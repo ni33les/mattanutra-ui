@@ -1,4 +1,5 @@
 import { businessError, type AgenticErrorResult } from "@/lib/agentic/contract/errors";
+import { AGENTIC_CONTRACT_VERSION } from "@/lib/agentic/config";
 import { PLAN_REQUEST } from "@/lib/agentic/contract/schemas";
 import { validateToolIssues, schemaIssuesToError } from "@/lib/agentic/contract/validate";
 import type { PlanRequest, PlanRequestPatch, PlanResult } from "@/lib/agentic/plan/types";
@@ -28,6 +29,14 @@ export function originalRequestFor(result: PlanResult): PlanRequest | AgenticErr
   const original = result.originalRequest ?? result.requestSnapshot.originalRequest ?? result.pendingInput?.request;
   if (original) return structuredClone(original);
   const state = result.requestSnapshot;
+  if (result.contractVersion !== AGENTIC_CONTRACT_VERSION && state.requirements.maxProductCount != null) {
+    return businessError({
+      fieldPath: "request.requirements.maxProductCount",
+      reasonCode: "contract_refresh_required",
+      message: "The original request is unavailable, so this recorded product count may be a customer ceiling or a historical default. Send a full replacement request with a customer-confirmed maxProductCount (null for unrestricted), preserving the targets, medications, intake, product proposals and other constraints.",
+      nextActions: ["replace_request"]
+    });
+  }
   // Legacy leftovers did not distinguish requested targets from existing intake.
   // Do not silently turn an existing supplement into a newly requested target.
   if (state.leftovers.some(item => !item.source)) return businessError({ fieldPath: "request.targets", reasonCode: "invalid_request", message: "This legacy plan has unresolved inputs without target provenance. Send a replacement request containing the original requested targets; keep disclosed medications and other context." });
