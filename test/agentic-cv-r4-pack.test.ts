@@ -1221,6 +1221,7 @@ export async function runCvR4PackTwice() {
   return { first, frozen, second };
 }
 
+if (process.env.NODE_TEST_CONTEXT) {
 describe("Customer value implementation pack v1.4", () => {
   it("V5-CV-R4-EVIDENCE retains business changes despite identical pass flags and historical hashes", () => {
     const baseline = {
@@ -1275,3 +1276,4 @@ describe("Customer value implementation pack v1.4", () => {
     );
   });
 });
+}

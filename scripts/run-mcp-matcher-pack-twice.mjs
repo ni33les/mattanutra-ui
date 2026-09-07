@@ -65,6 +65,7 @@ if (!process.execArgv.includes(strip)) {
             evidence: a.evidence.passedCases,
             commercial: a.commercial.passedCases,
             valueRemediation: a.valueRemediation.passedCases,
+            valueR4: a.valueR4.passedCases,
             matcher: a.matcher.scores
           },
           b: {
@@ -78,6 +79,7 @@ if (!process.execArgv.includes(strip)) {
             evidence: b.evidence.passedCases,
             commercial: b.commercial.passedCases,
             valueRemediation: b.valueRemediation.passedCases,
+            valueR4: b.valueR4.passedCases,
             matcher: b.matcher.scores
           }
         },

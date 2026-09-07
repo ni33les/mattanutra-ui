@@ -19,6 +19,7 @@ import { canonicalCvFixReport, runCvFixPack } from "../test/agentic-cv-fix-pack.
 import { canonicalCvImplReport, runCvImplPack } from "../test/agentic-cv-impl-pack.test.ts";
 import { canonicalR2Report, runCvR2Pack } from "../test/agentic-cv-r2-pack.test.ts";
 import { canonicalR3Report, runCvR3Pack } from "../test/agentic-cv-r3-pack.test.ts";
+import { canonicalR4Report, runCvR4Pack } from "../test/agentic-cv-r4-pack.test.ts";
 import { freezeImplCatalogue, freezeFinancialCatalogue } from "../test/agentic/value/impl-harness.ts";
 import { frozenPackInput } from "../test/helpers/frozen-pack-input.ts";
 import { assertRecordedMcpEvidence } from "../test/helpers/mcp-evidence.ts";
@@ -925,7 +926,25 @@ const ROWS = [
     category: "MCP commercial",
     id: "COM-46",
     purpose: "A fixed exception reaches exactly one explicit recoverable outcome"
-  }
+  },
+  ...[
+    ["R4-DUR-01", "Unknown current-stock duration retains current coverage without inventing future cash"],
+    ["R4-DUR-02", "A supplied stock duration advances the same plan and reconciles future orders"],
+    ["R4-DUR-03", "Keeping duration unknown preserves concise advice and idempotent recovery"],
+    ["R4-CON-01", "Unknown historical acquisition cost stays unavailable"],
+    ["R4-CON-02", "Current consumption and future cash remain separate ledgers"],
+    ["R4-CON-03", "Consumption cost follows independently calculated product quantities"],
+    ["R4-CAN-01", "Distinct current exposures retain distinct identities even below the reference limit"],
+    ["R4-CAN-02", "Reference-boundary exposures retain distinct safety evidence and identities"],
+    ["R4-CAN-03", "Changes to exposure, units, limits, contributors or rules change safety identity"],
+    ["R4-CAN-04", "Canonical input permutations retain equivalent business results"],
+    ["R4-REG-01", "Day-zero and later order events retain complete lines and reconciled cash totals"],
+    ["R4-REG-02", "Unknown current-product identity cannot support invented future orders or costs"],
+    ["R4-REG-03", "Reference-limit boundary advice remains serious without blocking purchase"],
+    ["R4-REG-04", "An explicit conditional target decision is answered once and replays consistently"],
+    ["R4-REG-05", "Fresh keys and target permutations preserve full financial results"],
+    ["R4-REG-06", "Evaluation creates no orders, checkout sessions or payments"]
+  ].map(([id, purpose]) => ({ category: "Customer value implementation v1.4", id, purpose }))
 ];
 
 function failNoteFromEvidence(evidence) {
@@ -950,7 +969,7 @@ function matcherResult(score) {
 }
 
 export function canonicalPack(run) {
-  for (const label of ["contract", "honesty", "planning", "explanations", "copy", "state", "boundary", "evidence", "commercial", "valueRemediation", "valueImplementation", "valueR2", "valueR3", "matcher"]) {
+  for (const label of ["contract", "honesty", "planning", "explanations", "copy", "state", "boundary", "evidence", "commercial", "valueRemediation", "valueImplementation", "valueR2", "valueR3", "valueR4", "matcher"]) {
     assertRecordedMcpEvidence(run[label], label);
   }
   return JSON.stringify({
@@ -967,6 +986,7 @@ export function canonicalPack(run) {
     valueImplementation: JSON.parse(canonicalCvImplReport(run.valueImplementation)),
     valueR2: JSON.parse(canonicalR2Report(run.valueR2)),
     valueR3: JSON.parse(canonicalR3Report(run.valueR3)),
+    valueR4: JSON.parse(canonicalR4Report(run.valueR4)),
     matcher: JSON.parse(canonicalDetReport(run.matcher))
   });
 }
@@ -1011,6 +1031,9 @@ export function snapshotFromRun(run) {
   const valueR3 = Object.fromEntries(
     run.valueR3.cases.map((item) => [item.id, item.result])
   );
+  const valueR4 = Object.fromEntries(
+    run.valueR4.cases.map((item) => [item.id, item.result])
+  );
   return {
     contract,
     honesty,
@@ -1025,6 +1048,7 @@ export function snapshotFromRun(run) {
     valueImplementation,
     valueR2,
     valueR3,
+    valueR4,
     matcher: {
       efficiency: run.matcher.scores.efficiency,
       matching: run.matcher.scores.matching,
@@ -1060,7 +1084,9 @@ function regressNote(id, current, baseline) {
     }
     return "";
   }
-  const section = id.startsWith("R2-")
+  const section = id.startsWith("R4-")
+    ? "valueR4"
+    : id.startsWith("R2-")
     ? "valueR2"
     : id.startsWith("REG-CV-") || id.startsWith("DEV-")
     ? "valueImplementation"
@@ -1114,6 +1140,7 @@ export function sectionTotals(run) {
     run.valueImplementation.passedCases === run.valueImplementation.totalCases;
   const valueR2Pass = run.valueR2.passedCases === run.valueR2.totalCases;
   const valueR3Pass = run.valueR3.passedCases === run.valueR3.totalCases;
+  const valueR4Pass = run.valueR4.passedCases === run.valueR4.totalCases;
   return {
     contract: {
       passed: contractPass,
@@ -1167,6 +1194,10 @@ export function sectionTotals(run) {
       passed: valueR3Pass,
       text: `${run.valueR3.passedCases}/${run.valueR3.totalCases}`
     },
+    valueR4: {
+      passed: valueR4Pass,
+      text: `${run.valueR4.passedCases}/${run.valueR4.totalCases}`
+    },
     matcher: {
       passed: matcherPass,
       text: `matching ${run.matcher.scores.matching}/10, safety ${run.matcher.scores.safety}/10, efficiency ${run.matcher.scores.efficiency}/10`
@@ -1185,7 +1216,8 @@ export function sectionTotals(run) {
       valueRemediationPass &&
       valueImplementationPass &&
       valueR2Pass &&
-      valueR3Pass
+      valueR3Pass &&
+      valueR4Pass
   };
 }
 
@@ -1226,6 +1258,9 @@ export function printTable(run) {
     byId.set(item.id, item);
   }
   for (const item of run.valueR3.cases) {
+    byId.set(item.id, item);
+  }
+  for (const item of run.valueR4.cases) {
     byId.set(item.id, item);
   }
 
@@ -1303,6 +1338,9 @@ export function printTable(run) {
   console.log(
     `Customer value implementation v1.3: ${totals.valueR3.text} — ${totals.valueR3.passed ? "PASS" : "FAIL"}`
   );
+  console.log(
+    `Customer value implementation v1.4: ${totals.valueR4.text} — ${totals.valueR4.passed ? "PASS" : "FAIL"}`
+  );
   if (baseline) {
     console.log(`Baseline: compared ${BASELINE_PATH}`);
   } else {
@@ -1361,6 +1399,9 @@ export async function runPackOnce(inputs = {}) {
   }));
   setMatcherSafetyCeilings(financialInput.ceilings);
   const valueR3 = await runCvR3Pack(1, financialInput.input);
+  await resetAfterMatcher();
+  setMatcherSafetyCeilings(financialInput.ceilings);
+  const valueR4 = await runCvR4Pack(1, financialInput.input);
   return {
     contract,
     honesty,
@@ -1375,6 +1416,7 @@ export async function runPackOnce(inputs = {}) {
     valueImplementation,
     valueR2,
     valueR3,
+    valueR4,
     matcher
   };
 }
