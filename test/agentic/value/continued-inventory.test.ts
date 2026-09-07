@@ -118,7 +118,7 @@ describe("continued inventory accounting", () => {
 
   it("marks missing pack facts and prices as unavailable instead of inventing zero future cost", () => {
     for (const p of [
-      { ...product, candidate: { ...product.candidate, facts: product.candidate.facts.map(fact => ({ ...fact, servingLabel: null })) } },
+      { ...product, candidate: { ...product.candidate, administration: { ...product.candidate.administration!, packQuantity: null }, facts: product.candidate.facts.map(fact => ({ ...fact, servingLabel: null })) } },
       { ...product, unitPriceMinor: 0 }
     ]) {
       const snap = { ...snapshot, products: snapshot.products.map(row => row.productId === p.productId ? p : row) };

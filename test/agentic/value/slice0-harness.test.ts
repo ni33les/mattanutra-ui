@@ -315,14 +315,12 @@ describe("Slice 0 value harness", () => {
     );
   });
 
-  it("freezes the live Thailand catalogue without fixtures when DEV retail is available", async () => {
+  it("freezes the required isolated Thailand catalogue without fixtures", async () => {
     const first = await freezeLiveThailandCatalogue("TH");
     const second = await freezeLiveThailandCatalogue("TH");
 
-    if (!isUsableLiveFreeze(first)) {
-      assert.equal(first.snapshot.products.some((item) => item.source === "fixture"), false);
-      return;
-    }
+    assert.equal(isUsableLiveFreeze(first), true, "Seed the isolated acceptance catalogue before running this suite");
+    assert.equal(isUsableLiveFreeze(second), true, "The second captured catalogue must remain usable");
 
     assert.equal(first.fingerprint, second.fingerprint);
     assert.equal(first.candidateSetHash, second.candidateSetHash);

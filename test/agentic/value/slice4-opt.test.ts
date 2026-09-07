@@ -84,11 +84,12 @@ function burdenOf(option: StackOption) {
 }
 
 describe("Slice 4 Pareto relevance burden and labels", () => {
-  it("OPT-01 caps two unique non-dominated options and names a lone option", () => {
+  it("OPT-01 exposes unique non-dominated trade-offs and merges roles on a lone option", () => {
     const snapshot = sampleValueSnapshot();
     const full = matchPlan({ snapshot, state: intentState(snapshot) });
     const options = optionsOf(full);
-    assert.ok(options.length >= 1 && options.length <= 2);
+    assert.equal(options.length, 3);
+    assert.deepEqual(options.flatMap(item => item.roles ?? []), ["closest_dose", "lower_cost", "simpler"]);
     const signatures = new Set(options.map(oracleOptionSignature));
     assert.equal(signatures.size, options.length);
     assert.equal(oracleHasDominatedPair(options), false);
@@ -107,6 +108,7 @@ describe("Slice 4 Pareto relevance burden and labels", () => {
     });
     const lone = optionsOf(creatineOnly);
     assert.equal(lone.length, 1);
+    assert.deepEqual(lone[0]!.roles, ["closest_dose", "lower_cost", "simpler"]);
     assert.equal(oracleLabelRoles(lone).noDistinctAlternative, true);
     assert.equal(publishedReason(lone[0]!, lone), "no_distinct_alternative");
   });
@@ -198,7 +200,15 @@ describe("Slice 4 Pareto relevance burden and labels", () => {
     assert.ok(collateralLine);
     assert.equal(collateralLine.selectionReason?.code, "dedicated_unavailable");
     const published = publicBasketItem(collateralLine);
-    assert.equal((published.incidentalNutrientNames ?? []).includes("Calcium"), true);
+    // The unchanged fixture declares Calcium with moderate confidence. Keep
+    // its labelled fact visible without upgrading it to quantified exposure.
+    assert.equal((published.incidentalNutrientNames ?? []).includes("Calcium"), false);
+    assert.equal((published.incidentalNutrients ?? []).some(row => row.name === "Calcium"), false);
+    const calcium = published.labelledFacts?.find(row => row.name === "Calcium");
+    assert.ok(calcium);
+    assert.equal(calcium.amount, 500);
+    assert.equal(calcium.unit, "mg");
+    assert.equal(calcium.confidence, "moderate");
     assert.equal((published.requestedNutrientNames ?? []).includes("Calcium"), false);
   });
 
@@ -273,6 +283,7 @@ describe("Slice 4 Pareto relevance burden and labels", () => {
       const expectedRole = derived.byOptionId.get(option.optionId);
       assert.ok(expectedRole);
       assert.equal(option.role, expectedRole);
+      assert.deepEqual(option.roles, derived.rolesByOptionId.get(option.optionId));
     }
     assert.equal(derived.noDistinctAlternative, options.length === 1);
     assert.equal(

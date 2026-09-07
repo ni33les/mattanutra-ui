@@ -202,13 +202,21 @@ describe("Slice 3 pack cash consumption baseline and savings", () => {
     assert.ok(
       creatineRow.status === "covered" ||
         creatineRow.status === "already_covered" ||
-        (creatineRow.coveragePercent ?? 0) >= 90
+        (creatineRow.coveragePercent ?? 0) === 100
     );
     for (const option of options) {
       const core = option.coverage.find((row) => row.supplementId === creatineId);
       if (core && core.status !== "covered" && core.status !== "already_covered") {
         assert.equal(option.recommended, false);
-        assert.equal(option.economics?.equivalent, false);
+        // A disclosed partial choice is comparable to its own equally partial
+        // baseline; it does not inherit savings against the complete basket.
+        assert.ok((option.tradeOff?.coverageDelta ?? 0) < 0);
+        assert.ok(option.economics);
+        assert.equal(option.economics.baseline.lines.some(line =>
+          snapshot.products.find(product => product.productId === line.productId)?.contributionSupplementIds.includes(creatineId)
+        ), false);
+        assert.equal(option.economics.savings90DayMinor, 0);
+        assert.equal(option.economics.savingClaim, "none");
         assert.notEqual(option.role, "minimum_core");
       }
       if ((option.economics?.savings90DayMinor ?? 0) <= 0) {

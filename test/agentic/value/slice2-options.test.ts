@@ -62,7 +62,7 @@ function optionList(selected: StackOption | null, alternatives: readonly StackOp
 }
 
 describe("Slice 2 value options and current supplements", () => {
-  it("VAL-02 returns one or two labelled options from one lowest_cost request", () => {
+  it("VAL-02 returns deduplicated dose, cost and simplicity trade-offs from one lowest_cost request", () => {
     const snapshot = sampleValueSnapshot();
     const state = intentState(snapshot);
     const first = matchPlan({ snapshot, state });
@@ -71,18 +71,19 @@ describe("Slice 2 value options and current supplements", () => {
     const creatineId = snapshot.supplements[0]!.supplementId;
     const magId = snapshot.supplements[1]!.supplementId;
     const d3Id = snapshot.supplements[2]!.supplementId;
-    const magProductId = snapshot.products[1]!.productId;
     const d3ProductIds = new Set(
       snapshot.products.filter((item) => item.contributionSupplementIds.includes(d3Id)).map((item) => item.productId)
     );
 
-    assert.ok(options.length >= 1 && options.length <= 2);
+    assert.equal(options.length, 3);
+    assert.deepEqual(options.flatMap(item => item.roles ?? []), ["closest_dose", "lower_cost", "simpler"]);
+    assert.ok(options.every(item => item.purchaseEligible === true));
     assert.equal(options.filter((item) => item.recommended).length, 1);
-    const core = options.find((item) => item.role === "requested_objective");
+    const core = options.find((item) => item.roles?.includes("closest_dose"));
     assert.ok(core);
     assert.equal(
       core.coverage.find((row) => row.supplementId === creatineId)?.status === "covered" ||
-        (core.coverage.find((row) => row.supplementId === creatineId)?.coveragePercent ?? 0) >= 90,
+        (core.coverage.find((row) => row.supplementId === creatineId)?.coveragePercent ?? 0) === 100,
       true
     );
     assert.equal(
@@ -110,7 +111,6 @@ describe("Slice 2 value options and current supplements", () => {
       canonicalHash(options.map((item) => item.optionId)),
       canonicalHash(optionList(second.selected, second.alternatives).map((item) => item.optionId))
     );
-    void magProductId;
   });
 
   it("VAL-04 retains current magnesium instead of buying it", () => {

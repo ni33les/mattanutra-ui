@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import { MATCHER_VERSION } from "../../../lib/matcher/config.ts";
+import { matcherSafetyCeilings, setMatcherSafetyCeilings } from "../../../lib/matcher/safety-ceilings.ts";
 import { catalogueSnapshotId } from "../../../lib/agentic/catalogue/freeze.ts";
 import { publicProductId, publicSupplementId } from "../../../lib/agentic/contract/ids.ts";
 import { matchPlan } from "../../../lib/agentic/plan/matching.ts";
@@ -356,19 +357,42 @@ describe("Slice 5 agent explanation safety and determinism", () => {
   it("SAFE-01.C dose fit ranks a cheap excessive magnesium below the exact labelled dose", () => {
     const snapshot = withCheapMegaMag(sampleValueSnapshot());
     const megaId = publicProductId(MEGA_MAG_UUID);
-    const { options, result } = publishPlan(snapshot, intentState(snapshot));
-    assert.ok(options.length >= 1);
-    for (const option of options) {
-      assert.equal(
-        option.basket.some((item) => item.productId === megaId),
-        false
-      );
-    }
-    for (const option of options) {
-      const selected = publishSelection(result, option);
-      assert.ok(selected.basket?.length);
-      assert.equal(selected.basket.some((item) => item.productId === megaId), false);
-    }
+    const previousLimits = matcherSafetyCeilings();
+    setMatcherSafetyCeilings([{ name: "Magnesium", subjectId: snapshot.supplements[1]!.supplementId,
+      maxAmount: 350, maxUnit: "mg", lifeStage: "adult", sourceScope: "supplemental",
+      bandId: "fixture-magnesium-adult", bandVersion: 1, authorityUrl: "https://fixture.example/declared-reference" }]);
+    try {
+      const { options, result } = publishPlan(snapshot, intentState(snapshot));
+      assert.ok(options.length >= 1);
+      const recommended = options.find(option => option.recommended);
+      assert.ok(recommended);
+      assert.equal(recommended.basket.some(item => item.productId === megaId), false);
+      assert.equal(recommended.doseFit?.total, 0);
+      const excessive = options.find(option => option.basket.some(item => item.productId === megaId));
+      assert.ok(excessive, "An excessive but valid cheaper choice remains reviewable");
+      assert.equal(excessive.recommended, false);
+      assert.equal(excessive.purchaseEligible, true);
+      assert.ok(excessive.roles?.includes("lower_cost"));
+      assert.ok((excessive.doseFit?.total ?? 0) > (recommended.doseFit?.total ?? 0));
+      const magnesium = excessive.coverage.find(row => row.name === "Magnesium");
+      assert.equal(magnesium?.requestedAmount, 150);
+      assert.equal(magnesium?.deliveredAmount, 2000);
+      const advice = excessive.safety?.guidance.find(row => row.code === "dose_review_required");
+      assert.ok(advice);
+      assert.equal(advice.action, "review");
+      assert.equal(advice.exposure, 2000);
+      assert.equal(advice.threshold, 350);
+      assert.equal(advice.unit, "mg");
+      assert.equal(advice.severity, "high");
+      assert.equal(advice.authorityUrl, "https://fixture.example/declared-reference");
+      assert.ok(advice.contributors?.some(row => row.productId === megaId && row.amount === 2000));
+      assert.ok(advice.uncertaintyCodes?.includes("unknown_intake"));
+      assert.equal(excessive.doseFit?.weightedLimit, 2 * (excessive.doseFit?.limit ?? 0));
+      const selected = publishSelection(result, excessive);
+      assert.ok(selected.basket?.some(item => item.productId === megaId));
+      assert.equal(selected.acknowledgementStatus, "not_required");
+      assert.ok(selected.safetyGuidance?.some(row => row.code === "dose_review_required" && row.action === "review"));
+    } finally { setMatcherSafetyCeilings(previousLimits); }
   });
 
   it("SAFE-01.D deferred and omitted targets add zero proposed exposure", () => {
