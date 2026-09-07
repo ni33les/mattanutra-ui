@@ -1,3 +1,5 @@
+import type { ChildProcess, SpawnOptions } from "node:child_process";
+
 /** Environment returned after validating the isolated DEV database and replacing
  * provider credentials with local fixture settings. The input is never mutated. */
 export type IsolatedValidationEnvironment = NodeJS.ProcessEnv & {
@@ -23,3 +25,17 @@ export type IsolatedValidationEnvironment = NodeJS.ProcessEnv & {
 export function isolatedValidationEnvironment(
   input?: Readonly<NodeJS.ProcessEnv>
 ): IsolatedValidationEnvironment;
+
+export function spawnValidationProcess(command: string, args: readonly string[], options: SpawnOptions): ChildProcess;
+export function signalValidationProcess(
+  child: Pick<ChildProcess, "pid" | "kill"> | null | undefined,
+  signal?: NodeJS.Signals,
+  platform?: NodeJS.Platform
+): boolean;
+export function validationClientMatrix(): Array<{ runId: "a" | "b"; locale: "en" | "th" | "zh-CN" }>;
+export function releaseLintInputs(root?: string, baseRef?: string): {
+  baseCommit: string;
+  headCommit: string;
+  files: string[];
+  sha256: string;
+};
