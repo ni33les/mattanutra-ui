@@ -158,6 +158,20 @@ describe("UAT-NL v1.0 TECH-02 and MKT-10", () => {
     assert.equal(orphanCensus().inflightIdempotency, 0);
   });
 
+  it("V5-UAT-NL-STORE-01 captured catalogue fixtures require their exact epoch inside a transaction", async () => {
+    const snapshot = frozenSnapshot();
+    assert.ok(snapshot && Number.isSafeInteger(snapshot.runtimeRevision));
+    const epoch = snapshot.runtimeRevision!;
+    const { store } = createUatNlRuntime("qa-v3:uat-nl:epoch-regression");
+    assert.equal(typeof store.isCatalogueRevisionCurrent, "function");
+    await assert.rejects(store.isCatalogueRevisionCurrent!(epoch), /require a transaction/);
+    await store.transaction(async tx => {
+      assert.equal(await tx.isCatalogueRevisionCurrent!(epoch), true);
+      assert.equal(await tx.isCatalogueRevisionCurrent!(epoch + 1), false);
+      assert.equal(await tx.isCatalogueRevisionCurrent!(-1), false);
+    });
+  });
+
   it("UAT-NL-T02-RED-02 worker completion order cannot lose a response", async () => {
     const { runtime } = createUatNlRuntime();
     const hold = deferred();

@@ -35,7 +35,7 @@ import {
   setAgenticRuntimeForTests,
   type AgenticRuntime
 } from "../../../lib/agentic/runtime.ts";
-import { createMemoryStore } from "../../../lib/agentic/store/memory.ts";
+import { createSnapshotMemoryStore } from "../value/snapshot-store.ts";
 import { createMockPaymentAdapter } from "../../../lib/agentic/commerce/payment.ts";
 import { F_READY, UAT_NL_CLOCK, uatNlFreshKey } from "./manifest.ts";
 
@@ -148,7 +148,8 @@ export function endUatNlRun() {
 }
 
 export function createUatNlRuntime(namespace = "qa-v3:uat-nl:dev") {
-  const store = createMemoryStore();
+  if (!frozenReal) throw new Error("Call freezeRealThailandCatalogue before creating a real-catalogue runtime");
+  const store = createSnapshotMemoryStore(frozenReal);
   const runtime = createAgenticRuntime({
     config: {
       ...loadAgenticConfig(),
