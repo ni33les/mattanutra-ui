@@ -8,12 +8,12 @@ import { replaceCatalogueSnapshot } from '../lib/agentic/catalogue/snapshot.ts';
 import { createPostgresStore } from '../lib/agentic/store/postgres.ts';
 import { loadAgenticConfig } from '../lib/agentic/config.ts';
 import { planTool } from '../lib/agentic/plan/service.ts';
+import { fixtureDatabaseUrl } from './helpers/fixture-teardown.ts';
 
 it('V5-PUBLISH-PG-01: PostgreSQL rejects a stale completed match and the same request recovers one saved revision', async () => {
   const databaseUrl = process.env.TEST_DB_URL;
   assert.ok(databaseUrl, 'The PostgreSQL gate must supply TEST_DB_URL');
-  const url = new URL(databaseUrl);
-  assert.equal(url.hostname, '127.0.0.1'); assert.equal(url.port, '55436'); assert.equal(url.pathname, '/mattanutra_lock_review');
+  fixtureDatabaseUrl();
   const sql = postgres(databaseUrl, { max: 3 });
   const store = createPostgresStore(sql);
   const principalScope = `publish-fence-pg:${randomUUID()}`;

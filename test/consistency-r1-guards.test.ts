@@ -179,7 +179,11 @@ describe("consistency r1 regression guards", () => {
     assert.doesNotMatch(live, /getLiveSaleEligibleRetailerCandidateSets/);
     assert.doesNotMatch(live, /loadProductRows/);
     assert.match(live, /from public.product_facts/);
-    assert.match(live, /supplement_id is not null/);
+    // Preserve unresolved raw facts and mapping evidence for advisory exploration;
+    // only verified mappings establish quantified coverage.
+    assert.doesNotMatch(live, /supplement_id is not null/);
+    assert.match(live, /'mappedName', supplements\.name/);
+    assert.match(live, /'confidence', product_facts\.confidence/);
     assert.doesNotMatch(snapshot, /fixture-skip/);
     assert.match(
       snapshot,

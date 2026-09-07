@@ -163,7 +163,8 @@ describe("matcher web adapter coverage mapping", () => {
       source,
       /unit:\s*fact\.comparableAmount != null \? "mcg"/
     );
-    assert.match(source, /amount:\s*fact\.amount \?\? 0/);
+    assert.doesNotMatch(source, /amount:\s*fact\.amount \?\? 0/);
+    assert.match(source, /facts\.filter\(fact => fact\.amount != null\)/);
     assert.match(source, /unit:\s*fact\.unit/);
     assert.match(source, /matcherProductOwnCoveragePercent/);
     assert.match(source, /servingMultiplierFromBasket/);
@@ -173,7 +174,7 @@ describe("matcher web adapter coverage mapping", () => {
       /selectorMode:\s*input\.stackPreference === "compact" \? "agentic" : "web_single"/
     );
     const candidates = await readFile("lib/matcher/candidates.ts", "utf8");
-    assert.match(candidates, /MAX_DAILY_UNITS = 3/);
+    assert.doesNotMatch(candidates, /MAX_DAILY_UNITS\s*=\s*3/);
     const config = await readFile("lib/matcher/config.ts", "utf8");
     assert.match(config, /WEB_MATCHER_CONFIG/);
     assert.match(config, /WEB_COMPACT_MATCHER_CONFIG/);
@@ -397,9 +398,12 @@ describe("matcher web adapter coverage mapping", () => {
         (item) => item.id === "supplement:vitamin-b12"
       )?.coveragePercent ?? 0;
 
-    assert.equal(b12, 6);
-    assert.equal(result.recommendations[0]?.servingMultiplier, 3);
-    assert.ok(b12 < 10);
+    assert.equal(b12, 100);
+    const selected = result.recommendations[0];
+    assert.ok(selected);
+    assert.equal(selected.servingMultiplier, 50);
+    assert.equal(selected.servingMultiplier * 10, 500,
+      "Only the labelled 10 mcg of B12 per serving contributes to the 500 mcg target; the 7500 mcg B1 does not");
   });
 
   it("does not stamp the stack percent onto a creatine-only SKU", () => {
@@ -585,7 +589,7 @@ describe("matcher web adapter coverage mapping", () => {
     );
   });
 
-  it("uses 2 servings when one underdoses and 3 when two still underdose", () => {
+  it("uses supported quantities beyond three servings to match the requested dose", () => {
     const coq10 = recommendWithMatcher({
       budgetAmount: null,
       candidates: [
@@ -687,12 +691,12 @@ describe("matcher web adapter coverage mapping", () => {
       )?.coveragePercent,
       100
     );
-    assert.equal(d3.recommendations[0]?.servingMultiplier, 3);
+    assert.equal(d3.recommendations[0]?.servingMultiplier, 10);
     assert.equal(
       [...d3.diagnostics.matchedNeeds, ...d3.diagnostics.unmatchedNeeds].find(
         (item) => item.id === "supplement:vitamin-d3"
       )?.coveragePercent,
-      30
+      100
     );
     assert.equal(magnesium.recommendations[0]?.servingMultiplier, 1);
     assert.equal(
