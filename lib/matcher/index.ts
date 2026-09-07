@@ -92,7 +92,8 @@ function leftoversFor(
  * machine must not publish a different completed basket from the same inputs.
  */
 export function match(request: CanonicalRequest, catalog: CatalogSnapshot,
-  config: MatcherConfig = DEFAULT_MATCHER_CONFIG, compiledGroups?: readonly ProductGroup[]): MatchResult {
+  config: MatcherConfig = DEFAULT_MATCHER_CONFIG, compiledGroups?: readonly ProductGroup[],
+  observeCandidate?: (sellerId: string, state: SearchState, groups: readonly ProductGroup[]) => void): MatchResult {
   const proposalIssues = validateProductDoseProposals(request, catalog);
   if (proposalIssues.length) throw new ProductDoseValidationError(proposalIssues);
   request = orderInvariantRequest(request);
@@ -113,7 +114,7 @@ export function match(request: CanonicalRequest, catalog: CatalogSnapshot,
     for (const [index, seller] of sellers.entries()) {
       const allocation = Math.floor(budget / sellers.length) + (index < budget % sellers.length ? 1 : 0);
       const run = searchGroups(perSellerGroups.get(seller.sellerId)!, request, { ...config, expansionBudget: allocation,
-        ...(expanded ? { initialBeamWidth: config.maxBeamWidth } : {}) }, perSellerStates.get(seller.sellerId));
+        ...(expanded ? { initialBeamWidth: config.maxBeamWidth } : {}) }, perSellerStates.get(seller.sellerId), observeCandidate ? { observe: (state, groups) => observeCandidate(seller.sellerId, state, groups) } : undefined);
       perSellerStates.set(seller.sellerId, run.complete);
       perSellerGroups.set(seller.sellerId, run.groups);
       expansionAttempts += run.expansionAttempts;

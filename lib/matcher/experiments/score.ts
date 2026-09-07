@@ -40,14 +40,14 @@ export type ExperimentalScore = Readonly<{
 
 /** Normalized nutrient deviation is transformed individually, never after summing. */
 export function nutrientPenalty(deviation: Rational, alpha: Rational): Rational {
-  if (deviation.num < 0n || compare(alpha, ZERO) < 0 || compare(alpha, ONE) > 0) throw new Error("Invalid nutrient penalty input");
+  if (deviation.num < BigInt(0) || compare(alpha, ZERO) < 0 || compare(alpha, ONE) > 0) throw new Error("Invalid nutrient penalty input");
   return add(multiply(subtract(ONE, alpha), deviation), multiply(alpha, multiply(deviation, deviation)));
 }
 function excess(value: bigint, reference: bigint): Rational {
-  return value > reference && reference > 0n ? rational(value - reference, reference) : ZERO;
+  return value > reference && reference > BigInt(0) ? rational(value - reference, reference) : ZERO;
 }
 function offsets(rows: readonly CanonicalCurrent[], subjectId: string) {
-  let minimum = 0n, maximum = 0n, base = 0n;
+  let minimum = BigInt(0), maximum = BigInt(0), base = BigInt(0);
   for (const row of rows) {
     if (row.subjectId !== subjectId) continue;
     const lo = scaleAmount({ amount: row.minimumDailyAmount ?? row.dailyAmount, subjectId, subjectName: row.name, unit: row.unit });
@@ -69,7 +69,7 @@ function limitsFor(request: CanonicalRequest, subjectId: string): readonly Limit
     const ceiling = safetyCeilingFor(request.safetyCeilings ?? [], { name, profile, sourceScope, subjectId });
     if (!ceiling || ceiling.maxAmount <= 0) return [];
     const scaled = scaleAmount({ amount: ceiling.maxAmount, subjectId, subjectName: ceiling.name, unit: ceiling.maxUnit });
-    return isDoseError(scaled) || scaled.units <= 0n || dimension && scaled.dim !== dimension ? [] : [{ ceiling, units: scaled.units, dimension: scaled.dim }];
+    return isDoseError(scaled) || scaled.units <= BigInt(0) || dimension && scaled.dim !== dimension ? [] : [{ ceiling, units: scaled.units, dimension: scaled.dim }];
   });cache.set(subjectId, limits);return limits;
 }
 function validActual(value: number | null, field: string, integer: boolean): Rational | null {
@@ -88,9 +88,9 @@ function preferenceScores(profile: ScoringProfile, request: CanonicalRequest, ac
   ] as const).map((row): ExperimentalPreference => {
     const preferred = row.preferred == null ? null : validActual(row.preferred, row.kind, row.metric !== "dailyPills");
     const weight = profile.preferenceWeights[row.metric];
-    const active = profile.preferenceCurve !== "off" && weight.num > 0n && preferred !== null;
-    const denominator = preferred === null ? null : preferred.num > 0n ? preferred : profile.zeroPreferenceScales[row.metric];
-    if (active && row.metric === "priceMinor" && preferred?.num === 0n && profile.zeroPreferenceScales.currency !== actual.currency) throw new Error("Zero price preference scale currency differs from actual currency");
+    const active = profile.preferenceCurve !== "off" && weight.num > BigInt(0) && preferred !== null;
+    const denominator = preferred === null ? null : preferred.num > BigInt(0) ? preferred : profile.zeroPreferenceScales[row.metric];
+    if (active && row.metric === "priceMinor" && preferred?.num === BigInt(0) && profile.zeroPreferenceScales.currency !== actual.currency) throw new Error("Zero price preference scale currency differs from actual currency");
     const overrun = preferred && row.actual ? positive(subtract(row.actual, preferred)) : null;
     const deviation = overrun && denominator ? divide(overrun, denominator) : null;
     const rawPenalty = !active ? ZERO : deviation === null ? null : profile.preferenceCurve === "quadratic" ? multiply(deviation, deviation) : deviation;
@@ -103,7 +103,7 @@ function preferenceScores(profile: ScoringProfile, request: CanonicalRequest, ac
  * losses are dimensionless. Unknown intake stays annotated, never a zero fact. */
 export function scoreExposure(profileInput: ScoringProfile, request: CanonicalRequest, exposure: ReadonlyMap<string, bigint>, actual: ScoringActuals): ExperimentalScore {
   const profile = resolveProfile(profileInput);
-  for (const value of exposure.values()) if (typeof value !== "bigint" || value < 0n) throw new Error("Exposure must contain nonnegative canonical scaled integers");
+  for (const value of exposure.values()) if (typeof value !== "bigint" || value < BigInt(0)) throw new Error("Exposure must contain nonnegative canonical scaled integers");
   const preferences = preferenceScores(profile, request, actual);
   const missingComponents = preferences.filter(row => !row.complete).map(row => row.kind);
   const preferenceTotal = missingComponents.length ? null : sum(preferences.map(row => row.penalty!));
@@ -117,18 +117,18 @@ export function scoreExposure(profileInput: ScoringProfile, request: CanonicalRe
   for (const subjectId of [...subjects].sort()) {
     const requested = request.targets.find(row => row.subjectId === subjectId);
     const target = requested?.importance === "conditional" && requested.prerequisite?.status !== "satisfied" ? undefined : requested;
-    const current = offsets(request.currentSupplements, subjectId),food = offsets(request.dietaryIntake ?? [], subjectId),nominal = exposure.get(subjectId) ?? 0n;
+    const current = offsets(request.currentSupplements, subjectId),food = offsets(request.dietaryIntake ?? [], subjectId),nominal = exposure.get(subjectId) ?? BigInt(0);
     const minimum = nominal + current.minimum - current.base,maximum = nominal + current.maximum - current.base;
-    const referenceRows = !requested ? request.currentSupplements.filter(row => row.subjectId === subjectId && intakeIsKnown(row) && row.daily.units > 0n) : [];
-    const reference = referenceRows.reduce((total, row) => total + row.daily.units, 0n),added = nominal > current.base ? nominal - current.base : 0n;
-    const continuedDeviation = reference > 0n ? rational(added, reference) : ZERO;
+    const referenceRows = !requested ? request.currentSupplements.filter(row => row.subjectId === subjectId && intakeIsKnown(row) && row.daily.units > BigInt(0)) : [];
+    const reference = referenceRows.reduce((total, row) => total + row.daily.units, BigInt(0)),added = nominal > current.base ? nominal - current.base : BigInt(0);
+    const continuedDeviation = reference > BigInt(0) ? rational(added, reference) : ZERO;
     const continuedPenalty = nutrientPenalty(continuedDeviation, profile.nutrientAlpha);
     const limits = limitsFor(request, subjectId);
     const cases = [...new Set([minimum, maximum])].flatMap(supplemental => [...new Set([food.minimum, food.maximum])].map(diet => {
-      const desired = target?.requested.units ?? 0n,delivered = supplemental + (target && targetBasis(target) === "total_daily" ? diet : 0n);
-      const under = desired > 0n && delivered < desired ? rational(desired - delivered, desired) : ZERO,over = excess(delivered, desired);
+      const desired = target?.requested.units ?? BigInt(0),delivered = supplemental + (target && targetBasis(target) === "total_daily" ? diet : BigInt(0));
+      const under = desired > BigInt(0) && delivered < desired ? rational(desired - delivered, desired) : ZERO,over = excess(delivered, desired);
       const underPenalty = nutrientPenalty(under, profile.nutrientAlpha),overPenalty = nutrientPenalty(over, profile.nutrientAlpha);
-      const bounded = limits.map(limit => { const sourceScope = limit.ceiling.sourceScope ?? "supplemental",amount = supplemental + (sourceScope === "total" ? diet : 0n),deviation = excess(amount, limit.units);return { limit, sourceScope, amount, deviation, penalty: multiply(rational(2n), deviation) }; });
+      const bounded = limits.map(limit => { const sourceScope = limit.ceiling.sourceScope ?? "supplemental",amount = supplemental + (sourceScope === "total" ? diet : BigInt(0)),deviation = excess(amount, limit.units);return { limit, sourceScope, amount, deviation, penalty: multiply(rational(BigInt(2)), deviation) }; });
       const safetyPenalty = sum(bounded.map(row => row.penalty));
       return { delivered, under, over, underPenalty, overPenalty, bounded, safetyPenalty, total: sum([underPenalty, overPenalty, continuedPenalty, safetyPenalty]) };
     }));
@@ -136,8 +136,8 @@ export function scoreExposure(profileInput: ScoringProfile, request: CanonicalRe
     targetUnder = add(targetUnder, worst.underPenalty);targetOver = add(targetOver, worst.overPenalty);continued = add(continued, continuedPenalty);safety = add(safety, worst.safetyPenalty);
     const unknown = [...uncertainty].some(note => note === `unknown_intake:${subjectId}` || note === "unknown_intake:*");
     const estimated = minimum !== maximum || food.minimum !== food.maximum || [...uncertainty].some(note => note === `estimated_intake:${subjectId}` || note === "estimated_intake:*");
-    if (target && target.requested.units > 0n) {
-      const includeFood = targetBasis(target) === "total_daily",lo = minimum + (includeFood ? food.minimum : 0n),hi = maximum + (includeFood ? food.maximum : 0n);
+    if (target && target.requested.units > BigInt(0)) {
+      const includeFood = targetBasis(target) === "total_daily",lo = minimum + (includeFood ? food.minimum : BigInt(0)),hi = maximum + (includeFood ? food.maximum : BigInt(0));
       let withinAcceptableRange: boolean | null = null;
       if (target.acceptableMinimum != null || target.acceptableMaximum != null) {
         const min = scaleAmount({ amount: target.acceptableMinimum ?? target.requestedAmount, subjectId, subjectName: target.name, unit: target.requestedUnit });
@@ -146,12 +146,12 @@ export function scoreExposure(profileInput: ScoringProfile, request: CanonicalRe
         withinAcceptableRange = lo >= min.units && hi <= max.units;
       }
       perTarget.push({ subjectId, name: target.name, basis: targetBasis(target), dimension: target.requested.dim, target: rational(target.requested.units),
-        exposure: rational(nominal + (includeFood ? food.base : 0n)),exposureMinimum: rational(lo),exposureMaximum: rational(hi),conservativeExposure: rational(worst.delivered),
+        exposure: rational(nominal + (includeFood ? food.base : BigInt(0))),exposureMinimum: rational(lo),exposureMaximum: rational(hi),conservativeExposure: rational(worst.delivered),
         under: worst.under, over: worst.over, deviation: add(worst.under, worst.over), penalty: add(worst.underPenalty, worst.overPenalty),certainty: unknown ? "unknown" : estimated ? "estimated" : "known",withinAcceptableRange });
     }
-    if (reference > 0n) perContinuedDose.push({ subjectId, name: referenceRows[0]!.name, referenceDose: rational(reference),added: rational(added),deviation: continuedDeviation,penalty: continuedPenalty,sourceIds: referenceRows.map(row => row.sourceId).sort() });
+    if (reference > BigInt(0)) perContinuedDose.push({ subjectId, name: referenceRows[0]!.name, referenceDose: rational(reference),added: rational(added),deviation: continuedDeviation,penalty: continuedPenalty,sourceIds: referenceRows.map(row => row.sourceId).sort() });
     for (const row of worst.bounded) perLimit.push({ subjectId,sourceScope: row.sourceScope,ruleId: catalogBandRuleId(row.limit.ceiling),limit: rational(row.limit.units),dimension: row.limit.dimension,
-      exposure: rational(nominal + (row.sourceScope === "total" ? food.base : 0n)),exposureMinimum: rational(minimum + (row.sourceScope === "total" ? food.minimum : 0n)),exposureMaximum: rational(maximum + (row.sourceScope === "total" ? food.maximum : 0n)),
+      exposure: rational(nominal + (row.sourceScope === "total" ? food.base : BigInt(0))),exposureMinimum: rational(minimum + (row.sourceScope === "total" ? food.minimum : BigInt(0))),exposureMaximum: rational(maximum + (row.sourceScope === "total" ? food.maximum : BigInt(0))),
       conservativeExposure: rational(row.amount),deviation: row.deviation,penalty: row.penalty });
   }
   const nutrientTotal = sum([targetUnder, targetOver, continued, safety]);

@@ -34,7 +34,7 @@ function object(value: unknown, keys: readonly string[], field: string): Record<
 }
 function coefficient(value: unknown, field: string, positive = false): Rational {
   const result = fromDecimal(value);
-  if (compare(result, ZERO) < 0 || positive && result.num === 0n) throw new Error(`${field} must be ${positive ? "positive" : "nonnegative"}`);
+  if (compare(result, ZERO) < 0 || positive && result.num === BigInt(0)) throw new Error(`${field} must be ${positive ? "positive" : "nonnegative"}`);
   return result;
 }
 export function profileDefinition(profile: ScoringProfile): ProfileDefinition {
@@ -53,8 +53,8 @@ function makeProfile(value: unknown): ScoringProfile {
   if (typeof scales.currency !== "string" || !/^[A-Z]{3}$/.test(scales.currency)) throw new Error("zeroPreferenceScales.currency must be an uppercase ISO currency code");
   const preferenceWeights = Object.freeze(Object.fromEntries(metrics.map(key => [key, coefficient(weights[key], `preferenceWeights.${key}`)])) as Record<PreferenceMetric, Rational>);
   const zeroPreferenceScales = Object.freeze({ ...Object.fromEntries(metrics.map(key => [key, coefficient(scales[key], `zeroPreferenceScales.${key}`, true)])), currency: scales.currency }) as ScoringProfile["zeroPreferenceScales"];
-  if (zeroPreferenceScales.priceMinor.den !== 1n || zeroPreferenceScales.priceMinor.num > BigInt(Number.MAX_SAFE_INTEGER)) throw new Error("zeroPreferenceScales.priceMinor must be a positive safe integer in the stated currency");
-  const nutrientCurve = compare(nutrientAlpha, ZERO) === 0 ? "linear" : compare(nutrientAlpha, ONE) === 0 ? "quadratic" : compare(nutrientAlpha, rational(1n, 2n)) === 0 ? "mixed" : "custom";
+  if (zeroPreferenceScales.priceMinor.den !== BigInt(1) || zeroPreferenceScales.priceMinor.num > BigInt(Number.MAX_SAFE_INTEGER)) throw new Error("zeroPreferenceScales.priceMinor must be a positive safe integer in the stated currency");
+  const nutrientCurve = compare(nutrientAlpha, ZERO) === 0 ? "linear" : compare(nutrientAlpha, ONE) === 0 ? "quadratic" : compare(nutrientAlpha, rational(BigInt(1), BigInt(2))) === 0 ? "mixed" : "custom";
   const preferenceWeight = metrics.every(key => compare(preferenceWeights[key], preferenceWeights.productCount) === 0) ? preferenceWeights.productCount : null;
   const partial = { id: input.id, version: VERSION, nutrientCurve, nutrientAlpha, preferenceCurve: input.preferenceCurve as PreferenceCurve, preferenceWeights, preferenceWeight, zeroPreferenceScales } as const;
   const definition = profileDefinition({ ...partial, hash: "" });

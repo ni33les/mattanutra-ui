@@ -15,6 +15,14 @@ import type {
   SearchState
 } from "@/lib/matcher/types";
 
+/** Optional offline instrumentation. Omission preserves the production algorithm. */
+export type SearchStrategy = Readonly<{
+  compare?: (left: SearchState, right: SearchState) => number;
+  cohort?: (state: SearchState) => string;
+  variants?: (group: ProductGroup, state: SearchState, existing: readonly DoseVariant[], probe: (variant: DoseVariant) => SearchState | null) => readonly DoseVariant[];
+  observe?: (state: SearchState, groups: readonly ProductGroup[]) => void;
+}>;
+
 export type SearchRun = Readonly<{
   complete: SearchState[];
   groups: readonly ProductGroup[];
@@ -134,12 +142,13 @@ function compareStates(a: SearchState, b: SearchState, request: CanonicalRequest
  * Skipping a listing is not a candidate expansion. There are no untracked
  * fallback passes outside this budget. */
 export function searchGroups(groups: readonly ProductGroup[], request: CanonicalRequest,
-  config: MatcherConfig = DEFAULT_MATCHER_CONFIG, incumbents: readonly SearchState[] = []): SearchRun {
+  config: MatcherConfig = DEFAULT_MATCHER_CONFIG, incumbents: readonly SearchState[] = [], strategy?: SearchStrategy): SearchRun {
   // Dynamic residual variants are scoped to this search. Cached catalogue
   // compilations remain immutable across customers and request revisions.
   groups = groups.map(group => ({ ...group, variants: [...group.variants] }));
   const baselineVariants = new Map(groups.map(group => [group.productId, [...group.variants]]));
-  const variantsForState = (group: ProductGroup, state: SearchState): readonly DoseVariant[] => {
+  const order = strategy?.compare ?? ((a: SearchState, b: SearchState) => compareStates(a, b, request));
+  const variantsForState = (group: ProductGroup, state: SearchState, phaseLimit = limit): readonly DoseVariant[] => {
     const initial = baselineVariants.get(group.productId)!;
     if (request.productDoses?.some(row => row.productId === group.productId) || !initial.length) return initial;
     const step = servingIncrement(group.product);
@@ -159,21 +168,27 @@ export function searchGroups(groups: readonly ProductGroup[], request: Canonical
         if (variant) result.set(variant.variantId, variant);
       }
     }
-    return [...result.values()];
+    const base = [...result.values()];
+    return strategy?.variants?.(group, state, base, variant => add(state, variant, group, phaseLimit)) ?? base;
   };
   const mustSelect = (group: ProductGroup) => request.productDoses?.some(row => row.productId === group.productId) || (request.retainProductIds.includes(group.productId) &&
     !request.currentSupplements.some((row) => row.productId === group.productId));
   const limit = Math.max(0, Math.floor(config.expansionBudget));
   let used = 0, trimmed = false;
   const archive = new Map<string, SearchState>();
-  const remember = (state: SearchState) => archive.set(fingerprintState({ ...state, nextGroupIndex: groups.length }), state);
+  const remember = (state: SearchState) => {
+    strategy?.observe?.(state, groups);
+    archive.set(fingerprintState({ ...state, nextGroupIndex: groups.length }), state);
+  };
   const seed = seedState(request);
   remember(seed);
   for (const state of incumbents) remember(state);
   const add = (state: SearchState, variant: DoseVariant, group: ProductGroup, phaseLimit = limit) => {
     if (used >= phaseLimit) { trimmed = true; return null; }
     used += 1;
-    return tryAddVariant(state, variant, group, request);
+    const next = tryAddVariant(state, variant, group, request);
+    if (next) strategy?.observe?.(next, groups);
+    return next;
   };
   const variantCount = groups.reduce((sum, group) => sum + group.variants.length, 0);
   const exact = groups.length <= config.exactGroupLimit && variantCount <= config.exactVariantLimit;
@@ -215,20 +230,29 @@ export function searchGroups(groups: readonly ProductGroup[], request: Canonical
     const expanded: SearchState[] = [];
     for (const state of beam) {
       if (!mustSelect(group)) expanded.push({ ...state, nextGroupIndex: index + 1 });
-      for (const variant of variantsForState(group, state)) {
+      for (const variant of variantsForState(group, state, groupLimit)) {
         if (used >= groupLimit) { trimmed = true; break; }
         const next = add(state, variant, group, groupLimit);
         if (next) expanded.push({ ...next, nextGroupIndex: index + 1 });
       }
     }
     const unique = [...new Map(expanded.map(state => [fingerprintState(state), state])).values()];
-    const ranked = unique.sort((a, b) => compareStates(a, b, request));
+    const ranked = unique.sort((a, b) => order(a, b));
     if (ranked.length > width) trimmed = true;
     // Reserve half the frontier for different remaining-gap patterns, including
     // weak standalone contributors that complement later products.
     const chosen = ranked.slice(0, Math.ceil(width / 2));
+    if (strategy?.cohort) {
+      const cohorts = [...new Set(ranked.map(strategy.cohort))].sort();
+      if (cohorts.length > 1) {
+        chosen.splice(0);
+        const quota = Math.max(1, Math.floor(width / cohorts.length));
+        for (const cohort of cohorts) chosen.push(...ranked.filter(row => strategy.cohort!(row) === cohort).slice(0, quota));
+      }
+    }
     const patterns = new Set(chosen.map(state => residualPattern(state, request)));
     for (const state of ranked) {
+      if (strategy?.cohort && chosen.length >= width) break;
       const key = residualPattern(state, request);
       if (patterns.has(key)) continue;
       chosen.push(state); patterns.add(key);
@@ -256,7 +280,7 @@ export function searchGroups(groups: readonly ProductGroup[], request: Canonical
   // remaining work on two additions to one basket. Removing a collateral SKU
   // can require changing a retained SKU's quantity at the same time.
   const replacementLimit = used + Math.floor((limit - used) * 0.75);
-  const leaders = [...archive.values()].sort((a, b) => compareStates(a, b, request)).slice(0, 4);
+  const leaders = [...archive.values()].sort((a, b) => order(a, b)).slice(0, 4);
   const repairedBases: SearchState[] = [];
   for (const leader of leaders) {
     if (used >= replacementLimit) break;
@@ -274,7 +298,7 @@ export function searchGroups(groups: readonly ProductGroup[], request: Canonical
       repairedBases.push(base);
       for (const group of groups) {
         if (base.selectedProductIds?.includes(group.productId)) continue;
-        for (const variant of variantsForState(group, base)) {
+        for (const variant of variantsForState(group, base, replacementLimit)) {
           if (used >= replacementLimit) break;
           const state = add(base, variant, group, replacementLimit);
           if (state) { repairedBases.push(state); remember(state); }
@@ -284,7 +308,7 @@ export function searchGroups(groups: readonly ProductGroup[], request: Canonical
       if (used >= replacementLimit) break;
     }
   }
-  for (const state of repairedBases.sort((a, b) => compareStates(a, b, request)).slice(0, width)) {
+  for (const state of repairedBases.sort((a, b) => order(a, b)).slice(0, width)) {
     for (const group of groups) {
       if (state.selectedProductIds?.includes(group.productId)) continue;
       for (const variant of variantsForState(group, state)) {
@@ -298,7 +322,7 @@ export function searchGroups(groups: readonly ProductGroup[], request: Canonical
   }
   if (used >= limit) trimmed = true;
   const all = [...archive.values()];
-  const complete = reviewFrontier(all, request, incumbents);
+  const complete = reviewFrontier(all, request, incumbents, order);
   trimmed ||= complete.length < all.length;
   return { complete, groups, expansionAttempts: used, mode: "bounded", trimmed };
 }
@@ -372,20 +396,20 @@ export function revalidateState(
 /** Full safety and conversational rendering runs on diverse bounded extrema,
  * not thousands of losing search states. This changes computational effort,
  * never the permitted number of products or quantities in a basket. */
-function reviewFrontier(states: readonly SearchState[], request: CanonicalRequest, incumbents: readonly SearchState[]) {
+function reviewFrontier(states: readonly SearchState[], request: CanonicalRequest, incumbents: readonly SearchState[], order = (a: SearchState, b: SearchState) => compareStates(a, b, request)) {
   if (states.length <= 192) return [...states];
-  const fitOrder = [...states].sort((a, b) => compareStates(a, b, request));
+  const fitOrder = [...states].sort((a, b) => order(a, b));
   const chosen = new Set<SearchState>([...incumbents, ...fitOrder.slice(0, 64)]);
   const nonempty = states.filter(row => row.count > 0);
   for (const compare of [
-    (a: SearchState, b: SearchState) => a.price - b.price || compareStates(a, b, request),
-    (a: SearchState, b: SearchState) => a.count - b.count || comparePillCounts(a.pills, a.pillCountKnown, b.pills, b.pillCountKnown) || compareStates(a, b, request),
-    (a: SearchState, b: SearchState) => comparePillCounts(a.pills, a.pillCountKnown, b.pills, b.pillCountKnown) || compareStates(a, b, request)
+    (a: SearchState, b: SearchState) => a.price - b.price || order(a, b),
+    (a: SearchState, b: SearchState) => a.count - b.count || comparePillCounts(a.pills, a.pillCountKnown, b.pills, b.pillCountKnown) || order(a, b),
+    (a: SearchState, b: SearchState) => comparePillCounts(a.pills, a.pillCountKnown, b.pills, b.pillCountKnown) || order(a, b)
   ]) for (const state of [...nonempty].sort(compare).slice(0, 24)) chosen.add(state);
   const protectedIds = new Set(request.targets.filter(row => row.importance === "core" || row.importance === "required").map(row => row.subjectId));
   if (protectedIds.size && request.targets.some(row => row.importance === "optional")) {
     const protectedFit = (state: SearchState) => doseFitScore(request, state.exposure).perTarget.filter(row => protectedIds.has(row.subjectId)).reduce((sum, row) => sum + row.under + row.over, 0);
-    for (const state of [...states].sort((a, b) => protectedFit(a) - protectedFit(b) || compareStates(a, b, request)).slice(0, 48)) chosen.add(state);
+    for (const state of [...states].sort((a, b) => protectedFit(a) - protectedFit(b) || order(a, b)).slice(0, 48)) chosen.add(state);
   }
   const patterns = new Set<string>();
   for (const state of fitOrder) {
