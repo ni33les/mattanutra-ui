@@ -54,6 +54,7 @@ import {
   questionsOf,
   safetyGuidanceOf,
   supplementByName,
+  withFinancialSession,
   type PlanSession
 } from "./agentic/value/impl-harness.ts";
 
@@ -691,7 +692,7 @@ function packCompleteOrOptional(plan: Record<string, unknown>, name: RegExp) {
   const complete = lineComplete(line) && economics.complete === true;
   const missingAllowed =
     !complete &&
-    (stringList(economics.unavailableReasons).length > 0 || economics.equivalent === false) &&
+    (Array.isArray(economics.unavailableReasons) && economics.unavailableReasons.some(reason => typeof asRecord(reason).reasonCode === "string") || economics.equivalent === false) &&
     plan.status !== "blocked" &&
     economics.savingClaim === "none" &&
     economics.savings90DayMinor == null;
@@ -738,13 +739,15 @@ async function runPack04(session: PlanSession, runIndex: number): Promise<R2Case
   }
   const missingTitle = {
     ...source,
-    candidate: { ...source.candidate, facts: source.candidate.facts.map((fact) => ({ ...fact, servingLabel: null })), title: "Incomplete pack fact control" },
+    source: "retail" as const,
+    candidate: { ...source.candidate, administration: null, facts: source.candidate.facts.map((fact) => ({ ...fact, servingLabel: null })), title: "Incomplete pack fact control" },
     unitPriceMinor: source.unitPriceMinor
   };
   const missingPrice = { ...source, unitPriceMinor: 0 };
   const missingServing = {
     ...source,
-    candidate: { ...source.candidate, facts: source.candidate.facts.map((fact) => ({ ...fact, amount: null, unit: null })) }
+    source: "retail" as const,
+    candidate: { ...source.candidate, administration: null, facts: source.candidate.facts.map((fact) => ({ ...fact, amount: null, unit: null })) }
   };
   const validations = [
     cataloguePackValidation(missingTitle),
@@ -788,8 +791,7 @@ async function runPack05(session: PlanSession, runIndex: number): Promise<R2Case
     assertTrue("PACK-05.quarantine", !basketOf(blockedPlan).some((item) => item.productId === source.productId)),
     assertTrue(
       "PACK-05.repair",
-      basketOf(repaired).some((item) => item.productId === source.productId) ||
-        completeMagProduct(session) != null
+      basketOf(repaired).some((item) => item.productId === source.productId)
     )
   ];
   return conclude("R2-PACK-05", assertions, envelopeFor(session, magPurchaseRequest(session), repaired, assertions, runIndex));
@@ -1097,7 +1099,7 @@ async function runContract02(session: PlanSession, runIndex: number): Promise<R2
     assertEq(
       "CONTRACT-02.checksum",
       officialChecksum,
-      JSON.parse(readFileSync(new URL("../contract/mcp/4.0.0/tools.json", import.meta.url), "utf8")).schemaChecksum
+      JSON.parse(readFileSync(new URL("../contract/mcp/5.0.0/tools.json", import.meta.url), "utf8")).schemaChecksum
     ),
     assertEq("CONTRACT-02.info", infoChecksum, officialChecksum),
     assertEq("CONTRACT-02.list", listedHash, directHash),
@@ -1112,7 +1114,7 @@ async function runContract03(session: PlanSession, runIndex: number): Promise<R2
     assertEq(
       "CONTRACT-03.checksum",
       officialChecksum,
-      JSON.parse(readFileSync(new URL("../contract/mcp/4.0.0/tools.json", import.meta.url), "utf8")).schemaChecksum
+      JSON.parse(readFileSync(new URL("../contract/mcp/5.0.0/tools.json", import.meta.url), "utf8")).schemaChecksum
     ),
     assertTrue(
       "CONTRACT-03.oneOf",
@@ -1124,7 +1126,7 @@ async function runContract03(session: PlanSession, runIndex: number): Promise<R2
 
 async function runContract04(session: PlanSession, runIndex: number): Promise<R2CaseResult> {
   const snapshot = JSON.parse(
-    readFileSync(new URL("../contract/mcp/4.0.0/tools.json", import.meta.url), "utf8")
+    readFileSync(new URL("../contract/mcp/5.0.0/tools.json", import.meta.url), "utf8")
   ) as { tools: Array<{ inputSchema: unknown; name: string }> };
   const wellKnown = JSON.parse(
     readFileSync(new URL("../public/.well-known/mcp.json", import.meta.url), "utf8")
@@ -1328,31 +1330,31 @@ export async function runCvR2Pack(
     cases.push(await runCase("R2-REG-05", () => runReg05(session, runIndex)));
     cases.push(await runCase("R2-REG-06", () => runReg06(session, runIndex)));
     cases.push(await runCase("R2-REG-07", () => runReg07(session, runIndex)));
-    cases.push(await runCase("R2-INV-01", () => runInv01(session, runIndex)));
-    cases.push(await runCase("R2-INV-02", () => runInv02(session, runIndex)));
-    cases.push(await runCase("R2-INV-03", () => runInv03(session, runIndex)));
-    cases.push(await runCase("R2-INV-04", () => runInv04(session, runIndex)));
-    cases.push(await runCase("R2-INV-05", () => runInv05(session, runIndex)));
-    cases.push(await runCase("R2-PACK-01", () => runPack01(session, runIndex)));
+    cases.push(await runCase("R2-INV-01", () => withFinancialSession(session, fixture => runInv01(fixture, runIndex))));
+    cases.push(await runCase("R2-INV-02", () => withFinancialSession(session, fixture => runInv02(fixture, runIndex))));
+    cases.push(await runCase("R2-INV-03", () => withFinancialSession(session, fixture => runInv03(fixture, runIndex))));
+    cases.push(await runCase("R2-INV-04", () => withFinancialSession(session, fixture => runInv04(fixture, runIndex))));
+    cases.push(await runCase("R2-INV-05", () => withFinancialSession(session, fixture => runInv05(fixture, runIndex))));
+    cases.push(await runCase("R2-PACK-01", () => withFinancialSession(session, fixture => runPack01(fixture, runIndex))));
     cases.push(await runCase("R2-PACK-02", () => runPack02(session, runIndex)));
     cases.push(await runCase("R2-PACK-03", () => runPack03(session, runIndex)));
-    cases.push(await runCase("R2-PACK-04", () => runPack04(session, runIndex)));
-    cases.push(await runCase("R2-PACK-05", () => runPack05(session, runIndex)));
-    cases.push(await runCase("R2-ORDER-01", () => runOrder01(session, runIndex)));
-    cases.push(await runCase("R2-ORDER-02", () => runOrder02(session, runIndex)));
-    cases.push(await runCase("R2-ORDER-03", () => runOrder03(session, runIndex)));
-    cases.push(await runCase("R2-ORDER-04", () => runOrder04(session, runIndex)));
-    cases.push(await runCase("R2-ORDER-05", () => runOrder05(session, runIndex)));
-    cases.push(await runCase("R2-SAVE-01", () => runSave01(session, runIndex)));
+    cases.push(await runCase("R2-PACK-04", () => withFinancialSession(session, fixture => runPack04(fixture, runIndex))));
+    cases.push(await runCase("R2-PACK-05", () => withFinancialSession(session, fixture => runPack05(fixture, runIndex))));
+    cases.push(await runCase("R2-ORDER-01", () => withFinancialSession(session, fixture => runOrder01(fixture, runIndex))));
+    cases.push(await runCase("R2-ORDER-02", () => withFinancialSession(session, fixture => runOrder02(fixture, runIndex))));
+    cases.push(await runCase("R2-ORDER-03", () => withFinancialSession(session, fixture => runOrder03(fixture, runIndex))));
+    cases.push(await runCase("R2-ORDER-04", () => withFinancialSession(session, fixture => runOrder04(fixture, runIndex))));
+    cases.push(await runCase("R2-ORDER-05", () => withFinancialSession(session, fixture => runOrder05(fixture, runIndex))));
+    cases.push(await runCase("R2-SAVE-01", () => withFinancialSession(session, fixture => runSave01(fixture, runIndex))));
     cases.push(await runCase("R2-SAVE-02", () => runSave02(session, runIndex)));
-    cases.push(await runCase("R2-SAVE-03", () => runSave03(session, runIndex)));
+    cases.push(await runCase("R2-SAVE-03", () => withFinancialSession(session, fixture => runSave03(fixture, runIndex))));
     cases.push(await runCase("R2-SAVE-04", () => runSave04(session, runIndex)));
-    cases.push(await runCase("R2-SAVE-05", () => runSave05(session, runIndex)));
+    cases.push(await runCase("R2-SAVE-05", () => withFinancialSession(session, fixture => runSave05(fixture, runIndex))));
     cases.push(await runCase("R2-HASH-01", () => runHash01(session, runIndex)));
-    cases.push(await runCase("R2-HASH-02", () => runHash02(session, runIndex)));
+    cases.push(await runCase("R2-HASH-02", () => withFinancialSession(session, fixture => runHash02(fixture, runIndex))));
     cases.push(await runCase("R2-HASH-03", () => runHash03(session, runIndex)));
-    cases.push(await runCase("R2-HASH-04", () => runHash04(session, runIndex)));
-    cases.push(await runCase("R2-HASH-05", () => runHash05(session, runIndex)));
+    cases.push(await runCase("R2-HASH-04", () => withFinancialSession(session, fixture => runHash04(fixture, runIndex))));
+    cases.push(await runCase("R2-HASH-05", () => withFinancialSession(session, fixture => runHash05(fixture, runIndex))));
     cases.push(await runCase("R2-CONTRACT-01", () => runContract01(session, runIndex)));
     cases.push(await runCase("R2-CONTRACT-02", () => runContract02(session, runIndex)));
     cases.push(await runCase("R2-CONTRACT-03", () => runContract03(session, runIndex)));
@@ -1363,10 +1365,10 @@ export async function runCvR2Pack(
     cases.push(await runCase("R2-SAFE-02", () => runSafe02(session, runIndex)));
     cases.push(await runCase("R2-SAFE-03", () => runSafe03(session, runIndex)));
     cases.push(await runCase("R2-DET-02", () => runDet02(session, runIndex)));
-    cases.push(await runCase("R2-DET-03", () => runDet03(session, runIndex)));
+    cases.push(await runCase("R2-DET-03", () => withFinancialSession(session, fixture => runDet03(fixture, runIndex))));
     cases.push(await runCase("R2-DET-04", () => runDet04(session, runIndex)));
     cases.push(await runCase("R2-DET-05", () => runDet05(session, runIndex)));
-    cases.push(await runCase("R2-DET-06", () => runDet06(session, runIndex)));
+    cases.push(await runCase("R2-DET-06", () => withFinancialSession(session, fixture => runDet06(fixture, runIndex))));
     return {
       cases,
       contractVersion: IMPL_CONTRACT_VERSION,
@@ -1388,13 +1390,9 @@ export async function runCvR2PackTwice() {
 
 if (process.env.NODE_TEST_CONTEXT) {
 describe("Customer value implementation pack v1.2", () => {
-  it("Slices 0-H pass twice on one freeze", async (t) => {
-    const frozen = await freezeImplCatalogue();
-    if (!frozen.live) {
-      t.skip("live Thailand retail catalogue is not loaded in this runner");
-      return;
-    }
-    const { first, second } = await runCvR2PackTwice();
+  it("Slices 0-H pass twice on one freeze", async () => {
+    const { first, frozen, second } = await runCvR2PackTwice();
+    assert.ok(frozen.live && frozen.usable, "The isolated Thailand retail catalogue fixture is required");
     assert.equal(first.totalCases, PACK_IDS.length);
     assert.deepEqual(
       first.cases.map((item) => item.id),
@@ -1407,7 +1405,8 @@ describe("Customer value implementation pack v1.2", () => {
       failed.map((item) => `${item.id}:${JSON.stringify(asRecord(item.evidence).failed ?? item.result)}`).join("; ")
     );
     assert.equal(first.snapshotId, second.snapshotId);
-    assert.equal(MATCHER_VERSION, "advisory-dose-fit-2");
+    assert.equal(canonicalR2Report(first), canonicalR2Report(second), "All non-latency request and response evidence must match across runs");
+    assert.equal(MATCHER_VERSION, "flexible-dose-fit-3");
     assert.equal(CUSTOMER_VALUE_PACK_VERSION, "dev-customer-value-v4.0");
   });
 });
