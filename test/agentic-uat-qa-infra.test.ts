@@ -31,7 +31,14 @@ import {
 import { enforceMcpOrQaRateLimit, qaPackRateLimitApplies } from "../lib/agentic/qa/rate-limit.ts";
 
 const CATALOGUE_0 = fixtureSnapshot("2026-09-03T00:00:00.000Z");
-const CATALOGUE_1 = fixtureSnapshot("2026-09-03T12:00:00.000Z");
+const CATALOGUE_1 = {
+  ...fixtureSnapshot("2026-09-03T12:00:00.000Z"),
+  // Observation time alone is not a catalogue change. Keep all financial and
+  // dose facts intact while changing the ordinary eligibility of one product.
+  products: CATALOGUE_0.products.map((product, index) =>
+    index === 0 ? { ...product, orderable: false } : product
+  )
+};
 const PACK_IP = "203.0.113.10";
 
 function mcpRequest(extra: Record<string, string> = {}) {
@@ -71,6 +78,8 @@ describe("UAT QA infrastructure Slice A manifest freeze", () => {
     const first = await qaPreflight(undefined, "uat");
     replaceCatalogueSnapshot(CATALOGUE_1);
     const second = await qaPreflight(undefined, "uat");
+    assert.equal(CATALOGUE_0.products[0]?.orderable, true);
+    assert.equal(CATALOGUE_1.products[0]?.orderable, false);
     assert.notEqual(
       catalogueSnapshotId(CATALOGUE_0),
       catalogueSnapshotId(CATALOGUE_1),
