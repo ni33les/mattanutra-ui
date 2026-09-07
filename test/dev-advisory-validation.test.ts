@@ -62,3 +62,9 @@ it("V5-GATE-03 fingerprints preserve dose, price and provenance while ignoring r
   assert.deepEqual(canonicalFingerprintRows(first), canonicalFingerprintRows(reordered));
   for (const changed of [{ ...first[0], amount: 101 }, { ...first[0], price: 251 }, { ...first[0], administration: { route: "topical", doseIncrement: 1 } }]) assert.notDeepEqual(canonicalFingerprintRows(first), canonicalFingerprintRows([changed, first[1]]));
 });
+
+it("V5-GATE-04 requires the existing demand-cache schema before full runtime verification", async () => {
+  const { REQUIRED_VALIDATION_STAGES } = await import("../scripts/dev-validation-proof.mjs");
+  assert.ok(REQUIRED_VALIDATION_STAGES.includes("demand-cache-schema"));
+  assert.ok(REQUIRED_VALIDATION_STAGES.indexOf("demand-cache-schema") < REQUIRED_VALIDATION_STAGES.indexOf("runtime-schema"));
+});

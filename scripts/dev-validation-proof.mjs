@@ -4,7 +4,7 @@ import { dirname, isAbsolute, relative, resolve } from "node:path";
 
 export const VALIDATION_CLIENT_LOCALES = ["en", "th", "zh-CN"];
 export const REQUIRED_VALIDATION_STAGES = [
-  "prepare-assets", "administration-schema", "web-schema", "matcher-runtime-schema", "runtime-schema", "public-catalogue-fixtures", "typecheck", "changed-lint", "production-build", "browser-fixtures", "data-fingerprints-before", "test-full",
+  "prepare-assets", "administration-schema", "web-schema", "matcher-runtime-schema", "demand-cache-schema", "runtime-schema", "public-catalogue-fixtures", "typecheck", "changed-lint", "production-build", "browser-fixtures", "data-fingerprints-before", "test-full",
   "matcher-two-runs", ...["a", "b"].flatMap(run => VALIDATION_CLIENT_LOCALES.flatMap(locale => [`docs-client-${run}-${locale}`, `fixture-settlement-${run}-${locale}`, `docs-client-${run}-${locale}-paid`])),
   "documented-client-non-latency-equality", "full-suite-results", "matcher-results", "data-fingerprints-after", "unchanged-schema-and-catalogue"
 ];
