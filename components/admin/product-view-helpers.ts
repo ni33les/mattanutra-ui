@@ -8,12 +8,6 @@ import {
   normalizeProductCountryCode,
   type ProductCountryCode,
 } from "@/lib/product-countries";
-import {
-  doseAmountInLimitUnit,
-  doseExceedsLimit,
-  normalizeDoseUnit,
-  parseDoseLimit,
-} from "@/lib/dose-conversion";
 import { siteLocaleRegistry, type Locale } from "@/lib/i18n";
 import { productForms as productFormValues } from "@/lib/product-form";
 import { productFactObservableIssueMessages } from "@/lib/product-validation";
@@ -190,7 +184,6 @@ export const productViewLabels = {
     importReview: "Import review",
     importReviewHint:
       "This draft has an open review task. Use these actions to finish the review and update the catalogue.",
-    increaseLimit: "Increase limit",
     ingredient: "Ingredient",
     mattaNutraSku: "MattaNutra SKU",
     imageCandidates: "Image candidates",
@@ -240,7 +233,6 @@ export const productViewLabels = {
     shopAvailability: "Shop availability",
     productSaved: "Product saved. You are still editing this product.",
     importReviewUpdated: "Import review updated. You are still editing this product.",
-    safetyLimitUpdated: "Safety limit updated. You are still editing this product.",
     stateSaved: "Product state saved.",
     stateAction: "State",
     stateApproved: "Approved",
@@ -356,7 +348,6 @@ export const productViewLabels = {
     importReview: "รีวิวนำเข้า",
     importReviewHint:
       "ร่างนี้มีงานรีวิวที่เปิดอยู่ ใช้ปุ่มเหล่านี้เพื่อจบการรีวิวและอัปเดตแคตตาล็อก",
-    increaseLimit: "เพิ่มขีดจำกัด",
     ingredient: "ส่วนผสม",
     mattaNutraSku: "MattaNutra SKU",
     imageCandidates: "ตัวเลือกรูปภาพ",
@@ -406,7 +397,6 @@ export const productViewLabels = {
     shopAvailability: "สถานะร้านค้า",
     productSaved: "บันทึกสินค้าแล้ว คุณยังอยู่ในหน้าสินค้านี้",
     importReviewUpdated: "อัปเดตรีวิวนำเข้าแล้ว คุณยังอยู่ในหน้าสินค้านี้",
-    safetyLimitUpdated: "อัปเดตขีดจำกัดความปลอดภัยแล้ว คุณยังอยู่ในหน้าสินค้านี้",
     stateSaved: "บันทึกสถานะสินค้าแล้ว",
     stateAction: "สถานะ",
     stateApproved: "อนุมัติแล้ว",
@@ -521,7 +511,6 @@ export const productViewLabels = {
     importReview: "导入审核",
     importReviewHint:
       "此草稿有待处理审核任务。使用这些操作完成审核并更新目录。",
-    increaseLimit: "提高上限",
     ingredient: "成分",
     mattaNutraSku: "MattaNutra SKU",
     imageCandidates: "图片候选",
@@ -569,7 +558,6 @@ export const productViewLabels = {
     shopAvailability: "门店可售状态",
     productSaved: "产品已保存。你仍在编辑此产品。",
     importReviewUpdated: "导入审核已更新。你仍在编辑此产品。",
-    safetyLimitUpdated: "安全上限已更新。你仍在编辑此产品。",
     stateSaved: "产品状态已保存。",
     stateAction: "状态",
     stateApproved: "已批准",
@@ -1022,43 +1010,6 @@ export function productFactIssueSeverity(issues: readonly string[]) {
     : issues.length > 0
       ? "medium"
       : "none";
-}
-
-export function productFactSafetyLimitIncreaseLabel(
-  fact: AdminProductRow["facts"][number],
-) {
-  if (fact.amount === null || fact.amount <= 0 || !fact.unit || !fact.maxUnit) {
-    return null;
-  }
-
-  const doseUnit = normalizeDoseUnit(fact.unit);
-  const limit = parseDoseLimit(fact.maxAmount, fact.maxUnit);
-
-  if (!doseUnit || !limit) {
-    return null;
-  }
-
-  const factDose = {
-    amount: fact.amount,
-    originalText: `${fact.amount} ${fact.unit}`,
-    unit: doseUnit,
-  };
-  const supplementKey = fact.normalizedName || fact.name;
-  const exceedsLimit = doseExceedsLimit(factDose, limit, supplementKey);
-
-  if (exceedsLimit !== true) {
-    return null;
-  }
-
-  const nextLimitAmount = doseAmountInLimitUnit(factDose, limit, supplementKey);
-
-  if (nextLimitAmount === null) {
-    return null;
-  }
-
-  const roundedAmount = Math.ceil(nextLimitAmount * 1_000_000) / 1_000_000;
-
-  return `Increase limit to ${Number.isInteger(roundedAmount) ? roundedAmount.toFixed(0) : roundedAmount} ${fact.maxUnit}`;
 }
 
 const productDoseUnitOptions = supplementDoseUnits.filter(

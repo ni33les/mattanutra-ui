@@ -13,6 +13,8 @@ import { requestHealthScoreDelivery, deliverHealthScore } from "../../lib/health
 import { isLocale } from "../../lib/i18n.ts";
 import { applyTaskCompletionResult } from "../../lib/task-result-applier.ts";
 import { getTaskBundle } from "../../lib/task-service.ts";
+import { currentWebCheckoutRecommendations } from "../../lib/retail-product-checkout.ts";
+import { FunnelError } from "../../lib/funnel-errors.ts";
 
 const connection = new URL(process.env.TEST_DB_URL!);
 assert.equal(connection.hostname, "127.0.0.1");
@@ -70,6 +72,16 @@ try {
       (select count(*)::int from public.finance_transactions f join public.payments p on f.source_ref = 'stripe:payment:' || p.id || ':nominal-revenue' where p.plan_id = a.plan_id) as revenues
       from public.assessments a where a.plan_id = ${input.planId}::uuid`;
     output = row ?? null;
+  } else if (input.action === "checkoutSelection") {
+    try {
+      const rows = await currentWebCheckoutRecommendations(sql, { planId: input.planId, locale,
+        recommendationRunId: input.runId, optionId: input.optionId, selectedItemIds: input.selectedItemIds,
+        assessmentRevision: input.assessmentRevision, selectionRevision: input.selectionRevision });
+      output = { allowed: true, productIds: rows.map(row => row.product_id) };
+    } catch (error) {
+      if (!(error instanceof FunnelError)) throw error;
+      output = { allowed: false, code: error.code, status: error.status };
+    }
   } else if (input.action === "email") {
     const request = await requestHealthScoreDelivery(input.planId, { locale, email: "sink@funnel-fixture.test" });
     const sink: unknown[] = [];

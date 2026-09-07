@@ -6,6 +6,8 @@ import { loadAgenticConfig } from "../lib/agentic/config.ts";
 import { normalizePlanRequest } from "../lib/agentic/plan/normalize.ts";
 import { matchPlan } from "../lib/agentic/plan/matching.ts";
 import { MatchWorkerPool, MatcherUnavailableError } from "../lib/agentic/plan/match-worker-pool.ts";
+import { captureReferenceJobIdentity, validateReferenceJobIdentity, checkedReferenceCompletion } from "../lib/agentic/catalogue/reference-job.ts";
+import { matcherSafetyCeilings, setMatcherSafetyCeilings } from "../lib/matcher/safety-ceilings.ts";
 
 beforeEach(installGoldCatalogue);
 afterEach(uninstallGoldCatalogue);
@@ -21,6 +23,35 @@ async function input() {
 }
 
 describe("MCP matcher worker pool", () => {
+  it("ANNA-REF-WORKER-01 rejects a reference epoch that differs from the product snapshot", async () => {
+    const pool = new MatchWorkerPool(1);
+    try {
+      const job = await input();
+      setMatcherSafetyCeilings(matcherSafetyCeilings(), { runtimeRevision: 78, fingerprint: "a".repeat(64) });
+      await assert.rejects(pool.run({ ...job, snapshot: { ...job.snapshot, runtimeRevision: 77 } }), /reference.*identity|reference.*epoch/i);
+    } finally { await pool.close(); }
+  });
+
+  it("ANNA-REF-WORKER-02 rejects a live epoch without captured reference identity", async () => {
+    const pool = new MatchWorkerPool(1);
+    try {
+      const job = await input();
+      setMatcherSafetyCeilings(matcherSafetyCeilings());
+      await assert.rejects(pool.run({ ...job, snapshot: { ...job.snapshot, runtimeRevision: 77 } }), /reference.*identity|reference.*epoch/i);
+    } finally { await pool.close(); }
+  });
+
+  it("ANNA-REF-WORKER-04 rejects changed reference payloads and result identity", () => {
+    setMatcherSafetyCeilings(matcherSafetyCeilings(), { runtimeRevision: 77, fingerprint: "a".repeat(64) });
+    const identity = captureReferenceJobIdentity(77);
+    const ceilings = matcherSafetyCeilings();
+    assert.doesNotThrow(() => validateReferenceJobIdentity(identity, ceilings, 77));
+    assert.throws(() => validateReferenceJobIdentity(identity, [...ceilings, { subjectId: "mutated", name: "Vitamin D3", maxAmount: 1000, maxUnit: "mcg" }], 77), /worker input/);
+    assert.throws(() => validateReferenceJobIdentity({ ...identity, runtimeRevision: 76 }, ceilings, 77), /worker input/);
+    assert.throws(() => checkedReferenceCompletion({ value: "result", referenceIdentity: { ...identity, fingerprint: "b".repeat(64) } }, identity), /worker result/);
+    assert.equal(checkedReferenceCompletion({ value: "result", referenceIdentity: identity }, identity), "result");
+  });
+
   it("preserves matching and safety results across the worker boundary", async () => {
     const pool = new MatchWorkerPool(1);
     try {

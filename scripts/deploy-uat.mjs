@@ -107,6 +107,10 @@ async function applyRuntimeSchema(env) {
   await run(npmCommand, ["run", "supplements:country-availability:schema:apply"], {
     env
   });
+  // Must precede the life-stage seeder, which now preserves source provenance.
+  await run(npmCommand, ["run", "supplements:safety-reference-integrity:schema:apply"], {
+    env
+  });
   await run(npmCommand, ["run", "supplements:safety-limit-life-stages:schema:apply"], {
     env
   });
@@ -116,13 +120,22 @@ async function applyRuntimeSchema(env) {
   await run(npmCommand, ["run", "products:v9:schema:apply"], {
     env
   });
+  await run(npmCommand, ["run", "products:administration:schema:apply"], {
+    env
+  });
   await run(npmCommand, ["run", "product-coverage:demand-cache:schema:apply"], {
     env
   });
   await run(npmCommand, ["run", "payments:schema:apply"], {
     env
   });
+  await run(npmCommand, ["run", "web-funnel:schema:apply"], {
+    env
+  });
   await run(npmCommand, ["run", "agentic:schema:apply"], {
+    env
+  });
+  await run(npmCommand, ["run", "matcher:runtime:schema:apply"], {
     env
   });
 }
@@ -246,6 +259,7 @@ async function main() {
   await run("git", ["push", "origin", `HEAD:uat`]);
   await runSmokeUntilActive(runtimeEnv);
   await runImageStorageProbeIfConfigured();
+  console.log("[deploy:uat] Apply reviewed reference data separately after verifying the compatible application and workers; retain those readers during rollback.");
   console.log("[deploy:uat] UAT deployment accepted.");
 }
 

@@ -4,6 +4,8 @@ import { npmCommand, npmRun, run, runCapture } from "./dev-cycle-utils.mjs";
 const serviceName = "mattanutra-ui-dev.service";
 const schemaScripts = [
   "supplements:country-availability:schema:apply",
+  // Updated reference readers/seeders require these additive provenance columns.
+  "supplements:safety-reference-integrity:schema:apply",
   "supplements:safety-limit-life-stages:schema:apply",
   "products:soft-delete:schema:apply",
   "products:v9:schema:apply",
@@ -130,6 +132,7 @@ async function main() {
     await smokeCheck(url);
   }
 
+  console.log("[deploy:dev] Apply reviewed reference data separately after verifying the compatible application and workers; retain those readers during rollback.");
   console.log("[deploy:dev] DEV deploy complete.");
 }
 

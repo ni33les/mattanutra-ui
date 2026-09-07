@@ -817,70 +817,6 @@ export function AdminProductDetailView({
     }
   }
 
-  async function increaseProductSafetyLimit(
-    row: AdminProductDetailRow,
-    factId: string,
-  ) {
-    setSavingId(row.id);
-    setErrorId(null);
-    setErrorMessage(null);
-    setStatusMessage(null);
-
-    try {
-      const response = await fetch(
-        `/api/admin/products/${row.id}/safety-limit`,
-        {
-          body: JSON.stringify({
-            accessToken,
-            factId,
-          }),
-          headers: {
-            "Content-Type": "application/json",
-          },
-          method: "POST",
-        },
-      );
-
-      if (!response.ok) {
-        throw new Error(
-          await adminResponseErrorMessage(
-            response,
-            "Unable to increase safety limit",
-          ),
-        );
-      }
-
-      const payload = (await response.json()) as {
-        row?: AdminProductRow;
-      };
-      const savedRow = payload.row
-        ? normalizeProductDetailRow({
-            ...payload.row,
-            imageCandidates: row.imageCandidates
-          })
-        : null;
-
-      if (!savedRow) {
-        throw new Error("Safety limit update did not return a product row");
-      }
-
-      setDraft(savedRow);
-      setStatusMessage(viewLabels.safetyLimitUpdated);
-
-      return true;
-    } catch (error) {
-      setErrorId(row.id);
-      setErrorMessage(
-        error instanceof Error
-          ? error.message
-          : "Unable to increase safety limit",
-      );
-      return false;
-    } finally {
-      setSavingId(null);
-    }
-  }
-
   async function decideProductImportFromProduct(
     row: AdminProductDetailRow,
     action: "approve_product" | "ignore_import" | "merge_product",
@@ -1006,7 +942,6 @@ export function AdminProductDetailView({
       locale={locale}
       onImportDecision={decideProductImportFromProduct}
       onCorrectFacts={correctProductFacts}
-      onIncreaseSafetyLimit={increaseProductSafetyLimit}
       onClose={() => {
         window.location.href = backHref;
       }}
@@ -1216,7 +1151,6 @@ function ProductDetailPanel({
   locale,
   onImportDecision,
   onCorrectFacts,
-  onIncreaseSafetyLimit,
   onClose,
   onDelete,
   onSave,
@@ -1238,10 +1172,6 @@ function ProductDetailPanel({
     reviewerNote: string | null,
   ) => Promise<boolean>;
   onCorrectFacts: (row: AdminProductDetailRow) => Promise<AdminProductDetailRow | null>;
-  onIncreaseSafetyLimit: (
-    row: AdminProductDetailRow,
-    factId: string,
-  ) => Promise<boolean>;
   onClose: () => void;
   onDelete: (row: AdminProductDetailRow) => Promise<boolean>;
   onSave: (
@@ -1852,8 +1782,7 @@ function ProductDetailPanel({
       <ProductFactsEditor
         key={draft.id}
         draft={draft}
-        onIncreaseSafetyLimit={onIncreaseSafetyLimit}
-        saving={saving}
+        locale={locale}
         setDraft={setDraft}
         viewLabels={viewLabels}
       />

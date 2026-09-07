@@ -1,0 +1,808 @@
+{
+  "version": 1,
+  "environment": "uat",
+  "reviewedHeadCount": 18,
+  "corrections": [
+    {
+      "environment": "uat",
+      "manifestId": "anna-v6-reference-review-2026-09-07-uat",
+      "correctionId": "anna-v6-2026-09-07-uat-d3",
+      "supplementId": "927083fb-b90a-5a24-b4c5-5067b06ead5f",
+      "expectedHeadsFingerprint": "2567d9a144e8b23dd83e856858c7e8f4c9864b9054712514910980e5a69c12c7",
+      "changes": [
+        {
+          "lifeStage": "adolescent_14_18",
+          "sourceScope": "supplemental",
+          "maxAmount": null,
+          "maxUnit": "IU",
+          "confidence": "high",
+          "safetyFlags": [
+            "condition_caution"
+          ],
+          "sourceUrl": "https://ods.od.nih.gov/factsheets/VitaminD-HealthProfessional/",
+          "basisRationale": "Retire the incorrectly supplemental-scoped copy atomically with the reviewed total-intake reference.",
+          "safetyNotes": "Superseded by the same life-stage total-intake reference; do not resurrect earlier versions."
+        },
+        {
+          "lifeStage": "adolescent_14_18",
+          "sourceScope": "total",
+          "maxAmount": 4000,
+          "maxUnit": "IU",
+          "confidence": "high",
+          "safetyFlags": [
+            "condition_caution"
+          ],
+          "sourceUrl": "https://ods.od.nih.gov/factsheets/VitaminD-HealthProfessional/",
+          "basisRationale": "NIH ODS/FNB age-specific vitamin D total-intake UL from foods and supplements. Adult 100 mcg/day equals 4000 IU/day; this is an advisory reference, not approval or a purchase block. Unknown diet prevents verifying total exposure below the reference.",
+          "safetyNotes": "Consider hypercalcaemia and relevant conditions/medicines. Quantified intake is not necessarily complete total intake."
+        },
+        {
+          "lifeStage": "adult",
+          "sourceScope": "supplemental",
+          "maxAmount": null,
+          "maxUnit": "mcg/day",
+          "confidence": "high",
+          "safetyFlags": [
+            "condition_caution"
+          ],
+          "sourceUrl": "https://ods.od.nih.gov/factsheets/VitaminD-HealthProfessional/",
+          "basisRationale": "Retire the incorrectly supplemental-scoped copy atomically with the reviewed total-intake reference.",
+          "safetyNotes": "Superseded by the same life-stage total-intake reference; do not resurrect earlier versions."
+        },
+        {
+          "lifeStage": "adult",
+          "sourceScope": "total",
+          "maxAmount": 100,
+          "maxUnit": "mcg/day",
+          "confidence": "high",
+          "safetyFlags": [
+            "condition_caution"
+          ],
+          "sourceUrl": "https://ods.od.nih.gov/factsheets/VitaminD-HealthProfessional/",
+          "basisRationale": "NIH ODS/FNB age-specific vitamin D total-intake UL from foods and supplements. Adult 100 mcg/day equals 4000 IU/day; this is an advisory reference, not approval or a purchase block. Unknown diet prevents verifying total exposure below the reference.",
+          "safetyNotes": "Consider hypercalcaemia and relevant conditions/medicines. Quantified intake is not necessarily complete total intake."
+        },
+        {
+          "lifeStage": "breastfeeding",
+          "sourceScope": "supplemental",
+          "maxAmount": null,
+          "maxUnit": "IU",
+          "confidence": "high",
+          "safetyFlags": [
+            "condition_caution"
+          ],
+          "sourceUrl": "https://ods.od.nih.gov/factsheets/VitaminD-HealthProfessional/",
+          "basisRationale": "Retire the incorrectly supplemental-scoped copy atomically with the reviewed total-intake reference.",
+          "safetyNotes": "Superseded by the same life-stage total-intake reference; do not resurrect earlier versions."
+        },
+        {
+          "lifeStage": "breastfeeding",
+          "sourceScope": "total",
+          "maxAmount": 4000,
+          "maxUnit": "IU",
+          "confidence": "high",
+          "safetyFlags": [
+            "condition_caution"
+          ],
+          "sourceUrl": "https://ods.od.nih.gov/factsheets/VitaminD-HealthProfessional/",
+          "basisRationale": "NIH ODS/FNB age-specific vitamin D total-intake UL from foods and supplements. Adult 100 mcg/day equals 4000 IU/day; this is an advisory reference, not approval or a purchase block. Unknown diet prevents verifying total exposure below the reference.",
+          "safetyNotes": "Consider hypercalcaemia and relevant conditions/medicines. Quantified intake is not necessarily complete total intake."
+        },
+        {
+          "lifeStage": "child_1_3",
+          "sourceScope": "supplemental",
+          "maxAmount": null,
+          "maxUnit": "IU",
+          "confidence": "high",
+          "safetyFlags": [
+            "condition_caution"
+          ],
+          "sourceUrl": "https://ods.od.nih.gov/factsheets/VitaminD-HealthProfessional/",
+          "basisRationale": "Retire the incorrectly supplemental-scoped copy atomically with the reviewed total-intake reference.",
+          "safetyNotes": "Superseded by the same life-stage total-intake reference; do not resurrect earlier versions."
+        },
+        {
+          "lifeStage": "child_1_3",
+          "sourceScope": "total",
+          "maxAmount": 2500,
+          "maxUnit": "IU",
+          "confidence": "high",
+          "safetyFlags": [
+            "condition_caution"
+          ],
+          "sourceUrl": "https://ods.od.nih.gov/factsheets/VitaminD-HealthProfessional/",
+          "basisRationale": "NIH ODS/FNB age-specific vitamin D total-intake UL from foods and supplements. Adult 100 mcg/day equals 4000 IU/day; this is an advisory reference, not approval or a purchase block. Unknown diet prevents verifying total exposure below the reference.",
+          "safetyNotes": "Consider hypercalcaemia and relevant conditions/medicines. Quantified intake is not necessarily complete total intake."
+        },
+        {
+          "lifeStage": "child_4_8",
+          "sourceScope": "supplemental",
+          "maxAmount": null,
+          "maxUnit": "IU",
+          "confidence": "high",
+          "safetyFlags": [
+            "condition_caution"
+          ],
+          "sourceUrl": "https://ods.od.nih.gov/factsheets/VitaminD-HealthProfessional/",
+          "basisRationale": "Retire the incorrectly supplemental-scoped copy atomically with the reviewed total-intake reference.",
+          "safetyNotes": "Superseded by the same life-stage total-intake reference; do not resurrect earlier versions."
+        },
+        {
+          "lifeStage": "child_4_8",
+          "sourceScope": "total",
+          "maxAmount": 3000,
+          "maxUnit": "IU",
+          "confidence": "high",
+          "safetyFlags": [
+            "condition_caution"
+          ],
+          "sourceUrl": "https://ods.od.nih.gov/factsheets/VitaminD-HealthProfessional/",
+          "basisRationale": "NIH ODS/FNB age-specific vitamin D total-intake UL from foods and supplements. Adult 100 mcg/day equals 4000 IU/day; this is an advisory reference, not approval or a purchase block. Unknown diet prevents verifying total exposure below the reference.",
+          "safetyNotes": "Consider hypercalcaemia and relevant conditions/medicines. Quantified intake is not necessarily complete total intake."
+        },
+        {
+          "lifeStage": "child_9_13",
+          "sourceScope": "supplemental",
+          "maxAmount": null,
+          "maxUnit": "IU",
+          "confidence": "high",
+          "safetyFlags": [
+            "condition_caution"
+          ],
+          "sourceUrl": "https://ods.od.nih.gov/factsheets/VitaminD-HealthProfessional/",
+          "basisRationale": "Retire the incorrectly supplemental-scoped copy atomically with the reviewed total-intake reference.",
+          "safetyNotes": "Superseded by the same life-stage total-intake reference; do not resurrect earlier versions."
+        },
+        {
+          "lifeStage": "child_9_13",
+          "sourceScope": "total",
+          "maxAmount": 4000,
+          "maxUnit": "IU",
+          "confidence": "high",
+          "safetyFlags": [
+            "condition_caution"
+          ],
+          "sourceUrl": "https://ods.od.nih.gov/factsheets/VitaminD-HealthProfessional/",
+          "basisRationale": "NIH ODS/FNB age-specific vitamin D total-intake UL from foods and supplements. Adult 100 mcg/day equals 4000 IU/day; this is an advisory reference, not approval or a purchase block. Unknown diet prevents verifying total exposure below the reference.",
+          "safetyNotes": "Consider hypercalcaemia and relevant conditions/medicines. Quantified intake is not necessarily complete total intake."
+        },
+        {
+          "lifeStage": "pregnant",
+          "sourceScope": "supplemental",
+          "maxAmount": null,
+          "maxUnit": "IU",
+          "confidence": "high",
+          "safetyFlags": [
+            "condition_caution"
+          ],
+          "sourceUrl": "https://ods.od.nih.gov/factsheets/VitaminD-HealthProfessional/",
+          "basisRationale": "Retire the incorrectly supplemental-scoped copy atomically with the reviewed total-intake reference.",
+          "safetyNotes": "Superseded by the same life-stage total-intake reference; do not resurrect earlier versions."
+        },
+        {
+          "lifeStage": "pregnant",
+          "sourceScope": "total",
+          "maxAmount": 4000,
+          "maxUnit": "IU",
+          "confidence": "high",
+          "safetyFlags": [
+            "condition_caution"
+          ],
+          "sourceUrl": "https://ods.od.nih.gov/factsheets/VitaminD-HealthProfessional/",
+          "basisRationale": "NIH ODS/FNB age-specific vitamin D total-intake UL from foods and supplements. Adult 100 mcg/day equals 4000 IU/day; this is an advisory reference, not approval or a purchase block. Unknown diet prevents verifying total exposure below the reference.",
+          "safetyNotes": "Consider hypercalcaemia and relevant conditions/medicines. Quantified intake is not necessarily complete total intake."
+        }
+      ],
+      "evidence": {
+        "sourceUrl": "https://ods.od.nih.gov/factsheets/VitaminD-HealthProfessional/",
+        "checkedAt": "2026-09-07",
+        "reviewMethod": "Primary-authority reference table and scope review; original versions are retained. Uncertain internal amounts are not promoted to published ULs.",
+        "originalHeads": [
+          {
+            "id": "07536031-aea2-4f5f-bf3e-16bb06e11078",
+            "supplementId": "927083fb-b90a-5a24-b4c5-5067b06ead5f",
+            "version": 1,
+            "lifeStage": "adolescent_14_18",
+            "sourceScope": "supplemental",
+            "maxAmount": 4000,
+            "maxUnit": "IU",
+            "confidence": "high",
+            "safetyFlags": [
+              "condition_caution"
+            ],
+            "safetyNotes": "Check 25(OH)D/calcium if using high-dose chronic vitamin D.",
+            "sourceUrl": "https://ods.od.nih.gov/factsheets/VitaminD-HealthProfessional/",
+            "basisRationale": "NIH Office of Dietary Supplements; https://ods.od.nih.gov/factsheets/VitaminD-HealthProfessional/"
+          },
+          {
+            "id": "3384bc51-7870-4182-9118-cdc44920888c",
+            "supplementId": "927083fb-b90a-5a24-b4c5-5067b06ead5f",
+            "version": 4,
+            "lifeStage": "adult",
+            "sourceScope": "supplemental",
+            "maxAmount": 100,
+            "maxUnit": "mcg/day",
+            "confidence": "high",
+            "safetyFlags": [
+              "condition_caution"
+            ],
+            "safetyNotes": "Check 25(OH)D/calcium if using high-dose chronic vitamin D.",
+            "sourceUrl": null,
+            "basisRationale": null
+          },
+          {
+            "id": "28047d68-54e9-41f0-8f31-6457255d1040",
+            "supplementId": "927083fb-b90a-5a24-b4c5-5067b06ead5f",
+            "version": 1,
+            "lifeStage": "breastfeeding",
+            "sourceScope": "supplemental",
+            "maxAmount": 4000,
+            "maxUnit": "IU",
+            "confidence": "high",
+            "safetyFlags": [
+              "condition_caution"
+            ],
+            "safetyNotes": "Check 25(OH)D/calcium if using high-dose chronic vitamin D.",
+            "sourceUrl": "https://ods.od.nih.gov/factsheets/VitaminD-HealthProfessional/",
+            "basisRationale": "NIH Office of Dietary Supplements; https://ods.od.nih.gov/factsheets/VitaminD-HealthProfessional/"
+          },
+          {
+            "id": "f0238189-ba83-4dab-9c12-33f8f6e4a4c7",
+            "supplementId": "927083fb-b90a-5a24-b4c5-5067b06ead5f",
+            "version": 1,
+            "lifeStage": "child_1_3",
+            "sourceScope": "supplemental",
+            "maxAmount": 2500,
+            "maxUnit": "IU",
+            "confidence": "high",
+            "safetyFlags": [
+              "condition_caution"
+            ],
+            "safetyNotes": "Check 25(OH)D/calcium if using high-dose chronic vitamin D.",
+            "sourceUrl": "https://ods.od.nih.gov/factsheets/VitaminD-HealthProfessional/",
+            "basisRationale": "NIH Office of Dietary Supplements; https://ods.od.nih.gov/factsheets/VitaminD-HealthProfessional/"
+          },
+          {
+            "id": "2dca44f6-8948-41bc-9b70-beffbb9e5340",
+            "supplementId": "927083fb-b90a-5a24-b4c5-5067b06ead5f",
+            "version": 1,
+            "lifeStage": "child_4_8",
+            "sourceScope": "supplemental",
+            "maxAmount": 3000,
+            "maxUnit": "IU",
+            "confidence": "high",
+            "safetyFlags": [
+              "condition_caution"
+            ],
+            "safetyNotes": "Check 25(OH)D/calcium if using high-dose chronic vitamin D.",
+            "sourceUrl": "https://ods.od.nih.gov/factsheets/VitaminD-HealthProfessional/",
+            "basisRationale": "NIH Office of Dietary Supplements; https://ods.od.nih.gov/factsheets/VitaminD-HealthProfessional/"
+          },
+          {
+            "id": "d1cdaa7f-d7a5-4551-a617-705229915f1f",
+            "supplementId": "927083fb-b90a-5a24-b4c5-5067b06ead5f",
+            "version": 1,
+            "lifeStage": "child_9_13",
+            "sourceScope": "supplemental",
+            "maxAmount": 4000,
+            "maxUnit": "IU",
+            "confidence": "high",
+            "safetyFlags": [
+              "condition_caution"
+            ],
+            "safetyNotes": "Check 25(OH)D/calcium if using high-dose chronic vitamin D.",
+            "sourceUrl": "https://ods.od.nih.gov/factsheets/VitaminD-HealthProfessional/",
+            "basisRationale": "NIH Office of Dietary Supplements; https://ods.od.nih.gov/factsheets/VitaminD-HealthProfessional/"
+          },
+          {
+            "id": "826ba8ae-5f8d-4af9-8597-3de523297dc6",
+            "supplementId": "927083fb-b90a-5a24-b4c5-5067b06ead5f",
+            "version": 1,
+            "lifeStage": "pregnant",
+            "sourceScope": "supplemental",
+            "maxAmount": 4000,
+            "maxUnit": "IU",
+            "confidence": "high",
+            "safetyFlags": [
+              "condition_caution"
+            ],
+            "safetyNotes": "Check 25(OH)D/calcium if using high-dose chronic vitamin D.",
+            "sourceUrl": "https://ods.od.nih.gov/factsheets/VitaminD-HealthProfessional/",
+            "basisRationale": "NIH Office of Dietary Supplements; https://ods.od.nih.gov/factsheets/VitaminD-HealthProfessional/"
+          }
+        ],
+        "originalAdultAmount": 100,
+        "authority": "NIH ODS citing FNB/NASEM",
+        "adultEquivalent": "100 mcg/day = 4000 IU/day",
+        "originalUnits": "Table ULs are in mcg and IU; 1 mcg=40 IU. Child 1–3 retains exact 2500 IU rather than converting the rounded 63 mcg display.",
+        "sourceScope": "Total intake from foods and supplements; sunlight synthesis is not dietary intake."
+      }
+    },
+    {
+      "environment": "uat",
+      "manifestId": "anna-v6-reference-review-2026-09-07-uat",
+      "correctionId": "anna-v6-2026-09-07-uat-b6",
+      "supplementId": "ccc3e67b-d753-5315-a8cb-a8aefa8b2fd8",
+      "expectedHeadsFingerprint": "8ed177c0eaef987675c91e202064241f032e2b0d2c35ddaba84c70a92fb2a911",
+      "changes": [
+        {
+          "lifeStage": "adolescent_14_18",
+          "sourceScope": "supplemental",
+          "maxAmount": null,
+          "maxUnit": "mg",
+          "confidence": "moderate",
+          "safetyFlags": [
+            "condition_caution"
+          ],
+          "sourceUrl": "https://ods.od.nih.gov/factsheets/VitaminB6-HealthProfessional/",
+          "basisRationale": "Retire the incorrectly supplemental-scoped FNB copy atomically with its total-intake reference.",
+          "safetyNotes": "Superseded by the same life-stage total-intake reference."
+        },
+        {
+          "lifeStage": "adolescent_14_18",
+          "sourceScope": "total",
+          "maxAmount": 80,
+          "maxUnit": "mg",
+          "confidence": "high",
+          "safetyFlags": [
+            "condition_caution"
+          ],
+          "sourceUrl": "https://ods.od.nih.gov/factsheets/VitaminB6-HealthProfessional/",
+          "basisRationale": "NIH ODS/FNB age-specific B6 UL applies to total food and supplement intake. Retain the supported age-band amount and correct its scope. EFSA 2023 uses lower limits; this is the FNB reference, not a universal safety guarantee.",
+          "safetyNotes": "Peripheral neuropathy is a concern with prolonged excessive B6. Unknown diet prevents verifying total exposure below the reference."
+        },
+        {
+          "lifeStage": "adult",
+          "sourceScope": "supplemental",
+          "maxAmount": 50,
+          "maxUnit": "mg/day",
+          "confidence": "low",
+          "safetyFlags": [
+            "condition_caution"
+          ],
+          "sourceUrl": "https://ods.od.nih.gov/factsheets/VitaminB6-HealthProfessional/",
+          "basisRationale": "Uncertain internal advisory threshold of 50 mg/day; no independent source establishes this amount as a UL. NIH ODS reports FNB adult 100 mg total and EFSA 2023 adult 12 mg total. Preserve the internal amount pending a governed reference-policy decision; do not describe it as independently verified.",
+          "safetyNotes": "Chronic B6 neuropathy concern. Internal supplemental threshold, not a medically approved dose or a verified total-exposure safety limit."
+        },
+        {
+          "lifeStage": "breastfeeding",
+          "sourceScope": "supplemental",
+          "maxAmount": null,
+          "maxUnit": "mg",
+          "confidence": "moderate",
+          "safetyFlags": [
+            "condition_caution"
+          ],
+          "sourceUrl": "https://ods.od.nih.gov/factsheets/VitaminB6-HealthProfessional/",
+          "basisRationale": "Retire the incorrectly supplemental-scoped FNB copy atomically with its total-intake reference.",
+          "safetyNotes": "Superseded by the same life-stage total-intake reference."
+        },
+        {
+          "lifeStage": "breastfeeding",
+          "sourceScope": "total",
+          "maxAmount": 100,
+          "maxUnit": "mg",
+          "confidence": "moderate",
+          "safetyFlags": [
+            "condition_caution"
+          ],
+          "sourceUrl": "https://ods.od.nih.gov/factsheets/VitaminB6-HealthProfessional/",
+          "basisRationale": "NIH ODS/FNB age-specific B6 UL applies to total food and supplement intake. Retain the supported age-band amount and correct its scope. EFSA 2023 uses lower limits; this is the FNB reference, not a universal safety guarantee. This 100 mg FNB reference applies to age 19+; the FNB reference at age 14–18 is 80 mg. EFSA uses 12 mg for adults including pregnancy and lactation. This combined life-stage band cannot verify the age-specific reference.",
+          "safetyNotes": "Peripheral neuropathy is a concern with prolonged excessive B6. Unknown diet prevents verifying total exposure below the reference. This 100 mg FNB reference is for age 19+; FNB age14–18 is 80 mg. EFSA adult pregnancy/lactation is 12 mg. Age-specific interpretation remains uncertain in this combined life-stage band."
+        },
+        {
+          "lifeStage": "child_1_3",
+          "sourceScope": "supplemental",
+          "maxAmount": null,
+          "maxUnit": "mg",
+          "confidence": "moderate",
+          "safetyFlags": [
+            "condition_caution"
+          ],
+          "sourceUrl": "https://ods.od.nih.gov/factsheets/VitaminB6-HealthProfessional/",
+          "basisRationale": "Retire the incorrectly supplemental-scoped FNB copy atomically with its total-intake reference.",
+          "safetyNotes": "Superseded by the same life-stage total-intake reference."
+        },
+        {
+          "lifeStage": "child_1_3",
+          "sourceScope": "total",
+          "maxAmount": 30,
+          "maxUnit": "mg",
+          "confidence": "high",
+          "safetyFlags": [
+            "condition_caution"
+          ],
+          "sourceUrl": "https://ods.od.nih.gov/factsheets/VitaminB6-HealthProfessional/",
+          "basisRationale": "NIH ODS/FNB age-specific B6 UL applies to total food and supplement intake. Retain the supported age-band amount and correct its scope. EFSA 2023 uses lower limits; this is the FNB reference, not a universal safety guarantee.",
+          "safetyNotes": "Peripheral neuropathy is a concern with prolonged excessive B6. Unknown diet prevents verifying total exposure below the reference."
+        },
+        {
+          "lifeStage": "child_4_8",
+          "sourceScope": "supplemental",
+          "maxAmount": null,
+          "maxUnit": "mg",
+          "confidence": "moderate",
+          "safetyFlags": [
+            "condition_caution"
+          ],
+          "sourceUrl": "https://ods.od.nih.gov/factsheets/VitaminB6-HealthProfessional/",
+          "basisRationale": "Retire the incorrectly supplemental-scoped FNB copy atomically with its total-intake reference.",
+          "safetyNotes": "Superseded by the same life-stage total-intake reference."
+        },
+        {
+          "lifeStage": "child_4_8",
+          "sourceScope": "total",
+          "maxAmount": 40,
+          "maxUnit": "mg",
+          "confidence": "high",
+          "safetyFlags": [
+            "condition_caution"
+          ],
+          "sourceUrl": "https://ods.od.nih.gov/factsheets/VitaminB6-HealthProfessional/",
+          "basisRationale": "NIH ODS/FNB age-specific B6 UL applies to total food and supplement intake. Retain the supported age-band amount and correct its scope. EFSA 2023 uses lower limits; this is the FNB reference, not a universal safety guarantee.",
+          "safetyNotes": "Peripheral neuropathy is a concern with prolonged excessive B6. Unknown diet prevents verifying total exposure below the reference."
+        },
+        {
+          "lifeStage": "child_9_13",
+          "sourceScope": "supplemental",
+          "maxAmount": null,
+          "maxUnit": "mg",
+          "confidence": "moderate",
+          "safetyFlags": [
+            "condition_caution"
+          ],
+          "sourceUrl": "https://ods.od.nih.gov/factsheets/VitaminB6-HealthProfessional/",
+          "basisRationale": "Retire the incorrectly supplemental-scoped FNB copy atomically with its total-intake reference.",
+          "safetyNotes": "Superseded by the same life-stage total-intake reference."
+        },
+        {
+          "lifeStage": "child_9_13",
+          "sourceScope": "total",
+          "maxAmount": 60,
+          "maxUnit": "mg",
+          "confidence": "high",
+          "safetyFlags": [
+            "condition_caution"
+          ],
+          "sourceUrl": "https://ods.od.nih.gov/factsheets/VitaminB6-HealthProfessional/",
+          "basisRationale": "NIH ODS/FNB age-specific B6 UL applies to total food and supplement intake. Retain the supported age-band amount and correct its scope. EFSA 2023 uses lower limits; this is the FNB reference, not a universal safety guarantee.",
+          "safetyNotes": "Peripheral neuropathy is a concern with prolonged excessive B6. Unknown diet prevents verifying total exposure below the reference."
+        },
+        {
+          "lifeStage": "pregnant",
+          "sourceScope": "supplemental",
+          "maxAmount": null,
+          "maxUnit": "mg",
+          "confidence": "moderate",
+          "safetyFlags": [
+            "condition_caution"
+          ],
+          "sourceUrl": "https://ods.od.nih.gov/factsheets/VitaminB6-HealthProfessional/",
+          "basisRationale": "Retire the incorrectly supplemental-scoped FNB copy atomically with its total-intake reference.",
+          "safetyNotes": "Superseded by the same life-stage total-intake reference."
+        },
+        {
+          "lifeStage": "pregnant",
+          "sourceScope": "total",
+          "maxAmount": 100,
+          "maxUnit": "mg",
+          "confidence": "moderate",
+          "safetyFlags": [
+            "condition_caution"
+          ],
+          "sourceUrl": "https://ods.od.nih.gov/factsheets/VitaminB6-HealthProfessional/",
+          "basisRationale": "NIH ODS/FNB age-specific B6 UL applies to total food and supplement intake. Retain the supported age-band amount and correct its scope. EFSA 2023 uses lower limits; this is the FNB reference, not a universal safety guarantee. This 100 mg FNB reference applies to age 19+; the FNB reference at age 14–18 is 80 mg. EFSA uses 12 mg for adults including pregnancy and lactation. This combined life-stage band cannot verify the age-specific reference.",
+          "safetyNotes": "Peripheral neuropathy is a concern with prolonged excessive B6. Unknown diet prevents verifying total exposure below the reference. This 100 mg FNB reference is for age 19+; FNB age14–18 is 80 mg. EFSA adult pregnancy/lactation is 12 mg. Age-specific interpretation remains uncertain in this combined life-stage band."
+        }
+      ],
+      "evidence": {
+        "sourceUrl": "https://ods.od.nih.gov/factsheets/VitaminB6-HealthProfessional/",
+        "checkedAt": "2026-09-07",
+        "reviewMethod": "Primary-authority reference table and scope review; original versions are retained. Uncertain internal amounts are not promoted to published ULs.",
+        "originalHeads": [
+          {
+            "id": "7ef2f2fc-abf3-4611-be8f-0bf7cde64749",
+            "supplementId": "ccc3e67b-d753-5315-a8cb-a8aefa8b2fd8",
+            "version": 1,
+            "lifeStage": "adolescent_14_18",
+            "sourceScope": "supplemental",
+            "maxAmount": 80,
+            "maxUnit": "mg",
+            "confidence": "moderate",
+            "safetyFlags": [
+              "condition_caution"
+            ],
+            "safetyNotes": "Use conservative cap to avoid chronic high-dose B6 neuropathy risk. Raised from product review to cover 20.6 mg in Vitamin B6. Raised from product review to cover 30 mg in Vitamin B6. Raised from product review to cover 50 mg in Vitamin B6.",
+            "sourceUrl": "https://ods.od.nih.gov/factsheets/VitaminB6-HealthProfessional/",
+            "basisRationale": "NIH Office of Dietary Supplements; https://ods.od.nih.gov/factsheets/VitaminB6-HealthProfessional/"
+          },
+          {
+            "id": "f21a821e-ae6a-45f6-a2b7-f4151b45caf0",
+            "supplementId": "ccc3e67b-d753-5315-a8cb-a8aefa8b2fd8",
+            "version": 5,
+            "lifeStage": "adult",
+            "sourceScope": "supplemental",
+            "maxAmount": 50,
+            "maxUnit": "mg/day",
+            "confidence": "moderate",
+            "safetyFlags": [
+              "condition_caution"
+            ],
+            "safetyNotes": "Use conservative cap to avoid chronic high-dose B6 neuropathy risk. Raised from product review to cover 20.6 mg in Vitamin B6. Raised from product review to cover 30 mg in Vitamin B6. Raised from product review to cover 50 mg in Vitamin B6.",
+            "sourceUrl": null,
+            "basisRationale": null
+          },
+          {
+            "id": "d1391a6f-5e5d-4545-946b-47ed7089b50b",
+            "supplementId": "ccc3e67b-d753-5315-a8cb-a8aefa8b2fd8",
+            "version": 1,
+            "lifeStage": "breastfeeding",
+            "sourceScope": "supplemental",
+            "maxAmount": 100,
+            "maxUnit": "mg",
+            "confidence": "moderate",
+            "safetyFlags": [
+              "condition_caution"
+            ],
+            "safetyNotes": "Use conservative cap to avoid chronic high-dose B6 neuropathy risk. Raised from product review to cover 20.6 mg in Vitamin B6. Raised from product review to cover 30 mg in Vitamin B6. Raised from product review to cover 50 mg in Vitamin B6.",
+            "sourceUrl": "https://ods.od.nih.gov/factsheets/VitaminB6-HealthProfessional/",
+            "basisRationale": "NIH Office of Dietary Supplements; https://ods.od.nih.gov/factsheets/VitaminB6-HealthProfessional/"
+          },
+          {
+            "id": "2d4f4773-6d69-4e98-bbc8-21d5b57ae411",
+            "supplementId": "ccc3e67b-d753-5315-a8cb-a8aefa8b2fd8",
+            "version": 1,
+            "lifeStage": "child_1_3",
+            "sourceScope": "supplemental",
+            "maxAmount": 30,
+            "maxUnit": "mg",
+            "confidence": "moderate",
+            "safetyFlags": [
+              "condition_caution"
+            ],
+            "safetyNotes": "Use conservative cap to avoid chronic high-dose B6 neuropathy risk. Raised from product review to cover 20.6 mg in Vitamin B6. Raised from product review to cover 30 mg in Vitamin B6. Raised from product review to cover 50 mg in Vitamin B6.",
+            "sourceUrl": "https://ods.od.nih.gov/factsheets/VitaminB6-HealthProfessional/",
+            "basisRationale": "NIH Office of Dietary Supplements; https://ods.od.nih.gov/factsheets/VitaminB6-HealthProfessional/"
+          },
+          {
+            "id": "2c27aa8b-7b73-4388-8dea-bcbd869d6576",
+            "supplementId": "ccc3e67b-d753-5315-a8cb-a8aefa8b2fd8",
+            "version": 1,
+            "lifeStage": "child_4_8",
+            "sourceScope": "supplemental",
+            "maxAmount": 40,
+            "maxUnit": "mg",
+            "confidence": "moderate",
+            "safetyFlags": [
+              "condition_caution"
+            ],
+            "safetyNotes": "Use conservative cap to avoid chronic high-dose B6 neuropathy risk. Raised from product review to cover 20.6 mg in Vitamin B6. Raised from product review to cover 30 mg in Vitamin B6. Raised from product review to cover 50 mg in Vitamin B6.",
+            "sourceUrl": "https://ods.od.nih.gov/factsheets/VitaminB6-HealthProfessional/",
+            "basisRationale": "NIH Office of Dietary Supplements; https://ods.od.nih.gov/factsheets/VitaminB6-HealthProfessional/"
+          },
+          {
+            "id": "c1afa80c-2434-4d71-8c28-66795d02d733",
+            "supplementId": "ccc3e67b-d753-5315-a8cb-a8aefa8b2fd8",
+            "version": 1,
+            "lifeStage": "child_9_13",
+            "sourceScope": "supplemental",
+            "maxAmount": 60,
+            "maxUnit": "mg",
+            "confidence": "moderate",
+            "safetyFlags": [
+              "condition_caution"
+            ],
+            "safetyNotes": "Use conservative cap to avoid chronic high-dose B6 neuropathy risk. Raised from product review to cover 20.6 mg in Vitamin B6. Raised from product review to cover 30 mg in Vitamin B6. Raised from product review to cover 50 mg in Vitamin B6.",
+            "sourceUrl": "https://ods.od.nih.gov/factsheets/VitaminB6-HealthProfessional/",
+            "basisRationale": "NIH Office of Dietary Supplements; https://ods.od.nih.gov/factsheets/VitaminB6-HealthProfessional/"
+          },
+          {
+            "id": "b1bddee0-e7d5-4631-bbf7-87a353a38a4c",
+            "supplementId": "ccc3e67b-d753-5315-a8cb-a8aefa8b2fd8",
+            "version": 1,
+            "lifeStage": "pregnant",
+            "sourceScope": "supplemental",
+            "maxAmount": 100,
+            "maxUnit": "mg",
+            "confidence": "moderate",
+            "safetyFlags": [
+              "condition_caution"
+            ],
+            "safetyNotes": "Use conservative cap to avoid chronic high-dose B6 neuropathy risk. Raised from product review to cover 20.6 mg in Vitamin B6. Raised from product review to cover 30 mg in Vitamin B6. Raised from product review to cover 50 mg in Vitamin B6.",
+            "sourceUrl": "https://ods.od.nih.gov/factsheets/VitaminB6-HealthProfessional/",
+            "basisRationale": "NIH Office of Dietary Supplements; https://ods.od.nih.gov/factsheets/VitaminB6-HealthProfessional/"
+          }
+        ],
+        "authority": "NIH ODS citing FNB/NASEM; EFSA 2023 values also disclosed",
+        "uncertainty": "The existing adult internal cap is not the FNB adult 100 mg or EFSA adult 12 mg UL. Preserve its amount with low confidence; do not invent a new authority policy. Pregnancy/lactation reference is adult FNB 100 mg; adolescent FNB 80 mg and stricter EFSA guidance require interpretation."
+      }
+    },
+    {
+      "environment": "uat",
+      "manifestId": "anna-v6-reference-review-2026-09-07-uat",
+      "correctionId": "anna-v6-2026-09-07-uat-b3",
+      "supplementId": "d5b9d597-5e92-500d-a691-f7e406eda7b1",
+      "expectedHeadsFingerprint": "a92f88449cb57ec70121692ff1dd4295ace2f2b930b2a6ff00b25b9d5f51a3eb",
+      "changes": [
+        {
+          "lifeStage": "adult",
+          "sourceScope": "supplemental",
+          "maxAmount": 35,
+          "maxUnit": "mg/day",
+          "confidence": "high",
+          "safetyFlags": [
+            "liver_caution"
+          ],
+          "sourceUrl": "https://ods.od.nih.gov/factsheets/Niacin-HealthProfessional/",
+          "basisRationale": "Restore NIH ODS/FNB adult35 mg/day UL for added niacin from supplements and fortified foods. This is niacin mass, not dietary niacin equivalents from tryptophan. Generic supplemental reporting cannot verify unquantified fortified-food exposure.",
+          "safetyNotes": "Flushing is especially associated with nicotinic acid; nicotinamide has a different adverse-effect profile. The FNB added-niacin UL covers both forms. Liver and other risks depend on form, amount and duration. Unknown added-food niacin prevents a complete exposure claim."
+        }
+      ],
+      "evidence": {
+        "sourceUrl": "https://ods.od.nih.gov/factsheets/Niacin-HealthProfessional/",
+        "checkedAt": "2026-09-07",
+        "reviewMethod": "Primary-authority reference table and scope review; original versions are retained. Uncertain internal amounts are not promoted to published ULs.",
+        "originalHeads": [
+          {
+            "id": "b32eead9-bf27-453a-9a19-3565c3d0b0e3",
+            "supplementId": "d5b9d597-5e92-500d-a691-f7e406eda7b1",
+            "version": 3,
+            "lifeStage": "adult",
+            "sourceScope": "supplemental",
+            "maxAmount": 100,
+            "maxUnit": "mg NE/day",
+            "confidence": "high",
+            "safetyFlags": [
+              "liver_caution"
+            ],
+            "safetyNotes": "Use lower limits for nicotinic acid; niacinamide has different risk profile. Raised from product review to cover 40 mg in Vitamin B3. Raised from product review to cover 100 mg in Vitamin B3.",
+            "sourceUrl": null,
+            "basisRationale": null
+          }
+        ],
+        "authority": "NIH ODS citing FNB/NASEM",
+        "reference": "Adult35 mg/day niacin added in supplements and fortified foods, covering nicotinic acid and nicotinamide; natural food niacin and tryptophan equivalents are outside this UL.",
+        "scopeLimitation": "Supplemental scope quantifies continued/new supplements; the present intake model cannot isolate added niacin from unspecified food. Fortified-food exposure remains uncertainty, never assumed zero."
+      }
+    },
+    {
+      "environment": "uat",
+      "manifestId": "anna-v6-reference-review-2026-09-07-uat",
+      "correctionId": "anna-v6-2026-09-07-uat-glucosamine",
+      "supplementId": "0389528a-10fe-5185-a94b-d4cecddf0aa9",
+      "expectedHeadsFingerprint": "3a2ad62835b93c3f60e64b0d753d0056322a47acec75441c97d25a32eb3de521",
+      "changes": [
+        {
+          "lifeStage": "adult",
+          "sourceScope": "supplemental",
+          "maxAmount": 2000,
+          "maxUnit": "mg/day",
+          "confidence": "low",
+          "safetyFlags": [
+            "allergy_caution",
+            "condition_caution",
+            "medication_interaction"
+          ],
+          "sourceUrl": "https://www.nccih.nih.gov/health/glucosamine-and-chondroitin-for-osteoarthritis-what-you-need-to-know",
+          "basisRationale": "Uncertain internal advisory threshold of 2000 mg/day, retained with low confidence. NCCIH does not establish this internal amount as a tolerable upper intake level. Evidence about formulations and benefit varies; warfarin interaction, glucose effects and limited pregnancy/lactation information remain relevant. Source supports the uncertainty and cautions, not the numeric threshold.",
+          "safetyNotes": "NCCIH does not establish this internal amount as a tolerable upper intake level. Evidence about formulations and benefit varies; warfarin interaction, glucose effects and limited pregnancy/lactation information remain relevant. This internal threshold is advice, never a purchase restriction or a verified safe-dose boundary."
+        }
+      ],
+      "evidence": {
+        "sourceUrl": "https://www.nccih.nih.gov/health/glucosamine-and-chondroitin-for-osteoarthritis-what-you-need-to-know",
+        "checkedAt": "2026-09-07",
+        "reviewMethod": "Primary-authority reference table and scope review; original versions are retained. Uncertain internal amounts are not promoted to published ULs.",
+        "originalHeads": [
+          {
+            "id": "859b3737-e31b-443f-b562-ce7e508da4cc",
+            "supplementId": "0389528a-10fe-5185-a94b-d4cecddf0aa9",
+            "version": 4,
+            "lifeStage": "adult",
+            "sourceScope": "supplemental",
+            "maxAmount": 2000,
+            "maxUnit": "mg/day",
+            "confidence": "moderate",
+            "safetyFlags": [
+              "allergy_caution",
+              "condition_caution",
+              "medication_interaction"
+            ],
+            "safetyNotes": "Use caution with warfarin and shellfish allergy. Raised from product review to cover 1860 mg in Glucosamine. Raised from product review to cover 2000 mg in Glucosamine.",
+            "sourceUrl": null,
+            "basisRationale": null
+          }
+        ]
+      }
+    },
+    {
+      "environment": "uat",
+      "manifestId": "anna-v6-reference-review-2026-09-07-uat",
+      "correctionId": "anna-v6-2026-09-07-uat-probiotics",
+      "supplementId": "1deaa8e5-58ec-56fc-ae06-41dc13d698ef",
+      "expectedHeadsFingerprint": "2b0cdd0198cf7c7d61a890f1ff19a15ef6737923caa680aaa04cfcd15887ee69",
+      "changes": [
+        {
+          "lifeStage": "adult",
+          "sourceScope": "supplemental",
+          "maxAmount": 100,
+          "maxUnit": "billion CFU/day",
+          "confidence": "low",
+          "safetyFlags": [
+            "general_caution"
+          ],
+          "sourceUrl": "https://ods.od.nih.gov/factsheets/Probiotics-HealthProfessional/",
+          "basisRationale": "Uncertain internal advisory threshold of 100 billion CFU/day, retained with low confidence. NIH ODS does not establish a universal CFU upper intake level. Evidence and risk depend on strain, preparation, condition and host; a species name or summed CFU does not verify a strain-specific safety limit. Source supports the uncertainty and cautions, not the numeric threshold.",
+          "safetyNotes": "NIH ODS does not establish a universal CFU upper intake level. Evidence and risk depend on strain, preparation, condition and host; a species name or summed CFU does not verify a strain-specific safety limit. This internal threshold is advice, never a purchase restriction or a verified safe-dose boundary."
+        }
+      ],
+      "evidence": {
+        "sourceUrl": "https://ods.od.nih.gov/factsheets/Probiotics-HealthProfessional/",
+        "checkedAt": "2026-09-07",
+        "reviewMethod": "Primary-authority reference table and scope review; original versions are retained. Uncertain internal amounts are not promoted to published ULs.",
+        "originalHeads": [
+          {
+            "id": "8d1bf7d5-7e56-45c4-b9c6-a63886f40f95",
+            "supplementId": "1deaa8e5-58ec-56fc-ae06-41dc13d698ef",
+            "version": 6,
+            "lifeStage": "adult",
+            "sourceScope": "supplemental",
+            "maxAmount": 100,
+            "maxUnit": "billion CFU/day",
+            "confidence": "moderate",
+            "safetyFlags": [
+              "general_caution"
+            ],
+            "safetyNotes": "Require strain IDs and CFU count. Raised from product review to cover 80 billion CFU in Multi-strain probiotics. Raised from product review to cover 3110 billion CFU in Multi-strain probiotics.",
+            "sourceUrl": null,
+            "basisRationale": null
+          }
+        ]
+      }
+    },
+    {
+      "environment": "uat",
+      "manifestId": "anna-v6-reference-review-2026-09-07-uat",
+      "correctionId": "anna-v6-2026-09-07-uat-b-longum",
+      "supplementId": "5333965c-2ad2-50d3-9617-122f752c3d16",
+      "expectedHeadsFingerprint": "309ecbb660754d6a60dc01c9dff6b69893bf26404eebfaaf32e594f7bc087645",
+      "changes": [
+        {
+          "lifeStage": "adult",
+          "sourceScope": "supplemental",
+          "maxAmount": 20,
+          "maxUnit": "billion CFU/day",
+          "confidence": "low",
+          "safetyFlags": [
+            "general_caution"
+          ],
+          "sourceUrl": "https://ods.od.nih.gov/factsheets/Probiotics-HealthProfessional/",
+          "basisRationale": "Uncertain internal advisory threshold of 20 billion CFU/day, retained with low confidence. NIH ODS does not establish a universal CFU upper intake level. Evidence and risk depend on strain, preparation, condition and host; a species name or summed CFU does not verify a strain-specific safety limit. Source supports the uncertainty and cautions, not the numeric threshold.",
+          "safetyNotes": "NIH ODS does not establish a universal CFU upper intake level. Evidence and risk depend on strain, preparation, condition and host; a species name or summed CFU does not verify a strain-specific safety limit. This internal threshold is advice, never a purchase restriction or a verified safe-dose boundary."
+        }
+      ],
+      "evidence": {
+        "sourceUrl": "https://ods.od.nih.gov/factsheets/Probiotics-HealthProfessional/",
+        "checkedAt": "2026-09-07",
+        "reviewMethod": "Primary-authority reference table and scope review; original versions are retained. Uncertain internal amounts are not promoted to published ULs.",
+        "originalHeads": [
+          {
+            "id": "bc1db35f-0842-4a24-ad9c-56a3d1ef682a",
+            "supplementId": "5333965c-2ad2-50d3-9617-122f752c3d16",
+            "version": 2,
+            "lifeStage": "adult",
+            "sourceScope": "supplemental",
+            "maxAmount": 20,
+            "maxUnit": "billion CFU/day",
+            "confidence": "moderate",
+            "safetyFlags": [
+              "general_caution"
+            ],
+            "safetyNotes": "Probiotic dosing should be by strain and CFU, not mg. Raised from product review to cover 20 billion CFU in Bifidobacterium longum.",
+            "sourceUrl": null,
+            "basisRationale": null
+          }
+        ]
+      }
+    }
+  ]
+}

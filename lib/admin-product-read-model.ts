@@ -333,11 +333,15 @@ export async function loadProductRows(
       ) supplement_alias_rows on true
       left join lateral (
         select max_amount, max_unit, safety_flags
-        from public.supplement_safety_limits
-        where supplement_safety_limits.supplement_id = coalesce(product_facts.supplement_id, supplement_match_rows.supplement_id)
-          and life_stage = 'adult'
-          and source_scope = 'supplemental'
-        order by version desc
+        from (
+          select distinct on (source_scope) source_scope,max_amount,max_unit,safety_flags
+          from public.supplement_safety_limits
+          where supplement_id = coalesce(product_facts.supplement_id, supplement_match_rows.supplement_id)
+            and life_stage = 'adult'
+          order by source_scope,version desc
+        ) current_limits
+        where max_amount is not null and max_amount > 0
+        order by case source_scope when 'supplemental' then 0 else 1 end
         limit 1
       ) supplement_safety_limits on true
       where product_facts.product_id = products.id

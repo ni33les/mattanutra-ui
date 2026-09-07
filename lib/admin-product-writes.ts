@@ -29,7 +29,6 @@ import {
   preferredProductTitle
 } from "./admin-product-helpers.ts";
 import type {
-  AdminProductRow,
   CreateAdminProductInput,
   ProductDbRow,
   ProductImportFactInput,
@@ -44,8 +43,6 @@ import {
   normalizeProductFactKey
 } from "@/lib/product-recommendations";
 import { validationCacheMismatchReasons, productFactObservableIssueMessages } from "@/lib/product-validation";
-import { appendSupplementSafetyLimitVersion } from "@/lib/supplement-safety-limit-versions";
-import { normalizeSupplementSafetyFlags } from "@/lib/supplement-safety-flags";
 import {
   defaultProductCountryCode,
   normalizeProductCountryCodes
@@ -59,12 +56,6 @@ import {
   replaceProductRegulatoryApprovals,
   thaiFdaApprovalInput
 } from "@/lib/product-regulatory-approvals";
-import {
-  doseAmountInLimitUnit,
-  doseExceedsLimit,
-  normalizeDoseUnit,
-  parseDoseLimit
-} from "@/lib/dose-conversion";
 // Use Web Crypto API (available in Node runtime for Next.js server code)
 const randomUUID = () => globalThis.crypto.randomUUID();
 
@@ -783,223 +774,19 @@ export async function runProductValidationCheck(input: Readonly<{
   return row;
 }
 
-// increaseProductFactSafetyLimit - moved from god module
-
-function roundedDoseAmount(value: number) {
-  return Math.ceil(value * 1_000_000) / 1_000_000;
-}
-
+/** Compatibility entry point for the retired product-derived reference update.
+ * A SKU dose cannot establish a population reference limit. Refuse before even
+ * obtaining a database connection so older callers cannot alter global advice.
+ */
 export async function increaseProductFactSafetyLimit(input: Readonly<{
   actor?: string | null;
   factId: string;
   productId: string;
-}>) {
-  const sql = getSql();
-
-  if (!sql) {
-    throw new Error("Database is not configured");
-  }
-
-  if (!isUuidValue(input.productId) || !isUuidValue(input.factId)) {
-    throw new Error("Product fact was not found");
-  }
-
-  const rows = await sql<Array<{
-    amount: string | number | null;
-    confidence: "high" | "low" | "moderate" | null;
-    fact_name: string;
-    max_amount: string | number | null;
-    max_unit: string | null;
-    normalized_name: string;
-    safety_flags: string[] | null;
-    safety_notes: string | null;
-    supplement_id: string | null;
-    supplement_name: string | null;
-    unit: string | null;
-  }>>`
-    select
-      product_facts.name as fact_name,
-      product_facts.normalized_name,
-      product_facts.amount,
-      product_facts.unit,
-      product_facts.supplement_id::text,
-      supplements.name as supplement_name,
-      limits.max_amount,
-      limits.max_unit,
-      limits.confidence,
-      limits.safety_flags,
-      limits.safety_notes
-    from public.product_facts
-    left join public.supplements
-      on supplements.id = product_facts.supplement_id
-    left join lateral (
-      select *
-      from public.supplement_safety_limits
-      where supplement_safety_limits.supplement_id = product_facts.supplement_id
-        and life_stage = 'adult'
-        and source_scope = 'supplemental'
-      order by version desc
-      limit 1
-    ) limits on true
-    where product_facts.id = ${input.factId}::uuid
-      and product_facts.product_id = ${input.productId}::uuid
-    limit 1
-  `;
-  const fact = rows[0];
-
-  if (!fact || !isUuidValue(fact.supplement_id)) {
-    throw new Error("Safety limit can only be changed for a canonical supplement fact");
-  }
-
-  const amount = numberOrNull(fact.amount);
-  const doseUnit = fact.unit ? normalizeDoseUnit(fact.unit) : null;
-  const supplementKey = fact.normalized_name || fact.fact_name;
-
-  if (amount === null || amount <= 0 || !doseUnit) {
-    throw new Error("Fact has no comparable dose for a safety limit update");
-  }
-
-  const currentLimit = parseDoseLimit(numberOrNull(fact.max_amount), fact.max_unit);
-  const factDose = {
-    amount,
-    originalText: `${amount} ${fact.unit ?? doseUnit}`,
-    unit: doseUnit
-  };
-
-  if (currentLimit) {
-    const exceedsLimit = doseExceedsLimit(factDose, currentLimit, supplementKey);
-
-    if (exceedsLimit === null) {
-      throw new Error(
-        "Safety limit unit cannot be compared with this product fact unit; update this supplement from the Supplements screen"
-      );
-    }
-
-    if (!exceedsLimit) {
-      throw new Error("The configured safety limit already covers this dose");
-    }
-  }
-
-  const maxUnit = fact.max_unit?.trim() || `${doseUnit}/day`;
-  const nextMaxAmount = currentLimit
-    ? doseAmountInLimitUnit(factDose, currentLimit, supplementKey)
-    : amount;
-
-  if (nextMaxAmount === null) {
-    throw new Error(
-      "Safety limit unit cannot be converted without changing the configured unit"
-    );
-  }
-
-  const nextMaxAmountRounded = roundedDoseAmount(nextMaxAmount);
-  const beforePayload = {
-    factId: input.factId,
-    factName: fact.fact_name,
-    maxAmount: numberOrNull(fact.max_amount),
-    maxUnit: fact.max_unit,
-    productId: input.productId,
-    supplementId: fact.supplement_id,
-    supplementName: fact.supplement_name
-  };
-  const safetyNotes = [
-    fact.safety_notes?.trim() || null,
-    `Raised from product review to cover ${amount} ${fact.unit ?? doseUnit} in ${fact.fact_name}.`
-  ]
-    .filter(Boolean)
-    .join(" ");
-
-  const version = await appendSupplementSafetyLimitVersion(sql, {
-    confidence: fact.confidence ?? "moderate",
-    maxAmount: nextMaxAmountRounded,
-    maxUnit,
-    safetyFlags: normalizeSupplementSafetyFlags(fact.safety_flags ?? []),
-    safetyNotes,
-    supplementId: fact.supplement_id
-  });
-
-  await sql`
-    insert into public.supplement_admin_audit (
-      id,
-      supplement_id,
-      action,
-      actor,
-      before_payload,
-      after_payload
-    )
-    values (
-      ${randomUUID()}::uuid,
-      ${fact.supplement_id}::uuid,
-      'safety_limit_increased_from_product',
-      ${input.actor ?? "admin_dashboard"},
-      ${sql.json(toJsonValue(beforePayload))}::jsonb,
-      ${sql.json(toJsonValue({
-        ...beforePayload,
-        factAmount: amount,
-        factUnit: fact.unit ?? doseUnit,
-        maxAmount: nextMaxAmountRounded,
-        maxUnit,
-        version
-      }))}::jsonb
-    )
-  `;
-
-  const revalidation = await refreshAndPersistProductValidations(
-    sql,
-    await productIdsUsingSupplement(sql, fact.supplement_id)
-  );
-  const validation = revalidation.find((row) => row.productId === input.productId) ??
-    await refreshAndPersistProductValidation(sql, input.productId);
-  const productVersion = await recordProductVersion(sql, {
-    actor: input.actor,
-    changeNote: "product_safety_limit_increased",
-    productId: input.productId
-  });
-
-  await sql`
-    insert into public.product_admin_audit (
-      product_id,
-      actor,
-      action,
-      after_payload
-    )
-    values (
-      ${input.productId}::uuid,
-      ${input.actor ?? "admin_dashboard"},
-      'product_safety_limit_increased',
-      ${sql.json(toJsonValue({
-        factId: input.factId,
-        factAmount: amount,
-        factUnit: fact.unit ?? doseUnit,
-        maxAmount: nextMaxAmountRounded,
-        maxUnit,
-        productVersion,
-        revalidatedProductCount: revalidation.length,
-        supplementId: fact.supplement_id,
-        validation: validation.validation,
-        version
-      }))}::jsonb
-    )
-  `;
-
-  const row = await loadAdminProductRow(input.productId);
-
-  if (!row) {
-    throw new Error("Product not found after safety limit update");
-  }
-
-  const revalidatedRows = (
-    await Promise.all(
-      revalidation.map((item) => loadAdminProductRow(item.productId))
-    )
-  ).filter((item): item is AdminProductRow => Boolean(item));
-
-  clearProductRecommendationCandidateCache();
-
-  return {
-    revalidatedProductIds: revalidation.map((item) => item.productId),
-    revalidatedRows,
-    row
-  };
+}>): Promise<never> {
+  void input;
+  throw Object.assign(new Error(
+    "Review reference source evidence in Supplements. A product's labelled dose cannot set or raise a global reference limit."
+  ), { code: "reference_review_required" });
 }
 
 

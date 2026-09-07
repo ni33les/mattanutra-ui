@@ -196,7 +196,7 @@ async function loadCatalogueSnapshot(
         cachedByCountry.set(code, live);
         lastSnapshot = live;
         const frozen = freezeCatalogueSnapshot(live);
-        await refreshAdminSafetyCeilings();
+        await refreshAdminSafetyCeilings({ runtimeRevision: frozen.runtimeRevision });
         return frozen;
       }
     } catch (error) {

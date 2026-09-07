@@ -746,6 +746,7 @@ export async function executeTaskWorkItem(
 
     return {
       catalogueRevision: workItem.catalogueRevision,
+      safetyReferenceIdentity: workItem.safetyReferenceIdentity,
       catalogueFingerprint: workItem.catalogueFingerprint,
       searchEffort: workItem.searchEffort ?? "standard",
       discovery: {

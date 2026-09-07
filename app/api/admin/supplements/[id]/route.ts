@@ -259,6 +259,7 @@ export async function PATCH(
   try {
     const row = await updateAdminSupplement({
       actor: "admin_dashboard",
+      expectedSafetyReferenceFingerprint: textOrNull(body.expectedSafetyReferenceFingerprint) ?? "",
       category: body.category === undefined
         ? undefined
         : textOrNull(body.category),
@@ -289,7 +290,8 @@ export async function PATCH(
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Unable to update supplement";
-    const status = supplementErrorStatus(message);
+    const code = error && typeof error === "object" && "code" in error ? String(error.code) : undefined;
+    const status = ["reference_version_required", "reference_version_conflict", "reference_review_in_progress"].includes(code ?? "") ? 409 : supplementErrorStatus(message);
 
     console.error("Unable to update supplement", {
       error: errorDetails(error),
@@ -298,6 +300,7 @@ export async function PATCH(
 
     return NextResponse.json(
       {
+        ...(code ? { code } : {}),
         details:
           process.env.NODE_ENV === "production" ? undefined : errorDetails(error),
         message

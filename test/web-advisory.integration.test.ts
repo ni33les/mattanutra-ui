@@ -1,4 +1,5 @@
 import { cleanupFixtureRelationships } from "./helpers/fixture-teardown.ts";
+import { loadAdminSafetyReferenceSnapshot } from "../lib/agentic/catalogue/load-safety-ceilings.ts";
 import { getCatalogueRuntimeRevision } from "../lib/catalogue-runtime-revision.ts";
 import { recommendWithMatcher } from "../lib/matcher/adapters/web.ts";
 import assert from "node:assert/strict";
@@ -43,6 +44,10 @@ describe("web advisory revisions on PostgreSQL", { skip: !databaseUrl }, () => {
     });
     await closeSqlPool();
   });
+  async function referenceIdentity() {
+    const { runtimeRevision, fingerprint } = await loadAdminSafetyReferenceSnapshot(getSql()!);
+    return { runtimeRevision, fingerprint };
+  }
   async function seed() {
     const planId = randomUUID(); plans.push(planId);
     await persistAssessmentSubmission({ answers, locale: "en", status: "captured", selectedPlan: "precision",
@@ -68,6 +73,7 @@ describe("web advisory revisions on PostgreSQL", { skip: !databaseUrl }, () => {
     const planId = await seed();
     const { task } = await createTask({ planId, title: "Current product refresh", taskType: "generate_product_recommendations", payload: {
       catalogueRevision: await getCatalogueRuntimeRevision(getSql()!),
+      safetyReferenceIdentity: await referenceIdentity(),
       productPreferences: { revision: 0, excludedProductIds: [], searchEffort: "standard" }, stackPreference: "balanced",
       matcherAlgorithmVersion: ACTIVE_PRODUCT_RECOMMENDATION_ALGORITHM_VERSION,
       matcherImplementationVersion: ACTIVE_PRODUCT_RECOMMENDATION_IMPLEMENTATION_VERSION
@@ -80,7 +86,7 @@ describe("web advisory revisions on PostgreSQL", { skip: !databaseUrl }, () => {
     const planId = await seed();
     const tasks = [];
     for (const taskType of ["generate_product_recommendations", "generate_food_gap_guidance"]) {
-      tasks.push((await createTask({ planId, title: "Product preference regression", taskType, payload: { productPreferences: { revision: 0, excludedProductIds: [] } } })).task);
+      tasks.push((await createTask({ planId, title: "Product preference regression", taskType, payload: { catalogueRevision: await getCatalogueRuntimeRevision(getSql()!), safetyReferenceIdentity: await referenceIdentity(), productPreferences: { revision: 0, excludedProductIds: [] } } })).task);
     }
     await withDatabaseTransaction(getSql()!, async tx => {
       await tx`select plan_id from public.assessments where plan_id = ${planId}::uuid for no key update`;
@@ -148,7 +154,7 @@ describe("web advisory revisions on PostgreSQL", { skip: !databaseUrl }, () => {
   it("serializes exclusion changes with simultaneous product and food-gap completion", async () => {
     for (const taskType of ["generate_product_recommendations", "generate_food_gap_guidance"]) {
       const planId = await seed();
-      const { task } = await createTask({ planId, title: "Concurrent preference regression", taskType, payload: { productPreferences: { revision: 0, excludedProductIds: [] } } });
+      const { task } = await createTask({ planId, title: "Concurrent preference regression", taskType, payload: { catalogueRevision: await getCatalogueRuntimeRevision(getSql()!), safetyReferenceIdentity: await referenceIdentity(), productPreferences: { revision: 0, excludedProductIds: [] } } });
       let lockHeld!: () => void;
       let releaseWriter!: () => void;
       let completionStarted!: () => void;
@@ -179,12 +185,13 @@ describe("web advisory revisions on PostgreSQL", { skip: !databaseUrl }, () => {
     const planId = await seed();
     const sql = getSql()!;
     const catalogueRevision = await getCatalogueRuntimeRevision(sql);
+    const safetyReferenceIdentity = await referenceIdentity();
     const generation = (await loadGenerationInput(sql, planId))!;
     await insertFormulationVersion(sql, { planId, generation, modelVersion: "v5-completion-fixture", formulation: { supplementBreakdown: [], sectionStatuses: { supplements: "ready" } } });
-    const { task } = await createTask({ planId, title: "Actual product completion", taskType: "generate_product_recommendations", payload: { catalogueRevision, productPreferences: { revision: 0, excludedProductIds: [], searchEffort: "standard" } } });
+    const { task } = await createTask({ planId, title: "Actual product completion", taskType: "generate_product_recommendations", payload: { catalogueRevision, safetyReferenceIdentity, productPreferences: { revision: 0, excludedProductIds: [], searchEffort: "standard" } } });
     const empty = recommendWithMatcher({ needs: [], candidates: [] });
     const recommendations = { ...empty, diagnostics: { ...empty.diagnostics, matching: { operationalStatus: "no_purchase" as const, selectedOptionId: null, options: [], alternativeSearch: undefined } } };
-    const resultPayload = { catalogueRevision, catalogueFingerprint: "fixture-v5", recommendations, recommendationVariants: [{ stackPreference: "balanced", maxProducts: null, recommendations }] };
+    const resultPayload = { catalogueRevision, safetyReferenceIdentity, catalogueFingerprint: "fixture-v5", recommendations, recommendationVariants: [{ stackPreference: "balanced", maxProducts: null, recommendations }] };
     await withDatabaseTransaction(sql, tx => applyTaskCompletionResult({ task, taskId: task.id, sql: tx, afterCommit: () => {}, resultPayload }));
     const runs = await sql`select selection_revision,generation_locale,generator_version,assessment_revision,catalogue_revision from public.product_recommendation_runs where plan_id=${planId}::uuid`;
     assert.equal(runs.length, 1);
@@ -196,6 +203,33 @@ describe("web advisory revisions on PostgreSQL", { skip: !databaseUrl }, () => {
     await sql`update public.catalogue_runtime_revision set revision=revision+1 where singleton=true`;
     assert.deepEqual(await withDatabaseTransaction(sql, tx => applyTaskCompletionResult({ task, taskId: task.id, sql: tx, afterCommit: () => {}, resultPayload })), { superseded: true, message: "Catalogue changed; old product result was not applied" });
     assert.equal((await sql`select count(*)::int as n from public.product_recommendation_runs where plan_id=${planId}::uuid`)[0].n, 1);
+  });
+
+  it("ANNA-REF-WEB-01 rejects legacy queued work and missing or changed result reference identity without writes", async () => {
+    const planId = await seed(), sql = getSql()!;
+    const identity = await referenceIdentity();
+    const generation = (await loadGenerationInput(sql, planId))!;
+    await insertFormulationVersion(sql, { planId, generation, modelVersion: "reference-fence-fixture", formulation: { supplementBreakdown: [], sectionStatuses: { supplements: "ready" } } });
+    const { task: legacy } = await createTask({ planId, title: "Legacy reference work", taskType: "generate_product_recommendations",
+      payload: { catalogueRevision: identity.runtimeRevision, productPreferences: { revision: 0, excludedProductIds: [], searchEffort: "standard" } } });
+    assert.equal((await buildTaskWorkItem(legacy)).taskType, "superseded_generation");
+    const replacementId = await enqueueProductRecommendationsTask({ planId, forceNew: true });
+    assert.ok(replacementId); assert.notEqual(replacementId, legacy.id);
+    const [replacement] = await sql`select payload from public.tasks where id=${replacementId}::uuid`;
+    assert.deepEqual(replacement.payload.safetyReferenceIdentity, identity);
+    assert.equal(await enqueueProductRecommendationsTask({ planId, forceNew: true }), replacementId);
+    for (const task of [legacy, { ...legacy, payload: { ...legacy.payload, safetyReferenceIdentity: identity } }]) {
+      for (const returnedIdentity of [undefined, { ...identity, fingerprint: "f".repeat(64) }]) {
+        assert.deepEqual(await withDatabaseTransaction(sql, tx => applyTaskCompletionResult({ task, taskId: task.id, sql: tx,
+          resultPayload: { catalogueRevision: identity.runtimeRevision, safetyReferenceIdentity: returnedIdentity } })),
+        { superseded: true, message: "Safety references changed or are missing; old product result was not applied" });
+      }
+    }
+    assert.deepEqual(await withDatabaseTransaction(sql, tx => applyTaskCompletionResult({
+      task: { ...legacy, payload: { ...legacy.payload, catalogueRevision: undefined, safetyReferenceIdentity: identity } }, taskId: legacy.id, sql: tx,
+      resultPayload: { safetyReferenceIdentity: identity } })),
+      { superseded: true, message: "Safety references changed or are missing; old product result was not applied" });
+    assert.equal((await sql`select count(*)::int as n from public.product_recommendation_runs where plan_id=${planId}::uuid`)[0].n, 0);
   });
 
   it("keeps completed no-purchase results terminal and starts one current copy task for a legacy HealthScore", async () => {

@@ -296,13 +296,17 @@ export function evaluateSafety(input: Readonly<{
     if (possibleExposure < row.limit) continue;
     const total = scaleAmount({ amount: possibleExposure, subjectId: row.subjectId, subjectName: row.name, unit: row.unit });
     const threshold = scaleAmount({ amount: row.limit, subjectId: row.subjectId, subjectName: row.name, unit: row.unit });
+    const reference = input.request.safetyCeilings?.find(ceiling => ceiling.bandId && ceiling.bandId === row.ruleId);
     add({ code: "dose_review_required", family: "dose", subjectId: row.subjectId, nutrientName: row.name,
       ruleId: row.ruleId ?? `ul:${row.sourceScope}:${row.subjectId}`,
       thresholdUnits: isDoseError(threshold) ? null : threshold.units,
       exposureUnits: isDoseError(total) ? null : total.units, unit: row.unit, severity: "high",
       comparator: possibleExposure > row.limit ? "gt" : "gte", sourceScope: row.sourceScope,
       authorityUrl: row.authorityUrl,
-      uncertainty: row.certainty === "known" ? [] : [row.certainty + "_intake", ...(row.exposureMinimum !== row.exposureMaximum ? ["amount_is_upper_endpoint_of_estimate"] : [])] });
+      uncertainty: [
+        ...(reference?.referenceConfidence && reference.referenceConfidence !== "high" ? ["reference_unverified"] : []),
+        ...(row.certainty === "known" ? [] : [row.certainty + "_intake", ...(row.exposureMinimum !== row.exposureMaximum ? ["amount_is_upper_endpoint_of_estimate"] : [])])
+      ] });
   }
   for (const row of fit.perContinuedDose ?? []) {
     if (row.over <= 0) continue;

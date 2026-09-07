@@ -256,6 +256,7 @@ export function AdminSupplementsView({
       maxAmount: null,
       maxUnit: "",
       name: "",
+      safetyReferenceFingerprint: "",
       safetyBands: [],
       primaryUseCase: null,
       safetyFlags: [],
@@ -302,6 +303,7 @@ export function AdminSupplementsView({
           name: row.name,
           primaryUseCase: row.primaryUseCase,
           safetyBands: row.safetyBands,
+          expectedSafetyReferenceFingerprint: row.safetyReferenceFingerprint,
           safetyFlags: row.safetyFlags,
           safetyNotes: row.safetyNotes
         }),

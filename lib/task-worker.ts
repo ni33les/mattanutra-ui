@@ -1,4 +1,4 @@
-import { getCatalogueRuntimeRevision } from "@/lib/catalogue-runtime-revision";
+import { loadAdminSafetyReferenceSnapshot } from "@/lib/agentic/catalogue/load-safety-ceilings";
 import { getAssessmentProductPreferences } from "@/lib/assessment-product-preferences";
 import { generationLocale, ASSESSMENT_GENERATION_TASKS, loadGenerationInput, FUNNEL_GENERATOR_VERSION } from "@/lib/assessment-revisions";
 import { deferUntilDatabaseCommit } from "@/lib/db";
@@ -1419,7 +1419,9 @@ export async function enqueueProductRecommendationsTask({
   }
 
   const productPreferences = await getAssessmentProductPreferences(sql, planId);
-  const catalogueRevision = await getCatalogueRuntimeRevision(sql);
+  const reference = await loadAdminSafetyReferenceSnapshot(sql);
+  const catalogueRevision = reference.runtimeRevision;
+  const safetyReferenceIdentity = { runtimeRevision: catalogueRevision, fingerprint: reference.fingerprint };
   const matcherAlgorithmVersion =
     ACTIVE_PRODUCT_RECOMMENDATION_ALGORITHM_VERSION;
   const matcherImplementationVersion =
@@ -1445,6 +1447,8 @@ export async function enqueueProductRecommendationsTask({
         and payload ->> 'stackPreference' = ${normalizedStackPreference}
         and coalesce(payload #>> '{productPreferences,searchEffort}', 'standard') = ${productPreferences.searchEffort}
         and (payload ->> 'catalogueRevision')::bigint = ${catalogueRevision}
+        and payload #>> '{safetyReferenceIdentity,runtimeRevision}' = ${String(catalogueRevision)}
+        and payload #>> '{safetyReferenceIdentity,fingerprint}' = ${safetyReferenceIdentity.fingerprint}
         and status not in ('failed', 'cancelled', 'skipped')
         and (status <> 'completed' or payload #>> '{row,formulationVersion}' = (select max(version)::text from public.formulations where plan_id=${planId}::uuid and assessment_revision=(select input_revision from public.assessments where plan_id=${planId}::uuid) and generation_locale=coalesce(${generationLocale(planId)}, (select locale from public.assessments where plan_id=${planId}::uuid)) and generator_version=${FUNNEL_GENERATOR_VERSION}))
       order by business_value desc, scheduled_for asc, created_at asc
@@ -1475,6 +1479,7 @@ export async function enqueueProductRecommendationsTask({
 
   const inputHash = stableHash({
     catalogueRevision,
+    safetyReferenceIdentity,
     productPreferences,
     dependencyTaskId: row.formulationVersion < 1 ? dependencyTaskId : null,
     matcherAlgorithmVersion,
@@ -1509,6 +1514,7 @@ export async function enqueueProductRecommendationsTask({
       : `product-recommendations:${planId}:${inputHash}`,
     payload: {
       catalogueRevision,
+      safetyReferenceIdentity,
       productPreferences,
       inputHash,
       dependsOnTaskId: dependencyTaskId,

@@ -4,9 +4,10 @@ import {
   nutrientMatchesName,
   SUPPLEMENTAL_UL_REFERENCE
 } from "@/lib/agentic/catalogue/supplemental-ul-reference";
-import { convertAmount } from "@/lib/matcher/dose";
 import { parseAdminLimitUnit } from "@/lib/matcher/safety-ceilings";
-import type { MatcherUnit } from "@/lib/matcher/types";
+import { appendSupplementSafetyLimitVersion } from "@/lib/supplement-safety-limit-versions";
+import type { SupplementConfidence, SupplementSafetyFlag } from "@/lib/admin-supplements";
+import type { SafetyLimitLifeStage, SafetySourceScope } from "@/lib/matcher/types";
 import {
   MATCHER_SOURCE_SCOPE,
   SAFETY_LIMIT_LIFE_STAGES,
@@ -62,54 +63,6 @@ const sql = postgres(connection, {
   ...(shouldUseSsl(connection) ? { ssl: "require" } : {})
 });
 
-function amountIsLooser(
-  existingAmount: number,
-  existingUnit: string,
-  nextAmount: number,
-  nextUnit: MatcherUnit,
-  supplementId: string
-) {
-  const existing = parseAdminLimitUnit(existingUnit);
-
-  if (!existing) {
-    return true;
-  }
-
-  const converted = convertAmount({
-    amount: nextAmount,
-    fromUnit: nextUnit,
-    subjectId: supplementId,
-    subjectName: supplementId,
-    toUnit: existing
-  });
-
-  return converted == null || converted > existingAmount + 1e-9;
-}
-
-function amountsEqual(
-  existingAmount: number,
-  existingUnit: string,
-  nextAmount: number,
-  nextUnit: MatcherUnit,
-  supplementId: string
-) {
-  const existing = parseAdminLimitUnit(existingUnit);
-
-  if (!existing) {
-    return false;
-  }
-
-  const converted = convertAmount({
-    amount: nextAmount,
-    fromUnit: nextUnit,
-    subjectId: supplementId,
-    subjectName: supplementId,
-    toUnit: existing
-  });
-
-  return converted != null && Math.abs(converted - existingAmount) <= 1e-9;
-}
-
 async function latestLimit(
   supplementId: string,
   lifeStage: string,
@@ -140,7 +93,7 @@ async function insertBand(input: Readonly<{
   basisRationale: string | null;
   confidence: string;
   lifeStage: string;
-  maxAmount: number;
+  maxAmount: number | null;
   maxUnit: string;
   safetyFlags: readonly string[];
   safetyNotes: string | null;
@@ -148,43 +101,14 @@ async function insertBand(input: Readonly<{
   sourceUrl: string | null;
   supplementId: string;
 }>) {
-  await sql`
-    insert into public.supplement_safety_limits (
-      id,
-      supplement_id,
-      version,
-      life_stage,
-      source_scope,
-      max_amount,
-      max_unit,
-      confidence,
-      safety_flags,
-      safety_notes,
-      source_url,
-      basis_rationale,
-      created_at,
-      updated_at
-    )
-    select
-      gen_random_uuid(),
-      ${input.supplementId}::uuid,
-      coalesce(max(version), 0) + 1,
-      ${input.lifeStage},
-      ${input.sourceScope},
-      ${input.maxAmount},
-      ${input.maxUnit},
-      ${input.confidence},
-      ${[...input.safetyFlags]},
-      ${input.safetyNotes},
-      ${input.sourceUrl},
-      ${input.basisRationale},
-      now(),
-      now()
-    from public.supplement_safety_limits
-    where supplement_id = ${input.supplementId}::uuid
-      and life_stage = ${input.lifeStage}
-      and source_scope = ${input.sourceScope}
-  `;
+  await appendSupplementSafetyLimitVersion(sql, {
+    ...input,
+    confidence: input.confidence as SupplementConfidence,
+    lifeStage: input.lifeStage as SafetyLimitLifeStage,
+    sourceScope: input.sourceScope as SafetySourceScope,
+    safetyFlags: input.safetyFlags as readonly SupplementSafetyFlag[],
+    onlyIfMissing: true
+  });
 }
 
 try {
@@ -290,7 +214,7 @@ try {
     const bandRows = await sql<
       Array<{
         life_stage: string;
-        max_amount: string | number;
+        max_amount: string | number | null;
         max_unit: string;
         source_scope: string;
         source_url: string | null;
@@ -307,8 +231,6 @@ try {
         bands.source_url,
         bands.basis_rationale
       from public.supplement_safety_limit_bands bands
-      where bands.max_amount is not null
-        and bands.max_amount > 0
       order by
         bands.supplement_id,
         bands.life_stage,
@@ -317,12 +239,11 @@ try {
     `;
 
     for (const band of bandRows) {
-      const amount = Number(band.max_amount);
+      const amount = band.max_amount == null ? null : Number(band.max_amount);
       const unit = parseAdminLimitUnit(band.max_unit);
 
       if (
-        !Number.isFinite(amount) ||
-        amount <= 0 ||
+        (amount !== null && (!Number.isFinite(amount) || amount <= 0)) ||
         !unit ||
         !(SAFETY_LIMIT_LIFE_STAGES as readonly string[]).includes(band.life_stage) ||
         !(SAFETY_SOURCE_SCOPES as readonly string[]).includes(band.source_scope)
@@ -336,39 +257,7 @@ try {
         band.life_stage,
         band.source_scope
       );
-      const existingAmount = existing?.max_amount == null
-        ? null
-        : Number(existing.max_amount);
-
-      if (
-        existing &&
-        existingAmount != null &&
-        Number.isFinite(existingAmount) &&
-        amountsEqual(
-          existingAmount,
-          existing.max_unit,
-          amount,
-          unit,
-          band.supplement_id
-        )
-      ) {
-        skipped += 1;
-        continue;
-      }
-
-      if (
-        existing &&
-        existingAmount != null &&
-        Number.isFinite(existingAmount) &&
-        existingAmount > 0 &&
-        amountIsLooser(
-          existingAmount,
-          existing.max_unit,
-          amount,
-          unit,
-          band.supplement_id
-        )
-      ) {
+      if (existing) {
         skipped += 1;
         continue;
       }
@@ -381,12 +270,12 @@ try {
 
       await insertBand({
         basisRationale: band.basis_rationale,
-        confidence: adult?.confidence ?? existing?.confidence ?? "high",
+        confidence: adult?.confidence ?? "high",
         lifeStage: band.life_stage,
         maxAmount: amount,
         maxUnit: band.max_unit,
-        safetyFlags: adult?.safety_flags ?? existing?.safety_flags ?? [],
-        safetyNotes: adult?.safety_notes ?? existing?.safety_notes ?? null,
+        safetyFlags: adult?.safety_flags ?? [],
+        safetyNotes: adult?.safety_notes ?? null,
         sourceScope: band.source_scope,
         sourceUrl: band.source_url,
         supplementId: band.supplement_id
@@ -435,51 +324,19 @@ try {
         band.lifeStage,
         nutrient.sourceScope
       );
-      const existingAmount = existing?.max_amount == null
-        ? null
-        : Number(existing.max_amount);
-
-      if (
-        existing &&
-        existingAmount != null &&
-        Number.isFinite(existingAmount) &&
-        amountsEqual(
-          existingAmount,
-          existing.max_unit,
-          band.maxAmount,
-          nutrient.unit,
-          supplement.id
-        )
-      ) {
-        skipped += 1;
-        continue;
-      }
-
-      if (
-        existing &&
-        existingAmount != null &&
-        Number.isFinite(existingAmount) &&
-        existingAmount > 0 &&
-        amountIsLooser(
-          existingAmount,
-          existing.max_unit,
-          band.maxAmount,
-          nutrient.unit,
-          supplement.id
-        )
-      ) {
+      if (existing) {
         skipped += 1;
         continue;
       }
 
       await insertBand({
         basisRationale: `${SUPPLEMENTAL_UL_REFERENCE.authority}; ${nutrient.authorityUrl}`,
-        confidence: adult?.confidence ?? existing?.confidence ?? "high",
+        confidence: adult?.confidence ?? "high",
         lifeStage: band.lifeStage,
         maxAmount: band.maxAmount,
         maxUnit: nutrient.unit,
-        safetyFlags: adult?.safety_flags ?? existing?.safety_flags ?? [],
-        safetyNotes: adult?.safety_notes ?? existing?.safety_notes ?? null,
+        safetyFlags: adult?.safety_flags ?? [],
+        safetyNotes: adult?.safety_notes ?? null,
         sourceScope: nutrient.sourceScope,
         sourceUrl: nutrient.authorityUrl,
         supplementId: supplement.id

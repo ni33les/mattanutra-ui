@@ -3,6 +3,7 @@ import type postgres from "postgres";
 import {
   getSql,
   INTERACTIVE_STATEMENT_TIMEOUT_MS,
+  withDatabaseTransaction,
   withLocalStatementTimeout
 } from "@/lib/db";
 import {
@@ -13,7 +14,8 @@ import {
   normalizeSupplementSafetyFlags,
   type SupplementSafetyFlag
 } from "@/lib/supplement-safety-flags";
-import { appendSupplementSafetyLimitVersion } from "@/lib/supplement-safety-limit-versions";
+import { readSupplementSafetyHeads, supplementSafetyHeadsFingerprint, type SupplementSafetyHead } from "@/lib/supplement-safety-reference-corrections";
+import { appendSupplementSafetyLimitVersion, lockSupplementSafetyReference } from "@/lib/supplement-safety-limit-versions";
 import type {
   SafetyLimitLifeStage,
   SafetySourceScope
@@ -76,6 +78,7 @@ export type AdminSupplementSafetyBand = Readonly<{
 }>;
 
 export type AdminSupplementRow = Readonly<{
+  safetyReferenceFingerprint: string;
   aliases: AdminSupplementAlias[];
   category: string;
   confidence: SupplementConfidence;
@@ -109,6 +112,7 @@ export type AdminSupplementsData = Readonly<{
 }>;
 
 type SupplementDbRow = Readonly<{
+  reference_heads: SupplementSafetyHead[];
   aliases: unknown;
   category: string;
   confidence: SupplementConfidence;
@@ -141,6 +145,7 @@ export type AdminSupplementTranslationInput = Readonly<{
 }>;
 
 export type UpdateAdminSupplementInput = Readonly<{
+  expectedSafetyReferenceFingerprint: string;
   actor?: string | null;
   category?: string | null;
   confidence: SupplementConfidence;
@@ -656,6 +661,7 @@ function rowFromDb(
     name: row.name,
     primaryUseCase: row.primary_use_case,
     safetyBands: safetyBandsFromDb(row.safety_bands),
+    safetyReferenceFingerprint: supplementSafetyHeadsFingerprint((row.reference_heads ?? []).map(head => ({ ...head, safetyFlags: [...head.safetyFlags].sort() }))),
     safetyFlags: normalizeSupplementSafetyFlags(row.safety_flags),
     safetyNotes: row.safety_notes,
     ...(selectionStats ? { selectionStats } : {}),
@@ -720,6 +726,7 @@ async function loadSupplementDocument(
       limits.safety_flags,
       limits.safety_notes,
       coalesce(band_rows.safety_bands, '[]'::jsonb) as safety_bands,
+      coalesce(band_rows.reference_heads, '[]'::jsonb) as reference_heads,
       coalesce(alias_rows.aliases, '[]'::jsonb) as aliases,
       case
         when jsonb_typeof(supplements.source_payload -> 'countryAvailability') = 'array'
@@ -747,19 +754,24 @@ async function loadSupplementDocument(
             'maxUnit', band.max_unit
           )
           order by band.life_stage, band.source_scope
-        ),
+        ) filter (where band.max_amount is not null and band.max_amount > 0),
         '[]'::jsonb
-      ) as safety_bands
+      ) as safety_bands,
+        coalesce(jsonb_agg(jsonb_build_object(
+          'id',band.id::text,'supplementId',band.supplement_id::text,'version',band.version,
+          'lifeStage',band.life_stage,'sourceScope',band.source_scope,'maxAmount',band.max_amount,'maxUnit',band.max_unit,
+          'confidence',band.confidence,'safetyFlags',coalesce(band.safety_flags,'{}'::text[]),'safetyNotes',band.safety_notes,
+          'sourceUrl',band.source_url,'basisRationale',band.basis_rationale
+        ) order by band.life_stage,band.source_scope),'[]'::jsonb) as reference_heads
       from (
         select distinct on (band_limits.life_stage, band_limits.source_scope)
           band_limits.life_stage,
           band_limits.source_scope,
           band_limits.max_amount,
-          band_limits.max_unit
+          band_limits.max_unit,band_limits.id,band_limits.supplement_id,band_limits.version,
+          band_limits.confidence,band_limits.safety_flags,band_limits.safety_notes,band_limits.source_url,band_limits.basis_rationale
         from public.supplement_safety_limits band_limits
         where band_limits.supplement_id = supplements.id
-          and band_limits.max_amount is not null
-          and band_limits.max_amount > 0
         order by band_limits.life_stage, band_limits.source_scope, band_limits.version desc
       ) band
     ) band_rows on true
@@ -851,6 +863,7 @@ export async function getAdminSupplementsData(
         limits.safety_flags,
         limits.safety_notes,
         coalesce(band_rows.safety_bands, '[]'::jsonb) as safety_bands,
+      coalesce(band_rows.reference_heads, '[]'::jsonb) as reference_heads,
         '[]'::jsonb as aliases,
         '[]'::jsonb as country_availability,
         '{}'::jsonb as translations
@@ -874,19 +887,24 @@ export async function getAdminSupplementsData(
               'maxUnit', band.max_unit
             )
             order by band.life_stage, band.source_scope
-          ),
+          ) filter (where band.max_amount is not null and band.max_amount > 0),
           '[]'::jsonb
-        ) as safety_bands
+        ) as safety_bands,
+        coalesce(jsonb_agg(jsonb_build_object(
+          'id',band.id::text,'supplementId',band.supplement_id::text,'version',band.version,
+          'lifeStage',band.life_stage,'sourceScope',band.source_scope,'maxAmount',band.max_amount,'maxUnit',band.max_unit,
+          'confidence',band.confidence,'safetyFlags',coalesce(band.safety_flags,'{}'::text[]),'safetyNotes',band.safety_notes,
+          'sourceUrl',band.source_url,'basisRationale',band.basis_rationale
+        ) order by band.life_stage,band.source_scope),'[]'::jsonb) as reference_heads
         from (
           select distinct on (band_limits.life_stage, band_limits.source_scope)
             band_limits.life_stage,
             band_limits.source_scope,
             band_limits.max_amount,
-            band_limits.max_unit
+            band_limits.max_unit,band_limits.id,band_limits.supplement_id,band_limits.version,
+          band_limits.confidence,band_limits.safety_flags,band_limits.safety_notes,band_limits.source_url,band_limits.basis_rationale
           from public.supplement_safety_limits band_limits
           where band_limits.supplement_id = supplements.id
-            and band_limits.max_amount is not null
-            and band_limits.max_amount > 0
           order by band_limits.life_stage, band_limits.source_scope, band_limits.version desc
         ) band
       ) band_rows on true
@@ -922,16 +940,18 @@ async function appendConfiguredSafetyBands(
     supplementId: string;
   }>
 ) {
-  await appendSupplementSafetyLimitVersion(sql, {
-    confidence: input.confidence,
-    lifeStage: "adult",
-    maxAmount: input.maxAmount,
-    maxUnit: input.maxUnit,
-    safetyFlags: input.safetyFlags,
-    safetyNotes: input.safetyNotes,
-    sourceScope: MATCHER_SOURCE_SCOPE,
-    supplementId: input.supplementId
+  if (input.maxAmount !== null || input.maxUnit.trim()) {
+    await appendSupplementSafetyLimitVersion(sql, {
+      confidence: input.confidence,
+      lifeStage: "adult",
+      maxAmount: input.maxAmount,
+      maxUnit: input.maxUnit,
+      safetyFlags: input.safetyFlags,
+      safetyNotes: input.safetyNotes,
+      sourceScope: MATCHER_SOURCE_SCOPE,
+      supplementId: input.supplementId
   });
+  }
 
   for (const band of input.safetyBands ?? []) {
     if (
@@ -961,9 +981,23 @@ async function appendConfiguredSafetyBands(
 
 export async function updateAdminSupplement(input: UpdateAdminSupplementInput) {
   const sql = getSql();
+  if (!sql) throw new Error("Database is not configured");
+  const result = await withDatabaseTransaction(sql, tx => updateAdminSupplementInTransaction(tx as unknown as postgres.TransactionSql, input));
+  const { revalidateProductsForSupplement } = await import("@/lib/admin-products");
+  await revalidateProductsForSupplement({ actor: input.actor, supplementId: input.id });
+  flushMatchingCatalogueCaches();
+  return result;
+}
 
-  if (!sql) {
-    throw new Error("Database is not configured");
+/** Shared transaction body for the admin writer and isolated PostgreSQL regressions. */
+export async function updateAdminSupplementInTransaction(sql: postgres.TransactionSql, input: UpdateAdminSupplementInput) {
+  if (!/^[a-f0-9]{64}$/.test(input.expectedSafetyReferenceFingerprint ?? "")) {
+    throw Object.assign(new Error("Reload the supplement reference review before saving"), { code: "reference_version_required" });
+  }
+  await lockSupplementSafetyReference(sql, input.id);
+  const fingerprint = supplementSafetyHeadsFingerprint(await readSupplementSafetyHeads(sql, input.id));
+  if (fingerprint !== input.expectedSafetyReferenceFingerprint) {
+    throw Object.assign(new Error("Supplement references changed; reload and review before saving"), { code: "reference_version_conflict" });
   }
 
   const beforeRows = await sql<SupplementDbRow[]>`
@@ -984,6 +1018,7 @@ export async function updateAdminSupplement(input: UpdateAdminSupplementInput) {
       limits.safety_flags,
       limits.safety_notes,
       coalesce(band_rows.safety_bands, '[]'::jsonb) as safety_bands,
+      coalesce(band_rows.reference_heads, '[]'::jsonb) as reference_heads,
       coalesce(alias_rows.aliases, '[]'::jsonb) as aliases,
       case
         when jsonb_typeof(supplements.source_payload -> 'countryAvailability') = 'array'
@@ -1011,19 +1046,24 @@ export async function updateAdminSupplement(input: UpdateAdminSupplementInput) {
             'maxUnit', band.max_unit
           )
           order by band.life_stage, band.source_scope
-        ),
+        ) filter (where band.max_amount is not null and band.max_amount > 0),
         '[]'::jsonb
-      ) as safety_bands
+      ) as safety_bands,
+        coalesce(jsonb_agg(jsonb_build_object(
+          'id',band.id::text,'supplementId',band.supplement_id::text,'version',band.version,
+          'lifeStage',band.life_stage,'sourceScope',band.source_scope,'maxAmount',band.max_amount,'maxUnit',band.max_unit,
+          'confidence',band.confidence,'safetyFlags',coalesce(band.safety_flags,'{}'::text[]),'safetyNotes',band.safety_notes,
+          'sourceUrl',band.source_url,'basisRationale',band.basis_rationale
+        ) order by band.life_stage,band.source_scope),'[]'::jsonb) as reference_heads
       from (
         select distinct on (band_limits.life_stage, band_limits.source_scope)
           band_limits.life_stage,
           band_limits.source_scope,
           band_limits.max_amount,
-          band_limits.max_unit
+          band_limits.max_unit,band_limits.id,band_limits.supplement_id,band_limits.version,
+          band_limits.confidence,band_limits.safety_flags,band_limits.safety_notes,band_limits.source_url,band_limits.basis_rationale
         from public.supplement_safety_limits band_limits
         where band_limits.supplement_id = supplements.id
-          and band_limits.max_amount is not null
-          and band_limits.max_amount > 0
         order by band_limits.life_stage, band_limits.source_scope, band_limits.version desc
       ) band
     ) band_rows on true
@@ -1204,7 +1244,7 @@ export async function updateAdminSupplement(input: UpdateAdminSupplementInput) {
   await appendConfiguredSafetyBands(sql, {
     confidence: input.confidence,
     maxAmount: input.maxAmount,
-    maxUnit: input.maxUnit,
+    maxUnit: input.maxAmount === null ? input.maxUnit || before.max_unit || "" : input.maxUnit,
     safetyBands: input.safetyBands,
     safetyFlags: input.safetyFlags,
     safetyNotes: input.safetyNotes,
@@ -1257,14 +1297,6 @@ export async function updateAdminSupplement(input: UpdateAdminSupplementInput) {
     )
   `;
 
-  const { revalidateProductsForSupplement } = await import("@/lib/admin-products");
-
-  await revalidateProductsForSupplement({
-    actor: input.actor,
-    supplementId: input.id
-  });
-
-  flushMatchingCatalogueCaches();
   return reloadAdminSupplement(sql, input.id);
 }
 

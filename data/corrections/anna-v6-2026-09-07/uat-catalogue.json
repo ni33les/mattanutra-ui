@@ -1,0 +1,1926 @@
+{
+  "version": 1,
+  "environment": "uat",
+  "corrections": [
+    {
+      "correctionId": "anna-v6-2026-09-07-uat-administration-040f1897-554e-4daf-9405-dbed3afe513c",
+      "entityTable": "products",
+      "entityId": "040f1897-554e-4daf-9405-dbed3afe513c",
+      "before": {
+        "id": "040f1897-554e-4daf-9405-dbed3afe513c",
+        "administration": null
+      },
+      "after": {
+        "id": "040f1897-554e-4daf-9405-dbed3afe513c",
+        "administration": {
+          "route": "oral",
+          "physicalUnit": "capsule",
+          "unitsPerServing": 1,
+          "doseIncrement": 1,
+          "packQuantity": null,
+          "provenance": {
+            "status": "verified",
+            "sourceUrl": "https://www.vistra.co.th/product/vistra-bilberry-extract-plus-lutein/",
+            "sourceText": "Manufacturer composition and oral directions support physical unit capsule. Composition basis is 1 physical unit(s) per labelled serving. Pack quantity for this SKU is not independently established.",
+            "verifiedAt": "2026-09-07T11:30:03.517518+00:00"
+          }
+        }
+      },
+      "beforeFingerprint": "6e8ef01301d45f44c19078468e8cb890f31fd9c68be6817d911fe0bc6568efac",
+      "afterFingerprint": "12f872b6a10cf8925e8cafd8bdc395d5a786c3cfe6c21de1b45edcbc6376cd7b",
+      "evidence": {
+        "sourceUrl": "https://www.vistra.co.th/product/vistra-bilberry-extract-plus-lutein/",
+        "checkedAt": "2026-09-07T11:30:03.517518+00:00",
+        "summary": "Manufacturer composition and oral directions support physical unit capsule. Composition basis is 1 physical unit(s) per labelled serving. Pack quantity for this SKU is not independently established. Archived label HTML SHA-256: eef9ba0eee9cba8367361b922df6832cd91ce072120023aa8cecd28e5a0f8cfa"
+      }
+    },
+    {
+      "correctionId": "anna-v6-2026-09-07-uat-administration-0974be22-fcc7-42bd-a446-5e36ed0dd1b4",
+      "entityTable": "products",
+      "entityId": "0974be22-fcc7-42bd-a446-5e36ed0dd1b4",
+      "before": {
+        "id": "0974be22-fcc7-42bd-a446-5e36ed0dd1b4",
+        "administration": null
+      },
+      "after": {
+        "id": "0974be22-fcc7-42bd-a446-5e36ed0dd1b4",
+        "administration": {
+          "route": "oral",
+          "physicalUnit": "tablet",
+          "unitsPerServing": null,
+          "doseIncrement": 1,
+          "packQuantity": null,
+          "provenance": {
+            "status": "verified",
+            "sourceUrl": "https://swisse.co.th/products/collagen-grape-seed",
+            "sourceText": "Manufacturer composition and oral directions support physical unit tablet. Composition basis per labelled serving is not explicit, so no nutrient-to-unit conversion is asserted. Pack quantity for this SKU is not independently established.",
+            "verifiedAt": "2026-09-07T11:30:03.519758+00:00"
+          }
+        }
+      },
+      "beforeFingerprint": "198fec094b142bee1a025edd1194d8fde29ad4976ff90cc5dd2c7676e5417795",
+      "afterFingerprint": "de83e0bd09a4245d3c6dd5c2851a488d2edd0d3fdb158d78df4bb7662f3a259c",
+      "evidence": {
+        "sourceUrl": "https://swisse.co.th/products/collagen-grape-seed",
+        "checkedAt": "2026-09-07T11:30:03.519758+00:00",
+        "summary": "Manufacturer composition and oral directions support physical unit tablet. Composition basis per labelled serving is not explicit, so no nutrient-to-unit conversion is asserted. Pack quantity for this SKU is not independently established. Archived label HTML SHA-256: df32aab7eccfeaabe717498deafea8b375d6d3059538673e32fe3962712c782c"
+      }
+    },
+    {
+      "correctionId": "anna-v6-2026-09-07-uat-administration-0f0905ec-d925-5ab2-8406-38edee67de16",
+      "entityTable": "products",
+      "entityId": "0f0905ec-d925-5ab2-8406-38edee67de16",
+      "before": {
+        "id": "0f0905ec-d925-5ab2-8406-38edee67de16",
+        "administration": null
+      },
+      "after": {
+        "id": "0f0905ec-d925-5ab2-8406-38edee67de16",
+        "administration": {
+          "route": "oral",
+          "physicalUnit": "sachet",
+          "unitsPerServing": null,
+          "doseIncrement": 1,
+          "packQuantity": null,
+          "provenance": {
+            "status": "verified",
+            "sourceUrl": "https://www.vistra.co.th/product/vistra-nutribeau-advanced-elastin-peptide-plus-collagen-5000-mg/",
+            "sourceText": "Manufacturer composition and oral directions support physical unit sachet. Composition basis per labelled serving is not explicit, so no nutrient-to-unit conversion is asserted. Pack quantity for this SKU is not independently established.",
+            "verifiedAt": "2026-09-07T11:30:03.539452+00:00"
+          }
+        }
+      },
+      "beforeFingerprint": "e05485f8159fe1024406b072cb9464254561df288abf95ec69fae00cc2dcedce",
+      "afterFingerprint": "951f28b79435093b4876c4b0607495011a9c027084bc4149d6a38550619f075d",
+      "evidence": {
+        "sourceUrl": "https://www.vistra.co.th/product/vistra-nutribeau-advanced-elastin-peptide-plus-collagen-5000-mg/",
+        "checkedAt": "2026-09-07T11:30:03.539452+00:00",
+        "summary": "Manufacturer composition and oral directions support physical unit sachet. Composition basis per labelled serving is not explicit, so no nutrient-to-unit conversion is asserted. Pack quantity for this SKU is not independently established. Archived label HTML SHA-256: c1b17bc3208d9174faaa700831d5b0730f2268192ccc58f323d5399df10c1d9a"
+      }
+    },
+    {
+      "correctionId": "anna-v6-2026-09-07-uat-administration-18f9442d-faa0-403a-8c06-5a6feecc0a35",
+      "entityTable": "products",
+      "entityId": "18f9442d-faa0-403a-8c06-5a6feecc0a35",
+      "before": {
+        "id": "18f9442d-faa0-403a-8c06-5a6feecc0a35",
+        "administration": null
+      },
+      "after": {
+        "id": "18f9442d-faa0-403a-8c06-5a6feecc0a35",
+        "administration": {
+          "route": "oral",
+          "physicalUnit": "capsule",
+          "unitsPerServing": 1,
+          "doseIncrement": 1,
+          "packQuantity": 30,
+          "provenance": {
+            "status": "verified",
+            "sourceUrl": "https://www.vistra.co.th/product/cranberry-600/",
+            "sourceText": "Manufacturer composition and oral directions support physical unit capsule. Composition basis is 1 physical unit(s) per labelled serving. The source identifies a single pack size of 30 physical units.",
+            "verifiedAt": "2026-09-07T11:30:04.665082+00:00"
+          }
+        }
+      },
+      "beforeFingerprint": "ce2dac8517257c8f4fb1654bf7bb10c5dea80ccbbb1178167d4caebac708cb38",
+      "afterFingerprint": "c8494df73d630c46c9f64c48aa5cb3513e1c6c90a41cc983be3b2e6eaa2fb53e",
+      "evidence": {
+        "sourceUrl": "https://www.vistra.co.th/product/cranberry-600/",
+        "checkedAt": "2026-09-07T11:30:04.665082+00:00",
+        "summary": "Manufacturer composition and oral directions support physical unit capsule. Composition basis is 1 physical unit(s) per labelled serving. The source identifies a single pack size of 30 physical units. Archived label HTML SHA-256: 4109e666552c5d88b96a244dc7817a9cc1fe41817cb66f5b69c29397daad5f1a"
+      }
+    },
+    {
+      "correctionId": "anna-v6-2026-09-07-uat-administration-1add87e5-c8bd-4a2b-afc8-d14d9b7a2a28",
+      "entityTable": "products",
+      "entityId": "1add87e5-c8bd-4a2b-afc8-d14d9b7a2a28",
+      "before": {
+        "id": "1add87e5-c8bd-4a2b-afc8-d14d9b7a2a28",
+        "administration": null
+      },
+      "after": {
+        "id": "1add87e5-c8bd-4a2b-afc8-d14d9b7a2a28",
+        "administration": {
+          "route": "oral",
+          "physicalUnit": "tablet",
+          "unitsPerServing": 1,
+          "doseIncrement": 1,
+          "packQuantity": 90,
+          "provenance": {
+            "status": "verified",
+            "sourceUrl": "https://www.blackmores.co.th/%E0%B8%9C%E0%B8%A5%E0%B8%B4%E0%B8%95%E0%B8%A0%E0%B8%B1%E0%B8%93%E0%B8%91%E0%B9%8C/%E0%B8%9C%E0%B8%A5%E0%B8%B4%E0%B8%95%E0%B8%A0%E0%B8%B1%E0%B8%93%E0%B8%91%E0%B9%8C%E0%B8%A2%E0%B8%B2/2127-blackmores-bio-folic",
+            "sourceText": "Manufacturer composition and oral directions support physical unit tablet. Composition basis is 1 physical unit(s) per labelled serving. The source identifies a single pack size of 90 physical units.",
+            "verifiedAt": "2026-09-07T11:30:04.667165+00:00"
+          }
+        }
+      },
+      "beforeFingerprint": "96b0ab1fbf1d00704203839b7d86e386540c2e43db2888d697cf6d1a7382ac11",
+      "afterFingerprint": "4087422a44533055ba84f88e8b74d4c46ab22aed26f838f2cc96f23cfc57ff37",
+      "evidence": {
+        "sourceUrl": "https://www.blackmores.co.th/%E0%B8%9C%E0%B8%A5%E0%B8%B4%E0%B8%95%E0%B8%A0%E0%B8%B1%E0%B8%93%E0%B8%91%E0%B9%8C/%E0%B8%9C%E0%B8%A5%E0%B8%B4%E0%B8%95%E0%B8%A0%E0%B8%B1%E0%B8%93%E0%B8%91%E0%B9%8C%E0%B8%A2%E0%B8%B2/2127-blackmores-bio-folic",
+        "checkedAt": "2026-09-07T11:30:04.667165+00:00",
+        "summary": "Manufacturer composition and oral directions support physical unit tablet. Composition basis is 1 physical unit(s) per labelled serving. The source identifies a single pack size of 90 physical units. Archived label HTML SHA-256: 08090c1d061b6769f041b91d41ec6dc0069bebb7994d92168b37e6ace6fad0b6"
+      }
+    },
+    {
+      "correctionId": "anna-v6-2026-09-07-uat-administration-202c5e09-36e8-575f-9d95-dcb35a8d2965",
+      "entityTable": "products",
+      "entityId": "202c5e09-36e8-575f-9d95-dcb35a8d2965",
+      "before": {
+        "id": "202c5e09-36e8-575f-9d95-dcb35a8d2965",
+        "administration": null
+      },
+      "after": {
+        "id": "202c5e09-36e8-575f-9d95-dcb35a8d2965",
+        "administration": {
+          "route": "oral",
+          "physicalUnit": "tablet",
+          "unitsPerServing": 1,
+          "doseIncrement": 1,
+          "packQuantity": 50,
+          "provenance": {
+            "status": "verified",
+            "sourceUrl": "https://www.blackmores.co.th/en/products/supplement/2125-blackmores-bio-magnesium-advance-d3",
+            "sourceText": "Manufacturer composition and oral directions support physical unit tablet. Composition basis is 1 physical unit(s) per labelled serving. The source identifies a single pack size of 50 physical units.",
+            "verifiedAt": "2026-09-07T11:40:30.371428+00:00"
+          }
+        }
+      },
+      "beforeFingerprint": "8c1f34760effcdebfea5a88aea5b17de5a37e5c37cc93e24001438690294f7ea",
+      "afterFingerprint": "21f95768070ac695174334441a737fe364dadec8290c62ee55e190d175a104e9",
+      "evidence": {
+        "sourceUrl": "https://www.blackmores.co.th/en/products/supplement/2125-blackmores-bio-magnesium-advance-d3",
+        "checkedAt": "2026-09-07T11:40:30.371428+00:00",
+        "summary": "Manufacturer composition and oral directions support physical unit tablet. Composition basis is 1 physical unit(s) per labelled serving. The source identifies a single pack size of 50 physical units. Archived label HTML SHA-256: 862a7fb763f4cdc7fa406e5b7f48faf011c01c0d36c6a8d88f42e2b22b200e60"
+      }
+    },
+    {
+      "correctionId": "anna-v6-2026-09-07-uat-administration-24115b3d-88d0-45f5-9bf7-a2eef194972f",
+      "entityTable": "products",
+      "entityId": "24115b3d-88d0-45f5-9bf7-a2eef194972f",
+      "before": {
+        "id": "24115b3d-88d0-45f5-9bf7-a2eef194972f",
+        "administration": null
+      },
+      "after": {
+        "id": "24115b3d-88d0-45f5-9bf7-a2eef194972f",
+        "administration": {
+          "route": "oral",
+          "physicalUnit": "tablet",
+          "unitsPerServing": 1,
+          "doseIncrement": 1,
+          "packQuantity": 30,
+          "provenance": {
+            "status": "verified",
+            "sourceUrl": "https://www.blackmores.co.th/en/products/medicine/2121-blackmores-hyperiforte",
+            "sourceText": "Manufacturer composition and oral directions support physical unit tablet. Composition basis is 1 physical unit(s) per labelled serving. The source identifies a single pack size of 30 physical units.",
+            "verifiedAt": "2026-09-07T11:41:23.060456+00:00"
+          }
+        }
+      },
+      "beforeFingerprint": "906ec559c5bae448d29542ddc135d360f6aeaf9563b0cf76a1fce6525d458c8f",
+      "afterFingerprint": "9394a7c46c251e3b8a80b530c8d5efb551d11789da203cbce80f8132c876195a",
+      "evidence": {
+        "sourceUrl": "https://www.blackmores.co.th/en/products/medicine/2121-blackmores-hyperiforte",
+        "checkedAt": "2026-09-07T11:41:23.060456+00:00",
+        "summary": "Manufacturer composition and oral directions support physical unit tablet. Composition basis is 1 physical unit(s) per labelled serving. The source identifies a single pack size of 30 physical units. Archived label HTML SHA-256: d8d865bddf9c754283c4b2894f5062720f841c585eda9f2fa8e35c610d4c8bfe"
+      }
+    },
+    {
+      "correctionId": "anna-v6-2026-09-07-uat-administration-24ac9f23-07fe-5db9-8ae1-c726b0562490",
+      "entityTable": "products",
+      "entityId": "24ac9f23-07fe-5db9-8ae1-c726b0562490",
+      "before": {
+        "id": "24ac9f23-07fe-5db9-8ae1-c726b0562490",
+        "administration": null
+      },
+      "after": {
+        "id": "24ac9f23-07fe-5db9-8ae1-c726b0562490",
+        "administration": {
+          "route": "oral",
+          "physicalUnit": "softgel",
+          "unitsPerServing": null,
+          "doseIncrement": 1,
+          "packQuantity": null,
+          "provenance": {
+            "status": "verified",
+            "sourceUrl": "https://ndi.fda.moph.go.th/drug_detail/index/?rctype=1C&rcno=4200257&register=MUMgMjU3LzQy",
+            "sourceText": "Thai FDA identifies the registered dosage form as a soft gelatin capsule. Per-serving nutrient basis and pack quantity remain unverified; no conversion from the title is used.",
+            "verifiedAt": "2026-09-07T11:30:04.949681+00:00"
+          }
+        }
+      },
+      "beforeFingerprint": "7d2de516764bbdba5caf7ddbe5df7161dba743e9b409e45c271edcda6817ddd2",
+      "afterFingerprint": "a54eaf3af82c6a7718fde56928eb17b812078a9524a35d88793b6369e3d28bb2",
+      "evidence": {
+        "sourceUrl": "https://ndi.fda.moph.go.th/drug_detail/index/?rctype=1C&rcno=4200257&register=MUMgMjU3LzQy",
+        "checkedAt": "2026-09-07T11:30:04.949681+00:00",
+        "summary": "Thai FDA identifies the registered dosage form as a soft gelatin capsule. Per-serving nutrient basis and pack quantity remain unverified; no conversion from the title is used. Archived label HTML SHA-256: 7c28342b6dbfd59d2fba44feb0fbed1fab018dc9468a604a9b9f8890d0608fd4"
+      }
+    },
+    {
+      "correctionId": "anna-v6-2026-09-07-uat-administration-24babd68-2570-4003-a6c3-15e7a568cc01",
+      "entityTable": "products",
+      "entityId": "24babd68-2570-4003-a6c3-15e7a568cc01",
+      "before": {
+        "id": "24babd68-2570-4003-a6c3-15e7a568cc01",
+        "administration": null
+      },
+      "after": {
+        "id": "24babd68-2570-4003-a6c3-15e7a568cc01",
+        "administration": {
+          "route": "oral",
+          "physicalUnit": "tablet",
+          "unitsPerServing": null,
+          "doseIncrement": 1,
+          "packQuantity": null,
+          "provenance": {
+            "status": "verified",
+            "sourceUrl": "https://swisse.co.th/products/collagen-gold",
+            "sourceText": "Manufacturer composition and oral directions support physical unit tablet. Composition basis per labelled serving is not explicit, so no nutrient-to-unit conversion is asserted. Pack quantity for this SKU is not independently established.",
+            "verifiedAt": "2026-09-07T11:30:05.121410+00:00"
+          }
+        }
+      },
+      "beforeFingerprint": "ac4ce1b1a3e73dcc00d338d9aefd6d398fa7f49507ef5329ac2fff7453e8c09b",
+      "afterFingerprint": "0c4dc319512c7fe1f231484e6c229d9155bb76bd5fa370ffe91f81d0fa3d1022",
+      "evidence": {
+        "sourceUrl": "https://swisse.co.th/products/collagen-gold",
+        "checkedAt": "2026-09-07T11:30:05.121410+00:00",
+        "summary": "Manufacturer composition and oral directions support physical unit tablet. Composition basis per labelled serving is not explicit, so no nutrient-to-unit conversion is asserted. Pack quantity for this SKU is not independently established. Archived label HTML SHA-256: b7e52011650aafee8effc20250712c9069c7b5283113f2bcc4233e13a78852ae"
+      }
+    },
+    {
+      "correctionId": "anna-v6-2026-09-07-uat-administration-26f57ca5-212b-452a-ac0e-03bf45d8a481",
+      "entityTable": "products",
+      "entityId": "26f57ca5-212b-452a-ac0e-03bf45d8a481",
+      "before": {
+        "id": "26f57ca5-212b-452a-ac0e-03bf45d8a481",
+        "administration": null
+      },
+      "after": {
+        "id": "26f57ca5-212b-452a-ac0e-03bf45d8a481",
+        "administration": {
+          "route": "oral",
+          "physicalUnit": "capsule",
+          "unitsPerServing": 1,
+          "doseIncrement": 1,
+          "packQuantity": null,
+          "provenance": {
+            "status": "verified",
+            "sourceUrl": "https://www.vistra.co.th/product/vistra-plant-amipro-plus-vitamin-b/",
+            "sourceText": "Manufacturer composition and oral directions support physical unit capsule. Composition basis is 1 physical unit(s) per labelled serving. Pack quantity for this SKU is not independently established.",
+            "verifiedAt": "2026-09-07T11:30:05.539163+00:00"
+          }
+        }
+      },
+      "beforeFingerprint": "823000c00e274427ae4049e168fd1a00a1e4d61a035b8d6d6cda1cd4949d2bb5",
+      "afterFingerprint": "41e12a2d6a4fe8430ceb7c48958a5fdea92d7693f2593e32825d5a8d47642a1f",
+      "evidence": {
+        "sourceUrl": "https://www.vistra.co.th/product/vistra-plant-amipro-plus-vitamin-b/",
+        "checkedAt": "2026-09-07T11:30:05.539163+00:00",
+        "summary": "Manufacturer composition and oral directions support physical unit capsule. Composition basis is 1 physical unit(s) per labelled serving. Pack quantity for this SKU is not independently established. Archived label HTML SHA-256: 5e1e015fab1ffd8a6553a2437a6fc3e31a1e6b720da54973d5b53edf9ce5a7fe"
+      }
+    },
+    {
+      "correctionId": "anna-v6-2026-09-07-uat-administration-2c9107c2-db62-4475-9755-c683ff46a98e",
+      "entityTable": "products",
+      "entityId": "2c9107c2-db62-4475-9755-c683ff46a98e",
+      "before": {
+        "id": "2c9107c2-db62-4475-9755-c683ff46a98e",
+        "administration": null
+      },
+      "after": {
+        "id": "2c9107c2-db62-4475-9755-c683ff46a98e",
+        "administration": {
+          "route": "oral",
+          "physicalUnit": "tablet",
+          "unitsPerServing": 1,
+          "doseIncrement": 1,
+          "packQuantity": null,
+          "provenance": {
+            "status": "verified",
+            "sourceUrl": "https://www.blackmores.co.th/en/products/supplement/2122-blackmores-bio-calciumd3",
+            "sourceText": "Manufacturer composition and oral directions support physical unit tablet. Composition basis is 1 physical unit(s) per labelled serving. Pack quantity for this SKU is not independently established.",
+            "verifiedAt": "2026-09-07T11:30:05.821523+00:00"
+          }
+        }
+      },
+      "beforeFingerprint": "709fb97015d2dc3b83c8f29dd543986aacc398adb0fc731c5e4865048912822a",
+      "afterFingerprint": "dba7301e338a61bd290e5695fc1144e9a4e215de14b84062dc8927e67476960b",
+      "evidence": {
+        "sourceUrl": "https://www.blackmores.co.th/en/products/supplement/2122-blackmores-bio-calciumd3",
+        "checkedAt": "2026-09-07T11:30:05.821523+00:00",
+        "summary": "Manufacturer composition and oral directions support physical unit tablet. Composition basis is 1 physical unit(s) per labelled serving. Pack quantity for this SKU is not independently established. Archived label HTML SHA-256: d9a189f57d6c01aa62c64e1902254c2eb50916b4a06e5595e4b25724a7db7ac0"
+      }
+    },
+    {
+      "correctionId": "anna-v6-2026-09-07-uat-administration-2ed6b86e-1e07-486d-8ad6-5d1f15c6c6b4",
+      "entityTable": "products",
+      "entityId": "2ed6b86e-1e07-486d-8ad6-5d1f15c6c6b4",
+      "before": {
+        "id": "2ed6b86e-1e07-486d-8ad6-5d1f15c6c6b4",
+        "administration": null
+      },
+      "after": {
+        "id": "2ed6b86e-1e07-486d-8ad6-5d1f15c6c6b4",
+        "administration": {
+          "route": "oral",
+          "physicalUnit": "sachet",
+          "unitsPerServing": null,
+          "doseIncrement": 1,
+          "packQuantity": null,
+          "provenance": {
+            "status": "verified",
+            "sourceUrl": "https://www.vistra.co.th/product/vistra-collagen-type-ii-1000-mg-plus-turmeric-extract/",
+            "sourceText": "Manufacturer composition and oral directions support physical unit sachet. Composition basis per labelled serving is not explicit, so no nutrient-to-unit conversion is asserted. Pack quantity for this SKU is not independently established.",
+            "verifiedAt": "2026-09-07T11:30:06.023582+00:00"
+          }
+        }
+      },
+      "beforeFingerprint": "194143715322cf565cd8baf7f6fc315ce23dad0992d23c855577070270eb6c98",
+      "afterFingerprint": "f4e3eea7180f01ce9694c1290a0382e81db201a03469291e298989b56f186296",
+      "evidence": {
+        "sourceUrl": "https://www.vistra.co.th/product/vistra-collagen-type-ii-1000-mg-plus-turmeric-extract/",
+        "checkedAt": "2026-09-07T11:30:06.023582+00:00",
+        "summary": "Manufacturer composition and oral directions support physical unit sachet. Composition basis per labelled serving is not explicit, so no nutrient-to-unit conversion is asserted. Pack quantity for this SKU is not independently established. Archived label HTML SHA-256: 19d971827f06ad5e7872936ddc588c32d48a29836497374b1f0602648c725cb2"
+      }
+    },
+    {
+      "correctionId": "anna-v6-2026-09-07-uat-administration-39994f28-818d-4ad7-954e-c2bcd43cd6eb",
+      "entityTable": "products",
+      "entityId": "39994f28-818d-4ad7-954e-c2bcd43cd6eb",
+      "before": {
+        "id": "39994f28-818d-4ad7-954e-c2bcd43cd6eb",
+        "administration": null
+      },
+      "after": {
+        "id": "39994f28-818d-4ad7-954e-c2bcd43cd6eb",
+        "administration": {
+          "route": "oral",
+          "physicalUnit": "capsule",
+          "unitsPerServing": 1,
+          "doseIncrement": 1,
+          "packQuantity": 30,
+          "provenance": {
+            "status": "verified",
+            "sourceUrl": "https://www.blackmores.co.th/en/products/supplement/2089-blackmores-pre-9-care-gold",
+            "sourceText": "Manufacturer composition and oral directions support physical unit capsule. Composition basis is 1 physical unit(s) per labelled serving. The source identifies a single pack size of 30 physical units.",
+            "verifiedAt": "2026-09-07T11:30:06.323905+00:00"
+          }
+        }
+      },
+      "beforeFingerprint": "2d0e472816b4fd8edee7e31e47938ba3a845a4808ee4552aae517ac8543ef8f0",
+      "afterFingerprint": "39ab7a2d6918de0f1a38ebf322724ee3bcfb127f693908046557777490ca588a",
+      "evidence": {
+        "sourceUrl": "https://www.blackmores.co.th/en/products/supplement/2089-blackmores-pre-9-care-gold",
+        "checkedAt": "2026-09-07T11:30:06.323905+00:00",
+        "summary": "Manufacturer composition and oral directions support physical unit capsule. Composition basis is 1 physical unit(s) per labelled serving. The source identifies a single pack size of 30 physical units. Archived label HTML SHA-256: 5b18b176a6ff279d0206886bee2fc51168ee8e1a7d5a67beeaa4714037aa31d8"
+      }
+    },
+    {
+      "correctionId": "anna-v6-2026-09-07-uat-administration-3c744ec2-52fe-5215-a755-2d3bb3b10175",
+      "entityTable": "products",
+      "entityId": "3c744ec2-52fe-5215-a755-2d3bb3b10175",
+      "before": {
+        "id": "3c744ec2-52fe-5215-a755-2d3bb3b10175",
+        "administration": null
+      },
+      "after": {
+        "id": "3c744ec2-52fe-5215-a755-2d3bb3b10175",
+        "administration": {
+          "route": "oral",
+          "physicalUnit": "tablet",
+          "unitsPerServing": 1,
+          "doseIncrement": 1,
+          "packQuantity": null,
+          "provenance": {
+            "status": "verified",
+            "sourceUrl": "https://www.vistra.co.th/product/l-carnitine-plus-3l/",
+            "sourceText": "Manufacturer composition and oral directions support physical unit tablet. Composition basis is 1 physical unit(s) per labelled serving. Pack quantity for this SKU is not independently established.",
+            "verifiedAt": "2026-09-07T11:30:06.500783+00:00"
+          }
+        }
+      },
+      "beforeFingerprint": "001fad9e171e3cc55919f6ec74abcaf972ef88cd05f27569109371f31015c92e",
+      "afterFingerprint": "79a0eead63f53103797293cbd7a733957efd56668674b75f17c0f218e48f2404",
+      "evidence": {
+        "sourceUrl": "https://www.vistra.co.th/product/l-carnitine-plus-3l/",
+        "checkedAt": "2026-09-07T11:30:06.500783+00:00",
+        "summary": "Manufacturer composition and oral directions support physical unit tablet. Composition basis is 1 physical unit(s) per labelled serving. Pack quantity for this SKU is not independently established. Archived label HTML SHA-256: e2986f746a7352cdd433c1ec289c6eaa9a7a93a72ebd271e5ce1794865e26daf"
+      }
+    },
+    {
+      "correctionId": "anna-v6-2026-09-07-uat-administration-3dc57564-e623-4262-b9f3-4f4a1c72ec21",
+      "entityTable": "products",
+      "entityId": "3dc57564-e623-4262-b9f3-4f4a1c72ec21",
+      "before": {
+        "id": "3dc57564-e623-4262-b9f3-4f4a1c72ec21",
+        "administration": null
+      },
+      "after": {
+        "id": "3dc57564-e623-4262-b9f3-4f4a1c72ec21",
+        "administration": {
+          "route": "oral",
+          "physicalUnit": "softgel",
+          "unitsPerServing": 1,
+          "doseIncrement": 1,
+          "packQuantity": null,
+          "provenance": {
+            "status": "verified",
+            "sourceUrl": "https://www.megawecare.com/products/vitamins/multilives",
+            "sourceText": "Manufacturer explicitly identifies this formulation as available in Thailand, with composition per softgel. Three discrepant local nutrient amounts are corrected separately without changing their confidence.",
+            "verifiedAt": "2026-09-07T11:40:30.376480+00:00"
+          }
+        }
+      },
+      "beforeFingerprint": "75e184fe513149749bdd7e52412c4347fc3f756f7d4cc560eb3bddb4f2349fdd",
+      "afterFingerprint": "b6ad767787d162285a3884874a94ade0106f49ccdceb3cab22585614f74889ce",
+      "evidence": {
+        "sourceUrl": "https://www.megawecare.com/products/vitamins/multilives",
+        "checkedAt": "2026-09-07T11:40:30.376480+00:00",
+        "summary": "Manufacturer explicitly identifies this formulation as available in Thailand, with composition per softgel. Three discrepant local nutrient amounts are corrected separately without changing their confidence. Archived label HTML SHA-256: 504b6d5ce98f26a96ae20bbbdc580e7df2a457423a7961010fd90547957a7360"
+      }
+    },
+    {
+      "correctionId": "anna-v6-2026-09-07-uat-administration-3ec6da20-8b4a-435f-924e-d54f874d8a70",
+      "entityTable": "products",
+      "entityId": "3ec6da20-8b4a-435f-924e-d54f874d8a70",
+      "before": {
+        "id": "3ec6da20-8b4a-435f-924e-d54f874d8a70",
+        "administration": null
+      },
+      "after": {
+        "id": "3ec6da20-8b4a-435f-924e-d54f874d8a70",
+        "administration": {
+          "route": "oral",
+          "physicalUnit": "tablet",
+          "unitsPerServing": 1,
+          "doseIncrement": 1,
+          "packQuantity": 30,
+          "provenance": {
+            "status": "verified",
+            "sourceUrl": "https://www.blackmores.co.th/en/products/supplement/2098-blackmores-ginkgo",
+            "sourceText": "Manufacturer composition and oral directions support physical unit tablet. Composition basis is 1 physical unit(s) per labelled serving. The source identifies a single pack size of 30 physical units.",
+            "verifiedAt": "2026-09-07T11:30:06.786140+00:00"
+          }
+        }
+      },
+      "beforeFingerprint": "3750b3d4e70aadbbe48630750fe0201cd45f6ab3fe81996371865f2cdaf5e4e1",
+      "afterFingerprint": "933585ff49f524c558167ea41388905b24c6bcff96e6e4b911dae47df1f6b9ce",
+      "evidence": {
+        "sourceUrl": "https://www.blackmores.co.th/en/products/supplement/2098-blackmores-ginkgo",
+        "checkedAt": "2026-09-07T11:30:06.786140+00:00",
+        "summary": "Manufacturer composition and oral directions support physical unit tablet. Composition basis is 1 physical unit(s) per labelled serving. The source identifies a single pack size of 30 physical units. Archived label HTML SHA-256: a914174ee5ed35ecd2e97201ed2de78cbc72637db2bf9eb4fd794900d6ff6fef"
+      }
+    },
+    {
+      "correctionId": "anna-v6-2026-09-07-uat-administration-44f3a282-8c3e-4f9d-898a-a68d9b27ccbc",
+      "entityTable": "products",
+      "entityId": "44f3a282-8c3e-4f9d-898a-a68d9b27ccbc",
+      "before": {
+        "id": "44f3a282-8c3e-4f9d-898a-a68d9b27ccbc",
+        "administration": null
+      },
+      "after": {
+        "id": "44f3a282-8c3e-4f9d-898a-a68d9b27ccbc",
+        "administration": {
+          "route": "oral",
+          "physicalUnit": "capsule",
+          "unitsPerServing": 1,
+          "doseIncrement": 1,
+          "packQuantity": null,
+          "provenance": {
+            "status": "verified",
+            "sourceUrl": "https://www.vistra.co.th/product/vistra-relacza-plus/",
+            "sourceText": "Manufacturer composition and oral directions support physical unit capsule. Composition basis is 1 physical unit(s) per labelled serving. Pack quantity for this SKU is not independently established.",
+            "verifiedAt": "2026-09-07T11:30:07.023667+00:00"
+          }
+        }
+      },
+      "beforeFingerprint": "6114905655d47cc73171b876be427b665d6ae0bb5abc8bae4fc94e279348f633",
+      "afterFingerprint": "f966020409d6f28def96d64658d4740aa37123ad7933ae89cb3694542c73e112",
+      "evidence": {
+        "sourceUrl": "https://www.vistra.co.th/product/vistra-relacza-plus/",
+        "checkedAt": "2026-09-07T11:30:07.023667+00:00",
+        "summary": "Manufacturer composition and oral directions support physical unit capsule. Composition basis is 1 physical unit(s) per labelled serving. Pack quantity for this SKU is not independently established. Archived label HTML SHA-256: 63c78d0a257a638159e9a76150e46647c4c9dd532add99390d74c23274f5d2dd"
+      }
+    },
+    {
+      "correctionId": "anna-v6-2026-09-07-uat-administration-461232a2-8b3d-4c14-b337-09b5752a4ba0",
+      "entityTable": "products",
+      "entityId": "461232a2-8b3d-4c14-b337-09b5752a4ba0",
+      "before": {
+        "id": "461232a2-8b3d-4c14-b337-09b5752a4ba0",
+        "administration": null
+      },
+      "after": {
+        "id": "461232a2-8b3d-4c14-b337-09b5752a4ba0",
+        "administration": {
+          "route": "oral",
+          "physicalUnit": "tablet",
+          "unitsPerServing": 1,
+          "doseIncrement": 1,
+          "packQuantity": 60,
+          "provenance": {
+            "status": "verified",
+            "sourceUrl": "https://www.blackmores.co.th/en/products/supplement/2110-blackmores-biotin-h",
+            "sourceText": "Manufacturer composition and oral directions support physical unit tablet. Composition basis is 1 physical unit(s) per labelled serving. The source identifies a single pack size of 60 physical units.",
+            "verifiedAt": "2026-09-07T11:30:07.043190+00:00"
+          }
+        }
+      },
+      "beforeFingerprint": "33e567d506f7f71a04801e9fcb9104a7e077168824f96c085516cb5bbdcc427c",
+      "afterFingerprint": "bf4c80abef360bf04ee20d447076cc19bd322a76accf80a341f1e2bcf55f31d8",
+      "evidence": {
+        "sourceUrl": "https://www.blackmores.co.th/en/products/supplement/2110-blackmores-biotin-h",
+        "checkedAt": "2026-09-07T11:30:07.043190+00:00",
+        "summary": "Manufacturer composition and oral directions support physical unit tablet. Composition basis is 1 physical unit(s) per labelled serving. The source identifies a single pack size of 60 physical units. Archived label HTML SHA-256: d8f07bc875a293cece283ea3a2ac29d85a6c59940ab7fa41253c1b041bb73b42"
+      }
+    },
+    {
+      "correctionId": "anna-v6-2026-09-07-uat-administration-463ab90c-cdda-5d10-9ca2-0e1922ce288e",
+      "entityTable": "products",
+      "entityId": "463ab90c-cdda-5d10-9ca2-0e1922ce288e",
+      "before": {
+        "id": "463ab90c-cdda-5d10-9ca2-0e1922ce288e",
+        "administration": null
+      },
+      "after": {
+        "id": "463ab90c-cdda-5d10-9ca2-0e1922ce288e",
+        "administration": {
+          "route": "oral",
+          "physicalUnit": "tablet",
+          "unitsPerServing": null,
+          "doseIncrement": 1,
+          "packQuantity": null,
+          "provenance": {
+            "status": "verified",
+            "sourceUrl": "https://www.vistra.co.th/product/vistra-vital-pro-multivitamins-ultra-plus-amino-acid/",
+            "sourceText": "Manufacturer composition and oral directions support physical unit tablet. Composition basis per labelled serving is not explicit, so no nutrient-to-unit conversion is asserted. Pack quantity for this SKU is not independently established.",
+            "verifiedAt": "2026-09-07T11:30:07.399371+00:00"
+          }
+        }
+      },
+      "beforeFingerprint": "4a7bac1c644d95a8f2c44d267f48744f99adc6053b1ace0e9d2e5f08ee1f12af",
+      "afterFingerprint": "5c2c97dd34c09e56727e44319d03a814f42d370953ac544737142e7f62241275",
+      "evidence": {
+        "sourceUrl": "https://www.vistra.co.th/product/vistra-vital-pro-multivitamins-ultra-plus-amino-acid/",
+        "checkedAt": "2026-09-07T11:30:07.399371+00:00",
+        "summary": "Manufacturer composition and oral directions support physical unit tablet. Composition basis per labelled serving is not explicit, so no nutrient-to-unit conversion is asserted. Pack quantity for this SKU is not independently established. Archived label HTML SHA-256: 7e78d6f3fb617b7340bfd42b46b4900ef5c53b53aa59a8cce72d4ca137c8a931"
+      }
+    },
+    {
+      "correctionId": "anna-v6-2026-09-07-uat-administration-53533cd8-ee50-5581-a8b7-bc21c8917750",
+      "entityTable": "products",
+      "entityId": "53533cd8-ee50-5581-a8b7-bc21c8917750",
+      "before": {
+        "id": "53533cd8-ee50-5581-a8b7-bc21c8917750",
+        "administration": null
+      },
+      "after": {
+        "id": "53533cd8-ee50-5581-a8b7-bc21c8917750",
+        "administration": {
+          "route": "oral",
+          "physicalUnit": "capsule",
+          "unitsPerServing": 1,
+          "doseIncrement": 1,
+          "packQuantity": null,
+          "provenance": {
+            "status": "verified",
+            "sourceUrl": "https://www.vistra.co.th/product/vistra-coenzyme-q10/",
+            "sourceText": "Manufacturer composition and oral directions support physical unit capsule. Composition basis is 1 physical unit(s) per labelled serving. Pack quantity for this SKU is not independently established.",
+            "verifiedAt": "2026-09-07T11:30:07.568508+00:00"
+          }
+        }
+      },
+      "beforeFingerprint": "50a6feb4d1ac983fef9bc6f20c5e9a4d9fb7a21250c9f5497af252e808a9e667",
+      "afterFingerprint": "5efda0689fd0068088e76efc764ee1fd4bf9c568f8de61b6d1604909a4736730",
+      "evidence": {
+        "sourceUrl": "https://www.vistra.co.th/product/vistra-coenzyme-q10/",
+        "checkedAt": "2026-09-07T11:30:07.568508+00:00",
+        "summary": "Manufacturer composition and oral directions support physical unit capsule. Composition basis is 1 physical unit(s) per labelled serving. Pack quantity for this SKU is not independently established. Archived label HTML SHA-256: 44d8ad1f59257d640c62211ef6ec3a28f30544ad949e18231b4bf540f598baf2"
+      }
+    },
+    {
+      "correctionId": "anna-v6-2026-09-07-uat-administration-5651fa1b-f6b5-42f7-a18b-260c42aab52d",
+      "entityTable": "products",
+      "entityId": "5651fa1b-f6b5-42f7-a18b-260c42aab52d",
+      "before": {
+        "id": "5651fa1b-f6b5-42f7-a18b-260c42aab52d",
+        "administration": null
+      },
+      "after": {
+        "id": "5651fa1b-f6b5-42f7-a18b-260c42aab52d",
+        "administration": {
+          "route": "oral",
+          "physicalUnit": "capsule",
+          "unitsPerServing": 1,
+          "doseIncrement": 1,
+          "packQuantity": null,
+          "provenance": {
+            "status": "verified",
+            "sourceUrl": "https://www.vistra.co.th/product/vistra-sesamin-dha-epa/",
+            "sourceText": "Manufacturer composition and oral directions support physical unit capsule. Composition basis is 1 physical unit(s) per labelled serving. Pack quantity for this SKU is not independently established.",
+            "verifiedAt": "2026-09-07T11:30:07.836805+00:00"
+          }
+        }
+      },
+      "beforeFingerprint": "c0e64b64917605c651740f0c3253039d0c30768569047ad307c7bc021fc8578b",
+      "afterFingerprint": "9d26a3449b40dd85aae1c63edaab6cc68609b9bb3b28436142fa8d980122655a",
+      "evidence": {
+        "sourceUrl": "https://www.vistra.co.th/product/vistra-sesamin-dha-epa/",
+        "checkedAt": "2026-09-07T11:30:07.836805+00:00",
+        "summary": "Manufacturer composition and oral directions support physical unit capsule. Composition basis is 1 physical unit(s) per labelled serving. Pack quantity for this SKU is not independently established. Archived label HTML SHA-256: 50ea1154109d83bd6dd06262e8ff8c5df60e84d16b1dab3633768f2ef56aecb5"
+      }
+    },
+    {
+      "correctionId": "anna-v6-2026-09-07-uat-administration-56f119ad-5e96-460e-a299-d88aa6596f3a",
+      "entityTable": "products",
+      "entityId": "56f119ad-5e96-460e-a299-d88aa6596f3a",
+      "before": {
+        "id": "56f119ad-5e96-460e-a299-d88aa6596f3a",
+        "administration": null
+      },
+      "after": {
+        "id": "56f119ad-5e96-460e-a299-d88aa6596f3a",
+        "administration": {
+          "route": "oral",
+          "physicalUnit": "capsule",
+          "unitsPerServing": 1,
+          "doseIncrement": 1,
+          "packQuantity": 60,
+          "provenance": {
+            "status": "verified",
+            "sourceUrl": "https://www.blackmores.co.th/en/products/supplement/2093-blackmores-choles-bloc",
+            "sourceText": "Manufacturer composition and oral directions support physical unit capsule. Composition basis is 1 physical unit(s) per labelled serving. The source identifies a single pack size of 60 physical units.",
+            "verifiedAt": "2026-09-07T11:30:07.995397+00:00"
+          }
+        }
+      },
+      "beforeFingerprint": "be5c677d318ee3d99e65ddf22a18accd34d2dacf25a00cc762060cfb4df88478",
+      "afterFingerprint": "60d266b235a7712a73120e37f502770cf6880bcd730cba5b1e97b7f200ed76aa",
+      "evidence": {
+        "sourceUrl": "https://www.blackmores.co.th/en/products/supplement/2093-blackmores-choles-bloc",
+        "checkedAt": "2026-09-07T11:30:07.995397+00:00",
+        "summary": "Manufacturer composition and oral directions support physical unit capsule. Composition basis is 1 physical unit(s) per labelled serving. The source identifies a single pack size of 60 physical units. Archived label HTML SHA-256: d368d4b0b40181a808736b10ba9145fd02fc16a3c4fdf62a02d27a25c8ad0b4a"
+      }
+    },
+    {
+      "correctionId": "anna-v6-2026-09-07-uat-administration-58ecb2a0-8899-4736-b2ee-d000fbc7ea76",
+      "entityTable": "products",
+      "entityId": "58ecb2a0-8899-4736-b2ee-d000fbc7ea76",
+      "before": {
+        "id": "58ecb2a0-8899-4736-b2ee-d000fbc7ea76",
+        "administration": null
+      },
+      "after": {
+        "id": "58ecb2a0-8899-4736-b2ee-d000fbc7ea76",
+        "administration": {
+          "route": "oral",
+          "physicalUnit": "capsule",
+          "unitsPerServing": 1,
+          "doseIncrement": 1,
+          "packQuantity": 30,
+          "provenance": {
+            "status": "verified",
+            "sourceUrl": "https://www.blackmores.co.th/en/products/supplement/2126-blackmores-vis-care-pro-lutein-dietary-supplement",
+            "sourceText": "Manufacturer composition and oral directions support physical unit capsule. Composition basis is 1 physical unit(s) per labelled serving. The source identifies a single pack size of 30 physical units.",
+            "verifiedAt": "2026-09-07T11:30:08.256461+00:00"
+          }
+        }
+      },
+      "beforeFingerprint": "c6e4ae11afdfdf25c58c8bfcfaf46aaa0c5df73d43c56b51b79785a4e8e3a3d3",
+      "afterFingerprint": "571b8d817674e0e36248258eac58cf357f1d7f72b4a03356d221faa41d262684",
+      "evidence": {
+        "sourceUrl": "https://www.blackmores.co.th/en/products/supplement/2126-blackmores-vis-care-pro-lutein-dietary-supplement",
+        "checkedAt": "2026-09-07T11:30:08.256461+00:00",
+        "summary": "Manufacturer composition and oral directions support physical unit capsule. Composition basis is 1 physical unit(s) per labelled serving. The source identifies a single pack size of 30 physical units. Archived label HTML SHA-256: d4d1e404cb4204c3e26aa3679162ff25d4e8af7a5e8f78036dfaea0b1f92c3d1"
+      }
+    },
+    {
+      "correctionId": "anna-v6-2026-09-07-uat-administration-59b7b3c3-265f-450a-8cf6-fdb62a3a5963",
+      "entityTable": "products",
+      "entityId": "59b7b3c3-265f-450a-8cf6-fdb62a3a5963",
+      "before": {
+        "id": "59b7b3c3-265f-450a-8cf6-fdb62a3a5963",
+        "administration": null
+      },
+      "after": {
+        "id": "59b7b3c3-265f-450a-8cf6-fdb62a3a5963",
+        "administration": {
+          "route": "oral",
+          "physicalUnit": "tablet",
+          "unitsPerServing": 1,
+          "doseIncrement": 1,
+          "packQuantity": 90,
+          "provenance": {
+            "status": "verified",
+            "sourceUrl": "https://www.blackmores.com.au/products/multivitamins-for-50-plus",
+            "sourceText": "Manufacturer composition and oral directions support physical unit tablet. Composition basis is 1 physical unit(s) per labelled serving. The source identifies a single pack size of 90 physical units.",
+            "verifiedAt": "2026-09-07T11:30:08.305097+00:00"
+          }
+        }
+      },
+      "beforeFingerprint": "34b293fabae42bcc49baef73bdc09eaef347c6ac1bc28ba09cc55e73a30eaea8",
+      "afterFingerprint": "b3e2a66be01be71da16d4a1ff031e526c2d8538d99c72437f61584ba4376849d",
+      "evidence": {
+        "sourceUrl": "https://www.blackmores.com.au/products/multivitamins-for-50-plus",
+        "checkedAt": "2026-09-07T11:30:08.305097+00:00",
+        "summary": "Manufacturer composition and oral directions support physical unit tablet. Composition basis is 1 physical unit(s) per labelled serving. The source identifies a single pack size of 90 physical units. Archived label HTML SHA-256: 3a8d4d7e724ea0512fec3cd419977d13fe6aa919e07e4b34ca28eef2a947d6bf"
+      }
+    },
+    {
+      "correctionId": "anna-v6-2026-09-07-uat-administration-5c7c94ab-ea40-4f7e-81be-849c96e8dbca",
+      "entityTable": "products",
+      "entityId": "5c7c94ab-ea40-4f7e-81be-849c96e8dbca",
+      "before": {
+        "id": "5c7c94ab-ea40-4f7e-81be-849c96e8dbca",
+        "administration": null
+      },
+      "after": {
+        "id": "5c7c94ab-ea40-4f7e-81be-849c96e8dbca",
+        "administration": {
+          "route": "oral",
+          "physicalUnit": "capsule",
+          "unitsPerServing": 1,
+          "doseIncrement": 1,
+          "packQuantity": null,
+          "provenance": {
+            "status": "verified",
+            "sourceUrl": "https://www.vistra.co.th/product/vistra-omega-concentrate-x3-rtg-omega-3-from-fish-oil-dietary-supplement-product/",
+            "sourceText": "Manufacturer composition and oral directions support physical unit capsule. Composition basis is 1 physical unit(s) per labelled serving. Pack quantity for this SKU is not independently established.",
+            "verifiedAt": "2026-09-07T11:30:08.582205+00:00"
+          }
+        }
+      },
+      "beforeFingerprint": "dc3eb9f610365187f5971f5e0891a4139baecd1539f5032564ff5071268114f6",
+      "afterFingerprint": "9d6a5d067fc667e3b9d585dda0272a98d097568b9a98aa16e2db548e091b9bf1",
+      "evidence": {
+        "sourceUrl": "https://www.vistra.co.th/product/vistra-omega-concentrate-x3-rtg-omega-3-from-fish-oil-dietary-supplement-product/",
+        "checkedAt": "2026-09-07T11:30:08.582205+00:00",
+        "summary": "Manufacturer composition and oral directions support physical unit capsule. Composition basis is 1 physical unit(s) per labelled serving. Pack quantity for this SKU is not independently established. Archived label HTML SHA-256: f5d4da34cd57ea19404f693b7d0adb04f86db3a89853a72562f144d5ada721b2"
+      }
+    },
+    {
+      "correctionId": "anna-v6-2026-09-07-uat-administration-635eff91-e95c-42c9-8a3a-4ad10a92bf86",
+      "entityTable": "products",
+      "entityId": "635eff91-e95c-42c9-8a3a-4ad10a92bf86",
+      "before": {
+        "id": "635eff91-e95c-42c9-8a3a-4ad10a92bf86",
+        "administration": null
+      },
+      "after": {
+        "id": "635eff91-e95c-42c9-8a3a-4ad10a92bf86",
+        "administration": {
+          "route": "oral",
+          "physicalUnit": "capsule",
+          "unitsPerServing": 1,
+          "doseIncrement": 1,
+          "packQuantity": null,
+          "provenance": {
+            "status": "verified",
+            "sourceUrl": "https://www.vistra.co.th/product/vistra-beta-glucan/",
+            "sourceText": "Manufacturer composition and oral directions support physical unit capsule. Composition basis is 1 physical unit(s) per labelled serving. Pack quantity for this SKU is not independently established.",
+            "verifiedAt": "2026-09-07T11:30:09.069478+00:00"
+          }
+        }
+      },
+      "beforeFingerprint": "ce11e07119741abbee899e4b074fdcbc8c99aedc33728a749612ea3548797705",
+      "afterFingerprint": "d557d26cb0171e72c489502dc77ab306ced9168bb2f06713e0333edad45fad4a",
+      "evidence": {
+        "sourceUrl": "https://www.vistra.co.th/product/vistra-beta-glucan/",
+        "checkedAt": "2026-09-07T11:30:09.069478+00:00",
+        "summary": "Manufacturer composition and oral directions support physical unit capsule. Composition basis is 1 physical unit(s) per labelled serving. Pack quantity for this SKU is not independently established. Archived label HTML SHA-256: df031876067b903c911c6548089c2529d641a7c748721601ce9c84c5843d45d2"
+      }
+    },
+    {
+      "correctionId": "anna-v6-2026-09-07-uat-administration-65fd0d62-45a0-4430-aae7-54932a9c3f28",
+      "entityTable": "products",
+      "entityId": "65fd0d62-45a0-4430-aae7-54932a9c3f28",
+      "before": {
+        "id": "65fd0d62-45a0-4430-aae7-54932a9c3f28",
+        "administration": null
+      },
+      "after": {
+        "id": "65fd0d62-45a0-4430-aae7-54932a9c3f28",
+        "administration": {
+          "route": "oral",
+          "physicalUnit": "tablet",
+          "unitsPerServing": 1,
+          "doseIncrement": 1,
+          "packQuantity": null,
+          "provenance": {
+            "status": "verified",
+            "sourceUrl": "https://www.vistra.co.th/product/vistra-bacopa-extract/",
+            "sourceText": "Manufacturer composition and oral directions support physical unit tablet. Composition basis is 1 physical unit(s) per labelled serving. Pack quantity for this SKU is not independently established.",
+            "verifiedAt": "2026-09-07T11:30:09.070119+00:00"
+          }
+        }
+      },
+      "beforeFingerprint": "a6e28f84c4b16376a2898b1d15247ca4c8ddaae440a18c00834abb238724b93e",
+      "afterFingerprint": "b475fc4ad74e288e26f04e3191d2af863ea26aab38330f24035ca34b3332d72f",
+      "evidence": {
+        "sourceUrl": "https://www.vistra.co.th/product/vistra-bacopa-extract/",
+        "checkedAt": "2026-09-07T11:30:09.070119+00:00",
+        "summary": "Manufacturer composition and oral directions support physical unit tablet. Composition basis is 1 physical unit(s) per labelled serving. Pack quantity for this SKU is not independently established. Archived label HTML SHA-256: f92e35cf71c24bd502c20724148813798c616b1f662083c5b39fd057237dcd8c"
+      }
+    },
+    {
+      "correctionId": "anna-v6-2026-09-07-uat-administration-6ce9942b-1a9f-4a58-ba98-c33711f612bd",
+      "entityTable": "products",
+      "entityId": "6ce9942b-1a9f-4a58-ba98-c33711f612bd",
+      "before": {
+        "id": "6ce9942b-1a9f-4a58-ba98-c33711f612bd",
+        "administration": null
+      },
+      "after": {
+        "id": "6ce9942b-1a9f-4a58-ba98-c33711f612bd",
+        "administration": {
+          "route": "oral",
+          "physicalUnit": "capsule",
+          "unitsPerServing": 1,
+          "doseIncrement": 1,
+          "packQuantity": null,
+          "provenance": {
+            "status": "verified",
+            "sourceUrl": "https://www.vistra.co.th/product/vistra-vital-pro-pre-care-multi-plus/",
+            "sourceText": "Manufacturer composition and oral directions support physical unit capsule. Composition basis is 1 physical unit(s) per labelled serving. Pack quantity for this SKU is not independently established.",
+            "verifiedAt": "2026-09-07T11:30:09.580040+00:00"
+          }
+        }
+      },
+      "beforeFingerprint": "55d3438df2aab9528509b28c8151dbf48d78e82ab46792ac7a3e0504581ecd95",
+      "afterFingerprint": "d29b818c84cf2d3d120fcd88ec7647b85bcd735ed559c502c0908ed504d6ffc3",
+      "evidence": {
+        "sourceUrl": "https://www.vistra.co.th/product/vistra-vital-pro-pre-care-multi-plus/",
+        "checkedAt": "2026-09-07T11:30:09.580040+00:00",
+        "summary": "Manufacturer composition and oral directions support physical unit capsule. Composition basis is 1 physical unit(s) per labelled serving. Pack quantity for this SKU is not independently established. Archived label HTML SHA-256: f167639dc9051843146de72295c2af8ed7b4dededd9456ca158ca2db7d15db01"
+      }
+    },
+    {
+      "correctionId": "anna-v6-2026-09-07-uat-administration-70a207e6-b1b5-5e4b-9de2-cfdc30a4f1cc",
+      "entityTable": "products",
+      "entityId": "70a207e6-b1b5-5e4b-9de2-cfdc30a4f1cc",
+      "before": {
+        "id": "70a207e6-b1b5-5e4b-9de2-cfdc30a4f1cc",
+        "administration": null
+      },
+      "after": {
+        "id": "70a207e6-b1b5-5e4b-9de2-cfdc30a4f1cc",
+        "administration": {
+          "route": "oral",
+          "physicalUnit": "capsule",
+          "unitsPerServing": 1,
+          "doseIncrement": 1,
+          "packQuantity": 30,
+          "provenance": {
+            "status": "verified",
+            "sourceUrl": "https://www.blackmores.co.th/%E0%B8%9C%E0%B8%A5%E0%B8%B4%E0%B8%95%E0%B8%A0%E0%B8%B1%E0%B8%93%E0%B8%91%E0%B9%8C/%E0%B8%9C%E0%B8%A5%E0%B8%B4%E0%B8%95%E0%B8%A0%E0%B8%B1%E0%B8%93%E0%B8%91%E0%B9%8C%E0%B9%80%E0%B8%AA%E0%B8%A3%E0%B8%B4%E0%B8%A1%E0%B8%AD%E0%B8%B2%E0%B8%AB%E0%B8%B2%E0%B8%A3/2103-blackmores-astaxanthin-6-mg-plus",
+            "sourceText": "Manufacturer composition and oral directions support physical unit capsule. Composition basis is 1 physical unit(s) per labelled serving. The source identifies a single pack size of 30 physical units.",
+            "verifiedAt": "2026-09-07T11:40:30.716179+00:00"
+          }
+        }
+      },
+      "beforeFingerprint": "f4afcc31e716d20bd42254efca57281e8e6f4119166f89abb54c49a9361248e3",
+      "afterFingerprint": "302338f7e1caf06dac2c086b31b37e6091727287ae3492856dd5e5c39d89356f",
+      "evidence": {
+        "sourceUrl": "https://www.blackmores.co.th/%E0%B8%9C%E0%B8%A5%E0%B8%B4%E0%B8%95%E0%B8%A0%E0%B8%B1%E0%B8%93%E0%B8%91%E0%B9%8C/%E0%B8%9C%E0%B8%A5%E0%B8%B4%E0%B8%95%E0%B8%A0%E0%B8%B1%E0%B8%93%E0%B8%91%E0%B9%8C%E0%B9%80%E0%B8%AA%E0%B8%A3%E0%B8%B4%E0%B8%A1%E0%B8%AD%E0%B8%B2%E0%B8%AB%E0%B8%B2%E0%B8%A3/2103-blackmores-astaxanthin-6-mg-plus",
+        "checkedAt": "2026-09-07T11:40:30.716179+00:00",
+        "summary": "Manufacturer composition and oral directions support physical unit capsule. Composition basis is 1 physical unit(s) per labelled serving. The source identifies a single pack size of 30 physical units. Archived label HTML SHA-256: 1b4e3ff8333c5ec1882c2b974d8cb5f5d2ac9a4ffcd56bc20d15a6d673d3c355"
+      }
+    },
+    {
+      "correctionId": "anna-v6-2026-09-07-uat-administration-71b5f9e8-198e-4ac2-a4e1-6971ebf0fb7a",
+      "entityTable": "products",
+      "entityId": "71b5f9e8-198e-4ac2-a4e1-6971ebf0fb7a",
+      "before": {
+        "id": "71b5f9e8-198e-4ac2-a4e1-6971ebf0fb7a",
+        "administration": null
+      },
+      "after": {
+        "id": "71b5f9e8-198e-4ac2-a4e1-6971ebf0fb7a",
+        "administration": {
+          "route": "oral",
+          "physicalUnit": "capsule",
+          "unitsPerServing": 1,
+          "doseIncrement": 1,
+          "packQuantity": 30,
+          "provenance": {
+            "status": "verified",
+            "sourceUrl": "https://www.blackmores.co.th/en/products/supplement/2124-blackmores-bio-c-gluta-imu",
+            "sourceText": "Manufacturer composition and oral directions support physical unit capsule. Composition basis is 1 physical unit(s) per labelled serving. The source identifies a single pack size of 30 physical units.",
+            "verifiedAt": "2026-09-07T11:30:09.581820+00:00"
+          }
+        }
+      },
+      "beforeFingerprint": "ab98a3eee0856e522696da7da2ff05e877b9a7ec5320b01cd323cf537de559ca",
+      "afterFingerprint": "b3584bb7ab8f31d33e0c07e30065b9e5c7b134ff4f0f05347de2070ee2d29950",
+      "evidence": {
+        "sourceUrl": "https://www.blackmores.co.th/en/products/supplement/2124-blackmores-bio-c-gluta-imu",
+        "checkedAt": "2026-09-07T11:30:09.581820+00:00",
+        "summary": "Manufacturer composition and oral directions support physical unit capsule. Composition basis is 1 physical unit(s) per labelled serving. The source identifies a single pack size of 30 physical units. Archived label HTML SHA-256: 0644232aba4d90cc113ea1a734d7ae78ad6ca7c8c40bc8a8d4d8b63a4f55617a"
+      }
+    },
+    {
+      "correctionId": "anna-v6-2026-09-07-uat-administration-79ca5ee6-e2c8-43cc-afcb-5791712855b6",
+      "entityTable": "products",
+      "entityId": "79ca5ee6-e2c8-43cc-afcb-5791712855b6",
+      "before": {
+        "id": "79ca5ee6-e2c8-43cc-afcb-5791712855b6",
+        "administration": null
+      },
+      "after": {
+        "id": "79ca5ee6-e2c8-43cc-afcb-5791712855b6",
+        "administration": {
+          "route": "oral",
+          "physicalUnit": "gummy",
+          "unitsPerServing": 2,
+          "doseIncrement": 1,
+          "packQuantity": null,
+          "provenance": {
+            "status": "verified",
+            "sourceUrl": "https://swisse.co.th/products/probiotic-gummies",
+            "sourceText": "Manufacturer identifies a daily serving as two gummies supplying 3 billion CFU and 3 g fibre. Whole-gummy increment is one; the pack count is not established for the local SKU.",
+            "verifiedAt": "2026-09-07T11:30:10.036151+00:00"
+          }
+        }
+      },
+      "beforeFingerprint": "679760a4124190ff41687cb002153112c8fd339d48c73b1f77ae294a924668fb",
+      "afterFingerprint": "6c16dfc9a3583be8cd0068f457ef768333798d82be59a7d9d6e314fed27928fe",
+      "evidence": {
+        "sourceUrl": "https://swisse.co.th/products/probiotic-gummies",
+        "checkedAt": "2026-09-07T11:30:10.036151+00:00",
+        "summary": "Manufacturer identifies a daily serving as two gummies supplying 3 billion CFU and 3 g fibre. Whole-gummy increment is one; the pack count is not established for the local SKU. Archived label HTML SHA-256: 34d41ee2daa4e68dc05a0ec719368f5856c15816dda5b414616a4fe04ba17822"
+      }
+    },
+    {
+      "correctionId": "anna-v6-2026-09-07-uat-administration-7b70f063-0676-5518-9b81-7224c4230e0a",
+      "entityTable": "products",
+      "entityId": "7b70f063-0676-5518-9b81-7224c4230e0a",
+      "before": {
+        "id": "7b70f063-0676-5518-9b81-7224c4230e0a",
+        "administration": null
+      },
+      "after": {
+        "id": "7b70f063-0676-5518-9b81-7224c4230e0a",
+        "administration": {
+          "route": "oral",
+          "physicalUnit": "capsule",
+          "unitsPerServing": 1,
+          "doseIncrement": 1,
+          "packQuantity": 60,
+          "provenance": {
+            "status": "verified",
+            "sourceUrl": "https://www.blackmores.co.th/%E0%B8%9C%E0%B8%A5%E0%B8%B4%E0%B8%95%E0%B8%A0%E0%B8%B1%E0%B8%93%E0%B8%91%E0%B9%8C/%E0%B8%9C%E0%B8%A5%E0%B8%B4%E0%B8%95%E0%B8%A0%E0%B8%B1%E0%B8%93%E0%B8%91%E0%B9%8C%E0%B9%80%E0%B8%AA%E0%B8%A3%E0%B8%B4%E0%B8%A1%E0%B8%AD%E0%B8%B2%E0%B8%AB%E0%B8%B2%E0%B8%A3/2109-blackmores-evening-primrose-oil-1000",
+            "sourceText": "Manufacturer composition and oral directions support physical unit capsule. Composition basis is 1 physical unit(s) per labelled serving. The source identifies a single pack size of 60 physical units.",
+            "verifiedAt": "2026-09-07T11:30:10.284488+00:00"
+          }
+        }
+      },
+      "beforeFingerprint": "1f8348d130792574eef5d2530e4672396bac907fbe28daf5c42867937b156306",
+      "afterFingerprint": "f7e3e39d1e1d80823ffd6f81f931d5341f15e25cd0ba6c8275dedba7e77f5acc",
+      "evidence": {
+        "sourceUrl": "https://www.blackmores.co.th/%E0%B8%9C%E0%B8%A5%E0%B8%B4%E0%B8%95%E0%B8%A0%E0%B8%B1%E0%B8%93%E0%B8%91%E0%B9%8C/%E0%B8%9C%E0%B8%A5%E0%B8%B4%E0%B8%95%E0%B8%A0%E0%B8%B1%E0%B8%93%E0%B8%91%E0%B9%8C%E0%B9%80%E0%B8%AA%E0%B8%A3%E0%B8%B4%E0%B8%A1%E0%B8%AD%E0%B8%B2%E0%B8%AB%E0%B8%B2%E0%B8%A3/2109-blackmores-evening-primrose-oil-1000",
+        "checkedAt": "2026-09-07T11:30:10.284488+00:00",
+        "summary": "Manufacturer composition and oral directions support physical unit capsule. Composition basis is 1 physical unit(s) per labelled serving. The source identifies a single pack size of 60 physical units. Archived label HTML SHA-256: ed458d6bdf393e3ee47c6e11c3f533b71595afcecab03bf7068a721a5591b026"
+      }
+    },
+    {
+      "correctionId": "anna-v6-2026-09-07-uat-administration-7cdf7657-0df0-4991-ad92-8ecac3a35dd2",
+      "entityTable": "products",
+      "entityId": "7cdf7657-0df0-4991-ad92-8ecac3a35dd2",
+      "before": {
+        "id": "7cdf7657-0df0-4991-ad92-8ecac3a35dd2",
+        "administration": null
+      },
+      "after": {
+        "id": "7cdf7657-0df0-4991-ad92-8ecac3a35dd2",
+        "administration": {
+          "route": "oral",
+          "physicalUnit": "capsule",
+          "unitsPerServing": 1,
+          "doseIncrement": 1,
+          "packQuantity": null,
+          "provenance": {
+            "status": "verified",
+            "sourceUrl": "https://www.blackmores.com.au/products/pregnancy-breast-feeding-gold",
+            "sourceText": "Manufacturer composition and oral directions support physical unit capsule. Composition basis is 1 physical unit(s) per labelled serving. Pack quantity for this SKU is not independently established.",
+            "verifiedAt": "2026-09-07T11:30:10.391753+00:00"
+          }
+        }
+      },
+      "beforeFingerprint": "7ffd81a6840ffaeb5182b2433890e74598f8b3fe6329a79ebe57e475d1fdebd2",
+      "afterFingerprint": "8c938d1ad78fbbdca268d4082f89fa7110668ac983f1eb1de59c764148fb6c84",
+      "evidence": {
+        "sourceUrl": "https://www.blackmores.com.au/products/pregnancy-breast-feeding-gold",
+        "checkedAt": "2026-09-07T11:30:10.391753+00:00",
+        "summary": "Manufacturer composition and oral directions support physical unit capsule. Composition basis is 1 physical unit(s) per labelled serving. Pack quantity for this SKU is not independently established. Archived label HTML SHA-256: b6f86506f0b9ba3efe3b3689d7f3bfef8f093c6f2ab2bb7d7084ef153c09b271"
+      }
+    },
+    {
+      "correctionId": "anna-v6-2026-09-07-uat-administration-7f51a7a9-1c70-44d3-bd50-ef4194d241ec",
+      "entityTable": "products",
+      "entityId": "7f51a7a9-1c70-44d3-bd50-ef4194d241ec",
+      "before": {
+        "id": "7f51a7a9-1c70-44d3-bd50-ef4194d241ec",
+        "administration": null
+      },
+      "after": {
+        "id": "7f51a7a9-1c70-44d3-bd50-ef4194d241ec",
+        "administration": {
+          "route": "oral",
+          "physicalUnit": "tablet",
+          "unitsPerServing": 1,
+          "doseIncrement": 1,
+          "packQuantity": null,
+          "provenance": {
+            "status": "verified",
+            "sourceUrl": "https://www.blackmores.com.au/products/bio-magnesium",
+            "sourceText": "Manufacturer composition and oral directions support physical unit tablet. Composition basis is 1 physical unit(s) per labelled serving. Pack quantity for this SKU is not independently established.",
+            "verifiedAt": "2026-09-07T11:30:10.397364+00:00"
+          }
+        }
+      },
+      "beforeFingerprint": "1251bfd290c0bbe545db0e151f67b0608bcaf048845bd1f7b6471945ecc0500a",
+      "afterFingerprint": "1a23a31a9f73de25f430e2ccf088391dde8b14323a882e00425bd886ed865dd7",
+      "evidence": {
+        "sourceUrl": "https://www.blackmores.com.au/products/bio-magnesium",
+        "checkedAt": "2026-09-07T11:30:10.397364+00:00",
+        "summary": "Manufacturer composition and oral directions support physical unit tablet. Composition basis is 1 physical unit(s) per labelled serving. Pack quantity for this SKU is not independently established. Archived label HTML SHA-256: 3907397b67e7c587ff3b584e1d6031007c4d18e1396427eb895a2b5e1f2c2df1"
+      }
+    },
+    {
+      "correctionId": "anna-v6-2026-09-07-uat-administration-8286d8a1-8620-4748-be2f-90803cd4f8bb",
+      "entityTable": "products",
+      "entityId": "8286d8a1-8620-4748-be2f-90803cd4f8bb",
+      "before": {
+        "id": "8286d8a1-8620-4748-be2f-90803cd4f8bb",
+        "administration": null
+      },
+      "after": {
+        "id": "8286d8a1-8620-4748-be2f-90803cd4f8bb",
+        "administration": {
+          "route": "oral",
+          "physicalUnit": "capsule",
+          "unitsPerServing": 1,
+          "doseIncrement": 1,
+          "packQuantity": null,
+          "provenance": {
+            "status": "verified",
+            "sourceUrl": "https://www.vistra.co.th/product/vistra-soy-germ-powder-plus-dong-quai-extract-multivitamins-and-evening-primrose-oil/",
+            "sourceText": "Manufacturer composition and oral directions support physical unit capsule. Composition basis is 1 physical unit(s) per labelled serving. Pack quantity for this SKU is not independently established.",
+            "verifiedAt": "2026-09-07T11:30:10.742964+00:00"
+          }
+        }
+      },
+      "beforeFingerprint": "ae04e0d1be27afc287da47f25623106ce5a1add3b1a2cbf77705a8a28a40a316",
+      "afterFingerprint": "cc8e86d62706ac64f98b113955102e7e2d39946d5461264feee21ea3a40225e0",
+      "evidence": {
+        "sourceUrl": "https://www.vistra.co.th/product/vistra-soy-germ-powder-plus-dong-quai-extract-multivitamins-and-evening-primrose-oil/",
+        "checkedAt": "2026-09-07T11:30:10.742964+00:00",
+        "summary": "Manufacturer composition and oral directions support physical unit capsule. Composition basis is 1 physical unit(s) per labelled serving. Pack quantity for this SKU is not independently established. Archived label HTML SHA-256: ac58c7d5cf31e435d9a6e5af45cb9d4b67e8174cad9d4d54635c858d6401562b"
+      }
+    },
+    {
+      "correctionId": "anna-v6-2026-09-07-uat-administration-8a023f8f-007f-4f7a-bd84-27a4b6653e2e",
+      "entityTable": "products",
+      "entityId": "8a023f8f-007f-4f7a-bd84-27a4b6653e2e",
+      "before": {
+        "id": "8a023f8f-007f-4f7a-bd84-27a4b6653e2e",
+        "administration": null
+      },
+      "after": {
+        "id": "8a023f8f-007f-4f7a-bd84-27a4b6653e2e",
+        "administration": {
+          "route": "oral",
+          "physicalUnit": "capsule",
+          "unitsPerServing": null,
+          "doseIncrement": 1,
+          "packQuantity": null,
+          "provenance": {
+            "status": "verified",
+            "sourceUrl": "https://www.vistra.co.th/product/vistra-sesamin-night-time/",
+            "sourceText": "Manufacturer composition and oral directions support physical unit capsule. Composition basis per labelled serving is not explicit, so no nutrient-to-unit conversion is asserted. Pack quantity for this SKU is not independently established.",
+            "verifiedAt": "2026-09-07T11:30:10.744264+00:00"
+          }
+        }
+      },
+      "beforeFingerprint": "ec569891b95a8ee5c5d51e92e94626bbe1c8a0c7ec46a95376d09da5cd5892b3",
+      "afterFingerprint": "f607df221219fbfaaf76f8f825c9d91d844f6f0652e4be9d03a177383aa97009",
+      "evidence": {
+        "sourceUrl": "https://www.vistra.co.th/product/vistra-sesamin-night-time/",
+        "checkedAt": "2026-09-07T11:30:10.744264+00:00",
+        "summary": "Manufacturer composition and oral directions support physical unit capsule. Composition basis per labelled serving is not explicit, so no nutrient-to-unit conversion is asserted. Pack quantity for this SKU is not independently established. Archived label HTML SHA-256: 19fedae0d99b0a44909a3eabb23ed771f200b0ae2397e0174ba4a282aa34d93b"
+      }
+    },
+    {
+      "correctionId": "anna-v6-2026-09-07-uat-administration-947325dc-b9ec-4e44-973c-44133d357199",
+      "entityTable": "products",
+      "entityId": "947325dc-b9ec-4e44-973c-44133d357199",
+      "before": {
+        "id": "947325dc-b9ec-4e44-973c-44133d357199",
+        "administration": null
+      },
+      "after": {
+        "id": "947325dc-b9ec-4e44-973c-44133d357199",
+        "administration": {
+          "route": "oral",
+          "physicalUnit": "capsule",
+          "unitsPerServing": 1,
+          "doseIncrement": 1,
+          "packQuantity": null,
+          "provenance": {
+            "status": "verified",
+            "sourceUrl": "https://www.vistra.co.th/product/vistra-advanced-telopro-vita-plus/",
+            "sourceText": "Manufacturer composition and oral directions support physical unit capsule. Composition basis is 1 physical unit(s) per labelled serving. Pack quantity for this SKU is not independently established.",
+            "verifiedAt": "2026-09-07T11:30:10.819253+00:00"
+          }
+        }
+      },
+      "beforeFingerprint": "146a1f4c4290916ab0a622e24cdecaea88feaa9f99f2611ddc4456d5d6363ed9",
+      "afterFingerprint": "efed9a7f14ff9de6a9d88594d03800f2579bda0d27b6042d1c1dcf861054b06b",
+      "evidence": {
+        "sourceUrl": "https://www.vistra.co.th/product/vistra-advanced-telopro-vita-plus/",
+        "checkedAt": "2026-09-07T11:30:10.819253+00:00",
+        "summary": "Manufacturer composition and oral directions support physical unit capsule. Composition basis is 1 physical unit(s) per labelled serving. Pack quantity for this SKU is not independently established. Archived label HTML SHA-256: bb2d8212f438b99bbaa91a5af7d57deb7c754d564c6abf429003e3a399329b4c"
+      }
+    },
+    {
+      "correctionId": "anna-v6-2026-09-07-uat-administration-9a552c67-34b2-514a-87a7-ce02f9d758de",
+      "entityTable": "products",
+      "entityId": "9a552c67-34b2-514a-87a7-ce02f9d758de",
+      "before": {
+        "id": "9a552c67-34b2-514a-87a7-ce02f9d758de",
+        "administration": null
+      },
+      "after": {
+        "id": "9a552c67-34b2-514a-87a7-ce02f9d758de",
+        "administration": {
+          "route": "oral",
+          "physicalUnit": "capsule",
+          "unitsPerServing": 1,
+          "doseIncrement": 1,
+          "packQuantity": null,
+          "provenance": {
+            "status": "verified",
+            "sourceUrl": "https://www.blackmores.co.th/en/products/supplement/2094-blackmores-fish-oil-1000-mg",
+            "sourceText": "Manufacturer composition and oral directions support physical unit capsule. Composition basis is 1 physical unit(s) per labelled serving. Pack quantity for this SKU is not independently established.",
+            "verifiedAt": "2026-09-07T11:41:23.067336+00:00"
+          }
+        }
+      },
+      "beforeFingerprint": "805df8e6d922431ab8bd5298c99f6760e2da226a4652084001cb9ba27ea4be55",
+      "afterFingerprint": "fcdcd58a086d004866baa7c694976fe4d156a6d837d28c73716ded4dd9575454",
+      "evidence": {
+        "sourceUrl": "https://www.blackmores.co.th/en/products/supplement/2094-blackmores-fish-oil-1000-mg",
+        "checkedAt": "2026-09-07T11:41:23.067336+00:00",
+        "summary": "Manufacturer composition and oral directions support physical unit capsule. Composition basis is 1 physical unit(s) per labelled serving. Pack quantity for this SKU is not independently established. Archived label HTML SHA-256: 30d60ab65621ba75bfecd2c18bdeae9f95463ff3cfc3488f0bd7e927df0182ec"
+      }
+    },
+    {
+      "correctionId": "anna-v6-2026-09-07-uat-administration-a520f712-57e0-4a64-9127-4cbd2332dc77",
+      "entityTable": "products",
+      "entityId": "a520f712-57e0-4a64-9127-4cbd2332dc77",
+      "before": {
+        "id": "a520f712-57e0-4a64-9127-4cbd2332dc77",
+        "administration": null
+      },
+      "after": {
+        "id": "a520f712-57e0-4a64-9127-4cbd2332dc77",
+        "administration": {
+          "route": "oral",
+          "physicalUnit": "capsule",
+          "unitsPerServing": null,
+          "doseIncrement": 1,
+          "packQuantity": null,
+          "provenance": {
+            "status": "verified",
+            "sourceUrl": "https://www.dnaethailand.com/product/be-proud/?srsltid=AfmBOorCg0EVrfkXDth4vMWD8ZJyq-8gx0Wn3ZsEXEvxheJL5NtVEmUc",
+            "sourceText": "Manufacturer composition and oral directions support physical unit capsule. Composition basis per labelled serving is not explicit, so no nutrient-to-unit conversion is asserted. Pack quantity for this SKU is not independently established.",
+            "verifiedAt": "2026-09-07T11:30:11.194453+00:00"
+          }
+        }
+      },
+      "beforeFingerprint": "8cce79cf548141ea1992bd09a289b7378105325d7efd302aa452efdc4c2bee1d",
+      "afterFingerprint": "dc11be636a36d79396b40f94820be87e6ad8a002dee579741cca4f11fd074078",
+      "evidence": {
+        "sourceUrl": "https://www.dnaethailand.com/product/be-proud/?srsltid=AfmBOorCg0EVrfkXDth4vMWD8ZJyq-8gx0Wn3ZsEXEvxheJL5NtVEmUc",
+        "checkedAt": "2026-09-07T11:30:11.194453+00:00",
+        "summary": "Manufacturer composition and oral directions support physical unit capsule. Composition basis per labelled serving is not explicit, so no nutrient-to-unit conversion is asserted. Pack quantity for this SKU is not independently established. Archived label HTML SHA-256: 1c40350ccefd0304644c4f8f94210f4dabecf0a33c76ec674bde21cb32c347d7"
+      }
+    },
+    {
+      "correctionId": "anna-v6-2026-09-07-uat-administration-a6bd4a16-b8d5-4ba4-96ba-767aa4233b48",
+      "entityTable": "products",
+      "entityId": "a6bd4a16-b8d5-4ba4-96ba-767aa4233b48",
+      "before": {
+        "id": "a6bd4a16-b8d5-4ba4-96ba-767aa4233b48",
+        "administration": null
+      },
+      "after": {
+        "id": "a6bd4a16-b8d5-4ba4-96ba-767aa4233b48",
+        "administration": {
+          "route": "oral",
+          "physicalUnit": "sachet",
+          "unitsPerServing": 1,
+          "doseIncrement": 1,
+          "packQuantity": null,
+          "provenance": {
+            "status": "verified",
+            "sourceUrl": "https://www.megawecare.com/products/general-wellbeing/pro-amino",
+            "sourceText": "Manufacturer composition and oral directions support physical unit sachet. Composition basis is 1 physical unit(s) per labelled serving. Pack quantity for this SKU is not independently established.",
+            "verifiedAt": "2026-09-07T11:40:30.739597+00:00"
+          }
+        }
+      },
+      "beforeFingerprint": "86532305f24130d6a4002d1c5f783fef481e5ee60118185fee76bcb6720bf2b0",
+      "afterFingerprint": "e82e01dc102946fa61ad5565b573c2a628f03643d9dff9d70f0a2e1896ea8378",
+      "evidence": {
+        "sourceUrl": "https://www.megawecare.com/products/general-wellbeing/pro-amino",
+        "checkedAt": "2026-09-07T11:40:30.739597+00:00",
+        "summary": "Manufacturer composition and oral directions support physical unit sachet. Composition basis is 1 physical unit(s) per labelled serving. Pack quantity for this SKU is not independently established. Archived label HTML SHA-256: f336b43fa403e3a6817e1f36c22b0c6c9b5ebd884084bbaf573c157801a1b724"
+      }
+    },
+    {
+      "correctionId": "anna-v6-2026-09-07-uat-administration-a7de86f0-f7f8-43fe-8118-d16ca506c350",
+      "entityTable": "products",
+      "entityId": "a7de86f0-f7f8-43fe-8118-d16ca506c350",
+      "before": {
+        "id": "a7de86f0-f7f8-43fe-8118-d16ca506c350",
+        "administration": null
+      },
+      "after": {
+        "id": "a7de86f0-f7f8-43fe-8118-d16ca506c350",
+        "administration": {
+          "route": "oral",
+          "physicalUnit": "capsule",
+          "unitsPerServing": 1,
+          "doseIncrement": 1,
+          "packQuantity": null,
+          "provenance": {
+            "status": "verified",
+            "sourceUrl": "https://www.blackmores.com.au/products/probiotics-daily-health",
+            "sourceText": "Manufacturer composition and oral directions support physical unit capsule. Composition basis is 1 physical unit(s) per labelled serving. Pack quantity for this SKU is not independently established.",
+            "verifiedAt": "2026-09-07T11:30:11.221300+00:00"
+          }
+        }
+      },
+      "beforeFingerprint": "76da29e03988fb26b5a3f229938dab2f6c877e1704d7e4c5fabac58f8d38ccdd",
+      "afterFingerprint": "e7cfa9eaba4c34818de7a7677684058073a56ff10e7af77b4756a62b04d452ac",
+      "evidence": {
+        "sourceUrl": "https://www.blackmores.com.au/products/probiotics-daily-health",
+        "checkedAt": "2026-09-07T11:30:11.221300+00:00",
+        "summary": "Manufacturer composition and oral directions support physical unit capsule. Composition basis is 1 physical unit(s) per labelled serving. Pack quantity for this SKU is not independently established. Archived label HTML SHA-256: 0e65b2cffb8810bf7e9052c61286cbc4c3b4ab6de136516988bc18f3b2764783"
+      }
+    },
+    {
+      "correctionId": "anna-v6-2026-09-07-uat-administration-b64a615a-3f11-5aff-8cc9-667f60e16a9b",
+      "entityTable": "products",
+      "entityId": "b64a615a-3f11-5aff-8cc9-667f60e16a9b",
+      "before": {
+        "id": "b64a615a-3f11-5aff-8cc9-667f60e16a9b",
+        "administration": null
+      },
+      "after": {
+        "id": "b64a615a-3f11-5aff-8cc9-667f60e16a9b",
+        "administration": {
+          "route": "oral",
+          "physicalUnit": "capsule",
+          "unitsPerServing": null,
+          "doseIncrement": 1,
+          "packQuantity": null,
+          "provenance": {
+            "status": "verified",
+            "sourceUrl": "https://www.vistra.co.th/product/vistra-vital-pro-daily-complete-probiotics/",
+            "sourceText": "Manufacturer composition and oral directions support physical unit capsule. Composition basis per labelled serving is not explicit, so no nutrient-to-unit conversion is asserted. Pack quantity for this SKU is not independently established.",
+            "verifiedAt": "2026-09-07T11:30:11.373244+00:00"
+          }
+        }
+      },
+      "beforeFingerprint": "6c0e7fb6578ff40fc0de1e24faef505fe8152ff6d953159ca03826b96ab3e586",
+      "afterFingerprint": "5eb8d2f53a728e3c5ba70b7db32bfc9b8a76e89c25eb6f5dd63da72c7fa40ffd",
+      "evidence": {
+        "sourceUrl": "https://www.vistra.co.th/product/vistra-vital-pro-daily-complete-probiotics/",
+        "checkedAt": "2026-09-07T11:30:11.373244+00:00",
+        "summary": "Manufacturer composition and oral directions support physical unit capsule. Composition basis per labelled serving is not explicit, so no nutrient-to-unit conversion is asserted. Pack quantity for this SKU is not independently established. Archived label HTML SHA-256: 225e9634f5dda6471f2728da46c34fcdb312c435d6080927834b2e46944fbd8c"
+      }
+    },
+    {
+      "correctionId": "anna-v6-2026-09-07-uat-administration-b682e829-ac20-5de2-990e-b04b8e4c59d8",
+      "entityTable": "products",
+      "entityId": "b682e829-ac20-5de2-990e-b04b8e4c59d8",
+      "before": {
+        "id": "b682e829-ac20-5de2-990e-b04b8e4c59d8",
+        "administration": null
+      },
+      "after": {
+        "id": "b682e829-ac20-5de2-990e-b04b8e4c59d8",
+        "administration": {
+          "route": "oral",
+          "physicalUnit": "sachet",
+          "unitsPerServing": null,
+          "doseIncrement": 1,
+          "packQuantity": null,
+          "provenance": {
+            "status": "verified",
+            "sourceUrl": "https://www.vistra.co.th/product/vistra-collagen-peptide-4000-mg/",
+            "sourceText": "Manufacturer composition and oral directions support physical unit sachet. Composition basis per labelled serving is not explicit, so no nutrient-to-unit conversion is asserted. Pack quantity for this SKU is not independently established.",
+            "verifiedAt": "2026-09-07T11:30:11.396012+00:00"
+          }
+        }
+      },
+      "beforeFingerprint": "51ea455690e094209015e45a9e6f0d13d9853c4a013294c1fdb85562645a01bb",
+      "afterFingerprint": "d88cc147ca868aea799b2868b97d67277f1bd5048edf86248dfb1d91b962af25",
+      "evidence": {
+        "sourceUrl": "https://www.vistra.co.th/product/vistra-collagen-peptide-4000-mg/",
+        "checkedAt": "2026-09-07T11:30:11.396012+00:00",
+        "summary": "Manufacturer composition and oral directions support physical unit sachet. Composition basis per labelled serving is not explicit, so no nutrient-to-unit conversion is asserted. Pack quantity for this SKU is not independently established. Archived label HTML SHA-256: ea06f28bd9a5bb5aaf1e396ec47e48587e5f32c9fa63f56a6a5b12822caa8933"
+      }
+    },
+    {
+      "correctionId": "anna-v6-2026-09-07-uat-administration-bf82696d-4282-4a70-bd6c-3bcb60ff941e",
+      "entityTable": "products",
+      "entityId": "bf82696d-4282-4a70-bd6c-3bcb60ff941e",
+      "before": {
+        "id": "bf82696d-4282-4a70-bd6c-3bcb60ff941e",
+        "administration": null
+      },
+      "after": {
+        "id": "bf82696d-4282-4a70-bd6c-3bcb60ff941e",
+        "administration": {
+          "route": "oral",
+          "physicalUnit": "capsule",
+          "unitsPerServing": 1,
+          "doseIncrement": 1,
+          "packQuantity": null,
+          "provenance": {
+            "status": "verified",
+            "sourceUrl": "https://www.vistra.co.th/product/vistra-sesamin-vital/",
+            "sourceText": "Manufacturer composition and oral directions support physical unit capsule. Composition basis is 1 physical unit(s) per labelled serving. Pack quantity for this SKU is not independently established.",
+            "verifiedAt": "2026-09-07T11:30:11.792567+00:00"
+          }
+        }
+      },
+      "beforeFingerprint": "33f4e5e0b91d37f9b117fc2b9416ee4f22a187794a1e074aa6bc794bb9cc4742",
+      "afterFingerprint": "a21608e6b8dbe35299d3de5b4b2edaadb0a05a1436160e4c91b8ca5a599ec702",
+      "evidence": {
+        "sourceUrl": "https://www.vistra.co.th/product/vistra-sesamin-vital/",
+        "checkedAt": "2026-09-07T11:30:11.792567+00:00",
+        "summary": "Manufacturer composition and oral directions support physical unit capsule. Composition basis is 1 physical unit(s) per labelled serving. Pack quantity for this SKU is not independently established. Archived label HTML SHA-256: 4c462bbddae988bd510069a5e39cdc025baf8307b02976df2616c78206a453f0"
+      }
+    },
+    {
+      "correctionId": "anna-v6-2026-09-07-uat-administration-c13bd416-4a85-4d54-a3c5-669f310c2afb",
+      "entityTable": "products",
+      "entityId": "c13bd416-4a85-4d54-a3c5-669f310c2afb",
+      "before": {
+        "id": "c13bd416-4a85-4d54-a3c5-669f310c2afb",
+        "administration": null
+      },
+      "after": {
+        "id": "c13bd416-4a85-4d54-a3c5-669f310c2afb",
+        "administration": {
+          "route": "oral",
+          "physicalUnit": "tablet",
+          "unitsPerServing": 1,
+          "doseIncrement": 1,
+          "packQuantity": 90,
+          "provenance": {
+            "status": "verified",
+            "sourceUrl": "https://www.blackmores.co.th/en/products/supplement/2118-blackmores-bio-zinc-a-chelate",
+            "sourceText": "Manufacturer composition and oral directions support physical unit tablet. Composition basis is 1 physical unit(s) per labelled serving. The source identifies a single pack size of 90 physical units.",
+            "verifiedAt": "2026-09-07T11:30:11.837729+00:00"
+          }
+        }
+      },
+      "beforeFingerprint": "28fc18ea99ab3ccdf8a0e017b3319f6ffe4ac6ef5439003123ca9b9f1096031c",
+      "afterFingerprint": "4d019b451632a609379c65a725cdc2e393225cee26a26e0b33acee9c615e0751",
+      "evidence": {
+        "sourceUrl": "https://www.blackmores.co.th/en/products/supplement/2118-blackmores-bio-zinc-a-chelate",
+        "checkedAt": "2026-09-07T11:30:11.837729+00:00",
+        "summary": "Manufacturer composition and oral directions support physical unit tablet. Composition basis is 1 physical unit(s) per labelled serving. The source identifies a single pack size of 90 physical units. Archived label HTML SHA-256: e6e0e255dcf6dc06552eeeba2bb2288d92ce4886cbc1b155144aa04676bdaa95"
+      }
+    },
+    {
+      "correctionId": "anna-v6-2026-09-07-uat-administration-c6af4cc2-dba7-477b-94f8-50694b9c6956",
+      "entityTable": "products",
+      "entityId": "c6af4cc2-dba7-477b-94f8-50694b9c6956",
+      "before": {
+        "id": "c6af4cc2-dba7-477b-94f8-50694b9c6956",
+        "administration": null
+      },
+      "after": {
+        "id": "c6af4cc2-dba7-477b-94f8-50694b9c6956",
+        "administration": {
+          "route": "oral",
+          "physicalUnit": "capsule",
+          "unitsPerServing": 1,
+          "doseIncrement": 1,
+          "packQuantity": 30,
+          "provenance": {
+            "status": "verified",
+            "sourceUrl": "https://www.dnaethailand.com/product/dnae-andro-plus-1/",
+            "sourceText": "Manufacturer composition and oral directions support physical unit capsule. Composition basis is 1 physical unit(s) per labelled serving. The source identifies a single pack size of 30 physical units.",
+            "verifiedAt": "2026-09-07T11:30:12.256759+00:00"
+          }
+        }
+      },
+      "beforeFingerprint": "2e6670a1604aea3346082c981a7c79478516c72b1800d37191fe9991ca60d283",
+      "afterFingerprint": "32546bd79318f17284ee19c4d08885e4190cfce5d36a2289dcbe42b8f3baa375",
+      "evidence": {
+        "sourceUrl": "https://www.dnaethailand.com/product/dnae-andro-plus-1/",
+        "checkedAt": "2026-09-07T11:30:12.256759+00:00",
+        "summary": "Manufacturer composition and oral directions support physical unit capsule. Composition basis is 1 physical unit(s) per labelled serving. The source identifies a single pack size of 30 physical units. Archived label HTML SHA-256: 6749b3a6766db0d28d702288663269d790693135ac8270b469d30dc90aa46014"
+      }
+    },
+    {
+      "correctionId": "anna-v6-2026-09-07-uat-administration-d44ca534-c77b-4d50-865b-2ab7b856e678",
+      "entityTable": "products",
+      "entityId": "d44ca534-c77b-4d50-865b-2ab7b856e678",
+      "before": {
+        "id": "d44ca534-c77b-4d50-865b-2ab7b856e678",
+        "administration": null
+      },
+      "after": {
+        "id": "d44ca534-c77b-4d50-865b-2ab7b856e678",
+        "administration": {
+          "route": "oral",
+          "physicalUnit": "tablet",
+          "unitsPerServing": 1,
+          "doseIncrement": 1,
+          "packQuantity": null,
+          "provenance": {
+            "status": "verified",
+            "sourceUrl": "https://www.blackmores.co.th/en/products/medicine/2113-blackmores-exec-bs",
+            "sourceText": "Manufacturer composition and oral directions support physical unit tablet. Composition basis is 1 physical unit(s) per labelled serving. Pack quantity for this SKU is not independently established.",
+            "verifiedAt": "2026-09-07T11:41:23.074560+00:00"
+          }
+        }
+      },
+      "beforeFingerprint": "2ddfc163c2d37272ad0699b04e03b85a91f05eeb7e4ea57e1ef7b4cdabebab3e",
+      "afterFingerprint": "660c9d041dfae8118aaafcc5b65ecad9a665e21e5ddc86002d06c055c919e37b",
+      "evidence": {
+        "sourceUrl": "https://www.blackmores.co.th/en/products/medicine/2113-blackmores-exec-bs",
+        "checkedAt": "2026-09-07T11:41:23.074560+00:00",
+        "summary": "Manufacturer composition and oral directions support physical unit tablet. Composition basis is 1 physical unit(s) per labelled serving. Pack quantity for this SKU is not independently established. Archived label HTML SHA-256: f523925ada77a7d8dbf6dacce1efd940a071e499afdc4f297680f9a37991c10f"
+      }
+    },
+    {
+      "correctionId": "anna-v6-2026-09-07-uat-administration-d4823f19-ff68-4351-9751-50e39f549179",
+      "entityTable": "products",
+      "entityId": "d4823f19-ff68-4351-9751-50e39f549179",
+      "before": {
+        "id": "d4823f19-ff68-4351-9751-50e39f549179",
+        "administration": null
+      },
+      "after": {
+        "id": "d4823f19-ff68-4351-9751-50e39f549179",
+        "administration": {
+          "route": "oral",
+          "physicalUnit": "capsule",
+          "unitsPerServing": null,
+          "doseIncrement": 1,
+          "packQuantity": null,
+          "provenance": {
+            "status": "verified",
+            "sourceUrl": "https://www.vistra.co.th/product/vistra-astaxanthin-6-mg-advanced-plus-coq10-dietary-supplement-product/",
+            "sourceText": "Manufacturer composition and oral directions support physical unit capsule. Composition basis per labelled serving is not explicit, so no nutrient-to-unit conversion is asserted. Pack quantity for this SKU is not independently established.",
+            "verifiedAt": "2026-09-07T11:30:12.309230+00:00"
+          }
+        }
+      },
+      "beforeFingerprint": "c3c33cefd37f6762d872f304a49e93c6cd87a3f2d2d36b178fe9addf32a16950",
+      "afterFingerprint": "a48ca5a953d175d7dd841d81be23fd841771a7d6b7e135f90a10996e63288be5",
+      "evidence": {
+        "sourceUrl": "https://www.vistra.co.th/product/vistra-astaxanthin-6-mg-advanced-plus-coq10-dietary-supplement-product/",
+        "checkedAt": "2026-09-07T11:30:12.309230+00:00",
+        "summary": "Manufacturer composition and oral directions support physical unit capsule. Composition basis per labelled serving is not explicit, so no nutrient-to-unit conversion is asserted. Pack quantity for this SKU is not independently established. Archived label HTML SHA-256: 618b2c3ebdd72c96b685604ad5062087d5cdeb44b5629cd51d9d773ea092be25"
+      }
+    },
+    {
+      "correctionId": "anna-v6-2026-09-07-uat-administration-d87a37c3-b9da-4a86-a3be-49fb2c39fdad",
+      "entityTable": "products",
+      "entityId": "d87a37c3-b9da-4a86-a3be-49fb2c39fdad",
+      "before": {
+        "id": "d87a37c3-b9da-4a86-a3be-49fb2c39fdad",
+        "administration": null
+      },
+      "after": {
+        "id": "d87a37c3-b9da-4a86-a3be-49fb2c39fdad",
+        "administration": {
+          "route": "oral",
+          "physicalUnit": "capsule",
+          "unitsPerServing": 1,
+          "doseIncrement": 1,
+          "packQuantity": 60,
+          "provenance": {
+            "status": "verified",
+            "sourceUrl": "https://www.blackmores.co.th/en/products/supplement/2095-blackmores-omega-dha",
+            "sourceText": "Manufacturer composition and oral directions support physical unit capsule. Composition basis is 1 physical unit(s) per labelled serving. The source identifies a single pack size of 60 physical units.",
+            "verifiedAt": "2026-09-07T11:30:12.393183+00:00"
+          }
+        }
+      },
+      "beforeFingerprint": "04301452f18e6110ecce97adcb718eb2c1b43c2acabf452c371082f91a37b49a",
+      "afterFingerprint": "cbe9c5572d2e72200617deff9b957c43da5c5cbfeaa3f7b08b4c9e2f14b30c76",
+      "evidence": {
+        "sourceUrl": "https://www.blackmores.co.th/en/products/supplement/2095-blackmores-omega-dha",
+        "checkedAt": "2026-09-07T11:30:12.393183+00:00",
+        "summary": "Manufacturer composition and oral directions support physical unit capsule. Composition basis is 1 physical unit(s) per labelled serving. The source identifies a single pack size of 60 physical units. Archived label HTML SHA-256: 5f777ff35974d5585fdf0dd031559ac514529ef29c48120ec5ee233c05d5a73b"
+      }
+    },
+    {
+      "correctionId": "anna-v6-2026-09-07-uat-administration-dcb59353-b7eb-4325-9ee6-7ba835e6a537",
+      "entityTable": "products",
+      "entityId": "dcb59353-b7eb-4325-9ee6-7ba835e6a537",
+      "before": {
+        "id": "dcb59353-b7eb-4325-9ee6-7ba835e6a537",
+        "administration": null
+      },
+      "after": {
+        "id": "dcb59353-b7eb-4325-9ee6-7ba835e6a537",
+        "administration": {
+          "route": "oral",
+          "physicalUnit": "capsule",
+          "unitsPerServing": 1,
+          "doseIncrement": 1,
+          "packQuantity": null,
+          "provenance": {
+            "status": "verified",
+            "sourceUrl": "https://www.vistra.co.th/product/vistra-livotox/",
+            "sourceText": "Manufacturer composition and oral directions support physical unit capsule. Composition basis is 1 physical unit(s) per labelled serving. Pack quantity for this SKU is not independently established.",
+            "verifiedAt": "2026-09-07T11:30:12.676984+00:00"
+          }
+        }
+      },
+      "beforeFingerprint": "4506c49568ed157dea8eaff87fdf51bab17078d6f8bb217fa1586526246574ba",
+      "afterFingerprint": "35aceef99bc64c2b4a356e77e4612bcfca2aa5225839e572d266dc46955e042b",
+      "evidence": {
+        "sourceUrl": "https://www.vistra.co.th/product/vistra-livotox/",
+        "checkedAt": "2026-09-07T11:30:12.676984+00:00",
+        "summary": "Manufacturer composition and oral directions support physical unit capsule. Composition basis is 1 physical unit(s) per labelled serving. Pack quantity for this SKU is not independently established. Archived label HTML SHA-256: 56d873b89c3311de5bf10aa14b24b631697bcfc060f734e483a776f903621293"
+      }
+    },
+    {
+      "correctionId": "anna-v6-2026-09-07-uat-administration-e19ebbb0-798a-48e4-9a53-b61db247946b",
+      "entityTable": "products",
+      "entityId": "e19ebbb0-798a-48e4-9a53-b61db247946b",
+      "before": {
+        "id": "e19ebbb0-798a-48e4-9a53-b61db247946b",
+        "administration": null
+      },
+      "after": {
+        "id": "e19ebbb0-798a-48e4-9a53-b61db247946b",
+        "administration": {
+          "route": "oral",
+          "physicalUnit": "capsule",
+          "unitsPerServing": 1,
+          "doseIncrement": 1,
+          "packQuantity": null,
+          "provenance": {
+            "status": "verified",
+            "sourceUrl": "https://www.vistra.co.th/product/evening-primrose-oil/?real=1",
+            "sourceText": "Manufacturer composition and oral directions support physical unit capsule. Composition basis is 1 physical unit(s) per labelled serving. Pack quantity for this SKU is not independently established.",
+            "verifiedAt": "2026-09-07T11:30:12.758370+00:00"
+          }
+        }
+      },
+      "beforeFingerprint": "b12d64d9d8421c8982e55cf00d213164581ee2e02e8d1a44150467af7c056e2e",
+      "afterFingerprint": "43c70e86d8f46e85ec0a15dd62c4e241f07f0d529c7e4471622a074c0f610123",
+      "evidence": {
+        "sourceUrl": "https://www.vistra.co.th/product/evening-primrose-oil/?real=1",
+        "checkedAt": "2026-09-07T11:30:12.758370+00:00",
+        "summary": "Manufacturer composition and oral directions support physical unit capsule. Composition basis is 1 physical unit(s) per labelled serving. Pack quantity for this SKU is not independently established. Archived label HTML SHA-256: b1a90fcf09746e1d11676dcabe671617fe2a52a91f6c2f03026c08b5dca85f97"
+      }
+    },
+    {
+      "correctionId": "anna-v6-2026-09-07-uat-administration-e261adbe-890a-485a-a81e-784608625d11",
+      "entityTable": "products",
+      "entityId": "e261adbe-890a-485a-a81e-784608625d11",
+      "before": {
+        "id": "e261adbe-890a-485a-a81e-784608625d11",
+        "administration": null
+      },
+      "after": {
+        "id": "e261adbe-890a-485a-a81e-784608625d11",
+        "administration": {
+          "route": "oral",
+          "physicalUnit": "tablet",
+          "unitsPerServing": 1,
+          "doseIncrement": 1,
+          "packQuantity": null,
+          "provenance": {
+            "status": "verified",
+            "sourceUrl": "https://www.blackmores.co.th/en/products/supplement/2099-blackmores-multivitamin-active",
+            "sourceText": "Manufacturer composition and oral directions support physical unit tablet. Composition basis is 1 physical unit(s) per labelled serving. Pack quantity for this SKU is not independently established.",
+            "verifiedAt": "2026-09-07T11:30:13.116198+00:00"
+          }
+        }
+      },
+      "beforeFingerprint": "407eddbbe9e1dc60a732ae5b2c7c387e97d9e9813b1222f36c2ecee3983904f6",
+      "afterFingerprint": "056addefd9297e2048837cec7514401da166a0763beafa2b7343567333cb0d3d",
+      "evidence": {
+        "sourceUrl": "https://www.blackmores.co.th/en/products/supplement/2099-blackmores-multivitamin-active",
+        "checkedAt": "2026-09-07T11:30:13.116198+00:00",
+        "summary": "Manufacturer composition and oral directions support physical unit tablet. Composition basis is 1 physical unit(s) per labelled serving. Pack quantity for this SKU is not independently established. Archived label HTML SHA-256: ddb73d829e2bae125d3aa5c9674b123e52cfc1cfe6d8283e370a354b0a145464"
+      }
+    },
+    {
+      "correctionId": "anna-v6-2026-09-07-uat-administration-ec278e48-ab6d-4a12-a385-3aa62d22c378",
+      "entityTable": "products",
+      "entityId": "ec278e48-ab6d-4a12-a385-3aa62d22c378",
+      "before": {
+        "id": "ec278e48-ab6d-4a12-a385-3aa62d22c378",
+        "administration": null
+      },
+      "after": {
+        "id": "ec278e48-ab6d-4a12-a385-3aa62d22c378",
+        "administration": {
+          "route": "oral",
+          "physicalUnit": "tablet",
+          "unitsPerServing": 1,
+          "doseIncrement": 1,
+          "packQuantity": null,
+          "provenance": {
+            "status": "verified",
+            "sourceUrl": "https://www.blackmores.co.th/en/products/supplement/2128--blackmores-bio-c-500-mg-daily-imu-chewable",
+            "sourceText": "Manufacturer composition is per chewable tablet. Oral administration and one whole tablet increment are supported. Multiple pack sizes prevent a unique local pack quantity.",
+            "verifiedAt": "2026-09-07T11:41:23.500664+00:00"
+          }
+        }
+      },
+      "beforeFingerprint": "88c6840549ed593b754a8c5ff1d6e9b7400be85ce61857d7253add2b45d8c6df",
+      "afterFingerprint": "40d0a658e5a088396220b328b68c099e9140e5e704a4d0bf26b1c9d7ee45ed21",
+      "evidence": {
+        "sourceUrl": "https://www.blackmores.co.th/en/products/supplement/2128--blackmores-bio-c-500-mg-daily-imu-chewable",
+        "checkedAt": "2026-09-07T11:41:23.500664+00:00",
+        "summary": "Manufacturer composition is per chewable tablet. Oral administration and one whole tablet increment are supported. Multiple pack sizes prevent a unique local pack quantity. Archived label HTML SHA-256: b64eecf03c60c6769705b6b31d9b67153ad52045c227150a89e526f432829d8a"
+      }
+    },
+    {
+      "correctionId": "anna-v6-2026-09-07-uat-administration-ec476337-cff3-4cba-8b42-65342d964669",
+      "entityTable": "products",
+      "entityId": "ec476337-cff3-4cba-8b42-65342d964669",
+      "before": {
+        "id": "ec476337-cff3-4cba-8b42-65342d964669",
+        "administration": null
+      },
+      "after": {
+        "id": "ec476337-cff3-4cba-8b42-65342d964669",
+        "administration": {
+          "route": "oral",
+          "physicalUnit": "tablet",
+          "unitsPerServing": 1,
+          "doseIncrement": 1,
+          "packQuantity": null,
+          "provenance": {
+            "status": "verified",
+            "sourceUrl": "https://www.blackmores.com.au/products/mega-b-complex",
+            "sourceText": "Manufacturer composition and oral directions support physical unit tablet. Composition basis is 1 physical unit(s) per labelled serving. Pack quantity for this SKU is not independently established.",
+            "verifiedAt": "2026-09-07T11:30:13.392413+00:00"
+          }
+        }
+      },
+      "beforeFingerprint": "567d25c444da02915952a048b717c7cdd9f2b2d9ca7c41c7ee02b631dc86389e",
+      "afterFingerprint": "a3e20e7a133f4d25129f04c8cfeed6f200cea0a26e254d37e7f6bad44e1cd51e",
+      "evidence": {
+        "sourceUrl": "https://www.blackmores.com.au/products/mega-b-complex",
+        "checkedAt": "2026-09-07T11:30:13.392413+00:00",
+        "summary": "Manufacturer composition and oral directions support physical unit tablet. Composition basis is 1 physical unit(s) per labelled serving. Pack quantity for this SKU is not independently established. Archived label HTML SHA-256: b748693e0f5f81a5a3f6999598f8a324d74f156059e89889fa5744e5f7309e77"
+      }
+    },
+    {
+      "correctionId": "anna-v6-2026-09-07-uat-administration-f0ac13e7-57b3-4fdb-b6f7-206ad8b6f0ef",
+      "entityTable": "products",
+      "entityId": "f0ac13e7-57b3-4fdb-b6f7-206ad8b6f0ef",
+      "before": {
+        "id": "f0ac13e7-57b3-4fdb-b6f7-206ad8b6f0ef",
+        "administration": null
+      },
+      "after": {
+        "id": "f0ac13e7-57b3-4fdb-b6f7-206ad8b6f0ef",
+        "administration": {
+          "route": "oral",
+          "physicalUnit": "tablet",
+          "unitsPerServing": 1,
+          "doseIncrement": 1,
+          "packQuantity": null,
+          "provenance": {
+            "status": "verified",
+            "sourceUrl": "https://www.vistra.co.th/product/vistra-calplex-calcium-600-mg-menaquinone-7-plus/",
+            "sourceText": "Manufacturer composition and oral directions support physical unit tablet. Composition basis is 1 physical unit(s) per labelled serving. Pack quantity for this SKU is not independently established.",
+            "verifiedAt": "2026-09-07T11:30:13.779915+00:00"
+          }
+        }
+      },
+      "beforeFingerprint": "2dcc6e32fbeeeac1c5d9f7662280dd463e9780f32fbd443c25e3e7097432f262",
+      "afterFingerprint": "121da3029d2a9beef289bb4ab042eb154f8d034927475eef2942e6b9d9f49f8a",
+      "evidence": {
+        "sourceUrl": "https://www.vistra.co.th/product/vistra-calplex-calcium-600-mg-menaquinone-7-plus/",
+        "checkedAt": "2026-09-07T11:30:13.779915+00:00",
+        "summary": "Manufacturer composition and oral directions support physical unit tablet. Composition basis is 1 physical unit(s) per labelled serving. Pack quantity for this SKU is not independently established. Archived label HTML SHA-256: a0349cee096f0637b94f221c9aa05b58554c60a0dfef24d0c4f0974e1a1b8ac6"
+      }
+    },
+    {
+      "correctionId": "anna-v6-2026-09-07-uat-administration-f172802d-12f6-55ca-90d2-457451371c00",
+      "entityTable": "products",
+      "entityId": "f172802d-12f6-55ca-90d2-457451371c00",
+      "before": {
+        "id": "f172802d-12f6-55ca-90d2-457451371c00",
+        "administration": null
+      },
+      "after": {
+        "id": "f172802d-12f6-55ca-90d2-457451371c00",
+        "administration": {
+          "route": "oral",
+          "physicalUnit": "sachet",
+          "unitsPerServing": null,
+          "doseIncrement": 1,
+          "packQuantity": null,
+          "provenance": {
+            "status": "verified",
+            "sourceUrl": "https://www.vistra.co.th/product/vistra-pure-collagen-dipeptide/",
+            "sourceText": "Manufacturer composition and oral directions support physical unit sachet. Composition basis per labelled serving is not explicit, so no nutrient-to-unit conversion is asserted. Pack quantity for this SKU is not independently established.",
+            "verifiedAt": "2026-09-07T11:30:13.923985+00:00"
+          }
+        }
+      },
+      "beforeFingerprint": "457960692fbdd6021cfd3d23e304eddbcf23c47536dd70e164af81604b05b7c1",
+      "afterFingerprint": "f27c2680e82adcdcec5b86682fdd7f460d82f969e8970f754b9e63a52a0c112b",
+      "evidence": {
+        "sourceUrl": "https://www.vistra.co.th/product/vistra-pure-collagen-dipeptide/",
+        "checkedAt": "2026-09-07T11:30:13.923985+00:00",
+        "summary": "Manufacturer composition and oral directions support physical unit sachet. Composition basis per labelled serving is not explicit, so no nutrient-to-unit conversion is asserted. Pack quantity for this SKU is not independently established. Archived label HTML SHA-256: 36a21a34c7eed0558b87fa1ae003dffce926b8a06e68eb50636573661a3a3d5d"
+      }
+    },
+    {
+      "correctionId": "anna-v6-2026-09-07-uat-administration-f829101b-28c7-40af-a5cc-334321374a09",
+      "entityTable": "products",
+      "entityId": "f829101b-28c7-40af-a5cc-334321374a09",
+      "before": {
+        "id": "f829101b-28c7-40af-a5cc-334321374a09",
+        "administration": null
+      },
+      "after": {
+        "id": "f829101b-28c7-40af-a5cc-334321374a09",
+        "administration": {
+          "route": "oral",
+          "physicalUnit": "tablet",
+          "unitsPerServing": 1,
+          "doseIncrement": 1,
+          "packQuantity": 60,
+          "provenance": {
+            "status": "verified",
+            "sourceUrl": "https://www.blackmores.com.au/products/joint-mobility-plus",
+            "sourceText": "Manufacturer composition is per chewable tablet with a 60-tablet pack. Oral administration and whole-tablet increments are supported.",
+            "verifiedAt": "2026-09-07T11:30:14.200493+00:00"
+          }
+        }
+      },
+      "beforeFingerprint": "754acd2319c573ff9f7305845e65a3f389b49522e0145752adce32fcb35d4d39",
+      "afterFingerprint": "9c5e2a71168b2d122754a5700ae80d4f669c0c1af7d3881eb509aeb2db024b54",
+      "evidence": {
+        "sourceUrl": "https://www.blackmores.com.au/products/joint-mobility-plus",
+        "checkedAt": "2026-09-07T11:30:14.200493+00:00",
+        "summary": "Manufacturer composition is per chewable tablet with a 60-tablet pack. Oral administration and whole-tablet increments are supported. Archived label HTML SHA-256: cf986de3dd6c15d4f63c1480245e200ba508d0408ce5f61f32f9c73d170c6ab2"
+      }
+    },
+    {
+      "correctionId": "anna-v6-2026-09-07-uat-multilives-42547f0b-cb53-45b1-ba4c-0cb8ff88992d",
+      "entityTable": "product_facts",
+      "entityId": "42547f0b-cb53-45b1-ba4c-0cb8ff88992d",
+      "before": {
+        "id": "42547f0b-cb53-45b1-ba4c-0cb8ff88992d",
+        "product_id": "3dc57564-e623-4262-b9f3-4f4a1c72ec21",
+        "name": "Vitamin C",
+        "amount": 50,
+        "unit": "mg",
+        "confidence": "high",
+        "source_url": null,
+        "source_text": null
+      },
+      "after": {
+        "id": "42547f0b-cb53-45b1-ba4c-0cb8ff88992d",
+        "product_id": "3dc57564-e623-4262-b9f3-4f4a1c72ec21",
+        "name": "Vitamin C",
+        "amount": 60,
+        "unit": "mg",
+        "confidence": "high",
+        "source_url": "https://www.megawecare.com/products/vitamins/multilives",
+        "source_text": "Thailand formulation manufacturer composition per softgel states Vitamin C 60 mg. Correct the transcribed amount/unit and preserve original fact confidence."
+      },
+      "beforeFingerprint": "b0f7c7c5809ed99d2c5788271217d13341ba59590088ea27f9aeb6a15394a107",
+      "afterFingerprint": "57baf231d064f9682175580e41e82cd826e769f0a07324b12d3593346cf1bf9f",
+      "evidence": {
+        "sourceUrl": "https://www.megawecare.com/products/vitamins/multilives",
+        "checkedAt": "2026-09-07T11:40:30.376480+00:00",
+        "summary": "Thailand formulation manufacturer composition per softgel states Vitamin C 60 mg. Correct the transcribed amount/unit and preserve original fact confidence. Archived label HTML SHA-256: 504b6d5ce98f26a96ae20bbbdc580e7df2a457423a7961010fd90547957a7360"
+      }
+    },
+    {
+      "correctionId": "anna-v6-2026-09-07-uat-multilives-9968cbe1-84b6-4db9-90a5-86db6db9df03",
+      "entityTable": "product_facts",
+      "entityId": "9968cbe1-84b6-4db9-90a5-86db6db9df03",
+      "before": {
+        "id": "9968cbe1-84b6-4db9-90a5-86db6db9df03",
+        "product_id": "3dc57564-e623-4262-b9f3-4f4a1c72ec21",
+        "name": "Biotin",
+        "amount": 1,
+        "unit": "mg",
+        "confidence": "moderate",
+        "source_url": null,
+        "source_text": null
+      },
+      "after": {
+        "id": "9968cbe1-84b6-4db9-90a5-86db6db9df03",
+        "product_id": "3dc57564-e623-4262-b9f3-4f4a1c72ec21",
+        "name": "Biotin",
+        "amount": 50,
+        "unit": "mcg",
+        "confidence": "moderate",
+        "source_url": "https://www.megawecare.com/products/vitamins/multilives",
+        "source_text": "Thailand formulation manufacturer composition per softgel states Biotin 50 mcg. Correct the transcribed amount/unit and preserve original fact confidence."
+      },
+      "beforeFingerprint": "a78fb5ca06be721790c4901335daa0d11f0d78413400daae5bf57a83f1f01e46",
+      "afterFingerprint": "d52eb71b6c938c21e75d2d750dac4375f486c3a52c37a218870f9fd4b6ea51dd",
+      "evidence": {
+        "sourceUrl": "https://www.megawecare.com/products/vitamins/multilives",
+        "checkedAt": "2026-09-07T11:40:30.376480+00:00",
+        "summary": "Thailand formulation manufacturer composition per softgel states Biotin 50 mcg. Correct the transcribed amount/unit and preserve original fact confidence. Archived label HTML SHA-256: 504b6d5ce98f26a96ae20bbbdc580e7df2a457423a7961010fd90547957a7360"
+      }
+    },
+    {
+      "correctionId": "anna-v6-2026-09-07-uat-multilives-ce7002be-c97b-47cb-9ca6-394281ce004d",
+      "entityTable": "product_facts",
+      "entityId": "ce7002be-c97b-47cb-9ca6-394281ce004d",
+      "before": {
+        "id": "ce7002be-c97b-47cb-9ca6-394281ce004d",
+        "product_id": "3dc57564-e623-4262-b9f3-4f4a1c72ec21",
+        "name": "Lutein",
+        "amount": 1,
+        "unit": "mg",
+        "confidence": "moderate",
+        "source_url": null,
+        "source_text": null
+      },
+      "after": {
+        "id": "ce7002be-c97b-47cb-9ca6-394281ce004d",
+        "product_id": "3dc57564-e623-4262-b9f3-4f4a1c72ec21",
+        "name": "Lutein",
+        "amount": 6,
+        "unit": "mg",
+        "confidence": "moderate",
+        "source_url": "https://www.megawecare.com/products/vitamins/multilives",
+        "source_text": "Thailand formulation manufacturer composition per softgel states Lutein 6 mg. Correct the transcribed amount/unit and preserve original fact confidence."
+      },
+      "beforeFingerprint": "8472f344a084ec6000d1175d2fa443a7b12461e75d157372e8917876f02b4faf",
+      "afterFingerprint": "6b9950b8fc68fa8d15d4b237759f1742afbec91101fe80a816da121a21e0b574",
+      "evidence": {
+        "sourceUrl": "https://www.megawecare.com/products/vitamins/multilives",
+        "checkedAt": "2026-09-07T11:40:30.376480+00:00",
+        "summary": "Thailand formulation manufacturer composition per softgel states Lutein 6 mg. Correct the transcribed amount/unit and preserve original fact confidence. Archived label HTML SHA-256: 504b6d5ce98f26a96ae20bbbdc580e7df2a457423a7961010fd90547957a7360"
+      }
+    }
+  ]
+}

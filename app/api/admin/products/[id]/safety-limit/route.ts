@@ -1,6 +1,4 @@
-import { NextResponse } from "next/server";
 import { adminDashboardOrClawRequestAllowed } from "@/lib/admin-auth";
-import { increaseProductFactSafetyLimit } from "@/lib/admin-products";
 import { isUuid } from "@/lib/assessment-store";
 
 export const runtime = "nodejs";
@@ -31,7 +29,7 @@ export async function POST(
     request.headers.get("x-admin-dashboard-token") ?? textOrNull(body.accessToken);
 
   if (!adminDashboardOrClawRequestAllowed(request, accessToken)) {
-    return NextResponse.json(
+    return Response.json(
       { message: "Not found" },
       {
         headers: {
@@ -45,7 +43,7 @@ export async function POST(
   const factId = textOrNull(body.factId, 80);
 
   if (!isUuid(id) || !isUuid(factId ?? "")) {
-    return NextResponse.json(
+    return Response.json(
       { message: "Product fact was not found" },
       {
         headers: {
@@ -56,40 +54,12 @@ export async function POST(
     );
   }
 
-  try {
-    const result = await increaseProductFactSafetyLimit({
-      actor: "admin_dashboard",
-      factId: factId!,
-      productId: id
-    });
-
-    return NextResponse.json(
-      {
-        revalidatedProductIds: result.revalidatedProductIds,
-        rows: result.revalidatedRows,
-        row: result.row
-      },
-      {
-        headers: {
-          "Cache-Control": "no-store"
-        }
-      }
-    );
-  } catch (error) {
-    console.error("Unable to increase product safety limit", error);
-
-    return NextResponse.json(
-      {
-        message: error instanceof Error
-          ? error.message
-          : "Unable to increase product safety limit"
-      },
-      {
-        headers: {
-          "Cache-Control": "no-store"
-        },
-        status: 400
-      }
-    );
-  }
+  return Response.json(
+    {
+      code: "reference_review_required",
+      message: "Review reference source evidence in Supplements. A product's labelled dose cannot set or raise a global reference limit.",
+      nextAction: "review_reference_evidence"
+    },
+    { headers: { "Cache-Control": "no-store" }, status: 410 }
+  );
 }

@@ -10,7 +10,16 @@ export type CatalogueCorrection = Readonly<{
   afterFingerprint: string;
   evidence: Readonly<{ sourceUrl: string; checkedAt: string; summary: string }>;
 }>;
-export type CatalogueCorrectionManifest = Readonly<{ version: 1; corrections: readonly CatalogueCorrection[] }>;
+export type CatalogueCorrectionManifest = Readonly<{ version: 1; environment?: "dev" | "uat"; corrections: readonly CatalogueCorrection[] }>;
+
+/** A reviewed UAT manifest must never be mistaken for the DEV before-state. */
+export function validateCatalogueCorrectionTarget(manifest: CatalogueCorrectionManifest, environment: string | undefined, databaseUrl: string) {
+  const url = new URL(databaseUrl);
+  const isolated = ["127.0.0.1", "localhost", "[::1]"].includes(url.hostname) && /^\/mattanutra_lock_review(?:[_-][a-zA-Z0-9_-]+)?$/.test(url.pathname);
+  if (isolated) return;
+  if (!manifest.environment || manifest.environment !== environment || !["dev", "uat"].includes(environment ?? "")) throw new Error("Catalogue writes require the matching reviewed DEV or UAT manifest");
+  if (!new RegExp(`(?:^|[-_])${environment}$`, "i").test(url.pathname.slice(1))) throw new Error("Catalogue correction database does not match its reviewed environment");
+}
 
 export function catalogueRecordFingerprint(record: unknown): string {
   function canonical(value: unknown): unknown {

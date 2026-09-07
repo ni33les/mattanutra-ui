@@ -57,11 +57,21 @@ export function parseAdminLimitUnit(value: string): MatcherUnit | null {
   return null;
 }
 
-let cached: { at: number; ceilings: SafetyCeiling[] } | null = null;
+/** Decode a complete reference quantity; a scaled CFU label cannot be parsed as a unit alone. */
+export function parseAdminLimitDose(amount: number, value: string): { amount: number; unit: MatcherUnit } | null {
+  const scaledCfu = value.trim().match(/^(million|billion)\s+CFU(?:\s*\/\s*day)?$/i);
+  const unit = scaledCfu ? "CFU" : parseAdminLimitUnit(value);
+  const normalizedAmount = amount * (scaledCfu ? scaledCfu[1].toLowerCase() === "billion" ? 1_000_000_000 : 1_000_000 : 1);
+  if (!unit || !Number.isFinite(normalizedAmount) || normalizedAmount <= 0 || normalizedAmount > Number.MAX_SAFE_INTEGER) return null;
+  return { amount: normalizedAmount, unit };
+}
+
+export type SafetyReferenceIdentity = Readonly<{ runtimeRevision: number; fingerprint: string }>;
+let cached: { at: number; ceilings: SafetyCeiling[]; referenceIdentity: SafetyReferenceIdentity | null } | null = null;
 let unavailable = false;
 
-export function setMatcherSafetyCeilings(ceilings: readonly SafetyCeiling[]) {
-  cached = { at: Date.now(), ceilings: [...ceilings] };
+export function setMatcherSafetyCeilings(ceilings: readonly SafetyCeiling[], referenceIdentity: SafetyReferenceIdentity | null = null) {
+  cached = { at: Date.now(), ceilings: [...ceilings], referenceIdentity };
   unavailable = false;
 }
 
@@ -79,6 +89,10 @@ export function matcherSafetyCeilings() {
 
 export function matcherSafetyCeilingsCachedAt() {
   return cached?.at ?? 0;
+}
+
+export function matcherSafetyReferenceIdentity() {
+  return cached?.referenceIdentity ?? null;
 }
 
 export function resetMatcherSafetyCeilings() {

@@ -40,7 +40,6 @@ import {
   productDoseUnitSelectOptions,
   productFactIssueMessages,
   productFactIssueSeverity,
-  productFactSafetyLimitIncreaseLabel,
   productLocaleMeta,
   productStatusLabel,
   productTranslationFor,
@@ -51,6 +50,7 @@ import {
   type ProductViewLabels,
 } from "@/components/admin/product-view-helpers";
 import { AdminModal } from "@/components/admin/ui";
+import { ProductReferenceReview } from "@/components/admin/product-reference-review";
 import {
   packCountFromFacts,
   servingLabelWithPackCount
@@ -1575,17 +1575,12 @@ export function ProductCard({
 
 export function ProductFactsEditor({
   draft,
-  onIncreaseSafetyLimit,
-  saving,
+  locale,
   setDraft,
   viewLabels,
 }: Readonly<{
   draft: AdminProductDetailRow;
-  onIncreaseSafetyLimit: (
-    row: AdminProductDetailRow,
-    factId: string,
-  ) => Promise<boolean>;
-  saving: boolean;
+  locale: Locale;
   setDraft: (row: AdminProductDetailRow) => void;
   viewLabels: Readonly<Record<string, string>>;
 }>) {
@@ -1740,6 +1735,7 @@ export function ProductFactsEditor({
           {viewLabels.servingsPerPackHint}
         </span>
       </label>
+      <ProductReferenceReview locale={locale} />
       <div className="mt-2 space-y-2">
         {draft.facts.length > 0 ? (
           draft.facts.map((fact, index) => {
@@ -1747,8 +1743,6 @@ export function ProductFactsEditor({
             const issueSeverity = productFactIssueSeverity(factIssues);
             const hasIssues = issueSeverity !== "none";
             const highSeverity = issueSeverity === "high";
-            const safetyLimitIncreaseLabel =
-              productFactSafetyLimitIncreaseLabel(fact);
             const inputClass = classNames(
               "rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 outline-none focus:ring-2 focus:ring-[#1FA77A]",
               hasIssues ? "ring-amber-200" : "ring-gray-200",
@@ -1842,16 +1836,6 @@ export function ProductFactsEditor({
                   <option value="low">{viewLabels.confidenceLow}</option>
                 </select>
                 <div className="flex items-center justify-end gap-2">
-                  {safetyLimitIncreaseLabel ? (
-                    <button
-                      className="rounded-md px-2 py-1 text-xs font-semibold text-[#126B4F] hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-60"
-                      disabled={saving}
-                      onClick={() => void onIncreaseSafetyLimit(draft, fact.id)}
-                      type="button"
-                    >
-                      {viewLabels.increaseLimit}
-                    </button>
-                  ) : null}
                   <button
                     className="rounded-md px-2 py-1 text-xs font-semibold text-red-700 hover:bg-red-50"
                     onClick={() => removeFact(index)}

@@ -39,7 +39,7 @@ type TriggerRow = Readonly<{
 const requiredTables = [
   "agentic_matcher_events",
   "organisations", "product_brands", "product_facts", "supplements", "supplement_aliases", "supplement_safety_limits", "retail_sellable_products",
-  "catalogue_runtime_revision", "catalogue_correction_audit",
+  "catalogue_runtime_revision", "catalogue_correction_audit", "supplement_safety_reference_corrections",
   "assessment_product_preferences", "assessments", "formulations", "food_guidance", "recommendations", "nutrition_reports", "product_recommendation_runs",
   "assessment_inputs", "assessment_healthscore_results", "assessment_resume_drafts", "funnel_requests", "healthscore_delivery_requests", "tasks",
   "admin_product_coverage_demand_profile_cache",
@@ -277,6 +277,10 @@ try {
   }
   for (const column of ["catalogue_revision", "catalogue_fingerprint", "search_effort"]) requireColumn(columnMap, "product_recommendation_runs", column);
   requireColumn(columnMap, "catalogue_runtime_revision", "revision", { dataType: "bigint", notNull: true });
+  for (const column of ["source_url", "basis_rationale"]) requireColumn(columnMap, "supplement_safety_limits", column, { dataType: "text" });
+  for (const column of ["environment", "correction_id", "manifest_id", "supplement_id", "manifest_sha256", "before_heads_fingerprint", "after_heads_fingerprint", "before_heads", "after_heads", "manifest", "applied_at"]) requireColumn(columnMap, "supplement_safety_reference_corrections", column, { notNull: true });
+  requireConstraint(constraintMap, "supplement_safety_reference_corrections", "supplement_safety_reference_corrections_pkey", ["primary key (environment, correction_id)"]);
+  requireTrigger(triggerMap, "supplement_safety_reference_corrections", "supplement_safety_reference_corrections_immutable", ["before", "update", "delete", "prevent_domain_version_mutation"]);
   for (const table of ["products", "product_facts", "supplements", "supplement_aliases", "supplement_safety_limits", "supplement_country_availability", "retail_sellable_products"]) {
     requireTrigger(triggerMap, table, "catalogue_runtime_revision_changed", ["for each statement", "bump_catalogue_runtime_revision"]);
   }

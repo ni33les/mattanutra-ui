@@ -75,6 +75,8 @@
     "supplements:ashwagandha:country-repair": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/repair-ashwagandha-country-availability.ts",
     "supplements:country-availability:schema:apply": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/apply-supplement-country-availability-schema.ts",
     "supplements:safety-limit-life-stages:schema:apply": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/apply-supplement-safety-limit-life-stages-schema.ts",
+    "supplements:safety-reference-integrity:schema:apply": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/apply-supplement-safety-reference-integrity-schema.ts",
+    "supplements:safety-references:correct": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/correct-supplement-safety-references.ts",
     "supplements:safety-limit-bands:schema:apply": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/apply-supplement-safety-limit-bands-schema.ts",
     "assessment:schema:apply": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/apply-assessment-schema.ts",
     "foods:schema:apply": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/apply-food-schema.ts",

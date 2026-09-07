@@ -6,6 +6,14 @@ import { ThreadPoolUnavailableError } from "../lib/thread-pool.ts";
 import { setMatcherSafetyCeilings } from "../lib/matcher/safety-ceilings.ts";
 import { productMatchWorkItem } from "./helpers/product-match-work-item.ts";
 
+it("ANNA-REF-WORKER-03 product jobs reject live catalogue work without reviewed reference identity", async () => {
+  const pool = new ProductMatcherPool(1);
+  try {
+    setMatcherSafetyCeilings([], { runtimeRevision: 77, fingerprint: "a".repeat(64) });
+    await assert.rejects(pool.match({ ...productMatchWorkItem(), catalogueRevision: 77 }), /reference.*identity/i);
+  } finally { await pool.close(); }
+});
+
 function withoutTimings(value: unknown) {
   return JSON.parse(JSON.stringify(value, (key, child: unknown) => key === "timingMs" ? undefined : child));
 }

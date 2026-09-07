@@ -346,6 +346,7 @@ export function reviewRowToSupplementDraft(
   const value = reviewValuePill(labels, row.businessValue);
 
   return {
+    safetyReferenceFingerprint: "",
     aliases: [],
     category: reviewKindLabel(labels, row),
     confidence:

@@ -1,16 +1,15 @@
 import { readFile } from "node:fs/promises";
 import { closeSqlPool, getSql } from "@/lib/db";
-import { catalogueCorrectionState, catalogueRecordFingerprint, type CatalogueCorrectionManifest } from "@/lib/catalogue-corrections";
+import { catalogueCorrectionState, catalogueRecordFingerprint, validateCatalogueCorrectionTarget, type CatalogueCorrectionManifest } from "@/lib/catalogue-corrections";
 
 const args = process.argv.slice(2);
 const apply = args.includes("--apply");
 const manifestPath = args.find(arg => !arg.startsWith("--"));
-if (!manifestPath) throw new Error("Pass a reviewed manifest path; read-only by default. --apply permits DEV or loopback isolated DB only.");
+if (!manifestPath) throw new Error("Pass a reviewed manifest path; read-only by default. --apply permits the matching DEV/UAT environment or an isolated database.");
 const environment = process.env.MATTANUTRA_ENV;
-const url = new URL(process.env.DB_URL ?? "postgresql://invalid");
-if (apply && !(["127.0.0.1", "localhost", "::1"].includes(url.hostname) || (environment === "dev" && /dev/i.test(url.pathname))) ) throw new Error("Catalogue correction writes are restricted to DEV or an isolated loopback database");
 const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as CatalogueCorrectionManifest;
 if (manifest.version !== 1 || !Array.isArray(manifest.corrections) || !manifest.corrections.length) throw new Error("Invalid or empty catalogue correction manifest");
+if (apply) validateCatalogueCorrectionTarget(manifest, environment, process.env.DB_URL ?? "postgresql://invalid");
 const sql = getSql();
 if (!sql) throw new Error("Database connection is not configured");
 try {

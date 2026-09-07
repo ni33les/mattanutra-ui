@@ -1,4 +1,6 @@
-import { getCatalogueRuntimeRevision } from "@/lib/catalogue-runtime-revision";
+import { loadAdminSafetyReferenceSnapshot, refreshAdminSafetyCeilings } from "@/lib/agentic/catalogue/load-safety-ceilings";
+import { matchesSafetyReferenceIdentity } from "@/lib/agentic/catalogue/reference-job";
+import { matcherSafetyReferenceIdentity, type SafetyReferenceIdentity } from "@/lib/matcher/safety-ceilings";
 import { valueCatalogueFingerprint } from "@/lib/agentic/value/fingerprint";
 import { administrationDailyPills } from "@/lib/product-administration";
 import { assessmentFieldKnown } from "@/lib/assessment-input-provenance";
@@ -353,6 +355,8 @@ export type NutritionPlanRefinementWorkItem = Readonly<{
 }>;
 
 export type ProductRecommendationsWorkItem = Readonly<{
+  safetyReferenceIdentity?: SafetyReferenceIdentity;
+  historicalReferenceFixture?: true;
   searchEffort?: "standard" | "expanded";
   catalogueFingerprint?: string;
   catalogueRevision?: number;
@@ -2026,6 +2030,11 @@ async function buildProductRecommendationsWorkItem(task: TaskRecord) {
   );
   const candidateLoadMs = Date.now() - candidateLoadStartedAt;
   const hydrateMs = Date.now() - hydrateStartedAt;
+  const catalogueRevision = requireCachedLiveRetailSnapshot(countryCode).runtimeRevision;
+  await refreshAdminSafetyCeilings({ runtimeRevision: catalogueRevision });
+  const safetyReferenceIdentity = matcherSafetyReferenceIdentity();
+  if (!safetyReferenceIdentity || !matchesSafetyReferenceIdentity(payloadRecord(task.payload).safetyReferenceIdentity, safetyReferenceIdentity) ||
+      safetyReferenceIdentity.runtimeRevision !== catalogueRevision) throw new Error("Safety reference identity changed; regenerate product matching work");
 
   console.info("[matching:work-item]", {
     candidateCount: retailerCandidateSets.reduce(
@@ -2041,7 +2050,8 @@ async function buildProductRecommendationsWorkItem(task: TaskRecord) {
 
   return {
     candidateLoadMs,
-    catalogueRevision: requireCachedLiveRetailSnapshot(countryCode).runtimeRevision,
+    catalogueRevision,
+    safetyReferenceIdentity,
     catalogueFingerprint: valueCatalogueFingerprint(requireCachedLiveRetailSnapshot(countryCode)),
     searchEffort: payloadRecord(payloadRecord(task.payload).productPreferences).searchEffort === "expanded" ? "expanded" : "standard",
     clientContext: { ...productRecommendationClientContextFromPlan(row.answers, [], []),
@@ -2371,7 +2381,11 @@ export async function buildTaskWorkItem(task: TaskRecord): Promise<TaskWorkItem>
     if (!generation || !row || generation.generatorVersion !== FUNNEL_GENERATOR_VERSION || Number(row.input_revision) !== generation.revision) {
       return { taskId: task.id, taskType: "superseded_generation" };
     }
-    if (task.taskType === "generate_product_recommendations" && payloadRecord(task.payload).catalogueRevision != null && Number(payloadRecord(task.payload).catalogueRevision) !== await getCatalogueRuntimeRevision(sql)) return { taskId: task.id, taskType: "superseded_generation" };
+    if (task.taskType === "generate_product_recommendations") {
+      const reference = await loadAdminSafetyReferenceSnapshot(sql);
+      if (Number(payloadRecord(task.payload).catalogueRevision) !== reference.runtimeRevision ||
+          !matchesSafetyReferenceIdentity(payloadRecord(task.payload).safetyReferenceIdentity, reference)) return { taskId: task.id, taskType: "superseded_generation" };
+    }
     if (task.taskType === "generate_product_recommendations" || task.taskType === "generate_food_gap_guidance") {
       const [preferences] = await sql`select revision from public.assessment_product_preferences where plan_id = ${task.planId}::uuid`;
       if (Number(payloadRecord(payloadRecord(task.payload).productPreferences).revision ?? 0) !== Number(preferences?.revision ?? 0)) {
