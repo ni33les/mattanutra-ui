@@ -29,6 +29,12 @@ export function canonicalizeTargets(input: Readonly<{
   const leftovers: MatcherLeftover[] = [...(input.leftovers ?? [])];
 
   for (const target of input.targets) {
+    if (target.acceptableMinimum != null && (!Number.isFinite(target.acceptableMinimum) || target.acceptableMinimum < 0 || target.acceptableMinimum > target.amount)) {
+      throw new RangeError(`targets.${target.subjectId}.acceptableMinimum must be finite, nonnegative and no greater than target ${target.amount} ${target.unit}.`);
+    }
+    if (target.acceptableMaximum != null && (!Number.isFinite(target.acceptableMaximum) || target.acceptableMaximum < target.amount)) {
+      throw new RangeError(`targets.${target.subjectId}.acceptableMaximum must be finite and at least target ${target.amount} ${target.unit}.`);
+    }
     const requested = scaleAmount({
       amount: target.amount,
       subjectId: target.subjectId,

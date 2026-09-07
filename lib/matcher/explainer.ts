@@ -58,7 +58,7 @@ function seedUnusableReason(
     return "incidental_only";
   }
 
-  if (request.maxProductCount < 1) {
+  if (request.maxProductCount != null && request.maxProductCount < 1) {
     return "max_products";
   }
 

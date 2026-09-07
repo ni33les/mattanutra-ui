@@ -153,7 +153,13 @@ export function doseFitScore(request: CanonicalRequest, exposure: ReadonlyMap<st
         exposure: amount(known + (includeFood ? dietary.base : BigInt(0))),
         exposureMinimum: amount(minimum + (includeFood ? dietary.minimum : BigInt(0))),
         exposureMaximum: amount(maximum + (includeFood ? dietary.maximum : BigInt(0))),
-        conservativeExposure: amount(worst.targetExposure), under: value(worst.shortfall), over: value(worst.overshoot), certainty: rowCertainty });
+        conservativeExposure: amount(worst.targetExposure), under: value(worst.shortfall), over: value(worst.overshoot), certainty: rowCertainty,
+        ...(target.acceptableMinimum != null || target.acceptableMaximum != null ? {
+          acceptableMinimum: target.acceptableMinimum ?? target.requestedAmount,
+          acceptableMaximum: target.acceptableMaximum ?? target.requestedAmount,
+          withinAcceptableRange: amount(minimum + (includeFood ? dietary.minimum : BigInt(0))) >= (target.acceptableMinimum ?? target.requestedAmount) &&
+            amount(maximum + (includeFood ? dietary.maximum : BigInt(0))) <= (target.acceptableMaximum ?? target.requestedAmount)
+        } : {}) });
     }
     if (reference > BigInt(0)) {
       const first = referenceRows[0]!;

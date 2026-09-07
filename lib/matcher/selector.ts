@@ -1,3 +1,4 @@
+import { coverageSummary } from "@/lib/matcher/coverage";
 import { compareDoseFit, doseFitScore } from "@/lib/matcher/dose-fit";
 import { COVERED_THRESHOLD, DEFAULT_MATCHER_CONFIG } from "@/lib/matcher/config";
 import { contributionFor, productIsDedicatedForTarget } from "@/lib/matcher/candidates";
@@ -209,6 +210,7 @@ export function scoreState(input: Readonly<{
   return {
     aggregateCoverage: aggregateCoverage(input.request, input.state.delivered),
     coverageBySubject,
+    coverageSummary: coverageSummary(input.request, validated.exposure),
     coveredCount: coveredTargetCount(input.request, coverageBySubject),
     dailyPills: input.state.pills,
     dedicatedPartialCount: dedicatedPartialCountFor(
@@ -329,6 +331,37 @@ export function hasFewerConcerns(candidate: ScoredBasket, selected: ScoredBasket
   return [...before].some(([key, value]) => (after.get(key) ?? 0) < value);
 }
 
+
+/** The default may trade between incomparable required targets, but optional
+ * gains cannot displace a candidate that is no worse on every protected fact. */
+export function protectedReferenceCandidates(baskets: readonly ScoredBasket[], request: CanonicalRequest): ScoredBasket[] {
+  const protectedIds = new Set(request.targets.filter(row => row.importance === "required" || row.importance === "core").map(row => row.subjectId));
+  if (!protectedIds.size || !request.targets.some(row => row.importance === "optional")) return [...baskets];
+  const vectors = baskets.map(basket => {
+    const fit = fitOf(basket, request);
+    const vector = new Map<string, number>();
+    for (const row of fit.perTarget) if (protectedIds.has(row.subjectId)) {
+      vector.set(`deviation:${row.subjectId}`, row.under + row.over);
+      vector.set(`target_excess:${row.subjectId}`, row.over);
+    }
+    for (const row of fit.perContinuedDose ?? []) vector.set(`continued:${row.subjectId}`, row.over);
+    for (const row of fit.perLimit) vector.set(`limit:${row.sourceScope}:${row.subjectId}`, row.excess);
+    return vector;
+  });
+  return baskets.filter((_, i) => !vectors.some((other, j) => {
+    if (i === j) return false;
+    const own = vectors[i]!;
+    const keys = new Set([...own.keys(), ...other.keys()]);
+    let strict = false;
+    for (const key of keys) {
+      const a = other.get(key) ?? 0, b = own.get(key) ?? 0;
+      if (a > b) return false;
+      if (a < b) strict = true;
+    }
+    return strict;
+  }));
+}
+
 export function selectOptions(input: Readonly<{ baskets: readonly ScoredBasket[]; config?: MatcherConfig; request: CanonicalRequest }>) {
   const unique = new Map<string, ScoredBasket>();
   for (const basket of input.baskets) {
@@ -338,7 +371,7 @@ export function selectOptions(input: Readonly<{ baskets: readonly ScoredBasket[]
     if (!previous || compareBaskets(basket, previous, input.request, input.config) < 0) unique.set(signature, basket);
   }
   const ranked = [...unique.values()].sort((a, b) => compareBaskets(a, b, input.request, input.config));
-  const best = ranked[0];
+  const best = protectedReferenceCandidates(ranked, input.request)[0];
   if (!best) return { alternatives: [] as ScoredBasket[], selected: null };
   const selected = { ...best, optionRole: "requested_objective" as const, recommended: true, reason: selectedReason(input.request) };
   const alternative = ranked.find((row) => hasFewerConcerns(row, selected, input.request));

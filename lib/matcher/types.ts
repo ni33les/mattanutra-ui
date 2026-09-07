@@ -291,6 +291,7 @@ export type DoseFitScore = Readonly<{
     basis?: "total_daily" | "supplemental";
     subjectId: string; name: string; unit: MatcherUnit;
     target: number; exposure: number; under: number; over: number;
+    acceptableMinimum?: number; acceptableMaximum?: number; withinAcceptableRange?: boolean;
     exposureMinimum?: number; exposureMaximum?: number; conservativeExposure?: number;
     certainty: "known" | "estimated" | "unknown";
   }>[];
@@ -313,7 +314,15 @@ export type DoseFitScore = Readonly<{
 
 export type ValueOptionRole = "requested_objective" | "fewer_concerns" | "best_value" | "complete" | "minimum_core";
 
+export type CoverageSummaryRow = Readonly<{
+  subjectId: string; name: string; unit: MatcherUnit; target: number; importance: TargetImportance;
+  basis: "total_daily" | "supplemental"; knownCurrent: number; estimatedCurrent: number; unknown: boolean;
+  newContribution: number; quantifiedTotal: number; knownTotal: number; remainingGap: number; excess: number;
+  fullyMet: boolean; coveragePercent: number;
+}>;
+
 export type ScoredBasket = Readonly<{
+  coverageSummary?: readonly CoverageSummaryRow[];
   aggregateCoverage: number;
   coverageBySubject: ReadonlyMap<string, number>;
   coveredCount: number;

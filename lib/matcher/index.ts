@@ -62,6 +62,7 @@ function leftoversFor(
 
   for (const target of request.targets) {
     if (isDeferredConditional(target)) continue;
+    const summary = selected?.coverageSummary?.find(row => row.subjectId === target.subjectId);
     const coverage = selected?.coverageBySubject.get(target.subjectId) ?? 0;
     const percent = Math.round(coverage / 100);
 
@@ -81,7 +82,7 @@ function leftoversFor(
               ? "hard_constraint:maxPriceMinor"
               : undefined;
       push({
-        amount: target.requestedAmount,
+        amount: summary?.remainingGap ?? target.requestedAmount,
         name: target.name,
         ...(constraint ? { note: constraint } : {}),
         reason: "uncovered",
@@ -89,9 +90,9 @@ function leftoversFor(
         subjectId: target.subjectId,
         unit: target.requestedUnit
       });
-    } else if (percent < 90) {
+    } else if (coverage < 10000) {
       push({
-        amount: target.requestedAmount,
+        amount: summary?.remainingGap ?? target.requestedAmount,
         name: target.name,
         note: `covered ${percent}%`,
         reason: "dose_gap",
