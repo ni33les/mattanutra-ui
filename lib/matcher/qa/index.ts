@@ -18,4 +18,4 @@ export {
   QA_UNSAFE_ONLY,
   qaLargeNoisy
 } from "@/lib/matcher/qa/profiles";
-export { bruteForceMatch, mulberry32, pickCatalog } from "@/lib/matcher/qa/oracle";
+export { bruteForceMatch, finiteCatalogueOracle, mulberry32, pickCatalog } from "@/lib/matcher/qa/oracle";
