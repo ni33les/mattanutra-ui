@@ -1,3 +1,4 @@
+import { cleanupFixtureRelationships } from "./helpers/fixture-teardown.ts";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { before, after, describe, it } from "node:test";
@@ -20,6 +21,7 @@ describe("durable HealthScore delivery", { skip: !databaseUrl }, () => {
   after(async () => {
     await withDatabaseTransaction(getSql()!, async sql => {
       await sql`set local session_replication_role = replica`;
+      await cleanupFixtureRelationships(sql, { planIds: plans });
       for (const id of plans) {
         await sql`delete from public.communication_messages where plan_id = ${id}::uuid`;
         await sql`delete from public.task_events where task_id in (select id from public.tasks where plan_id = ${id}::uuid)`;

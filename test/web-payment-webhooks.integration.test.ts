@@ -1,3 +1,4 @@
+import { cleanupFixtureRelationships } from "./helpers/fixture-teardown.ts";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { after, before, describe, it } from "node:test";
@@ -19,6 +20,8 @@ describe("signed webhook interruption and replay", { skip: !databaseUrl }, () =>
   after(async () => {
     await withDatabaseTransaction(getSql()!, async sql => {
       await sql`set local session_replication_role = replica`;
+      const tasks = await sql`select id from public.tasks where payload->>'paymentId' = ${paymentId}`;
+      await cleanupFixtureRelationships(sql, { taskIds: tasks.map(task => task.id) });
       await sql`delete from public.stripe_webhook_events where stripe_event_id = ${eventId}`;
       await sql`delete from public.task_events where task_id in (select id from public.tasks where payload->>'paymentId' = ${paymentId})`;
       await sql`delete from public.task_comments where task_id in (select id from public.tasks where payload->>'paymentId' = ${paymentId})`;

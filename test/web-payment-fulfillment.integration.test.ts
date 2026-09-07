@@ -1,3 +1,4 @@
+import { cleanupFixtureRelationships } from "./helpers/fixture-teardown.ts";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { after, before, describe, it } from "node:test";
@@ -38,6 +39,7 @@ describe("durable web payment fulfillment on PostgreSQL", { skip: !databaseUrl }
       }
       const tasks = await sql`select id from public.tasks where plan_id = any(${plans}::uuid[]) or payload->>'paymentId' = any(${ids})`;
       const taskIds = tasks.map(t => t.id);
+      await cleanupFixtureRelationships(sql, { planIds: plans, taskIds });
       await sql`delete from public.task_events where task_id = any(${taskIds}::uuid[])`;
       await sql`delete from public.task_comments where task_id = any(${taskIds}::uuid[])`;
       await sql`delete from public.tasks where id = any(${taskIds}::uuid[])`;

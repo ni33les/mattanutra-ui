@@ -1,3 +1,4 @@
+import { cleanupFixtureRelationships } from "./helpers/fixture-teardown.ts";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { after, before, describe, it } from "node:test";
@@ -27,6 +28,7 @@ describe("task lifecycle transactions on PostgreSQL", {skip: !databaseUrl}, () =
       // audit/FK triggers only for cleanup of the synthetic fixture IDs.
       await withDatabaseTransaction(getSql()!, async sql => {
         await sql`set local session_replication_role = replica`;
+        await cleanupFixtureRelationships(sql, { taskIds });
         await sql`delete from public.lock_review_task_results where task_id = any(${taskIds}::uuid[])`;
         await sql`delete from public.task_events where task_id = any(${taskIds}::uuid[])`;
         await sql`delete from public.task_reservations where task_id = any(${taskIds}::uuid[])`;

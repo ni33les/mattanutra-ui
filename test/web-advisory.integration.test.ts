@@ -1,3 +1,4 @@
+import { cleanupFixtureRelationships } from "./helpers/fixture-teardown.ts";
 import { getCatalogueRuntimeRevision } from "../lib/catalogue-runtime-revision.ts";
 import { recommendWithMatcher } from "../lib/matcher/adapters/web.ts";
 import assert from "node:assert/strict";
@@ -34,6 +35,7 @@ describe("web advisory revisions on PostgreSQL", { skip: !databaseUrl }, () => {
   after(async () => {
     await withDatabaseTransaction(getSql()!, async tx => {
       await tx`set local session_replication_role = replica`;
+      await cleanupFixtureRelationships(tx, { planIds: plans });
       for (const table of ["task_events", "task_comments"]) await tx.unsafe(`delete from public.${table} where task_id in (select id from public.tasks where plan_id = any($1::uuid[]))`, [plans]);
       for (const table of ["tasks", "formulations", "product_recommendation_runs", "assessment_product_preferences", "assessment_healthscore_results", "assessment_inputs", "recommendations", "assessment_versions", "assessment_version_counters", "assessments"]) {
         await tx.unsafe(`delete from public.${table} where plan_id = any($1::uuid[])`, [plans]);

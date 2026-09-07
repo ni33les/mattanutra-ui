@@ -1,3 +1,4 @@
+import { fixtureDatabaseUrl } from "./helpers/fixture-teardown.ts";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { after, before, describe, it } from "node:test";
@@ -9,8 +10,7 @@ const databaseUrl = process.env.TEST_DB_URL;
 describe("retail provider session replay on PostgreSQL", { skip: !databaseUrl }, () => {
   const planId = randomUUID();
   before(async () => {
-    const url = new URL(databaseUrl!);
-    assert.equal(url.hostname, "127.0.0.1"); assert.equal(url.port, "55436"); assert.equal(url.pathname, "/mattanutra_lock_review");
+    fixtureDatabaseUrl();
     process.env.DB_URL = databaseUrl;
     await getSql()!`insert into public.assessments (plan_id, locale, answers, answer_summary, health_score)
       values (${planId}::uuid, 'en', '{}'::jsonb, '{}'::jsonb, '{}'::jsonb)`;

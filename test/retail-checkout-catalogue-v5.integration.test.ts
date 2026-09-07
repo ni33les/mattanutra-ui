@@ -1,3 +1,4 @@
+import { cleanupFixtureRelationships, fixtureDatabaseUrl } from "./helpers/fixture-teardown.ts";
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { it } from 'node:test';
@@ -8,8 +9,7 @@ import { FUNNEL_GENERATOR_VERSION } from '../lib/assessment-revisions.ts';
 it('V5-CHECKOUT-PG-01: new checkout holds catalogue epoch stable until its short intent transaction commits', async () => {
   const databaseUrl = process.env.TEST_DB_URL;
   assert.ok(databaseUrl, 'The maintained PostgreSQL gate must provide an isolated TEST_DB_URL');
-  const url = new URL(databaseUrl);
-  assert.equal(url.hostname, '127.0.0.1'); assert.equal(url.port, '55436'); assert.equal(url.pathname, '/mattanutra_lock_review');
+  fixtureDatabaseUrl();
   const sql = postgres(databaseUrl, { max: 3 });
   const planId = randomUUID(), runId = randomUUID();
   let release!: () => void;
@@ -72,6 +72,7 @@ it('V5-CHECKOUT-PG-01: new checkout holds catalogue epoch stable until its short
         // Isolated test cleanup only: preserve append-only protection in every
         // exercised runtime operation, including the stale-run assertion.
         await tx`set local session_replication_role = replica`;
+        await cleanupFixtureRelationships(tx, { planIds: [planId] });
         await tx`delete from public.product_recommendation_items where run_id = ${runId}::uuid`;
         await tx`delete from public.product_recommendation_runs where id = ${runId}::uuid`;
         await tx`delete from public.assessment_versions where plan_id = ${planId}::uuid`;

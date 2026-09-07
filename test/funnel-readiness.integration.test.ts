@@ -1,3 +1,4 @@
+import { cleanupFixtureRelationships } from "./helpers/fixture-teardown.ts";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { after, before, describe, it } from "node:test";
@@ -25,6 +26,7 @@ describe("shared revision and locale readiness", { skip: !databaseUrl }, () => {
   after(async () => {
     await withDatabaseTransaction(getSql()!, async sql => {
       await sql`set local session_replication_role = replica`;
+      await cleanupFixtureRelationships(sql, { planIds: plans });
       for (const table of ["task_events", "task_comments"]) await sql.unsafe(`delete from public.${table} where task_id in (select id from public.tasks where plan_id = any($1::uuid[]))`, [plans]);
       for (const table of ["tasks", "formulations", "product_recommendation_runs", "assessment_healthscore_results", "payments", "assessment_inputs", "assessment_versions", "assessment_version_counters", "assessments"]) {
         await sql.unsafe(`delete from public.${table} where plan_id = any($1::uuid[])`, [plans]);

@@ -1,3 +1,4 @@
+import { cleanupFixtureRelationships } from "./helpers/fixture-teardown.ts";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { after, before, describe, it } from "node:test";
@@ -19,6 +20,7 @@ describe("web payment integrity on PostgreSQL", { skip: !databaseUrl }, () => {
   after(async () => {
     await withDatabaseTransaction(getSql()!, async sql => {
       await sql`set local session_replication_role = replica`;
+      await cleanupFixtureRelationships(sql, { planIds: plans });
       for (const id of ids) {
         await sql`delete from public.finance_transactions where source_ref = ${`stripe:payment:${id}:nominal-revenue`}`;
         await sql`delete from public.payment_versions where payment_id = ${id}::uuid`;

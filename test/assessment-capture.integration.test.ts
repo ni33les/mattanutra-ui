@@ -1,3 +1,4 @@
+import { cleanupFixtureRelationships } from "./helpers/fixture-teardown.ts";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { before, after, describe, it } from "node:test";
@@ -23,6 +24,7 @@ describe("shared assessment capture on PostgreSQL", { skip: !databaseUrl }, () =
   after(async () => {
     await withDatabaseTransaction(getSql()!, async sql => {
       await sql`set local session_replication_role = replica`;
+      await cleanupFixtureRelationships(sql, { planIds: plans });
       for (const id of drafts) await sql`delete from public.assessment_resume_drafts where id = ${id}::uuid`;
       for (const key of keys) await sql`delete from public.funnel_requests where request_key = ${key}`;
       for (const id of payments) {

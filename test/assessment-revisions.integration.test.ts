@@ -1,3 +1,4 @@
+import { cleanupFixtureRelationships } from "./helpers/fixture-teardown.ts";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { after, before, describe, it } from "node:test";
@@ -32,6 +33,7 @@ describe("assessment revisions and atomic generation", { skip: !databaseUrl }, (
   after(async () => {
     await withDatabaseTransaction(getSql()!, async sql => {
       await sql`set local session_replication_role = replica`;
+      await cleanupFixtureRelationships(sql, { planIds: plans });
       for (const scope of requestScopes) await sql`delete from public.funnel_requests where scope = ${scope}`;
       for (const id of plans) {
         await sql`delete from public.task_events where task_id in (select id from public.tasks where plan_id = ${id}::uuid)`;
