@@ -1,5 +1,6 @@
 
 import { conditionImpliesCkd, subjectIsMagnesium } from "@/lib/matcher/condition-ceilings";
+import { factSupportsQuantifiedExposure } from "@/lib/matcher/fact-provenance";
 import { doseFitScore, knownLimitProfile } from "@/lib/matcher/dose-fit";
 import { canonicalNutrientKey, normalizeProductFactKey, productKeysMatch } from "@/lib/product-key-matching";
 import { nutrientNameMatchesTarget } from "@/lib/nutrient-identity";
@@ -65,7 +66,7 @@ export function labelledSafetyExposure(
   const omegaTotals = new Set<string>();
 
   for (const fact of product.labelledContributions) {
-    if (!fact.amount || fact.amount <= 0 || !fact.unit) {
+    if (!factSupportsQuantifiedExposure(product, fact) || !fact.amount || fact.amount <= 0 || !fact.unit) {
       continue;
     }
 
@@ -303,6 +304,9 @@ export function evaluateSafety(input: Readonly<{
   if (input.request.unknownIntakeSubjectIds?.length) unknownReasons.add("unknown_intake");
   if (input.request.estimatedIntakeSubjectIds?.length) unknownReasons.add("estimated_intake");
   if (input.variants.some((row) => row.unknownSafetyAmount)) unknownReasons.add("unknown_product_amount");
+  const selectedProducts = input.products.filter(product => input.variants.some(variant => variant.productId === product.productId));
+  if (selectedProducts.some(product => product.labelledContributions.some(fact => !factSupportsQuantifiedExposure(product, fact)))) unknownReasons.add("unverified_product_facts");
+  if (selectedProducts.some(product => product.administration?.route === "topical" || product.administration?.route === "other")) unknownReasons.add("nonoral_product_route");
   for (const subjectId of new Set([...input.request.targets.map((row) => row.subjectId), ...exposure.keys()])) {
     if (!fit.perLimit.some((row) => row.subjectId === subjectId)) unknownReasons.add("no_applicable_reference:" + subjectId);
   }

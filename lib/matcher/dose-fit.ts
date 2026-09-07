@@ -200,3 +200,18 @@ export function compareDoseFit(left: DoseFitScore, right: DoseFitScore) {
   const delta = a.num * b.den - b.num * a.den;
   return delta < BigInt(0) ? -1 : delta > BigInt(0) ? 1 : 0;
 }
+
+/** Annotate incomplete product evidence without changing the independently
+ * tested arithmetic or losing its exact rational comparison identity. */
+export function withProductUncertainty(score: DoseFitScore, subjectIds: readonly string[] = []): DoseFitScore {
+  if (!subjectIds.length) return score;
+  const unknown = new Set([...score.unknownSubjectIds, ...subjectIds]);
+  const annotate = <T extends { subjectId: string; certainty: 'known' | 'estimated' | 'unknown' }>(row: T): T =>
+    unknown.has(row.subjectId) || unknown.has('*') ? { ...row, certainty: 'unknown' } : row;
+  const result: DoseFitScore = { ...score, unknownSubjectIds: [...unknown].sort(),
+    perTarget: score.perTarget.map(annotate), perLimit: score.perLimit.map(annotate),
+    ...(score.perContinuedDose ? { perContinuedDose: score.perContinuedDose.map(annotate) } : {}) };
+  const exact = exactTotals.get(score);
+  if (exact) exactTotals.set(result, exact);
+  return result;
+}

@@ -6,6 +6,7 @@ import { isFalseOmegaAttribution } from "@/lib/agentic/catalogue/product-fit";
 import { canonicalNutrientKey, normalizeProductFactKey, productKeysMatch } from "@/lib/product-key-matching";
 import { nutrientNameMatchesTarget } from "@/lib/nutrient-identity";
 import { labelledSafetyExposure } from "@/lib/matcher/safety";
+import { factSupportsQuantifiedExposure, uncertainProductSubjects } from "@/lib/matcher/fact-provenance";
 import { knownCurrentTargetExposure, targetDoseTicks } from "@/lib/matcher/target-basis";
 import type {
   CanonicalRequest,
@@ -170,7 +171,7 @@ function contributionForFresh(
   }
 
   const hits = product.labelledContributions.filter((item) => {
-    if (item.mappingStatus === "conflicting" || item.amount == null || item.amount <= 0) {
+    if (!factSupportsQuantifiedExposure(product, item) || item.amount == null || item.amount <= 0) {
       return false;
     }
     if (item.name?.trim() && targetName.trim() && !nutrientNameMatchesTarget(targetName, item.name)) return false;
@@ -212,8 +213,8 @@ export function compileVariant(input: Readonly<{
   const ratio = input.dailyUnitsRatio ?? ratioForSupportedServings(input.product, input.dailyUnits);
   if (!ratio) return null;
   const amountPerUnit = new Map<string, ScaledAmount>();
-  let unknown = input.product.unknownSafetyAmount || input.product.labelledContributions.some(row =>
-    row.mappingStatus === "conflicting" || row.confidence === "low" || row.confidence === "moderate");
+  const unknownSubjectIds = uncertainProductSubjects(input.product, input.request);
+  let unknown = input.product.unknownSafetyAmount || unknownSubjectIds.length > 0;
 
   for (const target of input.request.targets) {
     const labelled = contributionFor(
@@ -265,7 +266,7 @@ export function compileVariant(input: Readonly<{
   }
 
   const safetyExposure = labelledSafetyExposure(input.product, input.dailyUnits, input.request, ratio);
-  const declaredTarget = input.product.unknownSafetyAmount && input.request.targets.some(row => input.product.contributionSubjectIds.includes(row.subjectId)) &&
+  const declaredTarget = unknown && input.request.targets.some(row => input.product.contributionSubjectIds.includes(row.subjectId) || unknownSubjectIds.includes(row.subjectId)) &&
     (!input.product.administration || input.product.administration.route === "oral" || input.product.administration.route === "unknown");
   if (amountPerUnit.size < 1 && !declaredTarget && !input.request.retainProductIds.includes(input.product.productId) &&
     !input.request.productDoses?.some(row => row.productId === input.product.productId) &&
@@ -290,6 +291,7 @@ export function compileVariant(input: Readonly<{
     productId: input.product.productId,
     safetyExposure,
     unknownSafetyAmount: unknown,
+    unknownSubjectIds,
     variantId: `${listingId(input.product)}:x${input.dailyUnits}`
   };
 }

@@ -13,7 +13,8 @@ export function coverageSummary(request: CanonicalRequest, exposure: Exposure): 
     const estimated = current.filter(row => !intakeIsKnown(row)).reduce((sum, row) => sum + row.daily.units, BigInt(0));
     const newUnits = exposure.provenance.filter(row => row.source === 'selected' && row.subjectId === subjectId).reduce((sum, row) => sum + row.amount.units, BigInt(0));
     const total = known + newUnits;
-    const unknown = Boolean(request.unknownIntakeSubjectIds?.some(id => id === subjectId || id === '*') || current.some(row => row.certainty === 'unknown'));
+    const unknown = Boolean(request.unknownIntakeSubjectIds?.some(id => id === subjectId || id === '*') ||
+      exposure.unknownSubjectIds?.includes(subjectId) || current.some(row => row.certainty === 'unknown'));
     const amount = (units: bigint) => amountFromScaled({ ...target.requested, units }, target.requestedUnit, target.name) ?? 0;
     const gap = target.requested.units > total ? target.requested.units - total : BigInt(0);
     const excess = total > target.requested.units ? total - target.requested.units : BigInt(0);

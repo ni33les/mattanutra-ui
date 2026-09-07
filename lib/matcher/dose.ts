@@ -395,7 +395,8 @@ export function aggregateDailyExposure(input: Readonly<{
     }
   }
 
-  return { provenance, totals };
+  const unknownSubjectIds = [...new Set(input.variants.flatMap(variant => variant.unknownSubjectIds ?? []))].sort();
+  return { provenance, totals, ...(unknownSubjectIds.length ? { unknownSubjectIds } : {}) };
 }
 
 export function unitsOrZero(

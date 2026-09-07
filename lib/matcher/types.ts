@@ -246,6 +246,7 @@ export type DoseProvenance = Readonly<{
 export type Exposure = Readonly<{
   provenance: readonly DoseProvenance[];
   totals: ReadonlyMap<string, ScaledAmount>;
+  unknownSubjectIds?: readonly string[];
 }>;
 
 export type DoseVariant = Readonly<{
@@ -257,6 +258,7 @@ export type DoseVariant = Readonly<{
   productId: string;
   safetyExposure?: ReadonlyMap<string, ScaledAmount>;
   unknownSafetyAmount: boolean;
+  unknownSubjectIds?: readonly string[];
   variantId: string;
 }>;
 

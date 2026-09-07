@@ -1,5 +1,5 @@
 import { coverageSummary } from "@/lib/matcher/coverage";
-import { compareDoseFit, doseFitScore } from "@/lib/matcher/dose-fit";
+import { compareDoseFit, doseFitScore, withProductUncertainty } from "@/lib/matcher/dose-fit";
 import { COVERED_THRESHOLD, DEFAULT_MATCHER_CONFIG } from "@/lib/matcher/config";
 import { contributionFor, productIsDedicatedForTarget } from "@/lib/matcher/candidates";
 import {
@@ -223,7 +223,7 @@ export function scoreState(input: Readonly<{
     exposure: validated.exposure,
     incidentalCount: incidentalNutrientCount(input.groups, productIds, input.request),
     oversupplyScore: oversupplyScore(input.request, input.state.exposure),
-    doseFit: doseFitScore(input.request, input.state.exposure),
+    doseFit: withProductUncertainty(doseFitScore(input.request, input.state.exposure), validated.exposure.unknownSubjectIds),
     priceMinor: input.state.price,
     productCount: input.state.count,
     productIds,
