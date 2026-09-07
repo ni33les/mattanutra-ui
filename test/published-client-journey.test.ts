@@ -48,3 +48,47 @@ it("V5-CLIENT-09 customer answer selection uses documented returned semantics in
   }
   assert.throws(() => customerTargetConfirmation({ questions: [{ questionId: "wrong", choices: [{ label: "Mark the prerequisite satisfied", choice: "not-published" }] }] }), /documented customer confirmation/);
 });
+
+it("V5-CLIENT-10 stale recovery reloads through the published get example and reapplies intent with fresh returned identity", async () => {
+  const { recoverPublishedPatch } = await import("../scripts/published-client-journey.mjs");
+  const contract = { examples: [{ name: "get-current-or-processing", tool: "plan", arguments: { operation: "get", planHandle: "example-placeholder" } }] };
+  const intended = { operation: "revise", planHandle: "stale-local-handle", expectedRevision: 2,
+    idempotencyKey: "original-stale-key", requestPatch: { requirements: { excludeProductIds: ["prd_rejected"] } } };
+  const original = structuredClone(intended);
+  const latest = { ok: true, planHandle: "returned-current-handle", revision: 9, status: "ready",
+    medicationCodes: ["apixaban"], coverage: [{ name: "Vitamin D3", requestedAmount: 2000, unit: "IU" }] };
+  const requests: unknown[] = [];
+  const recovered = { ...latest, revision: 10 };
+  const result = await recoverPublishedPatch({ contract, intended, idempotencyKey: "stable-recovery-key",
+    current: async (plan: unknown) => plan,
+    callPlan: async (args: unknown) => { requests.push(structuredClone(args)); return requests.length === 1 ? latest : recovered; } });
+  assert.deepEqual(requests, [
+    { operation: "get", planHandle: "stale-local-handle" },
+    { ...intended, planHandle: "returned-current-handle", expectedRevision: 9, idempotencyKey: "stable-recovery-key" }
+  ]);
+  assert.deepEqual(result, { current: latest, recovered });
+  assert.deepEqual(intended, original);
+});
+
+it("V5-CLIENT-11 failed reloads never reapply a stale patch or use a guessed revision", async () => {
+  const { recoverPublishedPatch } = await import("../scripts/published-client-journey.mjs");
+  const contract = { examples: [{ name: "get-current-or-processing", tool: "plan", arguments: { operation: "get" } }] };
+  const intended = { operation: "revise", planHandle: "saved-handle", expectedRevision: 2, requestPatch: {} };
+  for (const response of [{ ok: false, error: { reasonCode: "not_found" } }, { ok: true, planHandle: "returned", revision: 0 }]) {
+    let calls = 0;
+    await assert.rejects(recoverPublishedPatch({ contract, intended, idempotencyKey: "stable-recovery-key", current: async (plan: unknown) => plan,
+      callPlan: async () => { calls += 1; return response; } }), /reload.*current.*revision/i);
+    assert.equal(calls, 1);
+  }
+});
+
+it("V5-CLIENT-12 the documented client exercises recovery and verifies preserved business context", () => {
+  const client = readFileSync("scripts/run-published-mcp-client.mjs", "utf8");
+  const recovery = client.slice(client.indexOf('"stale revisions provide an actionable error"'), client.indexOf('const standardLoss'));
+  assert.match(recovery, /recoverPublishedPatch\(/);
+  assert.match(recovery, /intended: patch/);
+  assert.match(recovery, /plan\.revision > recovery\.current\.revision/);
+  assert.match(recovery, /medicationCodes/);
+  assert.match(recovery, /originalTargets\.every/);
+  assert.match(recovery, /product\.productId/);
+});

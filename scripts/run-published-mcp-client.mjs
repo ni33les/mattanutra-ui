@@ -5,7 +5,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { isDeepStrictEqual } from "node:util";
 import Ajv from "ajv";
-import { selectPublishedResources, publishedExample, selectPurchaseTradeOff, customerTargetConfirmation } from "./published-client-journey.mjs";
+import { selectPublishedResources, publishedExample, selectPurchaseTradeOff, customerTargetConfirmation, recoverPublishedPatch } from "./published-client-journey.mjs";
 import { CLIENT_NORMALIZATION, normalizePublishedClientResult } from "./published-client-semantics.mjs";
 
 const args = process.argv.slice(2);
@@ -190,6 +190,18 @@ try {
     check(originalTargets.every(target => requestedRows.some(row => row.name === target.name && (row.requestedAmount ?? row.amount) === target.amount && row.unit === target.unit && row.basis === (target.basis ?? "total_daily"))), "replanning retains every original target amount, unit and basis");
     const stale = await call("plan", { ...patch, idempotencyKey: `docs-stale-${runKey}`, expectedRevision: before.revision });
     check(stale.ok === false && stale.error.reasonCode === "stale_revision", "stale revisions provide an actionable error");
+    const recovery = await recoverPublishedPatch({ contract, intended: patch, idempotencyKey: `docs-recover-stale-${runKey}`,
+      callPlan: args => call("plan", args), current });
+    plan = recovery.recovered;
+    check(plan.ok && plan.revision > recovery.current.revision && plan.planHandle === recovery.current.planHandle,
+      "stale recovery reapplies the intended patch as a new revision of the freshly returned plan");
+    check(!(plan.basket ?? []).some(item => item.productId === product.productId) &&
+      (plan.options ?? []).every(option => !(option.basket ?? []).some(item => item.productId === product.productId)),
+    "stale recovery preserves the rejected product exclusion in every returned option");
+    check(isDeepStrictEqual(plan.medicationCodes, request.medicationCodes), "stale recovery preserves disclosed medications");
+    const recoveredRows = [...(plan.coverage ?? []), ...(plan.leftovers ?? [])];
+    check(originalTargets.every(target => recoveredRows.some(row => row.name === target.name && (row.requestedAmount ?? row.amount) === target.amount && row.unit === target.unit && row.basis === (target.basis ?? "total_daily"))),
+      "stale recovery preserves every original target amount, unit and basis");
     plan = await current(await call("plan", { ...publishedExample(contract, "clear-product-exclusions"), planHandle: plan.planHandle, expectedRevision: plan.revision, idempotencyKey: `docs-clear-${runKey}` }));
     plan = await current(await call("plan", { ...publishedExample(contract, "clear-customer-ceilings"), planHandle: plan.planHandle, expectedRevision: plan.revision, idempotencyKey: `docs-clear-ceilings-${runKey}` }));
     const standardLoss = plan.doseFit.total;
