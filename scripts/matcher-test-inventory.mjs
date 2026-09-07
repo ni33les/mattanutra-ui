@@ -8,7 +8,7 @@ export const MATCHER_TEST_FAMILIES = Object.freeze({
   catalogue: /^test\/(?:catalogue-|dose-conversion|nutrient-identity|magnesium-ul-source|pack-facts|product-(?:advisory-cache-refresh|catalogue|countries|fact-canonical|form|health-advisory|validation)|retail-(?:listing-availability|sellability-pricing)|sale-states-catalogue)/,
   web: /^test\/(?:web-advisory|product-(?:matcher|matching|recommendation|recommendations|coverage)|recommendation-selection|assessment-(?:revisions|store-product-coverage)|formulation-|consistency-r|plan-(?:guidance-adjustments|reveal)|reveal-final|nutrition-(?:journey|report-reveal))/, 
   commerce: /^test\/(?:commerce-transactions|retail-(?:checkout-|cart-availability|order-workflow|product-checkout|plan-insert)|web-payment-|payment-confirmation-return)/,
-  additionalConsumers: /^test\/(?:admin-product-facts|phase3-t01-t08-static|plan-keep-warm-static|product-card-layout|retail-stock-fx|v9-product-master)\.test\.ts$/,
+  additionalConsumers: /^test\/(?:admin-product-(?:facts|reference-retirement)|phase3-t01-t08-static|plan-keep-warm-static|product-card-layout|retail-stock-fx|v9-product-master)\.test\.ts$/,
   infrastructure: /^test\/(?:full-test-suite-discovery|mcp-test-discovery|latency-acceptance-policy|dev-advisory-validation|dev-validation-(?:proof|fingerprints))/
 });
 

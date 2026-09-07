@@ -8,7 +8,7 @@ export type FiniteOracleFixture = Readonly<{
   current?: readonly OracleIntake[];
   dietary?: readonly OracleIntake[];
   limits?: readonly Readonly<{ subjectId: string; amount: OracleNumber; scope: "total" | "supplemental" }>[];
-  products: readonly Readonly<{ productId: string; sellerId: string; priceMinor: number; pillsPerServing: number;
+  products: readonly Readonly<{ productId: string; sellerId: string; priceMinor: number; pillsPerServing: number; pillCountKnown?: boolean;
     /** Supplied by the fixture, never compiled by the production dose enumerator. */
     doses: readonly OracleNumber[]; contributions: Readonly<Record<string, OracleNumber>>; eligible?: boolean }>[];
   maxProductCount?: number | null;
@@ -60,6 +60,7 @@ export type OracleBasket = Readonly<{
   productCount: number;
   priceMinor: number;
   dailyPills: number;
+  pillCountKnown: boolean;
   purchaseEligible: boolean;
   fullyCoveredFraction: number;
   coverage: readonly Readonly<{ subjectId: string; target: number; exposure: number; gap: number; excess: number; coverage: number; withinRange: boolean | null; certainty: "known" | "estimated" | "unknown" }>[];
@@ -122,6 +123,7 @@ function evaluate(fixture: FiniteOracleFixture, chosen: readonly { product: Fini
     variantIds: chosen.map(row => `${row.product.sellerId}:${row.product.productId}:x${numeric(row.dose)}`).sort(),
     doses: chosen.map(row => ({ productId: row.product.productId, servingsPerDay: numeric(row.dose) })).sort((a, b) => a.productId.localeCompare(b.productId)),
     sellerId: chosen[0]?.product.sellerId ?? "", priceMinor: chosen.reduce((sum, row) => sum + row.product.priceMinor, 0),
+    pillCountKnown: chosen.every(row => row.product.pillCountKnown !== false),
     dailyPills: numeric(sum(chosen.map(row => multiply(number(row.product.pillsPerServing), row.dose)))), purchaseEligible: chosen.length > 0,
     fullyCoveredFraction: coverage.length ? coverage.filter(row => row.gap === 0).length / coverage.length : 0, coverage,
     loss: { under: numeric(under), over: numeric(over), limit: numeric(limits), weightedLimit: numeric(multiply(number(2), limits)), total: numeric(total), exact: { numerator: String(total.n), denominator: String(total.d) } } };
@@ -142,7 +144,7 @@ export function finiteCatalogueOracle(fixture: FiniteOracleFixture): { selected:
   for (const limit of fixture.limits ?? []) if (compare(number(limit.amount), ZERO) <= 0) throw new Error("Invalid oracle reference limit");
   for (const key of ["maxDailyPills", "maxPriceMinor", "maxProductCount"] as const) if (fixture[key] != null && (!Number.isFinite(fixture[key]) || (key !== "maxDailyPills" && !Number.isSafeInteger(fixture[key])) || fixture[key]! < 0)) throw new Error(`Invalid oracle constraint: ${key}`);
   const products = fixture.products.filter(row => row.eligible !== false && !fixture.excludeProductIds?.includes(row.productId)).sort((a, b) => `${a.sellerId}:${a.productId}`.localeCompare(`${b.sellerId}:${b.productId}`));
-  if (fixture.maxProductCount == null && fixture.maxDailyPills == null && fixture.maxPriceMinor == null && new Set(products.map(row => row.sellerId)).size <= 1 && new Set(products.map(row => row.productId)).size === products.length) {
+  if (new Set(products.map(row => row.sellerId)).size <= 1 && new Set(products.map(row => row.productId)).size === products.length) {
     let leaves = 1;
     for (const product of products) {
       leaves *= new Set(product.doses.map(value => { const dose = number(value); return `${dose.n}/${dose.d}`; })).size + 1;
@@ -162,20 +164,19 @@ export function finiteCatalogueOracle(fixture: FiniteOracleFixture): { selected:
     const product = products[index]!;
     visit(index + 1, chosen, price, pills);
     if (chosen.some(row => row.product.productId === product.productId || row.product.sellerId !== product.sellerId)) return;
-    if (fixture.maxProductCount != null && chosen.length >= fixture.maxProductCount) return;
-    if (fixture.maxPriceMinor != null && price + product.priceMinor > fixture.maxPriceMinor) return;
     const proposal = fixture.productDoses?.find(row => row.productId === product.productId);
     const doses = [...new Map(product.doses.map(value => { const dose = number(value); return [`${dose.n}/${dose.d}`, dose] as const; })).values()].sort(compare);
     for (const dose of doses) {
       if (proposal && compare(dose, number(proposal.servingsPerDay)) !== 0) continue;
       const nextPills = add(pills, multiply(number(product.pillsPerServing), dose));
-      if (fixture.maxDailyPills != null && compare(nextPills, number(fixture.maxDailyPills)) > 0) continue;
       visit(index + 1, [...chosen, { product, dose }], price + product.priceMinor, nextPills);
     }
   }
   visit(0, [], 0, ZERO);
-  const commercial = (a: InternalBasket, b: InternalBasket) => (fixture.optimization === "fewest_pills" ? a.basket.dailyPills - b.basket.dailyPills : fixture.optimization === "best_coverage" || fixture.optimization === "balanced" ? compare(b.coverage, a.coverage) : 0) ||
-    a.basket.priceMinor - b.basket.priceMinor || a.basket.dailyPills - b.basket.dailyPills || a.basket.productCount - b.basket.productCount || [a.basket.sellerId, ...a.basket.variantIds].join("|").localeCompare([b.basket.sellerId, ...b.basket.variantIds].join("|"));
+  // Independent total order: an unknown quantity is never a measured zero.
+  const pillOrder = (a: OracleBasket, b: OracleBasket) => Number(!a.pillCountKnown) - Number(!b.pillCountKnown) || (a.pillCountKnown ? a.dailyPills - b.dailyPills : 0);
+  const commercial = (a: InternalBasket, b: InternalBasket) => (fixture.optimization === "fewest_pills" ? pillOrder(a.basket, b.basket) : fixture.optimization === "best_coverage" || fixture.optimization === "balanced" ? compare(b.coverage, a.coverage) : 0) ||
+    a.basket.priceMinor - b.basket.priceMinor || pillOrder(a.basket, b.basket) || a.basket.productCount - b.basket.productCount || [a.basket.sellerId, ...a.basket.variantIds].join("|").localeCompare([b.basket.sellerId, ...b.basket.variantIds].join("|"));
   const ranked = [...complete].sort((a, b) => compare(a.total, b.total) || commercial(a, b));
   const requiredReference = [...complete].sort((a, b) => compare(a.required, b.required) || compare(a.total, b.total) || commercial(a, b))[0];
   const qualifying = requiredReference ? ranked.filter(candidate => [...requiredReference.metrics].every(([id, metrics]) => metrics.every((value, index) => compare(candidate.metrics.get(id)?.[index] ?? ZERO, value) <= 0))) : ranked;
@@ -211,7 +212,7 @@ export function bruteForceMatch(request: CanonicalRequest, catalog: CatalogSnaps
       if (fact.subjectId in contributions) throw new Error(`Oracle fixture contains ambiguous duplicate facts: ${product.productId}/${fact.subjectId}`);
       contributions[fact.subjectId] = canonicalAmount(fact.amount, fact.unit, fact.name);
     }
-    return { productId: product.productId, sellerId: product.sellerId, priceMinor: product.unitPriceMinor,
+    return { productId: product.productId, sellerId: product.sellerId, priceMinor: product.unitPriceMinor, pillCountKnown: product.pillCountKnown,
       pillsPerServing: /powder|liquid|sachet|oil|drops|\bml\b/i.test(product.form) ? 0 : product.dailyPillsPerServing,
       doses: doseGrids[product.productId] ?? [1, 2, 3], contributions, eligible: independentlyEligible(request, product) };
   });
