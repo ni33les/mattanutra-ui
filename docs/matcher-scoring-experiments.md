@@ -56,7 +56,21 @@ Top-level artifacts are:
 - `latency.json`: descriptive wall-clock observations, kept apart from canonical matching evidence.
 - `failure.json`, when an attempt fails: failure status and completed case IDs; completed evidence is retained.
 
-Each `cases/CASE_ID/` directory contains `input.json`, `baseline-result.json`, `pool.jsonl` and `comparison.json`. Synthetic cases additionally contain `oracle.json`. Each profile has a `PROFILE_ID-cross-scores.jsonl` file; active preference curves also have cross-score files for sensitivity weights `0.10` and `0.50`. Only latency and manifest wall-clock metadata are excluded from paired semantic comparisons. Dose, price, reference, uncertainty and candidate identity evidence remain meaningful.
+Each `cases/CASE_ID/` directory contains `input.json`, `baseline-result.json`, `pool.jsonl` and `comparison.json`. Synthetic cases additionally contain `oracle.json`. Each profile has a `PROFILE_ID-cross-scores.jsonl` file; active preference curves also have cross-score files for sensitivity weights `0.10` and `0.50`. Only `latency.json` is excluded from direct paired artifact equality; the manifest itself must match exactly. Dose, price, reference, uncertainty and candidate identity evidence remain meaningful.
+
+## Verify a preserved pair
+
+After two identical-parameter runs have completed, verify their preserved evidence directly:
+
+```sh
+node scripts/verify-matcher-comparison-pair.mjs /tmp/matcher-comparison-standard-a /tmp/matcher-comparison-standard-b --output /tmp/matcher-comparison-standard-pair.json
+```
+
+The verifier does not run tests, searches, comparisons or live calls. It requires two distinct completed run directories and a new absolute receipt filename outside the checkout and both input directories. It checks passed manifests, unchanged source and commit identities, complete fixed case/profile inventories, corpus/report fingerprints, per-case input/baseline/pool identities and a cross-score row for every candidate under every profile and sensitivity weight. It verifies declared artifact hashes when present, and independently requires the complete expected artifact inventory.
+
+Every artifact is hashed and compared byte for byte, including unselected candidate doses, all cross-scores, reports and `manifest.json`. **Only `latency.json` is excluded from byte equality**; it must still be valid descriptive evidence for the complete case inventory. There is no exemption for different manifest metadata, product/reference values or newly added files. Missing/extra artifacts, `failure.json`, changed source, incomplete run counts and evidence modified during verification fail the check.
+
+Bounded-search `complete: false`, explicit unknown-score cohorts and finite-grid-only oracle scope remain valid recorded outcomes; they are not incomplete run inventories. The pair receipt records source, corpus/result fingerprints and the matching file hashes. Its pass means complete preserved offline evidence was identical, not that a scoring policy is clinically superior or approved for deployment.
 
 ## Scoring profiles
 
@@ -150,6 +164,6 @@ Bounded search completeness is separate from score completeness, nutrient-eviden
 
 `npm run test:matcher:experiments -- --list` lists the reviewed selection without running it. `npm run test:matcher:experiments -- --output /absolute/new/evidence-directory` runs the focused offline acceptance set and writes evidence outside the checkout.
 
-The selection is maintained in `test/matcher/experiment-impact.json`: seven experiment suites (scoring, search, oracle, corpus, report, runner and comparison) plus five directly affected matcher suites (advisory dose fit, flexible doses, priority, options and search). Every affected suite records its connection to the bounded production hooks. The runner rejects unregistered experiment suites, skips, retries and unchecked assertion-bypassing preconditions, and reconciles actual executed cases with the declared inventory.
+The selection is maintained in `test/matcher/experiment-impact.json`: eight experiment suites (scoring, search, oracle, corpus, report, runner, comparison and pairing) plus five directly affected matcher suites, for 13 files in total (advisory dose fit, flexible doses, priority, options and search). Every affected suite records its connection to the bounded production hooks. The runner rejects unregistered experiment suites, skips, retries and unchecked assertion-bypassing preconditions, and reconciles actual executed cases with the declared inventory.
 
 The runner removes inherited credentials, disables network access, runs one test process at a time, records before/after source fingerprints and requires unchanged source. This command is a focused experiment acceptance run. It does not invoke the full application, PostgreSQL, browser, MCP, connector, deployment or live checkout gates. Its result must not be relabelled as complete product or rollout validation.

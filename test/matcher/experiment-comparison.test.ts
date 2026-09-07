@@ -122,3 +122,23 @@ test('EXP-COMPARE-08 dedicated preload prohibits even local TCP, TLS and fetch b
   const result=execFileSync(process.execPath,['--import','./scripts/matcher-experiment-offline.mjs','--input-type=module','--eval',probe],{cwd:resolve('.'),encoding:'utf8',timeout:10000,stdio:['ignore','pipe','pipe']});
   assert.deepEqual(JSON.parse(result),{blocked:3});
 });
+
+test('EXP-COMPARE-09 expanded baseline consumes one 64k search budget without a preceding 8k search', async () => {
+  const {compareCase}=await import('../../scripts/compare-matcher-scoring.ts');
+  const directory=mkdtempSync(join(tmpdir(),'matcher-expanded-baseline-budget-'));
+  const calls:{effort:string;budget:number;hasIncumbent:boolean;attempts:number}[]=[];
+  const execute=(input:Parameters<typeof runExperimentSearch>[0])=>{
+    const result=runExperimentSearch(input);
+    calls.push({effort:input.effort??'standard',budget:result.searchSummary.expansionBudget,hasIncumbent:input.incumbent!==undefined,attempts:result.searchSummary.expansionAttempts});
+    return result;
+  };
+  try {
+    const input={id:'expanded-baseline-budget',kind:'synthetic' as const,request:request(),catalog:catalog([product('one',{a:100})]),provenance:{purpose:'Exact expanded invocation budget regression'}};
+    const result=await compareCase(input,[resolveProfile('baseline')],'expanded',directory,execute);
+    assert.equal(calls.length,1,'Expanded baseline must not spend a separate 8k control search first');
+    assert.equal(calls[0]?.effort,'expanded');assert.equal(calls[0]?.budget,64000);assert.equal(calls[0]?.hasIncumbent,false);
+    assert.ok(calls[0]!.attempts<=64000);
+    assert.equal(result.row.profiles[0]?.fullSearch.searchSummary.expansionBudget,64000);
+    assert.equal(result.row.profiles[0]?.fullSearch.searchSummary.expansionAttempts,calls[0]?.attempts);
+  } finally {rmSync(directory,{recursive:true,force:true});}
+});

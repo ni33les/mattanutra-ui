@@ -7,9 +7,9 @@ const impact = JSON.parse(readFileSync(new URL("./experiment-impact.json", impor
 const declared = [...impact.experimentTests, ...impact.affectedTests].map(row => row.file);
 
 describe("focused experiment runner", () => {
-  it("selects only seven registered experiment suites and five justified production regressions", () => {
+  it("selects only eight registered experiment suites and five justified production regressions", () => {
     const selection = selectExperimentTests(impact, declared);
-    assert.equal(selection.experiments.length, 7);
+    assert.equal(selection.experiments.length, 8);
     assert.equal(selection.affected.length, 5);
     assert.deepEqual(selection.files, [...declared].sort());
     assert.ok(selection.mapping.every(row => row.reason.length > 30));

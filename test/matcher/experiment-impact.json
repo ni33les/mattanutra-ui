@@ -8,7 +8,8 @@
     { "file": "test/matcher/experiment-corpus.test.ts", "reason": "Frozen catalogue provenance and synthetic request/catalogue identity without live access." },
     { "file": "test/matcher/experiment-report.test.ts", "reason": "Neutral winner comparisons retain exact quantities, preference facts, safety scope and uncertainty." },
     { "file": "test/matcher/experiment-runner.test.ts", "reason": "Reviewed test selection, forbidden test constructs, missing evidence and execution reconciliation." },
-    { "file": "test/matcher/experiment-comparison.test.ts", "reason": "Common candidate pools, explicit-grid materialization and immutable offline comparison arguments." }
+    { "file": "test/matcher/experiment-comparison.test.ts", "reason": "Common candidate pools, explicit-grid materialization and immutable offline comparison arguments." },
+    { "file": "test/matcher/experiment-pair.test.ts", "reason": "Complete paired artifact identity, missing evidence and non-latency determinism." }
   ],
   "affectedTests": [
     { "file": "test/matcher/advisory-dose-fit.test.ts", "changedProductionFiles": ["lib/matcher/index.ts", "lib/matcher/search.ts"], "reason": "Optional experiment hooks must preserve default symmetric dose loss,2x scoped safety penalties, continued-dose arithmetic and advice." },

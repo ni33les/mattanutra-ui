@@ -10,7 +10,7 @@ import { runBatch, sourceManifest } from "./run-full-test-suite.mjs";
 import { nodeExecutionProof, testSourceHygiene } from "./test-execution-proof.mjs";
 
 const ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)));
-const EXPERIMENTS = ["scoring", "search", "oracle", "corpus", "report", "runner", "comparison"].map(name => `test/matcher/experiment-${name}.test.ts`);
+const EXPERIMENTS = ["scoring", "search", "oracle", "corpus", "report", "runner", "comparison", "pair"].map(name => `test/matcher/experiment-${name}.test.ts`);
 const AFFECTED = ["advisory-dose-fit", "flexible-v5-doses", "flexible-v5-priority", "flexible-v5-options", "flexible-v5-search"].map(name => `test/matcher/${name}.test.ts`);
 const HOOK_FILES = new Set(["lib/matcher/index.ts", "lib/matcher/search.ts"]);
 const hash = value => createHash("sha256").update(value).digest("hex");
@@ -20,7 +20,7 @@ export function selectExperimentTests(impact, existingFiles) {
   assert.equal(impact.scope, "offline_scoring_experiment_and_affected_matcher_hooks");
   const mapping = [...impact.experimentTests, ...impact.affectedTests];
   assert.equal(new Set(mapping.map(row => row.file)).size, mapping.length, "Duplicate test selection");
-  assert.deepEqual(impact.experimentTests.map(row => row.file).sort(), [...EXPERIMENTS].sort(), "Experiment suites must match the reviewed seven-file inventory");
+  assert.deepEqual(impact.experimentTests.map(row => row.file).sort(), [...EXPERIMENTS].sort(), "Experiment suites must match the reviewed eight-file inventory");
   assert.deepEqual(impact.affectedTests.map(row => row.file).sort(), [...AFFECTED].sort(), "Only the five reviewed affected production suites may run");
   for (const row of mapping) assert.ok(typeof row.reason === "string" && row.reason.trim().length > 30, "Every selected suite needs a meaningful review reason");
   for (const row of impact.affectedTests) assert.ok(row.changedProductionFiles?.length > 0 && row.changedProductionFiles.every(file => HOOK_FILES.has(file)), "Affected tests must identify the bounded production hooks");

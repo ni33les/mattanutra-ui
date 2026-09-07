@@ -51,15 +51,16 @@ function* crossScores(profile: ScoringProfile, candidates: readonly ExperimentCa
     complete: candidate.score.complete, nutrientEvidenceComplete: candidate.score.nutrientEvidenceComplete, missingComponents: candidate.score.missingComponents };
 }
 
-async function compareCase(input: ExperimentCase, profiles: readonly ScoringProfile[], effort: 'standard' | 'expanded', output: string) {
+export async function compareCase(input: ExperimentCase, profiles: readonly ScoringProfile[], effort: 'standard' | 'expanded', output: string, executeSearch = runExperimentSearch) {
   const directory = join(output, 'cases', input.id); mkdirSync(directory, { recursive: true, mode: 0o700 });
   save(join(directory, 'input.json'), input);
   const started = performance.now(), timings: { profileId: string; elapsedMs: number }[] = [];
   const compiledGroups = compileGroups(input.request, input.catalog);
   const baselineProfile = resolveProfile('baseline');
   const controlStarted = performance.now();
-  let standardControl = runExperimentSearch({ ...input, profile: baselineProfile, compiledGroups });
-  let control = effort === 'expanded' ? runExperimentSearch({ ...input, profile: baselineProfile, compiledGroups, effort, incumbent: standardControl }) : standardControl;
+  // Production expanded search already includes its standard pass and incumbent.
+  // Run it once; controls carry baseline metadata, not another search allowance.
+  let control = executeSearch({ ...input, profile: baselineProfile, compiledGroups, effort });
   const controlElapsedMs = performance.now() - controlStarted;
   save(join(directory, 'baseline-result.json'), control.baseline);
   const controlFull = { metrics: candidateMetrics(control.selected, input.request), score: control.selected ? scoreBreakdown(control.selected.score) : null,
@@ -70,16 +71,16 @@ async function compareCase(input: ExperimentCase, profiles: readonly ScoringProf
     if (previous) assert.equal(candidateEvidenceIdentity(previous), candidateEvidenceIdentity(row), `Conflicting observed basket: ${row.signature}`);
     else union.set(row.signature, { signature: row.signature, sellerId: row.sellerId, state: row.state, groups: row.groups });
   } };
-  absorb(standardControl); absorb(control);
-  standardControl = compactRun(standardControl); control = compactRun(control);
+  absorb(control);
+  control = compactRun(control);
   const runs = new Map<string, ExperimentSearchResult>(), full = new Map<string, ProfileComparison['fullSearch']>();
   for (const profile of profiles) {
     const start = performance.now();
     let run: ExperimentSearchResult;
     if (profile.hash === baselineProfile.hash) run = control;
     else {
-      const standard = runExperimentSearch({ ...input, profile, compiledGroups, control: standardControl }); absorb(standard);
-      run = effort === 'expanded' ? runExperimentSearch({ ...input, profile, compiledGroups, effort, incumbent: standard, control }) : standard;
+      const standard = executeSearch({ ...input, profile, compiledGroups, control }); absorb(standard);
+      run = effort === 'expanded' ? executeSearch({ ...input, profile, compiledGroups, effort, incumbent: standard, control }) : standard;
     }
     absorb(run);
     full.set(profile.id, profile.hash === baselineProfile.hash ? controlFull : { metrics: candidateMetrics(run.selected, input.request), score: run.selected ? scoreBreakdown(run.selected.score) : null,
@@ -118,6 +119,7 @@ async function compareCase(input: ExperimentCase, profiles: readonly ScoringProf
         purchaseFallback: pooled.purchaseFallback, incompleteCandidates: pooled.incompleteCandidates }, sensitivity,
       oracle: oracle ? { checkedScores: oracle.checked, enumerated: oracle.reference.enumerated, scope: oracle.scope, gridComplete: true,
         ranking: oracle.rankings.find(row => row.profileId === profile.id) } : undefined });
+    console.log(`${input.id} ${effort} ${profile.id}: ${common.candidates.length} baskets cross-scored, including applicable sensitivity runs`);
   }
   const row: CaseComparison = { id: input.id, kind: input.kind,
     provenance: { ...input.provenance, effort, inputIdentity: control.inputIdentity, catalogueFingerprint: fingerprint(input.catalog), requestFingerprint: fingerprint(input.request),
