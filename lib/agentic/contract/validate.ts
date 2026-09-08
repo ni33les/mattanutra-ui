@@ -54,7 +54,7 @@ function branch(schema: JsonSchema, data: unknown): JsonSchema {
     return selected;
   }
   if (record(data) && typeof data.ok === "boolean" && Array.isArray(schema.anyOf)) {
-    const selected = schema.anyOf.find((option: JsonSchema) => record(option.properties) && record(option.properties.ok) && option.properties.ok.const === data.ok);
+    const selected = schema.anyOf.find((option: JsonSchema) => record(option.properties) && record(option.properties.ok) && option.properties.ok.const === data.ok && (record(option.properties.responseView) ? option.properties.responseView.const === data.responseView : !data.responseView || data.ok === false));
     if (selected) return selected as JsonSchema;
   }
   return schema;
@@ -63,7 +63,7 @@ function matchingUnionBranch(schema: JsonSchema, error: ErrorObject, data: unkno
   for (const match of error.schemaPath.matchAll(/\/(?:anyOf|oneOf)\/\d+/g)) {
     const candidate = pointerValue(schema, error.schemaPath.slice(1, match.index! + match[0].length));
     if (!record(candidate) || !record(candidate.properties)) continue;
-    for (const tag of ["certainty", "operation", "ok"]) {
+    for (const tag of ["certainty", "operation", "ok", "responseView"]) {
       const tagSchema = candidate.properties[tag];
       if (!record(tagSchema) || !("const" in tagSchema)) continue;
       let pointer = error.instancePath;

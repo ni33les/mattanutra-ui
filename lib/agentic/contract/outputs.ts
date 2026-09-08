@@ -51,8 +51,34 @@ const retail = o({ orderId: s, orderNumber: s, orderStatus: s, trackingUrl: s, c
 const ORDER_SUCCESS = o({ ok: Type.Literal(true), channel: e(["agentic", "web"] as const), checkoutExpiresAt: n(s), checkoutUrl: n(s), frozenOrder: frozen, fulfilment: o({ deliveryWindow: n(s), reasonCode: n(s), status: s, tracking: a(o({ number: s, url: s })) }), latestPaymentAttempt: n(s), latestPaymentReason: n(s), lookupStatus: Type.Literal("found"), message: s, messageKey: s, nextAction: e(["contact_support", "none", "open_checkout", "poll"] as const), orderReference: s, retailCustomerOrder: p(retail), orderStatus, paymentStatus, pollAfterSeconds: num, terminal: bool, receipt: n(o({ currency: s, paidAt: n(s), totalPriceMinor: money })), retryable: bool, stateVersion: int, acquisitionMinor: p(money), attribution: p(s), contributionMinor: pn(money), events: p(a(o({ createdAt: s, id: s, kind: e(["fulfilment", "order", "payment"] as const), sequence: p(int), status: s }))), money: p(o({ currency: s, items: a(o({ lineTotalMinor: money, productId: s, quantity: num })), totalPriceMinor: money })), paymentFeeMinor: p(money), paymentMinor: p(money), productCostMinor: p(money), responsibility: p(responsibility), shippingSubsidyMinor: p(money), timeline: p(s) });
 const SUPPORT_SUCCESS = o({ ok: Type.Literal(true), caseReference: s, createdAt: s, feedbackInvitation: invitation, messageId: s, orderContext: n(o({ fulfilmentStatus: s, nextAction: s, orderStatus: s, paymentStatus: s, stateVersion: int, timeline: s })), responseExpectation: s, responseExpectationKey: s, retailCustomerOrder: p(retail), status: Type.Literal("open"), supportHandle: s, thread: a(o({ author: e(["client", "support"] as const), body: s, createdAt: s, id: s, sequence: int })) });
 const EVIDENCE_SUCCESS = o({ ok: Type.Literal(true), claims: a(o({ claimId: s, limitation: s, researchVersion: s, reviewDate: s, source: s, statement: s, strength: s })), mode: e(["summary", "sources"] as const), planRevision: int, researchVersion: s });
+// Presentation is a typed projection of the established full contracts. Canonical
+// storage and legacy response fields remain untouched.
+export const CONVERSATION_BASKET_KEYS = ["productId", "productName", "servingsPerDay", "quantity", "unitPriceMinor", "lineTotalMinor", "currency", "dailyPills", "pillCountKnown", "daysOfSupply", "replenishmentDay"] as const;
+export const CONVERSATION_COVERAGE_KEYS = ["name", "unit", "basis", "requestedTargetId", "supplementId", "importance", "unresolved", "requestedAmount", "currentAmount", "deliveredAmount", "quantifiedExposureAmount", "totalExposureAmount", "totalExposureComplete", "intakeCertainty", "remainingGap", "excess", "coveragePercent", "status", "withinAgreedRange", "uncertainty"] as const;
+const conversationBasket = Type.Pick(BASKET_ITEM_SCHEMA, CONVERSATION_BASKET_KEYS);
+const conversationCoverage = Type.Pick(coverage, CONVERSATION_COVERAGE_KEYS);
+const conversationOption = o({ ...Type.Pick(OPTION_SCHEMA, ["optionId", "roles", "role", "selected", "recommended", "purchaseEligible", "stackSummary", "coveragePercent", "coverageSummary", "preferenceAssessment"]).properties,
+  basket: p(a(conversationBasket)), coverage: p(a(conversationCoverage)), adviceIds: ss,
+  shippingMinor: pn(money), firstOrderTotalMinor: pn(money) });
+const detailSections = e(["request", "products", "coverage", "advice", "score", "economics"] as const);
+const presentationBase = { ok: Type.Literal(true), planHandle: s, revision: int, resultVersion: s, contractVersion: s, locale: s, status };
+export const PLAN_CONVERSATION_SCHEMA = o({ ...presentationBase, responseView: Type.Literal("conversation"),
+  summary: s, operationalDecision: p(OPERATIONAL_DECISION_SCHEMA), nextActions: ss,
+  selectedOptionId: n(s), highlightedAlternativeOptionId: n(s), options: a(conversationOption),
+  advice: a(o({ ...ADVICE_SCHEMA.properties, adviceId: s })),
+  ...Type.Pick(PLAN_SUCCESS_SCHEMA, ["purchaseRequiredNow", "nextReplenishmentDay", "shippingMinor", "estimatedOrderTotalMinor", "questions", "pollAfterSeconds", "searchSummary", "refreshRequired", "sourceContractVersion", "reasonCode", "suggestedGroups", "unsupportedTargets"]).properties,
+  availableDetails: a(detailSections) });
+const detailOption = Type.Pick(OPTION_SCHEMA, ["optionId", "basket", "coverage", "advice", "doseFit", "economics"]);
+export const PLAN_DETAILS_SCHEMA = o({ ...presentationBase, responseView: Type.Literal("details"), sections: a(detailSections),
+  options: a(detailOption), ...Type.Pick(PLAN_SUCCESS_SCHEMA, ["originalRequest", "orderSchedule", "comparisonBasis", "unavailableReasons", "cash30DayMinor", "cash90DayMinor", "nextReplenishmentDay", "researchVersion", "claimIds"]).properties });
+export const PLAN_STATUS_SCHEMA = o({ ...presentationBase, responseView: Type.Literal("status"), unchanged: bool,
+  pendingRevision: n(int), operationStatus: n(s), nextActions: ss, pollAfterSeconds: num, refreshRequired: bool,
+  error: p(ERROR_SCHEMA.properties.error) });
+export type PlanConversationWire = Static<typeof PLAN_CONVERSATION_SCHEMA>;
+export type PlanDetailsWire = Static<typeof PLAN_DETAILS_SCHEMA>;
+export type PlanStatusWire = Static<typeof PLAN_STATUS_SCHEMA>;
 const result = <T extends TSchema>(success: T) => ({ type: "object", anyOf: [success, ERROR_SCHEMA] } as const);
-export const AGENTIC_OUTPUT_SCHEMAS = { info: result(INFO_SUCCESS), plan: result(PLAN_SUCCESS_SCHEMA), execute: result(EXECUTE_SUCCESS), order: result(ORDER_SUCCESS), support: result(SUPPORT_SUCCESS), feedback: result(o({ ok: Type.Literal(true), accepted: Type.Literal(true) })), evidence: result(EVIDENCE_SUCCESS) } as const;
+export const AGENTIC_OUTPUT_SCHEMAS = { info: result(INFO_SUCCESS), plan: { type: "object", anyOf: [PLAN_SUCCESS_SCHEMA, PLAN_CONVERSATION_SCHEMA, PLAN_DETAILS_SCHEMA, PLAN_STATUS_SCHEMA, ERROR_SCHEMA] }, execute: result(EXECUTE_SUCCESS), order: result(ORDER_SUCCESS), support: result(SUPPORT_SUCCESS), feedback: result(o({ ok: Type.Literal(true), accepted: Type.Literal(true) })), evidence: result(EVIDENCE_SUCCESS) } as const;
 
 export type PlanSuccessWire = Static<typeof PLAN_SUCCESS_SCHEMA>;
 export type PublicErrorWire = Static<typeof ERROR_SCHEMA>;

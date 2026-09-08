@@ -35,7 +35,7 @@ test("PAY-VIEW-01 eighteen frozen decisions retain all choices, doses, amounts, 
 });
 
 test("PAY-VIEW-02 batch details return exact stored sections and reject unknown options and stale revisions", () => {
-  const plan = baseline.cases[0].plan;
+  const plan = { ...baseline.cases[0].plan, originalRequest: baseline.cases[0].request };
   const details = projectPlan(plan, { responseView: "details", expectedRevision: plan.revision, sections: [...sections] });
   assert.ok(details.ok && "options" in details && "originalRequest" in details);
   assert.deepEqual(details.originalRequest, plan.originalRequest);
