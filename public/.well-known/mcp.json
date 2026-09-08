@@ -1,10 +1,10 @@
 {
   "contractVersion": "7.2.0",
   "name": "mattanutra_dev",
-  "schemaChecksum": "92c213fd7df5613faa179da1bac70142f059f0fe0fa4ec605299e0842872dd6b",
+  "schemaChecksum": "8432ba39c6a94771416868424571aafe02ce835c2bcd5e63fab2c8646696c58b",
   "tools": [
     {
-      "description": "Service card and contract. Call first. view=overview | client_guide | plan_schema; set planOperation for one operation schema.",
+      "description": "Service card + contract. Call first: view=overview | client_guide | plan_schema (choose planOperation).",
       "inputSchema": {
         "additionalProperties": false,
         "type": "object",
@@ -369,10 +369,10 @@
                                           "$ref": "#/$defs/s45"
                                         },
                                         "profile": {
-                                          "$ref": "#/$defs/s2"
+                                          "$ref": "#/$defs/s3"
                                         },
                                         "requirements": {
-                                          "$ref": "#/$defs/s3"
+                                          "$ref": "#/$defs/s2"
                                         },
                                         "safetyAcknowledgement": {
                                           "$ref": "#/$defs/s1"
@@ -768,6 +768,54 @@
                         "tool",
                         "arguments"
                       ]
+                    },
+                    {
+                      "additionalProperties": false,
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string"
+                        },
+                        "tool": {
+                          "const": "evidence",
+                          "type": "string"
+                        },
+                        "arguments": {
+                          "additionalProperties": false,
+                          "type": "object",
+                          "properties": {
+                            "evidenceHandle": {
+                              "minLength": 32,
+                              "maxLength": 4096,
+                              "type": "string"
+                            },
+                            "claimIds": {
+                              "$ref": "#/$defs/s35"
+                            },
+                            "locale": {
+                              "minLength": 1,
+                              "maxLength": 35,
+                              "type": "string"
+                            },
+                            "mode": {
+                              "type": "string",
+                              "enum": [
+                                "summary",
+                                "sources"
+                              ],
+                              "default": "summary"
+                            }
+                          },
+                          "required": [
+                            "evidenceHandle"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "tool",
+                        "arguments"
+                      ]
                     }
                   ]
                 }
@@ -1097,7 +1145,7 @@
               "full"
             ],
             "default": "conversation",
-            "description": "Plan presentation only. Omission means conversation. Explicit full is opt-in. During 7.2 only, X-MattaNutra-Contract-Version below 7.2 preserves the omitted full view; explicit responseView wins. Matching and idempotency are unchanged."
+            "description": "Presentation only; full is opt-in. Temporary legacy header: see info(client_guide)."
           },
           "s48": {
             "type": "string",
@@ -1554,7 +1602,7 @@
               "type": "string"
             }
           },
-          "s2": {
+          "s3": {
             "additionalProperties": false,
             "type": "object",
             "properties": {
@@ -1629,7 +1677,7 @@
           "s40": {
             "minimum": 0,
             "maximum": 1000,
-            "description": "Advisory preferred daily pill count, never a selection or purchase ceiling. Omission or null means no preference; null clears it in a patch. Explicit zero is a preference, not a no-purchase request. More than 20% above a positive preference, or any positive amount above zero, receives prominent advice; unknown counts stay unknown.",
+            "description": "Preferred daily pill count; unknown counts remain unknown.",
             "type": "number"
           },
           "s15": {
@@ -1645,7 +1693,7 @@
           "s41": {
             "minimum": 0,
             "maximum": 1000000000000,
-            "description": "Advisory first-order goods-price preference in destination currency minor units, never a purchase ceiling. Delivery is quoted separately. Null clears this preference; zero does not prevent purchase. More than 20% above a positive preference, or any positive price above zero, receives prominent advice.",
+            "description": "Preferred first-order goods price in destination currency minor units; delivery quoted separately.",
             "type": "integer"
           },
           "s16": {
@@ -1670,7 +1718,7 @@
               }
             ],
             "default": null,
-            "description": "Advisory preferred distinct new-product count. No system minimum or maximum basket count. Omitted on create/replacement or null means no preference; zero never prevents new products. Patch omission preserves the preference; null clears it. More than 20% above a positive preference, or any positive count above zero, receives prominent advice."
+            "description": "Preferred distinct new products; there is no system minimum or maximum basket count."
           },
           "s14": {
             "additionalProperties": false,
@@ -1693,7 +1741,7 @@
           "s25": {
             "maxItems": 100,
             "uniqueItems": true,
-            "description": "Require returned products at these daily labelled-serving quantities; other products remain optimisable. Use administration metadata to choose physically measurable quantities. [] clears proposals. Revise evaluates a new option; it never purchases directly. Incompatible exclusions or physically unsupported quantities return a field error. Numeric preferences and health advice never veto a proposal.",
+            "description": "Fix returned products at these daily labelled servings; other products remain optimisable. Use administration metadata for measurable quantities. [] clears proposals. Revision evaluates, never purchases. Exclusion/physical conflicts return field errors; numeric and health findings are advice.",
             "type": "array",
             "items": {
               "$ref": "#/$defs/s14"
@@ -1719,8 +1767,9 @@
               "type": "string"
             }
           },
-          "s3": {
+          "s2": {
             "additionalProperties": false,
+            "description": "maxDailyPills, maxPriceMinor and maxProductCount are advisory, never purchase limits. Create/replacement omission or null means no preference; patch omission preserves, null clears. Zero permits purchase. Prominent advice: strictly over 20% above a positive preference, or any positive actual above zero. Unknown actuals stay unknown.",
             "type": "object",
             "properties": {
               "allowedForms": {
@@ -1966,10 +2015,10 @@
                 "$ref": "#/$defs/s45"
               },
               "profile": {
-                "$ref": "#/$defs/s2"
+                "$ref": "#/$defs/s3"
               },
               "requirements": {
-                "$ref": "#/$defs/s3"
+                "$ref": "#/$defs/s2"
               },
               "safetyAcknowledgement": {
                 "$ref": "#/$defs/s1"
@@ -1998,7 +2047,7 @@
       "name": "info"
     },
     {
-      "description": "Create, get, revise, answer or select a plan. Default response is conversation. get supports status + knownResultVersion, or details + sections + expectedRevision + optional optionIds. requestPatch preserves context. Expanded search adds attempts, not looser rules.",
+      "description": "Create/get/revise/answer/select; conversation default. get: status + knownResultVersion, or details + sections + expectedRevision (optionIds optional). requestPatch preserves context. Expanded adds attempts, not looser rules.",
       "inputSchema": {
         "type": "object",
         "anyOf": [
@@ -2261,10 +2310,10 @@
                         "$ref": "#/$defs/s44"
                       },
                       "profile": {
-                        "$ref": "#/$defs/s2"
+                        "$ref": "#/$defs/s3"
                       },
                       "requirements": {
-                        "$ref": "#/$defs/s3"
+                        "$ref": "#/$defs/s2"
                       },
                       "safetyAcknowledgement": {
                         "$ref": "#/$defs/s1"
@@ -2381,7 +2430,7 @@
               "full"
             ],
             "default": "conversation",
-            "description": "Plan presentation only. Omission means conversation. Explicit full is opt-in. During 7.2 only, X-MattaNutra-Contract-Version below 7.2 preserves the omitted full view; explicit responseView wins. Matching and idempotency are unchanged."
+            "description": "Presentation only; full is opt-in. Temporary legacy header: see info(client_guide)."
           },
           "s47": {
             "type": "string",
@@ -2838,7 +2887,7 @@
               "type": "string"
             }
           },
-          "s2": {
+          "s3": {
             "additionalProperties": false,
             "type": "object",
             "properties": {
@@ -2913,7 +2962,7 @@
           "s39": {
             "minimum": 0,
             "maximum": 1000,
-            "description": "Advisory preferred daily pill count, never a selection or purchase ceiling. Omission or null means no preference; null clears it in a patch. Explicit zero is a preference, not a no-purchase request. More than 20% above a positive preference, or any positive amount above zero, receives prominent advice; unknown counts stay unknown.",
+            "description": "Preferred daily pill count; unknown counts remain unknown.",
             "type": "number"
           },
           "s15": {
@@ -2929,7 +2978,7 @@
           "s40": {
             "minimum": 0,
             "maximum": 1000000000000,
-            "description": "Advisory first-order goods-price preference in destination currency minor units, never a purchase ceiling. Delivery is quoted separately. Null clears this preference; zero does not prevent purchase. More than 20% above a positive preference, or any positive price above zero, receives prominent advice.",
+            "description": "Preferred first-order goods price in destination currency minor units; delivery quoted separately.",
             "type": "integer"
           },
           "s16": {
@@ -2954,7 +3003,7 @@
               }
             ],
             "default": null,
-            "description": "Advisory preferred distinct new-product count. No system minimum or maximum basket count. Omitted on create/replacement or null means no preference; zero never prevents new products. Patch omission preserves the preference; null clears it. More than 20% above a positive preference, or any positive count above zero, receives prominent advice."
+            "description": "Preferred distinct new products; there is no system minimum or maximum basket count."
           },
           "s14": {
             "additionalProperties": false,
@@ -2977,7 +3026,7 @@
           "s25": {
             "maxItems": 100,
             "uniqueItems": true,
-            "description": "Require returned products at these daily labelled-serving quantities; other products remain optimisable. Use administration metadata to choose physically measurable quantities. [] clears proposals. Revise evaluates a new option; it never purchases directly. Incompatible exclusions or physically unsupported quantities return a field error. Numeric preferences and health advice never veto a proposal.",
+            "description": "Fix returned products at these daily labelled servings; other products remain optimisable. Use administration metadata for measurable quantities. [] clears proposals. Revision evaluates, never purchases. Exclusion/physical conflicts return field errors; numeric and health findings are advice.",
             "type": "array",
             "items": {
               "$ref": "#/$defs/s14"
@@ -3003,8 +3052,9 @@
               "type": "string"
             }
           },
-          "s3": {
+          "s2": {
             "additionalProperties": false,
+            "description": "maxDailyPills, maxPriceMinor and maxProductCount are advisory, never purchase limits. Create/replacement omission or null means no preference; patch omission preserves, null clears. Zero permits purchase. Prominent advice: strictly over 20% above a positive preference, or any positive actual above zero. Unknown actuals stay unknown.",
             "type": "object",
             "properties": {
               "allowedForms": {
@@ -3250,10 +3300,10 @@
                 "$ref": "#/$defs/s44"
               },
               "profile": {
-                "$ref": "#/$defs/s2"
+                "$ref": "#/$defs/s3"
               },
               "requirements": {
-                "$ref": "#/$defs/s3"
+                "$ref": "#/$defs/s2"
               },
               "safetyAcknowledgement": {
                 "$ref": "#/$defs/s1"
@@ -3571,7 +3621,7 @@
                 ]
               },
               "orderSchedule": {
-                "$ref": "#/$defs/s5"
+                "$ref": "#/$defs/s6"
               },
               "scheduleComplete": {
                 "type": "boolean"
@@ -4768,7 +4818,7 @@
                 "$ref": "#/$defs/s1"
               },
               "orderSchedule": {
-                "$ref": "#/$defs/s5"
+                "$ref": "#/$defs/s6"
               },
               "comparisonBasis": {
                 "$ref": "#/$defs/s17"
@@ -5914,7 +5964,7 @@
               "type": "string"
             }
           },
-          "s7": {
+          "s8": {
             "additionalProperties": false,
             "type": "object",
             "properties": {
@@ -5989,7 +6039,7 @@
           "s85": {
             "minimum": 0,
             "maximum": 1000,
-            "description": "Advisory preferred daily pill count, never a selection or purchase ceiling. Omission or null means no preference; null clears it in a patch. Explicit zero is a preference, not a no-purchase request. More than 20% above a positive preference, or any positive amount above zero, receives prominent advice; unknown counts stay unknown.",
+            "description": "Preferred daily pill count; unknown counts remain unknown.",
             "type": "number"
           },
           "s56": {
@@ -6005,7 +6055,7 @@
           "s86": {
             "minimum": 0,
             "maximum": 1000000000000,
-            "description": "Advisory first-order goods-price preference in destination currency minor units, never a purchase ceiling. Delivery is quoted separately. Null clears this preference; zero does not prevent purchase. More than 20% above a positive preference, or any positive price above zero, receives prominent advice.",
+            "description": "Preferred first-order goods price in destination currency minor units; delivery quoted separately.",
             "type": "integer"
           },
           "s57": {
@@ -6030,7 +6080,7 @@
               }
             ],
             "default": null,
-            "description": "Advisory preferred distinct new-product count. No system minimum or maximum basket count. Omitted on create/replacement or null means no preference; zero never prevents new products. Patch omission preserves the preference; null clears it. More than 20% above a positive preference, or any positive count above zero, receives prominent advice."
+            "description": "Preferred distinct new products; there is no system minimum or maximum basket count."
           },
           "s45": {
             "additionalProperties": false,
@@ -6053,7 +6103,7 @@
           "s70": {
             "maxItems": 100,
             "uniqueItems": true,
-            "description": "Require returned products at these daily labelled-serving quantities; other products remain optimisable. Use administration metadata to choose physically measurable quantities. [] clears proposals. Revise evaluates a new option; it never purchases directly. Incompatible exclusions or physically unsupported quantities return a field error. Numeric preferences and health advice never veto a proposal.",
+            "description": "Fix returned products at these daily labelled servings; other products remain optimisable. Use administration metadata for measurable quantities. [] clears proposals. Revision evaluates, never purchases. Exclusion/physical conflicts return field errors; numeric and health findings are advice.",
             "type": "array",
             "items": {
               "$ref": "#/$defs/s45"
@@ -6079,8 +6129,9 @@
               "type": "string"
             }
           },
-          "s8": {
+          "s5": {
             "additionalProperties": false,
+            "description": "maxDailyPills, maxPriceMinor and maxProductCount are advisory, never purchase limits. Create/replacement omission or null means no preference; patch omission preserves, null clears. Zero permits purchase. Prominent advice: strictly over 20% above a positive preference, or any positive actual above zero. Unknown actuals stay unknown.",
             "type": "object",
             "properties": {
               "allowedForms": {
@@ -6326,10 +6377,10 @@
                 "$ref": "#/$defs/s117"
               },
               "profile": {
-                "$ref": "#/$defs/s7"
+                "$ref": "#/$defs/s8"
               },
               "requirements": {
-                "$ref": "#/$defs/s8"
+                "$ref": "#/$defs/s5"
               },
               "safetyAcknowledgement": {
                 "$ref": "#/$defs/s2"
@@ -7466,7 +7517,7 @@
               }
             ]
           },
-          "s5": {
+          "s6": {
             "additionalProperties": false,
             "type": "object",
             "properties": {
@@ -7876,7 +7927,7 @@
               }
             }
           },
-          "s6": {
+          "s7": {
             "additionalProperties": false,
             "type": "object",
             "properties": {
@@ -7955,7 +8006,7 @@
                 "$ref": "#/$defs/s101"
               },
               "deltas": {
-                "$ref": "#/$defs/s6"
+                "$ref": "#/$defs/s7"
               },
               "equivalent": {
                 "type": "boolean"
@@ -8199,7 +8250,7 @@
       "name": "plan"
     },
     {
-      "description": "After the person confirms the selected revision, create or recover its checkout using the same idempotency key; health advice does not block purchase.",
+      "description": "After the person confirms the selected revision, create/recover checkout with the same idempotency key; health advice is advisory.",
       "inputSchema": {
         "additionalProperties": false,
         "type": "object",
@@ -9099,7 +9150,7 @@
       "name": "execute"
     },
     {
-      "description": "Read payment and fulfilment: conversation for recovery, status + knownResultVersion for polls, details + frozen_order/events for facts; honor the last pollAfterSeconds until terminal=true.",
+      "description": "Read payment/fulfilment: conversation for recovery; status + knownResultVersion to poll; details for frozen_order/events. Honor the last pollAfterSeconds until terminal=true.",
       "inputSchema": {
         "type": "object",
         "anyOf": [
@@ -10751,7 +10802,7 @@
       "name": "order"
     },
     {
-      "description": "Open or reply to a help case for an order; omit supportHandle to open, include it to reply.",
+      "description": "Open an order help case; include its returned supportHandle to reply.",
       "inputSchema": {
         "additionalProperties": false,
         "type": "object",
