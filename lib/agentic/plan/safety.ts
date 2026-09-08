@@ -259,39 +259,19 @@ function zincExposure(
   };
 }
 
-export function assessedSafetyCodes(state: CanonicalPlanState) {
+export function assessedSafetyCodes(state: Pick<CanonicalPlanState, "medicationCodes" | "conditionCodes">, findings: readonly SafetyGuidance[] = []) {
+  // Recognized vocabulary is not evidence that a basket was assessed or cleared.
+  const medicationAssessed = findings.some(row => row.code === "medication_interaction" && row.ruleId.includes("omega3+anticoagulant"));
+  const conditionAssessed = findings.some(row => row.code === "condition_review_required" && row.ruleId.includes("magnesium+ckd"));
   return {
-    assessedConditionCodes: [
-      ...new Set(
-        state.conditionCodes
-          .map((code) => CONDITION_ALIASES[code])
-          .filter((code): code is string => Boolean(code))
-      )
-    ],
-    assessedMedicationCodes: [
-      ...new Set(
-        state.medicationCodes
-          .map((code) => MEDICATION_ALIASES[code])
-          .filter((code): code is string => Boolean(code))
-      )
-    ]
+    assessedConditionCodes: [...new Set(state.conditionCodes.map(code => CONDITION_ALIASES[code]).filter(code => code === "ckd" && conditionAssessed))],
+    assessedMedicationCodes: [...new Set(state.medicationCodes.map(code => MEDICATION_ALIASES[code]).filter(code => code === "apixaban" && medicationAssessed))]
   };
 }
 
-export function optionSafety(input: Readonly<{
-  locale: Locale;
-  selected: StackOption;
-  state: CanonicalPlanState;
-}>): OptionSafety {
-  return {
-    ...assessedSafetyCodes(input.state),
-    guidance: evaluateSafety({
-      coverage: input.selected.coverage,
-      locale: input.locale,
-      selected: input.selected,
-      state: input.state
-    })
-  };
+export function optionSafety(input: Readonly<{ locale: Locale; selected: StackOption; state: CanonicalPlanState }>): OptionSafety {
+  const findings = evaluateSafety({ coverage: input.selected.coverage, locale: input.locale, selected: input.selected, state: input.state });
+  return { ...assessedSafetyCodes(input.state, findings), guidance: findings };
 }
 
 export function evaluateSafety(input: Readonly<{
@@ -768,6 +748,15 @@ export function evaluateSafety(input: Readonly<{
     items.push({ ...guidance({ action: "review", code: "incomplete_information", locale: input.locale, productIds: [], severity: "info", supplementIds: [] }),
       guidanceId: "gdn:incomplete_information:algae_source", ruleId: "algae_alias_requires_explicit_source",
       message: clarification, messageKey: "plan.source.algae_alias_clarification", uncertainty: clarification, uncertaintyCodes: ["source_choice_unconfirmed"] });
+  }
+  const assessed = assessedSafetyCodes(input.state, items);
+  const unassessedMedications = input.state.medicationCodes.filter(code => !assessed.assessedMedicationCodes.includes(MEDICATION_ALIASES[code] ?? code));
+  const unassessedConditions = input.state.conditionCodes.filter(code => !assessed.assessedConditionCodes.includes(CONDITION_ALIASES[code] ?? code));
+  if (unassessedMedications.length || unassessedConditions.length) {
+    const message = agenticMessage(input.locale, "guidance.context_unassessed", { codes: [...unassessedMedications, ...unassessedConditions].join(", ") });
+    items.push({ ...guidance({ action: "review", code: "incomplete_information", locale: input.locale, productIds: [], severity: "info", supplementIds: [] }),
+      guidanceId: "gdn:incomplete_information:unassessed_context", ruleId: "context_unassessed", message, messageKey: "guidance.context_unassessed", uncertainty: message,
+      uncertaintyCodes: [...unassessedMedications.map(code => `medication_unassessed:${code}`), ...unassessedConditions.map(code => `condition_unassessed:${code}`)].sort() });
   }
   const undisclosedContext = Boolean(original && (original.medicationCodes === undefined || original.conditionCodes === undefined)) || input.state.targets.some(item => intakeCertaintyFor(input.state, item.supplementId) !== "known") || coverageRows.some(item => intakeCertaintyFor(input.state, item.supplementId) !== "known");
   if (undisclosedContext || (input.state.profileKnown && Object.values(input.state.profileKnown).some(known => !known)) || (input.state.intake ?? []).some(item => item.certainty !== "known") || input.state.medicationCodes.some(code => !MEDICATION_ALIASES[code]) || input.state.conditionCodes.some(code => !CONDITION_ALIASES[code])) {

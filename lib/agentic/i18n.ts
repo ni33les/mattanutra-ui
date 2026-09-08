@@ -4,6 +4,11 @@ import { isLocale } from "@/lib/i18n";
 export const AGENTIC_LOCALES = ["en", "th", "zh-CN"] as const;
 
 const MESSAGES: Record<string, Record<(typeof AGENTIC_LOCALES)[number], string>> = {
+  "guidance.context_unassessed": {
+    en: "Interactions for {codes} have not been assessed for this basket. No interaction finding does not mean cleared; ask a clinician or pharmacist to review the combination.",
+    th: "ยังไม่ได้ประเมินปฏิกิริยาระหว่าง {codes} กับผลิตภัณฑ์ชุดนี้ การไม่มีข้อค้นพบไม่ได้ยืนยันว่าปลอดภัย ควรให้แพทย์หรือเภสัชกรตรวจสอบการใช้ร่วมกัน",
+    "zh-CN": "尚未评估 {codes} 与此组合的相互作用。没有相互作用提示并不表示已确认安全；请医生或药师审查该组合。"
+  },
   "plan.option.target_focused": { "en": "A product focused on requested nutrients. Compare its dose coverage and labelled serving; unknown pill counts remain unknown.", "th": "ผลิตภัณฑ์ที่เน้นสารอาหารตามเป้าหมาย เปรียบเทียบความครอบคลุมของปริมาณและหน่วยบริโภคตามฉลาก หากไม่ทราบจำนวนเม็ดจะยังระบุว่าไม่ทราบ", "zh-CN": "侧重所请求营养素的产品。请比较剂量覆盖和标签份量；未知的每日片数仍标为未知。" },
   "guidance.reference_unknown": { "en": "An applicable reference limit for {nutrientName} is unavailable. Exposure cannot be verified as below a limit; this is missing information, not a measured limit breach. Review the available facts; purchase remains available.", "th": "ไม่มีค่าอ้างอิงที่ใช้ได้สำหรับ {nutrientName} จึงยืนยันไม่ได้ว่าปริมาณต่ำกว่าขีดจำกัด นี่คือข้อมูลที่ขาด ไม่ใช่การยืนยันว่าเกินขีดจำกัด โปรดตรวจสอบข้อมูลที่มี โดยยังซื้อได้", "zh-CN": "缺少适用于 {nutrientName} 的参考限值，无法确认摄入量低于限值。这表示信息不足，并非已测得超标。请查看现有资料，仍可购买。" },
   "guidance.references_unknown": { "en": "Applicable reference limits are unavailable for {nutrients}. Exposure cannot be verified as below those limits. These are information gaps, not measured limit breaches; full advice and sources remain in details. Purchase remains available.", "th": "ไม่มีค่าอ้างอิงที่ใช้ได้สำหรับ {nutrients} จึงยืนยันไม่ได้ว่าปริมาณต่ำกว่าขีดจำกัด เป็นช่องว่างของข้อมูล ไม่ใช่การยืนยันว่าเกินขีดจำกัด ดูคำแนะนำและแหล่งข้อมูลทั้งหมดในรายละเอียด โดยยังซื้อได้", "zh-CN": "缺少适用于 {nutrients} 的参考限值，无法确认摄入量低于这些限值。这些是信息缺口，并非已测得超标；详情保留完整建议和来源，仍可购买。" },
