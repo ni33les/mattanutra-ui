@@ -355,6 +355,12 @@
       "slice": "browser_boundary",
       "reason": "Protects the actual shared web matcher import graph from Node-only checkpoint codecs and verifies exact portable seller-fact equality.",
       "database": false
+    },
+    {
+      "file": "test/ax-refinement/polling.test.ts",
+      "slice": "reliability",
+      "reason": "Failed pending refinements must surface their error without presenting the last committed result as completed new work.",
+      "database": false
     }
   ]
 }

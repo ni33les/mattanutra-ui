@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { randomUUID } from "node:crypto";
+import { randomUUID, randomBytes } from "node:crypto";
 import { after, test } from "node:test";
 import postgres from "postgres";
 import { closeSqlPool } from "../../lib/db.ts";
@@ -57,4 +57,29 @@ test("AXR-REL-04 framework cancellation atomically fences the matching operation
   assert.equal((await store.getPlanOperation(operation.id))?.status, "cancelled");
   assert.equal(await updateClaimedOperation(store, claim, { status: "complete", response: { revision: 2 } }, now), false);
   assert.equal((await store.getPlan(planId))?.currentRevision, 1);
+});
+
+test("AXR-REL-03 large checkpoint bytes stay out of lifecycle writes and survive lease recovery", async () => {
+  const planId = randomUUID(), now = "2026-09-07T00:00:00Z";
+  await store.insertPlan({ id: planId, environment: "dev", tenantScope: "mattanutra", principalScope: `qa-v3:ax:${planId}`, currentRevision: 1, createdAt: now, updatedAt: now });
+  const operation = await admitPlanOperation(store, { planId, ownerScope: `dev:${planId}`, key: "ax-large-checkpoint", expectedRevision: 1, revision: 2,
+    payload: { operation: "revise" }, prepared: {}, scope: { environment: "dev", tenantScope: "mattanutra" }, now });
+  const claim = await claimPlanOperation(store, operation.id, "worker-one", now); assert.ok(claim);
+  const cursor = randomBytes(3 * 1024 * 1024).toString("base64");
+  const checkpoint = { stage: "search", reservedAttempts: 0, search: { cursor, expansionAttempts: 28000, expansionBudget: 64000 } };
+  assert.equal(await updateClaimedOperation(store, claim, { checkpoint }, now), true);
+  const [stored] = await sql`select record_json from public.agentic_plan_operations where id=${operation.id}::uuid`;
+  assert.equal(stored.record_json.checkpoint.search.cursor, undefined, "Lifecycle metadata must not rewrite the binary search archive");
+  const metadata = await store.getPlanOperation(operation.id, { includeCursor: false }); assert.ok(metadata);
+  assert.equal((metadata.checkpoint as typeof checkpoint).search.cursor, undefined);
+  const [relation] = await sql`select reltoastrelid::regclass::text as name from pg_class where oid='public.agentic_plan_operations'::regclass`;
+  const before = await sql.unsafe(`select distinct chunk_id from ${relation.name} order by chunk_id`);
+  assert.equal(await updateClaimedOperation(store, claim, { status: "retryable", error: { dependency: "statement_timeout" } }, now), true);
+  const after = await sql.unsafe(`select distinct chunk_id from ${relation.name} order by chunk_id`);
+  assert.deepEqual(after, before, "A lifecycle-only update must reuse the existing TOAST bytes");
+  const resumed = await claimPlanOperation(store, operation.id, "worker-two", now); assert.ok(resumed);
+  assert.deepEqual(resumed.checkpoint, checkpoint);
+  assert.equal(await updateClaimedOperation(store, claim, { checkpoint: null }, now), false, "Old leases cannot clear the checkpoint");
+  assert.equal(await cancelPlanOperation(store, operation.id, now), true);
+  assert.deepEqual((await store.getPlanOperation(operation.id))?.checkpoint, checkpoint);
 });

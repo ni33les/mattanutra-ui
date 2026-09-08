@@ -4,11 +4,33 @@ import { fixtureSnapshot } from "../../lib/agentic/catalogue/fixtures.ts";
 import { installGoldCatalogue, uninstallGoldCatalogue } from "../helpers/gold-catalogue.ts";
 import { normalizePlanRequest } from "../../lib/agentic/plan/normalize.ts";
 import { loadAgenticConfig } from "../../lib/agentic/config.ts";
-import { matchPlan, planCheckpointInputIdentity } from "../../lib/agentic/plan/matching.ts";
+import { matchPlan, matchPlanChunk, planCheckpointInputIdentity } from "../../lib/agentic/plan/matching.ts";
 import { setMatcherSafetyCeilings, matcherSafetyCeilings } from "../../lib/matcher/safety-ceilings.ts";
 import { MatchWorkerPool } from "../../lib/agentic/plan/match-worker-pool.ts";
 
 afterEach(uninstallGoldCatalogue);
+test("AXR-REL-03 recovery accepts a new observation clock but rejects changed catalogue facts", async () => {
+  installGoldCatalogue();
+  const snapshot = fixtureSnapshot();
+  const normalized = await normalizePlanRequest({ config: loadAgenticConfig(), snapshot, request: {
+    destinationCountry: "TH", locale: "en", optimization: "balanced", requirements: {},
+    profile: { ageYears: 38, sex: "male", lifeStage: "adult" },
+    targets: [{ name: "Magnesium", amount: 200, unit: "mg" }]
+  } });
+  assert.ok("state" in normalized);
+  const input = { snapshot, state: normalized.state };
+  const first = matchPlanChunk(input, { chunkBudget: 1 }); assert.equal(first.done, false);
+  const refreshed = { ...input, snapshot: { ...snapshot, availabilityAsOf: "2026-09-08T03:29:00Z" } };
+  assert.equal(planCheckpointInputIdentity(refreshed), first.checkpoint.inputIdentity);
+  const resumed = matchPlanChunk(refreshed, { checkpoint: first.checkpoint, chunkBudget: 8000 });
+  const uninterrupted = matchPlanChunk(input, { checkpoint: first.checkpoint, chunkBudget: 8000 });
+  assert.equal(resumed.expansionAttempts, uninterrupted.expansionAttempts);
+  assert.deepEqual(resumed.checkpoint, uninterrupted.checkpoint);
+  assert.ok(snapshot.products.length > 0);
+  const changed = { ...refreshed, snapshot: { ...refreshed.snapshot, products: refreshed.snapshot.products.map((product, index) => index === 0 ? { ...product, unitPriceMinor: product.unitPriceMinor + 1 } : product) } };
+  assert.throws(() => matchPlanChunk(changed, { checkpoint: first.checkpoint, chunkBudget: 1 }), /identity changed/);
+});
+
 test("AXR-SRCH-01 worker restart resumes the checkpoint and preserves synchronous results and work counts", async () => {
   installGoldCatalogue();
   const snapshot = fixtureSnapshot();
