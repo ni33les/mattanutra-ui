@@ -3,7 +3,7 @@ import { agenticMessage, negotiateLocale } from "@/lib/agentic/i18n";
 
 /** Describe an already-returned choice. Never alter scoring, eligibility,
  * ordering, or the selected basket to make a simpler routine look complete. */
-export function routineTradeoff(selected: StackOption | undefined, options: readonly StackOption[], locale: string) {
+export function routineTradeoff(selected: StackOption | null | undefined, options: readonly StackOption[], locale: string) {
   if (!selected || selected.basket.length < 2) return "";
   const covered = selected.coverage.filter(row => row.coveragePercent >= 100 && !row.unresolved);
   if (!covered.length) return "";
