@@ -4,16 +4,17 @@ import { toolResult } from "../../lib/agentic/mcp/rpc.ts";
 import { handleJsonRpc } from "../../lib/agentic/mcp/dispatcher.ts";
 import { createAgenticRuntime } from "../../lib/agentic/runtime.ts";
 
-test("M721-TEXT-01 opt-in removes only conversation/status clones; compatibility and errors remain complete", () => {
+test("M721-TEXT-01 conversation/status avoid clones by default; full/details and errors remain complete", () => {
   for (const responseView of ["conversation", "status", "full", "details"]) {
     const value = { ok: true, responseView, summary: "Ready with advice", planHandle: "opaque", revision: 1,
       operationalDecision: { nextAction: "confirm" }, advice: [{ message: "Calcium exceeds its reference." }] };
     const compatible = toolResult(value);
-    assert.deepEqual(JSON.parse(compatible.content.at(-1)!.text), value);
+    if (["full", "details"].includes(responseView)) assert.deepEqual(JSON.parse(compatible.content.at(-1)!.text), value);
+    else assert.equal(compatible.content.length, 1);
     const opted = toolResult(value, false, "plan", "structured");
     assert.strictEqual(opted.structuredContent, value);
     assert.equal(opted.content.length, ["conversation", "status"].includes(responseView) ? 1 : 2);
-    if (responseView === "conversation") { assert.match(opted.content[0].text, /Calcium exceeds/); assert.match(opted.content[0].text, /confirm/); }
+    if (responseView === "conversation") { assert.match(opted.content[0].text, /Ready with advice/); assert.match(opted.content[0].text, /confirm/); }
     assert.equal(toolResult(value, true, "plan", "structured").content.length, 2);
   }
 });

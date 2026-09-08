@@ -10,5 +10,6 @@ test("PAY-TRANSPORT-05 concise text headlines preserve refunds and distinguish p
   assert.equal(translated.content[0].text, "ชำระเงินแล้ว");
   const failed = toolResult({ ok: true, responseView: "status", planHandle: "cap_example", revision: 2, status: "ready", operationStatus: "failed" });
   assert.match(failed.content[0].text, /failed/);
-  assert.deepEqual(JSON.parse(refunded.content[1].text), refunded.structuredContent);
+  assert.equal(refunded.content.length, 1);
+  assert.equal(refunded.structuredContent.paymentStatus, "refunded");
 });
