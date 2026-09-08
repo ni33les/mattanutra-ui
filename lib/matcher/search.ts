@@ -130,12 +130,10 @@ function skipGroup(state: SearchState): SearchState {
 export function compareSearchStates(a: SearchState, b: SearchState, request: CanonicalRequest) {
   const fit = compareDoseFit(doseFitScore(request, a.exposure), doseFitScore(request, b.exposure));
   if (fit !== 0) return fit;
-  // Explore the same bounded frontier for every commercial objective. Otherwise
-  // an early pill/cost tie can discard a branch with a better eventual dose fit.
-  // The requested commercial tie-break is applied to the completed candidates.
-  const coverage = aggregateCoverage(request, b.delivered) - aggregateCoverage(request, a.delivered);
-  if (coverage !== 0) return coverage;
-  return a.price - b.price || comparePillCounts(a.pills, a.pillCountKnown, b.pills, b.pillCountKnown) || a.count - b.count || fingerprintState(a).localeCompare(fingerprintState(b));
+  // Use the final dose-first routine ordering during retention and repair.
+  // Independent price extrema remain in reviewFrontier for cheaper choices.
+  return comparePillCounts(a.pills, a.pillCountKnown, b.pills, b.pillCountKnown) ||
+    a.count - b.count || a.price - b.price || fingerprintState(a).localeCompare(fingerprintState(b));
 }
 
 /** Count actual attempted additions, including infeasible additions and repair.

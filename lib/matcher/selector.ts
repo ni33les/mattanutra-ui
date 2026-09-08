@@ -260,15 +260,11 @@ export function compareBaskets(left: ScoredBasket, right: ScoredBasket, request:
   void _config;
   const fit = compareDoseFit(fitOf(left, request), fitOf(right, request));
   if (fit !== 0) return fit;
-  if (request.optimization === "fewest_pills") {
-    const pills = comparePillCounts(left.dailyPills, left.pillCountKnown, right.dailyPills, right.pillCountKnown);
-    if (pills !== 0) return pills;
-  } else if (request.optimization === "best_coverage" || request.optimization === "balanced") {
-    const coverage = right.aggregateCoverage - left.aggregateCoverage;
-    if (coverage !== 0) return coverage;
-  }
-  return left.priceMinor - right.priceMinor || comparePillCounts(left.dailyPills, left.pillCountKnown, right.dailyPills, right.pillCountKnown) ||
-    left.productCount - right.productCount || basketSignature(left).localeCompare(basketSignature(right));
+  // Dose accuracy remains first. Price-led alternatives are selected below;
+  // an equally accurate default should not demand a harder daily routine.
+  return comparePillCounts(left.dailyPills, left.pillCountKnown, right.dailyPills, right.pillCountKnown) ||
+    left.productCount - right.productCount || left.priceMinor - right.priceMinor ||
+    basketSignature(left).localeCompare(basketSignature(right));
 }
 
 function productDoseSignature(basket: ScoredBasket) {

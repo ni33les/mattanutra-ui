@@ -175,8 +175,8 @@ export function finiteCatalogueOracle(fixture: FiniteOracleFixture): { selected:
   visit(0, [], 0, ZERO);
   // Independent total order: an unknown quantity is never a measured zero.
   const pillOrder = (a: OracleBasket, b: OracleBasket) => Number(!a.pillCountKnown) - Number(!b.pillCountKnown) || (a.pillCountKnown ? a.dailyPills - b.dailyPills : 0);
-  const commercial = (a: InternalBasket, b: InternalBasket) => (fixture.optimization === "fewest_pills" ? pillOrder(a.basket, b.basket) : fixture.optimization === "best_coverage" || fixture.optimization === "balanced" ? compare(b.coverage, a.coverage) : 0) ||
-    a.basket.priceMinor - b.basket.priceMinor || pillOrder(a.basket, b.basket) || a.basket.productCount - b.basket.productCount || [a.basket.sellerId, ...a.basket.variantIds].join("|").localeCompare([b.basket.sellerId, ...b.basket.variantIds].join("|"));
+  const commercial = (a: InternalBasket, b: InternalBasket) => pillOrder(a.basket, b.basket) ||
+    a.basket.productCount - b.basket.productCount || a.basket.priceMinor - b.basket.priceMinor || [a.basket.sellerId, ...a.basket.variantIds].join("|").localeCompare([b.basket.sellerId, ...b.basket.variantIds].join("|"));
   const ranked = [...complete].sort((a, b) => compare(a.total, b.total) || commercial(a, b));
   const requiredReference = [...complete].sort((a, b) => compare(a.required, b.required) || compare(a.total, b.total) || commercial(a, b))[0];
   const qualifying = requiredReference ? ranked.filter(candidate => [...requiredReference.metrics].every(([id, metrics]) => metrics.every((value, index) => compare(candidate.metrics.get(id)?.[index] ?? ZERO, value) <= 0))) : ranked;
