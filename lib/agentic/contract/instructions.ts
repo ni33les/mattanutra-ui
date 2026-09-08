@@ -20,5 +20,8 @@ export function agenticServerInstructions(environment: "dev" | "prd" | "uat") {
   return environment === "uat" ? AGENTIC_UAT_SERVER_INSTRUCTIONS : environment === "prd" ? AGENTIC_PRD_SERVER_INSTRUCTIONS : AGENTIC_SERVER_INSTRUCTIONS;
 }
 export function agenticToolDescriptions(_environment: "dev" | "prd" | "uat", _locale?: string) {
+  // Tool instructions are shared; info and plan supply localized customer copy.
+  void _environment;
+  void _locale;
   return AGENTIC_TOOL_DESCRIPTIONS;
 }
