@@ -10,7 +10,13 @@ type Job<Input, Result> = {
 };
 type Slot<Input, Result> = { worker: Worker; job?: Job<Input, Result> };
 
-export class ThreadPoolUnavailableError extends Error {}
+export class ThreadPoolUnavailableError extends Error {
+  readonly reason: "capacity" | "timeout" | "worker_failure" | "checkpoint_mismatch";
+  constructor(message: string, reason?: ThreadPoolUnavailableError["reason"]) {
+    super(message);
+    this.reason = reason ?? (/capacity/i.test(message) ? "capacity" : /deadline/i.test(message) ? "timeout" : "worker_failure");
+  }
+}
 
 /** Dedicated CPU workers keep search off the HTTP event loop. Every queued or
  * running job has a deadline, and aborting active search terminates its worker. */
@@ -98,7 +104,9 @@ export class ThreadPool<Input, Result> {
       slot.job = undefined;
       job.cleanup();
       worker.unref();
-      if (reply.error !== undefined) job.reject(new ThreadPoolUnavailableError("Matcher failed"));
+      if (reply.error !== undefined) job.reject(reply.error === "checkpoint_mismatch"
+        ? new ThreadPoolUnavailableError("Matching checkpoint identity changed", "checkpoint_mismatch")
+        : new ThreadPoolUnavailableError("Matcher failed", "worker_failure"));
       else job.resolve(reply.result);
       this.drain();
     });

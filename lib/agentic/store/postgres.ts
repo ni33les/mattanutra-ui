@@ -72,6 +72,11 @@ export function createPostgresStore(inputSql: Sql, inTransaction = false): Agent
       const [row] = await sql<{ record_json: PlanOperationRecord }>`select record_json from public.agentic_plan_operations where owner_scope=${ownerScope} and idempotency_key=${key}`;
       return row?.record_json ?? null;
     },
+    async getCompletedPlanOperation(planId, revision) {
+      const [row] = await sql<{ record_json: PlanOperationRecord }>`select record_json from public.agentic_plan_operations
+        where plan_id=${planId}::uuid and status='complete' and record_json->>'revision'=${String(revision)} order by created_at desc limit 1`;
+      return row?.record_json ?? null;
+    },
     async getActivePlanOperation(planId) {
       const [row] = await sql<{ record_json: PlanOperationRecord }>`select record_json from public.agentic_plan_operations
         where plan_id=${planId}::uuid and status in ('queued','running','retryable') order by created_at,id limit 1`;

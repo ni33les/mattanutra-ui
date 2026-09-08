@@ -16,6 +16,8 @@ import {
   productIsDedicatedForTarget,
   variantPillBurden
 } from "@/lib/matcher/candidates";
+import { createMatchCursor, advanceMatchCursor, matchCursorIdentity, matchCursorAttempts, decodeMatchCursor, encodeMatchCursor, expandMatchCursor, type MatchCursor } from "@/lib/matcher/match-cursor";
+import { DEFAULT_MATCHER_CONFIG } from "@/lib/matcher/config";
 import { COVERED_THRESHOLD } from "@/lib/matcher/config";
 import { displayCoveragePercent } from "@/lib/marketing-coverage";
 import { amountFromScaled, convertAmount } from "@/lib/matcher/dose";
@@ -41,6 +43,7 @@ import {
   catalogBandRuleId,
   catalogBandRulesVersion,
   matcherSafetyCeilings,
+  matcherSafetyReferenceIdentity,
   safetyCeilingFor
 } from "@/lib/matcher/safety-ceilings";
 import { agenticMessage, negotiateLocale } from "@/lib/agentic/i18n";
@@ -122,11 +125,8 @@ function matchPlanCacheKey(
   hash.update("\0");
   hash.update(state.locale);
   hash.update("\0");
-  for (const ceiling of matcherSafetyCeilings()) {
-    hash.update(
-      `${ceiling.subjectId}:${ceiling.maxAmount}:${ceiling.maxUnit}:${ceiling.lifeStage ?? ""}:${ceiling.bandId ?? ""}\n`
-    );
-  }
+  hash.update(JSON.stringify(matcherSafetyCeilings()));
+  hash.update(matcherSafetyReferenceIdentity()?.fingerprint ?? "unknown-reference-identity");
   return hash.digest("hex");
 }
 
@@ -1166,6 +1166,7 @@ export function matchPlan(input: Readonly<{
 function computeMatchPlan(input: Readonly<{
   snapshot: CatalogueSnapshot;
   state: CanonicalPlanState;
+  completedCursor?: MatchCursor;
 }>): ReturnType<typeof matchPlan> {
   const request = toCanonicalRequest(input.state);
 
@@ -1184,7 +1185,7 @@ function computeMatchPlan(input: Readonly<{
     availabilityAsOf: snapshot.availabilityAsOf,
     catalogueVersion: snapshot.catalogueVersion,
     products: matcherProductsFor(input.snapshot)
-  });
+  }, DEFAULT_MATCHER_CONFIG, undefined, undefined, input.completedCursor);
   const withSafety = (option: StackOption): StackOption => ({
     ...option,
     safety: optionSafety({
@@ -1283,4 +1284,46 @@ export function unmetRequirementsFor(input: Readonly<{
   }
 
   return unmet;
+}
+
+export type PlanSearchCheckpoint = Readonly<{
+  version: "plan-search-1"; inputIdentity: string; cursor: string;
+  expansionAttempts: number; expansionBudget: number;
+}>;
+export type PlanMatchChunk = Readonly<{
+  done: boolean; checkpoint: PlanSearchCheckpoint; expansionAttempts: number;
+  result?: ReturnType<typeof matchPlan>;
+}>;
+/** Worker-sized increments use the identical search and projection as synchronous
+ * consumers. The checkpoint is an internal operation fact, never a public job. */
+export function matchPlanChunk(input: Parameters<typeof matchPlan>[0], options: {
+  checkpoint?: PlanSearchCheckpoint; chunkBudget: number; lostAttempts?: number;
+}): PlanMatchChunk {
+  const request = toCanonicalRequest(input.state);
+  if ("error" in request) throw new Error(request.error);
+  const catalog = { availabilityAsOf: input.snapshot.availabilityAsOf, catalogueVersion: input.snapshot.catalogueVersion, products: matcherProductsFor(input.snapshot) };
+  const inputIdentity = planCheckpointInputIdentity(input);
+  if (options.checkpoint && options.checkpoint.inputIdentity !== inputIdentity) throw new Error("Plan checkpoint input identity changed");
+  const cursor = options.checkpoint
+    ? decodeMatchCursor(options.checkpoint.cursor, matchCursorIdentity(request, catalog, DEFAULT_MATCHER_CONFIG))
+    : createMatchCursor(request, catalog, DEFAULT_MATCHER_CONFIG);
+  if (input.state.searchEffort === "expanded" && cursor.effort !== "expanded") expandMatchCursor(cursor);
+  // A crashed chunk may have consumed every reserved attempt. Charge that work
+  // conservatively before any replay; completed archive entries remain intact.
+  let lost = options.lostAttempts ?? 0;
+  for (const seller of cursor.sellers) {
+    const used = Math.min(lost, seller.cursor.expansionBudget - seller.cursor.expansionAttempts);
+    seller.cursor.expansionAttempts += used; lost -= used;
+    if (seller.cursor.expansionAttempts >= seller.cursor.expansionBudget) { seller.cursor.done = true; seller.cursor.trimmed = true; }
+  }
+  if (lost > 0) throw new Error("Lost work exceeds the operation search budget");
+  advanceMatchCursor(cursor, request, options.chunkBudget);
+  const expansionAttempts = matchCursorAttempts(cursor);
+  const checkpoint: PlanSearchCheckpoint = { version: "plan-search-1", inputIdentity, cursor: encodeMatchCursor(cursor), expansionAttempts, expansionBudget: cursor.expansionBudget };
+  return { done: cursor.done, checkpoint, expansionAttempts,
+    ...(cursor.done ? { result: computeMatchPlan({ ...input, completedCursor: cursor }) } : {}) };
+}
+
+export function planCheckpointInputIdentity(input: Parameters<typeof matchPlan>[0]) {
+  return matchPlanCacheKey({ ...input.state, searchEffort: "standard" }, input.snapshot);
 }

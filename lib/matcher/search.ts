@@ -127,7 +127,7 @@ function skipGroup(state: SearchState): SearchState {
   return { ...state, nextGroupIndex: state.nextGroupIndex + 1 };
 }
 
-function compareStates(a: SearchState, b: SearchState, request: CanonicalRequest) {
+export function compareSearchStates(a: SearchState, b: SearchState, request: CanonicalRequest) {
   const fit = compareDoseFit(doseFitScore(request, a.exposure), doseFitScore(request, b.exposure));
   if (fit !== 0) return fit;
   // Explore the same bounded frontier for every commercial objective. Otherwise
@@ -147,7 +147,7 @@ export function searchGroups(groups: readonly ProductGroup[], request: Canonical
   // compilations remain immutable across customers and request revisions.
   groups = groups.map(group => ({ ...group, variants: [...group.variants] }));
   const baselineVariants = new Map(groups.map(group => [group.productId, [...group.variants]]));
-  const order = strategy?.compare ?? ((a: SearchState, b: SearchState) => compareStates(a, b, request));
+  const order = strategy?.compare ?? ((a: SearchState, b: SearchState) => compareSearchStates(a, b, request));
   const variantsForState = (group: ProductGroup, state: SearchState, phaseLimit = limit): readonly DoseVariant[] => {
     const initial = baselineVariants.get(group.productId)!;
     if (request.productDoses?.some(row => row.productId === group.productId) || !initial.length) return initial;
@@ -337,7 +337,7 @@ function* removalSets(ids: readonly string[]): Generator<readonly string[]> {
   }
 }
 
-function residualPattern(state: SearchState, request: CanonicalRequest) {
+export function residualPattern(state: SearchState, request: CanonicalRequest) {
   return request.targets.map(target => {
     const delivered = state.delivered.get(target.subjectId) ?? BigInt(0);
     if (target.requested.units <= 0) return "0";
@@ -396,7 +396,7 @@ export function revalidateState(
 /** Full safety and conversational rendering runs on diverse bounded extrema,
  * not thousands of losing search states. This changes computational effort,
  * never the permitted number of products or quantities in a basket. */
-function reviewFrontier(states: readonly SearchState[], request: CanonicalRequest, incumbents: readonly SearchState[], order = (a: SearchState, b: SearchState) => compareStates(a, b, request)) {
+export function reviewFrontier(states: readonly SearchState[], request: CanonicalRequest, incumbents: readonly SearchState[], order = (a: SearchState, b: SearchState) => compareSearchStates(a, b, request)) {
   if (states.length <= 192) return [...states];
   const fitOrder = [...states].sort((a, b) => order(a, b));
   const chosen = new Set<SearchState>([...incumbents, ...fitOrder.slice(0, 64)]);

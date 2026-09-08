@@ -61,6 +61,9 @@ export function createMemoryStore(): AgenticStore {
     async getPlanOperationByKey(ownerScope, key) {
       return clone([...operations.values()].find(row => row.ownerScope === ownerScope && row.key === key) ?? null);
     },
+    async getCompletedPlanOperation(planId, revision) {
+      return clone([...operations.values()].find(row => row.planId === planId && row.revision === revision && row.status === "complete") ?? null);
+    },
     async getActivePlanOperation(planId) {
       return clone([...operations.values()].filter(row => row.planId === planId && ["queued", "running", "retryable"].includes(row.status))
         .sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id))[0] ?? null);

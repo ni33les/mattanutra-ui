@@ -52,7 +52,7 @@ import {
 import { evaluateSafety, planStatus, safetyQuestions } from "@/lib/agentic/plan/safety";
 import { persistMatcherTelemetry } from "@/lib/agentic/plan/telemetry";
 import { publicPlanFields } from "@/lib/agentic/public-mapper";
-import { matchPlanInWorker, MatcherUnavailableError } from "@/lib/agentic/plan/match-worker-pool";
+import { matchPlanInWorker, matchPlanChunkInWorker, MatcherUnavailableError } from "@/lib/agentic/plan/match-worker-pool";
 import { issueEvidenceCapability } from "@/lib/agentic/evidence/tool";
 import { planCompactApplicable } from "@/lib/agentic/contract/plan-result";
 import { planClaimIds, planResearchVersion } from "@/lib/agentic/value/compact-decision";
@@ -130,6 +130,7 @@ export function resetPlanCreateInflightForTests() {
 
 type PlanAttempt = Readonly<{
   operation?: PlanOperationRecord;
+  operationStore?: AgenticStore;
   correlationId: string;
   signal?: AbortSignal;
   releases: Set<() => void>;
@@ -498,6 +499,37 @@ function targetNameGroups(
   return { groups, unsupported };
 }
 
+type DurableSearchCheckpoint = {
+  stage: "normalized" | "search"; state: CanonicalPlanState; catalogueId: string;
+  search?: import("@/lib/agentic/plan/matching").PlanSearchCheckpoint;
+  reservedAttempts?: number;
+};
+async function durableMatch(input: { snapshot: CatalogueSnapshot; state: CanonicalPlanState }) {
+  const attempt = planAttempts.getStore();
+  if (!attempt?.operation || !attempt.operationStore) return matchPlanInWorker(input);
+  const store = attempt.operationStore, claim = attempt.operation;
+  const current = await store.getPlanOperation(claim.id);
+  let checkpoint = current?.checkpoint as DurableSearchCheckpoint | null;
+  if (!checkpoint) throw new Error("Missing normalized operation checkpoint");
+  let lostAttempts = checkpoint.reservedAttempts ?? 0;
+  while (true) {
+    const remaining = (input.state.searchEffort === "expanded" ? 64_000 : checkpoint.search?.expansionBudget ?? 8_000)
+      - (checkpoint.search?.expansionAttempts ?? 0) - lostAttempts;
+    const chunkBudget = Math.min(4_000, Math.max(0, remaining));
+    const reserved = { ...checkpoint, stage: "search" as const, reservedAttempts: chunkBudget + lostAttempts };
+    if (!await updateClaimedOperation(store, claim, { checkpoint: reserved }, new Date().toISOString())) throw new Error("Matching operation lease lost");
+    const reply = await matchPlanChunkInWorker(input, { checkpoint: checkpoint.search, chunkBudget: Math.max(1, chunkBudget), lostAttempts });
+    checkpoint = { ...checkpoint, stage: "search", search: reply.checkpoint, reservedAttempts: 0 };
+    if (!await updateClaimedOperation(store, claim, { checkpoint }, new Date().toISOString())) throw new Error("Matching operation lease lost");
+    lostAttempts = 0;
+    console.info("[agentic-plan-checkpoint]", { operationId: claim.id, attempts: reply.expansionAttempts, budget: reply.checkpoint.expansionBudget, checkpointBytes: reply.checkpoint.cursor.length, complete: reply.done });
+    if (reply.done) {
+      if (!reply.result) throw new Error("Completed matcher chunk has no result");
+      return reply.result;
+    }
+  }
+}
+
 async function buildResult(input: Readonly<{
   catalogueMs?: number;
   locale: Locale;
@@ -525,7 +557,7 @@ async function buildResult(input: Readonly<{
       }
     : process.env.NODE_TEST_CONTEXT && process.env.AX_REFINEMENT_REAL_WORKERS !== "1"
       ? matchPlan({ snapshot: input.snapshot, state: input.state })
-      : await matchPlanInWorker({ snapshot: input.snapshot, state: input.state });
+      : await durableMatch({ snapshot: input.snapshot, state: input.state });
   const searchMs = Math.max(0, Date.now() - searchStartedAt);
   const matchMs =
     input.matchStartedAt != null ? Math.max(0, Date.now() - input.matchStartedAt) : searchMs;
@@ -957,7 +989,7 @@ export async function runAdmittedPlanOperation(input: Readonly<{
   if (!claim) return operationProcessingResponse(operation);
   const controller = new AbortController();
   const signal = input.signal ? AbortSignal.any([input.signal, controller.signal]) : controller.signal;
-  const attempt: PlanAttempt = { correlationId: `plan-operation:${claim.id}`, signal, releases: new Set(), operation: claim };
+  const attempt: PlanAttempt = { correlationId: `plan-operation:${claim.id}`, signal, releases: new Set(), operation: claim, operationStore: input.store };
   const prepared = claim.command.prepared as PreparedPlanCommand;
   const work = withRequestLifetime({ signal, correlationId: attempt.correlationId }, () => planAttempts.run(attempt, async () => {
     try {
@@ -1249,6 +1281,11 @@ async function executePlanTool(input: Readonly<{
         });
       }
 
+      if (!input.matchPort && payload.operation !== "get") {
+        const pending = await store.getActivePlanOperation(plan.id);
+        if (pending) return businessError({ reasonCode: "stale_revision", currentRevision: plan.currentRevision,
+          nextActions: ["reload_plan"], message: "A refinement is still pending. Poll this plan before submitting another change." });
+      }
       const current = await store.getPlanRevision(plan.id, plan.currentRevision);
 
       if (!current) {
@@ -1839,9 +1876,20 @@ async function completePreparedPlan(
   const activeOperation = planAttempts.getStore()?.operation;
   if (activeOperation) {
     const { matcherSafetyReferenceIdentity } = await import("@/lib/matcher/safety-ceilings");
+    let checkpoint = activeOperation.checkpoint as DurableSearchCheckpoint | null;
+    if (!checkpoint && state.searchEffort === "expanded" && activeOperation.expectedRevision > 0) {
+      const predecessor = await input.store.getCompletedPlanOperation(activeOperation.planId, activeOperation.expectedRevision);
+      const candidate = predecessor?.checkpoint as DurableSearchCheckpoint | null;
+      const { planCheckpointInputIdentity } = await import("@/lib/agentic/plan/matching");
+      if (candidate?.search?.inputIdentity === planCheckpointInputIdentity({ snapshot, state })) checkpoint = candidate;
+    }
+    if (checkpoint && (checkpoint.catalogueId !== catalogueSnapshotId(snapshot) ||
+      activeOperation.referenceIdentity && activeOperation.referenceIdentity !== matcherSafetyReferenceIdentity()?.fingerprint)) {
+      return businessError({ reasonCode: "stale_revision", message: "Catalogue or reference inputs changed during matching. Reload the plan." });
+    }
     const saved = await updateClaimedOperation(input.store, activeOperation, {
       catalogueIdentity: catalogueSnapshotId(snapshot), referenceIdentity: matcherSafetyReferenceIdentity()?.fingerprint ?? null,
-      checkpoint: { stage: "normalized", state, catalogueId: catalogueSnapshotId(snapshot) }
+      checkpoint: checkpoint ?? { stage: "normalized", state, catalogueId: catalogueSnapshotId(snapshot) }
     }, new Date().toISOString());
     if (!saved) return businessError({ reasonCode: "stale_revision", message: "This matching operation was cancelled or superseded. Reload the plan." });
   }
@@ -1885,8 +1933,11 @@ async function completePreparedPlan(
   } catch (error) {
     if (error instanceof MatcherUnavailableError) {
       return businessError({
-        message: "Matching is temporarily busy. Retry with the same idempotency key.",
-        reasonCode: "temporarily_unavailable", retryable: true
+        message: error.reason === "checkpoint_mismatch" ? "Matching inputs changed. Reload the plan before refining it."
+          : error.reason === "capacity" ? "Matching capacity is temporarily occupied. Retry with the same idempotency key."
+          : error.reason === "timeout" ? "The matching worker timed out. Retry with the same idempotency key to resume."
+          : "The matching worker failed. Retry with the same idempotency key to resume.",
+        reasonCode: error.reason === "checkpoint_mismatch" ? "stale_revision" : "temporarily_unavailable", retryable: error.reason !== "checkpoint_mismatch"
       });
     }
     throw error;
