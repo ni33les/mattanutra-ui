@@ -337,6 +337,18 @@
       "slice": "release",
       "reason": "Maintains current v7 identity checks on the unchanged ordinary full-verification deployment path; only its proof unit tests run.",
       "database": false
+    },
+    {
+      "file": "test/agentic-flexible-v5-contract.test.ts",
+      "slice": "consumers",
+      "reason": "Changed contract-version assertions and unchanged quantity/effort inputs directly verify the v7 published compatibility boundary.",
+      "database": false
+    },
+    {
+      "file": "test/matcher/phase2.test.ts",
+      "slice": "consumers",
+      "reason": "Changed explicit algae source assertions and existing ontology/oversupply selections directly consume the shared matcher and alias behaviour.",
+      "database": false
     }
   ]
 }

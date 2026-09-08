@@ -2,6 +2,7 @@
 /** Scoped DEV gate. Importing this module never starts tests. */
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
+import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { isAbsolute, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -14,12 +15,13 @@ const FAMILIES = { REL: 5, ALT: 3, DATA: 3, NOP: 2, ADV: 3, TERM: 2, SPEC: 2, RE
 export const REQUIRED_AX_IDS = Object.entries(FAMILIES).flatMap(([family, count]) => Array.from({ length: count }, (_, i) => `AXR-${family}-${String(i + 1).padStart(2, "0")}`));
 const hash = value => createHash("sha256").update(value).digest("hex");
 
-export function validateImpact(impact) {
+export function validateImpact(impact, changedTests = []) {
   assert.equal(impact.version, "ax-refinement-impact-1");
   assert.equal(impact.scope, "dev_ax_refinement_and_direct_consumers");
   assert.equal(impact.fullSuite, "deferred_by_explicit_user_scope");
   assert.deepEqual(impact.requirements.map(row => row.id).sort(), [...REQUIRED_AX_IDS].sort(), "The requirement inventory changed");
   const files = impact.files.map(row => row.file);
+  for (const file of changedTests) assert.ok(files.includes(file), `Changed test missing from scoped inventory: ${file}`);
   assert.equal(new Set(files).size, files.length, "Duplicate test files");
   for (const row of impact.files) {
     assert.match(row.file, /^test\/[\w./-]+\.test\.ts$/);
@@ -50,7 +52,10 @@ export async function main(args = process.argv.slice(2)) {
     else if (args[i] === "--list") list = true;
     else throw new Error(`Unknown argument: ${args[i]}`);
   }
-  const impact = validateImpact(JSON.parse(readFileSync(resolve(ROOT, "test/ax-refinement/impact.json"), "utf8")));
+  // The offline experiment is retained as the control, not re-executed here.
+  const changedTests = execFileSync("git", ["diff", "--name-only", "--diff-filter=ACMR", "6baeab0e175109411585f833cbd34c12f4ca0775", "--", "test"], { cwd: ROOT, encoding: "utf8" })
+    .trim().split("\n").filter(file => file.endsWith(".test.ts"));
+  const impact = validateImpact(JSON.parse(readFileSync(resolve(ROOT, "test/ax-refinement/impact.json"), "utf8")), changedTests);
   if (list) { console.log(JSON.stringify(impact, null, 2)); return impact; }
   const selected = impact.files.filter(row => !slice || row.slice === slice);
   assert.ok(selected.length, `No tests declared for ${slice}`);
