@@ -20,6 +20,7 @@ import {
 } from "../lib/agentic/mcp/dispatcher.ts";
 import { AGENTIC_CONTRACT_VERSION } from "../lib/agentic/config.ts";
 import { createAgenticRuntime } from "../lib/agentic/runtime.ts";
+import { publicContractBundle } from "../lib/agentic/contract/guide.ts";
 
 function rpcResult(response: JsonRpcResponse | null) {
   assert.ok(response);
@@ -28,17 +29,17 @@ function rpcResult(response: JsonRpcResponse | null) {
 }
 
 describe(`agentic MCP contract ${AGENTIC_CONTRACT_VERSION}`, () => {
-  it("exposes the public tools including evidence", () => {
+  it("exposes the installed-connector public tools", () => {
     assert.deepEqual([...AGENTIC_PUBLIC_TOOLS], [
       "info",
       "plan",
       "execute",
       "order",
       "support",
-      "feedback",
-      "evidence"
+      "feedback"
     ]);
     assert.equal(Object.keys(AGENTIC_TOOL_SCHEMAS).length, 7);
+    assert.ok(Object.hasOwn(AGENTIC_TOOL_SCHEMAS, "evidence"), "legacy evidence schema remains available internally");
     assert.equal(JSON.stringify(AGENTIC_TOOL_SCHEMAS).includes("sexAtBirth"), false);
     assert.equal(JSON.stringify(AGENTIC_TOOL_SCHEMAS).includes("intersex"), false);
     assert.equal(JSON.stringify(AGENTIC_TOOL_SCHEMAS.plan).includes("unspecified"), false);
@@ -70,6 +71,10 @@ describe(`agentic MCP contract ${AGENTIC_CONTRACT_VERSION}`, () => {
       snapshot.tools.map((tool) => tool.name),
       [...AGENTIC_PUBLIC_TOOLS]
     );
+    assert.deepEqual(Object.keys(publicContractBundle().tools), [...AGENTIC_PUBLIC_TOOLS]);
+
+    assert.equal(JSON.stringify(snapshot).includes("Use only the seven short tool names"), false);
+    assert.equal(JSON.stringify(snapshot).includes("Use only the six short tool names"), true);
 
     for (const tool of snapshot.tools) {
       assert.deepEqual(tool.outputSchema, JSON.parse(JSON.stringify(AGENTIC_OUTPUT_SCHEMAS[tool.name as keyof typeof AGENTIC_OUTPUT_SCHEMAS])));
@@ -140,6 +145,7 @@ describe(`agentic MCP contract ${AGENTIC_CONTRACT_VERSION}`, () => {
       (item) => item.name
     );
     assert.deepEqual(names, [...AGENTIC_PUBLIC_TOOLS]);
+    assert.equal(names.includes("evidence"), false);
     assert.equal((result.serverInfo as { name: string }).name, "mattanutra_uat");
   });
 

@@ -8,13 +8,14 @@ import { AGENTIC_PUBLIC_TOOLS, AGENTIC_OUTPUT_SCHEMAS, AGENTIC_TOOL_SCHEMAS } fr
 import { CLIENT_GUIDE_URI, CONTRACT_SCHEMA_URI, readContractResource, CLIENT_EXAMPLES } from "../../lib/agentic/contract/guide.ts";
 import { runtime, rpc } from "./helpers.ts";
 
-test("AXR-SPEC-01 contract 7 preserves seven tools, five operation inputs and historical v4–v6 resources", () => {
+test("AXR-SPEC-01 contract 7 preserves the installed public tools, five operation inputs and historical v4–v6 resources", () => {
   assert.equal(AGENTIC_CONTRACT_VERSION, "7.0.0");
   assert.equal(GUIDANCE_RULES_VERSION, "6.0.0", "Clinical reference rules were not changed by this package");
   const old = JSON.parse(readFileSync(new URL("../../contract/mcp/6.0.0/tools.json", import.meta.url), "utf8"));
-  assert.deepEqual([...AGENTIC_PUBLIC_TOOLS], old.tools.map((row: { name: string }) => row.name));
-  assert.equal(AGENTIC_PUBLIC_TOOLS.length, 7);
+  assert.deepEqual([...AGENTIC_PUBLIC_TOOLS], ["info", "plan", "execute", "order", "support", "feedback"]);
+  assert.equal(AGENTIC_PUBLIC_TOOLS.length, 6);
   for (const tool of AGENTIC_PUBLIC_TOOLS) assert.deepEqual(JSON.parse(JSON.stringify(AGENTIC_TOOL_SCHEMAS[tool])), old.tools.find((row: { name: string }) => row.name === tool).inputSchema);
+  assert.ok(Object.hasOwn(AGENTIC_TOOL_SCHEMAS, "evidence"), "legacy evidence schema remains available internally");
   for (const version of ["4.0.0", "5.0.0", "6.0.0"]) for (const suffix of ["client-guide", "schema"]) {
     const resource = readContractResource(`mattanutra://contract/${version}/${suffix}`);
     assert.ok(resource, `${version}/${suffix} remains accessible`);

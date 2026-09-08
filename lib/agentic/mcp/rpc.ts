@@ -108,7 +108,7 @@ export function toolList(environment: AgenticEnvironment = "dev", locale?: strin
     description: descriptions[name],
     ...AGENTIC_CONTRACT_REGISTRY[name],
     annotations: {
-      readOnlyHint: ["info", "order", "evidence"].includes(name),
+      readOnlyHint: ["info", "order"].includes(name),
       destructiveHint: false,
       idempotentHint: true,
       openWorldHint: true

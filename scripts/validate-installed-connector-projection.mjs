@@ -8,7 +8,7 @@ export function validateInstalledConnectorProjection(evidence, published) {
       !["dev", "uat"].includes(evidence.environment)) failures.push("installed_projection_evidence_required");
   const observed = evidence?.tools;
   const expected = published?.tools;
-  if (!Array.isArray(observed) || !Array.isArray(expected) || expected.length !== 7) {
+  if (!Array.isArray(observed) || !Array.isArray(expected) || expected.length !== 6) {
     failures.push("complete_tool_inventory_required");
     return { passed: false, failures };
   }

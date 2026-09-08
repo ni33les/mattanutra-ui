@@ -251,7 +251,7 @@ describe("Slice A discovery", () => {
     assert.equal(a.valuePropositionId, b.valuePropositionId);
   });
 
-  it("A-CONTRACT-03 advertised discovery includes evidence and bans welness", async () => {
+  it("A-CONTRACT-03 advertised discovery matches installed public tools and bans welness", async () => {
     const runtime = createDetRuntime();
     const listed = await runTwice(async () => detListTools(runtime, "en"));
     assert.deepEqual(
@@ -270,9 +270,9 @@ describe("Slice A discovery", () => {
       params: { protocolVersion: "2025-03-26" }
     });
     const instructions = String(init?.result?.instructions ?? "");
-    assert.match(instructions, /evidence/);
     assert.doesNotMatch(instructions, /welness/i);
-    assert.match(instructions, /info, plan, execute, order, support, feedback, evidence/);
+    assert.match(instructions, /info, plan, execute, order, support, feedback/);
+    assert.doesNotMatch(instructions, /info, plan, execute, order, support, feedback, evidence/);
   });
 });
 
@@ -336,7 +336,7 @@ describe("Slice B compact decision and evidence", () => {
     }
   });
 
-  it("B-INTEGRATION-01 evidence does not change plan revision", async () => {
+  it("B-INTEGRATION-01 evidence handles remain plan data and are not callable public tools", async () => {
     const runtime = createDetRuntime();
     const plan = await planTool({
       config: runtime.config,
@@ -350,11 +350,14 @@ describe("Slice B compact decision and evidence", () => {
     });
     const handle = (plan as { evidenceHandle?: string }).evidenceHandle;
     const revision = (plan as { revision: number }).revision;
-    assert.ok(handle, "revision stability coverage requires an evidence handle");
-    const evidence = await detCall(runtime, "evidence", {
-      evidenceHandle: handle,
-      mode: "summary"
+    assert.ok(handle, "plan responses still expose evidence handles for embedded supporting fields");
+    const response = await handleJsonRpc(runtime, {
+      id: 1,
+      jsonrpc: "2.0",
+      method: "tools/call",
+      params: { name: "evidence", arguments: { evidenceHandle: handle, mode: "summary" } }
     });
+    assert.equal(response?.error?.code, -32601);
     const again = await planTool({
       config: runtime.config,
       now: DET_V3_CLOCK,
@@ -362,13 +365,7 @@ describe("Slice B compact decision and evidence", () => {
       scope: runtime.scope,
       store: runtime.store
     });
-    assert.equal(evidence.ok, true);
     assert.equal((again as { revision: number }).revision, revision);
-    const claims = (evidence.claims as Array<{ reviewDate?: string; source?: string }>) ?? [];
-    if (claims.length > 0) {
-      assert.ok(claims[0]?.source);
-      assert.ok(claims[0]?.reviewDate);
-    }
   });
 
   it("B-CONTRACT-01 compact decision is required only where applicable", () => {
@@ -494,7 +491,7 @@ describe("Slice B compact decision and evidence", () => {
     assert.ok(issues.some((item) => item.reasonCode === "unexpected_property"));
   });
 
-  it("B-SECURITY-01 cross-namespace evidence handle does not leak claims", async () => {
+  it("B-SECURITY-01 evidence is not exposed through a callable public tool", async () => {
     const alice = createDetRuntime({ principal: "alice" });
     const plan = await planTool({
       config: alice.config,
@@ -507,10 +504,7 @@ describe("Slice B compact decision and evidence", () => {
       store: alice.store
     });
     const handle = (plan as { evidenceHandle?: string }).evidenceHandle;
-    if (!handle) {
-      assert.ok(true);
-      return;
-    }
+    assert.ok(handle);
     const bob = createAgenticRuntime({
       config: alice.config,
       now: DET_V3_CLOCK,
@@ -522,13 +516,14 @@ describe("Slice B compact decision and evidence", () => {
       },
       store: alice.store
     });
-    const stolen = await detCall(bob, "evidence", {
-      evidenceHandle: handle,
-      mode: "summary"
+    const stolen = await handleJsonRpc(bob, {
+      id: 1,
+      jsonrpc: "2.0",
+      method: "tools/call",
+      params: { name: "evidence", arguments: { evidenceHandle: handle, mode: "summary" } }
     });
-    const blob = canonicalJson(stolen);
-    assert.equal(stolen.ok, false);
-    assert.equal(/Magnesium contributes|NIH ODS/i.test(blob), false);
+    assert.equal(stolen?.error?.code, -32601);
+    assert.equal(/Magnesium contributes|NIH ODS/i.test(canonicalJson(stolen)), false);
   });
 });
 
@@ -1621,8 +1616,11 @@ describe("Slice G responsibility and trust", () => {
       operation: "get",
       planHandle: "cap_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
     });
-    const evidence = await detCall(runtime, "evidence", {
-      evidenceHandle: "cap_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    const unknownTool = await handleJsonRpc(runtime, {
+      id: 1,
+      jsonrpc: "2.0",
+      method: "tools/call",
+      params: { name: "evidence", arguments: { evidenceHandle: "cap_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" } }
     });
     const feedback = await detCall(runtime, "feedback", {
       consentConfirmed: false,
@@ -1641,7 +1639,8 @@ describe("Slice G responsibility and trust", () => {
       scope: runtime.scope,
       store: runtime.store
     });
-    const cases = [missing, evidence, feedback, unexpected, executeMissing as Record<string, unknown>];
+    const cases = [missing, feedback, unexpected, executeMissing as Record<string, unknown>];
+    assert.equal(unknownTool?.error?.code, -32601);
     for (const item of cases) {
       assert.equal(publicErrorSafe(item), true, canonicalJson(item));
     }
@@ -1758,7 +1757,7 @@ describe("Slice G responsibility and trust", () => {
     assert.equal(canonicalJson(accepted), canonicalJson(replay));
   });
 
-  it("G-ISOLATION-01 wrong-purpose evidence handle is rejected", async () => {
+  it("G-ISOLATION-01 plan handles are not accepted by hidden evidence routes", async () => {
     const runtime = createDetRuntime();
     const plan = await planTool({
       config: runtime.config,
@@ -1770,14 +1769,12 @@ describe("Slice G responsibility and trust", () => {
       scope: runtime.scope,
       store: runtime.store
     });
-    const stolen = await detCall(runtime, "evidence", {
-      evidenceHandle: (plan as { planHandle: string }).planHandle
+    const response = await handleJsonRpc(runtime, {
+      id: 1,
+      jsonrpc: "2.0",
+      method: "tools/call",
+      params: { name: "evidence", arguments: { evidenceHandle: (plan as { planHandle: string }).planHandle } }
     });
-    assert.equal(stolen.ok, false);
-    assert.ok(
-      stolen.error &&
-        ((stolen.error as { reasonCode?: string }).reasonCode === "wrong_purpose" ||
-          (stolen.error as { reasonCode?: string }).reasonCode === "not_found")
-    );
+    assert.equal(response?.error?.code, -32601);
   });
 });

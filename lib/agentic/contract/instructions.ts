@@ -82,8 +82,7 @@ export const AGENTIC_PUBLIC_TOOLS = [
   "execute",
   "order",
   "support",
-  "feedback",
-  "evidence"
+  "feedback"
 ] as const;
 
 export type AgenticPublicToolName = (typeof AGENTIC_PUBLIC_TOOLS)[number];

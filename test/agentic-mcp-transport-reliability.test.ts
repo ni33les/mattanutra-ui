@@ -30,7 +30,7 @@ describe("MCP client and HTTP contract", () => {
     }
     for (const tool of toolList()) {
       assert.ok(tool.outputSchema.anyOf.every(branch => branch.required.includes("ok")));
-      assert.equal(tool.annotations.readOnlyHint, ["info", "order", "evidence"].includes(tool.name));
+      assert.equal(tool.annotations.readOnlyHint, ["info", "order"].includes(tool.name));
     }
   });
 
