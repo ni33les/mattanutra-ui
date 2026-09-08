@@ -19,7 +19,7 @@ test("PAY-POLL-01 unchanged reads are small, ownership fenced and failure/cancel
   const first = await rpc(app, "plan", args); assert.equal(first.ok, true); assert.equal(first.responseView, "status");
   const same = await rpc(app, "plan", { ...args, knownResultVersion: first.resultVersion });
   assert.equal(same.unchanged, true); assert.ok(!("options" in same));
-  assert.ok(bytes(toolResult(same)) < 4096); assert.ok(bytes(toolResult(same)) < bytes(toolResult(created)) * .1);
+  assert.ok(bytes(toolResult(same)) < 2000); assert.ok(bytes(toolResult(same)) < bytes(toolResult(created)));
   const stranger = runtime("other-owner", app.store);
   assert.equal((await rpc(stranger, "plan", { ...args, knownResultVersion: first.resultVersion })).ok, false);
   const admitted = await admitPlanOperation(app.store, { planId: operation.planId, ownerScope, key: "payload-pending-revision-02", payload: { operation: "revise", requestPatch: {} }, expectedRevision: 1, revision: 2, prepared: operation.command.prepared, scope: app.scope, now: app.now! });

@@ -1,0 +1,89 @@
+{
+  "scope": "mcp_conversation_payload",
+  "releaseBase": "1c169407ba0f3fed3a19871afa87ce0bdeecf949",
+  "testPolicy": "Only changed conversation/status/formatting and directly affected clients. No full suite, expanded search, host-cache work, catalogue corrections or scoring changes. No skips, retries or cancelled tests.",
+  "files": [
+    {
+      "file": "test/mcp-conversation-pack/status.test.ts",
+      "expectedCases": 2,
+      "reason": "C3 shared operational next actions with no-purchase and processing states"
+    },
+    {
+      "file": "test/mcp-conversation-pack/cards.test.ts",
+      "expectedCases": 3,
+      "reason": "C1/C2/C5 exact cards and flags while preserving full advice, quantities, money and coverage"
+    },
+    {
+      "file": "test/mcp-conversation-pack/amount.test.ts",
+      "expectedCases": 3,
+      "reason": "C4 real overlap generation, legacy copy and unit/target precision"
+    },
+    {
+      "file": "test/mcp-conversation-pack/deployment.test.ts",
+      "expectedCases": 1,
+      "reason": "DEV-only work-package attestation rejects incorrect or altered evidence"
+    },
+    {
+      "file": "test/agentic-operational-decision.test.ts",
+      "expectedCases": 12,
+      "reason": "Shared decision extraction preserves advice, no-purchase, replenishment and readiness"
+    },
+    {
+      "file": "test/agentic-phase2-named-safety.test.ts",
+      "expectedCases": 3,
+      "reason": "Display-only safety formatting preserves measured reference quantities and classifications"
+    },
+    {
+      "file": "test/mcp-7-2-1/advice.test.ts",
+      "expectedCases": 3,
+      "reason": "Retained case IDs now assert advice references plus original details and classifications"
+    },
+    {
+      "file": "test/mcp-7-2-2/advice.test.ts",
+      "expectedCases": 4,
+      "reason": "Foreground advice references, single unknown notice, measured severity and display formatting"
+    },
+    {
+      "file": "test/mcp-7-2-3/advice.test.ts",
+      "expectedCases": 4,
+      "reason": "Distinct grouped findings remain retrievable without inline bodies or float artifacts"
+    },
+    {
+      "file": "test/mcp-payload/projection.test.ts",
+      "expectedCases": 4,
+      "reason": "Frozen projections, exact section retrieval, unknown values, identity and empty plans"
+    },
+    {
+      "file": "test/mcp-payload/status.test.ts",
+      "expectedCases": 1,
+      "reason": "Pending/failing/cancelled operation reads and ownership remain correct after C3"
+    },
+    {
+      "file": "test/mcp-agent-surface/views.test.ts",
+      "expectedCases": 9,
+      "reason": "Directly affected default-view consumers use cards and retrieve products/coverage for decisions"
+    },
+    {
+      "file": "test/mcp-payload/narrative.test.ts",
+      "expectedCases": 4,
+      "reason": "Generated guide and locale clients continue selection with card identities and details"
+    },
+    {
+      "file": "test/mcp-agent-surface/contracts.test.ts",
+      "expectedCases": 3,
+      "reason": "Generated contract fields, instructions and publication identity remain aligned at 7.2.4"
+    },
+    {
+      "file": "test/mcp-7-2-2/transport.test.ts",
+      "expectedCases": 2,
+      "reason": "Projected conversation retains compact text and bounded status transport"
+    }
+  ],
+  "inputs": [
+    "test/mcp-conversation-pack/d3-fixture.json",
+    "test/fixtures/mcp-payload/baseline.json.gz",
+    "test/fixtures/mcp-payload/manifest.json",
+    "test/fixtures/ax-refinement/six-profiles.json",
+    "test/fixtures/ax-refinement/dev-corrections.json"
+  ]
+}

@@ -160,7 +160,9 @@
     "test:mcp:723": "node scripts/mcp-721.mjs test --package=723",
     "validate:dev:mcp:723": "node scripts/mcp-721.mjs validate --package=723",
     "test:mcp:722": "node scripts/mcp-721.mjs test --package=722",
-    "validate:dev:mcp:722": "node scripts/mcp-721.mjs validate --package=722"
+    "validate:dev:mcp:722": "node scripts/mcp-721.mjs validate --package=722",
+    "test:mcp:conversation-pack": "node scripts/mcp-721.mjs test --package=conversation",
+    "validate:dev:mcp:conversation-pack": "node scripts/mcp-721.mjs validate --package=conversation"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1045.0",
