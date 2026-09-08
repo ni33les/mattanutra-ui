@@ -10,20 +10,7 @@ jobs:
   affected:
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_USER: nobody
-          POSTGRES_DB: mattanutra_lock_review_ax_mcp722
-          POSTGRES_HOST_AUTH_METHOD: trust
-        ports: ["55439:5432"]
-        options: >-
-          --health-cmd "pg_isready -U nobody -d mattanutra_lock_review_ax_mcp722"
-          --health-interval 5s --health-timeout 5s --health-retries 10
     env:
-      TEST_DB_URL: postgresql://nobody@127.0.0.1:55439/mattanutra_lock_review_ax_mcp722
-      DB_URL: postgresql://nobody@127.0.0.1:55439/mattanutra_lock_review_ax_mcp722
       MATTANUTRA_ENV: dev
       NODE_ENV: test
     steps:
@@ -35,12 +22,10 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci --include=dev
-      - run: node test/mcp-7-2-2/prepare-postgres.mjs
-      - run: node --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/apply-agentic-commerce-schema.ts
-      - run: npm run test:mcp:722 -- --output "$RUNNER_TEMP/mcp-722-evidence"
+      - run: npm run test:mcp:723 -- --output "$RUNNER_TEMP/mcp-723-evidence"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: mcp-722-scoped-evidence
-          path: ${{ runner.temp }}/mcp-722-evidence
+          name: mcp-723-scoped-evidence
+          path: ${{ runner.temp }}/mcp-723-evidence
           if-no-files-found: error

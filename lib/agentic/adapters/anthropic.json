@@ -1,8 +1,8 @@
 {
-  "contractVersion": "7.2.2",
+  "contractVersion": "7.2.3",
   "description": "MattaNutra matches agreed nutrient targets to a finite product catalogue in Thailand (THB); incidental nutrients may leave gaps. Wellness guidance, not diagnosis or pharmacy services.\nFlow: info → agree name/amount/unit/basis → plan(create) → explain closest_dose, highlightedAlternativeOptionId and advice → revise/answer/select → confirm with the person → execute → poll order.\nPlan conversation is the default decision view. Poll with status; request details for doseFit, labels or economics.\nNumeric pill, price and product counts are preferences; diet, exclusions and physical quantities bind.\nUnknown diet stays unknown, never zero. Ready means checkout-ready, not complete coverage or medical approval.\nWhile processing, poll the existing handle; retry mutations with the same key and payload.\nCall info first for the service card, templates and operation schemas.\nTools: info, plan, execute, order, support, feedback, evidence. Use the exact tool names exposed by your host; it may wrap the native names.",
   "name": "MattaNutra",
-  "schemaChecksum": "35d4f8a164bf7a6cff62749281a800024f408ef4e4f2620a8e3e93b2814a408e",
+  "schemaChecksum": "0cd1c67b1a742f89e3c530b1ab89e352a2c11476da86e4b38a0f63abf8119129",
   "server_url": "/api/mcp",
   "tools": [
     "info",

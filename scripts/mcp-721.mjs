@@ -8,8 +8,9 @@ import { payloadHash, compiledBuildIdentity } from "./mcp-payload/proof.mjs";
 import { MCP_PACKAGES, mcp721Identity, checkMcp721Proof } from "./mcp-721-proof.mjs";
 
 const [mode, ...rawArgs] = process.argv.slice(2);
-const packageId = rawArgs[0] === "--package=722" ? "722" : "721";
-const args = packageId === "722" ? rawArgs.slice(1) : rawArgs;
+const packageId = rawArgs[0]?.startsWith("--package=") ? rawArgs[0].slice("--package=".length) : "721";
+assert.ok(MCP_PACKAGES[packageId], "Unknown work package");
+const args = rawArgs[0]?.startsWith("--package=") ? rawArgs.slice(1) : rawArgs;
 const definition = MCP_PACKAGES[packageId], MCP721_BASE = definition.base;
 assert.ok(["test", "validate"].includes(mode));
 const inventory = JSON.parse(readFileSync(`${definition.directory}/impact.json`, "utf8"));
