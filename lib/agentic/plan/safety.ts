@@ -1,3 +1,4 @@
+import { formatNutrientAmount } from "@/lib/agentic/presentation/amount";
 import { adviceKind } from "@/lib/agentic/value/advice-kind";
 import { nutrientNameMatchesTarget } from "@/lib/nutrient-identity";
 import { intakeCertaintyFor } from "@/lib/agentic/plan/intake-certainty";
@@ -167,7 +168,7 @@ function guidance(input: Readonly<{
           return "";
         }
         return item.amount != null && item.unit
-          ? `${name} ${item.amount} ${item.unit}`
+          ? `${name} ${formatNutrientAmount(item.amount, item.unit, input.requested)} ${item.unit}`
           : name;
       })
       .filter(Boolean)
@@ -195,12 +196,12 @@ function guidance(input: Readonly<{
     guidanceId,
     message: agenticMessage(input.locale, messageKey, {
       contributors: contributorLabel,
-      threshold: input.threshold ?? "unknown",
-      exposure: input.exposure ?? "unknown",
+      threshold: input.threshold == null ? "unknown" : formatNutrientAmount(input.threshold, input.unit, input.requested),
+      exposure: input.exposure == null ? "unknown" : formatNutrientAmount(input.exposure, input.unit, input.requested),
       nextAction,
       nutrientName: input.nutrientName ?? "",
-      overflow: input.overflow ?? 0,
-      remainingGap: input.remainingGap ?? 0,
+      overflow: formatNutrientAmount(input.overflow ?? 0, input.unit, input.requested),
+      remainingGap: formatNutrientAmount(input.remainingGap ?? 0, input.unit, input.requested),
       unit: input.unit ?? ""
     }),
     messageKey,

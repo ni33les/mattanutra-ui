@@ -1,3 +1,4 @@
+import { formatNutrientMessage } from "@/lib/agentic/presentation/amount";
 import { assessedSafetyCodes } from "@/lib/agentic/plan/safety";
 import { routineTradeoff } from "@/lib/agentic/value/routine-tradeoff";
 import { adviceKind } from "@/lib/agentic/value/advice-kind";
@@ -730,7 +731,7 @@ export function publicOption(
     ...(option.doseFit ? { doseFit: option.doseFit } : {}),
     coverage: option.coverage.map(row => publicCoverage(row, locale)),
     basket: option.basket.map(item => publicBasketItem(item, locale)),
-    ...(option.safety ? { advice: option.safety.guidance.map(item => publicSafetyGuidance(item)) } : {}),
+    ...(option.safety ? { advice: option.safety.guidance.map(item => publicSafetyGuidance(item, "not_required", option.coverage.find(row => row.supplementId === item.supplementIds[0])?.requestedAmount)) } : {}),
     optionId: option.optionId,
     reason: option.basket.length > 0 && counts.coveragePercent === 0
       ? (locale === "th" ? "ตัวเลือกนี้ไม่ครอบคลุมสารอาหารตามเป้าหมายที่ขอ" : locale === "zh-CN" ? "此选项未覆盖所请求的营养目标。" : "This option does not cover the requested targets.")
@@ -769,7 +770,8 @@ function publicContributor(item: CoverageContributor) {
 
 export function publicSafetyGuidance(
   row: SafetyGuidance,
-  acknowledgementStatus: "acknowledged" | "not_required" | "pending" = "not_required"
+  acknowledgementStatus: "acknowledged" | "not_required" | "pending" = "not_required",
+  requestedAmount?: number
 ) {
   void acknowledgementStatus;
   const reference = row as SafetyGuidance & { referenceConfidence?: "high" | "moderate" | "low"; basisRationale?: string };
@@ -787,7 +789,7 @@ export function publicSafetyGuidance(
     code: row.code,
     kind: adviceKind(row),
     guidanceId: row.guidanceId,
-    message: row.message,
+    message: row.code === "duplicate_or_overlap" || row.kind === "overlap" ? formatNutrientMessage(row.message, row.unit, requestedAmount) : row.message,
     messageKey: row.messageKey,
     ruleId: row.ruleId,
     rulesVersion: row.rulesVersion,
@@ -1175,7 +1177,7 @@ export function publicPlanFields(result: Pick<
     ...(result.safetyGuidance.length > 0
       ? {
           safetyGuidance: result.safetyGuidance.map((item) =>
-            publicSafetyGuidance(item, acknowledgementStatus)
+            publicSafetyGuidance(item, acknowledgementStatus, result.coverage.find(row => row.supplementId === item.supplementIds[0])?.requestedAmount)
           )
         }
       : {}),
