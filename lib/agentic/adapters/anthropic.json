@@ -2,7 +2,7 @@
   "contractVersion": "7.1.0",
   "description": "Deterministic supplement stacks with external checkout and order polling. Call tools only as info, plan, execute, order, support, feedback. Never prefix mattanutra_dev. Never call mattanutra_dev.* or mattanutra_dev.mattanutra_dev.*.",
   "name": "MattaNutra",
-  "schemaChecksum": "bbfd14523374e015a76620eb2cbad7e343a9bf357e465b2db4aecbacf00b644e",
+  "schemaChecksum": "8b11c67a1d56273b244029894c0191cab0eabea956eb1644d45a0a836126d8de",
   "server_url": "/api/mcp",
   "tools": [
     "info",

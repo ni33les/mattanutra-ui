@@ -40,13 +40,14 @@ export function projectPlan(plan: PlanSuccessWire, input: PlanViewInput): PlanSu
   const adviceKeys = new Map<string, string>();
   // Deduplicate by complete content, never rule ID. Different exposures or
   // uncertainty for the same rule remain separate and resolve in this response.
-  const options = (plan.options ?? []).map(option => {
-    const adviceIds = (option.advice ?? []).map(row => {
+  const adviceIdFor = (row: NonNullable<PlanSuccessWire["safetyGuidance"]>[number]) => {
       const key = canonicalHash(row);
       let adviceId = adviceKeys.get(key);
       if (!adviceId) { adviceId = `advice_${advice.length + 1}`; adviceKeys.set(key, adviceId); advice.push({ ...row, adviceId }); }
-      return adviceId;
-    });
+    return adviceId;
+  };
+  const options = (plan.options ?? []).map(option => {
+    const adviceIds = (option.advice ?? []).map(adviceIdFor);
     const foreground = option.optionId === selectedOptionId || option.optionId === highlightedAlternativeOptionId;
     return { ...pick(option, ["optionId", "roles", "role", "selected", "recommended", "purchaseEligible", "stackSummary", "coveragePercent", "coverageSummary", "preferenceAssessment"]), adviceIds,
       ...(foreground && option.basket ? { basket: option.basket.map(row => pick(row, CONVERSATION_BASKET_KEYS)) } : {}),
@@ -55,5 +56,6 @@ export function projectPlan(plan: PlanSuccessWire, input: PlanViewInput): PlanSu
       firstOrderTotalMinor: option.economics?.firstOrderSubtotalMinor !== undefined && option.economics.shippingMinor !== undefined
         ? option.economics.firstOrderSubtotalMinor + option.economics.shippingMinor + (option.economics.otherCustomerCostMinor ?? 0) : null };
   });
-  return { ...base, responseView: "conversation", ...pick(plan, ["summary", "operationalDecision", "nextActions", "purchaseRequiredNow", "nextReplenishmentDay", "shippingMinor", "estimatedOrderTotalMinor", "questions", "pollAfterSeconds", "searchSummary", "refreshRequired", "sourceContractVersion", "reasonCode", "suggestedGroups", "unsupportedTargets"]), selectedOptionId, highlightedAlternativeOptionId, options, advice, availableDetails: options.length ? availableDetails : [] };
+  const planAdviceIds = (plan.safetyGuidance ?? []).map(adviceIdFor);
+  return { ...base, responseView: "conversation", ...pick(plan, ["summary", "operationalDecision", "nextActions", "purchaseRequiredNow", "nextReplenishmentDay", "shippingMinor", "estimatedOrderTotalMinor", "questions", "pollAfterSeconds", "searchSummary", "refreshRequired", "sourceContractVersion", "reasonCode", "suggestedGroups", "unsupportedTargets"]), selectedOptionId, highlightedAlternativeOptionId, options, advice, planAdviceIds, availableDetails: options.length ? availableDetails : [] };
 }

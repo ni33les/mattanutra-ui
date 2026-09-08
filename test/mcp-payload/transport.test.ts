@@ -31,10 +31,38 @@ test("PAY-TRANSPORT-02 operation/view matrix rejects unsupported fields and requ
   const check = (input: unknown) => validateToolIssues(AGENTIC_INPUT_SCHEMAS.plan, input);
   for (const responseView of ["full", "conversation", "status"]) assert.deepEqual(check({ operation: "get", planHandle: handle, responseView }), []);
   assert.deepEqual(check({ operation: "get", planHandle: handle, responseView: "details", expectedRevision: 1, sections: ["coverage", "advice"] }), []);
+  assert.deepEqual(check({ operation: "get", planHandle: handle, responseView: "details" }).map(issue => issue.fieldPath), ["expectedRevision", "sections"]);
   for (const input of [
     { operation: "get", planHandle: handle, responseView: "details" },
     { operation: "get", planHandle: handle, responseView: "status", sections: ["products"] },
     { operation: "create", idempotencyKey: "payload-invalid-view-01", request: profile("A6"), responseView: "status" },
     { operation: "get", planHandle: handle, responseView: "details", expectedRevision: 1, sections: ["private"] },
   ]) assert.ok(check(input).length > 0);
+});
+
+test("PAY-TRANSPORT-03 saved 7.0 decisions remain selectable and checkoutable without a contract refresh", async () => {
+  await installRealCatalogue("dev");
+  const app = runtime("payload-v70"), key = "payload-v70-create-01";
+  const plan = await rpc(app, "plan", { operation: "create", idempotencyKey: key, request: profile("A6") });
+  assert.equal(plan.ok, true); assert.equal(plan.status, "ready");
+  const operation = await app.store.getPlanOperationByKey(`dev:mattanutra:${app.scope.principalScope}`, key); assert.ok(operation);
+  const revision = await app.store.getPlanRevision(operation.planId, Number(plan.revision)); assert.ok(revision);
+  await app.store.updatePlanRevision({ ...revision, result: { ...(revision.result as object), contractVersion: "7.0.0" } });
+  const selected = await rpc(app, "plan", { operation: "select", planHandle: plan.planHandle, expectedRevision: plan.revision, optionId: plan.optionId, idempotencyKey: "payload-v70-select-01", responseView: "conversation" });
+  assert.equal(selected.ok, true); assert.notEqual(selected.refreshRequired, true);
+  const checkout = await rpc(app, "execute", { planHandle: selected.planHandle, expectedRevision: selected.revision, idempotencyKey: "payload-v70-checkout-01" });
+  assert.equal(checkout.ok, true);
+  assert.deepEqual(checkout.frozenPlan.items.map(item => [item.productId,item.servingsPerDay,item.quantity,item.lineTotalMinor]), plan.basket.map(item => [item.productId,item.servingsPerDay,item.quantity,item.lineTotalMinor]));
+});
+
+test("PAY-TRANSPORT-04 covered targets finish naturally and above-limit findings remain visible and selectable", async () => {
+  await installRealCatalogue("dev");
+  const app = runtime("payload-advice"), base = { destinationCountry: "TH", locale: "en", optimization: "balanced", profile: { ageYears: 40, lifeStage: "adult" }, requirements: {}, targets: [{ name: "Vitamin C", amount: 500, unit: "mg", basis: "supplemental" }] };
+  const noPurchase = await rpc(app, "plan", { operation: "create", idempotencyKey: "payload-no-purchase-01", responseView: "conversation", request: { ...base, currentSupplements: [{ name: "Vitamin C", dailyAmount: 500, unit: "mg", daysRemaining: 40 }] } });
+  assert.equal(noPurchase.ok, true); assert.equal(noPurchase.status, "no_purchase"); assert.equal(noPurchase.purchaseRequiredNow, false); assert.equal(noPurchase.highlightedAlternativeOptionId, null);
+  const above = await rpc(app, "plan", { operation: "create", idempotencyKey: "payload-above-limit-01", responseView: "conversation", request: { ...base, targets: [{ name: "Vitamin D3", amount: 150, unit: "mcg", basis: "supplemental" }], currentSupplements: [{ name: "Vitamin D3", dailyAmount: 120, unit: "mcg" }] } });
+  assert.equal(above.ok, true); assert.ok(above.advice.some(row => row.exposure > row.threshold && row.threshold > 0));
+  const option = above.options.find(row => row.purchaseEligible); assert.ok(option);
+  const selected = await rpc(app, "plan", { operation: "select", planHandle: above.planHandle, expectedRevision: above.revision, optionId: option.optionId, idempotencyKey: "payload-above-select-01", responseView: "conversation" });
+  assert.equal(selected.ok, true); assert.equal(selected.operationalDecision.purchaseEligible, true); assert.ok(selected.advice.some(row => row.exposure > row.threshold && row.threshold > 0));
 });

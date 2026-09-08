@@ -1,5 +1,5 @@
 {
-  "schemaChecksum": "bbfd14523374e015a76620eb2cbad7e343a9bf357e465b2db4aecbacf00b644e",
+  "schemaChecksum": "8b11c67a1d56273b244029894c0191cab0eabea956eb1644d45a0a836126d8de",
   "contractVersion": "7.1.0",
   "instructions": "Agree provisional nutrient targets, then plan(create). Set responseView=conversation (omission remains full). Use selectedOptionId, highlightedAlternativeOptionId, advice and operationalDecision to guide the conversation. Health findings and numerical preferences are advisory; exclusions, dietary requirements and physical quantities still apply. total_daily includes quantified diet and continued/new supplements; supplemental excludes diet. Missing intake and pill counts stay unknown. Refine with requestPatch to preserve health context; arrays replace, [] clears, and null clears numerical preferences. Preserve expectedRevision, searchEffort and idempotencyKey during recovery; actualLowerBound means at least that amount, total unknown. Use returned option IDs; confirm the selected basket before execute. Retry interrupted mutations with the same key and payload; poll existing handles at pollAfterSeconds. Finish with no_purchase or replenish_later when no purchase is needed. Use only the six short tool names: info, plan, execute, order, support, feedback; never prefix a server name. Track order(orderHandle); polling is the only continuation method. Operation help: info(view=plan_schema,planOperation=create|get|revise|answer|select); full guidance: info(view=client_guide). Guide: mattanutra://contract/7.1.0/client-guide. Schema: mattanutra://contract/7.1.0/schema. DEV uses Stripe Test Mode; explicit customer confirmation of the exact current option/revision is required before execute. Feedback remains optional and requires explicit consent.",
   "tools": [
@@ -754,54 +754,6 @@
                             "expectedRevision",
                             "idempotencyKey",
                             "consentConfirmed"
-                          ]
-                        }
-                      },
-                      "required": [
-                        "name",
-                        "tool",
-                        "arguments"
-                      ]
-                    },
-                    {
-                      "additionalProperties": false,
-                      "type": "object",
-                      "properties": {
-                        "name": {
-                          "type": "string"
-                        },
-                        "tool": {
-                          "const": "evidence",
-                          "type": "string"
-                        },
-                        "arguments": {
-                          "additionalProperties": false,
-                          "type": "object",
-                          "properties": {
-                            "evidenceHandle": {
-                              "minLength": 32,
-                              "maxLength": 4096,
-                              "type": "string"
-                            },
-                            "claimIds": {
-                              "$ref": "#/$defs/s35"
-                            },
-                            "locale": {
-                              "minLength": 1,
-                              "maxLength": 35,
-                              "type": "string"
-                            },
-                            "mode": {
-                              "type": "string",
-                              "enum": [
-                                "summary",
-                                "sources"
-                              ],
-                              "default": "summary"
-                            }
-                          },
-                          "required": [
-                            "evidenceHandle"
                           ]
                         }
                       },
@@ -4461,6 +4413,7 @@
                       }
                     },
                     "adviceIds": {
+                      "description": "Resolve these IDs in this response’s advice array; no detail call is required to review this option’s findings.",
                       "type": "array",
                       "items": {
                         "type": "string"
@@ -4675,6 +4628,13 @@
                   ]
                 }
               },
+              "planAdviceIds": {
+                "description": "Plan-wide findings, resolved in this response’s advice array even when there is no product option.",
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
               "purchaseRequiredNow": {
                 "type": "boolean"
               },
@@ -4737,6 +4697,7 @@
               "highlightedAlternativeOptionId",
               "options",
               "advice",
+              "planAdviceIds",
               "availableDetails"
             ]
           },

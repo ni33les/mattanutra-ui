@@ -1,6 +1,6 @@
 import Ajv, { type ErrorObject, type ValidateFunction } from "ajv";
 import { businessError, type AgenticErrorResult } from "@/lib/agentic/contract/errors";
-import { PLAN_OPERATION_SCHEMAS, type JsonSchema } from "@/lib/agentic/contract/schemas";
+import { PLAN_OPERATION_SCHEMAS, ORDER_INPUT_SCHEMA, type JsonSchema } from "@/lib/agentic/contract/schemas";
 
 export type SchemaIssue = Readonly<{
   fieldPath: string;
@@ -50,9 +50,11 @@ function issueFrom(error: ErrorObject, data: unknown): SchemaIssue {
 function branch(schema: JsonSchema, data: unknown): JsonSchema {
   if (record(data) && typeof data.operation === "string" && data.operation in PLAN_OPERATION_SCHEMAS && (schema.anyOf || schema.oneOf)) {
     const selected = PLAN_OPERATION_SCHEMAS[data.operation as keyof typeof PLAN_OPERATION_SCHEMAS] as JsonSchema;
+    if (data.operation === "get" && Array.isArray(selected.anyOf)) return selected.anyOf[data.responseView === "status" ? 1 : data.responseView === "details" ? 2 : 0] as JsonSchema;
     if (data.operation === "revise" && Array.isArray(selected.anyOf)) return selected.anyOf["requestPatch" in data ? 1 : 0] as JsonSchema;
     return selected;
   }
+  if (schema === ORDER_INPUT_SCHEMA && record(data)) return ORDER_INPUT_SCHEMA.anyOf[data.responseView === "status" ? 1 : data.responseView === "details" ? 2 : 0];
   if (record(data) && typeof data.ok === "boolean" && Array.isArray(schema.anyOf)) {
     const selected = schema.anyOf.find((option: JsonSchema) => record(option.properties) && record(option.properties.ok) && option.properties.ok.const === data.ok && (record(option.properties.responseView) ? option.properties.responseView.const === data.responseView : !data.responseView || data.ok === false));
     if (selected) return selected as JsonSchema;

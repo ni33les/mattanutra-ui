@@ -1,7 +1,7 @@
 {
   "contractVersion": "7.1.0",
   "name": "mattanutra_dev",
-  "schemaChecksum": "bbfd14523374e015a76620eb2cbad7e343a9bf357e465b2db4aecbacf00b644e",
+  "schemaChecksum": "8b11c67a1d56273b244029894c0191cab0eabea956eb1644d45a0a836126d8de",
   "tools": [
     {
       "description": "MattaNutra matches real products to agreed nutrient targets, optimising overlap, current stock and cost. Safety advice follows responsibility-4.0.0 boundaries; it provides wellness guidance, not diagnosis, pharmacy services or clinical advice.",
@@ -754,54 +754,6 @@
                             "expectedRevision",
                             "idempotencyKey",
                             "consentConfirmed"
-                          ]
-                        }
-                      },
-                      "required": [
-                        "name",
-                        "tool",
-                        "arguments"
-                      ]
-                    },
-                    {
-                      "additionalProperties": false,
-                      "type": "object",
-                      "properties": {
-                        "name": {
-                          "type": "string"
-                        },
-                        "tool": {
-                          "const": "evidence",
-                          "type": "string"
-                        },
-                        "arguments": {
-                          "additionalProperties": false,
-                          "type": "object",
-                          "properties": {
-                            "evidenceHandle": {
-                              "minLength": 32,
-                              "maxLength": 4096,
-                              "type": "string"
-                            },
-                            "claimIds": {
-                              "$ref": "#/$defs/s35"
-                            },
-                            "locale": {
-                              "minLength": 1,
-                              "maxLength": 35,
-                              "type": "string"
-                            },
-                            "mode": {
-                              "type": "string",
-                              "enum": [
-                                "summary",
-                                "sources"
-                              ],
-                              "default": "summary"
-                            }
-                          },
-                          "required": [
-                            "evidenceHandle"
                           ]
                         }
                       },
@@ -4461,6 +4413,7 @@
                       }
                     },
                     "adviceIds": {
+                      "description": "Resolve these IDs in this response’s advice array; no detail call is required to review this option’s findings.",
                       "type": "array",
                       "items": {
                         "type": "string"
@@ -4675,6 +4628,13 @@
                   ]
                 }
               },
+              "planAdviceIds": {
+                "description": "Plan-wide findings, resolved in this response’s advice array even when there is no product option.",
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
               "purchaseRequiredNow": {
                 "type": "boolean"
               },
@@ -4737,6 +4697,7 @@
               "highlightedAlternativeOptionId",
               "options",
               "advice",
+              "planAdviceIds",
               "availableDetails"
             ]
           },

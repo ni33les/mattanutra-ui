@@ -1,3 +1,4 @@
+import { createLogger } from "@/lib/logger";
 import { AGENTIC_CONTRACT_REGISTRY } from "@/lib/agentic/contract/registry";
 import { CONTRACT_RESOURCES, readContractResource } from "@/lib/agentic/contract/guide";
 import type { AgenticConfig, AgenticEnvironment } from "@/lib/agentic/config";
@@ -181,14 +182,20 @@ export function toolText(value: unknown) {
   return "ok";
 }
 
-export function toolResult(value: unknown, isError = false) {
+const responseLog = createLogger("agentic.mcp.payload");
+export function toolResult(value: unknown, isError = false, tool?: string) {
+  const serialized = JSON.stringify(value);
+  if (tool && process.env.NODE_ENV !== "test") {
+    const view = record(value).responseView ?? "full";
+    responseLog.info("response_bytes", { tool, view, structuredBytes: Buffer.byteLength(serialized, "utf8"), isError });
+  }
   return {
     content: [
       {
         text: toolText(value),
         type: "text"
       },
-      { type: "text", text: JSON.stringify(value) }
+      { type: "text", text: serialized }
     ],
     isError,
     structuredContent: value
@@ -323,7 +330,7 @@ export async function handleLightweightJsonRpc(
     const response = validateToolInput(AGENTIC_OUTPUT_SCHEMAS.info, value)
       ? businessError({ message: "The capability response is temporarily unavailable.", reasonCode: "temporarily_unavailable", nextActions: ["retry"] })
       : value;
-    return { id, jsonrpc: "2.0", result: toolResult(response, isAgenticErrorResult(response)) };
+    return { id, jsonrpc: "2.0", result: toolResult(response, isAgenticErrorResult(response), "info") };
   }
 
   return undefined;

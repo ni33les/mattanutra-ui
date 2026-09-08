@@ -3764,54 +3764,6 @@
                         "tool",
                         "arguments"
                       ]
-                    },
-                    {
-                      "additionalProperties": false,
-                      "type": "object",
-                      "properties": {
-                        "name": {
-                          "type": "string"
-                        },
-                        "tool": {
-                          "const": "evidence",
-                          "type": "string"
-                        },
-                        "arguments": {
-                          "additionalProperties": false,
-                          "type": "object",
-                          "properties": {
-                            "evidenceHandle": {
-                              "minLength": 32,
-                              "maxLength": 4096,
-                              "type": "string"
-                            },
-                            "claimIds": {
-                              "$ref": "#/$defs/s35"
-                            },
-                            "locale": {
-                              "minLength": 1,
-                              "maxLength": 35,
-                              "type": "string"
-                            },
-                            "mode": {
-                              "type": "string",
-                              "enum": [
-                                "summary",
-                                "sources"
-                              ],
-                              "default": "summary"
-                            }
-                          },
-                          "required": [
-                            "evidenceHandle"
-                          ]
-                        }
-                      },
-                      "required": [
-                        "name",
-                        "tool",
-                        "arguments"
-                      ]
                     }
                   ]
                 }
@@ -7461,6 +7413,7 @@
                       }
                     },
                     "adviceIds": {
+                      "description": "Resolve these IDs in this response’s advice array; no detail call is required to review this option’s findings.",
                       "type": "array",
                       "items": {
                         "type": "string"
@@ -7675,6 +7628,13 @@
                   ]
                 }
               },
+              "planAdviceIds": {
+                "description": "Plan-wide findings, resolved in this response’s advice array even when there is no product option.",
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
               "purchaseRequiredNow": {
                 "type": "boolean"
               },
@@ -7737,6 +7697,7 @@
               "highlightedAlternativeOptionId",
               "options",
               "advice",
+              "planAdviceIds",
               "availableDetails"
             ]
           },

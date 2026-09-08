@@ -22,7 +22,7 @@ test("PAY-VIEW-01 eighteen frozen decisions retain all choices, doses, amounts, 
       assert.equal(option.purchaseEligible, old.purchaseEligible);
       assert.deepEqual(option.stackSummary, old.stackSummary);
       assert.deepEqual(option.preferenceAssessment, old.preferenceAssessment);
-      assert.deepEqual(option.adviceIds.map(id => { const { adviceId: _, ...advice } = compact.advice.find(row => row.adviceId === id)!; return advice; }), old.advice);
+      assert.deepEqual(option.adviceIds.map(id => { const { adviceId, ...advice } = compact.advice.find(row => row.adviceId === id)!; assert.equal(adviceId, id); return advice; }), old.advice);
       if (option.basket) {
         assert.deepEqual(option.basket.map(row => [row.productId,row.servingsPerDay,row.quantity,row.unitPriceMinor,row.lineTotalMinor,row.dailyPills]), old.basket!.map(row => [row.productId,row.servingsPerDay,row.quantity,row.unitPriceMinor,row.lineTotalMinor,row.dailyPills]));
         assert.ok(!("labelledFacts" in option.basket[0]));

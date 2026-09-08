@@ -22,19 +22,24 @@ export async function readPlanPresentation(runtime: AgenticRuntime, planHandle: 
     const active = await store.getActivePlanOperation(plan.id);
     const operation = active ?? await store.getFailedPlanOperation(plan.id, plan.currentRevision);
     const order = await store.getActiveOrderForPlanRevision(plan.id, requestedRevision ?? plan.currentRevision);
-    return { plan, revision, operation, frozen: Boolean(order) };
+    const snapshotId = revision ? pinnedSnapshotIdFromResult(revision.result as PlanResult) : "";
+    const snapshot = snapshotId ? getPinnedCatalogueSnapshot(snapshotId)?.snapshot ?? await store.getCatalogueSnapshot(snapshotId) : null;
+    const current = snapshot?.runtimeRevision === undefined || !store.isCatalogueRevisionCurrent
+      ? true : await store.isCatalogueRevisionCurrent(snapshot.runtimeRevision);
+    return { plan, revision, operation, frozen: Boolean(order), current };
   });
   if (!state?.revision) return businessError({ reasonCode: "not_found", message: "Plan revision not found." });
   const result = state.revision.result as PlanResult;
-  const snapshotId = pinnedSnapshotIdFromResult(result);
-  const snapshot = snapshotId ? getPinnedCatalogueSnapshot(snapshotId)?.snapshot ?? await runtime.store.getCatalogueSnapshot(snapshotId) : null;
-  const current = snapshot?.runtimeRevision === undefined || !runtime.store.isCatalogueRevisionCurrent
-    ? true : await runtime.store.isCatalogueRevisionCurrent(snapshot.runtimeRevision);
-  const refreshRequired = !state.frozen && (Boolean(result.refreshRequired) || !planContractCompatible(result.contractVersion) || !current);
+  const refreshRequired = !state.frozen && (Boolean(result.refreshRequired) || !planContractCompatible(result.contractVersion) || !state.current);
   const operation = state.operation;
   const operationState = operation ? { id: operation.id, status: operation.status, revision: operation.revision, error: operation.error } : null;
+  // Search diagnostics and archives are not customer-visible identity inputs.
+  // The returned options, quantities, advice, request and searchSummary remain
+  // below; content fingerprints fence the underlying catalogue facts.
+  const telemetry = { snapshotId: result.matcherTelemetry.snapshotId, matcherVersion: result.matcherTelemetry.matcherVersion,
+    factLedgerHash: result.matcherTelemetry.factLedgerHash };
   const resultVersion = canonicalHash({ presentation: AGENTIC_CONTRACT_VERSION, revision: state.revision.revision,
-    currentRevision: state.plan.currentRevision, result, operation: operationState, refreshRequired });
+    currentRevision: state.plan.currentRevision, result: { ...result, matcherTelemetry: telemetry }, operation: operationState, refreshRequired });
   return { ...state, revision: state.revision, result, resultVersion, refreshRequired, originalRequest: () => originalRequestFor(result) };
 }
 
