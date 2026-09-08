@@ -1,3 +1,4 @@
+import { correctedAxSnapshot } from "../../lib/agentic/catalogue/ax-corrections.ts";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { createAgenticRuntime } from "../../lib/agentic/runtime.ts";
@@ -23,6 +24,7 @@ export function profile(id: string): PlanRequest {
 export async function installRealCatalogue(environment: "dev" | "uat" = "uat") {
   resetQaPersistForTests(); resetServiceClock(); resetMatchPlanCache(); resetCataloguePins(); resetInfoCache();
   const frozen = reconstructAnnaSnapshot(await loadFrozenAnnaInput(environment));
+  if (environment === "dev") frozen.snapshot = correctedAxSnapshot(frozen.snapshot, JSON.parse(readFileSync(new URL("../fixtures/ax-refinement/dev-corrections.json", import.meta.url), "utf8"))).snapshot;
   replaceCatalogueSnapshot(frozen.snapshot);
   setMatcherSafetyCeilings(frozen.ceilings, { runtimeRevision: frozen.snapshot.runtimeRevision!, fingerprint: String(frozen.provenance.reconstructedReferenceFingerprint) });
   return frozen;

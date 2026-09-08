@@ -18,7 +18,7 @@ test("AXR-DATA-01 audit preserves the identifiable original subset and explicitl
 
 test("AXR-DATA-02 reviewed corrections preserve prices, unknown packs and reference content while excluding contradictory coverage", async () => {
   const raw = await loadFrozenAnnaInput("dev"), frozen = reconstructAnnaSnapshot(raw);
-  const result = correctedAxSnapshot(frozen.snapshot, raw);
+  const result = correctedAxSnapshot(frozen.snapshot, JSON.parse(readFileSync(new URL("../fixtures/ax-refinement/dev-corrections.json", import.meta.url), "utf8")));
   assert.notEqual(catalogueRecordFingerprint(result.snapshot), catalogueRecordFingerprint(frozen.snapshot));
   assert.equal(result.receipts.length, 2);
   assert.deepEqual(result.snapshot.supplements, frozen.snapshot.supplements);
