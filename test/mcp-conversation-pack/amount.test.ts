@@ -36,6 +36,7 @@ test("overlap formatting retains requested precision above two decimal places", 
 test("nutrient amount formatter uses unit precision and never changes its input", () => {
   assert.equal(formatNutrientAmount(158.39999999999998, "mg"), "158.4");
   assert.equal(formatNutrientAmount(1.239, "mcg"), "1.24");
+  assert.equal(formatNutrientAmount(1.239, "mcg", null), "1.24");
   assert.equal(formatNutrientAmount(158.39999999999998, "IU"), "158");
   assert.equal(formatNutrientAmount(158.9, "IU", 200.1234), "159");
   assert.equal(formatNutrientAmount(1.23456, "mg", 2.0001), "1.2346");
