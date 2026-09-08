@@ -8,6 +8,7 @@ import { originalRequestFor } from "@/lib/agentic/plan/request-patch";
 import type { PlanResult } from "@/lib/agentic/plan/types";
 import type { PlanStatusWire } from "@/lib/agentic/contract/outputs";
 import { planContractCompatible } from "@/lib/agentic/presentation/compatibility";
+import { expirePlanOperation } from "@/lib/agentic/plan/operations";
 
 /** Reads committed data and the admitted operation without building baskets,
  * advice or schedules. No matching, network calls or shared customer cache. */
@@ -19,7 +20,8 @@ export async function readPlanPresentation(runtime: AgenticRuntime, planHandle: 
     const plan = await store.getPlan(capability.resourceId);
     if (!plan) return null;
     const revision = await store.getPlanRevision(plan.id, requestedRevision ?? plan.currentRevision);
-    const active = await store.getActivePlanOperation(plan.id);
+    let active = await store.getActivePlanOperation(plan.id);
+    if (active && await expirePlanOperation(store, active.id, new Date().toISOString())) active = null;
     const operation = active ?? await store.getFailedPlanOperation(plan.id, plan.currentRevision);
     const order = await store.getActiveOrderForPlanRevision(plan.id, requestedRevision ?? plan.currentRevision);
     const snapshotId = revision ? pinnedSnapshotIdFromResult(revision.result as PlanResult) : "";

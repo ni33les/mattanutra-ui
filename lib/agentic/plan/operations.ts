@@ -2,9 +2,28 @@ import { nextTestUuid } from "@/lib/agentic/capabilities";
 import { canonicalRequestHash } from "@/lib/agentic/idempotency";
 import type { CapabilityScope } from "@/lib/agentic/capabilities";
 import type { AgenticStore, PlanOperationRecord } from "@/lib/agentic/store/types";
+import { businessError } from "@/lib/agentic/contract/errors";
 
 export const PLAN_OPERATION_LEASE_MS = 60_000;
 export const PLAN_OPERATION_TASK = "match_agentic_plan";
+// Includes queueing, retries and worker restarts; leave time for the next poll
+// to observe failure inside the published three-minute terminal bound.
+export const PLAN_OPERATION_TERMINAL_MS = 175_000;
+export function planOperationDeadlineError() {
+  return businessError({ reasonCode: "temporarily_unavailable", retryable: false,
+    nextActions: ["refresh_plan"], message: "Matching reached its overall deadline. The last committed plan is preserved. Review it and revise with a new idempotency key." });
+}
+export function operationDeadlineRemaining(operation: PlanOperationRecord, now = Date.now()) {
+  return Math.max(0, (operation.deadlineAt ? Date.parse(operation.deadlineAt) : Date.parse(operation.createdAt) + PLAN_OPERATION_TERMINAL_MS) - now);
+}
+export async function expirePlanOperation(store: AgenticStore, id: string, now: string) {
+  return store.transaction(async tx => {
+    const current = await tx.getPlanOperation(id, { includeCursor: false });
+    if (!current || !["queued", "running", "retryable"].includes(current.status) || operationDeadlineRemaining(current, Date.parse(now)) > 0) return false;
+    return tx.updatePlanOperation({ ...current, status: "failed", error: planOperationDeadlineError(),
+      leaseToken: null, leaseExpiresAt: null, updatedAt: now, version: current.version + 1 }, current.version);
+  });
+}
 
 /** Leave 100 ms for response serialization inside the existing 60 s deadline. */
 export function planReturnWaitMs(elapsedMs: number) {
@@ -14,7 +33,7 @@ export function planReturnWaitMs(elapsedMs: number) {
 export async function admitPlanOperation(store: AgenticStore, input: Readonly<{
   planId: string; ownerScope: string; key: string; payload: unknown;
   expectedRevision: number; revision: number; prepared: Record<string, unknown>;
-  scope: CapabilityScope; now: string;
+  scope: CapabilityScope; now: string; admittedAt?: string;
 }>): Promise<PlanOperationRecord> {
   return store.transaction(async tx => {
     const plan = await tx.getPlanForUpdate(input.planId);
@@ -33,6 +52,7 @@ export async function admitPlanOperation(store: AgenticStore, input: Readonly<{
       requestHash, expectedRevision: input.expectedRevision, revision: input.revision,
       taskId: nextTestUuid(), status: "queued", version: 1, leaseToken: null, leaseExpiresAt: null,
       createdAt: input.now, updatedAt: input.now,
+      deadlineAt: new Date(Date.parse(input.admittedAt ?? input.now) + PLAN_OPERATION_TERMINAL_MS).toISOString(),
       command: { payload: structuredClone(input.payload), prepared: structuredClone(input.prepared), scope: input.scope },
       checkpoint: null, catalogueIdentity: null, referenceIdentity: null, response: null, error: null
     };
@@ -42,6 +62,7 @@ export async function admitPlanOperation(store: AgenticStore, input: Readonly<{
 }
 
 export async function claimPlanOperation(store: AgenticStore, id: string, leaseToken: string, now: string) {
+  if (await expirePlanOperation(store, id, now)) return null;
   const claimed = await store.transaction(async tx => {
     const current = await tx.getPlanOperation(id, { includeCursor: false });
     if (!current || ["complete", "cancelled", "failed"].includes(current.status)) return null;

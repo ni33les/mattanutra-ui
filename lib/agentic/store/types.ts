@@ -49,6 +49,7 @@ export type PlanOperationRecord = Readonly<{
   expectedRevision: number;
   revision: number;
   taskId: string;
+  deadlineAt?: string;
   status: "queued" | "running" | "retryable" | "complete" | "failed" | "cancelled";
   version: number;
   leaseToken: string | null;
