@@ -3,6 +3,7 @@ import { test } from "node:test";
 import { match } from "../../lib/matcher/index.ts";
 import { canonicalizeTargets } from "../../lib/matcher/canonicalizer.ts";
 import { request, product, catalog } from "../matcher/flexible-v5-fixtures.ts";
+import { finiteCatalogueOracle } from "../../lib/matcher/qa/oracle.ts";
 
 function inputs() {
   const target = canonicalizeTargets({ targets: [{ subjectId: "d3", name: "Vitamin D3", amount: 2000, unit: "IU" }] }).targets;
@@ -28,6 +29,18 @@ test("M721-ROUTINE-01 equal-dose dedicated D3 beats ten incidental tablets while
   assert.ok(result.searchSummary!.expansionAttempts <= 8000);
   const reordered = match(req, catalog([dedicated, incidental]));
   assert.deepEqual([reordered.selected?.variantIds, ...reordered.alternatives.map(row => row.variantIds)], [result.selected.variantIds, ...result.alternatives.map(row => row.variantIds)]);
+});
+
+test("M721-ROUTINE-03 independent enumeration ranks equal-dose routines before cost without changing arithmetic", () => {
+  const result = finiteCatalogueOracle({ targets: [{ subjectId: "d3", amount: 2000, basis: "supplemental" }],
+    current: [], dietary: [], optimization: "lowest_cost", products: [
+      { productId: "dedicated", sellerId: "one", priceMinor: 1000, pillsPerServing: 1, pillCountKnown: true, doses: [1, 2], contributions: { d3: 1000 } },
+      { productId: "incidental", sellerId: "one", priceMinor: 100, pillsPerServing: 1, pillCountKnown: true, doses: [1, 10], contributions: { d3: 200 } }
+    ] });
+  assert.deepEqual(result.selected?.productIds, ["dedicated"]);
+  assert.equal(result.selected?.loss.total, 0);
+  assert.equal(result.selected?.dailyPills, 2);
+  assert.ok(result.baskets.some(row => row.productIds.length === 1 && row.productIds[0] === "incidental" && row.dailyPills === 10 && row.loss.total === 0));
 });
 
 test("M721-ROUTINE-02 unknown pills cannot win as zero, and better dose fit still wins over convenience", () => {
