@@ -236,6 +236,19 @@
         "AG72-CARD-01",
         "AG72-SCHEMA-01"
       ]
+    },
+    {
+      "file": "test/mcp-agent-surface/views.test.ts",
+      "slice": "agent-surface",
+      "database": false,
+      "reason": "Default view for all five plan operations, legacy client pinning, explicit-view precedence, evidence capability isolation and the unchanged six frozen archetypes.",
+      "expectedCases": 9,
+      "cases": [
+        "AG72-VIEW-01",
+        "AG72-VIEW-02",
+        "AG72-EVIDENCE-01",
+        "AG72-GOLDEN-01"
+      ]
     }
   ]
 }
