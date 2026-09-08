@@ -4,9 +4,23 @@ import Ajv from "ajv";
 import { toolList, handleLightweightJsonRpc } from "../../lib/agentic/mcp/rpc.ts";
 import { agenticServerInstructions } from "../../lib/agentic/contract/instructions.ts";
 import { loadAgenticConfig } from "../../lib/agentic/config.ts";
+import { CLIENT_EXAMPLES, CLIENT_GUIDE_URI, readContractResource } from "../../lib/agentic/contract/guide.ts";
 
 const names = ["info", "plan", "execute", "order", "support", "feedback", "evidence"];
 const isolatedInfo = { conditionCodes: ["high_cholesterol"], medicationCodes: ["apixaban"], supportedCountries: [{ countryCode: "TH", countryName: "Thailand", currency: "THB" }] };
+test("AG72-DOC-01 current guide has one plan default, a dated compatibility window and a valid evidence template", () => {
+  const text = readContractResource(CLIENT_GUIDE_URI)!.contents[0].text;
+  assert.match(text, /All five plan operations default to responseView=conversation/);
+  assert.ok(!text.includes("Omitting responseView retains the compatible full response"));
+  assert.match(text, /X-MattaNutra-Contract-Version: 7.1.0/); assert.match(text, /ends in 7.3/);
+  const evidence = CLIENT_EXAMPLES.find(example => example.tool === "evidence"); assert.ok(evidence);
+  const tool = toolList().find(item => item.name === "evidence")!;
+  assert.equal(new Ajv({ strict: false, validateFormats: false }).validate(tool.inputSchema, evidence.arguments), true);
+  for (const version of ["7.0.0", "7.1.0"]) {
+    const historical = readContractResource(`mattanutra://contract/${version}/schema`); assert.ok(historical);
+    assert.equal(JSON.parse(historical.contents[0].text).contractVersion, version);
+  }
+});
 async function info(environment: "dev" | "uat" | "prd", args: Record<string, unknown>) {
   const reply = await handleLightweightJsonRpc({ ...loadAgenticConfig(), environment }, { id: 1, method: "tools/call", params: { name: "info", arguments: args } }, isolatedInfo);
   const value = reply?.result?.structuredContent as Record<string, unknown>;

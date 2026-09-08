@@ -231,10 +231,11 @@
       "slice": "agent-surface",
       "database": false,
       "reason": "Seven-tool discovery, concise honest service card, environment/locale alignment and emitted get-schema equivalence.",
-      "expectedCases": 2,
+      "expectedCases": 3,
       "cases": [
         "AG72-CARD-01",
-        "AG72-SCHEMA-01"
+        "AG72-SCHEMA-01",
+        "AG72-DOC-01"
       ]
     },
     {
