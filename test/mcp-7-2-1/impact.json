@@ -95,7 +95,7 @@
     },
     {
       "file": "test/web-advisory-matching.test.ts",
-      "expectedCases": 6,
+      "expectedCases": 7,
       "reason": "Web coverage, retained intake, physical facts and worker dose-before-price ordering"
     },
     {
