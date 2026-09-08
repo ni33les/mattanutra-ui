@@ -176,11 +176,15 @@ export function toolText(value: unknown) {
 const responseLog = createLogger("agentic.mcp.payload");
 function structuredSummary(value: unknown) {
   const row = record(value);
-  const lines = [toolText(value)];
+  // Questions remain structured; the text capability is summary plus next action.
+  const summary = typeof row.summary === "string" && row.summary.trim() ? row.summary : toolText(value);
   const next = record(row.operationalDecision).nextAction ?? row.nextAction ??
     (Array.isArray(row.nextActions) ? row.nextActions.join(", ") : undefined);
-  if (typeof next === "string" && next) lines.push(`Next: ${next}`);
-  return lines.join("\n");
+  const suffix = typeof next === "string" && next ? `\nNext: ${next}` : "";
+  const limit = Math.max(0, 799 - suffix.length);
+  // Full text remains in structuredContent. Preserve the actionable suffix.
+  const short = summary.length <= limit ? summary : summary.slice(0, Math.max(0, limit - 1)).replace(/[\uD800-\uDBFF]$/, "") + "…";
+  return short + suffix;
 }
 
 export function toolResult(value: unknown, isError = false, tool?: string, resultContent?: "structured") {

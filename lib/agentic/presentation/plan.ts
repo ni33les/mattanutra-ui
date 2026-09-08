@@ -3,7 +3,7 @@ import { CONVERSATION_BASKET_KEYS, CONVERSATION_COVERAGE_KEYS } from "@/lib/agen
 import { businessError, type AgenticErrorResult } from "@/lib/agentic/contract/errors";
 import { canonicalHash } from "@/lib/agentic/value/canonical";
 import { AGENTIC_CONTRACT_VERSION } from "@/lib/agentic/config";
-import { isIncompleteInformation, incompleteInformationNotice, speakableMessage } from "@/lib/agentic/presentation/conversation-advice";
+import { isIncompleteInformation, incompleteInformationNotice, speakableMessage, groupConversationAdvice } from "@/lib/agentic/presentation/conversation-advice";
 
 export type PlanSection = "request" | "products" | "coverage" | "advice" | "score" | "economics";
 export type PlanViewInput = Readonly<{ responseView?: "full" | "conversation" | "details"; expectedRevision?: number; sections?: readonly PlanSection[]; optionIds?: readonly string[] }>;
@@ -65,5 +65,10 @@ export function projectPlan(plan: PlanSuccessWire, input: PlanViewInput): PlanSu
   });
   const planAdviceIds = [...new Set([...(missingId ? [missingId] : []), ...(plan.safetyGuidance ?? []).map(row =>
     isIncompleteInformation(row) && missingId ? missingId : adviceIdFor(row))])];
+  const grouped = groupConversationAdvice(advice, plan.locale, { options, planAdviceIds, selectedOptionId });
+  const groupedIds = (ids: string[]) => [...new Set(ids.map(id => grouped.ids.get(id)!))];
+  for (const option of options) option.adviceIds = groupedIds(option.adviceIds);
+  advice.splice(0, advice.length, ...grouped.rows);
+  planAdviceIds.splice(0, planAdviceIds.length, ...groupedIds(planAdviceIds));
   return { ...base, responseView: "conversation", ...pick(plan, ["summary", "operationalDecision", "nextActions", "purchaseRequiredNow", "nextReplenishmentDay", "shippingMinor", "estimatedOrderTotalMinor", "questions", "pollAfterSeconds", "searchSummary", "refreshRequired", "sourceContractVersion", "reasonCode", "suggestedGroups", "unsupportedTargets", "evidenceHandle", "alternativeSearch"]), selectedOptionId, highlightedAlternativeOptionId, options, advice, planAdviceIds, availableDetails: options.length ? availableDetails : [] };
 }

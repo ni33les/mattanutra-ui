@@ -31,6 +31,7 @@ import {
   wantsMcpSse
 } from "@/lib/agentic/mcp/transport";
 import { assertReleaseManifestReady } from "@/lib/agentic/release-manifest";
+import { requestSetupRecovery } from "@/lib/agentic/mcp/dependency-error";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -130,23 +131,15 @@ async function handlePost(request: Request) {
     );
   }
 
-  if (mcpNeedsRateLimit(body)) {
-    const limited = await enforceMcpOrQaRateLimit(
-      request,
-      loadAgenticConfig(request).environment,
-      body
-    );
-
-    if (limited) {
-      return limited;
-    }
-  }
-
   const started = performance.now();
   const timed = timedToolName(body);
   const correlationId = requestCorrelationId(request);
 
   try {
+    if (mcpNeedsRateLimit(body)) {
+      const limited = await enforceMcpOrQaRateLimit(request, loadAgenticConfig(request).environment, body);
+      if (limited) return limited;
+    }
     if (!Array.isArray(body) && !mcpCallNeedsStore(body)) {
       const light = await handleLightweightJsonRpc(
         loadAgenticConfig(request),
@@ -227,6 +220,9 @@ async function handlePost(request: Request) {
       message: error instanceof Error ? error.message : "unknown",
       tool: timed ?? "unknown"
     });
+
+    const recovery = requestSetupRecovery(error, body, correlationId);
+    if (recovery) return mcpReply(request, { id: (body as JsonRpcRequest).id ?? null, jsonrpc: "2.0", result: toolResult(recovery, true) });
 
     return mcpReply(
       request,

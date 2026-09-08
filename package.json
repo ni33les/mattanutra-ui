@@ -155,6 +155,8 @@
     "mcp:payload-profile": "node scripts/mcp-payload/profile.mjs",
     "test:mcp:721": "node scripts/mcp-721.mjs test",
     "validate:dev:mcp:721": "node scripts/mcp-721.mjs validate",
+    "test:mcp:723": "node scripts/mcp-721.mjs test --package=723",
+    "validate:dev:mcp:723": "node scripts/mcp-721.mjs validate --package=723",
     "test:mcp:722": "node scripts/mcp-721.mjs test --package=722",
     "validate:dev:mcp:722": "node scripts/mcp-721.mjs validate --package=722"
   },

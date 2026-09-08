@@ -1,10 +1,3074 @@
 {
   "contractVersion": "7.2.3",
-  "name": "mattanutra_dev",
-  "schemaChecksum": "b6bc3aadfb519a5b42cb439e6e5e5331d5b286f023a9930db66495c938cb9e9b",
-  "tools": [
+  "planOperations": {
+    "create": {
+      "additionalProperties": false,
+      "type": "object",
+      "properties": {
+        "responseView": {
+          "type": "string",
+          "enum": [
+            "conversation",
+            "full"
+          ],
+          "default": "conversation",
+          "description": "Presentation only; full is opt-in. Temporary legacy header: see info(client_guide)."
+        },
+        "operation": {
+          "const": "create",
+          "type": "string"
+        },
+        "idempotencyKey": {
+          "minLength": 16,
+          "maxLength": 128,
+          "type": "string"
+        },
+        "searchEffort": {
+          "type": "string",
+          "enum": [
+            "standard",
+            "expanded"
+          ],
+          "default": "standard",
+          "description": "Deterministic search budget: standard 8000 expansion attempts; expanded 64000. Expanded includes the standard incumbent. A revise omission preserves prior effort. Repeating identical inputs reuses work; after expanded exhaustion refine the request."
+        },
+        "request": {
+          "additionalProperties": false,
+          "description": "Complete plan request. Replacement revisions reset omitted optional fields. Agreed targets are not diagnoses. Resolved nutrient amounts must represent at least one nanogram, one CFU, or 0.001 ml/serving; IU precision depends on nutrient form. Below-precision errors report the exact field and permitted minimum.",
+          "type": "object",
+          "properties": {
+            "answers": {
+              "maxItems": 50,
+              "uniqueItems": true,
+              "type": "array",
+              "items": {
+                "additionalProperties": false,
+                "type": "object",
+                "properties": {
+                  "choice": {
+                    "minLength": 1,
+                    "maxLength": 240,
+                    "type": "string"
+                  },
+                  "questionId": {
+                    "minLength": 1,
+                    "maxLength": 128,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "choice",
+                  "questionId"
+                ]
+              }
+            },
+            "conditionCodes": {
+              "maxItems": 50,
+              "uniqueItems": true,
+              "type": "array",
+              "items": {
+                "minLength": 1,
+                "maxLength": 128,
+                "type": "string"
+              },
+              "description": "Condition codes from info.conditionCodes; unrecognised reported context is preserved as unassessed advice."
+            },
+            "medicationCodes": {
+              "maxItems": 50,
+              "uniqueItems": true,
+              "type": "array",
+              "items": {
+                "minLength": 1,
+                "maxLength": 128,
+                "type": "string"
+              },
+              "description": "Medication codes from info.medicationCodes; omission means unknown, not confirmed none."
+            },
+            "currentSupplements": {
+              "maxItems": 50,
+              "description": "Quantified continued supplements. Omission means unknown; [] explicitly reports none. A (productId, nutrient) pair may occur only once across this field and current-source intake observations.",
+              "type": "array",
+              "items": {
+                "additionalProperties": false,
+                "type": "object",
+                "properties": {
+                  "dailyAmount": {
+                    "minimum": 0,
+                    "maximum": 1000000000000000,
+                    "description": "Daily amount in the accompanying unit; zero must be explicitly reported.",
+                    "type": "number"
+                  },
+                  "daysRemaining": {
+                    "exclusiveMinimum": 0,
+                    "maximum": 36500,
+                    "description": "Positive remaining days of retained inventory. Omit when unknown. If none remains, remove this retained inventory entry and revise the intended request.",
+                    "type": "number"
+                  },
+                  "name": {
+                    "minLength": 1,
+                    "maxLength": 240,
+                    "type": "string"
+                  },
+                  "productId": {
+                    "pattern": "^prd_[A-Za-z0-9_-]+$",
+                    "maxLength": 128,
+                    "type": "string"
+                  },
+                  "supplementId": {
+                    "pattern": "^sup_[A-Za-z0-9_-]+$",
+                    "maxLength": 128,
+                    "type": "string"
+                  },
+                  "unit": {
+                    "type": "string",
+                    "enum": [
+                      "mcg",
+                      "mg",
+                      "g",
+                      "IU",
+                      "CFU",
+                      "ml",
+                      "serving"
+                    ]
+                  }
+                },
+                "required": [
+                  "dailyAmount",
+                  "name",
+                  "unit"
+                ]
+              }
+            },
+            "intake": {
+              "maxItems": 100,
+              "description": "Reported observations. Omission or [] does not establish zero dietary intake. An explicitly reported known amount of 0 is required to establish zero for a nutrient.",
+              "type": "array",
+              "items": {
+                "description": "Reported daily intake. Missing quantities are unknown, never zero. Broad dietary descriptions are accepted without labels or portion sizes.",
+                "anyOf": [
+                  {
+                    "additionalProperties": false,
+                    "type": "object",
+                    "properties": {
+                      "daysRemaining": {
+                        "exclusiveMinimum": 0,
+                        "maximum": 36500,
+                        "description": "Current-supplement observations only: positive remaining days of retained stock. Omit unknown duration. Invalid for diet observations.",
+                        "type": "number"
+                      },
+                      "source": {
+                        "type": "string",
+                        "enum": [
+                          "diet",
+                          "current_supplement"
+                        ]
+                      },
+                      "name": {
+                        "minLength": 1,
+                        "maxLength": 240,
+                        "type": "string"
+                      },
+                      "supplementId": {
+                        "pattern": "^sup_[A-Za-z0-9_-]+$",
+                        "maxLength": 128,
+                        "type": "string"
+                      },
+                      "productId": {
+                        "pattern": "^prd_[A-Za-z0-9_-]+$",
+                        "maxLength": 128,
+                        "type": "string"
+                      },
+                      "description": {
+                        "minLength": 1,
+                        "maxLength": 1000,
+                        "type": "string"
+                      },
+                      "evidence": {
+                        "minLength": 1,
+                        "maxLength": 1000,
+                        "type": "string"
+                      },
+                      "certainty": {
+                        "const": "known",
+                        "type": "string"
+                      },
+                      "amount": {
+                        "minimum": 0,
+                        "maximum": 1000000000000000,
+                        "description": "Daily amount in the accompanying unit; zero must be explicitly reported.",
+                        "type": "number"
+                      },
+                      "unit": {
+                        "type": "string",
+                        "enum": [
+                          "mcg",
+                          "mg",
+                          "g",
+                          "IU",
+                          "CFU",
+                          "ml",
+                          "serving"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "source",
+                      "certainty",
+                      "amount",
+                      "unit"
+                    ]
+                  },
+                  {
+                    "additionalProperties": false,
+                    "type": "object",
+                    "properties": {
+                      "daysRemaining": {
+                        "exclusiveMinimum": 0,
+                        "maximum": 36500,
+                        "description": "Current-supplement observations only: positive remaining days of retained stock. Omit unknown duration. Invalid for diet observations.",
+                        "type": "number"
+                      },
+                      "source": {
+                        "type": "string",
+                        "enum": [
+                          "diet",
+                          "current_supplement"
+                        ]
+                      },
+                      "name": {
+                        "minLength": 1,
+                        "maxLength": 240,
+                        "type": "string"
+                      },
+                      "supplementId": {
+                        "pattern": "^sup_[A-Za-z0-9_-]+$",
+                        "maxLength": 128,
+                        "type": "string"
+                      },
+                      "productId": {
+                        "pattern": "^prd_[A-Za-z0-9_-]+$",
+                        "maxLength": 128,
+                        "type": "string"
+                      },
+                      "description": {
+                        "minLength": 1,
+                        "maxLength": 1000,
+                        "type": "string"
+                      },
+                      "evidence": {
+                        "minLength": 1,
+                        "maxLength": 1000,
+                        "type": "string"
+                      },
+                      "certainty": {
+                        "const": "estimated",
+                        "type": "string"
+                      },
+                      "amount": {
+                        "minimum": 0,
+                        "maximum": 1000000000000000,
+                        "description": "Daily amount in the accompanying unit; zero must be explicitly reported.",
+                        "type": "number"
+                      },
+                      "minimum": {
+                        "minimum": 0,
+                        "maximum": 1000000000000000,
+                        "description": "Daily amount in the accompanying unit; zero must be explicitly reported.",
+                        "type": "number"
+                      },
+                      "maximum": {
+                        "minimum": 0,
+                        "maximum": 1000000000000000,
+                        "description": "Daily amount in the accompanying unit; zero must be explicitly reported.",
+                        "type": "number"
+                      },
+                      "unit": {
+                        "type": "string",
+                        "enum": [
+                          "mcg",
+                          "mg",
+                          "g",
+                          "IU",
+                          "CFU",
+                          "ml",
+                          "serving"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "source",
+                      "certainty"
+                    ]
+                  },
+                  {
+                    "additionalProperties": false,
+                    "type": "object",
+                    "properties": {
+                      "daysRemaining": {
+                        "exclusiveMinimum": 0,
+                        "maximum": 36500,
+                        "description": "Current-supplement observations only: positive remaining days of retained stock. Omit unknown duration. Invalid for diet observations.",
+                        "type": "number"
+                      },
+                      "source": {
+                        "type": "string",
+                        "enum": [
+                          "diet",
+                          "current_supplement"
+                        ]
+                      },
+                      "name": {
+                        "minLength": 1,
+                        "maxLength": 240,
+                        "type": "string"
+                      },
+                      "supplementId": {
+                        "pattern": "^sup_[A-Za-z0-9_-]+$",
+                        "maxLength": 128,
+                        "type": "string"
+                      },
+                      "productId": {
+                        "pattern": "^prd_[A-Za-z0-9_-]+$",
+                        "maxLength": 128,
+                        "type": "string"
+                      },
+                      "description": {
+                        "minLength": 1,
+                        "maxLength": 1000,
+                        "type": "string"
+                      },
+                      "evidence": {
+                        "minLength": 1,
+                        "maxLength": 1000,
+                        "type": "string"
+                      },
+                      "certainty": {
+                        "const": "unknown",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "source",
+                      "certainty"
+                    ]
+                  }
+                ]
+              }
+            },
+            "costHorizonsDays": {
+              "minItems": 1,
+              "maxItems": 2,
+              "uniqueItems": true,
+              "default": [
+                30,
+                90
+              ],
+              "description": "Supported comparison horizons in days. The response exposes the 30- and 90-day ledgers; other periods are unavailable.",
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "enum": [
+                  30,
+                  90
+                ]
+              }
+            },
+            "baseline": {
+              "additionalProperties": false,
+              "type": "object",
+              "properties": {
+                "items": {
+                  "maxItems": 100,
+                  "type": "array",
+                  "items": {
+                    "additionalProperties": false,
+                    "type": "object",
+                    "properties": {
+                      "daysRemaining": {
+                        "minimum": 0,
+                        "maximum": 36500,
+                        "type": "number"
+                      },
+                      "dailyServings": {
+                        "exclusiveMinimum": 0,
+                        "maximum": 1000,
+                        "description": "Actual catalogue servings per day for this comparison basket. Omission makes equivalent-coverage savings unavailable; quantity remains packs purchased.",
+                        "type": "number"
+                      },
+                      "productId": {
+                        "pattern": "^prd_[A-Za-z0-9_-]+$",
+                        "maxLength": 128,
+                        "type": "string"
+                      },
+                      "quantity": {
+                        "exclusiveMinimum": 0,
+                        "maximum": 1000000000000000,
+                        "description": "Positive quantity in this field’s stated units. Nutrient quantities also use the documented dose precision.",
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "productId",
+                      "quantity"
+                    ]
+                  }
+                },
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "current_basket",
+                    "separate_direct_products"
+                  ]
+                }
+              },
+              "required": [
+                "type"
+              ]
+            },
+            "destinationCountry": {
+              "pattern": "^[A-Z]{2}$",
+              "description": "Deliverable ISO country from info.supportedCountries.",
+              "type": "string"
+            },
+            "locale": {
+              "minLength": 2,
+              "maxLength": 35,
+              "description": "BCP 47 locale; supported locales are advertised by info. Unsupported locales fall back to English.",
+              "type": "string"
+            },
+            "optimization": {
+              "type": "string",
+              "enum": [
+                "balanced",
+                "best_coverage",
+                "lowest_cost",
+                "fewest_pills"
+              ],
+              "description": "Closest dose fit remains the default recommendation. This preference chooses commercial tie-breaks and disclosed trade-offs; it never changes agreed targets or eliminates above-preference options."
+            },
+            "profile": {
+              "additionalProperties": false,
+              "type": "object",
+              "properties": {
+                "ageYears": {
+                  "minimum": 0,
+                  "maximum": 120,
+                  "description": "Reported age. Omit when unknown; scoring defaults are not health evidence.",
+                  "type": "integer"
+                },
+                "goals": {
+                  "maxItems": 30,
+                  "uniqueItems": true,
+                  "type": "array",
+                  "items": {
+                    "minLength": 1,
+                    "maxLength": 80,
+                    "type": "string"
+                  }
+                },
+                "lifeStage": {
+                  "type": "string",
+                  "enum": [
+                    "adult",
+                    "child",
+                    "pregnant",
+                    "breastfeeding",
+                    "trying_to_conceive"
+                  ]
+                },
+                "sex": {
+                  "type": "string",
+                  "enum": [
+                    "female",
+                    "male"
+                  ]
+                }
+              }
+            },
+            "requirements": {
+              "additionalProperties": false,
+              "description": "maxDailyPills, maxPriceMinor and maxProductCount are advisory, never purchase limits. Create/replacement omission or null means no preference; patch omission preserves, null clears. Zero permits purchase. Prominent advice: strictly over 20% above a positive preference, or any positive actual above zero. Unknown actuals stay unknown.",
+              "type": "object",
+              "properties": {
+                "allowedForms": {
+                  "uniqueItems": true,
+                  "maxItems": 8,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "enum": [
+                      "capsule",
+                      "softgel",
+                      "tablet",
+                      "powder",
+                      "liquid",
+                      "gummy",
+                      "sachet",
+                      "other"
+                    ]
+                  }
+                },
+                "dietaryPreference": {
+                  "type": "string",
+                  "enum": [
+                    "any",
+                    "plant_based",
+                    "vegan"
+                  ]
+                },
+                "excludeProductIds": {
+                  "maxItems": 100,
+                  "uniqueItems": true,
+                  "type": "array",
+                  "items": {
+                    "pattern": "^prd_[A-Za-z0-9_-]+$",
+                    "maxLength": 128,
+                    "type": "string"
+                  },
+                  "description": "Exclude only these products. Does not remove requested nutrients. [] clears this exclusion."
+                },
+                "excludeSupplementIds": {
+                  "maxItems": 100,
+                  "uniqueItems": true,
+                  "type": "array",
+                  "items": {
+                    "pattern": "^sup_[A-Za-z0-9_-]+$",
+                    "maxLength": 128,
+                    "type": "string"
+                  },
+                  "description": "Exclude products containing these nutrient concepts, not particular product IDs. [] clears this exclusion."
+                },
+                "maxDailyPills": {
+                  "anyOf": [
+                    {
+                      "minimum": 0,
+                      "maximum": 1000,
+                      "description": "Preferred daily pill count; unknown counts remain unknown.",
+                      "type": "number"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "maxPriceMinor": {
+                  "anyOf": [
+                    {
+                      "minimum": 0,
+                      "maximum": 1000000000000,
+                      "description": "Preferred first-order goods price in destination currency minor units; delivery quoted separately.",
+                      "type": "integer"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "maxProductCount": {
+                  "anyOf": [
+                    {
+                      "minimum": 0,
+                      "maximum": 9007199254740991,
+                      "type": "integer"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "description": "Preferred distinct new products; there is no system minimum or maximum basket count."
+                },
+                "productDoses": {
+                  "maxItems": 100,
+                  "uniqueItems": true,
+                  "description": "Fix returned products at these daily labelled servings; other products remain optimisable. Use administration metadata for measurable quantities. [] clears proposals. Revision evaluates, never purchases. Exclusion/physical conflicts return field errors; numeric and health findings are advice.",
+                  "type": "array",
+                  "items": {
+                    "additionalProperties": false,
+                    "type": "object",
+                    "properties": {
+                      "productId": {
+                        "pattern": "^prd_[A-Za-z0-9_-]+$",
+                        "maxLength": 128,
+                        "type": "string"
+                      },
+                      "servingsPerDay": {
+                        "exclusiveMinimum": 0,
+                        "maximum": 1000000000000000,
+                        "description": "Positive quantity in this field’s stated units. Nutrient quantities also use the documented dose precision.",
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "productId",
+                      "servingsPerDay"
+                    ]
+                  }
+                },
+                "omega3SourcePreference": {
+                  "type": "string",
+                  "enum": [
+                    "any",
+                    "algae_only",
+                    "fish_allowed"
+                  ]
+                },
+                "retainProductIds": {
+                  "maxItems": 100,
+                  "uniqueItems": true,
+                  "type": "array",
+                  "items": {
+                    "pattern": "^prd_[A-Za-z0-9_-]+$",
+                    "maxLength": 128,
+                    "type": "string"
+                  }
+                },
+                "retainSupplementIds": {
+                  "maxItems": 100,
+                  "uniqueItems": true,
+                  "type": "array",
+                  "items": {
+                    "pattern": "^sup_[A-Za-z0-9_-]+$",
+                    "maxLength": 128,
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "safetyAcknowledgement": {
+              "additionalProperties": false,
+              "description": "Deprecated compatibility input. Health advice never requires acknowledgement.",
+              "type": "object",
+              "properties": {
+                "confirmed": {
+                  "const": true,
+                  "type": "boolean"
+                },
+                "guidanceIds": {
+                  "maxItems": 50,
+                  "uniqueItems": true,
+                  "type": "array",
+                  "items": {
+                    "minLength": 1,
+                    "maxLength": 128,
+                    "type": "string"
+                  }
+                },
+                "revision": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "confirmed",
+                "guidanceIds",
+                "revision"
+              ]
+            },
+            "targets": {
+              "minItems": 1,
+              "maxItems": 30,
+              "description": "Agreed targets: name, amount, and unit. Optional importance defaults to required.",
+              "type": "array",
+              "items": {
+                "additionalProperties": false,
+                "type": "object",
+                "properties": {
+                  "basis": {
+                    "type": "string",
+                    "enum": [
+                      "total_daily",
+                      "supplemental"
+                    ],
+                    "default": "total_daily",
+                    "description": "total_daily covers known dietary intake, continued supplements and new products; supplemental covers continued supplements and new products only. Web food-gap recommendations explicitly use supplemental. Estimated intake affects dose-fit ranges, never guaranteed coverage."
+                  },
+                  "acceptableRange": {
+                    "additionalProperties": false,
+                    "type": "object",
+                    "properties": {
+                      "maximum": {
+                        "exclusiveMinimum": 0,
+                        "maximum": 1000000000000000,
+                        "description": "Positive quantity in this field’s stated units. Nutrient quantities also use the documented dose precision.",
+                        "type": "number"
+                      },
+                      "minimum": {
+                        "exclusiveMinimum": 0,
+                        "maximum": 1000000000000000,
+                        "description": "Positive quantity in this field’s stated units. Nutrient quantities also use the documented dose precision.",
+                        "type": "number"
+                      },
+                      "unit": {
+                        "type": "string",
+                        "enum": [
+                          "mcg",
+                          "mg",
+                          "g",
+                          "IU",
+                          "CFU",
+                          "ml",
+                          "serving"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "maximum",
+                      "minimum",
+                      "unit"
+                    ]
+                  },
+                  "amount": {
+                    "exclusiveMinimum": 0,
+                    "maximum": 1000000000000000,
+                    "description": "Positive quantity in this field’s stated units. Nutrient quantities also use the documented dose precision.",
+                    "type": "number"
+                  },
+                  "importance": {
+                    "type": "string",
+                    "enum": [
+                      "core",
+                      "optional",
+                      "conditional",
+                      "required"
+                    ],
+                    "default": "required"
+                  },
+                  "name": {
+                    "minLength": 1,
+                    "maxLength": 240,
+                    "type": "string"
+                  },
+                  "prerequisite": {
+                    "additionalProperties": false,
+                    "type": "object",
+                    "properties": {
+                      "nextAction": {
+                        "minLength": 1,
+                        "maxLength": 1000,
+                        "type": "string"
+                      },
+                      "reasonCode": {
+                        "minLength": 1,
+                        "maxLength": 128,
+                        "type": "string"
+                      },
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "satisfied",
+                          "unsatisfied",
+                          "unknown"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "status"
+                    ]
+                  },
+                  "supplementId": {
+                    "pattern": "^sup_[A-Za-z0-9_-]+$",
+                    "maxLength": 128,
+                    "type": "string"
+                  },
+                  "unit": {
+                    "type": "string",
+                    "enum": [
+                      "mcg",
+                      "mg",
+                      "g",
+                      "IU",
+                      "CFU",
+                      "ml",
+                      "serving"
+                    ]
+                  }
+                },
+                "required": [
+                  "amount",
+                  "name",
+                  "unit"
+                ]
+              }
+            }
+          },
+          "required": [
+            "destinationCountry",
+            "locale",
+            "optimization",
+            "profile",
+            "requirements",
+            "targets"
+          ]
+        }
+      },
+      "required": [
+        "operation",
+        "idempotencyKey",
+        "request"
+      ]
+    },
+    "get": {
+      "anyOf": [
+        {
+          "additionalProperties": false,
+          "type": "object",
+          "properties": {
+            "operation": {
+              "const": "get",
+              "type": "string"
+            },
+            "planHandle": {
+              "minLength": 32,
+              "maxLength": 4096,
+              "type": "string"
+            },
+            "responseView": {
+              "type": "string",
+              "enum": [
+                "conversation",
+                "full"
+              ],
+              "default": "conversation",
+              "description": "Presentation only; full is opt-in. Temporary legacy header: see info(client_guide)."
+            }
+          },
+          "required": [
+            "operation",
+            "planHandle"
+          ]
+        },
+        {
+          "additionalProperties": false,
+          "type": "object",
+          "properties": {
+            "operation": {
+              "const": "get",
+              "type": "string"
+            },
+            "planHandle": {
+              "minLength": 32,
+              "maxLength": 4096,
+              "type": "string"
+            },
+            "responseView": {
+              "const": "status",
+              "type": "string"
+            },
+            "knownResultVersion": {
+              "minLength": 1,
+              "maxLength": 128,
+              "description": "Previous returned resultVersion; unchanged is true only for the same visible state and representation identity.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "operation",
+            "planHandle",
+            "responseView"
+          ]
+        },
+        {
+          "additionalProperties": false,
+          "type": "object",
+          "properties": {
+            "operation": {
+              "const": "get",
+              "type": "string"
+            },
+            "planHandle": {
+              "minLength": 32,
+              "maxLength": 4096,
+              "type": "string"
+            },
+            "responseView": {
+              "const": "details",
+              "type": "string"
+            },
+            "expectedRevision": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "sections": {
+              "minItems": 1,
+              "uniqueItems": true,
+              "description": "Batch only the sections needed. Reads stored facts without rematching.",
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "request",
+                  "products",
+                  "coverage",
+                  "advice",
+                  "score",
+                  "economics"
+                ]
+              }
+            },
+            "optionIds": {
+              "minItems": 1,
+              "uniqueItems": true,
+              "type": "array",
+              "items": {
+                "minLength": 8,
+                "maxLength": 128,
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "operation",
+            "planHandle",
+            "responseView",
+            "expectedRevision",
+            "sections"
+          ]
+        }
+      ]
+    },
+    "revise": {
+      "anyOf": [
+        {
+          "additionalProperties": false,
+          "type": "object",
+          "properties": {
+            "responseView": {
+              "type": "string",
+              "enum": [
+                "conversation",
+                "full"
+              ],
+              "default": "conversation",
+              "description": "Presentation only; full is opt-in. Temporary legacy header: see info(client_guide)."
+            },
+            "operation": {
+              "const": "revise",
+              "type": "string"
+            },
+            "idempotencyKey": {
+              "minLength": 16,
+              "maxLength": 128,
+              "type": "string"
+            },
+            "planHandle": {
+              "minLength": 32,
+              "maxLength": 4096,
+              "type": "string"
+            },
+            "expectedRevision": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "searchEffort": {
+              "type": "string",
+              "enum": [
+                "standard",
+                "expanded"
+              ],
+              "default": "standard",
+              "description": "Deterministic search budget: standard 8000 expansion attempts; expanded 64000. Expanded includes the standard incumbent. A revise omission preserves prior effort. Repeating identical inputs reuses work; after expanded exhaustion refine the request."
+            },
+            "request": {
+              "additionalProperties": false,
+              "description": "Complete plan request. Replacement revisions reset omitted optional fields. Agreed targets are not diagnoses. Resolved nutrient amounts must represent at least one nanogram, one CFU, or 0.001 ml/serving; IU precision depends on nutrient form. Below-precision errors report the exact field and permitted minimum.",
+              "type": "object",
+              "properties": {
+                "answers": {
+                  "maxItems": 50,
+                  "uniqueItems": true,
+                  "type": "array",
+                  "items": {
+                    "additionalProperties": false,
+                    "type": "object",
+                    "properties": {
+                      "choice": {
+                        "minLength": 1,
+                        "maxLength": 240,
+                        "type": "string"
+                      },
+                      "questionId": {
+                        "minLength": 1,
+                        "maxLength": 128,
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "choice",
+                      "questionId"
+                    ]
+                  }
+                },
+                "conditionCodes": {
+                  "maxItems": 50,
+                  "uniqueItems": true,
+                  "type": "array",
+                  "items": {
+                    "minLength": 1,
+                    "maxLength": 128,
+                    "type": "string"
+                  },
+                  "description": "Condition codes from info.conditionCodes; unrecognised reported context is preserved as unassessed advice."
+                },
+                "medicationCodes": {
+                  "maxItems": 50,
+                  "uniqueItems": true,
+                  "type": "array",
+                  "items": {
+                    "minLength": 1,
+                    "maxLength": 128,
+                    "type": "string"
+                  },
+                  "description": "Medication codes from info.medicationCodes; omission means unknown, not confirmed none."
+                },
+                "currentSupplements": {
+                  "maxItems": 50,
+                  "description": "Quantified continued supplements. Omission means unknown; [] explicitly reports none. A (productId, nutrient) pair may occur only once across this field and current-source intake observations.",
+                  "type": "array",
+                  "items": {
+                    "additionalProperties": false,
+                    "type": "object",
+                    "properties": {
+                      "dailyAmount": {
+                        "minimum": 0,
+                        "maximum": 1000000000000000,
+                        "description": "Daily amount in the accompanying unit; zero must be explicitly reported.",
+                        "type": "number"
+                      },
+                      "daysRemaining": {
+                        "exclusiveMinimum": 0,
+                        "maximum": 36500,
+                        "description": "Positive remaining days of retained inventory. Omit when unknown. If none remains, remove this retained inventory entry and revise the intended request.",
+                        "type": "number"
+                      },
+                      "name": {
+                        "minLength": 1,
+                        "maxLength": 240,
+                        "type": "string"
+                      },
+                      "productId": {
+                        "pattern": "^prd_[A-Za-z0-9_-]+$",
+                        "maxLength": 128,
+                        "type": "string"
+                      },
+                      "supplementId": {
+                        "pattern": "^sup_[A-Za-z0-9_-]+$",
+                        "maxLength": 128,
+                        "type": "string"
+                      },
+                      "unit": {
+                        "type": "string",
+                        "enum": [
+                          "mcg",
+                          "mg",
+                          "g",
+                          "IU",
+                          "CFU",
+                          "ml",
+                          "serving"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "dailyAmount",
+                      "name",
+                      "unit"
+                    ]
+                  }
+                },
+                "intake": {
+                  "maxItems": 100,
+                  "description": "Reported observations. Omission or [] does not establish zero dietary intake. An explicitly reported known amount of 0 is required to establish zero for a nutrient.",
+                  "type": "array",
+                  "items": {
+                    "description": "Reported daily intake. Missing quantities are unknown, never zero. Broad dietary descriptions are accepted without labels or portion sizes.",
+                    "anyOf": [
+                      {
+                        "additionalProperties": false,
+                        "type": "object",
+                        "properties": {
+                          "daysRemaining": {
+                            "exclusiveMinimum": 0,
+                            "maximum": 36500,
+                            "description": "Current-supplement observations only: positive remaining days of retained stock. Omit unknown duration. Invalid for diet observations.",
+                            "type": "number"
+                          },
+                          "source": {
+                            "type": "string",
+                            "enum": [
+                              "diet",
+                              "current_supplement"
+                            ]
+                          },
+                          "name": {
+                            "minLength": 1,
+                            "maxLength": 240,
+                            "type": "string"
+                          },
+                          "supplementId": {
+                            "pattern": "^sup_[A-Za-z0-9_-]+$",
+                            "maxLength": 128,
+                            "type": "string"
+                          },
+                          "productId": {
+                            "pattern": "^prd_[A-Za-z0-9_-]+$",
+                            "maxLength": 128,
+                            "type": "string"
+                          },
+                          "description": {
+                            "minLength": 1,
+                            "maxLength": 1000,
+                            "type": "string"
+                          },
+                          "evidence": {
+                            "minLength": 1,
+                            "maxLength": 1000,
+                            "type": "string"
+                          },
+                          "certainty": {
+                            "const": "known",
+                            "type": "string"
+                          },
+                          "amount": {
+                            "minimum": 0,
+                            "maximum": 1000000000000000,
+                            "description": "Daily amount in the accompanying unit; zero must be explicitly reported.",
+                            "type": "number"
+                          },
+                          "unit": {
+                            "type": "string",
+                            "enum": [
+                              "mcg",
+                              "mg",
+                              "g",
+                              "IU",
+                              "CFU",
+                              "ml",
+                              "serving"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "source",
+                          "certainty",
+                          "amount",
+                          "unit"
+                        ]
+                      },
+                      {
+                        "additionalProperties": false,
+                        "type": "object",
+                        "properties": {
+                          "daysRemaining": {
+                            "exclusiveMinimum": 0,
+                            "maximum": 36500,
+                            "description": "Current-supplement observations only: positive remaining days of retained stock. Omit unknown duration. Invalid for diet observations.",
+                            "type": "number"
+                          },
+                          "source": {
+                            "type": "string",
+                            "enum": [
+                              "diet",
+                              "current_supplement"
+                            ]
+                          },
+                          "name": {
+                            "minLength": 1,
+                            "maxLength": 240,
+                            "type": "string"
+                          },
+                          "supplementId": {
+                            "pattern": "^sup_[A-Za-z0-9_-]+$",
+                            "maxLength": 128,
+                            "type": "string"
+                          },
+                          "productId": {
+                            "pattern": "^prd_[A-Za-z0-9_-]+$",
+                            "maxLength": 128,
+                            "type": "string"
+                          },
+                          "description": {
+                            "minLength": 1,
+                            "maxLength": 1000,
+                            "type": "string"
+                          },
+                          "evidence": {
+                            "minLength": 1,
+                            "maxLength": 1000,
+                            "type": "string"
+                          },
+                          "certainty": {
+                            "const": "estimated",
+                            "type": "string"
+                          },
+                          "amount": {
+                            "minimum": 0,
+                            "maximum": 1000000000000000,
+                            "description": "Daily amount in the accompanying unit; zero must be explicitly reported.",
+                            "type": "number"
+                          },
+                          "minimum": {
+                            "minimum": 0,
+                            "maximum": 1000000000000000,
+                            "description": "Daily amount in the accompanying unit; zero must be explicitly reported.",
+                            "type": "number"
+                          },
+                          "maximum": {
+                            "minimum": 0,
+                            "maximum": 1000000000000000,
+                            "description": "Daily amount in the accompanying unit; zero must be explicitly reported.",
+                            "type": "number"
+                          },
+                          "unit": {
+                            "type": "string",
+                            "enum": [
+                              "mcg",
+                              "mg",
+                              "g",
+                              "IU",
+                              "CFU",
+                              "ml",
+                              "serving"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "source",
+                          "certainty"
+                        ]
+                      },
+                      {
+                        "additionalProperties": false,
+                        "type": "object",
+                        "properties": {
+                          "daysRemaining": {
+                            "exclusiveMinimum": 0,
+                            "maximum": 36500,
+                            "description": "Current-supplement observations only: positive remaining days of retained stock. Omit unknown duration. Invalid for diet observations.",
+                            "type": "number"
+                          },
+                          "source": {
+                            "type": "string",
+                            "enum": [
+                              "diet",
+                              "current_supplement"
+                            ]
+                          },
+                          "name": {
+                            "minLength": 1,
+                            "maxLength": 240,
+                            "type": "string"
+                          },
+                          "supplementId": {
+                            "pattern": "^sup_[A-Za-z0-9_-]+$",
+                            "maxLength": 128,
+                            "type": "string"
+                          },
+                          "productId": {
+                            "pattern": "^prd_[A-Za-z0-9_-]+$",
+                            "maxLength": 128,
+                            "type": "string"
+                          },
+                          "description": {
+                            "minLength": 1,
+                            "maxLength": 1000,
+                            "type": "string"
+                          },
+                          "evidence": {
+                            "minLength": 1,
+                            "maxLength": 1000,
+                            "type": "string"
+                          },
+                          "certainty": {
+                            "const": "unknown",
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "source",
+                          "certainty"
+                        ]
+                      }
+                    ]
+                  }
+                },
+                "costHorizonsDays": {
+                  "minItems": 1,
+                  "maxItems": 2,
+                  "uniqueItems": true,
+                  "default": [
+                    30,
+                    90
+                  ],
+                  "description": "Supported comparison horizons in days. The response exposes the 30- and 90-day ledgers; other periods are unavailable.",
+                  "type": "array",
+                  "items": {
+                    "type": "integer",
+                    "enum": [
+                      30,
+                      90
+                    ]
+                  }
+                },
+                "baseline": {
+                  "additionalProperties": false,
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "maxItems": 100,
+                      "type": "array",
+                      "items": {
+                        "additionalProperties": false,
+                        "type": "object",
+                        "properties": {
+                          "daysRemaining": {
+                            "minimum": 0,
+                            "maximum": 36500,
+                            "type": "number"
+                          },
+                          "dailyServings": {
+                            "exclusiveMinimum": 0,
+                            "maximum": 1000,
+                            "description": "Actual catalogue servings per day for this comparison basket. Omission makes equivalent-coverage savings unavailable; quantity remains packs purchased.",
+                            "type": "number"
+                          },
+                          "productId": {
+                            "pattern": "^prd_[A-Za-z0-9_-]+$",
+                            "maxLength": 128,
+                            "type": "string"
+                          },
+                          "quantity": {
+                            "exclusiveMinimum": 0,
+                            "maximum": 1000000000000000,
+                            "description": "Positive quantity in this field’s stated units. Nutrient quantities also use the documented dose precision.",
+                            "type": "number"
+                          }
+                        },
+                        "required": [
+                          "productId",
+                          "quantity"
+                        ]
+                      }
+                    },
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "current_basket",
+                        "separate_direct_products"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "type"
+                  ]
+                },
+                "destinationCountry": {
+                  "pattern": "^[A-Z]{2}$",
+                  "description": "Deliverable ISO country from info.supportedCountries.",
+                  "type": "string"
+                },
+                "locale": {
+                  "minLength": 2,
+                  "maxLength": 35,
+                  "description": "BCP 47 locale; supported locales are advertised by info. Unsupported locales fall back to English.",
+                  "type": "string"
+                },
+                "optimization": {
+                  "type": "string",
+                  "enum": [
+                    "balanced",
+                    "best_coverage",
+                    "lowest_cost",
+                    "fewest_pills"
+                  ],
+                  "description": "Closest dose fit remains the default recommendation. This preference chooses commercial tie-breaks and disclosed trade-offs; it never changes agreed targets or eliminates above-preference options."
+                },
+                "profile": {
+                  "additionalProperties": false,
+                  "type": "object",
+                  "properties": {
+                    "ageYears": {
+                      "minimum": 0,
+                      "maximum": 120,
+                      "description": "Reported age. Omit when unknown; scoring defaults are not health evidence.",
+                      "type": "integer"
+                    },
+                    "goals": {
+                      "maxItems": 30,
+                      "uniqueItems": true,
+                      "type": "array",
+                      "items": {
+                        "minLength": 1,
+                        "maxLength": 80,
+                        "type": "string"
+                      }
+                    },
+                    "lifeStage": {
+                      "type": "string",
+                      "enum": [
+                        "adult",
+                        "child",
+                        "pregnant",
+                        "breastfeeding",
+                        "trying_to_conceive"
+                      ]
+                    },
+                    "sex": {
+                      "type": "string",
+                      "enum": [
+                        "female",
+                        "male"
+                      ]
+                    }
+                  }
+                },
+                "requirements": {
+                  "additionalProperties": false,
+                  "description": "maxDailyPills, maxPriceMinor and maxProductCount are advisory, never purchase limits. Create/replacement omission or null means no preference; patch omission preserves, null clears. Zero permits purchase. Prominent advice: strictly over 20% above a positive preference, or any positive actual above zero. Unknown actuals stay unknown.",
+                  "type": "object",
+                  "properties": {
+                    "allowedForms": {
+                      "uniqueItems": true,
+                      "maxItems": 8,
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "capsule",
+                          "softgel",
+                          "tablet",
+                          "powder",
+                          "liquid",
+                          "gummy",
+                          "sachet",
+                          "other"
+                        ]
+                      }
+                    },
+                    "dietaryPreference": {
+                      "type": "string",
+                      "enum": [
+                        "any",
+                        "plant_based",
+                        "vegan"
+                      ]
+                    },
+                    "excludeProductIds": {
+                      "maxItems": 100,
+                      "uniqueItems": true,
+                      "type": "array",
+                      "items": {
+                        "pattern": "^prd_[A-Za-z0-9_-]+$",
+                        "maxLength": 128,
+                        "type": "string"
+                      },
+                      "description": "Exclude only these products. Does not remove requested nutrients. [] clears this exclusion."
+                    },
+                    "excludeSupplementIds": {
+                      "maxItems": 100,
+                      "uniqueItems": true,
+                      "type": "array",
+                      "items": {
+                        "pattern": "^sup_[A-Za-z0-9_-]+$",
+                        "maxLength": 128,
+                        "type": "string"
+                      },
+                      "description": "Exclude products containing these nutrient concepts, not particular product IDs. [] clears this exclusion."
+                    },
+                    "maxDailyPills": {
+                      "anyOf": [
+                        {
+                          "minimum": 0,
+                          "maximum": 1000,
+                          "description": "Preferred daily pill count; unknown counts remain unknown.",
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "maxPriceMinor": {
+                      "anyOf": [
+                        {
+                          "minimum": 0,
+                          "maximum": 1000000000000,
+                          "description": "Preferred first-order goods price in destination currency minor units; delivery quoted separately.",
+                          "type": "integer"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "maxProductCount": {
+                      "anyOf": [
+                        {
+                          "minimum": 0,
+                          "maximum": 9007199254740991,
+                          "type": "integer"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "default": null,
+                      "description": "Preferred distinct new products; there is no system minimum or maximum basket count."
+                    },
+                    "productDoses": {
+                      "maxItems": 100,
+                      "uniqueItems": true,
+                      "description": "Fix returned products at these daily labelled servings; other products remain optimisable. Use administration metadata for measurable quantities. [] clears proposals. Revision evaluates, never purchases. Exclusion/physical conflicts return field errors; numeric and health findings are advice.",
+                      "type": "array",
+                      "items": {
+                        "additionalProperties": false,
+                        "type": "object",
+                        "properties": {
+                          "productId": {
+                            "pattern": "^prd_[A-Za-z0-9_-]+$",
+                            "maxLength": 128,
+                            "type": "string"
+                          },
+                          "servingsPerDay": {
+                            "exclusiveMinimum": 0,
+                            "maximum": 1000000000000000,
+                            "description": "Positive quantity in this field’s stated units. Nutrient quantities also use the documented dose precision.",
+                            "type": "number"
+                          }
+                        },
+                        "required": [
+                          "productId",
+                          "servingsPerDay"
+                        ]
+                      }
+                    },
+                    "omega3SourcePreference": {
+                      "type": "string",
+                      "enum": [
+                        "any",
+                        "algae_only",
+                        "fish_allowed"
+                      ]
+                    },
+                    "retainProductIds": {
+                      "maxItems": 100,
+                      "uniqueItems": true,
+                      "type": "array",
+                      "items": {
+                        "pattern": "^prd_[A-Za-z0-9_-]+$",
+                        "maxLength": 128,
+                        "type": "string"
+                      }
+                    },
+                    "retainSupplementIds": {
+                      "maxItems": 100,
+                      "uniqueItems": true,
+                      "type": "array",
+                      "items": {
+                        "pattern": "^sup_[A-Za-z0-9_-]+$",
+                        "maxLength": 128,
+                        "type": "string"
+                      }
+                    }
+                  }
+                },
+                "safetyAcknowledgement": {
+                  "additionalProperties": false,
+                  "description": "Deprecated compatibility input. Health advice never requires acknowledgement.",
+                  "type": "object",
+                  "properties": {
+                    "confirmed": {
+                      "const": true,
+                      "type": "boolean"
+                    },
+                    "guidanceIds": {
+                      "maxItems": 50,
+                      "uniqueItems": true,
+                      "type": "array",
+                      "items": {
+                        "minLength": 1,
+                        "maxLength": 128,
+                        "type": "string"
+                      }
+                    },
+                    "revision": {
+                      "minimum": 1,
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "confirmed",
+                    "guidanceIds",
+                    "revision"
+                  ]
+                },
+                "targets": {
+                  "minItems": 1,
+                  "maxItems": 30,
+                  "description": "Agreed targets: name, amount, and unit. Optional importance defaults to required.",
+                  "type": "array",
+                  "items": {
+                    "additionalProperties": false,
+                    "type": "object",
+                    "properties": {
+                      "basis": {
+                        "type": "string",
+                        "enum": [
+                          "total_daily",
+                          "supplemental"
+                        ],
+                        "default": "total_daily",
+                        "description": "total_daily covers known dietary intake, continued supplements and new products; supplemental covers continued supplements and new products only. Web food-gap recommendations explicitly use supplemental. Estimated intake affects dose-fit ranges, never guaranteed coverage."
+                      },
+                      "acceptableRange": {
+                        "additionalProperties": false,
+                        "type": "object",
+                        "properties": {
+                          "maximum": {
+                            "exclusiveMinimum": 0,
+                            "maximum": 1000000000000000,
+                            "description": "Positive quantity in this field’s stated units. Nutrient quantities also use the documented dose precision.",
+                            "type": "number"
+                          },
+                          "minimum": {
+                            "exclusiveMinimum": 0,
+                            "maximum": 1000000000000000,
+                            "description": "Positive quantity in this field’s stated units. Nutrient quantities also use the documented dose precision.",
+                            "type": "number"
+                          },
+                          "unit": {
+                            "type": "string",
+                            "enum": [
+                              "mcg",
+                              "mg",
+                              "g",
+                              "IU",
+                              "CFU",
+                              "ml",
+                              "serving"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "maximum",
+                          "minimum",
+                          "unit"
+                        ]
+                      },
+                      "amount": {
+                        "exclusiveMinimum": 0,
+                        "maximum": 1000000000000000,
+                        "description": "Positive quantity in this field’s stated units. Nutrient quantities also use the documented dose precision.",
+                        "type": "number"
+                      },
+                      "importance": {
+                        "type": "string",
+                        "enum": [
+                          "core",
+                          "optional",
+                          "conditional",
+                          "required"
+                        ],
+                        "default": "required"
+                      },
+                      "name": {
+                        "minLength": 1,
+                        "maxLength": 240,
+                        "type": "string"
+                      },
+                      "prerequisite": {
+                        "additionalProperties": false,
+                        "type": "object",
+                        "properties": {
+                          "nextAction": {
+                            "minLength": 1,
+                            "maxLength": 1000,
+                            "type": "string"
+                          },
+                          "reasonCode": {
+                            "minLength": 1,
+                            "maxLength": 128,
+                            "type": "string"
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "satisfied",
+                              "unsatisfied",
+                              "unknown"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "status"
+                        ]
+                      },
+                      "supplementId": {
+                        "pattern": "^sup_[A-Za-z0-9_-]+$",
+                        "maxLength": 128,
+                        "type": "string"
+                      },
+                      "unit": {
+                        "type": "string",
+                        "enum": [
+                          "mcg",
+                          "mg",
+                          "g",
+                          "IU",
+                          "CFU",
+                          "ml",
+                          "serving"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "amount",
+                      "name",
+                      "unit"
+                    ]
+                  }
+                }
+              },
+              "required": [
+                "destinationCountry",
+                "locale",
+                "optimization",
+                "profile",
+                "requirements",
+                "targets"
+              ]
+            }
+          },
+          "required": [
+            "operation",
+            "idempotencyKey",
+            "planHandle",
+            "expectedRevision",
+            "request"
+          ]
+        },
+        {
+          "additionalProperties": false,
+          "type": "object",
+          "properties": {
+            "responseView": {
+              "type": "string",
+              "enum": [
+                "conversation",
+                "full"
+              ],
+              "default": "conversation",
+              "description": "Presentation only; full is opt-in. Temporary legacy header: see info(client_guide)."
+            },
+            "operation": {
+              "const": "revise",
+              "type": "string"
+            },
+            "idempotencyKey": {
+              "minLength": 16,
+              "maxLength": 128,
+              "type": "string"
+            },
+            "planHandle": {
+              "minLength": 32,
+              "maxLength": 4096,
+              "type": "string"
+            },
+            "expectedRevision": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "searchEffort": {
+              "type": "string",
+              "enum": [
+                "standard",
+                "expanded"
+              ],
+              "default": "standard",
+              "description": "Deterministic search budget: standard 8000 expansion attempts; expanded 64000. Expanded includes the standard incumbent. A revise omission preserves prior effort. Repeating identical inputs reuses work; after expanded exhaustion refine the request."
+            },
+            "requestPatch": {
+              "type": "object",
+              "properties": {
+                "answers": {
+                  "maxItems": 50,
+                  "uniqueItems": true,
+                  "type": "array",
+                  "items": {
+                    "additionalProperties": false,
+                    "type": "object",
+                    "properties": {
+                      "choice": {
+                        "minLength": 1,
+                        "maxLength": 240,
+                        "type": "string"
+                      },
+                      "questionId": {
+                        "minLength": 1,
+                        "maxLength": 128,
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "choice",
+                      "questionId"
+                    ]
+                  }
+                },
+                "conditionCodes": {
+                  "maxItems": 50,
+                  "uniqueItems": true,
+                  "type": "array",
+                  "items": {
+                    "minLength": 1,
+                    "maxLength": 128,
+                    "type": "string"
+                  },
+                  "description": "Condition codes from info.conditionCodes; unrecognised reported context is preserved as unassessed advice."
+                },
+                "medicationCodes": {
+                  "maxItems": 50,
+                  "uniqueItems": true,
+                  "type": "array",
+                  "items": {
+                    "minLength": 1,
+                    "maxLength": 128,
+                    "type": "string"
+                  },
+                  "description": "Medication codes from info.medicationCodes; omission means unknown, not confirmed none."
+                },
+                "currentSupplements": {
+                  "maxItems": 50,
+                  "description": "Quantified continued supplements. Omission means unknown; [] explicitly reports none. A (productId, nutrient) pair may occur only once across this field and current-source intake observations.",
+                  "type": "array",
+                  "items": {
+                    "additionalProperties": false,
+                    "type": "object",
+                    "properties": {
+                      "dailyAmount": {
+                        "minimum": 0,
+                        "maximum": 1000000000000000,
+                        "description": "Daily amount in the accompanying unit; zero must be explicitly reported.",
+                        "type": "number"
+                      },
+                      "daysRemaining": {
+                        "exclusiveMinimum": 0,
+                        "maximum": 36500,
+                        "description": "Positive remaining days of retained inventory. Omit when unknown. If none remains, remove this retained inventory entry and revise the intended request.",
+                        "type": "number"
+                      },
+                      "name": {
+                        "minLength": 1,
+                        "maxLength": 240,
+                        "type": "string"
+                      },
+                      "productId": {
+                        "pattern": "^prd_[A-Za-z0-9_-]+$",
+                        "maxLength": 128,
+                        "type": "string"
+                      },
+                      "supplementId": {
+                        "pattern": "^sup_[A-Za-z0-9_-]+$",
+                        "maxLength": 128,
+                        "type": "string"
+                      },
+                      "unit": {
+                        "type": "string",
+                        "enum": [
+                          "mcg",
+                          "mg",
+                          "g",
+                          "IU",
+                          "CFU",
+                          "ml",
+                          "serving"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "dailyAmount",
+                      "name",
+                      "unit"
+                    ]
+                  }
+                },
+                "intake": {
+                  "maxItems": 100,
+                  "description": "Reported observations. Omission or [] does not establish zero dietary intake. An explicitly reported known amount of 0 is required to establish zero for a nutrient.",
+                  "type": "array",
+                  "items": {
+                    "description": "Reported daily intake. Missing quantities are unknown, never zero. Broad dietary descriptions are accepted without labels or portion sizes.",
+                    "anyOf": [
+                      {
+                        "additionalProperties": false,
+                        "type": "object",
+                        "properties": {
+                          "daysRemaining": {
+                            "exclusiveMinimum": 0,
+                            "maximum": 36500,
+                            "description": "Current-supplement observations only: positive remaining days of retained stock. Omit unknown duration. Invalid for diet observations.",
+                            "type": "number"
+                          },
+                          "source": {
+                            "type": "string",
+                            "enum": [
+                              "diet",
+                              "current_supplement"
+                            ]
+                          },
+                          "name": {
+                            "minLength": 1,
+                            "maxLength": 240,
+                            "type": "string"
+                          },
+                          "supplementId": {
+                            "pattern": "^sup_[A-Za-z0-9_-]+$",
+                            "maxLength": 128,
+                            "type": "string"
+                          },
+                          "productId": {
+                            "pattern": "^prd_[A-Za-z0-9_-]+$",
+                            "maxLength": 128,
+                            "type": "string"
+                          },
+                          "description": {
+                            "minLength": 1,
+                            "maxLength": 1000,
+                            "type": "string"
+                          },
+                          "evidence": {
+                            "minLength": 1,
+                            "maxLength": 1000,
+                            "type": "string"
+                          },
+                          "certainty": {
+                            "const": "known",
+                            "type": "string"
+                          },
+                          "amount": {
+                            "minimum": 0,
+                            "maximum": 1000000000000000,
+                            "description": "Daily amount in the accompanying unit; zero must be explicitly reported.",
+                            "type": "number"
+                          },
+                          "unit": {
+                            "type": "string",
+                            "enum": [
+                              "mcg",
+                              "mg",
+                              "g",
+                              "IU",
+                              "CFU",
+                              "ml",
+                              "serving"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "source",
+                          "certainty",
+                          "amount",
+                          "unit"
+                        ]
+                      },
+                      {
+                        "additionalProperties": false,
+                        "type": "object",
+                        "properties": {
+                          "daysRemaining": {
+                            "exclusiveMinimum": 0,
+                            "maximum": 36500,
+                            "description": "Current-supplement observations only: positive remaining days of retained stock. Omit unknown duration. Invalid for diet observations.",
+                            "type": "number"
+                          },
+                          "source": {
+                            "type": "string",
+                            "enum": [
+                              "diet",
+                              "current_supplement"
+                            ]
+                          },
+                          "name": {
+                            "minLength": 1,
+                            "maxLength": 240,
+                            "type": "string"
+                          },
+                          "supplementId": {
+                            "pattern": "^sup_[A-Za-z0-9_-]+$",
+                            "maxLength": 128,
+                            "type": "string"
+                          },
+                          "productId": {
+                            "pattern": "^prd_[A-Za-z0-9_-]+$",
+                            "maxLength": 128,
+                            "type": "string"
+                          },
+                          "description": {
+                            "minLength": 1,
+                            "maxLength": 1000,
+                            "type": "string"
+                          },
+                          "evidence": {
+                            "minLength": 1,
+                            "maxLength": 1000,
+                            "type": "string"
+                          },
+                          "certainty": {
+                            "const": "estimated",
+                            "type": "string"
+                          },
+                          "amount": {
+                            "minimum": 0,
+                            "maximum": 1000000000000000,
+                            "description": "Daily amount in the accompanying unit; zero must be explicitly reported.",
+                            "type": "number"
+                          },
+                          "minimum": {
+                            "minimum": 0,
+                            "maximum": 1000000000000000,
+                            "description": "Daily amount in the accompanying unit; zero must be explicitly reported.",
+                            "type": "number"
+                          },
+                          "maximum": {
+                            "minimum": 0,
+                            "maximum": 1000000000000000,
+                            "description": "Daily amount in the accompanying unit; zero must be explicitly reported.",
+                            "type": "number"
+                          },
+                          "unit": {
+                            "type": "string",
+                            "enum": [
+                              "mcg",
+                              "mg",
+                              "g",
+                              "IU",
+                              "CFU",
+                              "ml",
+                              "serving"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "source",
+                          "certainty"
+                        ]
+                      },
+                      {
+                        "additionalProperties": false,
+                        "type": "object",
+                        "properties": {
+                          "daysRemaining": {
+                            "exclusiveMinimum": 0,
+                            "maximum": 36500,
+                            "description": "Current-supplement observations only: positive remaining days of retained stock. Omit unknown duration. Invalid for diet observations.",
+                            "type": "number"
+                          },
+                          "source": {
+                            "type": "string",
+                            "enum": [
+                              "diet",
+                              "current_supplement"
+                            ]
+                          },
+                          "name": {
+                            "minLength": 1,
+                            "maxLength": 240,
+                            "type": "string"
+                          },
+                          "supplementId": {
+                            "pattern": "^sup_[A-Za-z0-9_-]+$",
+                            "maxLength": 128,
+                            "type": "string"
+                          },
+                          "productId": {
+                            "pattern": "^prd_[A-Za-z0-9_-]+$",
+                            "maxLength": 128,
+                            "type": "string"
+                          },
+                          "description": {
+                            "minLength": 1,
+                            "maxLength": 1000,
+                            "type": "string"
+                          },
+                          "evidence": {
+                            "minLength": 1,
+                            "maxLength": 1000,
+                            "type": "string"
+                          },
+                          "certainty": {
+                            "const": "unknown",
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "source",
+                          "certainty"
+                        ]
+                      }
+                    ]
+                  }
+                },
+                "costHorizonsDays": {
+                  "minItems": 1,
+                  "maxItems": 2,
+                  "uniqueItems": true,
+                  "default": [
+                    30,
+                    90
+                  ],
+                  "description": "Supported comparison horizons in days. The response exposes the 30- and 90-day ledgers; other periods are unavailable.",
+                  "type": "array",
+                  "items": {
+                    "type": "integer",
+                    "enum": [
+                      30,
+                      90
+                    ]
+                  }
+                },
+                "baseline": {
+                  "additionalProperties": false,
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "maxItems": 100,
+                      "type": "array",
+                      "items": {
+                        "additionalProperties": false,
+                        "type": "object",
+                        "properties": {
+                          "daysRemaining": {
+                            "minimum": 0,
+                            "maximum": 36500,
+                            "type": "number"
+                          },
+                          "dailyServings": {
+                            "exclusiveMinimum": 0,
+                            "maximum": 1000,
+                            "description": "Actual catalogue servings per day for this comparison basket. Omission makes equivalent-coverage savings unavailable; quantity remains packs purchased.",
+                            "type": "number"
+                          },
+                          "productId": {
+                            "pattern": "^prd_[A-Za-z0-9_-]+$",
+                            "maxLength": 128,
+                            "type": "string"
+                          },
+                          "quantity": {
+                            "exclusiveMinimum": 0,
+                            "maximum": 1000000000000000,
+                            "description": "Positive quantity in this field’s stated units. Nutrient quantities also use the documented dose precision.",
+                            "type": "number"
+                          }
+                        },
+                        "required": [
+                          "productId",
+                          "quantity"
+                        ]
+                      }
+                    },
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "current_basket",
+                        "separate_direct_products"
+                      ]
+                    }
+                  }
+                },
+                "destinationCountry": {
+                  "pattern": "^[A-Z]{2}$",
+                  "description": "Deliverable ISO country from info.supportedCountries.",
+                  "type": "string"
+                },
+                "locale": {
+                  "minLength": 2,
+                  "maxLength": 35,
+                  "description": "BCP 47 locale; supported locales are advertised by info. Unsupported locales fall back to English.",
+                  "type": "string"
+                },
+                "optimization": {
+                  "type": "string",
+                  "enum": [
+                    "balanced",
+                    "best_coverage",
+                    "lowest_cost",
+                    "fewest_pills"
+                  ],
+                  "description": "Closest dose fit remains the default recommendation. This preference chooses commercial tie-breaks and disclosed trade-offs; it never changes agreed targets or eliminates above-preference options."
+                },
+                "profile": {
+                  "additionalProperties": false,
+                  "type": "object",
+                  "properties": {
+                    "ageYears": {
+                      "minimum": 0,
+                      "maximum": 120,
+                      "description": "Reported age. Omit when unknown; scoring defaults are not health evidence.",
+                      "type": "integer"
+                    },
+                    "goals": {
+                      "maxItems": 30,
+                      "uniqueItems": true,
+                      "type": "array",
+                      "items": {
+                        "minLength": 1,
+                        "maxLength": 80,
+                        "type": "string"
+                      }
+                    },
+                    "lifeStage": {
+                      "type": "string",
+                      "enum": [
+                        "adult",
+                        "child",
+                        "pregnant",
+                        "breastfeeding",
+                        "trying_to_conceive"
+                      ]
+                    },
+                    "sex": {
+                      "type": "string",
+                      "enum": [
+                        "female",
+                        "male"
+                      ]
+                    }
+                  }
+                },
+                "requirements": {
+                  "additionalProperties": false,
+                  "description": "maxDailyPills, maxPriceMinor and maxProductCount are advisory, never purchase limits. Create/replacement omission or null means no preference; patch omission preserves, null clears. Zero permits purchase. Prominent advice: strictly over 20% above a positive preference, or any positive actual above zero. Unknown actuals stay unknown.",
+                  "type": "object",
+                  "properties": {
+                    "allowedForms": {
+                      "uniqueItems": true,
+                      "maxItems": 8,
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "capsule",
+                          "softgel",
+                          "tablet",
+                          "powder",
+                          "liquid",
+                          "gummy",
+                          "sachet",
+                          "other"
+                        ]
+                      }
+                    },
+                    "dietaryPreference": {
+                      "type": "string",
+                      "enum": [
+                        "any",
+                        "plant_based",
+                        "vegan"
+                      ]
+                    },
+                    "excludeProductIds": {
+                      "maxItems": 100,
+                      "uniqueItems": true,
+                      "type": "array",
+                      "items": {
+                        "pattern": "^prd_[A-Za-z0-9_-]+$",
+                        "maxLength": 128,
+                        "type": "string"
+                      },
+                      "description": "Exclude only these products. Does not remove requested nutrients. [] clears this exclusion."
+                    },
+                    "excludeSupplementIds": {
+                      "maxItems": 100,
+                      "uniqueItems": true,
+                      "type": "array",
+                      "items": {
+                        "pattern": "^sup_[A-Za-z0-9_-]+$",
+                        "maxLength": 128,
+                        "type": "string"
+                      },
+                      "description": "Exclude products containing these nutrient concepts, not particular product IDs. [] clears this exclusion."
+                    },
+                    "maxDailyPills": {
+                      "anyOf": [
+                        {
+                          "minimum": 0,
+                          "maximum": 1000,
+                          "description": "Preferred daily pill count; unknown counts remain unknown.",
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "maxPriceMinor": {
+                      "anyOf": [
+                        {
+                          "minimum": 0,
+                          "maximum": 1000000000000,
+                          "description": "Preferred first-order goods price in destination currency minor units; delivery quoted separately.",
+                          "type": "integer"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "maxProductCount": {
+                      "anyOf": [
+                        {
+                          "minimum": 0,
+                          "maximum": 9007199254740991,
+                          "type": "integer"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "default": null,
+                      "description": "Preferred distinct new products; there is no system minimum or maximum basket count."
+                    },
+                    "productDoses": {
+                      "maxItems": 100,
+                      "uniqueItems": true,
+                      "description": "Fix returned products at these daily labelled servings; other products remain optimisable. Use administration metadata for measurable quantities. [] clears proposals. Revision evaluates, never purchases. Exclusion/physical conflicts return field errors; numeric and health findings are advice.",
+                      "type": "array",
+                      "items": {
+                        "additionalProperties": false,
+                        "type": "object",
+                        "properties": {
+                          "productId": {
+                            "pattern": "^prd_[A-Za-z0-9_-]+$",
+                            "maxLength": 128,
+                            "type": "string"
+                          },
+                          "servingsPerDay": {
+                            "exclusiveMinimum": 0,
+                            "maximum": 1000000000000000,
+                            "description": "Positive quantity in this field’s stated units. Nutrient quantities also use the documented dose precision.",
+                            "type": "number"
+                          }
+                        },
+                        "required": [
+                          "productId",
+                          "servingsPerDay"
+                        ]
+                      }
+                    },
+                    "omega3SourcePreference": {
+                      "type": "string",
+                      "enum": [
+                        "any",
+                        "algae_only",
+                        "fish_allowed"
+                      ]
+                    },
+                    "retainProductIds": {
+                      "maxItems": 100,
+                      "uniqueItems": true,
+                      "type": "array",
+                      "items": {
+                        "pattern": "^prd_[A-Za-z0-9_-]+$",
+                        "maxLength": 128,
+                        "type": "string"
+                      }
+                    },
+                    "retainSupplementIds": {
+                      "maxItems": 100,
+                      "uniqueItems": true,
+                      "type": "array",
+                      "items": {
+                        "pattern": "^sup_[A-Za-z0-9_-]+$",
+                        "maxLength": 128,
+                        "type": "string"
+                      }
+                    }
+                  }
+                },
+                "safetyAcknowledgement": {
+                  "additionalProperties": false,
+                  "description": "Deprecated compatibility input. Health advice never requires acknowledgement.",
+                  "type": "object",
+                  "properties": {
+                    "confirmed": {
+                      "const": true,
+                      "type": "boolean"
+                    },
+                    "guidanceIds": {
+                      "maxItems": 50,
+                      "uniqueItems": true,
+                      "type": "array",
+                      "items": {
+                        "minLength": 1,
+                        "maxLength": 128,
+                        "type": "string"
+                      }
+                    },
+                    "revision": {
+                      "minimum": 1,
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "confirmed",
+                    "guidanceIds",
+                    "revision"
+                  ]
+                },
+                "targets": {
+                  "minItems": 1,
+                  "maxItems": 30,
+                  "description": "Agreed targets: name, amount, and unit. Optional importance defaults to required.",
+                  "type": "array",
+                  "items": {
+                    "additionalProperties": false,
+                    "type": "object",
+                    "properties": {
+                      "basis": {
+                        "type": "string",
+                        "enum": [
+                          "total_daily",
+                          "supplemental"
+                        ],
+                        "default": "total_daily",
+                        "description": "total_daily covers known dietary intake, continued supplements and new products; supplemental covers continued supplements and new products only. Web food-gap recommendations explicitly use supplemental. Estimated intake affects dose-fit ranges, never guaranteed coverage."
+                      },
+                      "acceptableRange": {
+                        "additionalProperties": false,
+                        "type": "object",
+                        "properties": {
+                          "maximum": {
+                            "exclusiveMinimum": 0,
+                            "maximum": 1000000000000000,
+                            "description": "Positive quantity in this field’s stated units. Nutrient quantities also use the documented dose precision.",
+                            "type": "number"
+                          },
+                          "minimum": {
+                            "exclusiveMinimum": 0,
+                            "maximum": 1000000000000000,
+                            "description": "Positive quantity in this field’s stated units. Nutrient quantities also use the documented dose precision.",
+                            "type": "number"
+                          },
+                          "unit": {
+                            "type": "string",
+                            "enum": [
+                              "mcg",
+                              "mg",
+                              "g",
+                              "IU",
+                              "CFU",
+                              "ml",
+                              "serving"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "maximum",
+                          "minimum",
+                          "unit"
+                        ]
+                      },
+                      "amount": {
+                        "exclusiveMinimum": 0,
+                        "maximum": 1000000000000000,
+                        "description": "Positive quantity in this field’s stated units. Nutrient quantities also use the documented dose precision.",
+                        "type": "number"
+                      },
+                      "importance": {
+                        "type": "string",
+                        "enum": [
+                          "core",
+                          "optional",
+                          "conditional",
+                          "required"
+                        ],
+                        "default": "required"
+                      },
+                      "name": {
+                        "minLength": 1,
+                        "maxLength": 240,
+                        "type": "string"
+                      },
+                      "prerequisite": {
+                        "additionalProperties": false,
+                        "type": "object",
+                        "properties": {
+                          "nextAction": {
+                            "minLength": 1,
+                            "maxLength": 1000,
+                            "type": "string"
+                          },
+                          "reasonCode": {
+                            "minLength": 1,
+                            "maxLength": 128,
+                            "type": "string"
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "satisfied",
+                              "unsatisfied",
+                              "unknown"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "status"
+                        ]
+                      },
+                      "supplementId": {
+                        "pattern": "^sup_[A-Za-z0-9_-]+$",
+                        "maxLength": 128,
+                        "type": "string"
+                      },
+                      "unit": {
+                        "type": "string",
+                        "enum": [
+                          "mcg",
+                          "mg",
+                          "g",
+                          "IU",
+                          "CFU",
+                          "ml",
+                          "serving"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "amount",
+                      "name",
+                      "unit"
+                    ]
+                  }
+                }
+              },
+              "additionalProperties": false,
+              "description": "Merge supplied object fields; supplied arrays replace completely; [] clears arrays; null clears only the advisory preferences requirements.maxProductCount, maxDailyPills and maxPriceMinor; null elsewhere is invalid. {} explicitly refreshes contract/policy without changing inputs."
+            }
+          },
+          "required": [
+            "operation",
+            "idempotencyKey",
+            "planHandle",
+            "expectedRevision",
+            "requestPatch"
+          ]
+        }
+      ]
+    },
+    "answer": {
+      "additionalProperties": false,
+      "type": "object",
+      "properties": {
+        "responseView": {
+          "type": "string",
+          "enum": [
+            "conversation",
+            "full"
+          ],
+          "default": "conversation",
+          "description": "Presentation only; full is opt-in. Temporary legacy header: see info(client_guide)."
+        },
+        "operation": {
+          "const": "answer",
+          "type": "string"
+        },
+        "idempotencyKey": {
+          "minLength": 16,
+          "maxLength": 128,
+          "type": "string"
+        },
+        "planHandle": {
+          "minLength": 32,
+          "maxLength": 4096,
+          "type": "string"
+        },
+        "expectedRevision": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "answers": {
+          "maxItems": 50,
+          "uniqueItems": true,
+          "type": "array",
+          "items": {
+            "additionalProperties": false,
+            "type": "object",
+            "properties": {
+              "choice": {
+                "minLength": 1,
+                "maxLength": 240,
+                "type": "string"
+              },
+              "questionId": {
+                "minLength": 1,
+                "maxLength": 128,
+                "type": "string"
+              }
+            },
+            "required": [
+              "choice",
+              "questionId"
+            ]
+          },
+          "minItems": 1
+        },
+        "safetyAcknowledgement": {
+          "additionalProperties": false,
+          "description": "Deprecated compatibility input. Health advice never requires acknowledgement.",
+          "type": "object",
+          "properties": {
+            "confirmed": {
+              "const": true,
+              "type": "boolean"
+            },
+            "guidanceIds": {
+              "maxItems": 50,
+              "uniqueItems": true,
+              "type": "array",
+              "items": {
+                "minLength": 1,
+                "maxLength": 128,
+                "type": "string"
+              }
+            },
+            "revision": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "confirmed",
+            "guidanceIds",
+            "revision"
+          ]
+        }
+      },
+      "required": [
+        "operation",
+        "idempotencyKey",
+        "planHandle",
+        "expectedRevision",
+        "answers"
+      ]
+    },
+    "select": {
+      "additionalProperties": false,
+      "type": "object",
+      "properties": {
+        "responseView": {
+          "type": "string",
+          "enum": [
+            "conversation",
+            "full"
+          ],
+          "default": "conversation",
+          "description": "Presentation only; full is opt-in. Temporary legacy header: see info(client_guide)."
+        },
+        "operation": {
+          "const": "select",
+          "type": "string"
+        },
+        "idempotencyKey": {
+          "minLength": 16,
+          "maxLength": 128,
+          "type": "string"
+        },
+        "planHandle": {
+          "minLength": 32,
+          "maxLength": 4096,
+          "type": "string"
+        },
+        "expectedRevision": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "optionId": {
+          "minLength": 8,
+          "maxLength": 128,
+          "type": "string"
+        }
+      },
+      "required": [
+        "operation",
+        "idempotencyKey",
+        "planHandle",
+        "expectedRevision",
+        "optionId"
+      ]
+    }
+  },
+  "examples": [
     {
-      "description": "MattaNutra matches agreed nutrient targets to a finite product catalogue in Thailand (THB); incidental nutrients may leave gaps. Wellness guidance, not diagnosis or pharmacy services. Ready means checkout-ready, not complete coverage or medical approval. Call first: view=overview | client_guide | plan_schema (choose planOperation). Medication/condition codes are accepted inputs, not evidence of an assessed interaction.",
+      "name": "discover",
+      "tool": "info",
+      "arguments": {
+        "locale": "en"
+      }
+    },
+    {
+      "name": "create",
+      "tool": "plan",
+      "arguments": {
+        "operation": "create",
+        "idempotencyKey": "example-create-v5-0001",
+        "request": {
+          "locale": "en",
+          "destinationCountry": "TH",
+          "optimization": "lowest_cost",
+          "profile": {},
+          "requirements": {},
+          "targets": [
+            {
+              "name": "Vitamin D3",
+              "amount": 2000,
+              "unit": "IU",
+              "basis": "total_daily"
+            }
+          ],
+          "intake": [
+            {
+              "source": "diet",
+              "certainty": "unknown",
+              "description": "Diet varies; quantities are not known."
+            }
+          ]
+        },
+        "responseView": "conversation"
+      }
+    },
+    {
+      "name": "create-partial-coverage",
+      "tool": "plan",
+      "arguments": {
+        "operation": "create",
+        "idempotencyKey": "example-partial-v5-01",
+        "request": {
+          "locale": "en",
+          "destinationCountry": "TH",
+          "optimization": "lowest_cost",
+          "profile": {},
+          "requirements": {
+            "retainProductIds": [
+              "prd_replace_with_returned_product_id"
+            ],
+            "productDoses": [
+              {
+                "productId": "prd_replace_with_returned_product_id",
+                "servingsPerDay": 2
+              }
+            ],
+            "maxProductCount": 1
+          },
+          "targets": [
+            {
+              "name": "Vitamin D3",
+              "amount": 2500,
+              "unit": "IU",
+              "basis": "total_daily"
+            }
+          ],
+          "intake": [
+            {
+              "source": "diet",
+              "certainty": "unknown",
+              "description": "Diet varies; quantities are not known."
+            }
+          ]
+        },
+        "responseView": "conversation"
+      }
+    },
+    {
+      "name": "ask-customer-target-decision",
+      "tool": "plan",
+      "arguments": {
+        "operation": "revise",
+        "idempotencyKey": "example-decision-v4-1",
+        "planHandle": "cap_replace_with_plan_handle_from_create",
+        "expectedRevision": 1,
+        "requestPatch": {
+          "targets": [
+            {
+              "name": "Vitamin D3",
+              "amount": 2500,
+              "unit": "IU",
+              "basis": "total_daily",
+              "importance": "conditional",
+              "prerequisite": {
+                "status": "unknown",
+                "reasonCode": "customer_target_confirmation",
+                "nextAction": "The customer is deciding whether to include this provisional target."
+              }
+            }
+          ]
+        },
+        "responseView": "conversation"
+      }
+    },
+    {
+      "name": "create-supplemental-target",
+      "tool": "plan",
+      "arguments": {
+        "operation": "create",
+        "idempotencyKey": "example-supplemental-v6",
+        "request": {
+          "locale": "en",
+          "destinationCountry": "TH",
+          "optimization": "balanced",
+          "profile": {},
+          "requirements": {},
+          "currentSupplements": [],
+          "targets": [
+            {
+              "name": "Vitamin C",
+              "amount": 40,
+              "unit": "mg",
+              "basis": "supplemental"
+            }
+          ],
+          "intake": [
+            {
+              "source": "diet",
+              "certainty": "unknown",
+              "description": "Dietary amounts are unknown; these are agreed supplement-only targets."
+            }
+          ]
+        },
+        "responseView": "conversation"
+      }
+    },
+    {
+      "name": "get-current-decision",
+      "tool": "plan",
+      "arguments": {
+        "operation": "get",
+        "planHandle": "cap_replace_with_plan_handle_from_create",
+        "responseView": "conversation"
+      }
+    },
+    {
+      "name": "poll-plan-status",
+      "tool": "plan",
+      "arguments": {
+        "operation": "get",
+        "planHandle": "cap_replace_with_plan_handle_from_create",
+        "responseView": "status",
+        "knownResultVersion": "replace_with_returned_resultVersion"
+      }
+    },
+    {
+      "name": "read-attached-evidence",
+      "tool": "evidence",
+      "arguments": {
+        "evidenceHandle": "cap_replace_with_evidence_handle_from_plan",
+        "mode": "sources",
+        "locale": "en"
+      }
+    },
+    {
+      "name": "read-plan-score-and-sources",
+      "tool": "plan",
+      "arguments": {
+        "operation": "get",
+        "planHandle": "cap_replace_with_plan_handle_from_create",
+        "responseView": "details",
+        "expectedRevision": 1,
+        "sections": [
+          "score",
+          "advice"
+        ],
+        "optionIds": [
+          "opt_replace_with_current_optionId"
+        ]
+      }
+    },
+    {
+      "name": "exclude-one-product",
+      "tool": "plan",
+      "arguments": {
+        "operation": "revise",
+        "idempotencyKey": "example-exclude-v4-001",
+        "planHandle": "cap_replace_with_plan_handle_from_create",
+        "expectedRevision": 1,
+        "requestPatch": {
+          "requirements": {
+            "excludeProductIds": [
+              "prd_replace_with_rejected_product_id"
+            ]
+          }
+        },
+        "responseView": "conversation"
+      }
+    },
+    {
+      "name": "clear-product-exclusions",
+      "tool": "plan",
+      "arguments": {
+        "operation": "revise",
+        "idempotencyKey": "example-clear-v4-0001",
+        "planHandle": "cap_replace_with_plan_handle_from_create",
+        "expectedRevision": 2,
+        "requestPatch": {
+          "requirements": {
+            "excludeProductIds": []
+          }
+        },
+        "responseView": "conversation"
+      }
+    },
+    {
+      "name": "answer-returned-customer-decision",
+      "tool": "plan",
+      "arguments": {
+        "operation": "answer",
+        "idempotencyKey": "example-answer-v4-001",
+        "planHandle": "cap_replace_with_plan_handle_from_create",
+        "expectedRevision": 3,
+        "answers": [
+          {
+            "questionId": "replace_with_returned_questionId",
+            "choice": "replace_with_returned_choice"
+          }
+        ],
+        "responseView": "conversation"
+      }
+    },
+    {
+      "name": "select",
+      "tool": "plan",
+      "arguments": {
+        "operation": "select",
+        "idempotencyKey": "example-select-v4-001",
+        "planHandle": "cap_replace_with_plan_handle_from_create",
+        "expectedRevision": 4,
+        "optionId": "opt_replace_with_current_optionId",
+        "responseView": "conversation"
+      }
+    },
+    {
+      "name": "confirm-then-checkout",
+      "tool": "execute",
+      "arguments": {
+        "planHandle": "cap_replace_with_plan_handle_from_create",
+        "expectedRevision": 5,
+        "idempotencyKey": "example-execute-v4-01"
+      }
+    },
+    {
+      "name": "payment-recovery",
+      "tool": "order",
+      "arguments": {
+        "orderHandle": "cap_replace_with_order_handle_from_execute",
+        "locale": "en",
+        "responseView": "conversation"
+      }
+    },
+    {
+      "name": "poll-order-status",
+      "tool": "order",
+      "arguments": {
+        "orderHandle": "cap_replace_with_order_handle_from_execute",
+        "locale": "en",
+        "responseView": "status",
+        "knownResultVersion": "replace_with_returned_resultVersion"
+      }
+    },
+    {
+      "name": "read-frozen-order",
+      "tool": "order",
+      "arguments": {
+        "orderHandle": "cap_replace_with_order_handle_from_execute",
+        "locale": "en",
+        "responseView": "details",
+        "sections": [
+          "frozen_order"
+        ]
+      }
+    },
+    {
+      "name": "propose-product-quantity",
+      "tool": "plan",
+      "arguments": {
+        "operation": "revise",
+        "idempotencyKey": "example-quantity-v5-01",
+        "planHandle": "cap_replace_with_plan_handle_from_create",
+        "expectedRevision": 1,
+        "requestPatch": {
+          "requirements": {
+            "productDoses": [
+              {
+                "productId": "prd_replace_with_returned_product_id",
+                "servingsPerDay": 1
+              }
+            ]
+          }
+        },
+        "responseView": "conversation"
+      }
+    },
+    {
+      "name": "clear-quantity-proposals",
+      "tool": "plan",
+      "arguments": {
+        "operation": "revise",
+        "idempotencyKey": "example-quantity-v5-02",
+        "planHandle": "cap_replace_with_plan_handle_from_create",
+        "expectedRevision": 2,
+        "requestPatch": {
+          "requirements": {
+            "productDoses": []
+          }
+        },
+        "responseView": "conversation"
+      }
+    },
+    {
+      "name": "clear-customer-ceilings",
+      "tool": "plan",
+      "arguments": {
+        "operation": "revise",
+        "idempotencyKey": "example-ceilings-v5-01",
+        "planHandle": "cap_replace_with_plan_handle_from_create",
+        "expectedRevision": 3,
+        "requestPatch": {
+          "requirements": {
+            "maxProductCount": null,
+            "maxDailyPills": null,
+            "maxPriceMinor": null
+          }
+        },
+        "responseView": "conversation"
+      }
+    },
+    {
+      "name": "expand-search",
+      "tool": "plan",
+      "arguments": {
+        "operation": "revise",
+        "idempotencyKey": "example-expanded-v5-01",
+        "planHandle": "cap_replace_with_plan_handle_from_create",
+        "expectedRevision": 4,
+        "searchEffort": "expanded",
+        "requestPatch": {},
+        "responseView": "conversation"
+      }
+    },
+    {
+      "name": "refresh-legacy-unexecuted",
+      "tool": "plan",
+      "arguments": {
+        "operation": "revise",
+        "idempotencyKey": "example-refresh-v4-01",
+        "planHandle": "cap_replace_with_plan_handle_from_create",
+        "expectedRevision": 1,
+        "requestPatch": {},
+        "responseView": "conversation"
+      }
+    }
+  ],
+  "tools": {
+    "info": {
       "inputSchema": {
         "additionalProperties": false,
         "type": "object",
@@ -2043,11 +5107,9 @@
             "type": "string"
           }
         }
-      },
-      "name": "info"
+      }
     },
-    {
-      "description": "MattaNutra matches agreed nutrient targets to a finite product catalogue in Thailand (THB); incidental nutrients may leave gaps. Wellness guidance, not diagnosis or pharmacy services. Ready means checkout-ready, not complete coverage or medical approval. Create/get/revise/answer/select; conversation default. get: status + knownResultVersion, or details + sections + expectedRevision (optionIds optional). requestPatch preserves context. Counts and health findings are advice; exclusions and physical quantities bind. Expanded adds attempts, not looser rules.",
+    "plan": {
       "inputSchema": {
         "type": "object",
         "anyOf": [
@@ -9845,11 +12907,9 @@
             ]
           }
         }
-      },
-      "name": "plan"
+      }
     },
-    {
-      "description": "After the person confirms the selected revision, create/recover checkout with the same idempotency key; health advice is advisory.",
+    "execute": {
       "inputSchema": {
         "additionalProperties": false,
         "type": "object",
@@ -10745,11 +13805,9 @@
             }
           }
         }
-      },
-      "name": "execute"
+      }
     },
-    {
-      "description": "Read payment/fulfilment: conversation for recovery; status + knownResultVersion to poll; details for frozen_order/events. Honor the last pollAfterSeconds until terminal=true.",
+    "order": {
       "inputSchema": {
         "type": "object",
         "anyOf": [
@@ -12397,11 +15455,9 @@
             }
           }
         }
-      },
-      "name": "order"
+      }
     },
-    {
-      "description": "Open an order help case; include its returned supportHandle to reply.",
+    "support": {
       "inputSchema": {
         "additionalProperties": false,
         "type": "object",
@@ -12815,11 +15871,9 @@
             ]
           }
         ]
-      },
-      "name": "support"
+      }
     },
-    {
-      "description": "Submit optional feedback for one plan revision only with consentConfirmed=true; this never changes a plan or checkout.",
+    "feedback": {
       "inputSchema": {
         "additionalProperties": false,
         "type": "object",
@@ -13081,11 +16135,9 @@
             ]
           }
         ]
-      },
-      "name": "feedback"
+      }
     },
-    {
-      "description": "Read attached claim text for a plan’s returned evidenceHandle; mode=summary or sources. Does not change the plan.",
+    "evidence": {
       "inputSchema": {
         "additionalProperties": false,
         "type": "object",
@@ -13380,120 +16432,7 @@
             ]
           }
         ]
-      },
-      "name": "evidence"
+      }
     }
-  ],
-  "resources": [
-    {
-      "uri": "mattanutra://contract/7.2.3/client-guide",
-      "name": "MattaNutra v7.2.3 client guide",
-      "mimeType": "text/markdown",
-      "description": "Workflow, complete operation semantics, advice and payment recovery examples."
-    },
-    {
-      "uri": "mattanutra://contract/7.2.3/schema",
-      "name": "MattaNutra v7.2.3 complete contract",
-      "mimeType": "application/schema+json",
-      "description": "Input and response contracts for all seven public tools and individual plan operations."
-    },
-    {
-      "uri": "mattanutra://contract/4.0.0/client-guide",
-      "name": "MattaNutra v4 client guide",
-      "mimeType": "text/markdown",
-      "description": "Workflow, complete operation semantics, advice and payment recovery examples."
-    },
-    {
-      "uri": "mattanutra://contract/4.0.0/schema",
-      "name": "MattaNutra v4 complete contract",
-      "mimeType": "application/schema+json",
-      "description": "Input and response contracts for all seven tools and individual plan operations."
-    },
-    {
-      "uri": "mattanutra://contract/5.0.0/client-guide",
-      "name": "MattaNutra v5 client-guide",
-      "mimeType": "text/markdown",
-      "description": "Frozen published contract 5.0.0 resource."
-    },
-    {
-      "uri": "mattanutra://contract/5.0.0/schema",
-      "name": "MattaNutra v5 schema",
-      "mimeType": "application/schema+json",
-      "description": "Frozen published contract 5.0.0 resource."
-    },
-    {
-      "uri": "mattanutra://contract/6.0.0/client-guide",
-      "name": "MattaNutra v6 client-guide",
-      "mimeType": "text/markdown",
-      "description": "Frozen published contract 6.0.0 resource."
-    },
-    {
-      "uri": "mattanutra://contract/6.0.0/schema",
-      "name": "MattaNutra v6 schema",
-      "mimeType": "application/schema+json",
-      "description": "Frozen published contract 6.0.0 resource."
-    },
-    {
-      "uri": "mattanutra://contract/7.0.0/client-guide",
-      "name": "Historical MattaNutra v7.0 client guide",
-      "mimeType": "text/markdown",
-      "description": "Historical 7.0.0 contract; current tools advertise the current version."
-    },
-    {
-      "uri": "mattanutra://contract/7.0.0/schema",
-      "name": "Historical MattaNutra v7.0 contract",
-      "mimeType": "application/schema+json",
-      "description": "Historical 7.0.0 contract; current tools advertise the current version."
-    },
-    {
-      "uri": "mattanutra://contract/7.1.0/client-guide",
-      "name": "MattaNutra v7.1 client guide",
-      "mimeType": "text/markdown",
-      "description": "Workflow, complete operation semantics, advice and payment recovery examples."
-    },
-    {
-      "uri": "mattanutra://contract/7.1.0/schema",
-      "name": "MattaNutra v7.1 complete contract",
-      "mimeType": "application/schema+json",
-      "description": "Input and response contracts for all six public tools and individual plan operations."
-    },
-    {
-      "uri": "mattanutra://contract/7.2.2/client-guide",
-      "name": "MattaNutra v7.2.2 client-guide",
-      "mimeType": "text/markdown",
-      "description": "Historical 7.2.2 contract, preserved unchanged."
-    },
-    {
-      "uri": "mattanutra://contract/7.2.2/schema",
-      "name": "MattaNutra v7.2.2 schema",
-      "mimeType": "application/schema+json",
-      "description": "Historical 7.2.2 contract, preserved unchanged."
-    },
-    {
-      "uri": "mattanutra://contract/7.2.1/client-guide",
-      "name": "MattaNutra v7.2.1 client-guide",
-      "mimeType": "text/markdown",
-      "description": "Historical 7.2.1 contract, preserved unchanged."
-    },
-    {
-      "uri": "mattanutra://contract/7.2.1/schema",
-      "name": "MattaNutra v7.2.1 schema",
-      "mimeType": "application/schema+json",
-      "description": "Historical 7.2.1 contract, preserved unchanged."
-    },
-    {
-      "uri": "mattanutra://contract/7.2.0/client-guide",
-      "name": "MattaNutra v7.2 client guide",
-      "mimeType": "text/markdown",
-      "description": "Immutable historical 7.2.0 contract resource."
-    },
-    {
-      "uri": "mattanutra://contract/7.2.0/schema",
-      "name": "MattaNutra v7.2 complete contract",
-      "mimeType": "application/schema+json",
-      "description": "Immutable historical 7.2.0 contract resource."
-    }
-  ],
-  "transport": "streamable-http",
-  "url": "https://dev.mattanutra.com/api/mcp"
+  }
 }
