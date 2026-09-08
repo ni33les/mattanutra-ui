@@ -7,6 +7,9 @@ import { toCanonicalRequest } from "../../lib/agentic/plan/matching.ts";
 import { toMatcherProduct } from "../../lib/agentic/plan/to-matcher-product.ts";
 import { match } from "../../lib/matcher/index.ts";
 import { setMatcherSafetyCeilings, resetMatcherSafetyCeilings } from "../../lib/matcher/safety-ceilings.ts";
+import { readFileSync } from "node:fs";
+import { correctedAxSnapshot } from "../../lib/agentic/catalogue/ax-corrections.ts";
+import type { PlanRequest } from "../../lib/agentic/plan/types.ts";
 
 test("AXR-SRCH-01 preserved Anna control with complete references keeps dose and commercial quality", async () => {
   const raw = await loadFrozenAnnaInput("uat"), frozen = reconstructAnnaSnapshot(raw);
@@ -26,6 +29,22 @@ test("AXR-SRCH-01 preserved Anna control with complete references keeps dose and
     const controlLoss = .25 + .5 + .5 + 2 * 4.3 / 350;
     assert.ok(result.selected.doseFit!.total <= controlLoss);
     assert.ok(result.selected.doseFit!.total < controlLoss || result.selected.priceMinor <= 53700, `An equal-dose basket became more expensive; earlier exploratory combination explored=${explored}`);
+    assert.ok(result.searchSummary!.expansionAttempts <= 8000);
+  } finally { resetMatcherSafetyCeilings(); }
+});
+
+for (const [id, loss, price] of [["A4", 4/300, 91900], ["A5", 5/100, 70300]] as const) test(`AXR-SRCH-02 ${id} preserves the frozen control complement within 8000 attempts`, async () => {
+  const profiles = JSON.parse(readFileSync(new URL("../fixtures/ax-refinement/six-profiles.json", import.meta.url), "utf8")) as { id: string; request: PlanRequest }[];
+  const request = profiles.find(row => row.id === id)!.request;
+  const frozen = reconstructAnnaSnapshot(await loadFrozenAnnaInput("dev"));
+  const snapshot = correctedAxSnapshot(frozen.snapshot, JSON.parse(readFileSync(new URL("../fixtures/ax-refinement/dev-corrections.json", import.meta.url), "utf8"))).snapshot;
+  setMatcherSafetyCeilings(frozen.ceilings);
+  try {
+    const normalized = await normalizePlanRequest({ config: loadAgenticConfig(), request, snapshot }); assert.ok("state" in normalized);
+    const canonical = toCanonicalRequest(normalized.state); assert.ok(!("error" in canonical));
+    const result = match(canonical, { ...snapshot, products: snapshot.products.map(toMatcherProduct) }); assert.ok(result.selected);
+    assert.ok(result.selected.doseFit!.total <= loss, `Dose loss ${result.selected.doseFit!.total} exceeds control ${loss}`);
+    assert.ok(result.selected.doseFit!.total < loss || result.selected.priceMinor <= price, `Equal fit costs ${result.selected.priceMinor}, control ${price}`);
     assert.ok(result.searchSummary!.expansionAttempts <= 8000);
   } finally { resetMatcherSafetyCeilings(); }
 });
