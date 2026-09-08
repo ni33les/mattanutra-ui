@@ -67,7 +67,7 @@ describe("consistency r3 regression guards", () => {
     assert.match(db, /export function getWorkerSql\(/);
     assert.match(db, /DEFAULT_DB_POOL_MAX = 6/);
     assert.match(db, /DEFAULT_DB_WORKER_POOL_MAX = 6/);
-    assert.match(db, /MAX_DB_POOL_MAX = 8/);
+    assert.match(db, /MAX_DB_POOL_MAX = 37/);
     assert.match(db, /mattanutra-web/);
     assert.match(db, /mattanutra-worker/);
     assert.match(db, /DB_WORKER_POOL_MAX/);
