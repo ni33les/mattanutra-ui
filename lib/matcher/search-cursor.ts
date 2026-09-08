@@ -265,7 +265,7 @@ export function advanceSearchCursor(cursor: SearchCursor, request: CanonicalRequ
   // Keep ranking work bounded at each checkpoint too. Static extrema can be
   // merged incrementally; the full lightweight archive remains available for
   // repair and replay evidence without rendering every losing basket.
-  cursor.review = reviewFrontier([...cursor.review, ...cursor.unreviewed], request, []);
+  cursor.review = reviewFrontier([...cursor.review, ...cursor.unreviewed], request, [], undefined, cursor.groups);
   cursor.unreviewed = [];
   return cursor;
 }

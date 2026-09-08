@@ -56,7 +56,7 @@ export function projectPlan(plan: PlanSuccessWire, input: PlanViewInput): PlanSu
   const options = (plan.options ?? []).map(option => {
     const adviceIds = foreground(option.optionId) ? [...new Set((option.advice ?? []).map(row =>
       isMissingReference(row) && missingId ? missingId : adviceIdFor(row)))] : [];
-    return { ...pick(option, ["optionId", "roles", "role", "selected", "recommended", "purchaseEligible", "stackSummary", "coveragePercent", "coverageSummary", "preferenceAssessment"]), adviceIds,
+    return { ...pick(option, ["optionId", "roles", "role", "reason", "selected", "recommended", "purchaseEligible", "stackSummary", "coveragePercent", "coverageSummary", "preferenceAssessment"]), adviceIds,
       ...(foreground(option.optionId) && option.basket ? { basket: option.basket.map(row => pick(row, CONVERSATION_BASKET_KEYS)) } : {}),
       ...(option.coverage ? { coverage: option.coverage.map(row => pick(row, CONVERSATION_COVERAGE_KEYS)) } : {}),
       shippingMinor: option.economics?.shippingMinor ?? null,

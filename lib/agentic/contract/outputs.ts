@@ -58,7 +58,7 @@ export const CONVERSATION_BASKET_KEYS = ["productId", "productName", "servingsPe
 export const CONVERSATION_COVERAGE_KEYS = ["name", "unit", "basis", "requestedTargetId", "supplementId", "importance", "unresolved", "requestedAmount", "currentAmount", "deliveredAmount", "quantifiedExposureAmount", "totalExposureAmount", "totalExposureComplete", "intakeCertainty", "remainingGap", "excess", "coveragePercent", "status", "withinAgreedRange", "uncertainty"] as const;
 const conversationBasket = Type.Pick(BASKET_ITEM_SCHEMA, CONVERSATION_BASKET_KEYS);
 const conversationCoverage = Type.Pick(coverage, CONVERSATION_COVERAGE_KEYS);
-const conversationOption = o({ ...Type.Pick(OPTION_SCHEMA, ["optionId", "roles", "role", "selected", "recommended", "purchaseEligible", "stackSummary", "coveragePercent", "coverageSummary", "preferenceAssessment"]).properties,
+const conversationOption = o({ ...Type.Pick(OPTION_SCHEMA, ["optionId", "roles", "role", "reason", "selected", "recommended", "purchaseEligible", "stackSummary", "coveragePercent", "coverageSummary", "preferenceAssessment"]).properties,
   basket: p(a(conversationBasket)), coverage: p(a(conversationCoverage)), adviceIds: Type.Array(s, { description: "Inline advice for the selected and highlighted options. Empty on background options does not mean no findings: select an option or request its advice details. Missing-reference notices may summarize several original findings." }),
   shippingMinor: pn(money), firstOrderTotalMinor: pn(money) });
 const detailSections = e(["request", "products", "coverage", "advice", "score", "economics"] as const);

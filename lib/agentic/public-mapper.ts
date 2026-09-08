@@ -388,6 +388,10 @@ function optionReasonFields(
 ) {
   const negotiated = negotiateLocale(locale);
   const group = advertised.length > 0 ? advertised : [option];
+  if (option.reason === "Target-focused option with disclosed dose and product-data uncertainty") {
+    return { code: "target_focused" as const, key: "plan.option.target_focused",
+      message: agenticMessage(negotiated, "plan.option.target_focused") };
+  }
   if (option.noDistinctAlternative) {
     return {
       code: "no_distinct_alternative" as const,

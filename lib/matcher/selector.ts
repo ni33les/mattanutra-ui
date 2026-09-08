@@ -398,6 +398,10 @@ export function selectOptions(input: Readonly<{ baskets: readonly ScoredBasket[]
   const lowerCost = [...nonempty].sort((a, b) => a.priceMinor - b.priceMinor || compare(a, b)).find(row => !nonempty.some(other => other !== row && optionDominates(other, row, input.request)));
   const simpler = [...nonempty].sort((a, b) => a.productCount - b.productCount || comparePillCounts(a.dailyPills, a.pillCountKnown, b.dailyPills, b.pillCountKnown) || compare(a, b)).find(row => !nonempty.some(other => other !== row && optionDominates(other, row, input.request)));
   const fewerConcerns = nonempty.find(row => hasFewerConcerns(row, best, input.request));
+  // A product supplying requested nutrients without incidental nutrient load
+  // can be useful even when missing administration facts prevent pill ranking.
+  // Keep one evaluated choice; do not invent a "fewer pills" role for unknowns.
+  const focused = nonempty.find(row => row.productCount === 1 && row.incidentalCount === 0 && row.requestedLabelCount > 0 && row.aggregateCoverage > 0);
   const fallback = best.productCount === 0 ? nonempty[0] : undefined;
   const options = new Map<string, { basket: ScoredBasket; roles: ConversationalOptionRole[] }>();
   const add = (basket: ScoredBasket | undefined, role: ConversationalOptionRole) => {
@@ -408,9 +412,10 @@ export function selectOptions(input: Readonly<{ baskets: readonly ScoredBasket[]
     options.set(key, row);
   };
   add(best, "closest_dose"); add(lowerCost, "lower_cost"); add(simpler, "simpler"); add(fewerConcerns, "fewer_concerns"); add(fallback, "purchase_fallback");
+  if (focused && !options.has(productDoseSignature(focused))) options.set(productDoseSignature(focused), { basket: focused, roles: [] });
   const mapped = [...options.values()].map(({ basket, roles }) => {
     const recommended = roles.includes("closest_dose");
-    const reason = recommended ? selectedReason(input.request) : roles.includes("purchase_fallback")
+    const reason = roles.length === 0 ? "Target-focused option with disclosed dose and product-data uncertainty" : recommended ? selectedReason(input.request) : roles.includes("purchase_fallback")
       ? "Available to purchase with the disclosed gaps, excesses and health advice; purchasing is not the closest dose fit."
       : roles.includes("fewer_concerns") ? "Fewer concerns without lower requested-target coverage"
       : roles.includes("simpler") ? "Fewer products or daily pills with the disclosed coverage trade-off"
