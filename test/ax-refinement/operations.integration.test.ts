@@ -46,3 +46,15 @@ test("AXR-REL-04 PostgreSQL rolls back operation and framework task as one trans
   const tasks = await sql`select id from public.tasks where id=${taskId}::uuid`;
   assert.equal(tasks.length, 0);
 });
+
+test("AXR-REL-04 framework cancellation atomically fences the matching operation", async () => {
+  const planId = randomUUID(), now = "2026-09-07T00:00:00Z";
+  await store.insertPlan({ id: planId, environment: "dev", tenantScope: "mattanutra", principalScope: `qa-v3:ax:${planId}`, currentRevision: 1, createdAt: now, updatedAt: now });
+  const operation = await admitPlanOperation(store, { planId, ownerScope: `dev:${planId}`, key: "ax-framework-cancel", expectedRevision: 1, revision: 2,
+    payload: { operation: "revise" }, prepared: {}, scope: { environment: "dev", tenantScope: "mattanutra" }, now });
+  const claim = await claimPlanOperation(store, operation.id, "worker", now); assert.ok(claim);
+  await sql`update public.tasks set status='cancelled' where id=${operation.taskId}::uuid`;
+  assert.equal((await store.getPlanOperation(operation.id))?.status, "cancelled");
+  assert.equal(await updateClaimedOperation(store, claim, { status: "complete", response: { revision: 2 } }, now), false);
+  assert.equal((await store.getPlan(planId))?.currentRevision, 1);
+});
