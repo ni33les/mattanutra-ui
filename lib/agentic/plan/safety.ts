@@ -1,3 +1,4 @@
+import { adviceKind } from "@/lib/agentic/value/advice-kind";
 import { nutrientNameMatchesTarget } from "@/lib/nutrient-identity";
 import { intakeCertaintyFor } from "@/lib/agentic/plan/intake-certainty";
 import { conditionImpliesCkd, subjectIsMagnesium } from "@/lib/matcher/condition-ceilings";
@@ -187,6 +188,7 @@ function guidance(input: Readonly<{
     ...(input.authorityUrl ? { authorityUrl: input.authorityUrl } : {}),
     ...(input.evidence ? { evidence: input.evidence } : {}),
     code: input.code,
+    kind: adviceKind(input),
     contributors: input.contributors ?? [],
     exposure: input.exposure ?? null,
     guidanceId,

@@ -1,5 +1,6 @@
+import { adviceKind } from "@/lib/agentic/value/advice-kind";
 import { continuedIntakeCoversTargets } from "@/lib/agentic/value/customer-choice";
-import { assessPreferences, type NumericPreferences } from "@/lib/matcher/preferences";
+import { assessPreferences, verifiedPillLowerBound, type NumericPreferences } from "@/lib/matcher/preferences";
 import { matchingExplanationFor } from "@/lib/agentic/value/matching-explanation";
 import { parseProductAdministration } from "@/lib/product-administration";
 import { operationalDecision } from "@/lib/agentic/value/operational-decision";
@@ -715,6 +716,7 @@ export function publicOption(
   const pillComparisonKnown = comparedPillDelta(option, selected) != null;
   const counts = requestedTargetCoverage(option.coverage);
   const preferenceAssessment = assessPreferences(preferences, { productCount: option.basket.length,
+    dailyPillsLowerBound: verifiedPillLowerBound(option.basket),
     dailyPills: option.basket.some(item => item.pillCountKnown === false || item.dailyPills == null) ? null : option.dailyPills,
     firstOrderGoodsPriceMinor: option.basket.some(item => item.incompleteCommercialFacts) ? null : option.basket.reduce((sum, item) => sum + item.lineTotalMinor, 0), currency }, locale).filter(row => row.status !== "not_requested");
   return {
@@ -777,6 +779,7 @@ export function publicSafetyGuidance(
     ...(row.referenceBasis ? { referenceBasis: row.referenceBasis } : {}),
     acknowledgementStatus: "not_required",
     code: row.code,
+    kind: adviceKind(row),
     guidanceId: row.guidanceId,
     message: row.message,
     messageKey: row.messageKey,
@@ -1010,6 +1013,7 @@ export function publicPlanFields(result: Pick<
   const claimIds = compactApplicable ? planClaimIds(result) : [];
 
   const preferenceAssessment = assessPreferences(snapshot?.requirements ?? {}, { productCount: selected?.basket.length ?? 0,
+    dailyPillsLowerBound: verifiedPillLowerBound(selected?.basket ?? []),
     dailyPills: selected?.basket.some(item => item.pillCountKnown === false || item.dailyPills == null) ? null : selected?.dailyPills ?? 0,
     firstOrderGoodsPriceMinor: selected?.basket.some(item => item.incompleteCommercialFacts) ? null : selected?.basket.reduce((sum, item) => sum + item.lineTotalMinor, 0) ?? 0,
     currency }, locale).filter(row => row.status !== "not_requested");

@@ -1,6 +1,7 @@
+import { adviceKind, type AdviceKind } from "@/lib/agentic/value/advice-kind";
 import { continuedIntakeCoversTargets, highlightedAlternativeOptionId } from "@/lib/agentic/value/customer-choice";
 import type { MatchingExplanation } from "@/lib/agentic/value/matching-explanation";
-import { assessPreferences, type PreferenceAssessment, type NumericPreferences } from "@/lib/matcher/preferences";
+import { assessPreferences, verifiedPillLowerBound, type PreferenceAssessment, type NumericPreferences } from "@/lib/matcher/preferences";
 import { RESEARCH_VERSION } from "@/lib/agentic/discovery/versions";
 import {
   planLevelSupplementNames,
@@ -20,6 +21,7 @@ export type CompactDecision = Readonly<{
   preferenceAssessment?: readonly PreferenceAssessment[];
   matchingExplanation?: MatchingExplanation;
   advice: readonly Readonly<{
+    kind?: AdviceKind;
     guidanceId: string;
     severity: SafetyGuidance["severity"];
     message: string;
@@ -115,7 +117,7 @@ export function buildCompactDecision(result: CompactPlanView, resolvedDecision?:
   }
   const advice = [...guidanceByContent.entries()].sort(([leftKey, left], [rightKey, right]) =>
     left.guidanceId.localeCompare(right.guidanceId) || leftKey.localeCompare(rightKey)
-  ).map(([, finding]) => ({ guidanceId: finding.guidanceId, severity: finding.severity,
+  ).map(([, finding]) => ({ kind: adviceKind(finding), guidanceId: finding.guidanceId, severity: finding.severity,
     message: finding.message, nutrientName: finding.nutrientName, exposure: finding.exposure,
     threshold: finding.threshold, unit: finding.unit,
     contributors: finding.contributors.map(({ productName, amount, unit }) => ({ productName, amount, unit })),
@@ -135,6 +137,7 @@ export function buildCompactDecision(result: CompactPlanView, resolvedDecision?:
   );
 
   const preferenceAssessment = assessPreferences(result.requestSnapshot?.requirements ?? {}, { productCount: selected?.basket.length ?? 0,
+    dailyPillsLowerBound: verifiedPillLowerBound(selected?.basket ?? []),
     dailyPills: selected?.basket.some(item => item.pillCountKnown === false || item.dailyPills == null) ? null : selected?.dailyPills ?? 0,
     firstOrderGoodsPriceMinor: selected?.basket.some(item => item.incompleteCommercialFacts) ? null : selected?.basket.reduce((sum, item) => sum + item.lineTotalMinor, 0) ?? 0, currency: selected?.basket[0]?.currency ?? "THB" }, locale).filter(row => row.status !== "not_requested");
   return {
