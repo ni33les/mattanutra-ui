@@ -22,7 +22,7 @@
       "file": "test/mcp-payload/discovery.test.ts",
       "slice": "discovery",
       "database": false,
-      "reason": "Published schema factoring and minimal tools-only operation help.",
+      "reason": "Published schema factoring, minimal tools-only operation help and current tool descriptions across DEV/UAT/PRD and supported locales.",
       "expectedCases": 3,
       "cases": [
         "PAY-SCHEMA-01",
