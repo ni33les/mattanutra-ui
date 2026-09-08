@@ -1,0 +1,60 @@
+{
+  "d3": {
+    "locale": "en",
+    "destinationCountry": "TH",
+    "optimization": "lowest_cost",
+    "profile": {},
+    "requirements": {},
+    "currentSupplements": [],
+    "intake": [
+      {
+        "source": "diet",
+        "certainty": "unknown",
+        "description": "Dietary intake is unknown."
+      }
+    ],
+    "targets": [
+      {
+        "name": "Vitamin D3",
+        "amount": 2000,
+        "unit": "IU",
+        "basis": "total_daily"
+      }
+    ]
+  },
+  "k2_d3": {
+    "locale": "en",
+    "destinationCountry": "TH",
+    "optimization": "lowest_cost",
+    "profile": {},
+    "requirements": {},
+    "currentSupplements": [],
+    "medicationCodes": [
+      "apixaban"
+    ],
+    "conditionCodes": [
+      "atrial_fibrillation"
+    ],
+    "intake": [
+      {
+        "source": "diet",
+        "certainty": "unknown",
+        "description": "Dietary intake is unknown."
+      }
+    ],
+    "targets": [
+      {
+        "name": "Vitamin K2",
+        "amount": 90,
+        "unit": "mcg",
+        "basis": "total_daily"
+      },
+      {
+        "name": "Vitamin D3",
+        "amount": 1000,
+        "unit": "IU",
+        "basis": "total_daily"
+      }
+    ]
+  }
+}
