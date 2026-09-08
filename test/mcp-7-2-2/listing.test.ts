@@ -18,7 +18,7 @@ test("test_hosted_plan_get_schema_advertises_response_view", () => {
     const text = declaration(); assert.match(text, /responseView\??: "conversation"/); assert.doesNotMatch(text, /responseView\??: unknown/);
   } else {
     const rows = operation("get"); assert.equal(rows.length, 3);
-    assert.deepEqual(rows, branches(PLAN_OPERATION_SCHEMAS.get as Schema));
+    assert.deepEqual(rows, branches(JSON.parse(JSON.stringify(PLAN_OPERATION_SCHEMAS.get))));
     assert.deepEqual(rows.flatMap(row => row.properties!.responseView.enum ?? [row.properties!.responseView.const]), ["conversation", "full", "status", "details"]);
   }
 });
