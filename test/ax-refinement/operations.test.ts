@@ -44,3 +44,12 @@ test("AXR-REL-04 admission and queue insertion roll back together", async () => 
   await assert.rejects(admitPlanOperation(store, command), /interrupted/);
   assert.equal(await store.getPlanOperationByKey(command.ownerScope, command.key), null);
 });
+
+test("AXR-REL-04 a different key cannot admit competing work against a pending base revision", async () => {
+  const { store, command } = await fixture();
+  const first = await admitPlanOperation(store, command);
+  await assert.rejects(admitPlanOperation(store, { ...command, key: "another-refinement-key", payload: { ...command.payload, requestPatch: {} } }), /stale_revision/);
+  assert.equal((await store.getPlan(command.planId))?.currentRevision, 3);
+  await cancelPlanOperation(store, first.id, now);
+  assert.notEqual((await admitPlanOperation(store, { ...command, key: "replacement-after-cancel" })).id, first.id);
+});
