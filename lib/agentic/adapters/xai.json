@@ -1,6 +1,6 @@
 {
   "contractVersion": "7.2.0",
-  "description": "Deterministic supplement stacks with external checkout and order polling. Call tools only as info, plan, execute, order, support, feedback. Never prefix mattanutra_dev. Never call mattanutra_dev.* or mattanutra_dev.mattanutra_dev.*.",
+  "description": "MattaNutra matches agreed nutrient targets to a finite product catalogue in Thailand (THB). Ready means checkout-ready, not complete coverage or medical approval. Conversation is the default; use status to poll and details for calculations. Tools: info, plan, execute, order, support, feedback, evidence. Use the exact tool names exposed by your host; it may wrap the native names.",
   "name": "MattaNutra",
   "schemaChecksum": "8432ba39c6a94771416868424571aafe02ce835c2bcd5e63fab2c8646696c58b",
   "server_url": "/api/mcp",

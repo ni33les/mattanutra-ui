@@ -6,9 +6,21 @@ export function validateInstalledConnectorProjection(evidence, published) {
   const failures = [];
   if (evidence?.source !== "installed_connector" || !evidence.connectorId || !evidence.observedAt ||
       !["dev", "uat"].includes(evidence.environment)) failures.push("installed_projection_evidence_required");
-  const observed = evidence?.tools;
+  // These are the documented application/host wrappers. Never strip an
+  // arbitrary prefix: that could accept another environment's connector.
+  const prefix = evidence?.environment === "uat" ? "mattanutra_uat" : "mattanutra_dev";
+  const canonicalName = name => {
+    if (typeof name !== "string") return name;
+    for (const wrapper of [`mcp__codex_apps__${prefix}_`, `${prefix}___`, `${prefix}.`]) {
+      if (name.startsWith(wrapper)) return name.slice(wrapper.length);
+    }
+    return name;
+  };
+  const observed = Array.isArray(evidence?.tools) ? evidence.tools.map(row => ({ ...row, name: canonicalName(row.name) })) : evidence?.tools;
   const expected = published?.tools;
-  if (!Array.isArray(observed) || !Array.isArray(expected) || expected.length !== 6) {
+  if (!Array.isArray(observed) || !Array.isArray(expected) || !expected.length ||
+      new Set(expected.map(row => row.name)).size !== expected.length ||
+      new Set(observed.map(row => row.name)).size !== observed.length) {
     failures.push("complete_tool_inventory_required");
     return { passed: false, failures };
   }

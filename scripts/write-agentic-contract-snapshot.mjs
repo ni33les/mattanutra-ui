@@ -51,8 +51,7 @@ writeFileSync(
 
 const adapter = {
   contractVersion: AGENTIC_CONTRACT_VERSION,
-  description:
-    "Deterministic supplement stacks with external checkout and order polling. Call tools only as info, plan, execute, order, support, feedback. Never prefix mattanutra_dev. Never call mattanutra_dev.* or mattanutra_dev.mattanutra_dev.*.",
+  description: `${AGENTIC_SERVER_INSTRUCTIONS}\nTools: ${AGENTIC_PUBLIC_TOOLS.join(", ")}. Use the exact tool names exposed by your host; it may wrap the native names.`,
   name: "MattaNutra",
   schemaChecksum,
   server_url: "/api/mcp",
