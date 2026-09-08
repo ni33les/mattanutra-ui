@@ -7,6 +7,8 @@ import { DEFAULT_MATCHER_CONFIG } from "../../lib/matcher/config.ts";
 import { match } from "../../lib/matcher/index.ts";
 import { scoreState, selectOptions } from "../../lib/matcher/selector.ts";
 import { product, request, catalog } from "../matcher/flexible-v5-fixtures.ts";
+import { equivalentSellerOffers } from "../../lib/matcher/seller-offers.ts";
+import { seedState, tryAddVariant } from "../../lib/matcher/search.ts";
 
 function fixture() {
   const targets = canonicalizeTargets({ targets: ["a", "b"].map(subjectId => ({ subjectId, name: subjectId.toUpperCase(), amount: 100, unit: "mg" as const })) }).targets;
@@ -57,6 +59,22 @@ test("AXR-SRCH-03 equal-dose retailer choices keep complete eligible offers and 
   assert.equal(chosen.sellerId, "cheaper"); assert.equal(chosen.priceMinor, 31700); assert.equal(chosen.doseFit?.total, 0);
   const unavailable = match(r, { ...c, products: c.products.map(row => row.sellerId === "cheaper" ? { ...row, orderable: false } : row) }).selected;
   assert.equal(unavailable?.sellerId, "expensive"); assert.equal(unavailable?.priceMinor, 53500);
+});
+
+test("AXR-SRCH-03 a discovered quantity is quoted at other complete sellers without mixing their offers or facts", () => {
+  const r = request(), groups = compileGroups(r, catalog([
+    product("same", { a: 100 }, 53500, { sellerId: "seller-a" }),
+    product("same", { a: 100 }, 31700, { sellerId: "seller-b" }),
+    product("same", { a: 50 }, 100, { sellerId: "wrong-facts" })
+  ]));
+  const source = groups.find(row => row.sellerId === "seller-a")!;
+  const variant = source.variants.find(row => row.dailyUnits === 1)!;
+  const state = tryAddVariant(seedState(r), variant, source, r)!;
+  const offers = equivalentSellerOffers(state, [source], groups);
+  assert.equal(offers.length, 1); assert.equal(offers[0]!.sellerId, "seller-b");
+  assert.equal(offers[0]!.state.price, 31700);
+  assert.deepEqual(offers[0]!.state.exposure, state.exposure);
+  assert.deepEqual(offers[0]!.state.selectedProductIds, state.selectedProductIds);
 });
 
 test("AXR-SRCH-04 expansion resumes the existing cursor and retains the standard incumbent", () => {
