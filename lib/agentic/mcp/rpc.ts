@@ -177,12 +177,6 @@ const responseLog = createLogger("agentic.mcp.payload");
 function structuredSummary(value: unknown) {
   const row = record(value);
   const lines = [toolText(value)];
-  if (row.responseView === "conversation") {
-    const messages = Array.isArray(row.advice) ? [...new Set(row.advice.map(record)
-      .filter(advice => advice.severity !== "info").map(advice => advice.message)
-      .filter((message): message is string => typeof message === "string" && Boolean(message.trim())))] : [];
-    if (messages.length) lines.push(messages.join(" "));
-  }
   const next = record(row.operationalDecision).nextAction ?? row.nextAction ??
     (Array.isArray(row.nextActions) ? row.nextActions.join(", ") : undefined);
   if (typeof next === "string" && next) lines.push(`Next: ${next}`);
@@ -192,7 +186,8 @@ function structuredSummary(value: unknown) {
 export function toolResult(value: unknown, isError = false, tool?: string, resultContent?: "structured") {
   const serialized = JSON.stringify(value);
   const view = record(value).responseView ?? "full";
-  const concise = !isError && resultContent === "structured" && (view === "conversation" || view === "status");
+  void resultContent; // Legacy opt-in remains accepted; concise views now always avoid JSON clones.
+  const concise = !isError && (view === "conversation" || view === "status");
   const content = concise ? [{ type: "text", text: structuredSummary(value) }] : [
     { type: "text", text: toolText(value) }, { type: "text", text: serialized }
   ];

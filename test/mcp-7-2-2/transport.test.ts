@@ -21,7 +21,7 @@ test("test_status_payload_under_2kb", () => {
   assert.ok(Buffer.byteLength(JSON.stringify({ jsonrpc: "2.0", id: 1, result })) < 2000);
   assert.equal(result.content.length, 1); assert.match(result.content[0].text, /failed/);
   for (const [payment, fulfilment] of [["paid", "processing"], ["refunded", "failed"]]) {
-    const order = toolResult({ ok: true, responseView: "status", orderHandle: "order", status: "processing", paymentState: payment, fulfilmentStatus: fulfilment, nextActions: ["poll_order"] });
+    const order = toolResult({ ok: true, responseView: "status", orderReference: "order", status: "processing", paymentStatus: payment, fulfilment: { status: fulfilment }, nextActions: ["poll_order"] });
     assert.match(order.content[0].text, new RegExp(payment));
     assert.match(order.content[0].text, new RegExp(fulfilment));
   }
