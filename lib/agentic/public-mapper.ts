@@ -875,6 +875,7 @@ function publicLeftovers(
     }
     out.push({
       name: item.name,
+      ...(item.note ? { note: item.note } : {}),
       reason: item.reason,
       unit,
       requestedAmount,

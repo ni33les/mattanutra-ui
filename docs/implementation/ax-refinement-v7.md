@@ -30,3 +30,12 @@ Record each intentional old/new expectation with its AXR ID before updating exis
 ### Reliability evidence
 
 `02-handoff-red-2.log` exposes missing handoff against pre-fix business code using real reconstructed data and a controlled barrier. `02-worker-sequence.log` completes A2 revisions 1–4 through actual matcher workers. `02-operations-green.log` and `02-postgres-operations-2.log` cover duplicate ownership, cancellation fencing and atomic queue admission. The first PostgreSQL attempt passed assertions but hung during cleanup; it remains incomplete, and cleanup was corrected before rerunning. Original UAT request IDs were not found in the local journal.
+
+### Intentional expectation changes recorded during implementation
+
+- `test/agentic-phase4-algae.test.ts` and the source-name assertions in `test/matcher/phase2.test.ts`: v7 preserves an explicit `fish_allowed` or omitted source preference instead of deriving `algae_only` from wording or storing it because the diet is vegan. The exact algae alias is resolved only with an explicit `algae_only`; otherwise the unresolved target has a nonblocking clarification. E-02 keeps its exact algae SKU assertion with an explicit algae source input. Prices and unrelated assertions are unchanged. Replacement cases: AXR-TERM-01–02.
+- `AXR-ALT-01–03` add a pointer into the existing option set; the presentation tests compare the original supplied arrays after projection. No basket mutation is permitted in that slice.
+- `AXR-NOP-01–02` distinguish confirmed continued-intake completion from an empty dose-fit recommendation with unresolved gaps. Historical future-schedule cases without such coverage evidence retain their prior expectations.
+- `AXR-ADV-01–03` add rule classification and a confirmed pill lower bound without changing thresholds, evidence, exact unknown totals, selection eligibility or acknowledgement requirements.
+
+Scoped evidence remains in `/root/.codex/visualizations/2026/09/08/ax-refinement-v7`. Intermediate timeouts, interrupted runs and RED outputs are retained. No whole-application or whole-MCP green claim has been made.

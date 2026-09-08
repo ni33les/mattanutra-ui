@@ -762,6 +762,12 @@ export function evaluateSafety(input: Readonly<{
   }
 
   const original = input.state.originalRequest;
+  if (original?.targets.some(target => target.name.trim().toLowerCase() === "algae omega-3") && original.requirements.omega3SourcePreference !== "algae_only") {
+    const clarification = agenticMessage(input.locale, "plan.source.algae_alias_clarification");
+    items.push({ ...guidance({ action: "review", code: "incomplete_information", locale: input.locale, productIds: [], severity: "info", supplementIds: [] }),
+      guidanceId: "gdn:incomplete_information:algae_source", ruleId: "algae_alias_requires_explicit_source",
+      message: clarification, messageKey: "plan.source.algae_alias_clarification", uncertainty: clarification, uncertaintyCodes: ["source_choice_unconfirmed"] });
+  }
   const undisclosedContext = Boolean(original && (original.medicationCodes === undefined || original.conditionCodes === undefined)) || input.state.targets.some(item => intakeCertaintyFor(input.state, item.supplementId) !== "known") || coverageRows.some(item => intakeCertaintyFor(input.state, item.supplementId) !== "known");
   if (undisclosedContext || (input.state.profileKnown && Object.values(input.state.profileKnown).some(known => !known)) || (input.state.intake ?? []).some(item => item.certainty !== "known") || input.state.medicationCodes.some(code => !MEDICATION_ALIASES[code]) || input.state.conditionCodes.some(code => !CONDITION_ALIASES[code])) {
     items.push({ ...guidance({ action: "review", code: "incomplete_information", locale: input.locale, productIds, severity: "high", supplementIds: [] }), uncertainty: agenticMessage(input.locale, "guidance.incomplete_information_uncertainty"), uncertaintyCodes: [

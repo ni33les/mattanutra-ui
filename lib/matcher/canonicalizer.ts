@@ -256,17 +256,8 @@ export function impliedOmegaPreference(
   omega: OmegaPreference | null | undefined,
   targetNames: readonly string[] = []
 ): OmegaPreference {
-  if (dietary === "vegan") {
-    return "algae_only";
-  }
-
-  if (omega === "algae_only") {
-    return "algae_only";
-  }
-
-  if (targetNames.some(targetImpliesAlgaeOmega)) {
-    return "algae_only";
-  }
-
+  // Keep the legacy helper signature for adapters, but source choice is now
+  // explicit. Dietary eligibility is evaluated independently.
+  void dietary; void targetNames;
   return omega ?? "any";
 }

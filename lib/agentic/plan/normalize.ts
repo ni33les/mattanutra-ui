@@ -1,6 +1,6 @@
 import { isAgenticErrorResult, businessError, type AgenticErrorResult } from "@/lib/agentic/contract/errors";
 import { canonicalRequestHash } from "@/lib/agentic/idempotency";
-import { negotiateLocale } from "@/lib/agentic/i18n";
+import { agenticMessage, negotiateLocale } from "@/lib/agentic/i18n";
 import type { CatalogueSnapshot, CatalogueSupplement } from "@/lib/agentic/catalogue/types";
 import { CONDITION_ALIASES, MEDICATION_ALIASES } from "@/lib/agentic/catalogue/names";
 import { resolveMarket } from "@/lib/agentic/catalogue/market";
@@ -8,7 +8,6 @@ import type { AgenticConfig } from "@/lib/agentic/config";
 import { scaleAmount, isDoseError, convertAmount } from "@/lib/matcher/dose";
 import type { MatcherUnit } from "@/lib/matcher/types";
 import { DEFAULT_TARGET_BASIS } from "@/lib/agentic/contract/schemas";
-import { impliedOmegaPreference } from "@/lib/matcher/canonicalizer";
 import { resolvedNutrientFormName } from "@/lib/nutrient-identity";
 import type {
   AcceptedGap,
@@ -476,9 +475,16 @@ export async function normalizePlanRequest(input: Readonly<{
     const fieldPath = target.supplementId
       ? `request.targets[${index}].supplementId`
       : `request.targets[${index}].name`;
+    const algaeAlias = normalizeName(target.name ?? "") === "algae omega 3";
+    const sourceAgreed = request.requirements.omega3SourcePreference === "algae_only";
+    if (algaeAlias && !sourceAgreed) {
+      leftovers.push({ ...leftoverForUnknown({ amount: target.amount, name: target.name, unit: target.unit, source: "target", requestIndex: index }),
+        note: agenticMessage(negotiateLocale(request.locale), "plan.source.algae_alias_clarification") });
+      continue;
+    }
     const supplement = resolveSupplement(
       input.snapshot,
-      { name: target.name, supplementId: target.supplementId },
+      { name: algaeAlias ? "Omega-3" : target.name, supplementId: target.supplementId },
       fieldPath
     );
 
@@ -665,18 +671,6 @@ export async function normalizePlanRequest(input: Readonly<{
 
   state = applyPlanAnswers(state, request);
 
-  const rawTargetNames = request.targets.map((item) => item.name);
-  state = {
-    ...state,
-    requirements: {
-      ...state.requirements,
-      omega3SourcePreference: impliedOmegaPreference(
-        state.requirements.dietaryPreference ?? "any",
-        state.requirements.omega3SourcePreference,
-        rawTargetNames
-      )
-    }
-  };
 
   return {
     hash: canonicalRequestHash(state),
