@@ -9,6 +9,7 @@ import type { PlanResult } from "@/lib/agentic/plan/types";
 import type { PlanStatusWire } from "@/lib/agentic/contract/outputs";
 import { planContractCompatible } from "@/lib/agentic/presentation/compatibility";
 import { expirePlanOperation } from "@/lib/agentic/plan/operations";
+import { planOperationalContext } from "@/lib/agentic/value/operational-decision";
 
 /** Reads committed data and the admitted operation without building baskets,
  * advice or schedules. No matching, network calls or shared customer cache. */
@@ -51,10 +52,11 @@ export async function readPlanStatus(runtime: AgenticRuntime, planHandle: string
   const { result, revision, operation, resultVersion, refreshRequired } = state;
   const active = operation && ["queued", "running", "retryable"].includes(operation.status);
   const error = operation && isAgenticErrorResult(operation.error) ? operation.error.error : undefined;
+  const { decision } = planOperationalContext(result);
   return { ok: true, responseView: "status", planHandle, revision: revision.revision, resultVersion,
     contractVersion: AGENTIC_CONTRACT_VERSION, locale: result.requestSnapshot.locale,
-    status: active ? "processing" : result.status, unchanged: knownResultVersion === resultVersion,
+    status: active ? "processing" : decision.status, unchanged: knownResultVersion === resultVersion,
     pendingRevision: operation?.revision ?? null, operationStatus: operation?.status ?? null,
-    nextActions: error || operation?.status === "cancelled" || refreshRequired ? ["refresh_plan"] : active ? ["poll_plan"] : ["get_conversation"],
+    nextActions: error || operation?.status === "cancelled" || refreshRequired ? ["refresh_plan"] : active ? ["poll_plan"] : [decision.nextAction],
     pollAfterSeconds: active ? 2 : 0, refreshRequired, ...(error ? { error: JSON.parse(JSON.stringify(error)) as PlanStatusWire["error"] } : {}) };
 }

@@ -1,11 +1,9 @@
 import { assessedSafetyCodes } from "@/lib/agentic/plan/safety";
 import { routineTradeoff } from "@/lib/agentic/value/routine-tradeoff";
 import { adviceKind } from "@/lib/agentic/value/advice-kind";
-import { continuedIntakeCoversTargets } from "@/lib/agentic/value/customer-choice";
 import { assessPreferences, verifiedPillLowerBound, type NumericPreferences } from "@/lib/matcher/preferences";
-import { matchingExplanationFor } from "@/lib/agentic/value/matching-explanation";
 import { parseProductAdministration } from "@/lib/product-administration";
-import { operationalDecision } from "@/lib/agentic/value/operational-decision";
+import { planOperationalContext } from "@/lib/agentic/value/operational-decision";
 import { requestedTargetCoverage } from "@/lib/agentic/value/coverage-summary";
 import { AGENTIC_CONTRACT_VERSION } from "@/lib/agentic/config";
 import { agenticMessage, negotiateLocale } from "@/lib/agentic/i18n";
@@ -971,24 +969,11 @@ export function publicPlanFields(result: Pick<
     unassessedMedicationCodes.length > 0 || unassessedConditionCodes.length > 0 || result.safetyGuidance.some(item => item.code === "incomplete_information")
       ? "partial"
       : "complete";
-  const tooBroad = result.breadth?.reasonCode === "request_too_broad";
   const currency = result.basket[0]?.currency ?? "THB";
   const horizonUnavailable = result.horizon?.complete === false || Boolean(result.horizon?.durationUnknown);
   const horizonUnavailableReason = result.horizon?.unavailableReasons?.[0]?.reasonCode ?? (result.horizon?.durationUnknown ? "current_inventory_duration_unknown" : "current_inventory_information_incomplete");
   const horizonReasons = [...(result.horizon?.unavailableReasons ?? []), ...(selected?.economics?.unavailableReasons ?? [])].filter((item, index, all) => all.findIndex(other => JSON.stringify(other) === JSON.stringify(item)) === index);
-  const continuedTargetsCovered = !selected?.basket.length && continuedIntakeCoversTargets(result.coverage);
-  const replenishesLater = continuedTargetsCovered ? (result.horizon?.nextReplenishmentDay ?? 0) > 0 : !horizonUnavailable && Boolean(
-    result.horizon?.orders.some((item) => item.day > 0 && item.day < 90) ||
-      (typeof result.horizon?.nextReplenishmentDay === "number" &&
-        result.horizon.nextReplenishmentDay > 0 &&
-        result.horizon.nextReplenishmentDay < 90)
-  );
-  const hasPurchaseOptions = alternatives.some(option => option.basket.length > 0 && option.purchaseEligible !== false);
-  const matchingExplanation = matchingExplanationFor({ diagnostics: (result as PlanResult).matchingDiagnostics,
-    empty: !selected?.basket.length, hasPurchaseOptions, canExpand: (result as PlanResult).searchSummary?.canExpand,
-    durationUnknown: result.horizon?.durationUnknown,
-    hasUnmetTargets: result.coverage.some(row => row.remainingGap > 0 || row.unresolved), locale });
-  const decision = operationalDecision({ continuedTargetsCovered, canRefine: matchingExplanation?.recoveryActions.includes("refine_request"), status: result.status, hasSelectedOption: Boolean(selected?.basket.length), hasPurchaseOptions: alternatives.some(option => option.basket.length > 0 && option.purchaseEligible !== false), hasQuestions: result.questions.length > 0, purchaseRequiredNow: result.horizon?.purchaseRequiredNow, replenishesLater, tooBroad });
+  const { decision, matchingExplanation, tooBroad } = planOperationalContext({ ...result, alternatives });
   if (decision.status !== result.status) result = { ...result, status: decision.status,
     summary: agenticMessage(negotiateLocale(locale), `plan.summary.${decision.status}`) };
   const quoteBasket =
