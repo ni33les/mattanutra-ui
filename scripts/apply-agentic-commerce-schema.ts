@@ -43,6 +43,12 @@ create table if not exists public.agentic_plan_operations (
   updated_at timestamptz not null,
   unique(owner_scope,idempotency_key)
 );
+-- Already-compressed checkpoint bytes do not belong in frequently updated JSONB.
+-- Readers retain the legacy inline fallback; no large backfill transaction is needed.
+alter table public.agentic_plan_operations add column if not exists checkpoint_cursor bytea;
+alter table public.agentic_plan_operations alter column checkpoint_cursor set storage external;
+create index if not exists agentic_plan_operations_failed_idx on public.agentic_plan_operations(plan_id,(record_json->>'expectedRevision'),created_at desc)
+  where status in ('failed','cancelled');
 create index if not exists agentic_plan_operations_active_idx on public.agentic_plan_operations(plan_id,created_at,id)
   where status in ('queued','running','retryable');
 create index if not exists agentic_plan_operations_completed_idx on public.agentic_plan_operations(plan_id,(record_json->>'revision'),created_at desc)

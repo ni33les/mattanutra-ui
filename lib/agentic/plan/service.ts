@@ -1,3 +1,4 @@
+import { withoutOperationCursor } from "@/lib/agentic/store/operation-checkpoint";
 import { planReturnWaitMs } from "@/lib/agentic/plan/operations";
 import { catalogueSnapshotId } from "@/lib/agentic/catalogue/freeze";
 import { validateProductDoseProposals } from "@/lib/matcher/serving-grid";
@@ -512,7 +513,7 @@ async function durableMatch(input: { snapshot: CatalogueSnapshot; state: Canonic
       - (checkpoint.search?.expansionAttempts ?? 0) - lostAttempts;
     const chunkBudget = Math.min(4_000, Math.max(0, remaining));
     const reserved = { ...checkpoint, stage: "search" as const, reservedAttempts: chunkBudget + lostAttempts };
-    if (!await updateClaimedOperation(store, claim, { checkpoint: reserved }, new Date().toISOString())) throw new Error("Matching operation lease lost");
+    if (!await updateClaimedOperation(store, claim, { checkpoint: withoutOperationCursor({ ...claim, checkpoint: reserved }).checkpoint }, new Date().toISOString())) throw new Error("Matching operation lease lost");
     const reply = await matchPlanChunkInWorker(input, { checkpoint: checkpoint.search, chunkBudget: Math.max(1, chunkBudget), lostAttempts });
     checkpoint = { ...checkpoint, stage: "search", search: reply.checkpoint, reservedAttempts: 0 };
     if (!await updateClaimedOperation(store, claim, { checkpoint }, new Date().toISOString())) throw new Error("Matching operation lease lost");
@@ -976,7 +977,7 @@ export async function runAdmittedPlanOperation(input: Readonly<{
 }>): Promise<PlanToolSuccess | AgenticErrorResult> {
   const existingWork = inflightDurableOperations.get(input.operationId);
   if (existingWork) return existingWork;
-  const operation = await input.store.getPlanOperation(input.operationId);
+  const operation = await input.store.getPlanOperation(input.operationId, { includeCursor: false });
   if (!operation) return businessError({ reasonCode: "not_found", message: "Matching operation not found." });
   if (operation.status === "complete") return operation.response as PlanToolSuccess;
   if (operation.status === "cancelled" || operation.status === "failed") return (operation.error as AgenticErrorResult | null) ?? businessError({ reasonCode: "stale_revision", message: "This matching operation is no longer active. Reload the plan." });
@@ -1009,8 +1010,19 @@ export async function runAdmittedPlanOperation(input: Readonly<{
   return work;
 }
 
+function operationFailureResponse(operation: PlanOperationRecord, currentRevision = operation.expectedRevision) {
+  const failure = isAgenticErrorResult(operation.error) ? operation.error : businessError({
+    reasonCode: "stale_revision", message: "This refinement did not complete. Revise the last committed plan with a new idempotency key." });
+  return { ...failure, error: { ...failure.error, currentRevision,
+    requestedRevision: operation.revision, nextActions: failure.error.nextActions ?? ["refresh_plan"] } };
+}
+
 async function admittedResponse(input: PlanExecutionInput, operation: PlanOperationRecord) {
   if (operation.status === "complete") return operation.response as PlanToolSuccess;
+  if (operation.status === "failed" || operation.status === "cancelled") {
+    const current = await input.store.getPlan(operation.planId);
+    return operationFailureResponse(operation, current?.currentRevision);
+  }
   const work = runAdmittedPlanOperation({ config: input.config, store: input.store, operationId: operation.id });
   if (input.payload.operation === "get") {
     void work.catch(() => undefined);
@@ -1119,8 +1131,12 @@ async function executePlanTool(input: Readonly<{
       now: input.now, resourceType: "plan", scope: input.scope, store: input.store });
     if (!capability) return businessError({ reasonCode: "not_found", message: "Not found." });
     const active = await input.store.getActivePlanOperation(capability.resourceId);
-    if (active && active.status !== "retryable") return admittedResponse(input, active);
-    if (active?.status === "retryable" && active.expectedRevision === active.revision) return active.error as AgenticErrorResult;
+    if (active) return admittedResponse(input, active);
+    const plan = await input.store.getPlan(capability.resourceId);
+    if (plan) {
+      const failed = await input.store.getFailedPlanOperation(plan.id, plan.currentRevision);
+      if (failed) return operationFailureResponse(failed);
+    }
   }
   const skipIdempotency =
     input.payload.operation === "get" || !input.payload.idempotencyKey;
@@ -1500,7 +1516,7 @@ async function executePlanTool(input: Readonly<{
     return prepared as AgenticErrorResult;
   }
   if (prepared.operationId) {
-    const operation = await input.store.getPlanOperation(prepared.operationId);
+    const operation = await input.store.getPlanOperation(prepared.operationId, { includeCursor: false });
     if (!operation) throw new Error("Admitted plan operation disappeared");
     return admittedResponse(input, operation);
   }
@@ -1884,7 +1900,7 @@ async function completePreparedPlan(
     }
     const saved = await updateClaimedOperation(input.store, activeOperation, {
       catalogueIdentity: catalogueSnapshotId(snapshot), referenceIdentity: matcherSafetyReferenceIdentity()?.fingerprint ?? null,
-      checkpoint: checkpoint ?? { stage: "normalized", state, catalogueId: catalogueSnapshotId(snapshot) }
+      checkpoint: activeOperation.checkpoint ? withoutOperationCursor(activeOperation).checkpoint : checkpoint ?? { stage: "normalized", state, catalogueId: catalogueSnapshotId(snapshot) }
     }, new Date().toISOString());
     if (!saved) return businessError({ reasonCode: "stale_revision", message: "This matching operation was cancelled or superseded. Reload the plan." });
   }
@@ -1982,7 +1998,7 @@ async function persistTerminalPlan(input: Readonly<{
     if (!plan) return businessError({ message: "Not found.", reasonCode: "not_found" });
     const operationClaim = planAttempts.getStore()?.operation;
     if (operationClaim) {
-      const active = await store.getPlanOperation(operationClaim.id);
+      const active = await store.getPlanOperation(operationClaim.id, { includeCursor: false });
       if (!active || active.status !== "running" || active.leaseToken !== operationClaim.leaseToken || Date.parse(active.leaseExpiresAt ?? "") <= Date.now()) {
         return businessError({ reasonCode: "stale_revision", message: "This matching operation no longer owns publication. Reload the plan." });
       }

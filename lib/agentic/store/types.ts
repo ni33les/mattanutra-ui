@@ -224,9 +224,10 @@ export type FeedbackRecord = Readonly<{
 }>;
 
 export type AgenticStore = {
-  getPlanOperation(id: string): Promise<PlanOperationRecord | null>;
+  getPlanOperation(id: string, options?: { includeCursor: boolean }): Promise<PlanOperationRecord | null>;
   getPlanOperationByKey(ownerScope: string, key: string): Promise<PlanOperationRecord | null>;
   getActivePlanOperation(planId: string): Promise<PlanOperationRecord | null>;
+  getFailedPlanOperation(planId: string, currentRevision: number): Promise<PlanOperationRecord | null>;
   getCompletedPlanOperation(planId: string, revision: number): Promise<PlanOperationRecord | null>;
   /** Insert operation and its framework task in the caller's transaction. */
   insertPlanOperation(record: PlanOperationRecord): Promise<void>;

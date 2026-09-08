@@ -116,6 +116,7 @@ export type ProductRecommendationNeedDiagnostic = Readonly<{
 export type ProductRecommendationAlgorithmVersion =
   | "flexible-dose-fit-3"
   | "flexible-dose-fit-5"
+  | "flexible-dose-fit-6"
   | "flexible-dose-fit-4"
   | "advisory-dose-fit-2"
   | "pareto-hybrid-1"

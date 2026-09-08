@@ -361,6 +361,12 @@
       "slice": "reliability",
       "reason": "Failed pending refinements must surface their error without presenting the last committed result as completed new work.",
       "database": false
+    },
+    {
+      "file": "test/ax-refinement/recovery.integration.test.ts",
+      "slice": "reliability",
+      "reason": "Real expanded workers and PostgreSQL exercise transient checkpoint rollback, charged lost attempts, refreshed clocks and same-key publication.",
+      "database": true
     }
   ]
 }

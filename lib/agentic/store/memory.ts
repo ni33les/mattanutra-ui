@@ -1,3 +1,4 @@
+import { operationCursor, withoutOperationCursor, withOperationCursor } from "@/lib/agentic/store/operation-checkpoint";
 import { AsyncLocalStorage } from "node:async_hooks";
 import type {
   AgenticStore,
@@ -57,7 +58,10 @@ export function createMemoryStore(): AgenticStore {
   const maps = [catalogues, capabilities, checkouts, feedback, fulfilment, idempotency, orderItems, orders, outbox, paymentAttempts, paymentAudits, plans, operations, providerEvents, retailLinks, revisions, supportCases, supportMessages] as Map<string, unknown>[];
 
   const store: AgenticStore = {
-    async getPlanOperation(id) { return clone(operations.get(id) ?? null); },
+    async getPlanOperation(id, options) {
+      const record = operations.get(id);
+      return record ? clone(options?.includeCursor === false ? withoutOperationCursor(record) : record) : null;
+    },
     async getPlanOperationByKey(ownerScope, key) {
       return clone([...operations.values()].find(row => row.ownerScope === ownerScope && row.key === key) ?? null);
     },
@@ -68,6 +72,10 @@ export function createMemoryStore(): AgenticStore {
       return clone([...operations.values()].filter(row => row.planId === planId && ["queued", "running", "retryable"].includes(row.status))
         .sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id))[0] ?? null);
     },
+    async getFailedPlanOperation(planId, currentRevision) {
+      return clone([...operations.values()].filter(row => row.planId === planId && row.expectedRevision === currentRevision && ["failed", "cancelled"].includes(row.status))
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt) || b.id.localeCompare(a.id))[0] ?? null);
+    },
     async insertPlanOperation(record) {
       if (!transactions.getStore()) throw new Error("Plan admission requires a transaction");
       if (operations.has(record.id) || [...operations.values()].some(row => row.ownerScope === record.ownerScope && row.key === record.key)) throw new Error("idempotency_conflict");
@@ -75,7 +83,7 @@ export function createMemoryStore(): AgenticStore {
     },
     async updatePlanOperation(record, expectedVersion) {
       if (operations.get(record.id)?.version !== expectedVersion) return false;
-      operations.set(record.id, clone(record)); return true;
+      operations.set(record.id, clone(withOperationCursor(record, operationCursor(record) ?? operationCursor(operations.get(record.id)!)))); return true;
     },
     async getCatalogueSnapshot(id) { return catalogues.get(id) ?? null; },
     async insertCatalogueSnapshot(id, snapshot) { catalogues.set(id, clone(snapshot)); },

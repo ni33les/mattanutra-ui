@@ -42,20 +42,23 @@ export async function admitPlanOperation(store: AgenticStore, input: Readonly<{
 }
 
 export async function claimPlanOperation(store: AgenticStore, id: string, leaseToken: string, now: string) {
-  return store.transaction(async tx => {
-    const current = await tx.getPlanOperation(id);
+  const claimed = await store.transaction(async tx => {
+    const current = await tx.getPlanOperation(id, { includeCursor: false });
     if (!current || ["complete", "cancelled", "failed"].includes(current.status)) return null;
     if (current.status === "running" && Date.parse(current.leaseExpiresAt ?? "") > Date.parse(now)) return null;
     const next: PlanOperationRecord = { ...current, status: "running", leaseToken,
       leaseExpiresAt: new Date(Date.parse(now) + PLAN_OPERATION_LEASE_MS).toISOString(), updatedAt: now, version: current.version + 1 };
     return await tx.updatePlanOperation(next, current.version) ? next : null;
   });
+  if (!claimed) return null;
+  const hydrated = await store.getPlanOperation(id);
+  return hydrated?.leaseToken === leaseToken && hydrated.status === "running" ? hydrated : null;
 }
 
 export async function updateClaimedOperation(store: AgenticStore, claim: PlanOperationRecord,
   changes: Partial<Pick<PlanOperationRecord, "checkpoint" | "catalogueIdentity" | "referenceIdentity" | "status" | "response" | "error">>, now: string) {
   return store.transaction(async tx => {
-    const current = await tx.getPlanOperation(claim.id);
+    const current = await tx.getPlanOperation(claim.id, { includeCursor: false });
     if (!current || current.status !== "running" || current.leaseToken !== claim.leaseToken ||
       Date.parse(current.leaseExpiresAt ?? "") <= Date.parse(now)) return false;
     const status = changes.status ?? current.status;
@@ -70,7 +73,7 @@ export function failPlanOperation(store: AgenticStore, claim: PlanOperationRecor
 
 export async function cancelPlanOperation(store: AgenticStore, id: string, now: string) {
   return store.transaction(async tx => {
-    const current = await tx.getPlanOperation(id);
+    const current = await tx.getPlanOperation(id, { includeCursor: false });
     if (!current || ["complete", "cancelled", "failed"].includes(current.status)) return false;
     return tx.updatePlanOperation({ ...current, status: "cancelled", leaseToken: null, leaseExpiresAt: null,
       version: current.version + 1, updatedAt: now }, current.version);

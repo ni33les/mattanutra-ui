@@ -7,6 +7,8 @@ import { loadAgenticConfig } from "../../lib/agentic/config.ts";
 import { matchPlan, matchPlanChunk, planCheckpointInputIdentity } from "../../lib/agentic/plan/matching.ts";
 import { setMatcherSafetyCeilings, matcherSafetyCeilings } from "../../lib/matcher/safety-ceilings.ts";
 import { MatchWorkerPool } from "../../lib/agentic/plan/match-worker-pool.ts";
+import { deserialize } from "node:v8";
+import { inflateSync } from "node:zlib";
 
 afterEach(uninstallGoldCatalogue);
 test("AXR-REL-03 recovery accepts a new observation clock but rejects changed catalogue facts", async () => {
@@ -25,7 +27,13 @@ test("AXR-REL-03 recovery accepts a new observation clock but rejects changed ca
   const resumed = matchPlanChunk(refreshed, { checkpoint: first.checkpoint, chunkBudget: 8000 });
   const uninterrupted = matchPlanChunk(input, { checkpoint: first.checkpoint, chunkBudget: 8000 });
   assert.equal(resumed.expansionAttempts, uninterrupted.expansionAttempts);
-  assert.deepEqual(resumed.checkpoint, uninterrupted.checkpoint);
+  const decoded = (cursor: string) => deserialize(inflateSync(Buffer.from(cursor, "base64")));
+  assert.deepEqual(decoded(resumed.checkpoint.cursor), decoded(uninterrupted.checkpoint.cursor));
+  // V8 bytes may differ with object sharing. Compare decoded work and complete
+  // results, normalizing only the deliberately changed observation timestamp.
+  const observationNormalized = (value: unknown): unknown => Array.isArray(value) ? value.map(observationNormalized)
+    : value && typeof value === "object" ? Object.fromEntries(Object.entries(value).map(([key, item]) => [key, key === "availabilityAsOf" ? snapshot.availabilityAsOf : observationNormalized(item)])) : value;
+  assert.deepEqual(observationNormalized(resumed.result), observationNormalized(uninterrupted.result));
   assert.ok(snapshot.products.length > 0);
   const changed = { ...refreshed, snapshot: { ...refreshed.snapshot, products: refreshed.snapshot.products.map((product, index) => index === 0 ? { ...product, unitPriceMinor: product.unitPriceMinor + 1 } : product) } };
   assert.throws(() => matchPlanChunk(changed, { checkpoint: first.checkpoint, chunkBudget: 1 }), /identity changed/);

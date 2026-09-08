@@ -1,3 +1,4 @@
+import { operationCursor, withoutOperationCursor, withOperationCursor } from "@/lib/agentic/store/operation-checkpoint";
 import { getSql, keepDatabaseWarm } from "@/lib/db";
 import type {
   AgenticStore,
@@ -64,23 +65,33 @@ export function createPostgresStore(inputSql: Sql, inTransaction = false): Agent
   // shape rather than leaking untyped columns into the store interface.
   const sql = inputSql as unknown as StoreSql;
   const store: AgenticStore = {
-    async getPlanOperation(id) {
-      const [row] = await sql<{ record_json: PlanOperationRecord }>`select record_json from public.agentic_plan_operations where id=${id}::uuid`;
-      return row?.record_json ?? null;
+    async getPlanOperation(id, options) {
+      if (options?.includeCursor === false) {
+        const [row] = await sql<{ record_json: PlanOperationRecord }>`select record_json from public.agentic_plan_operations where id=${id}::uuid`;
+        return row ? withoutOperationCursor(row.record_json) : null;
+      }
+      const [row] = await sql<{ record_json: PlanOperationRecord; checkpoint_cursor: Buffer | null }>`select record_json,checkpoint_cursor from public.agentic_plan_operations where id=${id}::uuid`;
+      return row ? withOperationCursor(row.record_json, row.checkpoint_cursor?.toString("base64")) : null;
     },
     async getPlanOperationByKey(ownerScope, key) {
       const [row] = await sql<{ record_json: PlanOperationRecord }>`select record_json from public.agentic_plan_operations where owner_scope=${ownerScope} and idempotency_key=${key}`;
-      return row?.record_json ?? null;
+      return row ? withoutOperationCursor(row.record_json) : null;
     },
     async getCompletedPlanOperation(planId, revision) {
-      const [row] = await sql<{ record_json: PlanOperationRecord }>`select record_json from public.agentic_plan_operations
+      const [row] = await sql<{ id: string }>`select id from public.agentic_plan_operations
         where plan_id=${planId}::uuid and status='complete' and record_json->>'revision'=${String(revision)} order by created_at desc limit 1`;
-      return row?.record_json ?? null;
+      return row ? store.getPlanOperation(row.id) : null;
     },
     async getActivePlanOperation(planId) {
       const [row] = await sql<{ record_json: PlanOperationRecord }>`select record_json from public.agentic_plan_operations
         where plan_id=${planId}::uuid and status in ('queued','running','retryable') order by created_at,id limit 1`;
-      return row?.record_json ?? null;
+      return row ? withoutOperationCursor(row.record_json) : null;
+    },
+    async getFailedPlanOperation(planId, currentRevision) {
+      const [row] = await sql<{ record_json: PlanOperationRecord }>`select record_json from public.agentic_plan_operations
+        where plan_id=${planId}::uuid and status in ('failed','cancelled') and record_json->>'expectedRevision'=${String(currentRevision)}
+        order by created_at desc,id desc limit 1`;
+      return row ? withoutOperationCursor(row.record_json) : null;
     },
     async insertPlanOperation(record) {
       if (!inTransaction) throw new Error("Plan admission requires a transaction");
@@ -92,8 +103,15 @@ export function createPostgresStore(inputSql: Sql, inTransaction = false): Agent
         idempotencyKey: `agentic-plan:${record.id}`, requiredCapabilities: ["match_agentic_plan"], maxAttempts: 3 }, inputSql);
     },
     async updatePlanOperation(record, expectedVersion) {
-      const rows = await sql<{ id: string }>`update public.agentic_plan_operations set status=${record.status},version=${record.version},
-        record_json=${asJson(record)},updated_at=${record.updatedAt}::timestamptz where id=${record.id}::uuid and version=${expectedVersion} returning id`;
+      const cursor = operationCursor(record), metadata = asJson(withoutOperationCursor(record));
+      const rows = cursor !== undefined
+        ? await sql<{ id: string }>`update public.agentic_plan_operations set status=${record.status},version=${record.version},
+          record_json=${metadata},checkpoint_cursor=${Buffer.from(cursor, "base64")},updated_at=${record.updatedAt}::timestamptz
+          where id=${record.id}::uuid and version=${expectedVersion} returning id`
+        : await sql<{ id: string }>`update public.agentic_plan_operations set status=${record.status},version=${record.version},
+          record_json=${metadata},checkpoint_cursor=case when ${record.checkpoint === null} then null else
+            coalesce(checkpoint_cursor,decode(record_json #>> '{checkpoint,search,cursor}','base64')) end,
+          updated_at=${record.updatedAt}::timestamptz where id=${record.id}::uuid and version=${expectedVersion} returning id`;
       return rows.length === 1;
     },
     async isCatalogueRevisionCurrent(expectedRevision) {

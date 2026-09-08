@@ -69,7 +69,7 @@ test("AXR-REL-03 large checkpoint bytes stay out of lifecycle writes and survive
   const checkpoint = { stage: "search", reservedAttempts: 0, search: { cursor, expansionAttempts: 28000, expansionBudget: 64000 } };
   assert.equal(await updateClaimedOperation(store, claim, { checkpoint }, now), true);
   const [stored] = await sql`select record_json from public.agentic_plan_operations where id=${operation.id}::uuid`;
-  assert.equal(stored.record_json.checkpoint.search.cursor, undefined, "Lifecycle metadata must not rewrite the binary search archive");
+  assert.equal(Object.hasOwn(stored.record_json.checkpoint.search, "cursor"), false, "Lifecycle metadata must not rewrite the binary search archive");
   const metadata = await store.getPlanOperation(operation.id, { includeCursor: false }); assert.ok(metadata);
   assert.equal((metadata.checkpoint as typeof checkpoint).search.cursor, undefined);
   const [relation] = await sql`select reltoastrelid::regclass::text as name from pg_class where oid='public.agentic_plan_operations'::regclass`;
@@ -82,4 +82,24 @@ test("AXR-REL-03 large checkpoint bytes stay out of lifecycle writes and survive
   assert.equal(await updateClaimedOperation(store, claim, { checkpoint: null }, now), false, "Old leases cannot clear the checkpoint");
   assert.equal(await cancelPlanOperation(store, operation.id, now), true);
   assert.deepEqual((await store.getPlanOperation(operation.id))?.checkpoint, checkpoint);
+});
+
+test("AXR-REL-03 legacy inline checkpoints migrate lazily without dropping their recovery data", async () => {
+  const planId = randomUUID(), now = "2026-09-07T00:00:00Z";
+  await store.insertPlan({ id: planId, environment: "dev", tenantScope: "mattanutra", principalScope: `qa-v3:ax:${planId}`, currentRevision: 1, createdAt: now, updatedAt: now });
+  const operation = await admitPlanOperation(store, { planId, ownerScope: `dev:${planId}`, key: "ax-inline-checkpoint", expectedRevision: 1, revision: 2,
+    payload: { operation: "revise" }, prepared: {}, scope: { environment: "dev", tenantScope: "mattanutra" }, now });
+  const checkpoint = { stage: "search", search: { cursor: randomBytes(4096).toString("base64"), expansionAttempts: 4000, expansionBudget: 64000 } };
+  const legacy = { ...operation, checkpoint };
+  await sql`update public.agentic_plan_operations set record_json=${sql.json(legacy)} where id=${operation.id}::uuid`;
+  assert.deepEqual((await store.getPlanOperation(operation.id))?.checkpoint, checkpoint);
+  const claim = await claimPlanOperation(store, operation.id, "legacy-worker", now); assert.ok(claim);
+  assert.deepEqual(claim.checkpoint, checkpoint);
+  const [row] = await sql`select record_json,checkpoint_cursor from public.agentic_plan_operations where id=${operation.id}::uuid`;
+  assert.equal(Object.hasOwn(row.record_json.checkpoint.search, "cursor"), false);
+  assert.equal(row.checkpoint_cursor.toString("base64"), checkpoint.search.cursor);
+  assert.equal(await updateClaimedOperation(store, claim, { checkpoint: null }, now), true);
+  assert.equal((await store.getPlanOperation(operation.id))?.checkpoint, null);
+  const [cleared] = await sql`select checkpoint_cursor from public.agentic_plan_operations where id=${operation.id}::uuid`;
+  assert.equal(cleared.checkpoint_cursor, null);
 });
