@@ -16,6 +16,20 @@ function product(id: string, amounts: Record<string, number>, priceAmount = 10, 
 }
 
 describe("web advisory matching boundaries", () => {
+  it("M721-WORKER-01 equal-dose retailer selection prefers verified easier routines before price", async () => {
+    setMatcherSafetyCeilings([]);
+    try {
+      const candidates = [product("ten-pills", { a: 10 }, 1, "cheap"), product("one-pill", { a: 100 }, 2, "easy")].map(row => ({ ...row,
+        administration: { route: "oral", physicalUnit: "tablet", unitsPerServing: 1, doseIncrement: 1, packQuantity: 60,
+          provenance: { status: "verified", sourceUrl: "https://example.test/label", sourceText: "one tablet serving", verifiedAt: "2026-09-08" } } as const }));
+      const result = await executeTaskWorkItem({ taskType: "generate_product_recommendations", taskId: "fixture", planId: "fixture", countryCode: "TH", stackPreference: "balanced",
+        clientSex: null, clientContext: { currentSupplements: "none" }, needs: [need("a")],
+        retailerCandidateSets: candidates.map(row => ({ candidates: [row], organisationId: row.selectedRetailerOrganisationId!, organisationName: "Fixture", currency: "THB", dispatchCity: null, etaDate: null, productCount: 1, subtotalAmount: row.priceAmount! })) });
+      const recommendations = (result as { recommendations: ProductRecommendationResult }).recommendations;
+      assert.deepEqual(recommendations.recommendations.map(row => row.product.id), ["one-pill"]);
+      assert.equal(recommendations.diagnostics.matching?.options[0]?.doseFit?.total, 0);
+    } finally { resetMatcherSafetyCeilings(); }
+  });
   it("counts all five requested targets with no offset for over-target delivery", () => {
     setMatcherSafetyCeilings([]);
     try {
