@@ -64,7 +64,7 @@ for (const locale of ["en", "th", "zh-CN"]) test(`PAY-SCHEMA-05 ${locale} publis
   const plan = await call("plan", { ...example("get-current-decision"), planHandle: created.planHandle });
   const options = plan.options as Record<string, unknown>[]; assert.ok(options.length > 1);
   assert.ok(options.every(row => !Object.hasOwn(row, "doseFit"))); assert.ok(!Object.hasOwn(plan, "claimIds"));
-  const option = options.find(row => row.purchaseEligible); assert.ok(option);
+  const option = options.find(row => row.optionId === plan.selectedOptionId); assert.ok(option);
   const details = await call("plan", { ...example("read-plan-score-and-sources"), planHandle: plan.planHandle, expectedRevision: plan.revision, optionIds: [option.optionId] });
   const detailedOptions = details.options as Record<string, unknown>[];
   assert.equal(detailedOptions.length, 1); assert.equal(detailedOptions[0].optionId, option.optionId);

@@ -19,29 +19,17 @@ test("PAY-VIEW-01 eighteen frozen decisions retain all choices, doses, amounts, 
     assert.ok(!("basket" in compact)); assert.ok(!("doseFit" in compact)); assert.ok(!("orderSchedule" in compact));
     for (const [i, option] of compact.options.entries()) {
       const old = plan.options![i];
-      assert.equal(option.purchaseEligible, old.purchaseEligible);
+      assert.deepEqual(Object.keys(option).sort(), ["coveragePercent", "optionId", "reason", "roles", "stackSummary"]);
       assert.deepEqual(option.stackSummary, old.stackSummary);
-      assert.deepEqual(option.preferenceAssessment, old.preferenceAssessment);
+      assert.equal(option.coveragePercent, old.coveragePercent);
       const foreground = option.optionId === compact.selectedOptionId || option.optionId === compact.highlightedAlternativeOptionId;
-      const inline = option.adviceIds.map(id => { const { adviceId, ...advice } = compact.advice.find(row => row.adviceId === id)!; assert.equal(adviceId, id); return advice; });
+      const inline = compact.advice.filter(row => row.optionIds.includes(option.optionId));
       if (!foreground) assert.deepEqual(inline, []);
-      else for (const finding of old.advice ?? []) {
-        if (finding.kind === "incomplete_information" || finding.code === "incomplete_information" || (finding.ruleId.startsWith("ul:missing:") && finding.threshold === null)) {
-          const notice = inline.find(row => row.kind === "incomplete_information"); assert.ok(notice);
-          assert.equal(notice.threshold, null);
-          for (const code of finding.uncertaintyCodes ?? []) assert.ok(notice.uncertaintyCodes?.includes(code));
-          for (const id of finding.productIds ?? []) assert.ok(notice.productIds?.includes(id));
-        } else {
-          const preserved = inline.flatMap(row => row.findings ?? [row]).find(row => row.guidanceId === finding.guidanceId && row.exposure === finding.exposure && row.threshold === finding.threshold && row.authorityUrl === finding.authorityUrl && row.uncertainty === finding.uncertainty);
-          assert.ok(preserved, finding.ruleId);
-          for (const key of ["ruleId", "severity", "nutrientName", "unit", "sourceScope", "uncertainty", "evidence"] as const) assert.deepEqual(preserved[key], finding[key]);
-        }
-      }
-      if (option.basket) {
-        assert.deepEqual(option.basket.map(row => [row.productId,row.servingsPerDay,row.quantity,row.unitPriceMinor,row.lineTotalMinor,row.dailyPills]), old.basket!.map(row => [row.productId,row.servingsPerDay,row.quantity,row.unitPriceMinor,row.lineTotalMinor,row.dailyPills]));
-        assert.ok(!("labelledFacts" in option.basket[0]));
-      }
-      assert.deepEqual(option.coverage?.map(row => [row.name,row.requestedAmount,row.currentAmount,row.deliveredAmount,row.quantifiedExposureAmount,row.totalExposureAmount,row.totalExposureComplete,row.intakeCertainty,row.remainingGap,row.excess,row.unit]), old.coverage?.map(row => [row.name,row.requestedAmount,row.currentAmount,row.deliveredAmount,row.quantifiedExposureAmount,row.totalExposureAmount,row.totalExposureComplete,row.intakeCertainty,row.remainingGap,row.excess,row.unit]));
+      else for (const finding of old.advice ?? []) assert.ok(inline.some(row => row.guidanceIds.includes(finding.guidanceId)), finding.ruleId);
+      const details = projectPlan(plan, { responseView: "details", expectedRevision: plan.revision, sections: ["products", "coverage", "advice"], optionIds: [option.optionId] });
+      assert.ok(details.ok);
+      for (const key of ["basket", "coverage", "advice"] as const) assert.deepEqual(details.options[0][key], old[key]);
+
     }
     originalBytes += bytes(toolResult(plan)); conciseBytes += bytes(toolResult(compact));
   }
@@ -70,8 +58,12 @@ test("PAY-VIEW-03 advice with identical rule IDs but different exposure, source 
   plan.options![0].advice!.push({ ...first, exposure: 999, threshold: 100, authorityUrl: "https://example.org/reference", uncertainty: "Different measured exposure" });
   const compact = projectPlan(plan, { responseView: "conversation" });
   assert.ok(compact.ok && "advice" in compact && "options" in compact);
-  const advice = compact.options[0].adviceIds.flatMap(id => { const row = compact.advice.find(row => row.adviceId === id)!; return row.findings ?? [row]; });
+  const ids = compact.advice.filter(row => row.optionIds.includes(compact.options[0].optionId)).flatMap(row => row.guidanceIds);
+  assert.ok(ids.includes(first.guidanceId));
+  const details = projectPlan(plan, { responseView: "details", expectedRevision: plan.revision, sections: ["advice"], optionIds: [compact.options[0].optionId] });
+  assert.ok(details.ok); const advice = details.options[0].advice!;
   assert.equal(advice.length, plan.options![0].advice!.length);
+  assert.deepEqual(advice, plan.options![0].advice);
   assert.ok(advice.some(row => row.exposure === 999 && row.threshold === 100));
 });
 
@@ -80,12 +72,9 @@ test("PAY-VIEW-04 plan-wide advice survives empty and processing decisions witho
   plan.options = []; plan.basket = []; plan.status = "processing";
   assert.ok(plan.safetyGuidance!.length > 0);
   const compact = projectPlan(plan, { responseView: "conversation" });
-  for (const finding of plan.safetyGuidance!) {
-    if (finding.kind === "incomplete_information" || finding.code === "incomplete_information" || (finding.ruleId.startsWith("ul:missing:") && finding.threshold === null)) {
-      const notice = compact.advice.find(row => row.kind === "incomplete_information"); assert.ok(notice);
-      for (const code of finding.uncertaintyCodes ?? []) assert.ok(notice.uncertaintyCodes?.includes(code));
-      assert.ok(compact.planAdviceIds.includes(notice.adviceId));
-    } else assert.ok(compact.advice.some(row => row.guidanceId === finding.guidanceId && row.exposure === finding.exposure && row.threshold === finding.threshold));
-  }
+  const planFlags = compact.advice.filter(row => compact.planAdviceIds.includes(row.adviceId));
+  for (const finding of plan.safetyGuidance!) assert.ok(planFlags.some(row => row.guidanceIds.includes(finding.guidanceId)));
+  const details = projectPlan(plan, { responseView: "details", expectedRevision: plan.revision, sections: ["advice"] });
+  assert.ok(details.ok); assert.deepEqual(details.safetyGuidance, plan.safetyGuidance);
   assert.ok(compact.planAdviceIds.length > 0);
 });

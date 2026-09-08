@@ -54,27 +54,23 @@ const SUPPORT_SUCCESS = o({ ok: Type.Literal(true), caseReference: s, createdAt:
 const EVIDENCE_SUCCESS = o({ ok: Type.Literal(true), claims: a(o({ claimId: s, limitation: s, researchVersion: s, reviewDate: s, source: s, statement: s, strength: s })), mode: e(["summary", "sources"] as const), planRevision: int, researchVersion: s });
 // Presentation is a typed projection of the established full contracts. Canonical
 // storage and legacy response fields remain untouched.
-export const CONVERSATION_BASKET_KEYS = ["productId", "productName", "servingsPerDay", "quantity", "unitPriceMinor", "lineTotalMinor", "currency", "dailyPills", "pillCountKnown", "daysOfSupply", "replenishmentDay"] as const;
-export const CONVERSATION_COVERAGE_KEYS = ["name", "unit", "basis", "requestedTargetId", "supplementId", "importance", "unresolved", "requestedAmount", "currentAmount", "deliveredAmount", "quantifiedExposureAmount", "totalExposureAmount", "totalExposureComplete", "intakeCertainty", "remainingGap", "excess", "coveragePercent", "status", "withinAgreedRange", "uncertainty"] as const;
-const conversationBasket = Type.Pick(BASKET_ITEM_SCHEMA, CONVERSATION_BASKET_KEYS);
-const conversationCoverage = Type.Pick(coverage, CONVERSATION_COVERAGE_KEYS);
-const conversationOption = o({ ...Type.Pick(OPTION_SCHEMA, ["optionId", "roles", "role", "reason", "selected", "recommended", "purchaseEligible", "stackSummary", "coveragePercent", "coverageSummary", "preferenceAssessment"]).properties,
-  basket: p(a(conversationBasket)), coverage: p(a(conversationCoverage)), adviceIds: Type.Array(s, { description: "Inline advice for the selected and highlighted options. Empty on background options does not mean no findings: select an option or request its advice details. Missing-reference notices may summarize several original findings." }),
-  shippingMinor: pn(money), firstOrderTotalMinor: pn(money) });
+export const CONVERSATION_OPTION_KEYS = ["optionId", "roles", "reason", "stackSummary", "coveragePercent"] as const;
+const conversationOption = o({ ...Type.Required(Type.Pick(OPTION_SCHEMA, CONVERSATION_OPTION_KEYS)).properties,
+  reason: Type.String({ maxLength: 160 }) });
 const detailSections = e(["request", "products", "coverage", "advice", "score", "economics"] as const);
 const presentationBase = { ok: Type.Literal(true), planHandle: s, revision: int, resultVersion: s, contractVersion: s, locale: s, status };
-export const CONVERSATION_FINDING_KEYS = ["guidanceId", "ruleId", "rulesVersion", "kind", "severity", "nutrientName", "exposure", "threshold", "unit", "sourceScope", "comparator", "authorityUrl", "referenceConfidence", "referenceBasis", "uncertainty", "uncertaintyCodes", "evidence", "productIds", "supplementIds"] as const;
-const conversationFinding = o({ ...Type.Pick(ADVICE_SCHEMA, CONVERSATION_FINDING_KEYS).properties,
-  optionIds: ss, planWide: bool }, "Option IDs identify exactly which foreground baskets produced this finding. planWide distinguishes genuine plan-wide advice from an alternative's findings.");
 export const PLAN_CONVERSATION_SCHEMA = o({ ...presentationBase, responseView: Type.Literal("conversation"),
   summary: s, operationalDecision: p(OPERATIONAL_DECISION_SCHEMA), nextActions: ss,
   selectedOptionId: n(s), highlightedAlternativeOptionId: n(s), options: a(conversationOption),
-  advice: Type.Array(o({ ...ADVICE_SCHEMA.properties, adviceId: s, findings: p(Type.Array(conversationFinding, { description: "Distinct findings in a grouped conversation notice. Each measurement keeps its own identity, reference and unit; the message states every finding. Full/details retain original messages, contributors and provenance." })) }), { maxItems: 5 }), planAdviceIds: Type.Array(s, { description: "Plan-wide findings, resolved in this response’s advice array even when there is no product option." }),
+  advice: a(o({ adviceId: s, guidanceIds: ss, optionIds: ss,
+    kind: e(["dose_review", "interaction", "overlap", "incomplete_information", "product_data", "other"] as const),
+    severity: adviceCore.severity }, "References only. Fetch details.sections=[advice] for these optionIds to read complete findings and sources.")),
+  planAdviceIds: Type.Array(s, { description: "Plan-wide flags in advice. Full plan-wide findings are available in details.sections=[advice].safetyGuidance." }),
   ...Type.Pick(PLAN_SUCCESS_SCHEMA, ["purchaseRequiredNow", "nextReplenishmentDay", "shippingMinor", "estimatedOrderTotalMinor", "questions", "pollAfterSeconds", "searchSummary", "refreshRequired", "sourceContractVersion", "reasonCode", "suggestedGroups", "unsupportedTargets", "evidenceHandle", "alternativeSearch"]).properties,
   availableDetails: a(detailSections) });
 const detailOption = Type.Pick(OPTION_SCHEMA, ["optionId", "basket", "coverage", "advice", "doseFit", "economics"]);
 export const PLAN_DETAILS_SCHEMA = o({ ...presentationBase, responseView: Type.Literal("details"), sections: a(detailSections),
-  options: a(detailOption), ...Type.Pick(PLAN_SUCCESS_SCHEMA, ["originalRequest", "orderSchedule", "comparisonBasis", "unavailableReasons", "cash30DayMinor", "cash90DayMinor", "nextReplenishmentDay", "researchVersion", "claimIds"]).properties });
+  options: a(detailOption), ...Type.Pick(PLAN_SUCCESS_SCHEMA, ["originalRequest", "orderSchedule", "comparisonBasis", "unavailableReasons", "cash30DayMinor", "cash90DayMinor", "nextReplenishmentDay", "researchVersion", "claimIds", "safetyGuidance"]).properties });
 export const PLAN_STATUS_SCHEMA = o({ ...presentationBase, responseView: Type.Literal("status"), unchanged: bool,
   pendingRevision: n(int), operationStatus: n(s), nextActions: ss, pollAfterSeconds: num, refreshRequired: bool,
   error: p(ERROR_SCHEMA.properties.error) });

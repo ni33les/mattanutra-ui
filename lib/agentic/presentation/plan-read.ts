@@ -9,6 +9,7 @@ import type { PlanResult } from "@/lib/agentic/plan/types";
 import type { PlanStatusWire } from "@/lib/agentic/contract/outputs";
 import { planContractCompatible } from "@/lib/agentic/presentation/compatibility";
 import { expirePlanOperation } from "@/lib/agentic/plan/operations";
+import { PLAN_PRESENTATION_VERSION } from "@/lib/agentic/presentation/version";
 import { planOperationalContext } from "@/lib/agentic/value/operational-decision";
 
 /** Reads committed data and the admitted operation without building baskets,
@@ -41,7 +42,7 @@ export async function readPlanPresentation(runtime: AgenticRuntime, planHandle: 
   // below; content fingerprints fence the underlying catalogue facts.
   const telemetry = { snapshotId: result.matcherTelemetry.snapshotId, matcherVersion: result.matcherTelemetry.matcherVersion,
     factLedgerHash: result.matcherTelemetry.factLedgerHash };
-  const resultVersion = canonicalHash({ presentation: AGENTIC_CONTRACT_VERSION, revision: state.revision.revision,
+  const resultVersion = canonicalHash({ presentation: PLAN_PRESENTATION_VERSION, revision: state.revision.revision,
     currentRevision: state.plan.currentRevision, result: { ...result, matcherTelemetry: telemetry }, operation: operationState, refreshRequired });
   return { ...state, revision: state.revision, result, resultVersion, refreshRequired, originalRequest: () => originalRequestFor(result) };
 }

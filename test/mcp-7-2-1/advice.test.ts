@@ -22,12 +22,12 @@ test("M721-ADVICE-01 only foreground and plan-wide advice is inline; other optio
   const { plan } = fixture(); const original = structuredClone(plan);
   const result = projectPlan(plan, { responseView: "conversation" });
   assert.deepEqual(result.options.map(row => row.optionId), ["selected", "highlight", "background"]);
-  assert.deepEqual(result.advice.map(row => row.ruleId).sort(), ["highlight", "plan-wide", "selected"]);
-  assert.deepEqual(result.options[2].adviceIds, []);
+  assert.deepEqual(result.advice.flatMap(row => row.guidanceIds).sort(), ["highlight", "plan-wide", "selected"]);
+  assert.ok(!result.advice.some(row => row.optionIds.includes("background")));
   const details = projectPlan(plan, { responseView: "details", expectedRevision: plan.revision, sections: ["advice"], optionIds: ["background"] });
-  assert.ok(details.ok && "options" in details); assert.deepEqual(details.options[0].advice, original.options![2].advice);
+  assert.ok(details.ok); assert.deepEqual(details.options[0].advice, original.options![2].advice);
   plan.optionId = "background";
-  assert.ok(projectPlan(plan, { responseView: "conversation" }).advice.some(row => row.ruleId === "background"));
+  assert.ok(projectPlan(plan, { responseView: "conversation" }).advice.some(row => row.guidanceIds.includes("background")));
   assert.strictEqual(projectPlan(plan, { responseView: "full" }), plan);
 });
 
@@ -41,11 +41,12 @@ test("M721-ADVICE-02 missing references collapse without erasing measured excess
     plan.locale = locale;
     const result = projectPlan(plan, { responseView: "conversation" });
     const missing = result.advice.filter(row => row.kind === "incomplete_information");
-    assert.equal(missing.length, 1); assert.equal(missing[0].threshold, null);
-    assert.deepEqual(missing[0].supplementIds, ["calcium", "vitamin_d"]);
-    assert.ok(missing[0].message.length > 20); assert.doesNotMatch(missing[0].message, /Old missing|exceeds 0/);
-    assert.ok(result.advice.some(row => row.ruleId === "actual-excess" && row.exposure === 200 && row.threshold === 100));
-    assert.ok(result.advice.some(row => row.ruleId === "interaction" && row.kind === "interaction"));
+    assert.equal(missing.length, 1); assert.equal(missing[0].severity, "info");
+    assert.deepEqual(missing[0].guidanceIds, ["ul:missing:calcium", "ul:missing:vitamin_d"]);
+    assert.ok(result.advice.some(row => row.guidanceIds.includes("actual-excess") && row.severity === "high"));
+    assert.ok(result.advice.some(row => row.guidanceIds.includes("interaction") && row.kind === "interaction"));
+    const details = projectPlan(plan, { responseView: "details", expectedRevision: plan.revision, sections: ["advice"], optionIds: ["selected"] });
+    assert.ok(details.ok); assert.deepEqual(details.options[0].advice, plan.options![0].advice);
     assert.deepEqual(validateToolIssues(AGENTIC_OUTPUT_SCHEMAS.plan, result), []);
   }
   assert.equal(plan.options![0].advice![0].message, "Old missing-reference wording", "Projection cannot rewrite stored evidence");

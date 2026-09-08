@@ -21,7 +21,7 @@ test("AG72-VIEW-01 every plan operation defaults to conversation without changin
   const choice = question.choices.find(value => value.labelKey === "plan.question.satisfy_prerequisite"); assert.ok(choice);
   plan = requireConversation(await rpc(app, "plan", { operation: "answer", planHandle: plan.planHandle, expectedRevision: plan.revision,
     idempotencyKey: "agent-surface-default-answer", answers: [{ questionId: question.questionId, choice: choice.choice }] }));
-  const option = plan.options.find(value => value.purchaseEligible); assert.ok(option);
+  const option = plan.options.find(value => value.optionId === plan.selectedOptionId); assert.ok(option);
   plan = requireConversation(await rpc(app, "plan", { operation: "select", planHandle: plan.planHandle, expectedRevision: plan.revision,
     idempotencyKey: "agent-surface-default-select", optionId: option.optionId }));
   assert.equal(plan.selectedOptionId, option.optionId);
@@ -67,12 +67,14 @@ for (const id of ["A1", "A2", "A3", "A4", "A5", "A6"]) test(`AG72-GOLDEN-01 ${id
   assert.ok(plan.options.length > 0);
   for (const option of plan.options) {
     const original = full.options!.find(value => value.optionId === option.optionId)!;
-    assert.equal(option.coveragePercent, original.coveragePercent); assert.equal(option.purchaseEligible, original.purchaseEligible);
-    if (option.basket) assert.deepEqual(option.basket.map(product => [product.productId, product.servingsPerDay, product.quantity, product.lineTotalMinor]), original.basket!.map(product => [product.productId, product.servingsPerDay, product.quantity, product.lineTotalMinor]));
-    assert.ok(option.adviceIds.every(adviceId => plan.advice.some(advice => advice.adviceId === adviceId)));
+    assert.equal(option.coveragePercent, original.coveragePercent); assert.deepEqual(option.stackSummary, original.stackSummary);
+    assert.ok(!("basket" in option) && !("coverage" in option));
+    const details = await rpc(app, "plan", { operation: "get", planHandle: plan.planHandle, responseView: "details", expectedRevision: plan.revision, optionIds: [option.optionId], sections: ["products", "coverage"] });
+    const detailed = (details.options as { basket: unknown; coverage: unknown }[])[0];
+    assert.deepEqual(detailed.basket, original.basket); assert.deepEqual(detailed.coverage, original.coverage);
   }
   if (full.alternativeSearch?.status === "found") {
     assert.ok(plan.highlightedAlternativeOptionId);
-    assert.ok(plan.options.some(option => option.optionId === plan.highlightedAlternativeOptionId && option.purchaseEligible));
+    assert.ok(plan.options.some(option => option.optionId === plan.highlightedAlternativeOptionId));
   }
 });
