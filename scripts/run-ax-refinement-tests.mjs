@@ -75,9 +75,16 @@ export async function main(args = process.argv.slice(2)) {
   save("source-before.json", before); save("inventory.json", { ...impact, selected: files, sha256: hash(JSON.stringify(impact)) });
   const env = Object.fromEntries(["PATH", "HOME", "TMPDIR", "LANG", "LC_ALL", "TZ"].flatMap(key => process.env[key] ? [[key, process.env[key]]] : []));
   Object.assign(env, { NODE_ENV: "test", MATTANUTRA_ENV: "dev", STRIPE_PAYMENT_MODE: "mock", AGENTIC_PAYMENT_PROVIDER: "mock", NODE_OPTIONS: "--max-old-space-size=2300", AX_REFINEMENT_EVIDENCE_DIR: evidence });
-  if (process.env.TEST_DB_URL) Object.assign(env, { TEST_DB_URL: process.env.TEST_DB_URL, DB_URL: process.env.TEST_DB_URL, DB_WORKER_URL: process.env.TEST_DB_URL, DB_POOL_MAX: "2" });
-  const result = await runBatch("node-ax", ["--test", "--test-concurrency=1", "--experimental-strip-types", "--import", "./scripts/register-ts-path-loader.mjs", ...files], env, evidence);
-  const events = readFileSync(resolve(evidence, "node-ax-events.jsonl"), "utf8").trim().split("\n").filter(Boolean).map(line => JSON.parse(line));
+  const groups = [false, true].map(database => ({ database, files: selected.filter(row => row.database === database).map(row => row.file) })).filter(group => group.files.length);
+  const runs = [], events = [];
+  for (const group of groups) {
+    const label = group.database ? "node-ax-postgres" : "node-ax-memory";
+    const testEnv = group.database ? { ...env, TEST_DB_URL: process.env.TEST_DB_URL, DB_URL: process.env.TEST_DB_URL, DB_WORKER_URL: process.env.TEST_DB_URL, DB_POOL_MAX: "2" } : env;
+    runs.push(await runBatch(label, ["--test", "--test-concurrency=1", "--experimental-strip-types", "--import", "./scripts/register-ts-path-loader.mjs", ...group.files], testEnv, evidence));
+    events.push(...readFileSync(resolve(evidence, `${label}-events.jsonl`), "utf8").trim().split("\n").filter(Boolean).map(line => JSON.parse(line)));
+  }
+  const result = { passed: runs.every(run => run.passed), runs };
+  writeFileSync(resolve(evidence, "node-ax-events.jsonl"), events.map(row => JSON.stringify(row)).join("\n") + "\n", { flag: "wx" });
   const execution = nodeExecutionProof(files, events);
   const names = events.filter(event => event.passed === true && !event.skip && !event.todo).map(event => event.name ?? "");
   const missingIds = impact.requirements.filter(row => files.includes(row.file) && !names.some(name => name.includes(row.id))).map(row => row.id);

@@ -8,7 +8,7 @@ import type { CatalogueSnapshot } from "@/lib/agentic/catalogue/types";
  * The database applier independently validates the same manifest against rows. */
 export function correctedAxSnapshot(snapshot: CatalogueSnapshot, manifest: CatalogueCorrectionManifest) {
   if (manifest.environment !== "dev") throw new Error("AX corrections are DEV only");
-  const products = structuredClone(snapshot.products);
+  const products = [...structuredClone(snapshot.products)];
   const receipts = [];
   const index = buildContributionIndex(snapshot.supplements);
   for (const correction of manifest.corrections) {
@@ -16,7 +16,7 @@ export function correctedAxSnapshot(snapshot: CatalogueSnapshot, manifest: Catal
     const listings = products.map((product, i) => ({ product, i })).filter(row => row.product.candidate.id === productId);
     if (!listings.length) throw new Error(`Missing reviewed product: ${correction.correctionId}`);
     for (const { product, i } of listings) {
-      const candidate = product.candidate;
+      const candidate = { ...product.candidate };
       if (correction.entityTable === "products") {
         catalogueCorrectionState(correction, { id: candidate.id, administration: candidate.administration });
         candidate.administration = parseProductAdministration(correction.after.administration);

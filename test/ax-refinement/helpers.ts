@@ -41,7 +41,7 @@ export function runtime(principal: string, store: AgenticStore = createMemorySto
 export async function rpc(instance: ReturnType<typeof runtime>, tool: string, args: Record<string, unknown>) {
   const response = await handleJsonRpc(instance, { id: 1, method: "tools/call", params: { name: tool, arguments: args } });
   assert.ok(response?.result?.structuredContent, JSON.stringify(response));
-  return response.result.structuredContent as Record<string, any>;
+  return response.result.structuredContent as Record<string, unknown>;
 }
 export function barrier() {
   let release!: () => void; const promise = new Promise<void>(resolve => { release = resolve; });

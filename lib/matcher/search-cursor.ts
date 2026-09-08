@@ -145,6 +145,18 @@ function resetGroup(cursor: SearchCursor) { cursor.parent = 0; cursor.variant = 
 function startBeam(cursor: SearchCursor) {
   cursor.phase = "beam"; cursor.group = 0; cursor.beamLimit = cursor.expansionAttempts + Math.floor((explorationLimit(cursor) - cursor.expansionAttempts) * .55); resetGroup(cursor);
 }
+function diverseSingles(cursor: SearchCursor, request: CanonicalRequest) {
+  const patterns = new Map<string, typeof cursor.singles>();
+  for (const row of cursor.singles) {
+    const key = residualPattern(row.state, request);
+    const bucket = patterns.get(key) ?? []; bucket.push(row); patterns.set(key, bucket);
+  }
+  const buckets = [...patterns.values()].map(rows => rows.sort((a,b) => compareSearchStates(a.state,b.state,request)))
+    .sort((a,b) => compareSearchStates(a[0]!.state,b[0]!.state,request));
+  const result: typeof cursor.singles = [];
+  for (let depth=0; result.length < cursor.singles.length; depth++) for (const rows of buckets) if (rows[depth]) result.push(rows[depth]!);
+  return result;
+}
 function finishBeamLayer(cursor: SearchCursor, request: CanonicalRequest) {
   const ranked = [...new Map(cursor.expanded.map(row => [fingerprintState(row), row])).values()].sort((a,b) => compareSearchStates(a,b,request));
   const size = width(cursor), chosen = ranked.slice(0, Math.ceil(size / 2));
@@ -162,7 +174,11 @@ function startRepair(cursor: SearchCursor, request: CanonicalRequest) {
   cursor.phase = "repair";
   cursor.repairLimit = cursor.expansionAttempts + Math.floor((cursor.expansionBudget - cursor.expansionAttempts) * .75);
   const leaders = [...cursor.review, ...cursor.unreviewed].sort((a,b) => compareSearchStates(a,b,request)).slice(0, 4);
-  cursor.repairJobs = leaders.map(leader => ({ leader, removal: 0, base: null, retained: [], build: 0, group: 0, variant: 0, variants: null, stage: "prepare" }));
+  // Preserve unmodified leaders for the second-addition pass. Start the repair
+  // allowance with an actual removal; otherwise adding to four already full
+  // leaders spends it before even one replacement receives an opportunity.
+  cursor.repaired.push(...leaders);
+  cursor.repairJobs = leaders.map(leader => ({ leader, removal: 1, base: null, retained: [], build: 0, group: 0, variant: 0, variants: null, stage: "prepare" }));
 }
 function removal(ids: readonly string[], index: number): readonly string[] | null {
   if (!index) return [];
@@ -204,7 +220,7 @@ export function advanceSearchCursor(cursor: SearchCursor, request: CanonicalRequ
       if (next) cursor.singles.push({state:next,group:cursor.group,variant:id});
     } else if (cursor.phase === "beam") {
       if (cursor.group >= cursor.groups.length || cursor.expansionAttempts >= cursor.beamLimit) {
-        cursor.phase="pairs"; cursor.pairSum=1; cursor.pairLeft=0; continue;
+        cursor.phase="pairs"; cursor.singles=diverseSingles(cursor,request); cursor.pairSum=1; cursor.pairLeft=0; continue;
       }
       if (cursor.groupLimit < 0) cursor.groupLimit=cursor.expansionAttempts + Math.floor((cursor.beamLimit-cursor.expansionAttempts)/(cursor.groups.length-cursor.group));
       if (cursor.parent >= cursor.beam.length || cursor.expansionAttempts >= cursor.groupLimit) { finishBeamLayer(cursor,request); continue; }
@@ -288,6 +304,7 @@ export function extendSearchCursor(cursor: SearchCursor, expansionBudget: number
 }
 
 export function searchCursorResult(cursor: SearchCursor, request: CanonicalRequest): SearchRun {
+  void request;
   const complete=cursor.exact && cursor.done && !cursor.trimmed ? [...archivedSearchStates(cursor)] : cursor.review;
   return { complete, groups:cursor.groups, expansionAttempts:cursor.expansionAttempts,
     mode:cursor.exact && cursor.done && !cursor.trimmed ? "exact" : "bounded", trimmed:cursor.trimmed || !cursor.exact || !cursor.done };

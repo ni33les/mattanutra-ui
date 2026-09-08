@@ -15,13 +15,13 @@ The original six-profile response report/content-hashed catalogue is unavailable
 
 ## Slice ledger
 
-1. Baseline and scoped runner: implemented; three focused harness cases passed (01-harness-green-2).
-2. Durable operation admission and three-second handoff implemented. Seven unit/real-worker/PostgreSQL cases pass. Cursor recovery and broader revision race/cache cases remain pending in the next slice.
-3. Resumable search and candidate recovery: pending.
-4. Useful alternatives and no-purchase: pending.
-5. Source-backed catalogue audit: pending.
-6. Advice, alias and contract 7: pending.
-7. Scoped paired acceptance and DEV rollout: pending.
+1. Baseline and scoped runner implemented. Historical requests and scoped exclusions are explicit.
+2. Durable operations, atomic task admission, leases, cancellation fencing and deadline handoff implemented; operation and PostgreSQL behavioural cases passed.
+3. Serializable bounded cursor, sparse complementary patterns, actual replacement opportunities and equivalent seller quotes implemented. The corrected A4/A5 controls pass at 8,000 attempts. Expanded A2 recovery remains under the original worker deadlines.
+4. Existing-option highlighting, zero-coverage wording and continued-supply no-purchase completion implemented; 18 initial published client profiles passed in English, Thai and Chinese. Quantity proposal and clearing checks were then added.
+5. Seven identifiable attachment products audited. Two supported DEV-only corrections reconstruct in isolation; unsupported packs and unavailable original union remain explicitly unresolved.
+6. Advice kinds, confirmed lower bounds, explicit algae source semantics and generated v7 contract implemented. Historical contracts retained.
+7. Explicit scoped validator and DEV-only attested deployment path implemented. Paired acceptance and live rollout remain pending.
 
 ## Expectation changes
 
@@ -43,3 +43,7 @@ Scoped evidence remains in `/root/.codex/visualizations/2026/09/08/ax-refinement
 ### Comparison harness correction
 
 The first comparison attempts (linear-comparison-1/2) are invalid evidence: the canonical request captured an empty reference list before worker setup installed the frozen references. The worker cannot repair an explicit request-level list. The harness now asserts exact frozen reference content before either implementation runs. The preliminary price-regression assertion was replaced with the correctly referenced control (loss 0.25 + 0.5 + 0.5 + 2 × 4.3/350; first-order goods 53,700 minor THB). Fixture prices were not changed. Both invalid reports and RED attempts remain preserved; they are not acceptance evidence.
+
+### Focused consumer execution
+
+The second affected-consumer attempt executed 135 assertions successfully, including existing checkout/payment replay and the PostgreSQL web selection fixture. Its overall source attestation is deliberately false because implementation continued during the focused run. Final acceptance must run unchanged source twice. The first consumer attempt was interrupted after a memory-only suite opened an unnecessary ambient database pool; memory and PostgreSQL tests now receive separate environments.

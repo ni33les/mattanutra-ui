@@ -20,7 +20,9 @@ assert.ok(args.includes("--output") && args.includes("--control"));
 mkdirSync(output, { recursive: false });
 const profiles = JSON.parse(readFileSync("test/fixtures/ax-refinement/six-profiles.json", "utf8")) as { id: string; request: PlanRequest }[];
 const corrections = JSON.parse(readFileSync("test/fixtures/ax-refinement/dev-corrections.json", "utf8"));
-async function run(root: string, input: unknown): Promise<Record<string, any>> {
+type ComparedBasket = { products: string[]; variants: string[]; priceMinor: number; pills: number | null; doseFit: { total: number }; [key: string]: unknown };
+type ComparedRun = { selected: ComparedBasket; options: ComparedBasket[]; selectedKey: string | null; explored: string[]; poolFingerprint: string; search: { expansionAttempts: number } };
+async function run(root: string, input: unknown): Promise<ComparedRun> {
   return new Promise((done, reject) => {
     const child = spawn(process.execPath, ["--experimental-strip-types", "--import", `${root}/scripts/register-ts-path-loader.mjs`, resolve("scripts/ax-refinement/compare-worker.mjs"), root], {
       cwd: root, env: { PATH: process.env.PATH, NODE_ENV: "test", NODE_OPTIONS: "--max-old-space-size=2200" }, stdio: ["pipe", "pipe", "pipe"] });
@@ -50,11 +52,11 @@ for (const environment of ["dev", "uat"] as const) {
     assert.ok(old.search.expansionAttempts <= 8000 && candidate.search.expansionAttempts <= 8000);
     assert.deepEqual(input.request.safetyCeilings, baseline.ceilings, "Both runs must carry the frozen reference content in their canonical request");
     const same = JSON.stringify(old.selected) === JSON.stringify(candidate.selected);
-    const present = old.explored.includes(candidate.selectedKey);
-    const sameBasket = candidate.selectedKey && old.explored.some((key: string) => key.slice(key.indexOf("|") + 1) === candidate.selectedKey.slice(candidate.selectedKey.indexOf("|") + 1));
+    const present = candidate.selectedKey != null && old.explored.includes(candidate.selectedKey);
+    const sameBasket = candidate.selectedKey && old.explored.some((key: string) => key.slice(key.indexOf("|") + 1) === candidate.selectedKey!.slice(candidate.selectedKey!.indexOf("|") + 1));
     const classification = same ? "unchanged" : present ? "explored_by_both_different_selection" : sameBasket ? "commercial_tie_lost" : "never_explored_by_control";
     const row = { id: item.id, environment, inputIdentity: createHash("sha256").update(serialize(input.request)).digest("hex"), catalogueIdentity: catalogueRecordFingerprint(snapshot),
-      classification, controlBasketExploredByCandidate: candidate.explored.includes(old.selectedKey), control: { ...old, explored: undefined }, candidate: { ...candidate, explored: undefined },
+      classification, controlBasketExploredByCandidate: old.selectedKey != null && candidate.explored.includes(old.selectedKey), control: { ...old, explored: undefined }, candidate: { ...candidate, explored: undefined },
       differences: { doseLoss: candidate.selected.doseFit.total - old.selected.doseFit.total, priceMinor: candidate.selected.priceMinor - old.selected.priceMinor,
         pills: candidate.selected.pills == null || old.selected.pills == null ? null : candidate.selected.pills - old.selected.pills } };
     rows.push(row); console.log(JSON.stringify({ id: item.id, classification, ...row.differences }));

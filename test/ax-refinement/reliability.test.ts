@@ -12,7 +12,7 @@ test("AXR-REL-02 a held real matcher hands off at its existing return budget wit
   await installRealCatalogue();
   const instance = runtime("handoff"), held = barrier(), entered = barrier();
   setMatcherGateForTests(held.promise); setMatcherEnteredForTests(entered.release);
-  let response: Record<string, any> | undefined;
+  let response: Awaited<ReturnType<typeof rpc>> | undefined;
   const pending = rpc(instance, "plan", { operation: "create", idempotencyKey: "ax-refinement-held-a2", request: profile("A2") }).then(value => { response = value; return value; });
   try {
     await Promise.race([entered.promise, pending.then(result => { throw new Error(`Returned before barrier: ${JSON.stringify(result)}`); })]);
