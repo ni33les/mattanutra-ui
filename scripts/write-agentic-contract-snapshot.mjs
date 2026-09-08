@@ -1,10 +1,9 @@
+import { AGENTIC_CONTRACT_REGISTRY } from "../lib/agentic/contract/registry.ts";
 import { mkdirSync, writeFileSync } from "node:fs";
 import {
   AGENTIC_PUBLIC_TOOLS,
   AGENTIC_SERVER_INSTRUCTIONS,
   AGENTIC_TOOL_DESCRIPTIONS,
-  AGENTIC_OUTPUT_SCHEMAS,
-  AGENTIC_TOOL_SCHEMAS
 } from "../lib/agentic/contract/index.ts";
 import { AGENTIC_CONTRACT_VERSION } from "../lib/agentic/config.ts";
 import { clientGuideMarkdown, publicContractBundle, CONTRACT_RESOURCES } from "../lib/agentic/contract/guide.ts";
@@ -17,8 +16,8 @@ const snapshot = {
   instructions: AGENTIC_SERVER_INSTRUCTIONS,
   tools: AGENTIC_PUBLIC_TOOLS.map((name) => ({
     description: AGENTIC_TOOL_DESCRIPTIONS[name],
-    inputSchema: AGENTIC_TOOL_SCHEMAS[name],
-    outputSchema: AGENTIC_OUTPUT_SCHEMAS[name],
+    inputSchema: AGENTIC_CONTRACT_REGISTRY[name].inputSchema,
+    outputSchema: AGENTIC_CONTRACT_REGISTRY[name].outputSchema,
     name
   }))
 };

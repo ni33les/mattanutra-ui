@@ -149,7 +149,7 @@ function publicCapabilityInfo(input: Readonly<{
   void input.buildId;
   return {
     ok: true,
-    ...clientDiscovery(input.locale),
+    ...clientDiscovery(input.locale, input.view, input.planOperation),
     ...(input.view === "client_guide" ? { clientGuideText: clientGuideMarkdown() } : {}),
     ...(input.view === "plan_schema" ? { planOperation: input.planOperation ?? "create", planSchemaJson: JSON.stringify(PLAN_OPERATION_SCHEMAS[input.planOperation ?? "create"]) } : {}),
     clientGuide: CLIENT_GUIDE_URI,

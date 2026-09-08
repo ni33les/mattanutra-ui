@@ -36,3 +36,23 @@ test("PAY-SCHEMA-02 overview offers one starting example and operation help work
     }
   }
 });
+
+test("PAY-SCHEMA-03 factored schemas preserve acceptance and normalized field errors", async () => {
+  const { AGENTIC_INPUT_SCHEMAS, AGENTIC_OUTPUT_SCHEMAS } = await import("../../lib/agentic/contract/index.ts");
+  const { factorSchema } = await import("../../lib/agentic/contract/factor-schema.ts");
+  const ajv = new Ajv({ strict: false, allErrors: true, validateFormats: false });
+  const errors = (check: ReturnType<typeof ajv.compile>) => (check.errors ?? []).map(({ instancePath, keyword, params }) => JSON.stringify({ instancePath, keyword, params })).sort();
+  const examples = baseline.cases.flatMap(row => row.discovery?.[2].response.result.structuredContent.clientExamples ?? []);
+  assert.ok(examples.length >= 3);
+  for (const [name, schema] of Object.entries(AGENTIC_INPUT_SCHEMAS)) {
+    const original = ajv.compile(schema), factored = ajv.compile(factorSchema(schema));
+    const corpus = [null, {}, { unexpected: true }, ...examples.filter(row => row.tool === name).flatMap(row => [row.arguments, { ...row.arguments, unexpected: true }])];
+    for (const input of corpus) { assert.equal(factored(input), original(input)); assert.deepEqual(errors(factored), errors(original)); }
+  }
+  const original = ajv.compile(AGENTIC_OUTPUT_SCHEMAS.plan), factored = ajv.compile(factorSchema(AGENTIC_OUTPUT_SCHEMAS.plan));
+  for (const row of baseline.cases) {
+    assert.equal(original(row.plan), true); assert.equal(factored(row.plan), true);
+    const invalid = { ...row.plan, revision: "one" };
+    assert.equal(original(invalid), false); assert.equal(factored(invalid), false); assert.deepEqual(errors(factored), errors(original));
+  }
+});
