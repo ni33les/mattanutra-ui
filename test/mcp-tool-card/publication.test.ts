@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { readFileSync, writeFileSync } from "node:fs";
-import nextConfig from "../../next.config.ts";
+import { register } from "node:module";
+register("./config-loader.mjs", import.meta.url);
+const { default: nextConfig } = await import("../../next.config.ts");
 import { toolList } from "../../lib/agentic/mcp/rpc.ts";
 import { AGENTIC_CONTRACT_VERSION } from "../../lib/agentic/config.ts";
 

@@ -3,5 +3,5 @@ import { AGENTIC_CONTRACT_VERSION } from "@/lib/agentic/config";
  * its original matching and payment identity. Earlier semantic versions still
  * require the existing explicit refresh flow. */
 export function planContractCompatible(version: string | undefined) {
-  return version === AGENTIC_CONTRACT_VERSION || version === "7.0.0" || version === "7.1.0" || version === "7.2.0" || version === "7.2.1" || version === "7.2.2";
+  return version === AGENTIC_CONTRACT_VERSION || version === "7.0.0" || version === "7.1.0" || version === "7.2.0" || version === "7.2.1" || version === "7.2.2" || version === "7.2.3";
 }

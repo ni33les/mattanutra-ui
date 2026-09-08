@@ -1,9 +1,9 @@
-import { AGENT_CARD, SERVICE_SCOPE, READY_MEANING } from "@/lib/agentic/contract/agent-card";
+import { AGENT_CARD, OVERVIEW_CARD, SERVICE_SCOPE, READY_MEANING } from "@/lib/agentic/contract/agent-card";
 export { AGENTIC_PUBLIC_TOOLS, type AgenticPublicToolName } from "@/lib/agentic/contract/names";
 
 export const AGENTIC_TOOL_DESCRIPTIONS = {
   info: `${SERVICE_SCOPE} ${READY_MEANING} Call first: view=overview | client_guide | plan_schema (choose planOperation). Medication/condition codes are accepted inputs, not evidence of an assessed interaction.`,
-  plan: `${SERVICE_SCOPE} ${READY_MEANING} Create/get/revise/answer/select; conversation default. get: status + knownResultVersion, or details + sections + expectedRevision (optionIds optional). requestPatch preserves context. Counts and health findings are advice; exclusions and physical quantities bind. Expanded adds attempts, not looser rules.`,
+  plan: OVERVIEW_CARD,
   evidence: "Read attached claim text for a plan’s returned evidenceHandle; mode=summary or sources. Does not change the plan.",
   execute: "After the person confirms the selected revision, create/recover checkout with the same idempotency key; health advice is advisory.",
   order: "Read payment/fulfilment: conversation for recovery; status + knownResultVersion to poll; details for frozen_order/events. Honor the last pollAfterSeconds until terminal=true.",

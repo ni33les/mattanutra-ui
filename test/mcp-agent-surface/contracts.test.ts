@@ -4,7 +4,7 @@ import Ajv from "ajv";
 import { toolList, handleLightweightJsonRpc } from "../../lib/agentic/mcp/rpc.ts";
 import { agenticServerInstructions } from "../../lib/agentic/contract/instructions.ts";
 import { loadAgenticConfig } from "../../lib/agentic/config.ts";
-import { CLIENT_EXAMPLES, CLIENT_GUIDE_URI, readContractResource } from "../../lib/agentic/contract/guide.ts";
+import { CLIENT_EXAMPLES, CLIENT_GUIDE_URI, GUIDE_ESSENTIALS, readContractResource } from "../../lib/agentic/contract/guide.ts";
 
 const names = ["info", "plan", "execute", "order", "support", "feedback", "evidence"];
 const isolatedInfo = { conditionCodes: ["high_cholesterol"], medicationCodes: ["apixaban"], supportedCountries: [{ countryCode: "TH", countryName: "Thailand", currency: "THB" }] };
@@ -33,7 +33,10 @@ test("AG72-CARD-01 seven short descriptors and an honest overview support resour
     for (const locale of ["en", "th", "zh-CN"]) {
       const tools = toolList(environment, locale);
       assert.deepEqual(tools.map(tool => tool.name), names);
-      for (const tool of tools) assert.ok(tool.description.length < 1000, `${tool.name} needs a concise descriptor`);
+      for (const tool of tools) {
+        if (tool.name === "plan") { assert.equal(tool.description, GUIDE_ESSENTIALS); assert.ok(tool.description.length < 2200); }
+        else assert.ok(tool.description.length < 1000, `${tool.name} needs a concise descriptor`);
+      }
       const overview = await info(environment, { locale });
       const text = String(overview.clientInstructions);
       assert.match(text, /finite/i); assert.match(text, /TH/);
@@ -44,7 +47,7 @@ test("AG72-CARD-01 seven short descriptors and an honest overview support resour
       assert.match(text, /last response/i); assert.match(text, /evidence/);
       assert.ok(text.length < 2200, "Overview must remain one screen");
       assert.ok(!/six short|never prefix|8000|64000/i.test(text));
-      assert.equal(overview.contractVersion, "7.2.3");
+      assert.equal(overview.contractVersion, "7.2.4");
       assert.deepEqual(overview.medicationCodes, ["apixaban"]);
       const examples = overview.clientExamples as { arguments: Record<string, unknown> }[];
       assert.equal(examples.length, 1); assert.equal(examples[0].arguments.responseView, "conversation");
