@@ -3,7 +3,7 @@ import { CONVERSATION_BASKET_KEYS, CONVERSATION_COVERAGE_KEYS } from "@/lib/agen
 import { businessError, type AgenticErrorResult } from "@/lib/agentic/contract/errors";
 import { canonicalHash } from "@/lib/agentic/value/canonical";
 import { AGENTIC_CONTRACT_VERSION } from "@/lib/agentic/config";
-import { isMissingReference, missingReferenceNotice } from "@/lib/agentic/presentation/conversation-advice";
+import { isIncompleteInformation, incompleteInformationNotice, speakableMessage } from "@/lib/agentic/presentation/conversation-advice";
 
 export type PlanSection = "request" | "products" | "coverage" | "advice" | "score" | "economics";
 export type PlanViewInput = Readonly<{ responseView?: "full" | "conversation" | "details"; expectedRevision?: number; sections?: readonly PlanSection[]; optionIds?: readonly string[] }>;
@@ -40,22 +40,22 @@ export function projectPlan(plan: PlanSuccessWire, input: PlanViewInput): PlanSu
   const advice: PlanConversationWire["advice"] = [];
   const adviceKeys = new Map<string, string>();
   const foreground = (optionId: string) => optionId === selectedOptionId || optionId === highlightedAlternativeOptionId;
-  const missing = missingReferenceNotice([
+  const missing = incompleteInformationNotice([
     ...(plan.safetyGuidance ?? []),
     ...(plan.options ?? []).filter(option => foreground(option.optionId)).flatMap(option => option.advice ?? [])
-  ].filter(isMissingReference), plan.locale);
+  ].filter(isIncompleteInformation), plan.locale);
   // Deduplicate by complete content, never rule ID. Different exposures or
   // uncertainty for the same rule remain separate and resolve in this response.
   const adviceIdFor = (row: NonNullable<PlanSuccessWire["safetyGuidance"]>[number]) => {
       const key = canonicalHash(row);
       let adviceId = adviceKeys.get(key);
-      if (!adviceId) { adviceId = `advice_${advice.length + 1}`; adviceKeys.set(key, adviceId); advice.push({ ...row, adviceId }); }
+      if (!adviceId) { adviceId = `advice_${advice.length + 1}`; adviceKeys.set(key, adviceId); advice.push({ ...row, message: speakableMessage(row.message), adviceId }); }
     return adviceId;
   };
   const missingId = missing ? adviceIdFor(missing) : null;
   const options = (plan.options ?? []).map(option => {
     const adviceIds = foreground(option.optionId) ? [...new Set((option.advice ?? []).map(row =>
-      isMissingReference(row) && missingId ? missingId : adviceIdFor(row)))] : [];
+      isIncompleteInformation(row) && missingId ? missingId : adviceIdFor(row)))] : [];
     return { ...pick(option, ["optionId", "roles", "role", "reason", "selected", "recommended", "purchaseEligible", "stackSummary", "coveragePercent", "coverageSummary", "preferenceAssessment"]), adviceIds,
       ...(foreground(option.optionId) && option.basket ? { basket: option.basket.map(row => pick(row, CONVERSATION_BASKET_KEYS)) } : {}),
       ...(option.coverage ? { coverage: option.coverage.map(row => pick(row, CONVERSATION_COVERAGE_KEYS)) } : {}),
@@ -64,6 +64,6 @@ export function projectPlan(plan: PlanSuccessWire, input: PlanViewInput): PlanSu
         ? option.economics.firstOrderSubtotalMinor + option.economics.shippingMinor + (option.economics.otherCustomerCostMinor ?? 0) : null };
   });
   const planAdviceIds = [...new Set([...(missingId ? [missingId] : []), ...(plan.safetyGuidance ?? []).map(row =>
-    isMissingReference(row) && missingId ? missingId : adviceIdFor(row))])];
+    isIncompleteInformation(row) && missingId ? missingId : adviceIdFor(row))])];
   return { ...base, responseView: "conversation", ...pick(plan, ["summary", "operationalDecision", "nextActions", "purchaseRequiredNow", "nextReplenishmentDay", "shippingMinor", "estimatedOrderTotalMinor", "questions", "pollAfterSeconds", "searchSummary", "refreshRequired", "sourceContractVersion", "reasonCode", "suggestedGroups", "unsupportedTargets", "evidenceHandle", "alternativeSearch"]), selectedOptionId, highlightedAlternativeOptionId, options, advice, planAdviceIds, availableDetails: options.length ? availableDetails : [] };
 }
