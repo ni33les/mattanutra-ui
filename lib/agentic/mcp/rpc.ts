@@ -151,24 +151,13 @@ export function toolText(value: unknown) {
     return recordValue.message;
   }
 
-  const paid =
-    recordValue.paymentStatus === "paid" ||
-    recordValue.orderStatus === "completed";
-
-  if (paid && typeof recordValue.orderReference === "string") {
-    return `Order ${recordValue.orderReference} is completed and paid.`;
+  if (typeof recordValue.message === "string" && recordValue.message.trim()) return recordValue.message;
+  if (typeof recordValue.orderReference === "string" && typeof recordValue.paymentStatus === "string") {
+    const fulfilment = record(recordValue.fulfilment).status;
+    return `Order ${recordValue.orderReference}: payment=${recordValue.paymentStatus}${typeof fulfilment === "string" ? `; fulfilment=${fulfilment}` : ""}.`;
   }
-
-  if (
-    typeof recordValue.orderReference === "string" &&
-    recordValue.checkoutUrl &&
-    recordValue.paymentStatus !== "paid"
-  ) {
-    return `Checkout ready for ${recordValue.orderReference}. Poll the order; the browser is not payment truth.`;
-  }
-
-  if (typeof recordValue.paymentStatus === "string") {
-    return `Order paymentStatus=${recordValue.paymentStatus} stateVersion=${recordValue.stateVersion ?? "?"}.`;
+  if (recordValue.responseView === "status" && typeof recordValue.planHandle === "string") {
+    return `Plan revision ${recordValue.revision}; refinement=${recordValue.operationStatus ?? recordValue.status}.`;
   }
 
   if (typeof recordValue.serviceName === "string") {

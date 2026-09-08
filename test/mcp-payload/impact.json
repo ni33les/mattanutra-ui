@@ -203,6 +203,16 @@
       "cases": [
         "AXR-REL-03 polling reports failed refinement instead of returning the previous ready revision"
       ]
+    },
+    {
+      "file": "test/mcp-payload/text-status.test.ts",
+      "slice": "readers",
+      "database": false,
+      "reason": "New concise status views bypass the legacy full-order headline path; preserve refunds, localized copy and pending failures.",
+      "expectedCases": 1,
+      "cases": [
+        "PAY-TRANSPORT-05"
+      ]
     }
   ]
 }
