@@ -9,12 +9,13 @@
       "file": "test/mcp-payload/harness.test.ts",
       "slice": "baseline",
       "database": false,
-      "reason": "UTF-8 byte accounting, complete calls and missing case detection.",
-      "expectedCases": 3,
+      "reason": "UTF-8 byte accounting, complete calls, missing cases and narrow bijective normalization of generated support identities.",
+      "expectedCases": 4,
       "cases": [
         "PAY-BASE-01",
         "PAY-BASE-02",
-        "PAY-BASE-03"
+        "PAY-BASE-03",
+        "PAY-BASE-04"
       ]
     },
     {

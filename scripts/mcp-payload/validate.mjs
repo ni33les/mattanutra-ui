@@ -8,6 +8,7 @@ import { runCapture } from "../dev-cycle-utils.mjs";
 import { payloadHash, payloadInputIdentity, payloadExpectedIdentity, readPayloadProof, compiledBuildIdentity } from "./proof.mjs";
 import { RELEASE_BASE } from "./run-tests.mjs";
 import { payloadReport } from "./report.mjs";
+import { semanticJourney, SEMANTIC_NORMALIZATION } from "./semantic.mjs";
 const args = process.argv.slice(2);
 assert.ok(args.length === 2 && args[0] === "--output" && args[1].startsWith("/"));
 const output = resolve(args[1]); assert.ok(relative(process.cwd(), output).startsWith("..") && !existsSync(output));
@@ -45,11 +46,8 @@ try {
 } finally { await admin.end(); }
 const files = readdirSync(resolve(output, "a")).filter(file => /^journey-.*\.json$/.test(file)).sort();
 assert.equal(files.length, 18); assert.deepEqual(files, readdirSync(resolve(output, "b")).filter(file => /^journey-.*\.json$/.test(file)).sort());
-// Only JSON object order is normalized. All generated identifiers, clocks,
-// doses, advice, money, option order, calls and state transitions remain checked.
-function canonical(value) { return Array.isArray(value) ? value.map(canonical) : value && typeof value === "object" ? Object.fromEntries(Object.keys(value).sort().map(key => [key, canonical(value[key])])) : value; }
-const comparisons = files.map(file => { const a = canonical(JSON.parse(readFileSync(resolve(output, "a", file), "utf8"))), b = canonical(JSON.parse(readFileSync(resolve(output, "b", file), "utf8"))); assert.deepEqual(a, b, `Paired semantic evidence differs: ${file}`); return { file, identical: true, sha256: payloadHash(JSON.stringify(a)) }; });
-save("semantic-comparison.json", { passed: true, normalization: "JSON object order only", comparisons }); stages.push({ label: "semantic-equality", passed: true });
+const comparisons = files.map(file => { const a = semanticJourney(JSON.parse(readFileSync(resolve(output, "a", file), "utf8"))), b = semanticJourney(JSON.parse(readFileSync(resolve(output, "b", file), "utf8"))); assert.deepEqual(a, b, `Paired semantic evidence differs: ${file}`); return { file, identical: true, sha256: payloadHash(JSON.stringify(a)) }; });
+save("semantic-comparison.json", { passed: true, normalization: SEMANTIC_NORMALIZATION, comparisons }); stages.push({ label: "semantic-equality", passed: true });
 payloadReport(resolve(output, "a"), output);
 await command("typecheck", process.execPath, ["node_modules/typescript/bin/tsc", "--noEmit"]);
 const lint = (await runCapture("git", ["diff", "--name-only", "--diff-filter=ACMR", RELEASE_BASE, "HEAD"])).split("\n").filter(file => /\.(?:[cm]?js|tsx?)$/.test(file)); assert.ok(lint.length);
