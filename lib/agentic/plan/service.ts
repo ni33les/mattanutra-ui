@@ -1,3 +1,4 @@
+import { planReturnWaitMs } from "@/lib/agentic/plan/operations";
 import { catalogueSnapshotId } from "@/lib/agentic/catalogue/freeze";
 import { validateProductDoseProposals } from "@/lib/matcher/serving-grid";
 import { toMatcherProduct } from "@/lib/agentic/plan/to-matcher-product";
@@ -53,11 +54,11 @@ import { evaluateSafety, planStatus, safetyQuestions } from "@/lib/agentic/plan/
 import { persistMatcherTelemetry } from "@/lib/agentic/plan/telemetry";
 import { publicPlanFields } from "@/lib/agentic/public-mapper";
 import { matchPlanInWorker, matchPlanChunkInWorker, MatcherUnavailableError } from "@/lib/agentic/plan/match-worker-pool";
-import { issueEvidenceCapability } from "@/lib/agentic/evidence/tool";
+import { evidenceHandleFor, issueEvidenceCapability } from "@/lib/agentic/evidence/tool";
 import { planCompactApplicable } from "@/lib/agentic/contract/plan-result";
 import { planClaimIds, planResearchVersion } from "@/lib/agentic/value/compact-decision";
 import { commitFunnelEvent } from "@/lib/agentic/funnel/ledger";
-import { setQueryNamespace } from "@/lib/agentic/plan/query-budget";
+import { setQueryNamespace, queryBudgetSnapshot } from "@/lib/agentic/plan/query-budget";
 import { acquirePermit, releasePermit } from "@/lib/agentic/qa/resource-permits";
 import { persistQueryBudget } from "@/lib/agentic/qa/persist";
 import { QA_NAMESPACE_PREFIX } from "@/lib/agentic/qa/session";
@@ -67,7 +68,7 @@ import {
   serviceDeadlineError,
   waitUntilDeadline
 } from "@/lib/agentic/qa/service-clock";
-import { waitForServiceDelay } from "@/lib/agentic/qa/service-clock";
+import { requestElapsedMs, waitForServiceDelay } from "@/lib/agentic/qa/service-clock";
 import { buildHorizonPlan } from "@/lib/agentic/value/inventory-ledger";
 import { DEFAULT_MATCHER_CONFIG } from "@/lib/matcher/config";
 import { isDoseError, scaleAmount } from "@/lib/matcher/dose";
@@ -170,13 +171,7 @@ function planCorrelationId(idempotencyKey?: string) {
 }
 
 function logicalPlanQueryCounts(namespace: string) {
-  void namespace;
-  return {
-    "catalogue.snapshot.TH": 1,
-    "plan.match": 1,
-    "plan.match.hit": 1,
-    "plan.match.miss": 0
-  };
+  return queryBudgetSnapshot(namespace);
 }
 
 async function stopIfPlanDeadline(
@@ -1021,7 +1016,7 @@ async function admittedResponse(input: PlanExecutionInput, operation: PlanOperat
     void work.catch(() => undefined);
     return operationProcessingResponse(operation);
   }
-  const handoff = waitForServiceDelay(PLAN_MATCH_RETURN_BUDGET_MS);
+  const handoff = waitForServiceDelay(Math.min(PLAN_MATCH_RETURN_BUDGET_MS, planReturnWaitMs(requestElapsedMs(planCorrelationId(input.payload.idempotencyKey)))));
   try { return await Promise.race([work, handoff.then(() => operationProcessingResponse(operation))]); }
   finally { handoff.cancel(); }
 }
@@ -1974,6 +1969,14 @@ async function persistTerminalPlan(input: Readonly<{
   skipSideEffects?: boolean;
 }>): Promise<PlanToolSuccess | AgenticErrorResult> {
   let committedResult: PlanResult | null = null;
+  const needsEvidence = planCompactApplicable(input.result.status) && !input.result.evidenceHandle;
+  const terminalResult = needsEvidence ? { ...input.result,
+    evidenceHandle: evidenceHandleFor(input.planId, input.revision, input.input.scope.tenantScope),
+    claimIds: planClaimIds(input.result), researchVersion: planResearchVersion() } : input.result;
+  // Render before acquiring the publication lock. Only the capability, revision
+  // and receipt writes belong to the atomic commit.
+  const projectedSuccess = successFromResult({ locale: input.locale, planHandle: input.planHandle,
+    result: terminalResult, revision: input.revision });
   const response = await input.input.store.transaction(async (store) => {
     const plan = await store.getPlanForUpdate(input.planId);
     if (!plan) return businessError({ message: "Not found.", reasonCode: "not_found" });
@@ -2016,17 +2019,12 @@ async function persistTerminalPlan(input: Readonly<{
         nextActions: ["retry_same_key", "refresh_plan"]
       });
     }
-    let result = input.result;
-    if (planCompactApplicable(result.status) && !result.evidenceHandle) {
-      const evidenceHandle = await issueEvidenceCapability({
-        config: input.input.config, now: input.input.now, planId: input.planId,
-        revision: input.revision, scope: input.input.scope, store
-      });
-      result = { ...result, claimIds: planClaimIds(result), evidenceHandle, researchVersion: planResearchVersion() };
+    const result = terminalResult;
+    if (needsEvidence) {
+      await issueEvidenceCapability({ config: input.input.config, now: input.input.now,
+        planId: input.planId, revision: input.revision, scope: input.input.scope, store });
     }
-    const success = successFromResult({
-      locale: input.locale, planHandle: input.planHandle, result, revision: input.revision
-    });
+    const success = projectedSuccess;
     const record = revisionRecord(input.planId, input.revision, result, current?.createdAt ?? input.input.now);
     if (current) await store.updatePlanRevision(record);
     else await store.insertPlanRevision(record);

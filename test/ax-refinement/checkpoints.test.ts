@@ -44,6 +44,7 @@ test("AXR-REL-05 compiled facts and checkpoint identities isolate locale, medica
   const snapshot = fixtureSnapshot();
   const normalized = await normalizePlanRequest({ config: loadAgenticConfig(), snapshot, request: {
     destinationCountry: "TH", locale: "en", optimization: "balanced", requirements: {},
+    profile: { ageYears: 38, sex: "male", lifeStage: "adult" },
     targets: [{ name: "Vitamin D3", amount: 10, unit: "mcg" }]
   } });
   assert.ok("state" in normalized);
@@ -51,6 +52,7 @@ test("AXR-REL-05 compiled facts and checkpoint identities isolate locale, medica
   const original = planCheckpointInputIdentity({ state, snapshot });
   assert.notEqual(planCheckpointInputIdentity({ state: { ...state, locale: "th" }, snapshot }), original);
   assert.notEqual(planCheckpointInputIdentity({ state: { ...state, requirements: { ...state.requirements, excludeProductIds: ["another-product"] } }, snapshot }), original);
+  assert.notEqual(planCheckpointInputIdentity({ state: { ...state, medicationCodes: ["apixaban"] }, snapshot }), original);
   const result = matchPlan({ state, snapshot });
   const copy = matchPlan({ state, snapshot });
   assert.deepEqual(copy, result); assert.notEqual(copy, result);

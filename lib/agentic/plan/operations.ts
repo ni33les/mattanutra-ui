@@ -6,6 +6,11 @@ import type { AgenticStore, PlanOperationRecord } from "@/lib/agentic/store/type
 export const PLAN_OPERATION_LEASE_MS = 60_000;
 export const PLAN_OPERATION_TASK = "match_agentic_plan";
 
+/** Leave 100 ms for response serialization inside the existing 60 s deadline. */
+export function planReturnWaitMs(elapsedMs: number) {
+  return Math.min(3_000, Math.max(0, 60_000 - elapsedMs - 100));
+}
+
 export async function admitPlanOperation(store: AgenticStore, input: Readonly<{
   planId: string; ownerScope: string; key: string; payload: unknown;
   expectedRevision: number; revision: number; prepared: Record<string, unknown>;
@@ -21,6 +26,7 @@ export async function admitPlanOperation(store: AgenticStore, input: Readonly<{
       return existing;
     }
     if (plan.currentRevision !== input.expectedRevision) throw new Error("stale_revision");
+    if (await tx.getActivePlanOperation(input.planId)) throw new Error("stale_revision");
     const id = nextTestUuid();
     const record: PlanOperationRecord = {
       id, planId: input.planId, ownerScope: input.ownerScope, key: input.key,

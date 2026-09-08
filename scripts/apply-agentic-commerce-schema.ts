@@ -45,6 +45,8 @@ create table if not exists public.agentic_plan_operations (
 );
 create index if not exists agentic_plan_operations_active_idx on public.agentic_plan_operations(plan_id,created_at,id)
   where status in ('queued','running','retryable');
+create index if not exists agentic_plan_operations_completed_idx on public.agentic_plan_operations(plan_id,(record_json->>'revision'),created_at desc)
+  where status='complete';
 
 create table if not exists public.agentic_capabilities (
   id uuid primary key,
