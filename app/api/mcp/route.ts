@@ -186,7 +186,8 @@ async function handlePost(request: Request) {
     const runtime = bindQaRuntime(live, request, qaNamespace);
 
     const result = await withQaSessionSnapshot(qaNamespace || undefined, () =>
-      handleJsonRpc({ ...runtime, clientContractVersion: request.headers.get(CLIENT_CONTRACT_VERSION_HEADER) ?? undefined }, body as JsonRpcRequest)
+      handleJsonRpc({ ...runtime, clientContractVersion: request.headers.get(CLIENT_CONTRACT_VERSION_HEADER) ?? undefined,
+        resultContent: request.headers.get("x-mattanutra-result-content") === "structured" ? "structured" : undefined }, body as JsonRpcRequest)
     );
 
     if (!result) {

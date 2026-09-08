@@ -172,23 +172,35 @@ export function toolText(value: unknown) {
 }
 
 const responseLog = createLogger("agentic.mcp.payload");
-export function toolResult(value: unknown, isError = false, tool?: string) {
-  const serialized = JSON.stringify(value);
-  if (tool && process.env.NODE_ENV !== "test") {
-    const view = record(value).responseView ?? "full";
-    responseLog.info("response_bytes", { tool, view, structuredBytes: Buffer.byteLength(serialized, "utf8"), isError });
+function structuredSummary(value: unknown) {
+  const row = record(value);
+  const lines = [toolText(value)];
+  if (row.responseView === "conversation") {
+    const messages = Array.isArray(row.advice) ? [...new Set(row.advice.map(record)
+      .filter(advice => advice.severity !== "info").map(advice => advice.message)
+      .filter((message): message is string => typeof message === "string" && Boolean(message.trim())))] : [];
+    if (messages.length) lines.push(messages.join(" "));
   }
-  return {
-    content: [
-      {
-        text: toolText(value),
-        type: "text"
-      },
-      { type: "text", text: serialized }
-    ],
-    isError,
-    structuredContent: value
-  };
+  const next = record(row.operationalDecision).nextAction ?? row.nextAction ??
+    (Array.isArray(row.nextActions) ? row.nextActions.join(", ") : undefined);
+  if (typeof next === "string" && next) lines.push(`Next: ${next}`);
+  return lines.join("\n");
+}
+
+export function toolResult(value: unknown, isError = false, tool?: string, resultContent?: "structured") {
+  const serialized = JSON.stringify(value);
+  const view = record(value).responseView ?? "full";
+  const concise = !isError && resultContent === "structured" && (view === "conversation" || view === "status");
+  const content = concise ? [{ type: "text", text: structuredSummary(value) }] : [
+    { type: "text", text: toolText(value) }, { type: "text", text: serialized }
+  ];
+  const result = { content, isError, structuredContent: value };
+  if (tool && process.env.NODE_ENV !== "test") {
+    responseLog.info("response_bytes", { tool, view, structuredBytes: Buffer.byteLength(serialized, "utf8"),
+      textBytes: content.reduce((sum, row) => sum + Buffer.byteLength(row.text, "utf8"), 0),
+      responseBytes: Buffer.byteLength(JSON.stringify(result), "utf8"), concise, isError });
+  }
+  return result;
 }
 
 export function mcpCallNeedsStore(body: unknown) {

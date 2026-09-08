@@ -328,7 +328,7 @@ async function callTool(
       value = businessError({ reasonCode: "temporarily_unavailable", message: "The response could not be completed consistently. Retry with the same request and idempotency key." });
     }
     return {
-      result: toolResult(value, isAgenticErrorResult(value), canonical)
+      result: toolResult(value, isAgenticErrorResult(value), canonical, runtime.resultContent)
     };
   } catch (error) {
     log.error("tool_failed", {
