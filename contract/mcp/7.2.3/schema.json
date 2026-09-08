@@ -9152,6 +9152,7 @@
                       "type": "array",
                       "items": {
                         "additionalProperties": false,
+                        "description": "Option IDs identify exactly which foreground baskets produced this finding. planWide distinguishes genuine plan-wide advice from an alternative's findings.",
                         "type": "object",
                         "properties": {
                           "guidanceId": {
@@ -9293,13 +9294,24 @@
                             "items": {
                               "type": "string"
                             }
+                          },
+                          "optionIds": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "planWide": {
+                            "type": "boolean"
                           }
                         },
                         "required": [
                           "guidanceId",
                           "ruleId",
                           "rulesVersion",
-                          "severity"
+                          "severity",
+                          "optionIds",
+                          "planWide"
                         ]
                       }
                     }

@@ -50,7 +50,7 @@ export function incompleteInformationNotice(rows: readonly Advice[], locale: str
 
 /** Bound speaking turns, not the findings themselves. Distinct measurements
  * keep separate identities and units; full/details are never projected here. */
-export function groupConversationAdvice(rows: PlanConversationWire["advice"], locale: string) {
+export function groupConversationAdvice(rows: PlanConversationWire["advice"], locale: string, context: Pick<PlanConversationWire, "options" | "planAdviceIds" | "selectedOptionId">) {
   const ids = new Map(rows.map(row => [row.adviceId, row.adviceId]));
   if (rows.length <= 5) return { rows, ids };
   const buckets = new Map<string, typeof rows>();
@@ -62,14 +62,21 @@ export function groupConversationAdvice(rows: PlanConversationWire["advice"], lo
     if (findings.length === 1) return findings[0];
     const adviceId = `advice_group_${canonicalHash(findings.map(row => row.adviceId)).slice(0, 12)}`;
     for (const row of findings) ids.set(row.adviceId, adviceId);
-    const message = findings.map(row => row.kind === "dose_review" && row.exposure != null && row.threshold != null
-      ? agenticMessage(locale as Locale, "guidance.measured_finding", { nutrient: row.nutrientName ?? row.ruleId, exposure: row.exposure, reference: row.threshold, unit: row.unit ?? "" })
-      : row.message).map(speakableMessage).filter((message, index, all) => all.indexOf(message) === index).join(" ");
+    const attribution = (row: typeof rows[number]) => ({ optionIds: context.options.filter(option => option.adviceIds.includes(row.adviceId)).map(option => option.optionId), planWide: context.planAdviceIds.includes(row.adviceId) });
+    const messages = new Map<string, string[]>();
+    for (const row of findings) {
+      const scope = attribution(row);
+      const key = scope.planWide ? "guidance.scope_plan" : scope.optionIds.length > 1 ? "guidance.scope_both" : scope.optionIds.includes(context.selectedOptionId ?? "") ? "guidance.scope_selected" : "guidance.scope_alternative";
+      const message = row.kind === "dose_review" && row.exposure != null && row.threshold != null
+        ? agenticMessage(locale as Locale, "guidance.measured_finding", { nutrient: row.nutrientName ?? row.ruleId, exposure: row.exposure, reference: row.threshold, unit: row.unit ?? "" }) : row.message;
+      messages.set(key, [...(messages.get(key) ?? []), speakableMessage(message)]);
+    }
+    const message = [...messages].map(([key, lines]) => agenticMessage(locale as Locale, key, { message: [...new Set(lines)].join(" ") })).join(" ");
     const severity = findings.some(row => row.severity === "blocking") ? "blocking" : findings.some(row => row.severity === "high") ? "high" : "info";
     return { adviceId, guidanceId: adviceId, ruleId: `conversation_group:${kind}`, rulesVersion: findings[0].rulesVersion,
       kind: kind === "dose_review" ? "other" as const : kind as Advice["kind"], severity: severity as Advice["severity"], action: "review" as const,
       message, threshold: null, exposure: null, unit: null,
-      findings: findings.map(row => Object.fromEntries(CONVERSATION_FINDING_KEYS.filter(key => Object.hasOwn(row, key)).map(key => [key, row[key]])) as NonNullable<PlanConversationWire["advice"][number]["findings"]>[number]) };
+      findings: findings.map(row => ({ ...Object.fromEntries(CONVERSATION_FINDING_KEYS.filter(key => Object.hasOwn(row, key)).map(key => [key, row[key]])), ...attribution(row) }) as NonNullable<PlanConversationWire["advice"][number]["findings"]>[number]) };
   });
   return { rows: grouped, ids };
 }

@@ -65,7 +65,7 @@ export function projectPlan(plan: PlanSuccessWire, input: PlanViewInput): PlanSu
   });
   const planAdviceIds = [...new Set([...(missingId ? [missingId] : []), ...(plan.safetyGuidance ?? []).map(row =>
     isIncompleteInformation(row) && missingId ? missingId : adviceIdFor(row))])];
-  const grouped = groupConversationAdvice(advice, plan.locale);
+  const grouped = groupConversationAdvice(advice, plan.locale, { options, planAdviceIds, selectedOptionId });
   const groupedIds = (ids: string[]) => [...new Set(ids.map(id => grouped.ids.get(id)!))];
   for (const option of options) option.adviceIds = groupedIds(option.adviceIds);
   advice.splice(0, advice.length, ...grouped.rows);

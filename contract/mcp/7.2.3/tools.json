@@ -1,5 +1,5 @@
 {
-  "schemaChecksum": "0cd1c67b1a742f89e3c530b1ab89e352a2c11476da86e4b38a0f63abf8119129",
+  "schemaChecksum": "b6bc3aadfb519a5b42cb439e6e5e5331d5b286f023a9930db66495c938cb9e9b",
   "contractVersion": "7.2.3",
   "instructions": "MattaNutra matches agreed nutrient targets to a finite product catalogue in Thailand (THB); incidental nutrients may leave gaps. Wellness guidance, not diagnosis or pharmacy services.\nFlow: info → agree name/amount/unit/basis → plan(create) → explain closest_dose, highlightedAlternativeOptionId and advice → revise/answer/select → confirm with the person → execute → poll order.\nPlan conversation is the default decision view. Poll with status; request details for doseFit, labels or economics.\nNumeric pill, price and product counts are preferences; diet, exclusions and physical quantities bind.\nUnknown diet stays unknown, never zero. Ready means checkout-ready, not complete coverage or medical approval.\nWhile processing, poll the existing handle; retry mutations with the same key and payload.\nCall info first for the service card, templates and operation schemas.",
   "tools": [
@@ -6090,6 +6090,7 @@
                       "type": "array",
                       "items": {
                         "additionalProperties": false,
+                        "description": "Option IDs identify exactly which foreground baskets produced this finding. planWide distinguishes genuine plan-wide advice from an alternative's findings.",
                         "type": "object",
                         "properties": {
                           "guidanceId": {
@@ -6231,13 +6232,24 @@
                             "items": {
                               "type": "string"
                             }
+                          },
+                          "optionIds": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "planWide": {
+                            "type": "boolean"
                           }
                         },
                         "required": [
                           "guidanceId",
                           "ruleId",
                           "rulesVersion",
-                          "severity"
+                          "severity",
+                          "optionIds",
+                          "planWide"
                         ]
                       }
                     }

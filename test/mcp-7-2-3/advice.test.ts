@@ -23,11 +23,19 @@ test("conversation_has_at_most_five_advice_rows", () => {
   for (let i = 0; i < 8; i++) {
     const finding = findings.find(row => row.guidanceId === `distinct-${i}`);
     assert.ok(finding); assert.equal(finding.exposure, 110 + i); assert.equal(finding.threshold, 100); assert.equal(finding.unit, "mg");
+    assert.deepEqual(finding.optionIds, [plan.optionId]); assert.equal(finding.planWide, false);
   }
+  const other = structuredClone(plan.options![0]); other.optionId = "highlighted";
+  other.advice = [{ ...other.advice![0], guidanceId: "highlighted-finding", exposure: 299, message: "Nutrient 0: 299 mg exceeds 100 mg." }];
+  plan.options!.push(other); plan.compactDecision!.highlightedAlternativeOptionId = other.optionId;
+  const together = projectPlan(plan, { responseView: "conversation" });
+  const specific = together.advice.flatMap(row => row.findings ?? []).find(row => row.guidanceId === "highlighted-finding");
+  assert.ok(specific); assert.deepEqual(specific.optionIds, ["highlighted"]); assert.equal(specific.exposure, 299);
+  assert.match(together.advice.map(row => row.message).join(" "), /Selected:.*Highlighted alternative:/);
   for (const locale of ["th", "zh-CN"]) {
     const localized = projectPlan({ ...plan, locale }, { responseView: "conversation" });
     assert.ok(localized.advice.length <= 5); assert.doesNotMatch(localized.advice[0].message, /reference/);
-    assert.deepEqual(localized.advice.flatMap(row => row.findings ?? []), findings);
+    assert.deepEqual(localized.advice.flatMap(row => row.findings ?? []), together.advice.flatMap(row => row.findings ?? []));
   }
 });
 test("incomplete_information_appears_once", () => {
