@@ -1,4 +1,5 @@
 import { Type, type Static, type TSchema, type TProperties } from "@sinclair/typebox";
+import { visibleOperationVariants } from "@/lib/agentic/contract/operation-variants";
 
 export type JsonSchema = Readonly<Record<string, unknown>>;
 export const object = <T extends TProperties>(properties: T, description?: string) => Type.Object(properties, { additionalProperties: false, ...(description ? { description } : {}) });
@@ -85,15 +86,15 @@ export const PLAN_DETAIL_SECTIONS = Type.Array(enumeration(["request", "products
 const readVersion = optional(Type.String({ minLength: 1, maxLength: 128, description: "Previous returned resultVersion; unchanged is true only for the same visible state and representation identity." }));
 export const PLAN_OPERATION_SCHEMAS = {
   create: object({ responseView: PLAN_MUTATION_VIEW, operation: Type.Literal("create"), idempotencyKey: key, searchEffort: optional(SEARCH_EFFORT_SCHEMA), request: PLAN_REQUEST }),
-  get: Type.Union([
+  get: visibleOperationVariants(Type.Union([
     object({ operation: Type.Literal("get"), planHandle: handle, responseView: PLAN_MUTATION_VIEW }),
     object({ operation: Type.Literal("get"), planHandle: handle, responseView: Type.Literal("status"), knownResultVersion: readVersion }),
     object({ operation: Type.Literal("get"), planHandle: handle, responseView: Type.Literal("details"), expectedRevision: revision, sections: PLAN_DETAIL_SECTIONS, optionIds: optional(Type.Array(Type.String({ minLength: 8, maxLength: 128 }), { minItems: 1, uniqueItems: true })) })
-  ]),
-  revise: Type.Union([
+  ])),
+  revise: visibleOperationVariants(Type.Union([
     object({ responseView: PLAN_MUTATION_VIEW, operation: Type.Literal("revise"), idempotencyKey: key, planHandle: handle, expectedRevision: revision, searchEffort: optional(SEARCH_EFFORT_SCHEMA), request: PLAN_REQUEST }),
     object({ responseView: PLAN_MUTATION_VIEW, operation: Type.Literal("revise"), idempotencyKey: key, planHandle: handle, expectedRevision: revision, searchEffort: optional(SEARCH_EFFORT_SCHEMA), requestPatch: PLAN_REQUEST_PATCH })
-  ]),
+  ])),
   answer: object({ responseView: PLAN_MUTATION_VIEW, operation: Type.Literal("answer"), idempotencyKey: key, planHandle: handle, expectedRevision: revision, answers: { ...PLAN_ANSWERS, minItems: 1 }, safetyAcknowledgement: optional(PLAN_SAFETY_ACK) }),
   select: object({ responseView: PLAN_MUTATION_VIEW, operation: Type.Literal("select"), idempotencyKey: key, planHandle: handle, expectedRevision: revision, optionId: Type.String({ minLength: 8, maxLength: 128 }) })
 } as const;

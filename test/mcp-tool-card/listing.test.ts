@@ -13,6 +13,10 @@ const leaves = (schema: Schema): Schema[] => schema.anyOf ? schema.anyOf.flatMap
 const operation = (name: string) => leaves(plan.inputSchema).filter(row => row.properties?.operation.const === name);
 
 test("hosted_get_schema_includes_response_view", () => {
+  const visible = (plan.inputSchema as Schema).anyOf!.find(row => row.properties?.operation.const === "get");
+  assert.ok(visible, "The get operation must be visible without traversing a second union");
+  assert.deepEqual(visible.properties!.responseView.enum, ["conversation", "full", "status", "details"]);
+  assert.ok(visible.properties!.knownResultVersion && visible.properties!.expectedRevision && visible.properties!.sections);
   const rows = operation("get"); assert.ok(rows.length);
   assert.deepEqual(rows, leaves(JSON.parse(JSON.stringify(PLAN_OPERATION_SCHEMAS.get))));
   assert.deepEqual(rows.flatMap(row => row.properties!.responseView.enum ?? [row.properties!.responseView.const]), ["conversation", "full", "status", "details"]);
