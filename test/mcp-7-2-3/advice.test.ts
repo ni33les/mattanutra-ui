@@ -18,6 +18,17 @@ test("conversation_has_at_most_five_advice_rows", () => {
   const details = projectPlan(plan, { responseView: "details", expectedRevision: plan.revision, sections: ["advice"] });
   assert.ok(details.ok); assert.deepEqual(details.options[0].advice, plan.options![0].advice);
   assert.ok(result.options[0].adviceIds.every(id => result.advice.some(row => row.adviceId === id)));
+  const findings = result.advice.flatMap(row => row.findings ?? []);
+  assert.equal(findings.length, 8);
+  for (let i = 0; i < 8; i++) {
+    const finding = findings.find(row => row.guidanceId === `distinct-${i}`);
+    assert.ok(finding); assert.equal(finding.exposure, 110 + i); assert.equal(finding.threshold, 100); assert.equal(finding.unit, "mg");
+  }
+  for (const locale of ["th", "zh-CN"]) {
+    const localized = projectPlan({ ...plan, locale }, { responseView: "conversation" });
+    assert.ok(localized.advice.length <= 5); assert.doesNotMatch(localized.advice[0].message, /reference/);
+    assert.deepEqual(localized.advice.flatMap(row => row.findings ?? []), findings);
+  }
 });
 test("incomplete_information_appears_once", () => {
   const plan = fixture(); const row = plan.options![0].advice![0];

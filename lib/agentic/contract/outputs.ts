@@ -63,10 +63,11 @@ const conversationOption = o({ ...Type.Pick(OPTION_SCHEMA, ["optionId", "roles",
   shippingMinor: pn(money), firstOrderTotalMinor: pn(money) });
 const detailSections = e(["request", "products", "coverage", "advice", "score", "economics"] as const);
 const presentationBase = { ok: Type.Literal(true), planHandle: s, revision: int, resultVersion: s, contractVersion: s, locale: s, status };
+const conversationFinding = Type.Pick(ADVICE_SCHEMA, ["guidanceId", "ruleId", "kind", "severity", "nutrientName", "exposure", "threshold", "unit", "sourceScope", "comparator", "authorityUrl", "referenceConfidence", "referenceBasis"]);
 export const PLAN_CONVERSATION_SCHEMA = o({ ...presentationBase, responseView: Type.Literal("conversation"),
   summary: s, operationalDecision: p(OPERATIONAL_DECISION_SCHEMA), nextActions: ss,
   selectedOptionId: n(s), highlightedAlternativeOptionId: n(s), options: a(conversationOption),
-  advice: a(o({ ...ADVICE_SCHEMA.properties, adviceId: s })), planAdviceIds: Type.Array(s, { description: "Plan-wide findings, resolved in this response’s advice array even when there is no product option." }),
+  advice: Type.Array(o({ ...ADVICE_SCHEMA.properties, adviceId: s, findings: p(Type.Array(conversationFinding, { description: "Distinct findings in a grouped conversation notice. Each measurement keeps its own identity, reference and unit; the message states every finding. Full/details retain original messages, contributors and provenance." })) }), { maxItems: 5 }), planAdviceIds: Type.Array(s, { description: "Plan-wide findings, resolved in this response’s advice array even when there is no product option." }),
   ...Type.Pick(PLAN_SUCCESS_SCHEMA, ["purchaseRequiredNow", "nextReplenishmentDay", "shippingMinor", "estimatedOrderTotalMinor", "questions", "pollAfterSeconds", "searchSummary", "refreshRequired", "sourceContractVersion", "reasonCode", "suggestedGroups", "unsupportedTargets", "evidenceHandle", "alternativeSearch"]).properties,
   availableDetails: a(detailSections) });
 const detailOption = Type.Pick(OPTION_SCHEMA, ["optionId", "basket", "coverage", "advice", "doseFit", "economics"]);

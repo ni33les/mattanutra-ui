@@ -1,6 +1,6 @@
 import { canonicalHash } from "@/lib/agentic/value/canonical";
 import { agenticMessage } from "@/lib/agentic/i18n";
-import type { PlanSuccessWire } from "@/lib/agentic/contract/outputs";
+import type { PlanSuccessWire, PlanConversationWire } from "@/lib/agentic/contract/outputs";
 import type { Locale } from "@/lib/i18n";
 
 type Advice = NonNullable<PlanSuccessWire["safetyGuidance"]>[number];
@@ -45,4 +45,31 @@ export function incompleteInformationNotice(rows: readonly Advice[], locale: str
     evidence: [...new Set(rows.flatMap(row => row.evidence ?? []))].sort(),
     uncertainty: [...new Set(rows.flatMap(row => row.uncertainty ? [row.uncertainty] : []))].join(" "),
     threshold: null, exposure: null, unit: null, contributors: [], comparator: null };
+}
+
+/** Bound speaking turns, not the findings themselves. Distinct measurements
+ * keep separate identities and units; full/details are never projected here. */
+export function groupConversationAdvice(rows: PlanConversationWire["advice"], locale: string) {
+  const ids = new Map(rows.map(row => [row.adviceId, row.adviceId]));
+  if (rows.length <= 5) return { rows, ids };
+  const buckets = new Map<string, typeof rows>();
+  for (const row of rows) {
+    const key = ["incomplete_information", "dose_review", "interaction", "overlap"].includes(row.kind ?? "") ? row.kind! : "other";
+    buckets.set(key, [...(buckets.get(key) ?? []), row]);
+  }
+  const grouped = [...buckets.entries()].map(([kind, findings]) => {
+    if (findings.length === 1) return findings[0];
+    const adviceId = `advice_group_${canonicalHash(findings.map(row => row.adviceId)).slice(0, 12)}`;
+    for (const row of findings) ids.set(row.adviceId, adviceId);
+    const message = findings.map(row => row.kind === "dose_review" && row.exposure != null && row.threshold != null
+      ? agenticMessage(locale as Locale, "guidance.measured_finding", { nutrient: row.nutrientName ?? row.ruleId, exposure: row.exposure, reference: row.threshold, unit: row.unit ?? "" })
+      : row.message).map(speakableMessage).filter((message, index, all) => all.indexOf(message) === index).join(" ");
+    const severity = findings.some(row => row.severity === "blocking") ? "blocking" : findings.some(row => row.severity === "high") ? "high" : "info";
+    return { adviceId, guidanceId: adviceId, ruleId: `conversation_group:${kind}`, rulesVersion: findings[0].rulesVersion,
+      kind: kind === "dose_review" ? "other" as const : kind as Advice["kind"], severity: severity as Advice["severity"], action: "review" as const,
+      message, threshold: null, exposure: null, unit: null,
+      findings: findings.map(({ guidanceId, ruleId, kind, severity, nutrientName, exposure, threshold, unit, sourceScope, comparator, authorityUrl, referenceConfidence, referenceBasis }) =>
+        ({ guidanceId, ruleId, kind, severity, nutrientName, exposure, threshold, unit, sourceScope, comparator, authorityUrl, referenceConfidence, referenceBasis })) };
+  });
+  return { rows: grouped, ids };
 }
