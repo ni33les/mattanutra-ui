@@ -28,5 +28,16 @@ export function readAxValidationProof(file, expected) {
     const path = realpathSync(resolve(directory, row.file));
     if (isAbsolute(row.file) || relative(directory, path).startsWith("..") || path === directory || axHash(readFileSync(path)) !== row.sha256) throw new Error(`AX proof artifact changed: ${row.file}`);
   }
+  const json = name => JSON.parse(readFileSync(resolve(directory, name), "utf8"));
+  for (const name of ["source-before.json", "source-after.json"]) if (json(name).sha256 !== expected.sourceSha256) throw new Error("AX source artifact identity changed");
+  for (const name of ["test-results-a.json", "test-results-b.json"]) {
+    const result = json(name);
+    if (result.passed !== true || result.unchangedSource !== true || result.sourceSha256 !== expected.sourceSha256 || result.missingIds?.length !== 0 ||
+      result.execution?.passed !== true || !(result.execution.cases > 0) || !(result.execution.files > 0) || result.execution.failures?.length !== 0) throw new Error(`AX execution evidence is incomplete: ${name}`);
+  }
+  const comparisons = json("semantic-comparison.json");
+  if (comparisons.passed !== true || comparisons.comparisons?.length !== 18 || new Set(comparisons.comparisons.map(row => row.file)).size !== 18 || comparisons.comparisons.some(row => row.identical !== true)) throw new Error("AX paired semantic comparison is incomplete");
+  if (json("linear-comparison.json").rows?.length !== 10) throw new Error("AX linear comparison is incomplete");
+  if (json("stage-results.json").passed !== true) throw new Error("AX stage evidence did not pass");
   return proof;
 }

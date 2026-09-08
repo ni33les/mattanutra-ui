@@ -6,7 +6,7 @@ import { setMatcherGateForTests, setMatcherEnteredForTests, resetPlanCreateInfli
 import { advanceServiceClock, useLiveServiceClock } from "../../lib/agentic/qa/service-clock.ts";
 import type { PlanResult } from "../../lib/agentic/plan/types.ts";
 
-afterEach(() => { setMatcherGateForTests(null); setMatcherEnteredForTests(null); resetPlanCreateInflightForTests(); uninstallRealCatalogue(); });
+afterEach(context => { if (context.name.startsWith("AXR-")) { setMatcherGateForTests(null); setMatcherEnteredForTests(null); resetPlanCreateInflightForTests(); uninstallRealCatalogue(); } });
 
 test("AXR-REL-02 a held real matcher hands off at its existing return budget without publishing a basket", { timeout: 30000 }, async () => {
   await installRealCatalogue();

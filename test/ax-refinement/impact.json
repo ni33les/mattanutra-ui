@@ -331,6 +331,12 @@
       "slice": "consumers",
       "reason": "Real PostgreSQL web selection and checkout identities directly consume the changed advisory matcher projections.",
       "database": true
+    },
+    {
+      "file": "test/dev-validation-proof.test.ts",
+      "slice": "release",
+      "reason": "Maintains current v7 identity checks on the unchanged ordinary full-verification deployment path; only its proof unit tests run.",
+      "database": false
     }
   ]
 }
