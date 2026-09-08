@@ -47,6 +47,26 @@ create index if not exists agentic_plan_operations_active_idx on public.agentic_
   where status in ('queued','running','retryable');
 create index if not exists agentic_plan_operations_completed_idx on public.agentic_plan_operations(plan_id,(record_json->>'revision'),created_at desc)
   where status='complete';
+create index if not exists agentic_plan_operations_task_idx on public.agentic_plan_operations((record_json->>'taskId'));
+
+create or replace function public.fence_cancelled_agentic_plan_task() returns trigger language plpgsql as $$
+begin
+  if new.task_type='match_agentic_plan' and new.status='cancelled' and old.status is distinct from new.status then
+    update public.agentic_plan_operations
+    set status='cancelled',version=version+1,updated_at=clock_timestamp(),
+      record_json=record_json || jsonb_build_object('status','cancelled','version',version+1,
+        'leaseToken',null,'leaseExpiresAt',null,'updatedAt',clock_timestamp())
+    where record_json->>'taskId'=new.id::text and status in ('queued','running','retryable');
+  end if;
+  return new;
+end $$;
+do $$ begin
+  if to_regclass('public.tasks') is not null then
+    drop trigger if exists fence_cancelled_agentic_plan_task on public.tasks;
+    create trigger fence_cancelled_agentic_plan_task after update of status on public.tasks
+      for each row execute function public.fence_cancelled_agentic_plan_task();
+  end if;
+end $$;
 
 create table if not exists public.agentic_capabilities (
   id uuid primary key,
