@@ -1,3 +1,4 @@
+import { assessedSafetyCodes } from "@/lib/agentic/plan/safety";
 import { adviceKind } from "@/lib/agentic/value/advice-kind";
 import { continuedIntakeCoversTargets } from "@/lib/agentic/value/customer-choice";
 import { assessPreferences, verifiedPillLowerBound, type NumericPreferences } from "@/lib/matcher/preferences";
@@ -956,14 +957,9 @@ export function publicPlanFields(result: Pick<
 
   const locale = snapshot?.locale ?? "en";
   const leftovers = publicLeftovers(result.leftovers, result.coverage);
-  const assessedMedicationCodes = [
-    ...new Set(medicationCodes.map((code) => MEDICATION_ALIASES[code]).filter(Boolean) as string[])
-  ];
-  const unassessedMedicationCodes = medicationCodes.filter((code) => !MEDICATION_ALIASES[code]);
-  const assessedConditionCodes = [
-    ...new Set(conditionCodes.map((code) => CONDITION_ALIASES[code]).filter(Boolean) as string[])
-  ];
-  const unassessedConditionCodes = conditionCodes.filter((code) => !CONDITION_ALIASES[code]);
+  const { assessedMedicationCodes, assessedConditionCodes } = assessedSafetyCodes({ medicationCodes, conditionCodes }, result.safetyGuidance);
+  const unassessedMedicationCodes = medicationCodes.filter(code => !assessedMedicationCodes.includes(MEDICATION_ALIASES[code] ?? code));
+  const unassessedConditionCodes = conditionCodes.filter(code => !assessedConditionCodes.includes(CONDITION_ALIASES[code] ?? code));
   const acknowledgedUnassessedMedicationCodes = [
     ...new Set(snapshot?.acknowledgedUnassessedMedicationCodes ?? [])
   ];
