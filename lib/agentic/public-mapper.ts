@@ -728,7 +728,9 @@ export function publicOption(
     basket: option.basket.map(item => publicBasketItem(item, locale)),
     ...(option.safety ? { advice: option.safety.guidance.map(item => publicSafetyGuidance(item)) } : {}),
     optionId: option.optionId,
-    reason: reason.message,
+    reason: option.basket.length > 0 && counts.coveragePercent === 0
+      ? (locale === "th" ? "ตัวเลือกนี้ไม่ครอบคลุมสารอาหารตามเป้าหมายที่ขอ" : locale === "zh-CN" ? "此选项未覆盖所请求的营养目标。" : "This option does not cover the requested targets.")
+      : reason.message,
     reasonCode: reason.code,
     reasonKey: reason.key,
     recommended: Boolean(option.recommended),

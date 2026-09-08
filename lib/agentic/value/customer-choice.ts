@@ -2,7 +2,9 @@ import type { CoverageRow, StackOption } from "@/lib/agentic/plan/types";
 import { requestedTargetCoverage } from "@/lib/agentic/value/coverage-summary";
 
 export function continuedIntakeCoversTargets(rows: readonly Partial<Pick<CoverageRow, "unresolved" | "intakeCertainty" | "requestedAmount" | "currentAmount" | "remainingGap">>[]) {
-  return rows.length > 0 && rows.every(row => !row.unresolved && row.intakeCertainty !== "unknown" && row.intakeCertainty !== "estimated" &&
+  // currentAmount contains quantified known contributions. Unknown additional
+  // diet cannot undo already covered targets; its safety uncertainty remains.
+  return rows.length > 0 && rows.every(row => !row.unresolved &&
     row.requestedAmount != null && row.currentAmount != null && row.requestedAmount > 0 && row.currentAmount >= row.requestedAmount &&
     row.remainingGap === 0);
 }
