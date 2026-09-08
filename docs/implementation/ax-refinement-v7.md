@@ -39,3 +39,7 @@ Record each intentional old/new expectation with its AXR ID before updating exis
 - `AXR-ADV-01–03` add rule classification and a confirmed pill lower bound without changing thresholds, evidence, exact unknown totals, selection eligibility or acknowledgement requirements.
 
 Scoped evidence remains in `/root/.codex/visualizations/2026/09/08/ax-refinement-v7`. Intermediate timeouts, interrupted runs and RED outputs are retained. No whole-application or whole-MCP green claim has been made.
+
+### Comparison harness correction
+
+The first comparison attempts (linear-comparison-1/2) are invalid evidence: the canonical request captured an empty reference list before worker setup installed the frozen references. The worker cannot repair an explicit request-level list. The harness now asserts exact frozen reference content before either implementation runs. The preliminary price-regression assertion was replaced with the correctly referenced control (loss 0.25 + 0.5 + 0.5 + 2 × 4.3/350; first-order goods 53,700 minor THB). Fixture prices were not changed. Both invalid reports and RED attempts remain preserved; they are not acceptance evidence.

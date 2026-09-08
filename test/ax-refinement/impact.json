@@ -26,7 +26,7 @@
     {
       "id": "AXR-REL-05",
       "slice": "reliability",
-      "file": "test/ax-refinement/reliability.test.ts"
+      "file": "test/ax-refinement/checkpoints.test.ts"
     },
     {
       "id": "AXR-ALT-01",
@@ -240,6 +240,96 @@
       "file": "test/ax-refinement/operations.integration.test.ts",
       "slice": "reliability",
       "reason": "Directly asserts durable operation admission, ownership and transaction rollback for plan refinement.",
+      "database": true
+    },
+    {
+      "file": "test/ax-refinement/checkpoints.test.ts",
+      "slice": "reliability",
+      "reason": "Real worker continuation and reference, locale and request checkpoint isolation directly assert the changed operation lifecycle.",
+      "database": false
+    },
+    {
+      "file": "test/matcher/advisory-dose-fit.test.ts",
+      "slice": "consumers",
+      "reason": "Unchanged linear symmetry and safety penalty assertions protect the changed shared search ranking consumers.",
+      "database": false
+    },
+    {
+      "file": "test/matcher/flexible-v5-priority.test.ts",
+      "slice": "consumers",
+      "reason": "Required/core priority and optional target handling directly consume the changed search frontier.",
+      "database": false
+    },
+    {
+      "file": "test/matcher/flexible-v5-doses.test.ts",
+      "slice": "consumers",
+      "reason": "Physical supported quantities and proposals consume the serialized variant domain.",
+      "database": false
+    },
+    {
+      "file": "test/matcher/flexible-v5-options.test.ts",
+      "slice": "consumers",
+      "reason": "Option roles and purchase fallbacks consume the changed retained candidates and seller repricing.",
+      "database": false
+    },
+    {
+      "file": "test/matcher/flexible-v5-search.test.ts",
+      "slice": "consumers",
+      "reason": "Existing deterministic complementary and sparse catalogue search regressions directly assert the replacement engine.",
+      "database": false
+    },
+    {
+      "file": "test/matcher-web-adapter.test.ts",
+      "slice": "consumers",
+      "reason": "Web matching is a direct consumer of the changed shared search engine and generation identity.",
+      "database": false
+    },
+    {
+      "file": "test/matcher-v5-web.test.ts",
+      "slice": "consumers",
+      "reason": "Web quantity, revision and unlimited basket behaviour consumes the new matcher identity.",
+      "database": false
+    },
+    {
+      "file": "test/agentic-execute-reuse.test.ts",
+      "slice": "consumers",
+      "reason": "Existing frozen checkout and payment idempotency directly consume revised plan and contract identities.",
+      "database": false
+    },
+    {
+      "file": "test/agentic/value/continued-inventory.test.ts",
+      "slice": "consumers",
+      "reason": "Known inventory and supply projections directly determine no-purchase completion.",
+      "database": false
+    },
+    {
+      "file": "test/agentic/value/compact-duration.test.ts",
+      "slice": "consumers",
+      "reason": "Compact duration and cash projections directly consume revised completion decisions.",
+      "database": false
+    },
+    {
+      "file": "test/agentic-phase4-algae.test.ts",
+      "slice": "consumers",
+      "reason": "The explicit source alias change affects these existing source-preservation assertions.",
+      "database": false
+    },
+    {
+      "file": "test/agentic-phase2-compact-rank.test.ts",
+      "slice": "consumers",
+      "reason": "Existing concise option ranking assertions consume the optional highlighted choice projection.",
+      "database": false
+    },
+    {
+      "file": "test/ax-refinement/retention.test.ts",
+      "slice": "search",
+      "reason": "Protects the complete-reference Anna control and commercial ranking at identical computational budgets.",
+      "database": false
+    },
+    {
+      "file": "test/matcher-v6-browser-preferences.integration.test.ts",
+      "slice": "consumers",
+      "reason": "Real PostgreSQL web selection and checkout identities directly consume the changed advisory matcher projections.",
       "database": true
     }
   ]

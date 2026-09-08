@@ -1,4 +1,7 @@
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, writeFile, readFile } from "node:fs/promises";
+import { dirname, resolve } from "node:path";
+import { sourceManifest } from "./run-full-test-suite.mjs";
+import { axExpectedIdentity, readAxValidationProof } from "./ax-validation-proof.mjs";
 import { npmCommand, npmRun, run, runCapture } from "./dev-cycle-utils.mjs";
 
 const serviceName = "mattanutra-ui-dev.service";
@@ -110,7 +113,21 @@ async function main() {
   }
 
   console.log(`[deploy:dev] Branch: ${branch}`);
-  await npmRun("verify:dev");
+  const scopedIndex = process.argv.indexOf("--ax-refinement-attestation");
+  if (scopedIndex >= 0) {
+    if (branch !== "dev" || process.env.MATTANUTRA_ENV !== "dev") throw new Error("AX work-package deployment requires the DEV environment and dev branch");
+    const file = process.argv[scopedIndex + 1];
+    if (!file || !file.startsWith("/")) throw new Error("Pass the absolute AX attestation path");
+    const base = await runCapture("git", ["rev-parse", "22bce180"]);
+    const proof = readAxValidationProof(file, axExpectedIdentity(sourceManifest().sha256, base));
+    if (await runCapture("git", ["status", "--porcelain"])) throw new Error("Validated deployment source must remain clean");
+    if (proof.sourceCommit !== await runCapture("git", ["rev-parse", "HEAD"])) throw new Error("Validated deployment commit changed");
+    const build = JSON.parse(await readFile(resolve(dirname(file), "build-identity.json"), "utf8"));
+    if (build.nextBuildId !== (await readFile(".next/BUILD_ID", "utf8")).trim()) throw new Error("Validated production build is missing or changed");
+    console.log(`[deploy:dev] Verified AX work-package evidence: ${file}`);
+  } else {
+    await npmRun("verify:dev");
+  }
   await applyOrVerifyRuntimeSchema();
   const sha = (await runCapture("git", ["rev-parse", "HEAD"])).trim();
   const dropInDir = "/etc/systemd/system/mattanutra-ui-dev.service.d";

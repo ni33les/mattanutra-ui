@@ -57,9 +57,12 @@ export async function refinementJourney({ rpc, request, discovery = "tools_only"
     }
     const product = plan.basket[0] ?? plan.options.flatMap(row => row.basket)[0];
     assert.ok(product, "Real exploratory profile must expose an eligible product");
+    plan = await complete(await call("plan", { operation: "revise", planHandle: plan.planHandle, expectedRevision: plan.revision,
+      idempotencyKey: `${key}-quantity`, requestPatch: { requirements: { productDoses: [{ productId: product.productId, servingsPerDay: product.servingsPerDay }] } } }));
+    assert.ok(plan.options.some(option => option.basket.some(item => item.productId === product.productId && item.servingsPerDay === product.servingsPerDay)), "Proposed physical quantity is evaluated before selection");
     const baseRevision = plan.revision;
     plan = await complete(await call("plan", { operation: "revise", planHandle: plan.planHandle, expectedRevision: baseRevision,
-      idempotencyKey: `${key}-exclude`, requestPatch: { requirements: { excludeProductIds: [product.productId] } } }));
+      idempotencyKey: `${key}-exclude`, requestPatch: { requirements: { productDoses: [], excludeProductIds: [product.productId], maxDailyPills: null, maxPriceMinor: null, maxProductCount: null } } }));
     for (const option of plan.options) assert.equal(option.basket.some(row => row.productId === product.productId), false);
     const stale = await call("plan", { operation: "select", planHandle: plan.planHandle, expectedRevision: baseRevision,
       idempotencyKey: `${key}-stale`, optionId: original.optionId ?? original.options[0].optionId });
