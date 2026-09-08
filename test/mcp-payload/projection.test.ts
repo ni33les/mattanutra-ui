@@ -26,8 +26,12 @@ test("PAY-VIEW-01 eighteen frozen decisions retain all choices, doses, amounts, 
       const inline = option.adviceIds.map(id => { const { adviceId, ...advice } = compact.advice.find(row => row.adviceId === id)!; assert.equal(adviceId, id); return advice; });
       if (!foreground) assert.deepEqual(inline, []);
       else for (const finding of old.advice ?? []) {
-        if (finding.ruleId.startsWith("ul:missing:") && finding.threshold === null) assert.ok(inline.some(row => row.ruleId === "incomplete_reference_information"));
-        else assert.ok(inline.some(row => JSON.stringify(row) === JSON.stringify(finding)), finding.ruleId);
+        if (finding.kind === "incomplete_information" || finding.code === "incomplete_information" || (finding.ruleId.startsWith("ul:missing:") && finding.threshold === null)) {
+          const notice = inline.find(row => row.kind === "incomplete_information"); assert.ok(notice);
+          assert.equal(notice.threshold, null);
+          for (const code of finding.uncertaintyCodes ?? []) assert.ok(notice.uncertaintyCodes?.includes(code));
+          for (const id of finding.productIds ?? []) assert.ok(notice.productIds?.includes(id));
+        } else assert.ok(inline.some(row => JSON.stringify({ ...row, message: finding.message }) === JSON.stringify(finding)), finding.ruleId);
       }
       if (option.basket) {
         assert.deepEqual(option.basket.map(row => [row.productId,row.servingsPerDay,row.quantity,row.unitPriceMinor,row.lineTotalMinor,row.dailyPills]), old.basket!.map(row => [row.productId,row.servingsPerDay,row.quantity,row.unitPriceMinor,row.lineTotalMinor,row.dailyPills]));
@@ -73,8 +77,11 @@ test("PAY-VIEW-04 plan-wide advice survives empty and processing decisions witho
   assert.ok(plan.safetyGuidance!.length > 0);
   const compact = projectPlan(plan, { responseView: "conversation" });
   for (const finding of plan.safetyGuidance!) {
-    if (finding.ruleId.startsWith("ul:missing:") && finding.threshold === null) assert.ok(compact.advice.some(row => row.ruleId === "incomplete_reference_information"));
-    else assert.ok(compact.advice.some(row => row.guidanceId === finding.guidanceId && row.message === finding.message && row.exposure === finding.exposure));
+    if (finding.kind === "incomplete_information" || finding.code === "incomplete_information" || (finding.ruleId.startsWith("ul:missing:") && finding.threshold === null)) {
+      const notice = compact.advice.find(row => row.kind === "incomplete_information"); assert.ok(notice);
+      for (const code of finding.uncertaintyCodes ?? []) assert.ok(notice.uncertaintyCodes?.includes(code));
+      assert.ok(compact.planAdviceIds.includes(notice.adviceId));
+    } else assert.ok(compact.advice.some(row => row.guidanceId === finding.guidanceId && row.exposure === finding.exposure && row.threshold === finding.threshold));
   }
   assert.ok(compact.planAdviceIds.length > 0);
 });

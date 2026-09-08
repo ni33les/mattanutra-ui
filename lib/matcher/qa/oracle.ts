@@ -58,6 +58,7 @@ export type OracleBasket = Readonly<{
   doses: readonly Readonly<{ productId: string; servingsPerDay: number }>[];
   sellerId: string;
   productCount: number;
+  incidentalCount: number;
   priceMinor: number;
   dailyPills: number;
   pillCountKnown: boolean;
@@ -120,6 +121,7 @@ function evaluate(fixture: FiniteOracleFixture, chosen: readonly { product: Fini
   const total = add(add(under, over), multiply(number(2), limits));
   const productIds = chosen.map(row => row.product.productId).sort();
   const basket: OracleBasket = { productIds, productCount: productIds.length,
+    incidentalCount: chosen.reduce((sum, row) => sum + Object.entries(row.product.contributions).filter(([id, amount]) => !fixture.targets.some(target => target.subjectId === id) && compare(number(amount), ZERO) > 0).length, 0),
     variantIds: chosen.map(row => `${row.product.sellerId}:${row.product.productId}:x${numeric(row.dose)}`).sort(),
     doses: chosen.map(row => ({ productId: row.product.productId, servingsPerDay: numeric(row.dose) })).sort((a, b) => a.productId.localeCompare(b.productId)),
     sellerId: chosen[0]?.product.sellerId ?? "", priceMinor: chosen.reduce((sum, row) => sum + row.product.priceMinor, 0),
@@ -175,7 +177,8 @@ export function finiteCatalogueOracle(fixture: FiniteOracleFixture): { selected:
   visit(0, [], 0, ZERO);
   // Independent total order: an unknown quantity is never a measured zero.
   const pillOrder = (a: OracleBasket, b: OracleBasket) => Number(!a.pillCountKnown) - Number(!b.pillCountKnown) || (a.pillCountKnown ? a.dailyPills - b.dailyPills : 0);
-  const commercial = (a: InternalBasket, b: InternalBasket) => pillOrder(a.basket, b.basket) ||
+  const focused = (row: OracleBasket) => fixture.targets.length === 1 && row.productCount === 1 && row.incidentalCount === 0;
+  const commercial = (a: InternalBasket, b: InternalBasket) => Number(focused(b.basket)) - Number(focused(a.basket)) || pillOrder(a.basket, b.basket) ||
     a.basket.productCount - b.basket.productCount || a.basket.priceMinor - b.basket.priceMinor || [a.basket.sellerId, ...a.basket.variantIds].join("|").localeCompare([b.basket.sellerId, ...b.basket.variantIds].join("|"));
   const ranked = [...complete].sort((a, b) => compare(a.total, b.total) || commercial(a, b));
   const requiredReference = [...complete].sort((a, b) => compare(a.required, b.required) || compare(a.total, b.total) || commercial(a, b))[0];

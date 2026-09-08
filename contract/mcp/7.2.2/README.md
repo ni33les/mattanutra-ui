@@ -14,13 +14,13 @@ Call info first for the service card, templates and operation schemas.
 
 ## Efficient response transport
 
-Connectors that have verified structuredContent reaches their agent may send X-MattaNutra-Result-Content: structured. Conversation and status then include a short text summary instead of cloned JSON; other clients keep the complete JSON text. This header changes transport only and never mutation identity. Full, details and errors retain complete text. Do not enable it merely because a host claims MCP support.
+Conversation and status always return structuredContent plus summary and next actions in text, without a JSON clone. Text-only consumers can request full or details for complete JSON text. The legacy X-MattaNutra-Result-Content: structured header remains accepted but is no longer required; transport never changes mutation identity. Full, details and errors retain complete text. Do not enable it merely because a host claims MCP support.
 
 ## Advice and daily routines
 
 Conversation includes the selected and highlighted options’ detailed advice plus plan-wide findings. Other options remain available; select one to review its advice before ordinary checkout confirmation, or request its advice details. An empty adviceIds on a background option does not establish absence of concerns. Repeated missing reference limits are summarized as incomplete information; details retain each original finding and source. No medical approval is implied.
 
-Closest dose fit and required/core priority remain first. Equal-fit defaults prefer fewer verified pills, then fewer products, then lower first-order goods price. Numeric preferences stay advisory. A target-focused option may have no extremal role (roles=[]); its reason explains its purpose. Unknown pill counts remain unknown and must never support a fewer-pills claim.
+Closest dose fit and required/core priority remain first. For a single target at equal dose fit, a single product with no verified incidental nutrient contributions is preferred. Remaining ties prefer fewer verified pills, then fewer products, then lower first-order goods price. Dedicated status comes from composition, never its title. Numeric preferences stay advisory. A target-focused option may have no extremal role (roles=[]); its reason explains its purpose. Unknown pill counts remain unknown and must never support a fewer-pills claim.
 
 ## Default and compatibility
 

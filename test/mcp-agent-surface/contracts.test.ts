@@ -44,7 +44,7 @@ test("AG72-CARD-01 seven short descriptors and an honest overview support resour
       assert.match(text, /last response/i); assert.match(text, /evidence/);
       assert.ok(text.length < 2200, "Overview must remain one screen");
       assert.ok(!/six short|never prefix|8000|64000/i.test(text));
-      assert.equal(overview.contractVersion, "7.2.1");
+      assert.equal(overview.contractVersion, "7.2.2");
       assert.deepEqual(overview.medicationCodes, ["apixaban"]);
       const examples = overview.clientExamples as { arguments: Record<string, unknown> }[];
       assert.equal(examples.length, 1); assert.equal(examples[0].arguments.responseView, "conversation");

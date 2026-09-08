@@ -1,0 +1,38 @@
+{
+  "version": 1,
+  "environment": "dev",
+  "corrections": [
+    {
+      "correctionId": "mcp-722-dev-d3-administration",
+      "entityTable": "products",
+      "entityId": "617d8373-80b3-4ada-99c0-769d502b5b1c",
+      "before": {
+        "id": "617d8373-80b3-4ada-99c0-769d502b5b1c",
+        "administration": null
+      },
+      "after": {
+        "id": "617d8373-80b3-4ada-99c0-769d502b5b1c",
+        "administration": {
+          "route": "oral",
+          "physicalUnit": "capsule",
+          "unitsPerServing": 1,
+          "doseIncrement": 1,
+          "packQuantity": null,
+          "provenance": {
+            "status": "verified",
+            "sourceUrl": "https://www.blackmores.com.au/products/vitamin-d3-1000-iu",
+            "sourceText": "Manufacturer composition is 1000 IU vitamin D3 per capsule, taken orally. The catalogue image identifies the same Vitamin D3 1000 IU capsule variant. Pack quantity remains unset because the manufacturer page mixes 60-tablet and 200-capsule variants. Nutrient facts, confidence, prices and dietary evidence are unchanged.",
+            "verifiedAt": "2026-09-08T12:00:00Z"
+          }
+        }
+      },
+      "beforeFingerprint": "d3ce4772eeaf7ed705e92474d7fac221e1026b15f207e7b07d287b862d53b26e",
+      "afterFingerprint": "07736014b2aaa680d683e82dbf2210bfee9eb6df739443de781ef98034b3f937",
+      "evidence": {
+        "sourceUrl": "https://www.blackmores.com.au/products/vitamin-d3-1000-iu",
+        "checkedAt": "2026-09-08T12:00:00Z",
+        "summary": "Verify one oral capsule per labelled 1000 IU serving using the manufacturer composition and the existing exact-product image (60 soft capsules, AUST L 407655). Do not infer pack quantity or change dietary eligibility, confidence, price or nutrient limits."
+      }
+    }
+  ]
+}

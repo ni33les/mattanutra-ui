@@ -39,7 +39,8 @@ test("M721-GOLD-01 frozen DEV D3 admits and reads conversation below 30 KB withi
   const full = (await call({ operation: "get", planHandle: value.planHandle, responseView: "full" })).value as unknown as PlanSuccessWire;
   const selected = full.options!.find(row => row.optionId === full.optionId)!; assert.ok(selected?.purchaseEligible);
   assert.equal(selected.doseFit!.total, 0);
-  assert.ok(selected.stackSummary.totalDailyPills !== null && selected.stackSummary.totalDailyPills < 10);
+  assert.equal(selected.basket!.length, 1); assert.equal(selected.basket![0].servingsPerDay, 2);
+  assert.equal(selected.stackSummary.totalDailyPills, null, "Historical frozen D3 administration stays unknown");
   assert.ok(full.options!.some(row => row.basket?.some(item => item.productName === "Blackmores Vitamin D3 1000 IU")), "The eligible dedicated D3 listing must remain a visible choice despite unknown pill metadata");
   assert.ok(full.options!.some(row => row.purchaseEligible && row.optionId !== selected.optionId), "Frozen catalogue must yield a useful alternative");
   for (const locale of ["en", "th", "zh-CN"]) {

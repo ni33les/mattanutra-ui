@@ -14,6 +14,19 @@ const sql = postgres(url.href, { max: 3, prepare: false });
 const store = createPostgresStore(sql);
 after(async () => { await sql.end(); await closeSqlPool(); });
 
+test("M722-EXP-PG deadline and stale completion are fenced across PostgreSQL workers", async () => {
+  const planId = randomUUID(), now = "2026-09-08T10:00:00Z", later = "2026-09-08T10:03:00Z";
+  await store.insertPlan({ id: planId, environment: "dev", tenantScope: "mattanutra", principalScope: `qa-v3:ax:${planId}`, currentRevision: 1, createdAt: now, updatedAt: now });
+  const operation = await admitPlanOperation(store, { planId, ownerScope: `dev:${planId}`, key: "m722-pg-deadline", expectedRevision: 1, revision: 2,
+    payload: { operation: "revise", searchEffort: "expanded" }, prepared: {}, scope: { environment: "dev", tenantScope: "mattanutra" }, now });
+  const claim = await claimPlanOperation(store, operation.id, "first-worker", now); assert.ok(claim);
+  const attempts = await Promise.all([claimPlanOperation(store, operation.id, "restart-one", later), claimPlanOperation(store, operation.id, "restart-two", later)]);
+  assert.deepEqual(attempts, [null, null]);
+  assert.equal((await store.getPlanOperation(operation.id))!.status, "failed");
+  assert.equal(await updateClaimedOperation(store, claim, { status: "complete", response: { revision: 2 } }, later), false);
+  assert.equal((await store.getPlan(planId))!.currentRevision, 1);
+});
+
 test("AXR-REL-04 PostgreSQL admits one task for duplicate calls and rejects cancelled publication", async () => {
   const planId = randomUUID(), now = "2026-09-07T00:00:00Z";
   await store.insertPlan({ id: planId, environment: "dev", tenantScope: "mattanutra", principalScope: `qa-v3:ax:${planId}`, currentRevision: 3, createdAt: now, updatedAt: now });
