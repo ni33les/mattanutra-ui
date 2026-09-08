@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { buildCompactDecision } from "../../lib/agentic/value/compact-decision.ts";
-import { publicPlanFields } from "../../lib/agentic/public-mapper.ts";
+import { publicPlanFields, publicOption } from "../../lib/agentic/public-mapper.ts";
 import { choice, coverage } from "./choice-fixtures.ts";
 
 test("AXR-ALT-01 highlights an existing positive-coverage option without changing supplied baskets or their ordering", () => {
@@ -11,6 +11,13 @@ test("AXR-ALT-01 highlights an existing positive-coverage option without changin
   assert.equal(compact.highlightedAlternativeOptionId, "full");
   assert.deepEqual(alternatives, original);
   assert.equal(compact.operationalDecision.nextAction, "review_options");
+});
+
+test("AXR-ALT-03 selectable zero-coverage choices say they do not cover requested targets", () => {
+  const option = choice("zero", [0]);
+  const output = publicOption(option, null, "en");
+  assert.equal(output.purchaseEligible, true);
+  assert.match(output.reason, /does not cover the requested targets/i);
 });
 
 test("AXR-ALT-02 exact highlight priorities respect full targets, coverage, known pills, products, known goods price and stable vector", () => {
