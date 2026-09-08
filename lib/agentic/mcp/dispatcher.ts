@@ -20,6 +20,8 @@ import { executeTool } from "@/lib/agentic/commerce/execute";
 import { orderTool } from "@/lib/agentic/commerce/order";
 import { supportTool } from "@/lib/agentic/support";
 import { feedbackTool } from "@/lib/agentic/feedback";
+import { evidenceTool } from "@/lib/agentic/evidence/tool";
+import { planResponseView } from "@/lib/agentic/contract/presentation-default";
 import { nowIso, type AgenticRuntime } from "@/lib/agentic/runtime";
 import {
   canonicalPublicToolName,
@@ -144,6 +146,11 @@ async function callTool(
   }
 
   const params = record(args);
+  if (canonical === "plan") {
+    const view = planResponseView(params.responseView as "conversation" | "full" | "status" | "details" | undefined, runtime.clientContractVersion);
+    if (typeof view !== "string") return { result: toolResult(view, true) };
+    params.responseView = view;
+  }
   const now = runtime.now ?? nowIso();
 
   try {
@@ -269,6 +276,11 @@ async function callTool(
             typeof params.supportHandle === "string" ? params.supportHandle : undefined
         });
         break;
+      case "evidence":
+        value = await evidenceTool({ config: runtime.config, now, scope: runtime.scope, store: runtime.store,
+          evidenceHandle: String(params.evidenceHandle), claimIds: params.claimIds as string[] | undefined,
+          locale: params.locale as string | undefined, mode: params.mode as string | undefined });
+        break;
       case "feedback":
         value = await feedbackTool({
           config: runtime.config,
@@ -316,7 +328,7 @@ async function callTool(
       value = businessError({ reasonCode: "temporarily_unavailable", message: "The response could not be completed consistently. Retry with the same request and idempotency key." });
     }
     return {
-      result: toolResult(value, isAgenticErrorResult(value), canonical)
+      result: toolResult(value, isAgenticErrorResult(value), canonical, runtime.resultContent)
     };
   } catch (error) {
     log.error("tool_failed", {

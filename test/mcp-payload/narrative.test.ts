@@ -28,7 +28,8 @@ test("PAY-SCHEMA-04 narrative identifies detail-only fields and publishes distin
   assert.ok(!text.includes("Supporting sources, evidence, claim IDs and uncertainty are returned in plan response fields."));
 });
 
-for (const locale of ["en", "th", "zh-CN"]) test(`PAY-SCHEMA-05 ${locale} published view examples continue admitted work and retrieve only the promised fields`, { timeout: 60000 }, async () => {
+for (const locale of ["en", "th", "zh-CN"]) test(`PAY-SCHEMA-05 ${locale} published view examples continue admitted work and retrieve only the promised fields`, { timeout: 60000 }, async (t) => {
+  t.mock.timers.enable({ apis: ["Date"], now: new Date("2026-09-07T00:00:00Z") });
   await installRealCatalogue("dev");
   const app = { ...runtime(`narrative-${locale}`), isolatedInfo: { conditionCodes: [], medicationCodes: [], supportedCountries: [{ countryCode: "TH", countryName: "Thailand", currency: "THB" }] } };
   const ajv = new Ajv({ strict: false, validateFormats: false });
@@ -64,12 +65,12 @@ for (const locale of ["en", "th", "zh-CN"]) test(`PAY-SCHEMA-05 ${locale} publis
   const plan = await call("plan", { ...example("get-current-decision"), planHandle: created.planHandle });
   const options = plan.options as Record<string, unknown>[]; assert.ok(options.length > 1);
   assert.ok(options.every(row => !Object.hasOwn(row, "doseFit"))); assert.ok(!Object.hasOwn(plan, "claimIds"));
-  const option = options.find(row => row.purchaseEligible); assert.ok(option);
+  const option = options.find(row => row.optionId === plan.selectedOptionId); assert.ok(option);
   const details = await call("plan", { ...example("read-plan-score-and-sources"), planHandle: plan.planHandle, expectedRevision: plan.revision, optionIds: [option.optionId] });
   const detailedOptions = details.options as Record<string, unknown>[];
   assert.equal(detailedOptions.length, 1); assert.equal(detailedOptions[0].optionId, option.optionId);
   assert.ok(detailedOptions[0].doseFit); assert.ok(Array.isArray(detailedOptions[0].advice)); assert.ok(!Object.hasOwn(detailedOptions[0], "basket"));
-  const full = await call("plan", { operation: "get", planHandle: plan.planHandle });
+  const full = await call("plan", { operation: "get", planHandle: plan.planHandle, responseView: "full" });
   assert.deepEqual(details.claimIds, full.claimIds);
   const selected = await call("plan", { ...example("select"), planHandle: plan.planHandle, expectedRevision: plan.revision, optionId: option.optionId, idempotencyKey: `narrative-select-${locale}` });
   // The isolated test persona confirms the exact selected revision.

@@ -1,0 +1,31 @@
+name: MCP conversation payload checks
+on:
+  push:
+    branches: [dev]
+  pull_request:
+    branches: [dev]
+permissions:
+  contents: read
+jobs:
+  affected:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      MATTANUTRA_ENV: dev
+      NODE_ENV: test
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --include=dev
+      - run: npm run test:mcp:conversation-pack -- --output "$RUNNER_TEMP/mcp-conversation-pack-evidence"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mcp-conversation-pack-scoped-evidence
+          path: ${{ runner.temp }}/mcp-conversation-pack-evidence
+          if-no-files-found: error

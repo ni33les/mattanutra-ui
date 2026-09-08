@@ -1,5 +1,6 @@
 import { payloadExpectedIdentity, readPayloadProof, compiledBuildIdentity } from "./mcp-payload/proof.mjs";
 import { RELEASE_BASE as PAYLOAD_RELEASE_BASE } from "./mcp-payload/run-tests.mjs";
+import { checkMcp721Proof, mcp721Identity } from "./mcp-721-proof.mjs";
 import { mkdir, writeFile, readFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { sourceManifest } from "./run-full-test-suite.mjs";
@@ -117,7 +118,23 @@ async function main() {
   console.log(`[deploy:dev] Branch: ${branch}`);
   const scopedIndex = process.argv.indexOf("--ax-refinement-attestation");
   const payloadIndex = process.argv.indexOf("--mcp-payload-attestation");
-  if (payloadIndex >= 0) {
+  const patchIndex = process.argv.indexOf("--mcp-721-attestation");
+  const conversationIndex = process.argv.indexOf("--mcp-conversation-attestation");
+  const toolCardIndex = process.argv.indexOf("--mcp-tool-card-attestation");
+  const latestPatchIndex = process.argv.indexOf("--mcp-723-attestation");
+  const currentPatchIndex = process.argv.indexOf("--mcp-722-attestation");
+  if ([scopedIndex, payloadIndex, patchIndex, currentPatchIndex, latestPatchIndex, toolCardIndex, conversationIndex].filter(index => index >= 0).length > 1) throw new Error("Choose exactly one release attestation path");
+  if (patchIndex >= 0 || currentPatchIndex >= 0 || latestPatchIndex >= 0 || toolCardIndex >= 0 || conversationIndex >= 0) {
+    const packageId = conversationIndex >= 0 ? "conversation" : toolCardIndex >= 0 ? "724" : latestPatchIndex >= 0 ? "723" : currentPatchIndex >= 0 ? "722" : "721";
+    if (branch !== "dev" || process.env.MATTANUTRA_ENV !== "dev") throw new Error("MCP work-package proof is DEV-only");
+    const file = process.argv[(conversationIndex >= 0 ? conversationIndex : toolCardIndex >= 0 ? toolCardIndex : latestPatchIndex >= 0 ? latestPatchIndex : currentPatchIndex >= 0 ? currentPatchIndex : patchIndex) + 1];
+    if (!file?.startsWith("/")) throw new Error("Pass the absolute MCP work-package attestation path");
+    if (await runCapture("git", ["status", "--porcelain"])) throw new Error("Validated source must remain clean");
+    checkMcp721Proof(file, mcp721Identity(sourceManifest().sha256, await runCapture("git", ["rev-parse", "HEAD"]), packageId), packageId);
+    const build = JSON.parse(await readFile(resolve(dirname(file), "build.json"), "utf8"));
+    if (build.nextBuildId !== (await readFile(".next/BUILD_ID", "utf8")).trim() || build.buildSha256 !== compiledBuildIdentity()) throw new Error("Validated compiled build changed");
+    console.log(`[deploy:dev] Verified scoped MCP ${packageId} evidence: ${file}`);
+  } else if (payloadIndex >= 0) {
     if (scopedIndex >= 0 || branch !== "dev" || process.env.MATTANUTRA_ENV !== "dev") throw new Error("MCP payload proof is DEV-only and cannot be combined with another bypass/path");
     const file = process.argv[payloadIndex + 1];
     if (!file?.startsWith("/")) throw new Error("Pass the absolute MCP payload attestation path");
@@ -142,7 +159,7 @@ async function main() {
   } else {
     await npmRun("verify:dev");
   }
-  if (payloadIndex >= 0) {
+  if (payloadIndex >= 0 || patchIndex >= 0 || latestPatchIndex >= 0 || toolCardIndex >= 0 || conversationIndex >= 0) {
     // This presentation-only package has no migrations or catalogue changes.
     await npmRun("dev-runtime-schema:verify");
   } else await applyOrVerifyRuntimeSchema();
@@ -154,7 +171,7 @@ async function main() {
     `[Service]\nEnvironment=AGENTIC_BUILD_ID=${sha}\nEnvironment=AGENTIC_WORKER_VERSION=${sha}\n`,
     "utf8"
   );
-  if (payloadIndex >= 0) await writeFile(`${dropInDir}/mcp-payload-worker-version.conf`, `[Service]\nEnvironment=WORKER_VERSION=${sha}\nEnvironment=AGENTIC_WORKER_VERSION=${sha}\n`, "utf8");
+  if (payloadIndex >= 0 || patchIndex >= 0 || currentPatchIndex >= 0 || latestPatchIndex >= 0 || toolCardIndex >= 0 || conversationIndex >= 0) await writeFile(`${dropInDir}/mcp-payload-worker-version.conf`, `[Service]\nEnvironment=WORKER_VERSION=${sha}\nEnvironment=AGENTIC_WORKER_VERSION=${sha}\n`, "utf8");
   await run("systemctl", ["daemon-reload"]);
   console.log(`[deploy:dev] AGENTIC_BUILD_ID=${sha}`);
   console.log(`[deploy:dev] Restarting ${serviceName}...`);

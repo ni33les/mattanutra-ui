@@ -90,7 +90,7 @@
       "file": "test/mcp-payload/deployment.test.ts",
       "slice": "deployment",
       "database": false,
-      "reason": "DEV-only scoped attestation rejects stale, altered and incomplete evidence.",
+      "reason": "DEV-only scoped attestation binds the published version/schema and rejects stale, altered and incomplete evidence.",
       "expectedCases": 2,
       "cases": [
         "PAY-AX-02",
@@ -101,7 +101,7 @@
       "file": "test/mcp-payload/journeys.test.ts",
       "slice": "journeys",
       "database": false,
-      "reason": "All changed contract views through multilingual documented client journeys and legacy equivalence.",
+      "reason": "All changed views through multilingual documented clients using omitted plan views; preserve frozen business decisions, order recovery and baseline prices.",
       "expectedCases": 18,
       "cases": [
         "PAY-AX-01"
@@ -129,7 +129,7 @@
       "file": "test/ax-refinement/contract.test.ts",
       "slice": "consumers",
       "database": false,
-      "reason": "Preserve AX IDs and historical artifacts while validating the additive 7.1 projection inputs.",
+      "reason": "Preserve AX IDs and historical v4\u2013v7.1 artifacts while publishing seven tools and concise 7.2 essentials with tools-only detail access.",
       "expectedCases": 4,
       "cases": [
         "AXR-SPEC-01",
@@ -227,6 +227,31 @@
       ]
     },
     {
+      "file": "test/mcp-agent-surface/contracts.test.ts",
+      "slice": "agent-surface",
+      "database": false,
+      "reason": "Seven-tool discovery, concise honest service card, environment/locale alignment and emitted get-schema equivalence.",
+      "expectedCases": 3,
+      "cases": [
+        "AG72-CARD-01",
+        "AG72-SCHEMA-01",
+        "AG72-DOC-01"
+      ]
+    },
+    {
+      "file": "test/mcp-agent-surface/views.test.ts",
+      "slice": "agent-surface",
+      "database": false,
+      "reason": "Default view for all five plan operations, legacy client pinning, explicit-view precedence, evidence capability isolation and the unchanged six frozen archetypes.",
+      "expectedCases": 9,
+      "cases": [
+        "AG72-VIEW-01",
+        "AG72-VIEW-02",
+        "AG72-EVIDENCE-01",
+        "AG72-GOLDEN-01"
+      ]
+    },
+    {
       "file": "test/mcp-payload/refinement-handoff.test.ts",
       "slice": "handoff",
       "database": false,
@@ -234,6 +259,16 @@
       "expectedCases": 1,
       "cases": [
         "PAY-HANDOFF-01"
+      ]
+    },
+    {
+      "file": "test/mcp-agent-surface/compatibility.test.ts",
+      "slice": "compatibility",
+      "database": false,
+      "reason": "One-release expiry and precise rejection of malformed/future presentation version pins.",
+      "expectedCases": 1,
+      "cases": [
+        "AG72-COMPAT-01"
       ]
     }
   ]

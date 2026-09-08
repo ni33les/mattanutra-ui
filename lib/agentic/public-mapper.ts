@@ -1,9 +1,10 @@
+import { formatNutrientMessage } from "@/lib/agentic/presentation/amount";
+import { assessedSafetyCodes } from "@/lib/agentic/plan/safety";
+import { routineTradeoff } from "@/lib/agentic/value/routine-tradeoff";
 import { adviceKind } from "@/lib/agentic/value/advice-kind";
-import { continuedIntakeCoversTargets } from "@/lib/agentic/value/customer-choice";
 import { assessPreferences, verifiedPillLowerBound, type NumericPreferences } from "@/lib/matcher/preferences";
-import { matchingExplanationFor } from "@/lib/agentic/value/matching-explanation";
 import { parseProductAdministration } from "@/lib/product-administration";
-import { operationalDecision } from "@/lib/agentic/value/operational-decision";
+import { planOperationalContext } from "@/lib/agentic/value/operational-decision";
 import { requestedTargetCoverage } from "@/lib/agentic/value/coverage-summary";
 import { AGENTIC_CONTRACT_VERSION } from "@/lib/agentic/config";
 import { agenticMessage, negotiateLocale } from "@/lib/agentic/i18n";
@@ -388,6 +389,10 @@ function optionReasonFields(
 ) {
   const negotiated = negotiateLocale(locale);
   const group = advertised.length > 0 ? advertised : [option];
+  if (option.reason === "Target-focused option with disclosed dose and product-data uncertainty") {
+    return { code: "target_focused" as const, key: "plan.option.target_focused",
+      message: agenticMessage(negotiated, "plan.option.target_focused") };
+  }
   if (option.noDistinctAlternative) {
     return {
       code: "no_distinct_alternative" as const,
@@ -726,7 +731,7 @@ export function publicOption(
     ...(option.doseFit ? { doseFit: option.doseFit } : {}),
     coverage: option.coverage.map(row => publicCoverage(row, locale)),
     basket: option.basket.map(item => publicBasketItem(item, locale)),
-    ...(option.safety ? { advice: option.safety.guidance.map(item => publicSafetyGuidance(item)) } : {}),
+    ...(option.safety ? { advice: option.safety.guidance.map(item => publicSafetyGuidance(item, "not_required", option.coverage.find(row => row.supplementId === item.supplementIds[0])?.requestedAmount)) } : {}),
     optionId: option.optionId,
     reason: option.basket.length > 0 && counts.coveragePercent === 0
       ? (locale === "th" ? "ตัวเลือกนี้ไม่ครอบคลุมสารอาหารตามเป้าหมายที่ขอ" : locale === "zh-CN" ? "此选项未覆盖所请求的营养目标。" : "This option does not cover the requested targets.")
@@ -765,7 +770,8 @@ function publicContributor(item: CoverageContributor) {
 
 export function publicSafetyGuidance(
   row: SafetyGuidance,
-  acknowledgementStatus: "acknowledged" | "not_required" | "pending" = "not_required"
+  acknowledgementStatus: "acknowledged" | "not_required" | "pending" = "not_required",
+  requestedAmount?: number
 ) {
   void acknowledgementStatus;
   const reference = row as SafetyGuidance & { referenceConfidence?: "high" | "moderate" | "low"; basisRationale?: string };
@@ -783,7 +789,7 @@ export function publicSafetyGuidance(
     code: row.code,
     kind: adviceKind(row),
     guidanceId: row.guidanceId,
-    message: row.message,
+    message: row.code === "duplicate_or_overlap" || row.kind === "overlap" ? formatNutrientMessage(row.message, row.unit, requestedAmount) : row.message,
     messageKey: row.messageKey,
     ruleId: row.ruleId,
     rulesVersion: row.rulesVersion,
@@ -952,14 +958,9 @@ export function publicPlanFields(result: Pick<
 
   const locale = snapshot?.locale ?? "en";
   const leftovers = publicLeftovers(result.leftovers, result.coverage);
-  const assessedMedicationCodes = [
-    ...new Set(medicationCodes.map((code) => MEDICATION_ALIASES[code]).filter(Boolean) as string[])
-  ];
-  const unassessedMedicationCodes = medicationCodes.filter((code) => !MEDICATION_ALIASES[code]);
-  const assessedConditionCodes = [
-    ...new Set(conditionCodes.map((code) => CONDITION_ALIASES[code]).filter(Boolean) as string[])
-  ];
-  const unassessedConditionCodes = conditionCodes.filter((code) => !CONDITION_ALIASES[code]);
+  const { assessedMedicationCodes, assessedConditionCodes } = assessedSafetyCodes({ medicationCodes, conditionCodes }, result.safetyGuidance);
+  const unassessedMedicationCodes = medicationCodes.filter(code => !assessedMedicationCodes.includes(MEDICATION_ALIASES[code] ?? code));
+  const unassessedConditionCodes = conditionCodes.filter(code => !assessedConditionCodes.includes(CONDITION_ALIASES[code] ?? code));
   const acknowledgedUnassessedMedicationCodes = [
     ...new Set(snapshot?.acknowledgedUnassessedMedicationCodes ?? [])
   ];
@@ -970,24 +971,11 @@ export function publicPlanFields(result: Pick<
     unassessedMedicationCodes.length > 0 || unassessedConditionCodes.length > 0 || result.safetyGuidance.some(item => item.code === "incomplete_information")
       ? "partial"
       : "complete";
-  const tooBroad = result.breadth?.reasonCode === "request_too_broad";
   const currency = result.basket[0]?.currency ?? "THB";
   const horizonUnavailable = result.horizon?.complete === false || Boolean(result.horizon?.durationUnknown);
   const horizonUnavailableReason = result.horizon?.unavailableReasons?.[0]?.reasonCode ?? (result.horizon?.durationUnknown ? "current_inventory_duration_unknown" : "current_inventory_information_incomplete");
   const horizonReasons = [...(result.horizon?.unavailableReasons ?? []), ...(selected?.economics?.unavailableReasons ?? [])].filter((item, index, all) => all.findIndex(other => JSON.stringify(other) === JSON.stringify(item)) === index);
-  const continuedTargetsCovered = !selected?.basket.length && continuedIntakeCoversTargets(result.coverage);
-  const replenishesLater = continuedTargetsCovered ? (result.horizon?.nextReplenishmentDay ?? 0) > 0 : !horizonUnavailable && Boolean(
-    result.horizon?.orders.some((item) => item.day > 0 && item.day < 90) ||
-      (typeof result.horizon?.nextReplenishmentDay === "number" &&
-        result.horizon.nextReplenishmentDay > 0 &&
-        result.horizon.nextReplenishmentDay < 90)
-  );
-  const hasPurchaseOptions = alternatives.some(option => option.basket.length > 0 && option.purchaseEligible !== false);
-  const matchingExplanation = matchingExplanationFor({ diagnostics: (result as PlanResult).matchingDiagnostics,
-    empty: !selected?.basket.length, hasPurchaseOptions, canExpand: (result as PlanResult).searchSummary?.canExpand,
-    durationUnknown: result.horizon?.durationUnknown,
-    hasUnmetTargets: result.coverage.some(row => row.remainingGap > 0 || row.unresolved), locale });
-  const decision = operationalDecision({ continuedTargetsCovered, canRefine: matchingExplanation?.recoveryActions.includes("refine_request"), status: result.status, hasSelectedOption: Boolean(selected?.basket.length), hasPurchaseOptions: alternatives.some(option => option.basket.length > 0 && option.purchaseEligible !== false), hasQuestions: result.questions.length > 0, purchaseRequiredNow: result.horizon?.purchaseRequiredNow, replenishesLater, tooBroad });
+  const { decision, matchingExplanation, tooBroad } = planOperationalContext({ ...result, alternatives });
   if (decision.status !== result.status) result = { ...result, status: decision.status,
     summary: agenticMessage(negotiateLocale(locale), `plan.summary.${decision.status}`) };
   const quoteBasket =
@@ -1049,7 +1037,7 @@ export function publicPlanFields(result: Pick<
     ...((result as PlanResult).searchSummary ? { searchSummary: (result as PlanResult).searchSummary } : {}),
     ...(selected?.doseFit ? { doseFit: selected.doseFit } : {}),
     status: result.status,
-    summary: matchingExplanation && result.status === "no_purchase" ? matchingExplanation.message : decision.nextAction === "review_options" ? agenticMessage(negotiateLocale(locale), "plan.summary.review_options") : result.summary,
+    summary: matchingExplanation && result.status === "no_purchase" ? matchingExplanation.message : decision.nextAction === "review_options" ? agenticMessage(negotiateLocale(locale), "plan.summary.review_options") : [result.summary, result.status === "ready" ? routineTradeoff(selected, advertisedOptions, locale) : ""].filter(Boolean).join(" "),
     ...(snapshot?.currentSupplements
       ? {
           comparisonBasis: {
@@ -1189,7 +1177,7 @@ export function publicPlanFields(result: Pick<
     ...(result.safetyGuidance.length > 0
       ? {
           safetyGuidance: result.safetyGuidance.map((item) =>
-            publicSafetyGuidance(item, acknowledgementStatus)
+            publicSafetyGuidance(item, acknowledgementStatus, result.coverage.find(row => row.supplementId === item.supplementIds[0])?.requestedAmount)
           )
         }
       : {}),

@@ -8,6 +8,9 @@ import { originalRequestFor } from "@/lib/agentic/plan/request-patch";
 import type { PlanResult } from "@/lib/agentic/plan/types";
 import type { PlanStatusWire } from "@/lib/agentic/contract/outputs";
 import { planContractCompatible } from "@/lib/agentic/presentation/compatibility";
+import { expirePlanOperation } from "@/lib/agentic/plan/operations";
+import { PLAN_PRESENTATION_VERSION } from "@/lib/agentic/presentation/version";
+import { planOperationalContext } from "@/lib/agentic/value/operational-decision";
 
 /** Reads committed data and the admitted operation without building baskets,
  * advice or schedules. No matching, network calls or shared customer cache. */
@@ -19,7 +22,8 @@ export async function readPlanPresentation(runtime: AgenticRuntime, planHandle: 
     const plan = await store.getPlan(capability.resourceId);
     if (!plan) return null;
     const revision = await store.getPlanRevision(plan.id, requestedRevision ?? plan.currentRevision);
-    const active = await store.getActivePlanOperation(plan.id);
+    let active = await store.getActivePlanOperation(plan.id);
+    if (active && await expirePlanOperation(store, active.id, new Date().toISOString())) active = null;
     const operation = active ?? await store.getFailedPlanOperation(plan.id, plan.currentRevision);
     const order = await store.getActiveOrderForPlanRevision(plan.id, requestedRevision ?? plan.currentRevision);
     const snapshotId = revision ? pinnedSnapshotIdFromResult(revision.result as PlanResult) : "";
@@ -38,7 +42,7 @@ export async function readPlanPresentation(runtime: AgenticRuntime, planHandle: 
   // below; content fingerprints fence the underlying catalogue facts.
   const telemetry = { snapshotId: result.matcherTelemetry.snapshotId, matcherVersion: result.matcherTelemetry.matcherVersion,
     factLedgerHash: result.matcherTelemetry.factLedgerHash };
-  const resultVersion = canonicalHash({ presentation: AGENTIC_CONTRACT_VERSION, revision: state.revision.revision,
+  const resultVersion = canonicalHash({ presentation: PLAN_PRESENTATION_VERSION, revision: state.revision.revision,
     currentRevision: state.plan.currentRevision, result: { ...result, matcherTelemetry: telemetry }, operation: operationState, refreshRequired });
   return { ...state, revision: state.revision, result, resultVersion, refreshRequired, originalRequest: () => originalRequestFor(result) };
 }
@@ -49,10 +53,11 @@ export async function readPlanStatus(runtime: AgenticRuntime, planHandle: string
   const { result, revision, operation, resultVersion, refreshRequired } = state;
   const active = operation && ["queued", "running", "retryable"].includes(operation.status);
   const error = operation && isAgenticErrorResult(operation.error) ? operation.error.error : undefined;
+  const { decision } = planOperationalContext(result);
   return { ok: true, responseView: "status", planHandle, revision: revision.revision, resultVersion,
     contractVersion: AGENTIC_CONTRACT_VERSION, locale: result.requestSnapshot.locale,
-    status: active ? "processing" : result.status, unchanged: knownResultVersion === resultVersion,
+    status: active ? "processing" : decision.status, unchanged: knownResultVersion === resultVersion,
     pendingRevision: operation?.revision ?? null, operationStatus: operation?.status ?? null,
-    nextActions: error || operation?.status === "cancelled" || refreshRequired ? ["refresh_plan"] : active ? ["poll_plan"] : ["get_conversation"],
+    nextActions: error || operation?.status === "cancelled" || refreshRequired ? ["refresh_plan"] : active ? ["poll_plan"] : [decision.nextAction],
     pollAfterSeconds: active ? 2 : 0, refreshRequired, ...(error ? { error: JSON.parse(JSON.stringify(error)) as PlanStatusWire["error"] } : {}) };
 }

@@ -4,6 +4,7 @@ import { createLogger } from "@/lib/logger";
 import { requestCorrelationId } from "@/lib/request-correlation";
 import { AGENTIC_CONTRACT_VERSION, loadAgenticConfig } from "@/lib/agentic/config";
 import { agenticServerInstructions } from "@/lib/agentic/contract";
+import { CLIENT_CONTRACT_VERSION_HEADER } from "@/lib/agentic/contract/presentation-default";
 import {
   canonicalPublicToolName,
   handleLightweightJsonRpc,
@@ -30,6 +31,7 @@ import {
   wantsMcpSse
 } from "@/lib/agentic/mcp/transport";
 import { assertReleaseManifestReady } from "@/lib/agentic/release-manifest";
+import { requestSetupRecovery } from "@/lib/agentic/mcp/dependency-error";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -129,23 +131,15 @@ async function handlePost(request: Request) {
     );
   }
 
-  if (mcpNeedsRateLimit(body)) {
-    const limited = await enforceMcpOrQaRateLimit(
-      request,
-      loadAgenticConfig(request).environment,
-      body
-    );
-
-    if (limited) {
-      return limited;
-    }
-  }
-
   const started = performance.now();
   const timed = timedToolName(body);
   const correlationId = requestCorrelationId(request);
 
   try {
+    if (mcpNeedsRateLimit(body)) {
+      const limited = await enforceMcpOrQaRateLimit(request, loadAgenticConfig(request).environment, body);
+      if (limited) return limited;
+    }
     if (!Array.isArray(body) && !mcpCallNeedsStore(body)) {
       const light = await handleLightweightJsonRpc(
         loadAgenticConfig(request),
@@ -185,7 +179,8 @@ async function handlePost(request: Request) {
     const runtime = bindQaRuntime(live, request, qaNamespace);
 
     const result = await withQaSessionSnapshot(qaNamespace || undefined, () =>
-      handleJsonRpc(runtime, body as JsonRpcRequest)
+      handleJsonRpc({ ...runtime, clientContractVersion: request.headers.get(CLIENT_CONTRACT_VERSION_HEADER) ?? undefined,
+        resultContent: request.headers.get("x-mattanutra-result-content") === "structured" ? "structured" : undefined }, body as JsonRpcRequest)
     );
 
     if (!result) {
@@ -225,6 +220,9 @@ async function handlePost(request: Request) {
       message: error instanceof Error ? error.message : "unknown",
       tool: timed ?? "unknown"
     });
+
+    const recovery = requestSetupRecovery(error, body, correlationId);
+    if (recovery) return mcpReply(request, { id: (body as JsonRpcRequest).id ?? null, jsonrpc: "2.0", result: toolResult(recovery, true) });
 
     return mcpReply(
       request,

@@ -6,7 +6,7 @@ import { AGENTIC_OUTPUT_SCHEMAS, validateToolIssues } from "../../lib/agentic/co
 import { toolResult } from "../../lib/agentic/mcp/rpc.ts";
 
 const sections = ["request", "products", "coverage", "advice", "score", "economics"] as const;
-test("PAY-VIEW-01 eighteen frozen decisions retain all choices, doses, amounts, unknowns and advice below 40% bytes", () => {
+test("PAY-VIEW-01 eighteen frozen decisions retain all choices, doses, amounts, unknowns and foreground advice below 40% bytes", () => {
   let originalBytes = 0, conciseBytes = 0;
   for (const { plan, caseId } of baseline.cases) {
     const compact = projectPlan(plan, { responseView: "conversation" });
@@ -19,15 +19,17 @@ test("PAY-VIEW-01 eighteen frozen decisions retain all choices, doses, amounts, 
     assert.ok(!("basket" in compact)); assert.ok(!("doseFit" in compact)); assert.ok(!("orderSchedule" in compact));
     for (const [i, option] of compact.options.entries()) {
       const old = plan.options![i];
-      assert.equal(option.purchaseEligible, old.purchaseEligible);
+      assert.deepEqual(Object.keys(option).sort(), ["coveragePercent", "optionId", "reason", "roles", "stackSummary"]);
       assert.deepEqual(option.stackSummary, old.stackSummary);
-      assert.deepEqual(option.preferenceAssessment, old.preferenceAssessment);
-      assert.deepEqual(option.adviceIds.map(id => { const { adviceId, ...advice } = compact.advice.find(row => row.adviceId === id)!; assert.equal(adviceId, id); return advice; }), old.advice);
-      if (option.basket) {
-        assert.deepEqual(option.basket.map(row => [row.productId,row.servingsPerDay,row.quantity,row.unitPriceMinor,row.lineTotalMinor,row.dailyPills]), old.basket!.map(row => [row.productId,row.servingsPerDay,row.quantity,row.unitPriceMinor,row.lineTotalMinor,row.dailyPills]));
-        assert.ok(!("labelledFacts" in option.basket[0]));
-      }
-      assert.deepEqual(option.coverage?.map(row => [row.name,row.requestedAmount,row.currentAmount,row.deliveredAmount,row.quantifiedExposureAmount,row.totalExposureAmount,row.totalExposureComplete,row.intakeCertainty,row.remainingGap,row.excess,row.unit]), old.coverage?.map(row => [row.name,row.requestedAmount,row.currentAmount,row.deliveredAmount,row.quantifiedExposureAmount,row.totalExposureAmount,row.totalExposureComplete,row.intakeCertainty,row.remainingGap,row.excess,row.unit]));
+      assert.equal(option.coveragePercent, old.coveragePercent);
+      const foreground = option.optionId === compact.selectedOptionId || option.optionId === compact.highlightedAlternativeOptionId;
+      const inline = compact.advice.filter(row => row.optionIds.includes(option.optionId));
+      if (!foreground) assert.deepEqual(inline, []);
+      else for (const finding of old.advice ?? []) assert.ok(inline.some(row => row.guidanceIds.includes(finding.guidanceId)), finding.ruleId);
+      const details = projectPlan(plan, { responseView: "details", expectedRevision: plan.revision, sections: ["products", "coverage", "advice"], optionIds: [option.optionId] });
+      assert.ok(details.ok);
+      for (const key of ["basket", "coverage", "advice"] as const) assert.deepEqual(details.options[0][key], old[key]);
+
     }
     originalBytes += bytes(toolResult(plan)); conciseBytes += bytes(toolResult(compact));
   }
@@ -51,12 +53,17 @@ test("PAY-VIEW-02 batch details return exact stored sections and reject unknown 
 
 test("PAY-VIEW-03 advice with identical rule IDs but different exposure, source or uncertainty stays distinct", () => {
   const plan = structuredClone(baseline.cases[0].plan);
+  plan.optionId = plan.options![0].optionId;
   const first = plan.options![0].advice![0];
   plan.options![0].advice!.push({ ...first, exposure: 999, threshold: 100, authorityUrl: "https://example.org/reference", uncertainty: "Different measured exposure" });
   const compact = projectPlan(plan, { responseView: "conversation" });
   assert.ok(compact.ok && "advice" in compact && "options" in compact);
-  const advice = compact.options[0].adviceIds.map(id => compact.advice.find(row => row.adviceId === id)!);
+  const ids = compact.advice.filter(row => row.optionIds.includes(compact.options[0].optionId)).flatMap(row => row.guidanceIds);
+  assert.ok(ids.includes(first.guidanceId));
+  const details = projectPlan(plan, { responseView: "details", expectedRevision: plan.revision, sections: ["advice"], optionIds: [compact.options[0].optionId] });
+  assert.ok(details.ok); const advice = details.options[0].advice!;
   assert.equal(advice.length, plan.options![0].advice!.length);
+  assert.deepEqual(advice, plan.options![0].advice);
   assert.ok(advice.some(row => row.exposure === 999 && row.threshold === 100));
 });
 
@@ -65,6 +72,9 @@ test("PAY-VIEW-04 plan-wide advice survives empty and processing decisions witho
   plan.options = []; plan.basket = []; plan.status = "processing";
   assert.ok(plan.safetyGuidance!.length > 0);
   const compact = projectPlan(plan, { responseView: "conversation" });
-  for (const finding of plan.safetyGuidance!) assert.ok(compact.advice.some(row => row.guidanceId === finding.guidanceId && row.message === finding.message && row.exposure === finding.exposure));
+  const planFlags = compact.advice.filter(row => compact.planAdviceIds.includes(row.adviceId));
+  for (const finding of plan.safetyGuidance!) assert.ok(planFlags.some(row => row.guidanceIds.includes(finding.guidanceId)));
+  const details = projectPlan(plan, { responseView: "details", expectedRevision: plan.revision, sections: ["advice"] });
+  assert.ok(details.ok); assert.deepEqual(details.safetyGuidance, plan.safetyGuidance);
   assert.ok(compact.planAdviceIds.length > 0);
 });

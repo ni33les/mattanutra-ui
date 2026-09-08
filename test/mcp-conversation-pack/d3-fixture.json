@@ -1,0 +1,1490 @@
+{
+  "matchingDiagnostics": {
+    "targets": [
+      {
+        "name": "Vitamin D3",
+        "subjectId": "sup_927083fbb90a5a24b4c55067b06ead5f",
+        "eligibleProducts": 13,
+        "candidateProducts": 13,
+        "supportedDoseVariants": 577
+      }
+    ],
+    "reasonCode": "purchase_options_available",
+    "rejectionCounts": [
+      {
+        "count": 123,
+        "reason": "incidental_only"
+      }
+    ],
+    "eligibleListings": 154,
+    "eligibleProducts": 79,
+    "catalogueListings": 154,
+    "catalogueProducts": 79,
+    "supportedDoseVariants": 693,
+    "evaluatedNonemptyBaskets": 305
+  },
+  "matchingExplanation": {
+    "reasonCode": "purchase_options_available",
+    "messageKey": "plan.matching.purchase_options_available",
+    "message": "Evaluated purchase options are available. Compare dose fit, target gaps, health advice and numeric preference differences before confirming one.",
+    "recoveryActions": [
+      "review_options",
+      "expand_search"
+    ]
+  },
+  "compactDecision": {
+    "highlightedAlternativeOptionId": "opt_5470cbf6ee654339",
+    "matchingExplanation": {
+      "reasonCode": "purchase_options_available",
+      "messageKey": "plan.matching.purchase_options_available",
+      "message": "Evaluated purchase options are available. Compare dose fit, target gaps, health advice and numeric preference differences before confirming one.",
+      "recoveryActions": [
+        "review_options",
+        "expand_search"
+      ]
+    },
+    "advice": [
+      {
+        "kind": "incomplete_information",
+        "guidanceId": "gdn:dose_review_required:vitamin_d3:supplemental:ul:missing:sup_927083fbb90a5a24b4c55067b06ead5f",
+        "severity": "info",
+        "message": "An applicable reference limit for Vitamin D3 is unavailable. Exposure cannot be verified as below a limit; this is missing information, not a measured limit breach. Review the available facts; purchase remains available.",
+        "nutrientName": "Vitamin D3",
+        "exposure": 2000,
+        "threshold": null,
+        "unit": "IU",
+        "contributors": [
+          {
+            "productName": "Blackmores Vitamin D3 1000 IU",
+            "amount": 2000,
+            "unit": "IU"
+          }
+        ],
+        "ruleId": "ul:missing:sup_927083fbb90a5a24b4c55067b06ead5f",
+        "rulesVersion": "6.0.0",
+        "sourceScope": "supplemental",
+        "uncertaintyCodes": [],
+        "evidence": [],
+        "uncertainty": "Guidance uses the reported inputs and available evidence; it is not medical approval."
+      },
+      {
+        "kind": "incomplete_information",
+        "guidanceId": "gdn:incomplete_information:incomplete_information",
+        "severity": "high",
+        "message": "Some health or intake information is unknown or estimated. The quantities shown do not establish complete exposure or medical suitability; discuss relevant uncertainties with a clinician or pharmacist before use.",
+        "exposure": null,
+        "threshold": null,
+        "contributors": [],
+        "ruleId": "incomplete_information",
+        "rulesVersion": "6.0.0",
+        "uncertaintyCodes": [
+          "condition_context_unknown",
+          "intake_unknown:sup_927083fbb90a5a24b4c55067b06ead5f",
+          "medication_context_unknown",
+          "profile_unknown:ageYears",
+          "profile_unknown:lifeStage",
+          "profile_unknown:sex"
+        ],
+        "evidence": [],
+        "uncertainty": "Unknown intake is not zero. Reported estimates are not verified measurements."
+      }
+    ],
+    "nextAction": "Review the advice and confirm this option with the person before checkout. Ready describes purchase readiness, not medical approval.",
+    "operationalDecision": {
+      "status": "ready",
+      "nextAction": "confirm_with_user",
+      "purchaseEligible": true
+    },
+    "cost": {
+      "cash30DayMinor": null,
+      "cash90DayMinor": null,
+      "currency": "THB",
+      "firstOrderMinor": 53500
+    },
+    "optionId": "opt_f816bb3d1d9f8d69",
+    "status": "ready",
+    "what": [
+      "1\u00d7 Blackmores Vitamin D3 1000 IU",
+      "Vitamin D3: target 2000 IU/day; known current 0, new 2000, quantified total 2000, gap 0 IU"
+    ],
+    "when": "buy the day-zero basket now",
+    "why": "This option covers 1 of 1 requested targets; 0 remain partial or unresolved."
+  },
+  "claimIds": [
+    "clm_d3_bone_v1"
+  ],
+  "researchVersion": "research-3.0.0",
+  "basket": [
+    {
+      "currency": "THB",
+      "dailyPills": 2,
+      "administration": {
+        "route": "oral",
+        "provenance": {
+          "status": "verified",
+          "sourceUrl": "https://www.blackmores.com.au/products/vitamin-d3-1000-iu",
+          "sourceText": "Manufacturer composition is 1000 IU vitamin D3 per capsule, taken orally. The catalogue image identifies the same Vitamin D3 1000 IU capsule variant. Pack quantity remains unset because the manufacturer page mixes 60-tablet and 200-capsule variants. Nutrient facts, confidence, prices and dietary evidence are unchanged.",
+          "verifiedAt": "2026-09-08T12:00:00Z"
+        },
+        "packQuantity": null,
+        "physicalUnit": "capsule",
+        "doseIncrement": 1,
+        "unitsPerServing": 1
+      },
+      "labelledFacts": [
+        {
+          "name": "Vitamin D3",
+          "unit": "IU",
+          "amount": 1000,
+          "sourceUrl": null,
+          "confidence": "high",
+          "sourceText": null,
+          "mappingStatus": "verified"
+        }
+      ],
+      "pillCountKnown": true,
+      "form": "capsule",
+      "lineTotalMinor": 48500,
+      "pillsPerServing": 1,
+      "productId": "prd_617d837380b34ada99c0769d502b5b1c",
+      "productName": "Blackmores Vitamin D3 1000 IU",
+      "quantity": 1,
+      "selectionReason": {
+        "code": "covers_target",
+        "message": "This product covers Vitamin D3 at 2000 IU per day.",
+        "messageKey": "plan.selection.covers_target",
+        "requestedNames": [
+          "Vitamin D3"
+        ],
+        "requestedSupplementIds": [
+          "sup_927083fbb90a5a24b4c55067b06ead5f"
+        ]
+      },
+      "servingsPerDay": 2,
+      "unitPriceMinor": 48500,
+      "requestedNutrientNames": [
+        "Vitamin D3"
+      ],
+      "requestedNutrients": [
+        {
+          "amount": 2000,
+          "name": "Vitamin D3",
+          "unit": "IU"
+        }
+      ],
+      "imageUrl": "https://mattanutra.sgp1.cdn.digitaloceanspaces.com/dev/products/617d8373-80b3-4ada-99c0-769d502b5b1c/1e25b3e82fc73b84b84ced7757015bd6e33e191b53acd4cef54fb91026210c40.webp"
+    }
+  ],
+  "coverage": [
+    {
+      "basis": "total_daily",
+      "coveragePercent": 100,
+      "currentAmount": 0,
+      "deliveredAmount": 2000,
+      "name": "Vitamin D3",
+      "remainingGap": 0,
+      "excess": 0,
+      "requestedAmount": 2000,
+      "status": "covered",
+      "supplementId": "sup_927083fbb90a5a24b4c55067b06ead5f",
+      "totalExposureAmount": null,
+      "quantifiedExposureAmount": 2000,
+      "totalExposureComplete": false,
+      "intakeCertainty": "unknown",
+      "unit": "IU",
+      "claimIds": [
+        "clm_d3_bone_v1"
+      ],
+      "importance": "required",
+      "contributors": [
+        {
+          "amount": 2000,
+          "productName": "Blackmores Vitamin D3 1000 IU",
+          "unit": "IU",
+          "productId": "prd_617d837380b34ada99c0769d502b5b1c"
+        }
+      ]
+    }
+  ],
+  "contractVersion": "7.2.4",
+  "operationalDecision": {
+    "status": "ready",
+    "nextAction": "confirm_with_user",
+    "purchaseEligible": true
+  },
+  "alternativeSearch": {
+    "reason": "No qualifying alternative was found within the deterministic search budget; absence is not proven.",
+    "status": "incomplete"
+  },
+  "searchSummary": {
+    "effort": "standard",
+    "complete": false,
+    "canExpand": true,
+    "expansionBudget": 8000,
+    "expansionAttempts": 8000
+  },
+  "doseFit": {
+    "over": 0,
+    "limit": 0,
+    "total": 0,
+    "under": 0,
+    "version": "dose-fit-1",
+    "perLimit": [],
+    "perTarget": [
+      {
+        "name": "Vitamin D3",
+        "over": 0,
+        "unit": "IU",
+        "basis": "total_daily",
+        "under": 0,
+        "target": 2000,
+        "exposure": 2000,
+        "certainty": "unknown",
+        "subjectId": "sup_927083fbb90a5a24b4c55067b06ead5f",
+        "exposureMaximum": 2000,
+        "exposureMinimum": 2000,
+        "conservativeExposure": 2000
+      }
+    ],
+    "limitWeight": 2,
+    "weightedLimit": 0,
+    "perContinuedDose": [],
+    "unknownSubjectIds": [
+      "sup_927083fbb90a5a24b4c55067b06ead5f"
+    ],
+    "estimatedSubjectIds": []
+  },
+  "status": "ready",
+  "summary": "A purchasable stack is ready. Confirm with the person first.",
+  "comparisonBasis": {
+    "currentInventory": []
+  },
+  "scheduleComplete": false,
+  "nextReplenishmentDay": null,
+  "orderSchedule": {
+    "30": {
+      "available": false,
+      "reasonCode": "pack_duration_unknown"
+    },
+    "90": {
+      "available": false,
+      "reasonCode": "pack_duration_unknown"
+    }
+  },
+  "purchaseRequiredNow": true,
+  "reasonCode": "closest_dose",
+  "cash30DayMinor": null,
+  "cash90DayMinor": null,
+  "cashComplete": false,
+  "consumptionComplete": false,
+  "comparisonComplete": false,
+  "unavailableReasons": [
+    {
+      "dimension": "schedule",
+      "reasonCode": "pack_duration_unknown",
+      "missingFieldNames": [
+        "basket.prd_617d837380b34ada99c0769d502b5b1c.servingsPerPack"
+      ],
+      "dependentCapabilities": [
+        "inventory_depletion_date",
+        "future_order_schedule",
+        "delivered_cash",
+        "savings",
+        "comparison"
+      ]
+    },
+    {
+      "dimension": "comparison",
+      "reasonCode": "baseline_facts_incomplete",
+      "missingFieldNames": [
+        "baseline.packFacts"
+      ],
+      "dependentCapabilities": [
+        "savings",
+        "comparison"
+      ]
+    }
+  ],
+  "summaryKey": "plan.summary.ready",
+  "locale": "en",
+  "nextActions": [
+    "confirm_with_user"
+  ],
+  "safetyScope": "partial",
+  "stackSummary": {
+    "currency": "THB",
+    "dailyCostMinor": null,
+    "productCount": 1,
+    "supplyDays": null,
+    "totalDailyPills": 2,
+    "totalPriceMinor": 48500
+  },
+  "acknowledgementStatus": "not_required",
+  "shippingMinor": 5000,
+  "estimatedOrderTotalMinor": 53500,
+  "optionId": "opt_f816bb3d1d9f8d69",
+  "reason": "Closest dose fit among the evaluated options",
+  "reasonKey": "plan.option.closest_dose",
+  "tradeOffs": {
+    "coverageDeltaPercent": 0,
+    "pillDelta": 0,
+    "priceDeltaMinor": 0,
+    "productCountDelta": 0,
+    "summary": "Selected option",
+    "summaryKey": "plan.tradeoff.selected"
+  },
+  "safetyGuidance": [
+    {
+      "action": "review",
+      "acknowledgementStatus": "not_required",
+      "code": "dose_review_required",
+      "kind": "incomplete_information",
+      "guidanceId": "gdn:dose_review_required:vitamin_d3:supplemental:ul:missing:sup_927083fbb90a5a24b4c55067b06ead5f",
+      "message": "An applicable reference limit for Vitamin D3 is unavailable. Exposure cannot be verified as below a limit; this is missing information, not a measured limit breach. Review the available facts; purchase remains available.",
+      "messageKey": "guidance.reference_unknown",
+      "ruleId": "ul:missing:sup_927083fbb90a5a24b4c55067b06ead5f",
+      "rulesVersion": "6.0.0",
+      "severity": "info",
+      "nutrientName": "Vitamin D3",
+      "unit": "IU",
+      "sourceScope": "supplemental",
+      "exposure": 2000,
+      "threshold": null,
+      "productIds": [
+        "prd_617d837380b34ada99c0769d502b5b1c"
+      ],
+      "supplementIds": [
+        "sup_927083fbb90a5a24b4c55067b06ead5f"
+      ],
+      "contributors": [
+        {
+          "amount": 2000,
+          "productName": "Blackmores Vitamin D3 1000 IU",
+          "unit": "IU",
+          "productId": "prd_617d837380b34ada99c0769d502b5b1c",
+          "source": "selected"
+        }
+      ]
+    },
+    {
+      "action": "review",
+      "uncertainty": "Unknown intake is not zero. Reported estimates are not verified measurements.",
+      "uncertaintyCodes": [
+        "condition_context_unknown",
+        "intake_unknown:sup_927083fbb90a5a24b4c55067b06ead5f",
+        "medication_context_unknown",
+        "profile_unknown:ageYears",
+        "profile_unknown:lifeStage",
+        "profile_unknown:sex"
+      ],
+      "acknowledgementStatus": "not_required",
+      "code": "incomplete_information",
+      "kind": "incomplete_information",
+      "guidanceId": "gdn:incomplete_information:incomplete_information",
+      "message": "Some health or intake information is unknown or estimated. The quantities shown do not establish complete exposure or medical suitability; discuss relevant uncertainties with a clinician or pharmacist before use.",
+      "messageKey": "guidance.incomplete_information",
+      "ruleId": "incomplete_information",
+      "rulesVersion": "6.0.0",
+      "severity": "high",
+      "exposure": null,
+      "threshold": null,
+      "productIds": [
+        "prd_617d837380b34ada99c0769d502b5b1c"
+      ]
+    }
+  ],
+  "guidanceIds": [
+    "gdn:dose_review_required:vitamin_d3:supplemental:ul:missing:sup_927083fbb90a5a24b4c55067b06ead5f",
+    "gdn:incomplete_information:incomplete_information"
+  ],
+  "options": [
+    {
+      "coveragePercent": 100,
+      "coverageSummary": {
+        "coveragePercent": 100,
+        "fullyMetCount": 1,
+        "requestedCount": 1
+      },
+      "doseFit": {
+        "over": 0,
+        "limit": 0,
+        "total": 0,
+        "under": 0,
+        "version": "dose-fit-1",
+        "perLimit": [],
+        "perTarget": [
+          {
+            "name": "Vitamin D3",
+            "over": 0,
+            "unit": "IU",
+            "basis": "total_daily",
+            "under": 0,
+            "target": 2000,
+            "exposure": 2000,
+            "certainty": "unknown",
+            "subjectId": "sup_927083fbb90a5a24b4c55067b06ead5f",
+            "exposureMaximum": 2000,
+            "exposureMinimum": 2000,
+            "conservativeExposure": 2000
+          }
+        ],
+        "limitWeight": 2,
+        "weightedLimit": 0,
+        "perContinuedDose": [],
+        "unknownSubjectIds": [
+          "sup_927083fbb90a5a24b4c55067b06ead5f"
+        ],
+        "estimatedSubjectIds": []
+      },
+      "coverage": [
+        {
+          "basis": "total_daily",
+          "coveragePercent": 100,
+          "currentAmount": 0,
+          "deliveredAmount": 2000,
+          "name": "Vitamin D3",
+          "remainingGap": 0,
+          "excess": 0,
+          "requestedAmount": 2000,
+          "status": "covered",
+          "supplementId": "sup_927083fbb90a5a24b4c55067b06ead5f",
+          "totalExposureAmount": null,
+          "quantifiedExposureAmount": 2000,
+          "totalExposureComplete": false,
+          "intakeCertainty": "unknown",
+          "unit": "IU",
+          "claimIds": [
+            "clm_d3_bone_v1"
+          ],
+          "importance": "required",
+          "contributors": [
+            {
+              "amount": 2000,
+              "productName": "Blackmores Vitamin D3 1000 IU",
+              "unit": "IU",
+              "productId": "prd_617d837380b34ada99c0769d502b5b1c"
+            }
+          ]
+        }
+      ],
+      "basket": [
+        {
+          "currency": "THB",
+          "dailyPills": 2,
+          "administration": {
+            "route": "oral",
+            "provenance": {
+              "status": "verified",
+              "sourceUrl": "https://www.blackmores.com.au/products/vitamin-d3-1000-iu",
+              "sourceText": "Manufacturer composition is 1000 IU vitamin D3 per capsule, taken orally. The catalogue image identifies the same Vitamin D3 1000 IU capsule variant. Pack quantity remains unset because the manufacturer page mixes 60-tablet and 200-capsule variants. Nutrient facts, confidence, prices and dietary evidence are unchanged.",
+              "verifiedAt": "2026-09-08T12:00:00Z"
+            },
+            "packQuantity": null,
+            "physicalUnit": "capsule",
+            "doseIncrement": 1,
+            "unitsPerServing": 1
+          },
+          "labelledFacts": [
+            {
+              "name": "Vitamin D3",
+              "unit": "IU",
+              "amount": 1000,
+              "sourceUrl": null,
+              "confidence": "high",
+              "sourceText": null,
+              "mappingStatus": "verified"
+            }
+          ],
+          "pillCountKnown": true,
+          "form": "capsule",
+          "lineTotalMinor": 48500,
+          "pillsPerServing": 1,
+          "productId": "prd_617d837380b34ada99c0769d502b5b1c",
+          "productName": "Blackmores Vitamin D3 1000 IU",
+          "quantity": 1,
+          "selectionReason": {
+            "code": "best_available",
+            "message": "This product is in the selected stack.",
+            "messageKey": "plan.selection.in_selected_stack",
+            "requestedNames": [
+              "Vitamin D3"
+            ],
+            "requestedSupplementIds": []
+          },
+          "servingsPerDay": 2,
+          "unitPriceMinor": 48500,
+          "requestedNutrientNames": [
+            "Vitamin D3"
+          ],
+          "requestedNutrients": [
+            {
+              "amount": 2000,
+              "name": "Vitamin D3",
+              "unit": "IU"
+            }
+          ],
+          "imageUrl": "https://mattanutra.sgp1.cdn.digitaloceanspaces.com/dev/products/617d8373-80b3-4ada-99c0-769d502b5b1c/1e25b3e82fc73b84b84ced7757015bd6e33e191b53acd4cef54fb91026210c40.webp"
+        }
+      ],
+      "advice": [
+        {
+          "action": "review",
+          "acknowledgementStatus": "not_required",
+          "code": "dose_review_required",
+          "kind": "incomplete_information",
+          "guidanceId": "gdn:dose_review_required:vitamin_d3:supplemental:ul:missing:sup_927083fbb90a5a24b4c55067b06ead5f",
+          "message": "An applicable reference limit for Vitamin D3 is unavailable. Exposure cannot be verified as below a limit; this is missing information, not a measured limit breach. Review the available facts; purchase remains available.",
+          "messageKey": "guidance.reference_unknown",
+          "ruleId": "ul:missing:sup_927083fbb90a5a24b4c55067b06ead5f",
+          "rulesVersion": "6.0.0",
+          "severity": "info",
+          "nutrientName": "Vitamin D3",
+          "unit": "IU",
+          "sourceScope": "supplemental",
+          "exposure": 2000,
+          "threshold": null,
+          "productIds": [
+            "prd_617d837380b34ada99c0769d502b5b1c"
+          ],
+          "supplementIds": [
+            "sup_927083fbb90a5a24b4c55067b06ead5f"
+          ],
+          "contributors": [
+            {
+              "amount": 2000,
+              "productName": "Blackmores Vitamin D3 1000 IU",
+              "unit": "IU",
+              "productId": "prd_617d837380b34ada99c0769d502b5b1c",
+              "source": "selected"
+            }
+          ]
+        },
+        {
+          "action": "review",
+          "uncertainty": "Unknown intake is not zero. Reported estimates are not verified measurements.",
+          "uncertaintyCodes": [
+            "condition_context_unknown",
+            "intake_unknown:sup_927083fbb90a5a24b4c55067b06ead5f",
+            "medication_context_unknown",
+            "profile_unknown:ageYears",
+            "profile_unknown:lifeStage",
+            "profile_unknown:sex"
+          ],
+          "acknowledgementStatus": "not_required",
+          "code": "incomplete_information",
+          "kind": "incomplete_information",
+          "guidanceId": "gdn:incomplete_information:incomplete_information",
+          "message": "Some health or intake information is unknown or estimated. The quantities shown do not establish complete exposure or medical suitability; discuss relevant uncertainties with a clinician or pharmacist before use.",
+          "messageKey": "guidance.incomplete_information",
+          "ruleId": "incomplete_information",
+          "rulesVersion": "6.0.0",
+          "severity": "high",
+          "exposure": null,
+          "threshold": null,
+          "productIds": [
+            "prd_617d837380b34ada99c0769d502b5b1c"
+          ]
+        }
+      ],
+      "optionId": "opt_f816bb3d1d9f8d69",
+      "reason": "Closest dose fit among the evaluated options",
+      "reasonCode": "closest_dose",
+      "reasonKey": "plan.option.closest_dose",
+      "recommended": true,
+      "selected": true,
+      "stackSummary": {
+        "currency": "THB",
+        "dailyCostMinor": null,
+        "productCount": 1,
+        "supplyDays": null,
+        "totalDailyPills": 2,
+        "totalPriceMinor": 48500
+      },
+      "tradeOffs": {
+        "coverageDeltaPercent": 0,
+        "pillDelta": 0,
+        "priceDeltaMinor": 0,
+        "productCountDelta": 0,
+        "summary": "Selected option",
+        "summaryKey": "plan.tradeoff.selected"
+      },
+      "role": "requested_objective",
+      "roles": [
+        "closest_dose"
+      ],
+      "purchaseEligible": true,
+      "tradeOff": {
+        "coverageDelta": 0,
+        "dailyPillsDelta": 0,
+        "cash90DayDeltaMinor": null
+      },
+      "includedTargetIds": [
+        "sup_927083fbb90a5a24b4c55067b06ead5f"
+      ],
+      "omittedTargetIds": [],
+      "deferredTargetIds": [],
+      "economics": {
+        "deltas": {
+          "pills": 0,
+          "coverage": 0,
+          "products": 0,
+          "administrations": 0
+        },
+        "baseline": {
+          "type": "separate_direct_products",
+          "lines": [
+            {
+              "quantity": 1,
+              "productId": "prd_617d837380b34ada99c0769d502b5b1c",
+              "lineTotalMinor": 48500,
+              "unitPriceMinor": 48500
+            }
+          ],
+          "cash90DayMinor": null
+        },
+        "complete": false,
+        "equivalent": true,
+        "savingClaim": "none",
+        "cashComplete": false,
+        "shippingMinor": 5000,
+        "cash30DayMinor": null,
+        "cash90DayMinor": null,
+        "cashTotalMinor": 53500,
+        "comparisonBasis": {
+          "currency": "THB",
+          "rounding": "minor_unit_once",
+          "baselineType": "separate_direct_products",
+          "orderBoundary": "order_at_H_excluded",
+          "costHorizonsDays": [
+            30,
+            90
+          ],
+          "currentInventory": [],
+          "destinationCountry": "TH",
+          "catalogId": "snap_d45c2099ba2ef7f8"
+        },
+        "consumptionScope": "full_horizon",
+        "comparisonComplete": false,
+        "unavailableReasons": [
+          {
+            "dimension": "schedule",
+            "reasonCode": "pack_duration_unknown",
+            "missingFieldNames": [
+              "basket.prd_617d837380b34ada99c0769d502b5b1c.servingsPerPack"
+            ],
+            "dependentCapabilities": [
+              "inventory_depletion_date",
+              "future_order_schedule",
+              "delivered_cash",
+              "savings",
+              "comparison"
+            ]
+          },
+          {
+            "dimension": "comparison",
+            "reasonCode": "baseline_facts_incomplete",
+            "missingFieldNames": [
+              "baseline.packFacts"
+            ],
+            "dependentCapabilities": [
+              "savings",
+              "comparison"
+            ]
+          }
+        ],
+        "consumptionComplete": false,
+        "otherCustomerCostMinor": 0,
+        "firstOrderSubtotalMinor": 48500
+      }
+    },
+    {
+      "coveragePercent": 100,
+      "coverageSummary": {
+        "coveragePercent": 100,
+        "fullyMetCount": 1,
+        "requestedCount": 1
+      },
+      "doseFit": {
+        "over": 0,
+        "limit": 0,
+        "total": 0,
+        "under": 0,
+        "version": "dose-fit-1",
+        "perLimit": [],
+        "perTarget": [
+          {
+            "name": "Vitamin D3",
+            "over": 0,
+            "unit": "IU",
+            "basis": "total_daily",
+            "under": 0,
+            "target": 2000,
+            "exposure": 2000,
+            "certainty": "unknown",
+            "subjectId": "sup_927083fbb90a5a24b4c55067b06ead5f",
+            "exposureMaximum": 2000,
+            "exposureMinimum": 2000,
+            "conservativeExposure": 2000
+          }
+        ],
+        "limitWeight": 2,
+        "weightedLimit": 0,
+        "perContinuedDose": [],
+        "unknownSubjectIds": [
+          "sup_14104f30c89659c689f1231f477ac685",
+          "sup_199df5c489215c37b85b6bcb14b443fa",
+          "sup_61a870f9f1a452b49df81ae2f44d3bf6",
+          "sup_684e1966535b59c78984ce1e68a181a0",
+          "sup_783b46dcbe5555a9bc436a15a1bfdb80",
+          "sup_795fb8b0ffe15856b3ed9012268c1d1c",
+          "sup_7ddcc4f2708f590599a402d80e935adf",
+          "sup_8e020fbf61f45b00853797c117fef918",
+          "sup_927083fbb90a5a24b4c55067b06ead5f",
+          "sup_ccc3e67bd7535315a8cba8aefa8b2fd8",
+          "sup_e7f084983cf85caa868a27adf61afeab"
+        ],
+        "estimatedSubjectIds": []
+      },
+      "coverage": [
+        {
+          "basis": "total_daily",
+          "coveragePercent": 100,
+          "currentAmount": 0,
+          "deliveredAmount": 2000,
+          "name": "Vitamin D3",
+          "remainingGap": 0,
+          "excess": 0,
+          "requestedAmount": 2000,
+          "status": "covered",
+          "supplementId": "sup_927083fbb90a5a24b4c55067b06ead5f",
+          "totalExposureAmount": null,
+          "quantifiedExposureAmount": 2000,
+          "totalExposureComplete": false,
+          "intakeCertainty": "unknown",
+          "unit": "IU",
+          "claimIds": [
+            "clm_d3_bone_v1"
+          ],
+          "importance": "required",
+          "contributors": [
+            {
+              "amount": 2000,
+              "productName": "VISTRA CALPLEX CALCIUM 600 mg & MENAQUINONE-7 PLUS",
+              "unit": "IU",
+              "productId": "prd_f0ac13e757b34fdbb6f7206ad8b6f0ef"
+            }
+          ]
+        }
+      ],
+      "basket": [
+        {
+          "currency": "THB",
+          "dailyPills": 10,
+          "administration": {
+            "route": "oral",
+            "provenance": {
+              "status": "verified",
+              "sourceUrl": "https://www.vistra.co.th/product/vistra-calplex-calcium-600-mg-menaquinone-7-plus/",
+              "sourceText": "Manufacturer composition and oral directions support physical unit tablet. Composition basis is 1 physical unit(s) per labelled serving. Pack quantity for this SKU is not independently established.",
+              "verifiedAt": "2026-09-07T11:30:13.779915+00:00"
+            },
+            "packQuantity": null,
+            "physicalUnit": "tablet",
+            "doseIncrement": 1,
+            "unitsPerServing": 1
+          },
+          "labelledFacts": [
+            {
+              "name": "Boron",
+              "unit": "mg",
+              "amount": 1.7,
+              "sourceUrl": null,
+              "confidence": "moderate",
+              "sourceText": "page_text: \u0e43\u0e2b\u0e49\u0e42\u0e1a\u0e23\u0e2d\u0e19 1.70 \u0e21\u0e01.",
+              "mappingStatus": "verified"
+            },
+            {
+              "name": "Calcium",
+              "unit": "mg",
+              "amount": 600,
+              "sourceUrl": null,
+              "confidence": "high",
+              "sourceText": "page_text: \u0e43\u0e2b\u0e49\u0e41\u0e04\u0e25\u0e40\u0e0b\u0e35\u0e22\u0e21 600 \u0e21\u0e01.",
+              "mappingStatus": "verified"
+            },
+            {
+              "name": "Copper",
+              "unit": "mg",
+              "amount": 2,
+              "sourceUrl": null,
+              "confidence": "moderate",
+              "sourceText": "page_text: \u0e43\u0e2b\u0e49\u0e04\u0e2d\u0e1b\u0e40\u0e1b\u0e2d\u0e23\u0e4c 2 \u0e21\u0e01.",
+              "mappingStatus": "verified"
+            },
+            {
+              "name": "Magnesium",
+              "unit": "mg",
+              "amount": 52.8,
+              "sourceUrl": null,
+              "confidence": "high",
+              "sourceText": "page_text: \u0e43\u0e2b\u0e49\u0e41\u0e21\u0e01\u0e19\u0e35\u0e40\u0e0b\u0e35\u0e22\u0e21 52.80 \u0e21\u0e01.",
+              "mappingStatus": "verified"
+            },
+            {
+              "name": "Manganese",
+              "unit": "mg",
+              "amount": 1.75,
+              "sourceUrl": null,
+              "confidence": "moderate",
+              "sourceText": "page_text: \u0e43\u0e2b\u0e49\u0e41\u0e21\u0e07\u0e01\u0e32\u0e19\u0e35\u0e2a 1.75 \u0e21\u0e01.",
+              "mappingStatus": "verified"
+            },
+            {
+              "name": "Vitamin B12",
+              "unit": "mcg",
+              "amount": 2,
+              "sourceUrl": null,
+              "confidence": "high",
+              "sourceText": "page_text: \u0e43\u0e2b\u0e49\u0e27\u0e34\u0e15\u0e32\u0e21\u0e34\u0e19\u0e1a\u0e3512 2 \u0e21\u0e04\u0e01.",
+              "mappingStatus": "verified"
+            },
+            {
+              "name": "Vitamin B6",
+              "unit": "mg",
+              "amount": 2,
+              "sourceUrl": null,
+              "confidence": "high",
+              "sourceText": "page_text: \u0e44\u0e1e\u0e23\u0e34\u0e14\u0e2d\u0e01\u0e0b\u0e35\u0e19 \u0e44\u0e2e\u0e42\u0e14\u0e23\u0e04\u0e25\u0e2d\u0e44\u0e23\u0e14\u0e4c 2 \u0e21\u0e01.",
+              "mappingStatus": "verified"
+            },
+            {
+              "name": "Vitamin B9",
+              "unit": "mcg",
+              "amount": 200,
+              "sourceUrl": null,
+              "confidence": "high",
+              "sourceText": "page_text: \u0e43\u0e2b\u0e49\u0e01\u0e23\u0e14\u0e42\u0e1f\u0e25\u0e34\u0e01 200 \u0e21\u0e04\u0e01.",
+              "mappingStatus": "verified"
+            },
+            {
+              "name": "Vitamin D3",
+              "unit": "IU",
+              "amount": 200,
+              "sourceUrl": null,
+              "confidence": "high",
+              "sourceText": "page_text: \u0e43\u0e2b\u0e49\u0e27\u0e34\u0e15\u0e32\u0e21\u0e34\u0e19\u0e14\u0e35 200 \u0e2b\u0e19\u0e48\u0e27\u0e22\u0e2a\u0e32\u0e01\u0e25",
+              "mappingStatus": "verified"
+            },
+            {
+              "name": "Vitamin K2",
+              "unit": "mcg",
+              "amount": 26,
+              "sourceUrl": null,
+              "confidence": "high",
+              "sourceText": "page_text: \u0e43\u0e2b\u0e49\u0e27\u0e34\u0e15\u0e32\u0e21\u0e34\u0e19\u0e40\u0e042 26 \u0e21\u0e04\u0e01.",
+              "mappingStatus": "verified"
+            },
+            {
+              "name": "Zinc",
+              "unit": "mg",
+              "amount": 7.5,
+              "sourceUrl": null,
+              "confidence": "high",
+              "sourceText": "page_text: \u0e43\u0e2b\u0e49\u0e0b\u0e34\u0e07\u0e04\u0e4c 7.50 \u0e21\u0e01.",
+              "mappingStatus": "verified"
+            }
+          ],
+          "pillCountKnown": true,
+          "form": "tablet",
+          "lineTotalMinor": 18900,
+          "pillsPerServing": 1,
+          "productId": "prd_f0ac13e757b34fdbb6f7206ad8b6f0ef",
+          "productName": "VISTRA CALPLEX CALCIUM 600 mg & MENAQUINONE-7 PLUS",
+          "quantity": 1,
+          "selectionReason": {
+            "code": "best_available",
+            "message": "This product is in the selected stack.",
+            "messageKey": "plan.selection.in_selected_stack",
+            "requestedNames": [
+              "Vitamin D3"
+            ],
+            "requestedSupplementIds": [
+              "sup_927083fbb90a5a24b4c55067b06ead5f"
+            ]
+          },
+          "servingsPerDay": 10,
+          "unitPriceMinor": 18900,
+          "incidentalNutrientNames": [
+            "Calcium",
+            "Magnesium",
+            "Vitamin B12",
+            "Vitamin B6",
+            "Vitamin B9",
+            "Vitamin K2",
+            "Zinc"
+          ],
+          "requestedNutrientNames": [
+            "Vitamin D3"
+          ],
+          "requestedNutrients": [
+            {
+              "amount": 2000,
+              "name": "Vitamin D3",
+              "unit": "IU"
+            }
+          ],
+          "imageUrl": "https://mattanutra.sgp1.cdn.digitaloceanspaces.com/uat/products/f0ac13e7-57b3-4fdb-b6f7-206ad8b6f0ef/562e70743e797f3305d255de68bb550823ba6b0c43f3ae258f45e4aac34ad716.webp"
+        }
+      ],
+      "advice": [
+        {
+          "action": "review",
+          "evidence": [],
+          "uncertainty": "Some product quantities or label facts are unverified. Treat reported amounts as provisional; missing physical units, pill counts and supply duration remain unknown. Conflicting nutrient mappings do not establish coverage. Review the label evidence before relying on these amounts.",
+          "uncertaintyCodes": [
+            "label_unverified:Boron",
+            "label_unverified:Copper",
+            "label_unverified:Manganese"
+          ],
+          "acknowledgementStatus": "not_required",
+          "code": "unverified_product_facts",
+          "kind": "product_data",
+          "guidanceId": "gdn:unverified_product_facts:unverified_product_facts",
+          "message": "VISTRA CALPLEX CALCIUM 600 mg & MENAQUINONE-7 PLUS: Some product quantities or label facts are unverified. Treat reported amounts as provisional; missing physical units, pill counts and supply duration remain unknown. Conflicting nutrient mappings do not establish coverage. Review the label evidence before relying on these amounts.",
+          "messageKey": "guidance.unverified_product_facts",
+          "ruleId": "unverified_product_facts",
+          "rulesVersion": "6.0.0",
+          "severity": "high",
+          "exposure": null,
+          "threshold": null,
+          "productIds": [
+            "prd_f0ac13e757b34fdbb6f7206ad8b6f0ef"
+          ],
+          "supplementIds": [
+            "sup_61a870f9f1a452b49df81ae2f44d3bf6",
+            "sup_684e1966535b59c78984ce1e68a181a0",
+            "sup_795fb8b0ffe15856b3ed9012268c1d1c",
+            "sup_199df5c489215c37b85b6bcb14b443fa",
+            "sup_783b46dcbe5555a9bc436a15a1bfdb80",
+            "sup_7ddcc4f2708f590599a402d80e935adf",
+            "sup_ccc3e67bd7535315a8cba8aefa8b2fd8",
+            "sup_14104f30c89659c689f1231f477ac685",
+            "sup_927083fbb90a5a24b4c55067b06ead5f",
+            "sup_8e020fbf61f45b00853797c117fef918",
+            "sup_e7f084983cf85caa868a27adf61afeab"
+          ]
+        },
+        {
+          "action": "review",
+          "acknowledgementStatus": "not_required",
+          "code": "dose_review_required",
+          "kind": "incomplete_information",
+          "guidanceId": "gdn:dose_review_required:vitamin_d3:supplemental:ul:missing:sup_927083fbb90a5a24b4c55067b06ead5f",
+          "message": "An applicable reference limit for Vitamin D3 is unavailable. Exposure cannot be verified as below a limit; this is missing information, not a measured limit breach. Review the available facts; purchase remains available.",
+          "messageKey": "guidance.reference_unknown",
+          "ruleId": "ul:missing:sup_927083fbb90a5a24b4c55067b06ead5f",
+          "rulesVersion": "6.0.0",
+          "severity": "info",
+          "nutrientName": "Vitamin D3",
+          "unit": "IU",
+          "sourceScope": "supplemental",
+          "exposure": 2000,
+          "threshold": null,
+          "productIds": [
+            "prd_f0ac13e757b34fdbb6f7206ad8b6f0ef"
+          ],
+          "supplementIds": [
+            "sup_927083fbb90a5a24b4c55067b06ead5f"
+          ],
+          "contributors": [
+            {
+              "amount": 2000,
+              "productName": "VISTRA CALPLEX CALCIUM 600 mg & MENAQUINONE-7 PLUS",
+              "unit": "IU",
+              "productId": "prd_f0ac13e757b34fdbb6f7206ad8b6f0ef",
+              "source": "selected"
+            }
+          ]
+        },
+        {
+          "action": "review",
+          "uncertainty": "Unknown intake is not zero. Reported estimates are not verified measurements.",
+          "uncertaintyCodes": [
+            "condition_context_unknown",
+            "intake_unknown:sup_927083fbb90a5a24b4c55067b06ead5f",
+            "medication_context_unknown",
+            "profile_unknown:ageYears",
+            "profile_unknown:lifeStage",
+            "profile_unknown:sex"
+          ],
+          "acknowledgementStatus": "not_required",
+          "code": "incomplete_information",
+          "kind": "incomplete_information",
+          "guidanceId": "gdn:incomplete_information:incomplete_information",
+          "message": "Some health or intake information is unknown or estimated. The quantities shown do not establish complete exposure or medical suitability; discuss relevant uncertainties with a clinician or pharmacist before use.",
+          "messageKey": "guidance.incomplete_information",
+          "ruleId": "incomplete_information",
+          "rulesVersion": "6.0.0",
+          "severity": "high",
+          "exposure": null,
+          "threshold": null,
+          "productIds": [
+            "prd_f0ac13e757b34fdbb6f7206ad8b6f0ef"
+          ]
+        }
+      ],
+      "optionId": "opt_5470cbf6ee654339",
+      "reason": "Lower cost",
+      "reasonCode": "lowest_cost",
+      "reasonKey": "plan.option.lowest_cost",
+      "recommended": false,
+      "selected": false,
+      "stackSummary": {
+        "currency": "THB",
+        "dailyCostMinor": null,
+        "productCount": 1,
+        "supplyDays": null,
+        "totalDailyPills": 10,
+        "totalPriceMinor": 18900
+      },
+      "tradeOffs": {
+        "coverageDeltaPercent": 0,
+        "pillDelta": 8,
+        "priceDeltaMinor": -29600,
+        "productCountDelta": 0,
+        "summary": "296 THB less; 8 more daily units",
+        "summaryKey": "plan.tradeoff.composed"
+      },
+      "role": "best_value",
+      "roles": [
+        "lower_cost"
+      ],
+      "purchaseEligible": true,
+      "tradeOff": {
+        "coverageDelta": 0,
+        "dailyPillsDelta": 8,
+        "cash90DayDeltaMinor": null
+      },
+      "includedTargetIds": [
+        "sup_927083fbb90a5a24b4c55067b06ead5f"
+      ],
+      "omittedTargetIds": [],
+      "deferredTargetIds": [],
+      "economics": {
+        "deltas": {
+          "pills": 8,
+          "coverage": 0,
+          "products": 0,
+          "administrations": 0
+        },
+        "baseline": {
+          "type": "separate_direct_products",
+          "lines": [
+            {
+              "quantity": 1,
+              "productId": "prd_617d837380b34ada99c0769d502b5b1c",
+              "lineTotalMinor": 48500,
+              "unitPriceMinor": 48500
+            }
+          ],
+          "cash90DayMinor": null
+        },
+        "complete": false,
+        "equivalent": true,
+        "savingClaim": "none",
+        "cashComplete": false,
+        "shippingMinor": 5000,
+        "cash30DayMinor": null,
+        "cash90DayMinor": null,
+        "cashTotalMinor": 23900,
+        "comparisonBasis": {
+          "currency": "THB",
+          "rounding": "minor_unit_once",
+          "baselineType": "separate_direct_products",
+          "orderBoundary": "order_at_H_excluded",
+          "costHorizonsDays": [
+            30,
+            90
+          ],
+          "currentInventory": [],
+          "destinationCountry": "TH",
+          "catalogId": "snap_d45c2099ba2ef7f8"
+        },
+        "consumptionScope": "full_horizon",
+        "comparisonComplete": false,
+        "unavailableReasons": [
+          {
+            "dimension": "schedule",
+            "reasonCode": "pack_duration_unknown",
+            "missingFieldNames": [
+              "basket.prd_f0ac13e757b34fdbb6f7206ad8b6f0ef.servingsPerPack"
+            ],
+            "dependentCapabilities": [
+              "inventory_depletion_date",
+              "future_order_schedule",
+              "delivered_cash",
+              "savings",
+              "comparison"
+            ]
+          },
+          {
+            "dimension": "comparison",
+            "reasonCode": "pack_duration_unknown",
+            "missingFieldNames": [
+              "baseline.basket.prd_617d837380b34ada99c0769d502b5b1c.servingsPerPack"
+            ],
+            "dependentCapabilities": [
+              "savings",
+              "comparison"
+            ]
+          },
+          {
+            "dimension": "comparison",
+            "reasonCode": "baseline_facts_incomplete",
+            "missingFieldNames": [
+              "baseline.packFacts"
+            ],
+            "dependentCapabilities": [
+              "savings",
+              "comparison"
+            ]
+          }
+        ],
+        "consumptionComplete": false,
+        "otherCustomerCostMinor": 0,
+        "firstOrderSubtotalMinor": 18900
+      }
+    },
+    {
+      "coveragePercent": 50,
+      "coverageSummary": {
+        "coveragePercent": 50,
+        "fullyMetCount": 0,
+        "requestedCount": 1
+      },
+      "doseFit": {
+        "over": 0,
+        "limit": 0,
+        "total": 0.5,
+        "under": 0.5,
+        "version": "dose-fit-1",
+        "perLimit": [],
+        "perTarget": [
+          {
+            "name": "Vitamin D3",
+            "over": 0,
+            "unit": "IU",
+            "basis": "total_daily",
+            "under": 0.5,
+            "target": 2000,
+            "exposure": 1000,
+            "certainty": "unknown",
+            "subjectId": "sup_927083fbb90a5a24b4c55067b06ead5f",
+            "exposureMaximum": 1000,
+            "exposureMinimum": 1000,
+            "conservativeExposure": 1000
+          }
+        ],
+        "limitWeight": 2,
+        "weightedLimit": 0,
+        "perContinuedDose": [],
+        "unknownSubjectIds": [
+          "sup_927083fbb90a5a24b4c55067b06ead5f"
+        ],
+        "estimatedSubjectIds": []
+      },
+      "coverage": [
+        {
+          "basis": "total_daily",
+          "coveragePercent": 50,
+          "currentAmount": 0,
+          "deliveredAmount": 1000,
+          "name": "Vitamin D3",
+          "remainingGap": 1000,
+          "excess": 0,
+          "requestedAmount": 2000,
+          "status": "partial",
+          "supplementId": "sup_927083fbb90a5a24b4c55067b06ead5f",
+          "totalExposureAmount": null,
+          "quantifiedExposureAmount": 1000,
+          "totalExposureComplete": false,
+          "intakeCertainty": "unknown",
+          "unit": "IU",
+          "claimIds": [
+            "clm_d3_bone_v1"
+          ],
+          "importance": "required",
+          "contributors": [
+            {
+              "amount": 1000,
+              "productName": "Blackmores Vitamin D3 1000 IU",
+              "unit": "IU",
+              "productId": "prd_617d837380b34ada99c0769d502b5b1c"
+            }
+          ]
+        }
+      ],
+      "basket": [
+        {
+          "currency": "THB",
+          "dailyPills": 1,
+          "administration": {
+            "route": "oral",
+            "provenance": {
+              "status": "verified",
+              "sourceUrl": "https://www.blackmores.com.au/products/vitamin-d3-1000-iu",
+              "sourceText": "Manufacturer composition is 1000 IU vitamin D3 per capsule, taken orally. The catalogue image identifies the same Vitamin D3 1000 IU capsule variant. Pack quantity remains unset because the manufacturer page mixes 60-tablet and 200-capsule variants. Nutrient facts, confidence, prices and dietary evidence are unchanged.",
+              "verifiedAt": "2026-09-08T12:00:00Z"
+            },
+            "packQuantity": null,
+            "physicalUnit": "capsule",
+            "doseIncrement": 1,
+            "unitsPerServing": 1
+          },
+          "labelledFacts": [
+            {
+              "name": "Vitamin D3",
+              "unit": "IU",
+              "amount": 1000,
+              "sourceUrl": null,
+              "confidence": "high",
+              "sourceText": null,
+              "mappingStatus": "verified"
+            }
+          ],
+          "pillCountKnown": true,
+          "form": "capsule",
+          "lineTotalMinor": 48500,
+          "pillsPerServing": 1,
+          "productId": "prd_617d837380b34ada99c0769d502b5b1c",
+          "productName": "Blackmores Vitamin D3 1000 IU",
+          "quantity": 1,
+          "selectionReason": {
+            "code": "best_available",
+            "message": "This product is in the selected stack.",
+            "messageKey": "plan.selection.in_selected_stack",
+            "requestedNames": [
+              "Vitamin D3"
+            ],
+            "requestedSupplementIds": []
+          },
+          "servingsPerDay": 1,
+          "unitPriceMinor": 48500,
+          "requestedNutrientNames": [
+            "Vitamin D3"
+          ],
+          "requestedNutrients": [
+            {
+              "amount": 1000,
+              "name": "Vitamin D3",
+              "unit": "IU"
+            }
+          ],
+          "imageUrl": "https://mattanutra.sgp1.cdn.digitaloceanspaces.com/dev/products/617d8373-80b3-4ada-99c0-769d502b5b1c/1e25b3e82fc73b84b84ced7757015bd6e33e191b53acd4cef54fb91026210c40.webp"
+        }
+      ],
+      "advice": [
+        {
+          "action": "review",
+          "acknowledgementStatus": "not_required",
+          "code": "dose_review_required",
+          "kind": "incomplete_information",
+          "guidanceId": "gdn:dose_review_required:vitamin_d3:supplemental:ul:missing:sup_927083fbb90a5a24b4c55067b06ead5f",
+          "message": "An applicable reference limit for Vitamin D3 is unavailable. Exposure cannot be verified as below a limit; this is missing information, not a measured limit breach. Review the available facts; purchase remains available.",
+          "messageKey": "guidance.reference_unknown",
+          "ruleId": "ul:missing:sup_927083fbb90a5a24b4c55067b06ead5f",
+          "rulesVersion": "6.0.0",
+          "severity": "info",
+          "nutrientName": "Vitamin D3",
+          "unit": "IU",
+          "sourceScope": "supplemental",
+          "exposure": 1000,
+          "threshold": null,
+          "productIds": [
+            "prd_617d837380b34ada99c0769d502b5b1c"
+          ],
+          "supplementIds": [
+            "sup_927083fbb90a5a24b4c55067b06ead5f"
+          ],
+          "contributors": [
+            {
+              "amount": 1000,
+              "productName": "Blackmores Vitamin D3 1000 IU",
+              "unit": "IU",
+              "productId": "prd_617d837380b34ada99c0769d502b5b1c",
+              "source": "selected"
+            }
+          ]
+        },
+        {
+          "action": "review",
+          "uncertainty": "Unknown intake is not zero. Reported estimates are not verified measurements.",
+          "uncertaintyCodes": [
+            "condition_context_unknown",
+            "intake_unknown:sup_927083fbb90a5a24b4c55067b06ead5f",
+            "medication_context_unknown",
+            "profile_unknown:ageYears",
+            "profile_unknown:lifeStage",
+            "profile_unknown:sex"
+          ],
+          "acknowledgementStatus": "not_required",
+          "code": "incomplete_information",
+          "kind": "incomplete_information",
+          "guidanceId": "gdn:incomplete_information:incomplete_information",
+          "message": "Some health or intake information is unknown or estimated. The quantities shown do not establish complete exposure or medical suitability; discuss relevant uncertainties with a clinician or pharmacist before use.",
+          "messageKey": "guidance.incomplete_information",
+          "ruleId": "incomplete_information",
+          "rulesVersion": "6.0.0",
+          "severity": "high",
+          "exposure": null,
+          "threshold": null,
+          "productIds": [
+            "prd_617d837380b34ada99c0769d502b5b1c"
+          ]
+        }
+      ],
+      "optionId": "opt_a69ed24dab2c98b4",
+      "reason": "Fewer daily pills",
+      "reasonCode": "fewest_pills",
+      "reasonKey": "plan.option.fewest_pills",
+      "recommended": false,
+      "selected": false,
+      "stackSummary": {
+        "currency": "THB",
+        "dailyCostMinor": null,
+        "productCount": 1,
+        "supplyDays": null,
+        "totalDailyPills": 1,
+        "totalPriceMinor": 48500
+      },
+      "tradeOffs": {
+        "coverageDeltaPercent": -50,
+        "pillDelta": -1,
+        "priceDeltaMinor": 0,
+        "productCountDelta": 0,
+        "summary": "1 fewer daily unit; 50 percentage points lower coverage",
+        "summaryKey": "plan.tradeoff.composed"
+      },
+      "role": "best_value",
+      "roles": [
+        "simpler"
+      ],
+      "purchaseEligible": true,
+      "tradeOff": {
+        "coverageDelta": -5000,
+        "dailyPillsDelta": -1,
+        "cash90DayDeltaMinor": null
+      },
+      "includedTargetIds": [],
+      "omittedTargetIds": [],
+      "deferredTargetIds": [],
+      "economics": {
+        "deltas": {
+          "pills": -1,
+          "coverage": -1,
+          "products": 0,
+          "administrations": 0
+        },
+        "baseline": {
+          "type": "separate_direct_products",
+          "lines": [
+            {
+              "quantity": 1,
+              "productId": "prd_617d837380b34ada99c0769d502b5b1c",
+              "lineTotalMinor": 48500,
+              "unitPriceMinor": 48500
+            }
+          ],
+          "cash90DayMinor": null
+        },
+        "complete": false,
+        "equivalent": true,
+        "savingClaim": "none",
+        "cashComplete": false,
+        "shippingMinor": 5000,
+        "cash30DayMinor": null,
+        "cash90DayMinor": null,
+        "cashTotalMinor": 53500,
+        "comparisonBasis": {
+          "currency": "THB",
+          "rounding": "minor_unit_once",
+          "baselineType": "separate_direct_products",
+          "orderBoundary": "order_at_H_excluded",
+          "costHorizonsDays": [
+            30,
+            90
+          ],
+          "currentInventory": [],
+          "destinationCountry": "TH",
+          "catalogId": "snap_d45c2099ba2ef7f8"
+        },
+        "consumptionScope": "full_horizon",
+        "comparisonComplete": false,
+        "unavailableReasons": [
+          {
+            "dimension": "schedule",
+            "reasonCode": "pack_duration_unknown",
+            "missingFieldNames": [
+              "basket.prd_617d837380b34ada99c0769d502b5b1c.servingsPerPack"
+            ],
+            "dependentCapabilities": [
+              "inventory_depletion_date",
+              "future_order_schedule",
+              "delivered_cash",
+              "savings",
+              "comparison"
+            ]
+          },
+          {
+            "dimension": "comparison",
+            "reasonCode": "baseline_facts_incomplete",
+            "missingFieldNames": [
+              "baseline.packFacts"
+            ],
+            "dependentCapabilities": [
+              "savings",
+              "comparison"
+            ]
+          }
+        ],
+        "consumptionComplete": false,
+        "otherCustomerCostMinor": 0,
+        "firstOrderSubtotalMinor": 48500
+      }
+    }
+  ],
+  "explanation": {
+    "administrations": 0,
+    "cash30DayMinor": null,
+    "cash90DayMinor": null,
+    "conditionalDeferrals": [],
+    "firstOrderCashMinor": 53500,
+    "nextAction": "Review the advice and confirm this option with the person before checkout. Ready describes purchase readiness, not medical approval.",
+    "nextActionKey": "plan.next_action.confirm_with_user",
+    "optionalOmissions": [],
+    "pills": 2,
+    "productCount": 1,
+    "purchases": [
+      {
+        "lineTotalMinor": 48500,
+        "productId": "prd_617d837380b34ada99c0769d502b5b1c",
+        "productName": "Blackmores Vitamin D3 1000 IU",
+        "quantity": 1
+      }
+    ],
+    "recommendedOptionId": "opt_f816bb3d1d9f8d69",
+    "retainedCurrent": [],
+    "safetyState": "advisory"
+  },
+  "canonical": {
+    "buildId": "1c169407ba0f3fed3a19871afa87ce0bdeecf949",
+    "canonicalVersion": "cv-4.0",
+    "contractVersion": "7.2.4",
+    "hash": "441595b68cdf5a4db14a2536c34eec8dd1f80607dce113972bd1b34f6796a19b",
+    "matcherVersion": "flexible-dose-fit-8",
+    "packVersion": "dev-customer-value-v4.0"
+  },
+  "ok": true,
+  "planHandle": "cap_conversation_frozen_d3_fixture_000001",
+  "revision": 1
+}

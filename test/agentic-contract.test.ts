@@ -37,10 +37,11 @@ describe(`agentic MCP contract ${AGENTIC_CONTRACT_VERSION}`, () => {
       "execute",
       "order",
       "support",
-      "feedback"
+      "feedback",
+      "evidence"
     ]);
     assert.equal(Object.keys(AGENTIC_TOOL_SCHEMAS).length, 7);
-    assert.ok(Object.hasOwn(AGENTIC_TOOL_SCHEMAS, "evidence"), "legacy evidence schema remains available internally");
+    assert.ok(Object.hasOwn(AGENTIC_TOOL_SCHEMAS, "evidence"), "evidence is a published, callable read-only contract");
     assert.equal(JSON.stringify(AGENTIC_TOOL_SCHEMAS).includes("sexAtBirth"), false);
     assert.equal(JSON.stringify(AGENTIC_TOOL_SCHEMAS).includes("intersex"), false);
     assert.equal(JSON.stringify(AGENTIC_TOOL_SCHEMAS.plan).includes("unspecified"), false);
@@ -75,7 +76,7 @@ describe(`agentic MCP contract ${AGENTIC_CONTRACT_VERSION}`, () => {
     assert.deepEqual(Object.keys(publicContractBundle().tools), [...AGENTIC_PUBLIC_TOOLS]);
 
     assert.equal(JSON.stringify(snapshot).includes("Use only the seven short tool names"), false);
-    assert.equal(JSON.stringify(snapshot).includes("Use only the six short tool names"), true);
+    assert.equal(JSON.stringify(snapshot).includes("Use only the six short tool names"), false);
 
     for (const tool of snapshot.tools) {
       assert.deepEqual(tool.outputSchema, JSON.parse(JSON.stringify(AGENTIC_CONTRACT_REGISTRY[tool.name as keyof typeof AGENTIC_CONTRACT_REGISTRY].outputSchema)));
@@ -103,8 +104,8 @@ describe(`agentic MCP contract ${AGENTIC_CONTRACT_VERSION}`, () => {
 
     const result = rpcResult(response);
     assert.equal(result.instructions, AGENTIC_SERVER_INSTRUCTIONS);
-    assert.match(String(result.instructions), /plan\(create\).*before execute/s);
-    assert.match(String(result.instructions), /never prefix a server name/i);
+    assert.match(String(result.instructions), /plan\(create\).*confirm.*execute/s);
+    assert.match(String(result.instructions), /conversation.*default/i);
     assert.equal(/D1-01 through D10-10/.test(String(result.instructions)), false);
     assert.equal(/\/api\/mcp\/qa/.test(String(result.instructions)), false);
     assert.equal(/dev-mcp-qa-token/.test(String(result.instructions)), false);
@@ -133,12 +134,10 @@ describe(`agentic MCP contract ${AGENTIC_CONTRACT_VERSION}`, () => {
     });
     const result = rpcResult(response);
     assert.equal(result.instructions, AGENTIC_UAT_SERVER_INSTRUCTIONS);
-    assert.match(String(result.instructions), /polling is the only continuation method/i);
-    assert.match(String(result.instructions), /order\(orderHandle\)/);
-    assert.match(String(result.instructions), /Stripe Test Mode/);
-    assert.match(String(result.instructions), /optionally invite feedback/);
-    assert.match(String(result.instructions), /after 3 plan calls/);
-    assert.match(String(result.instructions), /only when the person consents/);
+    assert.match(String(result.instructions), /poll the existing handle/i);
+    assert.match(String(result.instructions), /poll order/);
+    assert.match(String(result.instructions), /test payments only/);
+    assert.match(AGENTIC_TOOL_DESCRIPTIONS.feedback, /optional feedback.*consentConfirmed=true/);
     assert.equal(String(result.instructions).includes("dev-mcp-qa-token"), false);
     assert.equal(String(result.instructions).includes("scenario=decline_insufficient_funds"), false);
     const listed = await handleJsonRpc(runtime, { id: 2, method: "tools/list" });
@@ -146,7 +145,7 @@ describe(`agentic MCP contract ${AGENTIC_CONTRACT_VERSION}`, () => {
       (item) => item.name
     );
     assert.deepEqual(names, [...AGENTIC_PUBLIC_TOOLS]);
-    assert.equal(names.includes("evidence"), false);
+    assert.equal(names.includes("evidence"), true);
     assert.equal((result.serverInfo as { name: string }).name, "mattanutra_uat");
   });
 
@@ -168,8 +167,8 @@ describe(`agentic MCP contract ${AGENTIC_CONTRACT_VERSION}`, () => {
     });
     const result = rpcResult(response);
     assert.equal(result.instructions, AGENTIC_PRD_SERVER_INSTRUCTIONS);
-    assert.match(String(result.instructions), /polling is the only continuation method/i);
-    assert.match(String(result.instructions), /order\(orderHandle\)/);
+    assert.match(String(result.instructions), /poll the existing handle/i);
+    assert.match(String(result.instructions), /poll order/);
     assert.equal(String(result.instructions).includes("Stripe Test Mode"), false);
     assert.equal(String(result.instructions).includes("4242"), false);
     assert.equal(String(result.instructions).includes("dev-mcp-qa-token"), false);

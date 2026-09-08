@@ -1,4 +1,5 @@
 import { Type, type Static, type TSchema, type TProperties } from "@sinclair/typebox";
+import { visibleOperationVariants } from "@/lib/agentic/contract/operation-variants";
 
 export type JsonSchema = Readonly<Record<string, unknown>>;
 export const object = <T extends TProperties>(properties: T, description?: string) => Type.Object(properties, { additionalProperties: false, ...(description ? { description } : {}) });
@@ -24,18 +25,18 @@ export const PROFILE_SCHEMA = object({
 });
 export const DEFAULT_MAX_PRODUCT_COUNT = null;
 export const SEARCH_EFFORT_SCHEMA = { ...enumeration(["standard", "expanded"] as const), default: "standard", description: "Deterministic search budget: standard 8000 expansion attempts; expanded 64000. Expanded includes the standard incumbent. A revise omission preserves prior effort. Repeating identical inputs reuses work; after expanded exhaustion refine the request." };
-export const REQUIREMENTS_SCHEMA = object({
+export const REQUIREMENTS_SCHEMA = Type.Object({
   allowedForms: optional(Type.Array(enumeration(["capsule", "softgel", "tablet", "powder", "liquid", "gummy", "sachet", "other"] as const), { uniqueItems: true, maxItems: 8 })),
   dietaryPreference: optional(enumeration(["any", "plant_based", "vegan"] as const)),
   excludeProductIds: optional({ ...productIds, description: "Exclude only these products. Does not remove requested nutrients. [] clears this exclusion." }),
   excludeSupplementIds: optional({ ...supplementIds, description: "Exclude products containing these nutrient concepts, not particular product IDs. [] clears this exclusion." }),
-  maxDailyPills: optional(nullable(Type.Number({ minimum: 0, maximum: 1000, description: "Advisory preferred daily pill count, never a selection or purchase ceiling. Omission or null means no preference; null clears it in a patch. Explicit zero is a preference, not a no-purchase request. More than 20% above a positive preference, or any positive amount above zero, receives prominent advice; unknown counts stay unknown." }))),
-  maxPriceMinor: optional(nullable(Type.Integer({ minimum: 0, maximum: 1e12, description: "Advisory first-order goods-price preference in destination currency minor units, never a purchase ceiling. Delivery is quoted separately. Null clears this preference; zero does not prevent purchase. More than 20% above a positive preference, or any positive price above zero, receives prominent advice." }))),
-  maxProductCount: optional({ ...nullable(Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER })), default: null, description: "Advisory preferred distinct new-product count. No system minimum or maximum basket count. Omitted on create/replacement or null means no preference; zero never prevents new products. Patch omission preserves the preference; null clears it. More than 20% above a positive preference, or any positive count above zero, receives prominent advice." }),
-  productDoses: optional(Type.Array(object({ productId, servingsPerDay: positiveAmount }), { maxItems: 100, uniqueItems: true, description: "Require returned products at these daily labelled-serving quantities; other products remain optimisable. Use administration metadata to choose physically measurable quantities. [] clears proposals. Revise evaluates a new option; it never purchases directly. Incompatible exclusions or physically unsupported quantities return a field error. Numeric preferences and health advice never veto a proposal." })),
+  maxDailyPills: optional(nullable(Type.Number({ minimum: 0, maximum: 1000, description: "Preferred daily pill count; unknown counts remain unknown." }))),
+  maxPriceMinor: optional(nullable(Type.Integer({ minimum: 0, maximum: 1e12, description: "Preferred first-order goods price in destination currency minor units; delivery quoted separately." }))),
+  maxProductCount: optional({ ...nullable(Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER })), default: null, description: "Preferred distinct new products; there is no system minimum or maximum basket count." }),
+  productDoses: optional(Type.Array(object({ productId, servingsPerDay: positiveAmount }), { maxItems: 100, uniqueItems: true, description: "Fix returned products at these daily labelled servings; other products remain optimisable. Use administration metadata for measurable quantities. [] clears proposals. Revision evaluates, never purchases. Exclusion/physical conflicts return field errors; numeric and health findings are advice." })),
   omega3SourcePreference: optional(enumeration(["any", "algae_only", "fish_allowed"] as const)),
   retainProductIds: optional(productIds), retainSupplementIds: optional(supplementIds)
-});
+}, { additionalProperties: false, description: "maxDailyPills, maxPriceMinor and maxProductCount are advisory, never purchase limits. Create/replacement omission or null means no preference; patch omission preserves, null clears. Zero permits purchase. Prominent advice: strictly over 20% above a positive preference, or any positive actual above zero. Unknown actuals stay unknown." });
 export const DEFAULT_TARGET_BASIS = "total_daily" as const;
 export const TARGET_BASIS_SCHEMA = enumeration(["total_daily", "supplemental"] as const);
 export const TARGET_SCHEMA = object({
@@ -80,21 +81,22 @@ const key = Type.String({ minLength: 16, maxLength: 128 });
 const handle = Type.String({ minLength: 32, maxLength: 4096 });
 const revision = Type.Integer({ minimum: 1 });
 export const MUTATION_VIEW = optional({ ...enumeration(["conversation", "full"] as const), default: "full", description: "Presentation only; omitted means the compatible full response. Use conversation for routine dialogue. Does not change matching or idempotency." });
+export const PLAN_MUTATION_VIEW = optional({ ...enumeration(["conversation", "full"] as const), default: "conversation", description: "Presentation only; full is opt-in. Temporary legacy header: see info(client_guide)." });
 export const PLAN_DETAIL_SECTIONS = Type.Array(enumeration(["request", "products", "coverage", "advice", "score", "economics"] as const), { minItems: 1, uniqueItems: true, description: "Batch only the sections needed. Reads stored facts without rematching." });
 const readVersion = optional(Type.String({ minLength: 1, maxLength: 128, description: "Previous returned resultVersion; unchanged is true only for the same visible state and representation identity." }));
 export const PLAN_OPERATION_SCHEMAS = {
-  create: object({ responseView: MUTATION_VIEW, operation: Type.Literal("create"), idempotencyKey: key, searchEffort: optional(SEARCH_EFFORT_SCHEMA), request: PLAN_REQUEST }),
-  get: Type.Union([
-    object({ operation: Type.Literal("get"), planHandle: handle, responseView: MUTATION_VIEW }),
+  create: object({ responseView: PLAN_MUTATION_VIEW, operation: Type.Literal("create"), idempotencyKey: key, searchEffort: optional(SEARCH_EFFORT_SCHEMA), request: PLAN_REQUEST }),
+  get: visibleOperationVariants(Type.Union([
+    object({ operation: Type.Literal("get"), planHandle: handle, responseView: PLAN_MUTATION_VIEW }),
     object({ operation: Type.Literal("get"), planHandle: handle, responseView: Type.Literal("status"), knownResultVersion: readVersion }),
     object({ operation: Type.Literal("get"), planHandle: handle, responseView: Type.Literal("details"), expectedRevision: revision, sections: PLAN_DETAIL_SECTIONS, optionIds: optional(Type.Array(Type.String({ minLength: 8, maxLength: 128 }), { minItems: 1, uniqueItems: true })) })
-  ]),
-  revise: Type.Union([
-    object({ responseView: MUTATION_VIEW, operation: Type.Literal("revise"), idempotencyKey: key, planHandle: handle, expectedRevision: revision, searchEffort: optional(SEARCH_EFFORT_SCHEMA), request: PLAN_REQUEST }),
-    object({ responseView: MUTATION_VIEW, operation: Type.Literal("revise"), idempotencyKey: key, planHandle: handle, expectedRevision: revision, searchEffort: optional(SEARCH_EFFORT_SCHEMA), requestPatch: PLAN_REQUEST_PATCH })
-  ]),
-  answer: object({ responseView: MUTATION_VIEW, operation: Type.Literal("answer"), idempotencyKey: key, planHandle: handle, expectedRevision: revision, answers: { ...PLAN_ANSWERS, minItems: 1 }, safetyAcknowledgement: optional(PLAN_SAFETY_ACK) }),
-  select: object({ responseView: MUTATION_VIEW, operation: Type.Literal("select"), idempotencyKey: key, planHandle: handle, expectedRevision: revision, optionId: Type.String({ minLength: 8, maxLength: 128 }) })
+  ])),
+  revise: visibleOperationVariants(Type.Union([
+    object({ responseView: PLAN_MUTATION_VIEW, operation: Type.Literal("revise"), idempotencyKey: key, planHandle: handle, expectedRevision: revision, searchEffort: optional(SEARCH_EFFORT_SCHEMA), request: PLAN_REQUEST }),
+    object({ responseView: PLAN_MUTATION_VIEW, operation: Type.Literal("revise"), idempotencyKey: key, planHandle: handle, expectedRevision: revision, searchEffort: optional(SEARCH_EFFORT_SCHEMA), requestPatch: PLAN_REQUEST_PATCH })
+  ])),
+  answer: object({ responseView: PLAN_MUTATION_VIEW, operation: Type.Literal("answer"), idempotencyKey: key, planHandle: handle, expectedRevision: revision, answers: { ...PLAN_ANSWERS, minItems: 1 }, safetyAcknowledgement: optional(PLAN_SAFETY_ACK) }),
+  select: object({ responseView: PLAN_MUTATION_VIEW, operation: Type.Literal("select"), idempotencyKey: key, planHandle: handle, expectedRevision: revision, optionId: Type.String({ minLength: 8, maxLength: 128 }) })
 } as const;
 // MCP requires an object root; the discriminated branches specify each operation completely.
 export const PLAN_INPUT_SCHEMA = { type: "object", anyOf: Object.values(PLAN_OPERATION_SCHEMAS) } as const;

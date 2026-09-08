@@ -1,0 +1,172 @@
+{
+  "scope": "mcp_722_open_points",
+  "releaseBase": "391ba2beafc01a49d119a85b5f632a8a6f737944",
+  "testPolicy": "Named tests and affected consumers only; no retries, skips or full-suite claim. Installed connector verification is separate.",
+  "files": [
+    {
+      "file": "test/mcp-7-2-2/advice.test.ts",
+      "expectedCases": 4,
+      "reason": "Foreground advice and single explicit uncertainty notice"
+    },
+    {
+      "file": "test/mcp-7-2-2/catalogue.test.ts",
+      "expectedCases": 1,
+      "reason": "Reviewed physical metadata, immutable price and nutrient evidence"
+    },
+    {
+      "file": "test/mcp-7-2-2/deployment.test.ts",
+      "expectedCases": 1,
+      "reason": "Whitelisted DEV proof and artifact integrity"
+    },
+    {
+      "file": "test/mcp-7-2-2/expanded.test.ts",
+      "expectedCases": 3,
+      "reason": "Real expanded lifecycle, concurrency and constraint preservation"
+    },
+    {
+      "file": "test/mcp-7-2-2/golden.test.ts",
+      "expectedCases": 7,
+      "reason": "Frozen D3 routine, highlights, payload sizes and existing runtime locks"
+    },
+    {
+      "file": "test/mcp-7-2-2/identity.test.ts",
+      "expectedCases": 2,
+      "reason": "Tools list checksum and published artifact drift detection"
+    },
+    {
+      "file": "test/mcp-7-2-2/listing.test.ts",
+      "expectedCases": 3,
+      "reason": "Hosted callable schemas and honest descriptions"
+    },
+    {
+      "file": "test/mcp-7-2-2/locks.test.ts",
+      "expectedCases": 3,
+      "reason": "Existing discovery promises and per-operation schemas"
+    },
+    {
+      "file": "test/mcp-7-2-2/medications.test.ts",
+      "expectedCases": 2,
+      "reason": "Recognized versus assessed medication and condition guidance"
+    },
+    {
+      "file": "test/mcp-7-2-2/operation-deadline.test.ts",
+      "expectedCases": 1,
+      "reason": "Terminal deadline across restart and stale completion"
+    },
+    {
+      "file": "test/mcp-7-2-2/transport.test.ts",
+      "expectedCases": 2,
+      "reason": "Conversation and status clone elimination and state summaries"
+    },
+    {
+      "file": "test/mcp-7-2-1/transport.test.ts",
+      "expectedCases": 3,
+      "reason": "Structured-result opt-in, compatibility text and status semantics"
+    },
+    {
+      "file": "test/mcp-7-2-1/advice.test.ts",
+      "expectedCases": 3,
+      "reason": "Foreground advice, missing-reference consolidation and rule classification"
+    },
+    {
+      "file": "test/mcp-7-2-1/golden.test.ts",
+      "expectedCases": 1,
+      "reason": "Frozen DEV D3, dedicated-choice retention, default views, speed and selection"
+    },
+    {
+      "file": "test/mcp-7-2-1/deployment.test.ts",
+      "expectedCases": 2,
+      "reason": "DEV-only evidence verification and scoped test hygiene"
+    },
+    {
+      "file": "test/mcp-agent-surface/contracts.test.ts",
+      "expectedCases": 3,
+      "reason": "Emitted seven-tool schemas, ordinary discovery and compatibility documentation"
+    },
+    {
+      "file": "test/mcp-agent-surface/compatibility.test.ts",
+      "expectedCases": 1,
+      "reason": "Explicit views and the existing 7.2 compatibility window"
+    },
+    {
+      "file": "test/mcp-payload/projection.test.ts",
+      "expectedCases": 4,
+      "reason": "All existing option/dose/value projections and changed inline advice semantics"
+    },
+    {
+      "file": "test/mcp-payload/text-status.test.ts",
+      "expectedCases": 1,
+      "reason": "Unchanged text-only payment, refund and operation-failure summaries"
+    },
+    {
+      "file": "test/mcp-payload/transport.test.ts",
+      "expectedCases": 4,
+      "reason": "Presentation-independent replay, stale details, selection and frozen legacy checkout"
+    },
+    {
+      "file": "test/matcher/advisory-dose-fit.test.ts",
+      "expectedCases": 36,
+      "reason": "Preserved exact scoring and safety penalties; changed commercial tie ordering"
+    },
+    {
+      "file": "test/matcher/flexible-v5-priority.test.ts",
+      "expectedCases": 4,
+      "reason": "Required/core dose priority and canonical ranges after retention changes"
+    },
+    {
+      "file": "test/matcher/finite-oracle.test.ts",
+      "expectedCases": 7,
+      "reason": "Independent exhaustive arithmetic and bounded enumeration"
+    },
+    {
+      "file": "test/matcher/advisory-v6-preferences.test.ts",
+      "expectedCases": 8,
+      "reason": "Advisory preferences, unknown pills, dominance and proposal eligibility"
+    },
+    {
+      "file": "test/matcher-v5-web.test.ts",
+      "expectedCases": 8,
+      "reason": "Directly affected shared web matcher, worker identity and retailer alternatives"
+    },
+    {
+      "file": "test/web-advisory-matching.test.ts",
+      "expectedCases": 7,
+      "reason": "Web coverage, retained intake, physical facts and worker dose-before-price ordering"
+    },
+    {
+      "file": "test/ax-refinement/operations.test.ts",
+      "expectedCases": 5,
+      "reason": "Affected durable admission, lease, replay and cancellation behavior"
+    },
+    {
+      "file": "test/ax-refinement/operations.integration.test.ts",
+      "expectedCases": 6,
+      "reason": "PostgreSQL deadline races, durable task insertion and checkpoint preservation",
+      "database": true
+    },
+    {
+      "file": "test/agentic-phase1-dedicated.test.ts",
+      "expectedCases": 2,
+      "reason": "Single-target composition ties and retained cheaper incidental choices"
+    },
+    {
+      "file": "test/agentic-phase3-pills.test.ts",
+      "expectedCases": 11,
+      "reason": "Direct pill-order, multi-target and independent oracle consumers"
+    }
+  ],
+  "inputs": [
+    "test/fixtures/matcher-experiments/anna-dev.json",
+    "test/fixtures/matcher-experiments/manifest.json",
+    "test/fixtures/ax-refinement/dev-corrections.json",
+    "test/fixtures/ax-refinement/six-profiles.json",
+    "test/fixtures/mcp-payload/baseline.json.gz",
+    "test/fixtures/mcp-payload/manifest.json",
+    "test/fixtures/mcp-payload/journeys.json.gz",
+    "test/fixtures/mcp-payload/journeys-manifest.json",
+    "data/catalogue-corrections/mcp-7.2.2-dev.json",
+    "scripts/apply-agentic-commerce-schema.ts",
+    "db-rollout/product-administration-schema.sql",
+    "test/mcp-7-2-2/prepare-postgres.mjs"
+  ]
+}

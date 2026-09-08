@@ -58,7 +58,7 @@ save("build-identity.json", { sourceCommit: commit, sourceSha256: source.sha256,
 const after = sourceManifest(); assert.deepEqual(after, source); assert.deepEqual(payloadExpectedIdentity(after.sha256, RELEASE_BASE), identity);
 save("source-after.json", after); stages.push({ label: "unchanged-source-and-inputs", passed: true }); save("stage-results.json", { passed: true, stages });
 const artifactFiles = readdirSync(output, { recursive: true, withFileTypes: true }).filter(row => row.isFile()).map(row => relative(output, resolve(row.parentPath, row.name))).sort();
-save("attestation.json", { version: "dev-mcp-payload-1", environment: "dev", scope: "mcp_payload_and_direct_readers", contractVersion: "7.1.0", ...identity, sourceCommit: commit,
+save("attestation.json", { version: "dev-mcp-payload-1", environment: "dev", scope: "mcp_payload_and_direct_readers", ...identity, sourceCommit: commit,
   passed: true, unchangedSource: true, stages, artifacts: artifactFiles.map(file => ({ file, sha256: payloadHash(readFileSync(resolve(output, file))) })) });
 readPayloadProof(resolve(output, "attestation.json"), identity);
 console.log(JSON.stringify({ passed: true, output, sourceCommit: commit, scope: "DEV MCP payload package only; installed connector still requires deployment verification" }));

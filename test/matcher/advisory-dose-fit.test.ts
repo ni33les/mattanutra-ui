@@ -365,15 +365,16 @@ describe("advisory dose fit", () => {
     }
   });
 
-  it("uses the quoted pack subtotal only after dose fit and the requested pill objective", () => {
+  it("uses the quoted pack subtotal after dose fit and easier routines while preserving lower-cost options", () => {
     const targets = canonicalizeTargets({ targets: [{ subjectId: "a", name: "A", amount: 200, unit: "mg" }] }).targets;
     const products = [product("two_servings", 100, 0, 48_500), product("one_serving", 200, 0, 55_000),
       product("cheap_under", 90, 0, 1)];
     const input = request({ targets, safetyCeilings: [], maxProductCount: 1 });
     const cost = run({ ...input, optimization: "lowest_cost" }, products);
-    assert.deepEqual(cost.selected?.variantIds, ["seller:two_servings:x2"]);
+    assert.deepEqual(cost.selected?.variantIds, ["seller:one_serving:x1"]);
     assert.equal(cost.selected?.doseFit?.total, 0);
-    assert.equal(cost.selected?.priceMinor, 48_500);
+    assert.equal(cost.selected?.priceMinor, 55_000);
+    assert.ok(cost.alternatives.some(row => row.roles?.includes("lower_cost") && row.priceMinor < 55_000));
     const pills = run({ ...input, optimization: "fewest_pills" }, products);
     assert.deepEqual(pills.selected?.variantIds, ["seller:one_serving:x1"]);
     assert.equal(pills.selected?.doseFit?.total, 0);
@@ -481,13 +482,14 @@ describe("advisory dose fit", () => {
     assert.equal(result.selected?.sellerId, "seller");
   });
 
-  it("preserves country eligibility while numeric preferences retain the exact affordable dose fit", () => {
+  it("preserves country eligibility while numeric preferences retain exact dose fit and the easier routine", () => {
     const targets = canonicalizeTargets({ targets: [{ subjectId: "a", name: "A", amount: 100, unit: "mg" }, { subjectId: "b", name: "B", amount: 100, unit: "mg" }] }).targets;
     const r = request({ targets, maxPriceMinor: 20, maxDailyPills: 1, maxProductCount: 1 });
     const result = run(r, [product("a", 100), product("b", 0, 100), product("foreign", 100, 100, 1, { availableCountryCodes: ["US"] }), product("cost", 100, 100, 21), product("heavy", 100, 100, 10, { dailyPillsPerServing: 2 })]);
-    assert.deepEqual(result.selected?.productIds, ["heavy"]);
-    assert.equal(result.selected?.productCount, 1); assert.equal(result.selected?.dailyPills, 2);
-    assert.equal(result.selected?.priceMinor, 10);
+    assert.deepEqual(result.selected?.productIds, ["cost"]);
+    assert.equal(result.selected?.productCount, 1); assert.equal(result.selected?.dailyPills, 1);
+    assert.equal(result.selected?.priceMinor, 21);
+    assert.ok(result.alternatives.some(row => row.productIds.includes("heavy") && row.priceMinor === 10 && row.purchaseEligible));
     assert.equal(result.selected?.doseFit?.total, 0);
     assert.equal(result.selected?.coveredCount, 2);
     assert.ok(result.targetFrontiers?.find(row => row.subjectId === "a")?.productIds.every(id => ["a", "cost", "heavy"].includes(id)));

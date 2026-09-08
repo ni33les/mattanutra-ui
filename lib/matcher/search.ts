@@ -4,7 +4,7 @@ import { comparePillCounts } from "@/lib/matcher/pill-burden";
 import { compileVariant, isDeferredConditional } from "@/lib/matcher/candidates";
 import { compareDoseFit, doseFitScore } from "@/lib/matcher/dose-fit";
 import { DEFAULT_MATCHER_CONFIG } from "@/lib/matcher/config";
-import { aggregateCoverage, fingerprintState } from "@/lib/matcher/dominance";
+import { fingerprintState } from "@/lib/matcher/dominance";
 import { aggregateDailyExposure, isDoseError } from "@/lib/matcher/dose";
 import { evaluateSafety, labelledSafetyExposure } from "@/lib/matcher/safety";
 import type {
@@ -130,12 +130,10 @@ function skipGroup(state: SearchState): SearchState {
 export function compareSearchStates(a: SearchState, b: SearchState, request: CanonicalRequest) {
   const fit = compareDoseFit(doseFitScore(request, a.exposure), doseFitScore(request, b.exposure));
   if (fit !== 0) return fit;
-  // Explore the same bounded frontier for every commercial objective. Otherwise
-  // an early pill/cost tie can discard a branch with a better eventual dose fit.
-  // The requested commercial tie-break is applied to the completed candidates.
-  const coverage = aggregateCoverage(request, b.delivered) - aggregateCoverage(request, a.delivered);
-  if (coverage !== 0) return coverage;
-  return a.price - b.price || comparePillCounts(a.pills, a.pillCountKnown, b.pills, b.pillCountKnown) || a.count - b.count || fingerprintState(a).localeCompare(fingerprintState(b));
+  // Use the final dose-first routine ordering during retention and repair.
+  // Independent price extrema remain in reviewFrontier for cheaper choices.
+  return comparePillCounts(a.pills, a.pillCountKnown, b.pills, b.pillCountKnown) ||
+    a.count - b.count || a.price - b.price || fingerprintState(a).localeCompare(fingerprintState(b));
 }
 
 /** Count actual attempted additions, including infeasible additions and repair.
@@ -322,7 +320,7 @@ export function searchGroups(groups: readonly ProductGroup[], request: Canonical
   }
   if (used >= limit) trimmed = true;
   const all = [...archive.values()];
-  const complete = reviewFrontier(all, request, incumbents, order);
+  const complete = reviewFrontier(all, request, incumbents, order, groups);
   trimmed ||= complete.length < all.length;
   return { complete, groups, expansionAttempts: used, mode: "bounded", trimmed };
 }
@@ -396,11 +394,18 @@ export function revalidateState(
 /** Full safety and conversational rendering runs on diverse bounded extrema,
  * not thousands of losing search states. This changes computational effort,
  * never the permitted number of products or quantities in a basket. */
-export function reviewFrontier(states: readonly SearchState[], request: CanonicalRequest, incumbents: readonly SearchState[], order = (a: SearchState, b: SearchState) => compareSearchStates(a, b, request)) {
+export function reviewFrontier(states: readonly SearchState[], request: CanonicalRequest, incumbents: readonly SearchState[], order = (a: SearchState, b: SearchState) => compareSearchStates(a, b, request), groups: readonly ProductGroup[] = []) {
   if (states.length <= 192) return [...states];
   const fitOrder = [...states].sort((a, b) => order(a, b));
   const chosen = new Set<SearchState>([...incumbents, ...fitOrder.slice(0, 64)]);
   const nonempty = states.filter(row => row.count > 0);
+  const targetIds = new Set(request.targets.map(row => row.subjectId));
+  const focusedIds = new Set(groups.filter(group => {
+    const facts = group.product.labelledContributions.filter(row => row.amount != null && row.amount > 0);
+    return facts.length > 0 && facts.every(row => row.subjectId !== null && targetIds.has(row.subjectId));
+  }).map(group => group.productId));
+  const focused = nonempty.filter(row => row.count === 1 && row.selectedProductIds?.some(id => focusedIds.has(id))).sort(order)[0];
+  if (focused) chosen.add(focused);
   for (const compare of [
     (a: SearchState, b: SearchState) => a.price - b.price || order(a, b),
     (a: SearchState, b: SearchState) => a.count - b.count || comparePillCounts(a.pills, a.pillCountKnown, b.pills, b.pillCountKnown) || order(a, b),

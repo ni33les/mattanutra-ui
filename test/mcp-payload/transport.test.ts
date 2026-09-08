@@ -9,7 +9,7 @@ test("PAY-TRANSPORT-01 create replay changes presentation without new work, get 
   await installRealCatalogue("dev");
   const app = runtime("payload-transport");
   const args = { operation: "create", idempotencyKey: "payload-create-replay-01", request: profile("A6") };
-  const full = await rpc(app, "plan", args);
+  const full = await rpc(app, "plan", { ...args, responseView: "full" });
   assert.equal(full.ok, true); assert.equal(full.status, "ready");
   const compact = await rpc(app, "plan", { ...args, responseView: "conversation" });
   assert.equal(compact.ok, true); assert.equal(compact.responseView, "conversation");
@@ -43,7 +43,7 @@ test("PAY-TRANSPORT-02 operation/view matrix rejects unsupported fields and requ
 test("PAY-TRANSPORT-03 saved 7.0 decisions remain selectable and checkoutable without a contract refresh", async () => {
   await installRealCatalogue("dev");
   const app = runtime("payload-v70"), key = "payload-v70-create-01";
-  const plan = await rpc(app, "plan", { operation: "create", idempotencyKey: key, request: profile("A6") });
+  const plan = await rpc(app, "plan", { operation: "create", idempotencyKey: key, request: profile("A6"), responseView: "full" });
   assert.equal(plan.ok, true); assert.equal(plan.status, "ready");
   const operation = await app.store.getPlanOperationByKey(`dev:mattanutra:${app.scope.principalScope}`, key); assert.ok(operation);
   const revision = await app.store.getPlanRevision(operation.planId, Number(plan.revision)); assert.ok(revision);

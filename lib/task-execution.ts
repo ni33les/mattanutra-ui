@@ -200,12 +200,15 @@ function compareRetailerDoseFit(left: RetailerRecommendationOption, right: Retai
 function selectRetailerRecommendationOption(
   options: readonly RetailerRecommendationOption[]
 ) {
+  const pills = (left: RetailerRecommendationOption, right: RetailerRecommendationOption) => {
+    const a = selectedRetailerMatchingOption(left)?.dailyPills;
+    const b = selectedRetailerMatchingOption(right)?.dailyPills;
+    return Number(a == null) - Number(b == null) || (a != null && b != null ? a - b : 0);
+  };
   return [...options].sort((left, right) =>
     compareRetailerDoseFit(left, right) ||
-    (left.recommendations.diagnostics.stackPreference === "compact"
-      ? (selectedRetailerMatchingOption(left)?.dailyPills ?? Infinity) - (selectedRetailerMatchingOption(right)?.dailyPills ?? Infinity) : 0) ||
-    right.supplementProductCoveragePercent - left.supplementProductCoveragePercent ||
-    right.totalPlanCoveragePercent - left.totalPlanCoveragePercent ||
+    pills(left, right) ||
+    left.recommendations.recommendations.length - right.recommendations.recommendations.length ||
     left.subtotalAmount - right.subtotalAmount ||
     compareNullableEta(left.etaDate, right.etaDate) || left.organisationId.localeCompare(right.organisationId)
   )[0] ?? null;

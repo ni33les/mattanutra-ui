@@ -12,7 +12,8 @@ export function impactInventory() {
   const impact = JSON.parse(readFileSync("test/mcp-payload/impact.json", "utf8"));
   assert.equal(impact.releaseBase, RELEASE_BASE); assert.equal(impact.scope, "mcp_payload_and_direct_readers");
   const declared = impact.files.map(row => row.file);
-  const discovered = readdirSync("test/mcp-payload", { recursive: true }).filter(file => file.endsWith(".test.ts")).map(file => `test/mcp-payload/${file}`);
+  const discovered = ["test/mcp-payload", "test/mcp-agent-surface"].flatMap(directory =>
+    readdirSync(directory, { recursive: true }).filter(file => file.endsWith(".test.ts")).map(file => `${directory}/${file}`));
   for (const file of discovered) assert.ok(declared.includes(file), `Undeclared scoped test: ${file}`);
   const changed = execFileSync("git", ["diff", "--name-only", "--diff-filter=ACMR", RELEASE_BASE, "--", "test"], { encoding: "utf8" }).trim().split("\n").filter(file => file.endsWith(".test.ts"));
   for (const file of changed) assert.ok(declared.includes(file), `Changed test omitted from scope: ${file}`);

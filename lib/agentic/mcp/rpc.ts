@@ -1,8 +1,10 @@
+import { computeSchemaChecksum } from "@/lib/agentic/release-manifest";
 import { createLogger } from "@/lib/logger";
 import { AGENTIC_CONTRACT_REGISTRY } from "@/lib/agentic/contract/registry";
 import { CONTRACT_RESOURCES, readContractResource } from "@/lib/agentic/contract/guide";
 import type { AgenticConfig, AgenticEnvironment } from "@/lib/agentic/config";
 import {
+  AGENTIC_CONTRACT_VERSION,
   AGENTIC_SERVICE_NAME,
   AGENTIC_SERVICE_VERSION
 } from "@/lib/agentic/config";
@@ -109,7 +111,7 @@ export function toolList(environment: AgenticEnvironment = "dev", locale?: strin
     description: descriptions[name],
     ...AGENTIC_CONTRACT_REGISTRY[name],
     annotations: {
-      readOnlyHint: ["info", "order"].includes(name),
+      readOnlyHint: ["info", "order", "evidence"].includes(name),
       destructiveHint: false,
       idempotentHint: true,
       openWorldHint: true
@@ -172,23 +174,34 @@ export function toolText(value: unknown) {
 }
 
 const responseLog = createLogger("agentic.mcp.payload");
-export function toolResult(value: unknown, isError = false, tool?: string) {
+function structuredSummary(value: unknown) {
+  const row = record(value);
+  // Questions remain structured; the text capability is summary plus next action.
+  const summary = typeof row.summary === "string" && row.summary.trim() ? row.summary : toolText(value);
+  const next = record(row.operationalDecision).nextAction ?? row.nextAction ??
+    (Array.isArray(row.nextActions) ? row.nextActions.join(", ") : undefined);
+  const suffix = typeof next === "string" && next ? `\nNext: ${next}` : "";
+  const limit = Math.max(0, 799 - suffix.length);
+  // Full text remains in structuredContent. Preserve the actionable suffix.
+  const short = summary.length <= limit ? summary : summary.slice(0, Math.max(0, limit - 1)).replace(/[\uD800-\uDBFF]$/, "") + "…";
+  return short + suffix;
+}
+
+export function toolResult(value: unknown, isError = false, tool?: string, resultContent?: "structured") {
   const serialized = JSON.stringify(value);
+  const view = record(value).responseView ?? "full";
+  void resultContent; // Legacy opt-in remains accepted; concise views now always avoid JSON clones.
+  const concise = !isError && (view === "conversation" || view === "status");
+  const content = concise ? [{ type: "text", text: structuredSummary(value) }] : [
+    { type: "text", text: toolText(value) }, { type: "text", text: serialized }
+  ];
+  const result = { content, isError, structuredContent: value };
   if (tool && process.env.NODE_ENV !== "test") {
-    const view = record(value).responseView ?? "full";
-    responseLog.info("response_bytes", { tool, view, structuredBytes: Buffer.byteLength(serialized, "utf8"), isError });
+    responseLog.info("response_bytes", { tool, view, structuredBytes: Buffer.byteLength(serialized, "utf8"),
+      textBytes: content.reduce((sum, row) => sum + Buffer.byteLength(row.text, "utf8"), 0),
+      responseBytes: Buffer.byteLength(JSON.stringify(result), "utf8"), concise, isError });
   }
-  return {
-    content: [
-      {
-        text: toolText(value),
-        type: "text"
-      },
-      { type: "text", text: serialized }
-    ],
-    isError,
-    structuredContent: value
-  };
+  return result;
 }
 
 export function mcpCallNeedsStore(body: unknown) {
@@ -266,6 +279,8 @@ export async function handleLightweightJsonRpc(
       jsonrpc: "2.0",
       result: {
         responsibilityVersion: RESPONSIBILITY_VERSION,
+        contractVersion: AGENTIC_CONTRACT_VERSION,
+        schemaChecksum: computeSchemaChecksum(),
         tools: toolList(
           config.environment,
           typeof params.locale === "string" ? params.locale : undefined

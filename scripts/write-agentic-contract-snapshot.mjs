@@ -1,9 +1,8 @@
-import { AGENTIC_CONTRACT_REGISTRY } from "../lib/agentic/contract/registry.ts";
+import { toolList } from "../lib/agentic/mcp/rpc.ts";
 import { mkdirSync, writeFileSync } from "node:fs";
 import {
   AGENTIC_PUBLIC_TOOLS,
   AGENTIC_SERVER_INSTRUCTIONS,
-  AGENTIC_TOOL_DESCRIPTIONS,
 } from "../lib/agentic/contract/index.ts";
 import { AGENTIC_CONTRACT_VERSION } from "../lib/agentic/config.ts";
 import { clientGuideMarkdown, publicContractBundle, CONTRACT_RESOURCES } from "../lib/agentic/contract/guide.ts";
@@ -14,12 +13,7 @@ const snapshot = {
   schemaChecksum,
   contractVersion: AGENTIC_CONTRACT_VERSION,
   instructions: AGENTIC_SERVER_INSTRUCTIONS,
-  tools: AGENTIC_PUBLIC_TOOLS.map((name) => ({
-    description: AGENTIC_TOOL_DESCRIPTIONS[name],
-    inputSchema: AGENTIC_CONTRACT_REGISTRY[name].inputSchema,
-    outputSchema: AGENTIC_CONTRACT_REGISTRY[name].outputSchema,
-    name
-  }))
+  tools: toolList("dev")
 };
 
 const versionDirectory = new URL(`../contract/mcp/${AGENTIC_CONTRACT_VERSION}/`, import.meta.url);
@@ -51,8 +45,7 @@ writeFileSync(
 
 const adapter = {
   contractVersion: AGENTIC_CONTRACT_VERSION,
-  description:
-    "Deterministic supplement stacks with external checkout and order polling. Call tools only as info, plan, execute, order, support, feedback. Never prefix mattanutra_dev. Never call mattanutra_dev.* or mattanutra_dev.mattanutra_dev.*.",
+  description: `${AGENTIC_SERVER_INSTRUCTIONS}\nTools: ${AGENTIC_PUBLIC_TOOLS.join(", ")}. Use the exact tool names exposed by your host; it may wrap the native names.`,
   name: "MattaNutra",
   schemaChecksum,
   server_url: "/api/mcp",

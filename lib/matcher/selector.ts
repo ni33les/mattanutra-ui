@@ -260,15 +260,17 @@ export function compareBaskets(left: ScoredBasket, right: ScoredBasket, request:
   void _config;
   const fit = compareDoseFit(fitOf(left, request), fitOf(right, request));
   if (fit !== 0) return fit;
-  if (request.optimization === "fewest_pills") {
-    const pills = comparePillCounts(left.dailyPills, left.pillCountKnown, right.dailyPills, right.pillCountKnown);
-    if (pills !== 0) return pills;
-  } else if (request.optimization === "best_coverage" || request.optimization === "balanced") {
-    const coverage = right.aggregateCoverage - left.aggregateCoverage;
-    if (coverage !== 0) return coverage;
-  }
-  return left.priceMinor - right.priceMinor || comparePillCounts(left.dailyPills, left.pillCountKnown, right.dailyPills, right.pillCountKnown) ||
-    left.productCount - right.productCount || basketSignature(left).localeCompare(basketSignature(right));
+  // For a single requested nutrient, prefer an equally accurate dedicated
+  // product to a stack assembled from incidental ingredients. Unknown pills
+  // remain unknown; this is product focus, never a fabricated pill comparison.
+  const focusedSingle = (basket: ScoredBasket) => request.targets.length === 1 && basket.productCount === 1 && basket.incidentalCount === 0;
+  const focus = Number(focusedSingle(right)) - Number(focusedSingle(left));
+  if (focus) return focus;
+  // Dose accuracy remains first. Price-led alternatives are selected below;
+  // an equally accurate default should not demand a harder daily routine.
+  return comparePillCounts(left.dailyPills, left.pillCountKnown, right.dailyPills, right.pillCountKnown) ||
+    left.productCount - right.productCount || left.priceMinor - right.priceMinor ||
+    basketSignature(left).localeCompare(basketSignature(right));
 }
 
 function productDoseSignature(basket: ScoredBasket) {
@@ -288,8 +290,8 @@ export function materiallyDifferent(left: ScoredBasket, right: ScoredBasket) {
 export function requestWithoutOptionalPurchases(request: CanonicalRequest): CanonicalRequest { return request; }
 
 function selectedReason(request: CanonicalRequest) {
-  if (request.optimization === "lowest_cost") return "Lowest-cost option among the best dose-fit baskets";
-  if (request.optimization === "fewest_pills") return "Fewest daily pills among the best dose-fit baskets";
+  if (request.optimization === "lowest_cost") return "Closest dose fit with a target-focused daily routine; lower-cost trade-offs remain available";
+  if (request.optimization === "fewest_pills") return "Closest dose fit with a target-focused daily routine; simpler trade-offs remain available";
   return "Closest overall fit to the agreed daily targets";
 }
 
@@ -402,6 +404,10 @@ export function selectOptions(input: Readonly<{ baskets: readonly ScoredBasket[]
   const lowerCost = [...nonempty].sort((a, b) => a.priceMinor - b.priceMinor || compare(a, b)).find(row => !nonempty.some(other => other !== row && optionDominates(other, row, input.request)));
   const simpler = [...nonempty].sort((a, b) => a.productCount - b.productCount || comparePillCounts(a.dailyPills, a.pillCountKnown, b.dailyPills, b.pillCountKnown) || compare(a, b)).find(row => !nonempty.some(other => other !== row && optionDominates(other, row, input.request)));
   const fewerConcerns = nonempty.find(row => hasFewerConcerns(row, best, input.request));
+  // A product supplying requested nutrients without incidental nutrient load
+  // can be useful even when missing administration facts prevent pill ranking.
+  // Keep one evaluated choice; do not invent a "fewer pills" role for unknowns.
+  const focused = nonempty.find(row => row.productCount === 1 && row.incidentalCount === 0 && row.requestedLabelCount > 0 && row.aggregateCoverage > 0);
   const fallback = best.productCount === 0 ? nonempty[0] : undefined;
   const options = new Map<string, { basket: ScoredBasket; roles: ConversationalOptionRole[] }>();
   const add = (basket: ScoredBasket | undefined, role: ConversationalOptionRole) => {
@@ -412,9 +418,10 @@ export function selectOptions(input: Readonly<{ baskets: readonly ScoredBasket[]
     options.set(key, row);
   };
   add(best, "closest_dose"); add(lowerCost, "lower_cost"); add(simpler, "simpler"); add(fewerConcerns, "fewer_concerns"); add(fallback, "purchase_fallback");
+  if (focused && !options.has(productDoseSignature(focused))) options.set(productDoseSignature(focused), { basket: focused, roles: [] });
   const mapped = [...options.values()].map(({ basket, roles }) => {
     const recommended = roles.includes("closest_dose");
-    const reason = recommended ? selectedReason(input.request) : roles.includes("purchase_fallback")
+    const reason = roles.length === 0 ? "Target-focused option with disclosed dose and product-data uncertainty" : recommended ? selectedReason(input.request) : roles.includes("purchase_fallback")
       ? "Available to purchase with the disclosed gaps, excesses and health advice; purchasing is not the closest dose fit."
       : roles.includes("fewer_concerns") ? "Fewer concerns without lower requested-target coverage"
       : roles.includes("simpler") ? "Fewer products or daily pills with the disclosed coverage trade-off"

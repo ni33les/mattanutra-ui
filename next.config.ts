@@ -1,4 +1,4 @@
-import { execSync } from "node:child_process";
+import { execFileSync, execSync } from "node:child_process";
 import type { NextConfig } from "next";
 import { localeRoutePattern } from "./lib/i18n";
 import { firstPartyImageHosts } from "./lib/first-party-image-rules";
@@ -178,4 +178,11 @@ const nextConfig: NextConfig = {
   }
 };
 
-export default nextConfig;
+export default function configureNext(phase: string) {
+  if (phase === "phase-production-build") {
+    // Regenerate publication from the exact runtime tools/info contract before
+    // bundling. Server startup only reads artifacts; it never edits them.
+    execFileSync(process.execPath, ["--experimental-strip-types", "--import", "./scripts/register-ts-path-loader.mjs", "scripts/write-agentic-contract-snapshot.mjs"], { stdio: "inherit" });
+  }
+  return nextConfig;
+}
