@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import { test, afterEach } from "node:test";
-import { setImmediate as nextTurn } from "node:timers/promises";
+import { setImmediate as nextTurn, setTimeout as delay } from "node:timers/promises";
 import { profile, runtime, rpc, installRealCatalogue, uninstallRealCatalogue, barrier } from "./helpers.ts";
 import { setMatcherGateForTests, setMatcherEnteredForTests, resetPlanCreateInflightForTests, runAdmittedPlanOperation } from "../../lib/agentic/plan/service.ts";
-import { advanceServiceClock } from "../../lib/agentic/qa/service-clock.ts";
+import { advanceServiceClock, useLiveServiceClock } from "../../lib/agentic/qa/service-clock.ts";
 import type { PlanResult } from "../../lib/agentic/plan/types.ts";
 
 afterEach(() => { setMatcherGateForTests(null); setMatcherEnteredForTests(null); resetPlanCreateInflightForTests(); uninstallRealCatalogue(); });
@@ -35,12 +35,24 @@ test("AXR-REL-02 a held real matcher hands off at its existing return budget wit
   }
 });
 
-test("AXR-REL-01 reconstructed A2 expanded exclusions preserve effort, context and one revision per operation", { timeout: 90000 }, async () => {
+test("AXR-REL-01 reconstructed A2 expanded exclusions preserve effort, context and one revision per operation", async t => {
   process.env.AX_REFINEMENT_REAL_WORKERS = "1";
   await installRealCatalogue();
+  useLiveServiceClock();
   const instance = runtime("a2-expanded");
+  async function completed(args: Record<string, unknown>) {
+    let value = await rpc(instance, "plan", args);
+    while (value.status === "processing") {
+      await delay(Number(value.pollAfterSeconds) * 1000);
+      value = await rpc(instance, "plan", { operation: "get", planHandle: value.planHandle });
+    }
+    return value;
+  }
   const original = profile("A2");
-  let result = await rpc(instance, "plan", { operation: "create", idempotencyKey: "ax-refinement-a2-create", request: original });
+  let result!: Awaited<ReturnType<typeof rpc>>;
+  await t.test("create within the existing client deadline", { timeout: 90000 }, async () => {
+    result = await completed({ operation: "create", idempotencyKey: "ax-refinement-a2-create", request: original });
+  });
   assert.equal(result.ok, true, JSON.stringify(result)); assert.equal(result.revision, 1);
   const targets = original.targets.map(row => row.name === "Algae Omega-3" ? { ...row, name: "Omega-3" } : row);
   const patches = [
@@ -50,7 +62,9 @@ test("AXR-REL-01 reconstructed A2 expanded exclusions preserve effort, context a
   ];
   for (const [index, patch] of patches.entries()) {
     const args = { operation: "revise", idempotencyKey: `ax-refinement-a2-revise-${index}`, planHandle: result.planHandle, expectedRevision: result.revision, ...patch };
-    result = await rpc(instance, "plan", args);
+    await t.test(`revision ${index + 2} within the existing client deadline`, { timeout: 90000 }, async () => {
+      result = await completed(args);
+    });
     assert.equal(result.ok, true, JSON.stringify(result)); assert.equal(result.revision, index + 2);
     assert.notEqual(result.status, "processing");
     assert.deepEqual(await rpc(instance, "plan", args), result);

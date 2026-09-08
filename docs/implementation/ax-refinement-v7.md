@@ -47,3 +47,5 @@ The first comparison attempts (linear-comparison-1/2) are invalid evidence: the 
 ### Focused consumer execution
 
 The second affected-consumer attempt executed 135 assertions successfully, including existing checkout/payment replay and the PostgreSQL web selection fixture. Its overall source attestation is deliberately false because implementation continued during the focused run. Final acceptance must run unchanged source twice. The first consumer attempt was interrupted after a memory-only suite opened an unnecessary ambient database pool; memory and PostgreSQL tests now receive separate environments.
+
+The A2 sequence now uses the real three-second handoff and polls returned handles. Each create/revise operation retains the existing 90-second client bound and 15-second worker bound. The earlier 90-second aggregate timeout combined four requests, including two 64,000-attempt searches, and is retained as failed evidence; it is replaced by bounded subcases for each request, not by a longer request or worker deadline.

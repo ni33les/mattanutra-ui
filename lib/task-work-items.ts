@@ -63,8 +63,6 @@ import { loadActivePlanGuidanceAdjustments } from "@/lib/plan-guidance-adjustmen
 import {
   buildProductNeeds,
   normalizeProductStackPreference,
-  productFactAliasKeys,
-  productKeysMatch,
   type ProductCandidate,
   type ProductClientSex,
   type ProductRecommendationClientContext,
