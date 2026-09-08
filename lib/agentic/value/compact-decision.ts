@@ -1,3 +1,4 @@
+import { continuedIntakeCoversTargets, highlightedAlternativeOptionId } from "@/lib/agentic/value/customer-choice";
 import type { MatchingExplanation } from "@/lib/agentic/value/matching-explanation";
 import { assessPreferences, type PreferenceAssessment, type NumericPreferences } from "@/lib/matcher/preferences";
 import { RESEARCH_VERSION } from "@/lib/agentic/discovery/versions";
@@ -15,6 +16,7 @@ import { requestedTargetCoverage } from "@/lib/agentic/value/coverage-summary";
 const COMPACT_LIMIT_BYTES = 4 * 1024;
 
 export type CompactDecision = Readonly<{
+  highlightedAlternativeOptionId?: string | null;
   preferenceAssessment?: readonly PreferenceAssessment[];
   matchingExplanation?: MatchingExplanation;
   advice: readonly Readonly<{
@@ -55,6 +57,8 @@ export type CompactPlanView = Readonly<{
   safetyGuidance?: readonly SafetyGuidance[];
   questions?: readonly unknown[];
   coverage?: readonly Readonly<{
+    intakeCertainty?: "known" | "estimated" | "unknown";
+    unresolved?: boolean;
     deliveredAmount?: number;
     currentAmount?: number;
     remainingGap?: number;
@@ -96,7 +100,8 @@ export function buildCompactDecision(result: CompactPlanView, resolvedDecision?:
   const selected = result.selected;
   const locale = negotiateLocale(result.requestSnapshot?.locale);
   const durationUnknown = Boolean(result.horizon?.durationUnknown);
-  const decision = resolvedDecision ?? operationalDecision({ status: result.status, hasSelectedOption: Boolean(selected?.basket.length),
+  const continuedTargetsCovered = !selected?.basket.length && continuedIntakeCoversTargets(result.coverage ?? selected?.coverage ?? []);
+  const decision = resolvedDecision ?? operationalDecision({ continuedTargetsCovered, status: result.status, hasSelectedOption: Boolean(selected?.basket.length),
     hasPurchaseOptions: result.alternatives?.some(option => option.basket.length > 0 && option.purchaseEligible !== false),
     hasQuestions: result.questions ? result.questions.length > 0 : undefined,
     purchaseRequiredNow: result.horizon?.purchaseRequiredNow,
@@ -133,6 +138,7 @@ export function buildCompactDecision(result: CompactPlanView, resolvedDecision?:
     dailyPills: selected?.basket.some(item => item.pillCountKnown === false || item.dailyPills == null) ? null : selected?.dailyPills ?? 0,
     firstOrderGoodsPriceMinor: selected?.basket.some(item => item.incompleteCommercialFacts) ? null : selected?.basket.reduce((sum, item) => sum + item.lineTotalMinor, 0) ?? 0, currency: selected?.basket[0]?.currency ?? "THB" }, locale).filter(row => row.status !== "not_requested");
   return {
+    highlightedAlternativeOptionId: highlightedAlternativeOptionId(selected, result.alternatives ?? [], continuedTargetsCovered),
     ...(preferenceAssessment.length ? { preferenceAssessment } : {}),
     ...(matchingExplanation ? { matchingExplanation } : {}),
     advice,
