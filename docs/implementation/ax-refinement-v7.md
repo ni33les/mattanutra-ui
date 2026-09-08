@@ -15,7 +15,7 @@ The original six-profile response report/content-hashed catalogue is unavailable
 
 ## Slice ledger
 
-1. Baseline and scoped runner: in progress.
+1. Baseline and scoped runner: implemented; three focused harness cases passed (01-harness-green-2).
 2. Durable refinement and response handoff: pending.
 3. Resumable search and candidate recovery: pending.
 4. Useful alternatives and no-purchase: pending.

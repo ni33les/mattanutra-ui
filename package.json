@@ -147,7 +147,8 @@
     "products:administration:schema:apply": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/apply-product-administration-schema.ts",
     "matcher:runtime:schema:apply": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/apply-matcher-v5-runtime-schema.ts",
     "matcher:compare": "node --experimental-strip-types --import ./scripts/matcher-experiment-offline.mjs --import ./scripts/register-ts-path-loader.mjs scripts/compare-matcher-scoring.ts",
-    "test:matcher:experiments": "node scripts/run-matcher-experiment-tests.mjs"
+    "test:matcher:experiments": "node scripts/run-matcher-experiment-tests.mjs",
+    "test:ax-refinement": "node scripts/run-ax-refinement-tests.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1045.0",
