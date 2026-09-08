@@ -1,8 +1,8 @@
 import { siteBaseUrl } from "@/lib/site-url";
 
-export const AGENTIC_CONTRACT_VERSION = "7.2.1";
+export const AGENTIC_CONTRACT_VERSION = "7.2.2";
 export const AGENTIC_SERVICE_NAME = "MattaNutra";
-export const AGENTIC_SERVICE_VERSION = "7.2.1";
+export const AGENTIC_SERVICE_VERSION = "7.2.2";
 export const AGENTIC_MIGRATION_VERSION = "agentic-3.0.0";
 export const AGENTIC_POLL_AFTER_SECONDS = 3;
 export const AGENTIC_CHECKOUT_TTL_MS = 15 * 60 * 1000;
