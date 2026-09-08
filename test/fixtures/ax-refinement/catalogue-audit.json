@@ -1,0 +1,521 @@
+{
+  "version": 1,
+  "environment": "dev",
+  "scope": "Seven identifiable products from the original AX attachment; complete original selected union is unavailable.",
+  "originalUnionStatus": "ORIGINAL_DATA_UNAVAILABLE",
+  "checkedAt": "2026-09-08T00:00:00Z",
+  "rows": [
+    {
+      "productId": "prd_202c5e0936e8575f9d95dcb35a8d2965",
+      "productRecordId": "202c5e09-36e8-575f-9d95-dcb35a8d2965",
+      "variant": "BLACKMORE MAGNESIUM+D3 50'S",
+      "administration": {
+        "route": "oral",
+        "physicalUnit": "tablet",
+        "unitsPerServing": 1,
+        "doseIncrement": 1,
+        "packQuantity": 50,
+        "provenance": {
+          "status": "verified",
+          "sourceUrl": "https://www.blackmores.co.th/en/products/supplement/2125-blackmores-bio-magnesium-advance-d3",
+          "sourceText": "Manufacturer composition and oral directions support physical unit tablet. Composition basis is 1 physical unit(s) per labelled serving. The source identifies a single pack size of 50 physical units.",
+          "verifiedAt": "2026-09-07T11:40:30.371428+00:00"
+        }
+      },
+      "composition": [
+        {
+          "name": "Magnesium",
+          "amount": 301.5,
+          "unit": "mg",
+          "confidence": "high",
+          "servingLabel": null
+        },
+        {
+          "name": "Manganese",
+          "amount": 3.5,
+          "unit": "mg",
+          "confidence": "high",
+          "servingLabel": null
+        },
+        {
+          "name": "Vitamin B6",
+          "amount": 2,
+          "unit": "mg",
+          "confidence": "high",
+          "servingLabel": null
+        },
+        {
+          "name": "Vitamin C",
+          "amount": 60,
+          "unit": "mg",
+          "confidence": "high",
+          "servingLabel": null
+        },
+        {
+          "name": "Vitamin D3",
+          "amount": 100,
+          "unit": "IU",
+          "confidence": "high",
+          "servingLabel": null
+        }
+      ],
+      "sourceUrl": "https://www.blackmores.co.th/en/products/supplement/2125-blackmores-bio-magnesium-advance-d3",
+      "packReview": "SUPPORTED_UNCHANGED",
+      "dietaryEvidence": "No new categorical certification inferred; preserve existing eligibility facts and evidence.",
+      "correctionIds": []
+    },
+    {
+      "productId": "prd_50265f478be551c496f907a01d746dab",
+      "productRecordId": "50265f47-8be5-51c4-96f9-07a01d746dab",
+      "variant": "VISTRA VITAL-PRO RELACZA PLUS 30'S",
+      "administration": null,
+      "composition": [
+        {
+          "name": "GABA",
+          "amount": 125,
+          "unit": "mg",
+          "confidence": "high",
+          "servingLabel": null
+        },
+        {
+          "name": "Theanine",
+          "amount": 100,
+          "unit": "mg",
+          "confidence": "high",
+          "servingLabel": null
+        },
+        {
+          "name": "Vitamin B1",
+          "amount": 0.75,
+          "unit": "mg",
+          "confidence": "high",
+          "servingLabel": null
+        },
+        {
+          "name": "Vitamin B12",
+          "amount": 1,
+          "unit": "mcg",
+          "confidence": "high",
+          "servingLabel": null
+        },
+        {
+          "name": "Vitamin B6",
+          "amount": 1,
+          "unit": "mg",
+          "confidence": "high",
+          "servingLabel": null
+        }
+      ],
+      "sourceUrl": "https://www.vistra.co.th/product/vistra-relacza-plus/",
+      "packReview": "DATA_BLOCKED",
+      "dietaryEvidence": "No new categorical certification inferred; preserve existing eligibility facts and evidence.",
+      "correctionIds": [
+        "ax-v7-dev-relacza-administration"
+      ]
+    },
+    {
+      "productId": "prd_65fd0d6245a04430aae754932a9c3f28",
+      "productRecordId": "65fd0d62-45a0-4430-aae7-54932a9c3f28",
+      "variant": "VISTRA BACOPA EXTRACT 300 mg",
+      "administration": {
+        "route": "oral",
+        "physicalUnit": "tablet",
+        "unitsPerServing": 1,
+        "doseIncrement": 1,
+        "packQuantity": null,
+        "provenance": {
+          "status": "verified",
+          "sourceUrl": "https://www.vistra.co.th/product/vistra-bacopa-extract/",
+          "sourceText": "Manufacturer composition and oral directions support physical unit tablet. Composition basis is 1 physical unit(s) per labelled serving. Pack quantity for this SKU is not independently established.",
+          "verifiedAt": "2026-09-07T11:30:09.070119+00:00"
+        }
+      },
+      "composition": [
+        {
+          "name": "Bacopa monnieri",
+          "amount": 300,
+          "unit": "mg",
+          "confidence": "high",
+          "servingLabel": null
+        },
+        {
+          "name": "Vitamin B1",
+          "amount": 1.5,
+          "unit": "mg",
+          "confidence": "high",
+          "servingLabel": null
+        },
+        {
+          "name": "Vitamin B12",
+          "amount": 1,
+          "unit": "mcg",
+          "confidence": "high",
+          "servingLabel": null
+        },
+        {
+          "name": "Vitamin B6",
+          "amount": 2,
+          "unit": "mg",
+          "confidence": "high",
+          "servingLabel": null
+        }
+      ],
+      "sourceUrl": "https://www.vistra.co.th/product/vistra-bacopa-extract/",
+      "packReview": "DATA_BLOCKED",
+      "dietaryEvidence": "No new categorical certification inferred; preserve existing eligibility facts and evidence.",
+      "correctionIds": [
+        "ax-v7-dev-bacopa-b12-conflict"
+      ]
+    },
+    {
+      "productId": "prd_c13bd4164a854d54a3c5669f310c2afb",
+      "productRecordId": "c13bd416-4a85-4d54-a3c5-669f310c2afb",
+      "variant": "Blackmores Bio Zinc A Chelate",
+      "administration": {
+        "route": "oral",
+        "physicalUnit": "tablet",
+        "unitsPerServing": 1,
+        "doseIncrement": 1,
+        "packQuantity": 90,
+        "provenance": {
+          "status": "verified",
+          "sourceUrl": "https://www.blackmores.co.th/en/products/supplement/2118-blackmores-bio-zinc-a-chelate",
+          "sourceText": "Manufacturer composition and oral directions support physical unit tablet. Composition basis is 1 physical unit(s) per labelled serving. The source identifies a single pack size of 90 physical units.",
+          "verifiedAt": "2026-09-07T11:30:11.837729+00:00"
+        }
+      },
+      "composition": [
+        {
+          "name": "Magnesium",
+          "amount": 52.5,
+          "unit": "mg",
+          "confidence": "high",
+          "servingLabel": null
+        },
+        {
+          "name": "Manganese",
+          "amount": 2,
+          "unit": "mg",
+          "confidence": "high",
+          "servingLabel": null
+        },
+        {
+          "name": "Vitamin A",
+          "amount": 2500,
+          "unit": "IU",
+          "confidence": "high",
+          "servingLabel": null
+        },
+        {
+          "name": "Zinc",
+          "amount": 15,
+          "unit": "mg",
+          "confidence": "high",
+          "servingLabel": null
+        }
+      ],
+      "sourceUrl": "https://www.blackmores.co.th/en/products/supplement/2118-blackmores-bio-zinc-a-chelate",
+      "packReview": "SUPPORTED_UNCHANGED",
+      "dietaryEvidence": "No new categorical certification inferred; preserve existing eligibility facts and evidence.",
+      "correctionIds": []
+    },
+    {
+      "productId": "prd_f0ac13e757b34fdbb6f7206ad8b6f0ef",
+      "productRecordId": "f0ac13e7-57b3-4fdb-b6f7-206ad8b6f0ef",
+      "variant": "VISTRA CALPLEX CALCIUM 600 mg & MENAQUINONE-7 PLUS",
+      "administration": {
+        "route": "oral",
+        "physicalUnit": "tablet",
+        "unitsPerServing": 1,
+        "doseIncrement": 1,
+        "packQuantity": null,
+        "provenance": {
+          "status": "verified",
+          "sourceUrl": "https://www.vistra.co.th/product/vistra-calplex-calcium-600-mg-menaquinone-7-plus/",
+          "sourceText": "Manufacturer composition and oral directions support physical unit tablet. Composition basis is 1 physical unit(s) per labelled serving. Pack quantity for this SKU is not independently established.",
+          "verifiedAt": "2026-09-07T11:30:13.779915+00:00"
+        }
+      },
+      "composition": [
+        {
+          "name": "Boron",
+          "amount": 1.7,
+          "unit": "mg",
+          "confidence": "moderate",
+          "servingLabel": null
+        },
+        {
+          "name": "Calcium",
+          "amount": 600,
+          "unit": "mg",
+          "confidence": "high",
+          "servingLabel": null
+        },
+        {
+          "name": "Copper",
+          "amount": 2,
+          "unit": "mg",
+          "confidence": "moderate",
+          "servingLabel": null
+        },
+        {
+          "name": "Magnesium",
+          "amount": 52.8,
+          "unit": "mg",
+          "confidence": "high",
+          "servingLabel": null
+        },
+        {
+          "name": "Manganese",
+          "amount": 1.75,
+          "unit": "mg",
+          "confidence": "moderate",
+          "servingLabel": null
+        },
+        {
+          "name": "Vitamin B12",
+          "amount": 2,
+          "unit": "mcg",
+          "confidence": "high",
+          "servingLabel": null
+        },
+        {
+          "name": "Vitamin B6",
+          "amount": 2,
+          "unit": "mg",
+          "confidence": "high",
+          "servingLabel": null
+        },
+        {
+          "name": "Vitamin B9",
+          "amount": 200,
+          "unit": "mcg",
+          "confidence": "high",
+          "servingLabel": null
+        },
+        {
+          "name": "Vitamin D3",
+          "amount": 200,
+          "unit": "IU",
+          "confidence": "high",
+          "servingLabel": null
+        },
+        {
+          "name": "Vitamin K2",
+          "amount": 26,
+          "unit": "mcg",
+          "confidence": "high",
+          "servingLabel": null
+        },
+        {
+          "name": "Zinc",
+          "amount": 7.5,
+          "unit": "mg",
+          "confidence": "high",
+          "servingLabel": null
+        }
+      ],
+      "sourceUrl": "https://www.vistra.co.th/product/vistra-calplex-calcium-600-mg-menaquinone-7-plus/",
+      "packReview": "DATA_BLOCKED",
+      "dietaryEvidence": "No new categorical certification inferred; preserve existing eligibility facts and evidence.",
+      "correctionIds": []
+    },
+    {
+      "productId": "prd_2c298ab52a8056268aed426a29dda3aa",
+      "productRecordId": "2c298ab5-2a80-5626-8aed-426a29dda3aa",
+      "variant": "Optimum Nutrition Micronized Creatine Monohydrate Powder",
+      "administration": null,
+      "composition": [
+        {
+          "name": "Creatine",
+          "amount": 3,
+          "unit": "g",
+          "confidence": "high",
+          "servingLabel": "55 servings per container"
+        }
+      ],
+      "sourceUrl": "https://www.optimumnutrition.com/en-gb/products/micronised-creatine-powder?_pos=1&_psq=creatin&_ss=e&_v=1.0",
+      "packReview": "DATA_BLOCKED",
+      "dietaryEvidence": "No new categorical certification inferred; preserve existing eligibility facts and evidence.",
+      "correctionIds": []
+    },
+    {
+      "productId": "prd_59b7b3c3265f450a8cf6fdb62a3a5963",
+      "productRecordId": "59b7b3c3-265f-450a-8cf6-fdb62a3a5963",
+      "variant": "Blackmores Multivitamins for 50+",
+      "administration": {
+        "route": "oral",
+        "physicalUnit": "tablet",
+        "unitsPerServing": 1,
+        "doseIncrement": 1,
+        "packQuantity": 90,
+        "provenance": {
+          "status": "verified",
+          "sourceUrl": "https://www.blackmores.com.au/products/multivitamins-for-50-plus",
+          "sourceText": "Manufacturer composition and oral directions support physical unit tablet. Composition basis is 1 physical unit(s) per labelled serving. The source identifies a single pack size of 90 physical units.",
+          "verifiedAt": "2026-09-07T11:30:08.305097+00:00"
+        }
+      },
+      "composition": [
+        {
+          "name": "Biotin",
+          "amount": 30,
+          "unit": "mcg",
+          "confidence": "high",
+          "servingLabel": null
+        },
+        {
+          "name": "Calcium",
+          "amount": 6,
+          "unit": "mg",
+          "confidence": "high",
+          "servingLabel": null
+        },
+        {
+          "name": "Chromium",
+          "amount": 35,
+          "unit": "mcg",
+          "confidence": "high",
+          "servingLabel": null
+        },
+        {
+          "name": "Copper",
+          "amount": 600,
+          "unit": "mcg",
+          "confidence": "high",
+          "servingLabel": null
+        },
+        {
+          "name": "Iodine",
+          "amount": 150,
+          "unit": "mcg",
+          "confidence": "high",
+          "servingLabel": null
+        },
+        {
+          "name": "Iron",
+          "amount": 5,
+          "unit": "mg",
+          "confidence": "high",
+          "servingLabel": null
+        },
+        {
+          "name": "Magnesium",
+          "amount": 105,
+          "unit": "mg",
+          "confidence": "high",
+          "servingLabel": null
+        },
+        {
+          "name": "Manganese",
+          "amount": 3.5,
+          "unit": "mg",
+          "confidence": "high",
+          "servingLabel": null
+        },
+        {
+          "name": "Nicotinamide",
+          "amount": 16,
+          "unit": "mg",
+          "confidence": "high",
+          "servingLabel": null
+        },
+        {
+          "name": "Selenium",
+          "amount": 50,
+          "unit": "mcg",
+          "confidence": "high",
+          "servingLabel": null
+        },
+        {
+          "name": "Vitamin A",
+          "amount": 750,
+          "unit": "mcg",
+          "confidence": "high",
+          "servingLabel": null
+        },
+        {
+          "name": "Vitamin B1",
+          "amount": 1.2,
+          "unit": "mg",
+          "confidence": "high",
+          "servingLabel": null
+        },
+        {
+          "name": "Vitamin B12",
+          "amount": 2.4,
+          "unit": "mcg",
+          "confidence": "high",
+          "servingLabel": null
+        },
+        {
+          "name": "Vitamin B2",
+          "amount": 1.6,
+          "unit": "mg",
+          "confidence": "high",
+          "servingLabel": null
+        },
+        {
+          "name": "Vitamin B5",
+          "amount": 6,
+          "unit": "mg",
+          "confidence": "high",
+          "servingLabel": null
+        },
+        {
+          "name": "Vitamin B6",
+          "amount": 1.7,
+          "unit": "mg",
+          "confidence": "high",
+          "servingLabel": null
+        },
+        {
+          "name": "Vitamin B9",
+          "amount": 200,
+          "unit": "mcg",
+          "confidence": "high",
+          "servingLabel": null
+        },
+        {
+          "name": "Vitamin C",
+          "amount": 45,
+          "unit": "mg",
+          "confidence": "high",
+          "servingLabel": null
+        },
+        {
+          "name": "Vitamin D3",
+          "amount": 600,
+          "unit": "IU",
+          "confidence": "high",
+          "servingLabel": null
+        },
+        {
+          "name": "Vitamin E",
+          "amount": 14.9,
+          "unit": "IU",
+          "confidence": "high",
+          "servingLabel": null
+        },
+        {
+          "name": "Vitamin K1",
+          "amount": 35,
+          "unit": "mcg",
+          "confidence": "high",
+          "servingLabel": null
+        },
+        {
+          "name": "Zinc",
+          "amount": 10,
+          "unit": "mg",
+          "confidence": "high",
+          "servingLabel": null
+        }
+      ],
+      "sourceUrl": "https://www.blackmores.com.au/products/multivitamins-for-50-plus",
+      "packReview": "SUPPORTED_UNCHANGED",
+      "dietaryEvidence": "No new categorical certification inferred; preserve existing eligibility facts and evidence.",
+      "correctionIds": []
+    }
+  ]
+}
