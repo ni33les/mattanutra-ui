@@ -225,6 +225,17 @@
         "PAY-SCHEMA-04",
         "PAY-SCHEMA-05"
       ]
+    },
+    {
+      "file": "test/mcp-agent-surface/contracts.test.ts",
+      "slice": "agent-surface",
+      "database": false,
+      "reason": "Seven-tool discovery, concise honest service card, environment/locale alignment and emitted get-schema equivalence.",
+      "expectedCases": 2,
+      "cases": [
+        "AG72-CARD-01",
+        "AG72-SCHEMA-01"
+      ]
     }
   ]
 }
