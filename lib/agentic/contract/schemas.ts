@@ -80,21 +80,22 @@ const key = Type.String({ minLength: 16, maxLength: 128 });
 const handle = Type.String({ minLength: 32, maxLength: 4096 });
 const revision = Type.Integer({ minimum: 1 });
 export const MUTATION_VIEW = optional({ ...enumeration(["conversation", "full"] as const), default: "full", description: "Presentation only; omitted means the compatible full response. Use conversation for routine dialogue. Does not change matching or idempotency." });
+export const PLAN_MUTATION_VIEW = optional({ ...enumeration(["conversation", "full"] as const), default: "conversation", description: "Plan presentation only. Omission means conversation. Explicit full is opt-in. During 7.2 only, X-MattaNutra-Contract-Version below 7.2 preserves the omitted full view; explicit responseView wins. Matching and idempotency are unchanged." });
 export const PLAN_DETAIL_SECTIONS = Type.Array(enumeration(["request", "products", "coverage", "advice", "score", "economics"] as const), { minItems: 1, uniqueItems: true, description: "Batch only the sections needed. Reads stored facts without rematching." });
 const readVersion = optional(Type.String({ minLength: 1, maxLength: 128, description: "Previous returned resultVersion; unchanged is true only for the same visible state and representation identity." }));
 export const PLAN_OPERATION_SCHEMAS = {
-  create: object({ responseView: MUTATION_VIEW, operation: Type.Literal("create"), idempotencyKey: key, searchEffort: optional(SEARCH_EFFORT_SCHEMA), request: PLAN_REQUEST }),
+  create: object({ responseView: PLAN_MUTATION_VIEW, operation: Type.Literal("create"), idempotencyKey: key, searchEffort: optional(SEARCH_EFFORT_SCHEMA), request: PLAN_REQUEST }),
   get: Type.Union([
-    object({ operation: Type.Literal("get"), planHandle: handle, responseView: MUTATION_VIEW }),
+    object({ operation: Type.Literal("get"), planHandle: handle, responseView: PLAN_MUTATION_VIEW }),
     object({ operation: Type.Literal("get"), planHandle: handle, responseView: Type.Literal("status"), knownResultVersion: readVersion }),
     object({ operation: Type.Literal("get"), planHandle: handle, responseView: Type.Literal("details"), expectedRevision: revision, sections: PLAN_DETAIL_SECTIONS, optionIds: optional(Type.Array(Type.String({ minLength: 8, maxLength: 128 }), { minItems: 1, uniqueItems: true })) })
   ]),
   revise: Type.Union([
-    object({ responseView: MUTATION_VIEW, operation: Type.Literal("revise"), idempotencyKey: key, planHandle: handle, expectedRevision: revision, searchEffort: optional(SEARCH_EFFORT_SCHEMA), request: PLAN_REQUEST }),
-    object({ responseView: MUTATION_VIEW, operation: Type.Literal("revise"), idempotencyKey: key, planHandle: handle, expectedRevision: revision, searchEffort: optional(SEARCH_EFFORT_SCHEMA), requestPatch: PLAN_REQUEST_PATCH })
+    object({ responseView: PLAN_MUTATION_VIEW, operation: Type.Literal("revise"), idempotencyKey: key, planHandle: handle, expectedRevision: revision, searchEffort: optional(SEARCH_EFFORT_SCHEMA), request: PLAN_REQUEST }),
+    object({ responseView: PLAN_MUTATION_VIEW, operation: Type.Literal("revise"), idempotencyKey: key, planHandle: handle, expectedRevision: revision, searchEffort: optional(SEARCH_EFFORT_SCHEMA), requestPatch: PLAN_REQUEST_PATCH })
   ]),
-  answer: object({ responseView: MUTATION_VIEW, operation: Type.Literal("answer"), idempotencyKey: key, planHandle: handle, expectedRevision: revision, answers: { ...PLAN_ANSWERS, minItems: 1 }, safetyAcknowledgement: optional(PLAN_SAFETY_ACK) }),
-  select: object({ responseView: MUTATION_VIEW, operation: Type.Literal("select"), idempotencyKey: key, planHandle: handle, expectedRevision: revision, optionId: Type.String({ minLength: 8, maxLength: 128 }) })
+  answer: object({ responseView: PLAN_MUTATION_VIEW, operation: Type.Literal("answer"), idempotencyKey: key, planHandle: handle, expectedRevision: revision, answers: { ...PLAN_ANSWERS, minItems: 1 }, safetyAcknowledgement: optional(PLAN_SAFETY_ACK) }),
+  select: object({ responseView: PLAN_MUTATION_VIEW, operation: Type.Literal("select"), idempotencyKey: key, planHandle: handle, expectedRevision: revision, optionId: Type.String({ minLength: 8, maxLength: 128 }) })
 } as const;
 // MCP requires an object root; the discriminated branches specify each operation completely.
 export const PLAN_INPUT_SCHEMA = { type: "object", anyOf: Object.values(PLAN_OPERATION_SCHEMAS) } as const;

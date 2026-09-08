@@ -57,5 +57,5 @@ export function projectPlan(plan: PlanSuccessWire, input: PlanViewInput): PlanSu
         ? option.economics.firstOrderSubtotalMinor + option.economics.shippingMinor + (option.economics.otherCustomerCostMinor ?? 0) : null };
   });
   const planAdviceIds = (plan.safetyGuidance ?? []).map(adviceIdFor);
-  return { ...base, responseView: "conversation", ...pick(plan, ["summary", "operationalDecision", "nextActions", "purchaseRequiredNow", "nextReplenishmentDay", "shippingMinor", "estimatedOrderTotalMinor", "questions", "pollAfterSeconds", "searchSummary", "refreshRequired", "sourceContractVersion", "reasonCode", "suggestedGroups", "unsupportedTargets"]), selectedOptionId, highlightedAlternativeOptionId, options, advice, planAdviceIds, availableDetails: options.length ? availableDetails : [] };
+  return { ...base, responseView: "conversation", ...pick(plan, ["summary", "operationalDecision", "nextActions", "purchaseRequiredNow", "nextReplenishmentDay", "shippingMinor", "estimatedOrderTotalMinor", "questions", "pollAfterSeconds", "searchSummary", "refreshRequired", "sourceContractVersion", "reasonCode", "suggestedGroups", "unsupportedTargets", "evidenceHandle", "alternativeSearch"]), selectedOptionId, highlightedAlternativeOptionId, options, advice, planAdviceIds, availableDetails: options.length ? availableDetails : [] };
 }

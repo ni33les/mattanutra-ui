@@ -1,7 +1,7 @@
 {
-  "contractVersion": "7.2.0",
-  "name": "mattanutra_dev",
   "schemaChecksum": "92c213fd7df5613faa179da1bac70142f059f0fe0fa4ec605299e0842872dd6b",
+  "contractVersion": "7.2.0",
+  "instructions": "MattaNutra matches agreed nutrient targets to real products in Thailand (THB).\nWellness guidance only: no diagnosis, pharmacy services or complete catalogue.\nFlow: info → agree name/amount/unit/basis → plan(create) → explain closest_dose, highlightedAlternativeOptionId and advice → revise/answer/select → confirm with the person → execute → poll order.\nPlan conversation is the default decision view. Poll with status; request details for doseFit, labels or economics.\nNumeric pill, price and product counts are preferences; diet, exclusions and physical quantities bind.\nUnknown diet stays unknown, never zero. Ready means checkout-ready, not complete coverage or medical approval.\nWhile processing, poll the existing handle; retry mutations with the same key and payload.\nCall info first for the service card, templates and operation schemas.",
   "tools": [
     {
       "description": "Service card and contract. Call first. view=overview | client_guide | plan_schema; set planOperation for one operation schema.",
@@ -11733,81 +11733,5 @@
       },
       "name": "evidence"
     }
-  ],
-  "resources": [
-    {
-      "uri": "mattanutra://contract/7.2.0/client-guide",
-      "name": "MattaNutra v7.2 client guide",
-      "mimeType": "text/markdown",
-      "description": "Workflow, complete operation semantics, advice and payment recovery examples."
-    },
-    {
-      "uri": "mattanutra://contract/7.2.0/schema",
-      "name": "MattaNutra v7.2 complete contract",
-      "mimeType": "application/schema+json",
-      "description": "Input and response contracts for all seven public tools and individual plan operations."
-    },
-    {
-      "uri": "mattanutra://contract/4.0.0/client-guide",
-      "name": "MattaNutra v4 client guide",
-      "mimeType": "text/markdown",
-      "description": "Workflow, complete operation semantics, advice and payment recovery examples."
-    },
-    {
-      "uri": "mattanutra://contract/4.0.0/schema",
-      "name": "MattaNutra v4 complete contract",
-      "mimeType": "application/schema+json",
-      "description": "Input and response contracts for all seven tools and individual plan operations."
-    },
-    {
-      "uri": "mattanutra://contract/5.0.0/client-guide",
-      "name": "MattaNutra v5 client-guide",
-      "mimeType": "text/markdown",
-      "description": "Frozen published contract 5.0.0 resource."
-    },
-    {
-      "uri": "mattanutra://contract/5.0.0/schema",
-      "name": "MattaNutra v5 schema",
-      "mimeType": "application/schema+json",
-      "description": "Frozen published contract 5.0.0 resource."
-    },
-    {
-      "uri": "mattanutra://contract/6.0.0/client-guide",
-      "name": "MattaNutra v6 client-guide",
-      "mimeType": "text/markdown",
-      "description": "Frozen published contract 6.0.0 resource."
-    },
-    {
-      "uri": "mattanutra://contract/6.0.0/schema",
-      "name": "MattaNutra v6 schema",
-      "mimeType": "application/schema+json",
-      "description": "Frozen published contract 6.0.0 resource."
-    },
-    {
-      "uri": "mattanutra://contract/7.0.0/client-guide",
-      "name": "Historical MattaNutra v7.0 client guide",
-      "mimeType": "text/markdown",
-      "description": "Historical 7.0.0 contract; current tools advertise the current version."
-    },
-    {
-      "uri": "mattanutra://contract/7.0.0/schema",
-      "name": "Historical MattaNutra v7.0 contract",
-      "mimeType": "application/schema+json",
-      "description": "Historical 7.0.0 contract; current tools advertise the current version."
-    },
-    {
-      "uri": "mattanutra://contract/7.1.0/client-guide",
-      "name": "MattaNutra v7.1 client guide",
-      "mimeType": "text/markdown",
-      "description": "Workflow, complete operation semantics, advice and payment recovery examples."
-    },
-    {
-      "uri": "mattanutra://contract/7.1.0/schema",
-      "name": "MattaNutra v7.1 complete contract",
-      "mimeType": "application/schema+json",
-      "description": "Input and response contracts for all six public tools and individual plan operations."
-    }
-  ],
-  "transport": "streamable-http",
-  "url": "https://dev.mattanutra.com/api/mcp"
+  ]
 }

@@ -66,7 +66,7 @@ export const PLAN_CONVERSATION_SCHEMA = o({ ...presentationBase, responseView: T
   summary: s, operationalDecision: p(OPERATIONAL_DECISION_SCHEMA), nextActions: ss,
   selectedOptionId: n(s), highlightedAlternativeOptionId: n(s), options: a(conversationOption),
   advice: a(o({ ...ADVICE_SCHEMA.properties, adviceId: s })), planAdviceIds: Type.Array(s, { description: "Plan-wide findings, resolved in this response’s advice array even when there is no product option." }),
-  ...Type.Pick(PLAN_SUCCESS_SCHEMA, ["purchaseRequiredNow", "nextReplenishmentDay", "shippingMinor", "estimatedOrderTotalMinor", "questions", "pollAfterSeconds", "searchSummary", "refreshRequired", "sourceContractVersion", "reasonCode", "suggestedGroups", "unsupportedTargets"]).properties,
+  ...Type.Pick(PLAN_SUCCESS_SCHEMA, ["purchaseRequiredNow", "nextReplenishmentDay", "shippingMinor", "estimatedOrderTotalMinor", "questions", "pollAfterSeconds", "searchSummary", "refreshRequired", "sourceContractVersion", "reasonCode", "suggestedGroups", "unsupportedTargets", "evidenceHandle", "alternativeSearch"]).properties,
   availableDetails: a(detailSections) });
 const detailOption = Type.Pick(OPTION_SCHEMA, ["optionId", "basket", "coverage", "advice", "doseFit", "economics"]);
 export const PLAN_DETAILS_SCHEMA = o({ ...presentationBase, responseView: Type.Literal("details"), sections: a(detailSections),

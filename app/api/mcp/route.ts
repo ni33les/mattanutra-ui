@@ -4,6 +4,7 @@ import { createLogger } from "@/lib/logger";
 import { requestCorrelationId } from "@/lib/request-correlation";
 import { AGENTIC_CONTRACT_VERSION, loadAgenticConfig } from "@/lib/agentic/config";
 import { agenticServerInstructions } from "@/lib/agentic/contract";
+import { CLIENT_CONTRACT_VERSION_HEADER } from "@/lib/agentic/contract/presentation-default";
 import {
   canonicalPublicToolName,
   handleLightweightJsonRpc,
@@ -185,7 +186,7 @@ async function handlePost(request: Request) {
     const runtime = bindQaRuntime(live, request, qaNamespace);
 
     const result = await withQaSessionSnapshot(qaNamespace || undefined, () =>
-      handleJsonRpc(runtime, body as JsonRpcRequest)
+      handleJsonRpc({ ...runtime, clientContractVersion: request.headers.get(CLIENT_CONTRACT_VERSION_HEADER) ?? undefined }, body as JsonRpcRequest)
     );
 
     if (!result) {
