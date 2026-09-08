@@ -1,6 +1,7 @@
 import { canonicalHash } from "@/lib/agentic/value/canonical";
 import { agenticMessage } from "@/lib/agentic/i18n";
 import type { PlanSuccessWire, PlanConversationWire } from "@/lib/agentic/contract/outputs";
+import { CONVERSATION_FINDING_KEYS } from "@/lib/agentic/contract/outputs";
 import type { Locale } from "@/lib/i18n";
 
 type Advice = NonNullable<PlanSuccessWire["safetyGuidance"]>[number];
@@ -68,8 +69,7 @@ export function groupConversationAdvice(rows: PlanConversationWire["advice"], lo
     return { adviceId, guidanceId: adviceId, ruleId: `conversation_group:${kind}`, rulesVersion: findings[0].rulesVersion,
       kind: kind === "dose_review" ? "other" as const : kind as Advice["kind"], severity: severity as Advice["severity"], action: "review" as const,
       message, threshold: null, exposure: null, unit: null,
-      findings: findings.map(({ guidanceId, ruleId, kind, severity, nutrientName, exposure, threshold, unit, sourceScope, comparator, authorityUrl, referenceConfidence, referenceBasis }) =>
-        ({ guidanceId, ruleId, kind, severity, nutrientName, exposure, threshold, unit, sourceScope, comparator, authorityUrl, referenceConfidence, referenceBasis })) };
+      findings: findings.map(row => Object.fromEntries(CONVERSATION_FINDING_KEYS.filter(key => Object.hasOwn(row, key)).map(key => [key, row[key]])) as NonNullable<PlanConversationWire["advice"][number]["findings"]>[number]) };
   });
   return { rows: grouped, ids };
 }

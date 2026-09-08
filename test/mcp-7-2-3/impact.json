@@ -1,0 +1,124 @@
+{
+  "scope": "mcp_723_refinement_and_conversation",
+  "releaseBase": "380a1dd08ededd7dfcf25aef45ab3c4649b65b2b",
+  "testPolicy": "Affected tests only. No matching arithmetic, database schema or checkout changes. No retries, skips or full-suite claim. Actual installed connector verification is separate.",
+  "files": [
+    {
+      "file": "test/mcp-7-2-3/listing.test.ts",
+      "expectedCases": 3,
+      "reason": "Actual installed listing or generated native projection; external observation remains separate"
+    },
+    {
+      "file": "test/mcp-7-2-3/identity.test.ts",
+      "expectedCases": 1,
+      "reason": "Shared published schemas and contract identities"
+    },
+    {
+      "file": "test/mcp-7-2-3/transport.test.ts",
+      "expectedCases": 2,
+      "reason": "Concise body and compatibility status size"
+    },
+    {
+      "file": "test/mcp-7-2-3/advice.test.ts",
+      "expectedCases": 4,
+      "reason": "Bounded foreground notices with preserved distinct measurements"
+    },
+    {
+      "file": "test/mcp-7-2-3/expanded.test.ts",
+      "expectedCases": 3,
+      "reason": "Two independent expanded workers with HTTP hydration timeout recovery"
+    },
+    {
+      "file": "test/mcp-7-2-3/dependency-errors.test.ts",
+      "expectedCases": 1,
+      "reason": "Dependency recovery only, original identity and unexpected-fault preservation"
+    },
+    {
+      "file": "test/mcp-7-2-3/goldens.test.ts",
+      "expectedCases": 4,
+      "reason": "Exact D3 and AF K2/D3 requests, partial choice summary, view and advisory locks"
+    },
+    {
+      "file": "test/mcp-7-2-3/deployment.test.ts",
+      "expectedCases": 1,
+      "reason": "DEV-only whitelisted work-package proof"
+    },
+    {
+      "file": "test/mcp-7-2-2/advice.test.ts",
+      "expectedCases": 4,
+      "reason": "Foreground advice and single explicit uncertainty notice"
+    },
+    {
+      "file": "test/mcp-7-2-2/deployment.test.ts",
+      "expectedCases": 1,
+      "reason": "Whitelisted DEV proof and artifact integrity"
+    },
+    {
+      "file": "test/mcp-7-2-2/locks.test.ts",
+      "expectedCases": 3,
+      "reason": "Existing discovery promises and per-operation schemas"
+    },
+    {
+      "file": "test/mcp-7-2-2/medications.test.ts",
+      "expectedCases": 2,
+      "reason": "Recognized versus assessed medication and condition guidance"
+    },
+    {
+      "file": "test/mcp-7-2-2/transport.test.ts",
+      "expectedCases": 2,
+      "reason": "Conversation and status clone elimination and state summaries"
+    },
+    {
+      "file": "test/mcp-7-2-1/transport.test.ts",
+      "expectedCases": 3,
+      "reason": "Structured-result opt-in, compatibility text and status semantics"
+    },
+    {
+      "file": "test/mcp-7-2-1/advice.test.ts",
+      "expectedCases": 3,
+      "reason": "Foreground advice, missing-reference consolidation and rule classification"
+    },
+    {
+      "file": "test/mcp-7-2-1/deployment.test.ts",
+      "expectedCases": 2,
+      "reason": "DEV-only evidence verification and scoped test hygiene"
+    },
+    {
+      "file": "test/mcp-agent-surface/contracts.test.ts",
+      "expectedCases": 3,
+      "reason": "Emitted seven-tool schemas, ordinary discovery and compatibility documentation"
+    },
+    {
+      "file": "test/mcp-agent-surface/compatibility.test.ts",
+      "expectedCases": 1,
+      "reason": "Explicit views and the existing 7.2 compatibility window"
+    },
+    {
+      "file": "test/mcp-payload/projection.test.ts",
+      "expectedCases": 4,
+      "reason": "All existing option/dose/value projections and changed inline advice semantics"
+    },
+    {
+      "file": "test/mcp-payload/text-status.test.ts",
+      "expectedCases": 1,
+      "reason": "Unchanged text-only payment, refund and operation-failure summaries"
+    },
+    {
+      "file": "test/mcp-payload/transport.test.ts",
+      "expectedCases": 4,
+      "reason": "Presentation-independent replay, stale details, selection and frozen legacy checkout"
+    }
+  ],
+  "inputs": [
+    "test/fixtures/matcher-experiments/anna-dev.json",
+    "test/fixtures/matcher-experiments/manifest.json",
+    "test/fixtures/ax-refinement/dev-corrections.json",
+    "test/fixtures/ax-refinement/six-profiles.json",
+    "test/fixtures/mcp-payload/baseline.json.gz",
+    "test/fixtures/mcp-payload/manifest.json",
+    "test/fixtures/mcp-payload/journeys.json.gz",
+    "test/fixtures/mcp-payload/journeys-manifest.json",
+    "data/catalogue-corrections/mcp-7.2.2-dev.json",
+    "test/fixtures/mcp-7-2-3/goldens.json"
+  ]
+}

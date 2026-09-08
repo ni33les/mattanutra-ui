@@ -7,6 +7,8 @@ import { runtime, rpc, uninstallRealCatalogue } from "../ax-refinement/helpers.t
 import { resetPlanCreateInflightForTests } from "../../lib/agentic/plan/service.ts";
 import { useLiveServiceClock } from "../../lib/agentic/qa/service-clock.ts";
 import type { PlanSuccessWire, PlanConversationWire } from "../../lib/agentic/contract/outputs.ts";
+import { projectPlan } from "../../lib/agentic/presentation/plan.ts";
+import { toolResult } from "../../lib/agentic/mcp/rpc.ts";
 const app = runtime("m723-goldens");
 const results: Record<string, { create: Record<string, unknown>; conversation: PlanConversationWire; full: PlanSuccessWire; elapsedMs: number }> = {};
 before(async () => {
@@ -56,6 +58,14 @@ test("locks_omit_views_status_speed_and_unassessed_context", async () => {
     assert.equal(same.unchanged, true); assert.ok(Buffer.byteLength(JSON.stringify(same)) < 2000);
   }
   assert.ok(results.d3.elapsedMs <= 15000);
+  for (const locale of ["en", "th", "zh-CN"]) {
+    const projected = projectPlan({ ...results.d3.full, locale }, { responseView: "conversation" });
+    assert.ok(Buffer.byteLength(JSON.stringify(projected)) < 20000);
+    assert.ok(Buffer.byteLength(JSON.stringify({ jsonrpc: "2.0", id: 1, result: toolResult(projected) })) < 22000);
+    assert.ok(projected.advice.length <= 5);
+    assert.equal(projected.advice.filter(row => row.kind === "incomplete_information").length, 1);
+    assert.deepEqual(projected.options.map(row => row.optionId), results.d3.full.options!.map(row => row.optionId));
+  }
   const text = results.k2_d3.conversation.advice.map(row => row.message).join(" ");
   assert.match(text, /apixaban/); assert.match(text, /atrial_fibrillation/); assert.match(text, /not (?:been )?assessed/);
 });

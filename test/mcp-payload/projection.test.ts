@@ -31,7 +31,11 @@ test("PAY-VIEW-01 eighteen frozen decisions retain all choices, doses, amounts, 
           assert.equal(notice.threshold, null);
           for (const code of finding.uncertaintyCodes ?? []) assert.ok(notice.uncertaintyCodes?.includes(code));
           for (const id of finding.productIds ?? []) assert.ok(notice.productIds?.includes(id));
-        } else assert.ok(inline.some(row => JSON.stringify({ ...row, message: finding.message }) === JSON.stringify(finding)), finding.ruleId);
+        } else {
+          const preserved = inline.flatMap(row => row.findings ?? [row]).find(row => row.guidanceId === finding.guidanceId && row.exposure === finding.exposure && row.threshold === finding.threshold && row.authorityUrl === finding.authorityUrl && row.uncertainty === finding.uncertainty);
+          assert.ok(preserved, finding.ruleId);
+          for (const key of ["ruleId", "severity", "nutrientName", "unit", "sourceScope", "uncertainty", "evidence"] as const) assert.deepEqual(preserved[key], finding[key]);
+        }
       }
       if (option.basket) {
         assert.deepEqual(option.basket.map(row => [row.productId,row.servingsPerDay,row.quantity,row.unitPriceMinor,row.lineTotalMinor,row.dailyPills]), old.basket!.map(row => [row.productId,row.servingsPerDay,row.quantity,row.unitPriceMinor,row.lineTotalMinor,row.dailyPills]));
@@ -66,7 +70,7 @@ test("PAY-VIEW-03 advice with identical rule IDs but different exposure, source 
   plan.options![0].advice!.push({ ...first, exposure: 999, threshold: 100, authorityUrl: "https://example.org/reference", uncertainty: "Different measured exposure" });
   const compact = projectPlan(plan, { responseView: "conversation" });
   assert.ok(compact.ok && "advice" in compact && "options" in compact);
-  const advice = compact.options[0].adviceIds.map(id => compact.advice.find(row => row.adviceId === id)!);
+  const advice = compact.options[0].adviceIds.flatMap(id => { const row = compact.advice.find(row => row.adviceId === id)!; return row.findings ?? [row]; });
   assert.equal(advice.length, plan.options![0].advice!.length);
   assert.ok(advice.some(row => row.exposure === 999 && row.threshold === 100));
 });
