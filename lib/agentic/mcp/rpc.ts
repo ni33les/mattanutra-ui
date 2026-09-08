@@ -176,7 +176,8 @@ export function toolText(value: unknown) {
 const responseLog = createLogger("agentic.mcp.payload");
 function structuredSummary(value: unknown) {
   const row = record(value);
-  const lines = [toolText(value)];
+  // Questions remain structured; the text capability is summary plus next action.
+  const lines = [typeof row.summary === "string" && row.summary.trim() ? row.summary : toolText(value)];
   const next = record(row.operationalDecision).nextAction ?? row.nextAction ??
     (Array.isArray(row.nextActions) ? row.nextActions.join(", ") : undefined);
   if (typeof next === "string" && next) lines.push(`Next: ${next}`);
