@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {readFileSync,existsSync} from 'node:fs';
+import {readFileSync,existsSync,statSync} from 'node:fs';
 import {resolve,dirname} from 'node:path';
 import {builtinModules} from 'node:module';
 import {isDeepStrictEqual} from 'node:util';
@@ -9,7 +9,7 @@ import ts from 'typescript';
 test('AXR-SRCH-01 shared web matcher never imports server checkpoint codecs or Node builtins',()=>{
  const root=resolve('.'),visited=new Set<string>(),violations:string[]=[];
  function visit(file:string){
-  if(visited.has(file))return;
+  if(!visited.has(file)){
   visited.add(file);
   const ast=ts.createSourceFile(file,readFileSync(file,'utf8'),ts.ScriptTarget.Latest,true);
   for(const node of ast.statements){
@@ -20,8 +20,9 @@ test('AXR-SRCH-01 shared web matcher never imports server checkpoint codecs or N
    if(name.startsWith('node:')||builtinModules.includes(name))violations.push(`${file}: ${name}`);
    if(!name.startsWith('@/')&&!name.startsWith('.'))continue;
    const base=name.startsWith('@/')?resolve(root,name.slice(2)):resolve(dirname(file),name);
-   const dependency=[base,`${base}.ts`,`${base}.tsx`,`${base}/index.ts`].find(existsSync);
+   const dependency=[base,`${base}.ts`,`${base}.tsx`,`${base}/index.ts`].find(path=>existsSync(path)&&statSync(path).isFile());
    assert.ok(dependency,`Unresolved web dependency: ${file} -> ${name}`);visit(dependency);
+  }
   }
  }
  visit(resolve('lib/matcher/adapters/web.ts'));
