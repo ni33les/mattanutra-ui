@@ -12,6 +12,7 @@ import type {
   PaymentAttemptRecord,
   PaymentAuditRecord,
   PlanRecord,
+  PlanOperationRecord,
   PlanRevisionRecord,
   ProviderEventRecord,
   RetailOrderLinkRecord,
@@ -36,6 +37,7 @@ export function createMemoryStore(): AgenticStore {
   const paymentAttempts = new Map<string, PaymentAttemptRecord[]>();
   const paymentAudits = new Map<string, PaymentAuditRecord[]>();
   const plans = new Map<string, PlanRecord>();
+  const operations = new Map<string, PlanOperationRecord>();
   const providerEvents = new Map<string, ProviderEventRecord>();
   const retailLinks = new Map<string, RetailOrderLinkRecord>();
   const revisions = new Map<string, PlanRevisionRecord>();
@@ -52,15 +54,33 @@ export function createMemoryStore(): AgenticStore {
 
   const transactions = new AsyncLocalStorage<boolean>();
   let tail: Promise<unknown> = Promise.resolve();
-  const maps = [catalogues, capabilities, checkouts, feedback, fulfilment, idempotency, orderItems, orders, outbox, paymentAttempts, paymentAudits, plans, providerEvents, retailLinks, revisions, supportCases, supportMessages] as Map<string, unknown>[];
+  const maps = [catalogues, capabilities, checkouts, feedback, fulfilment, idempotency, orderItems, orders, outbox, paymentAttempts, paymentAudits, plans, operations, providerEvents, retailLinks, revisions, supportCases, supportMessages] as Map<string, unknown>[];
 
   const store: AgenticStore = {
+    async getPlanOperation(id) { return clone(operations.get(id) ?? null); },
+    async getPlanOperationByKey(ownerScope, key) {
+      return clone([...operations.values()].find(row => row.ownerScope === ownerScope && row.key === key) ?? null);
+    },
+    async getActivePlanOperation(planId) {
+      return clone([...operations.values()].filter(row => row.planId === planId && ["queued", "running", "retryable"].includes(row.status))
+        .sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id))[0] ?? null);
+    },
+    async insertPlanOperation(record) {
+      if (!transactions.getStore()) throw new Error("Plan admission requires a transaction");
+      if (operations.has(record.id) || [...operations.values()].some(row => row.ownerScope === record.ownerScope && row.key === record.key)) throw new Error("idempotency_conflict");
+      operations.set(record.id, clone(record));
+    },
+    async updatePlanOperation(record, expectedVersion) {
+      if (operations.get(record.id)?.version !== expectedVersion) return false;
+      operations.set(record.id, clone(record)); return true;
+    },
     async getCatalogueSnapshot(id) { return catalogues.get(id) ?? null; },
     async insertCatalogueSnapshot(id, snapshot) { catalogues.set(id, clone(snapshot)); },
     async deletePrincipalScope(principalScope) {
       const planIds = [...plans.values()]
         .filter((record) => record.principalScope === principalScope)
         .map((record) => record.id);
+      for (const [id, operation] of operations) if (planIds.includes(operation.planId)) operations.delete(id);
       const orderIds = [...orders.values()]
         .filter(
           (record) =>
@@ -134,6 +154,7 @@ export function createMemoryStore(): AgenticStore {
       paymentAttempts.clear();
       paymentAudits.clear();
       plans.clear();
+      operations.clear();
       providerEvents.clear();
       retailLinks.clear();
       revisions.clear();

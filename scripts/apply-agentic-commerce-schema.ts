@@ -31,6 +31,21 @@ create table if not exists public.agentic_plan_revisions (
   primary key (plan_id, revision)
 );
 
+create table if not exists public.agentic_plan_operations (
+  id uuid primary key,
+  plan_id uuid not null references public.agentic_plans(id) on delete restrict,
+  owner_scope text not null,
+  idempotency_key text not null,
+  status text not null check (status in ('queued','running','retryable','complete','failed','cancelled')),
+  version integer not null check (version > 0),
+  record_json jsonb not null,
+  created_at timestamptz not null,
+  updated_at timestamptz not null,
+  unique(owner_scope,idempotency_key)
+);
+create index if not exists agentic_plan_operations_active_idx on public.agentic_plan_operations(plan_id,created_at,id)
+  where status in ('queued','running','retryable');
+
 create table if not exists public.agentic_capabilities (
   id uuid primary key,
   capability_hash text not null unique,
@@ -414,6 +429,7 @@ begin
       public.agentic_catalogue_snapshots,
       public.agentic_plans,
       public.agentic_plan_revisions,
+      public.agentic_plan_operations,
       public.agentic_capabilities,
       public.agentic_idempotency_records,
       public.agentic_orders,

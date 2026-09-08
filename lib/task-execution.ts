@@ -228,6 +228,22 @@ export async function executeTaskWorkItem(
   workItem: TaskWorkItem,
   runtime: TaskExecutionRuntime = {}
 ) {
+  if (workItem.taskType === "match_agentic_plan") {
+    const { runAdmittedPlanOperation } = await import("@/lib/agentic/plan/service");
+    const { createRuntimeStore } = await import("@/lib/agentic/store/postgres");
+    const { loadAgenticConfig } = await import("@/lib/agentic/config");
+    const store = createRuntimeStore(), config = loadAgenticConfig();
+    const { setTimeout: wait } = await import("node:timers/promises");
+    for (;;) {
+      throwIfTaskExecutionAborted(runtime);
+      const result = await runAdmittedPlanOperation({ store, config, operationId: workItem.operationId, signal: runtime.signal });
+      if (!result.ok) throw new Error(result.error.reasonCode);
+      if (result.status !== "processing") return { operationId: workItem.operationId, revision: result.revision, status: result.status };
+      // Observe the admitted operation while its short lease belongs to the
+      // HTTP-started worker. This never consumes another search expansion.
+      await wait(1000, undefined, { signal: runtime.signal });
+    }
+  }
   if (workItem.taskType === "send_healthscore_email") {
     const { deliverHealthScore } = await import("@/lib/healthscore-delivery");
     return deliverHealthScore(workItem.deliveryRequestId);

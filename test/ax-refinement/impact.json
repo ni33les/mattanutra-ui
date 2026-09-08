@@ -16,12 +16,12 @@
     {
       "id": "AXR-REL-03",
       "slice": "reliability",
-      "file": "test/ax-refinement/reliability.test.ts"
+      "file": "test/ax-refinement/operations.test.ts"
     },
     {
       "id": "AXR-REL-04",
       "slice": "reliability",
-      "file": "test/ax-refinement/reliability.test.ts"
+      "file": "test/ax-refinement/operations.test.ts"
     },
     {
       "id": "AXR-REL-05",
@@ -229,6 +229,18 @@
       "slice": "contract",
       "reason": "Directly asserts the contract behaviour of this approved DEV work package.",
       "database": false
+    },
+    {
+      "file": "test/ax-refinement/operations.test.ts",
+      "slice": "reliability",
+      "reason": "Directly asserts durable operation admission, ownership and transaction rollback for plan refinement.",
+      "database": false
+    },
+    {
+      "file": "test/ax-refinement/operations.integration.test.ts",
+      "slice": "reliability",
+      "reason": "Directly asserts durable operation admission, ownership and transaction rollback for plan refinement.",
+      "database": true
     }
   ]
 }

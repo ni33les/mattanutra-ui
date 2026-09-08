@@ -424,6 +424,7 @@ export type RetailOperationsReviewWorkItem = Readonly<{
 }>;
 
 export type TaskWorkItem =
+  | Readonly<{ taskId: string; taskType: "match_agentic_plan"; operationId: string }>
   | Readonly<{ taskId: string; taskType: "send_healthscore_email"; deliveryRequestId: string }>
   | Readonly<{ taskId: string; taskType: "fulfill_web_payment"; paymentId: string }>
   | Readonly<{ taskId: string; taskType: "superseded_generation" }>
@@ -2338,6 +2339,7 @@ function buildWebPaymentFulfillmentWorkItem(task: TaskRecord) {
 }
 
 const taskWorkItemHandlers: Readonly<Record<string, TaskWorkItemBuilder>> = {
+  match_agentic_plan: task => ({ taskId: task.id, taskType: "match_agentic_plan", operationId: payloadText(task.payload, "operationId") }),
   [ADMIN_CATALOGUE_OPTIMIZATION_TASK_TYPE]: buildAdminCatalogueOptimizationWorkItem,
   analyze_healthscore: buildHealthScoreWorkItem,
   carrier_event_process: buildCarrierShipmentWorkItem,

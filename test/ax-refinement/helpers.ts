@@ -31,6 +31,9 @@ export function uninstallRealCatalogue() {
   replaceCatalogueSnapshot(null); resetCatalogueSnapshotCache(); resetMatcherSafetyCeilings(); resetCataloguePins(); resetInfoCache(); resetQaPersistForTests();
 }
 export function runtime(principal: string, store: AgenticStore = createMemoryStore()) {
+  // The real reconstructed fixture's epoch is immutable in this in-memory
+  // harness. PostgreSQL publication fencing is exercised separately.
+  store.isCatalogueRevisionCurrent ??= async expected => expected === 99;
   return createAgenticRuntime({ store, now: AX_CLOCK, scope: { environment: "dev", tenantScope: "mattanutra", principalScope: `ax-refinement:${principal}` } });
 }
 export async function rpc(instance: ReturnType<typeof runtime>, tool: string, args: Record<string, unknown>) {

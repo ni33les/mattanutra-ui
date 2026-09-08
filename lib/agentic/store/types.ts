@@ -38,6 +38,31 @@ export type PlanRecord = Readonly<{
   updatedAt: string;
 }>;
 
+/** Internal durable work; capabilities and the public plan/get protocol remain
+ * the customer interface. Secrets are never included in command/checkpoint. */
+export type PlanOperationRecord = Readonly<{
+  id: string;
+  planId: string;
+  ownerScope: string;
+  key: string;
+  requestHash: string;
+  expectedRevision: number;
+  revision: number;
+  taskId: string;
+  status: "queued" | "running" | "retryable" | "complete" | "failed" | "cancelled";
+  version: number;
+  leaseToken: string | null;
+  leaseExpiresAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  command: Readonly<{ payload: unknown; prepared: Record<string, unknown>; scope: import("@/lib/agentic/capabilities").CapabilityScope }>;
+  checkpoint: unknown;
+  catalogueIdentity: string | null;
+  referenceIdentity: string | null;
+  response: unknown;
+  error: unknown;
+}>;
+
 export type PlanRevisionRecord = Readonly<{
   availabilityAsOf: string;
   catalogueVersion: string;
@@ -199,6 +224,12 @@ export type FeedbackRecord = Readonly<{
 }>;
 
 export type AgenticStore = {
+  getPlanOperation(id: string): Promise<PlanOperationRecord | null>;
+  getPlanOperationByKey(ownerScope: string, key: string): Promise<PlanOperationRecord | null>;
+  getActivePlanOperation(planId: string): Promise<PlanOperationRecord | null>;
+  /** Insert operation and its framework task in the caller's transaction. */
+  insertPlanOperation(record: PlanOperationRecord): Promise<void>;
+  updatePlanOperation(record: PlanOperationRecord, expectedVersion: number): Promise<boolean>;
   getCatalogueSnapshot(id: string): Promise<import("@/lib/agentic/catalogue/types").CatalogueSnapshot | null>;
   insertCatalogueSnapshot(id: string, snapshot: import("@/lib/agentic/catalogue/types").CatalogueSnapshot): Promise<void>;
   deleteAll(): Promise<void>;

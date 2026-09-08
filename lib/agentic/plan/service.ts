@@ -2,7 +2,9 @@ import { catalogueSnapshotId } from "@/lib/agentic/catalogue/freeze";
 import { validateProductDoseProposals } from "@/lib/matcher/serving-grid";
 import { toMatcherProduct } from "@/lib/agentic/plan/to-matcher-product";
 import { mergeRequestPatch, originalRequestFor } from "@/lib/agentic/plan/request-patch";
-import { requestLifetime } from "@/lib/request-lifetime";
+import { requestLifetime, withRequestLifetime } from "@/lib/request-lifetime";
+import { admitPlanOperation, claimPlanOperation, failPlanOperation, updateClaimedOperation } from "@/lib/agentic/plan/operations";
+import type { PlanOperationRecord } from "@/lib/agentic/store/types";
 import { AsyncLocalStorage } from "node:async_hooks";
 import type { Locale } from "@/lib/i18n";
 import type { AgenticConfig } from "@/lib/agentic/config";
@@ -65,6 +67,7 @@ import {
   serviceDeadlineError,
   waitUntilDeadline
 } from "@/lib/agentic/qa/service-clock";
+import { waitForServiceDelay } from "@/lib/agentic/qa/service-clock";
 import { buildHorizonPlan } from "@/lib/agentic/value/inventory-ledger";
 import { DEFAULT_MATCHER_CONFIG } from "@/lib/matcher/config";
 import { isDoseError, scaleAmount } from "@/lib/matcher/dose";
@@ -126,6 +129,7 @@ export function resetPlanCreateInflightForTests() {
 }
 
 type PlanAttempt = Readonly<{
+  operation?: PlanOperationRecord;
   correlationId: string;
   signal?: AbortSignal;
   releases: Set<() => void>;
@@ -519,7 +523,7 @@ async function buildResult(input: Readonly<{
           state: input.state
         })
       }
-    : process.env.NODE_TEST_CONTEXT
+    : process.env.NODE_TEST_CONTEXT && process.env.AX_REFINEMENT_REAL_WORKERS !== "1"
       ? matchPlan({ snapshot: input.snapshot, state: input.state })
       : await matchPlanInWorker({ snapshot: input.snapshot, state: input.state });
   const searchMs = Math.max(0, Date.now() - searchStartedAt);
@@ -901,6 +905,7 @@ async function commitTerminalIdempotency(input: Readonly<{
 }
 
 type PreparedPlanCommand = Readonly<{
+  operationId?: string;
   effectiveRequest?: PlanRequest;
   answers: readonly PlanAnswer[];
   ack: SafetyAcknowledgement | null;
@@ -920,7 +925,7 @@ type PreparedPlanCommand = Readonly<{
   state: CanonicalPlanState;
 }>;
 
-export async function planTool(input: Readonly<{
+type PlanExecutionInput = Readonly<{
   config: AgenticConfig;
   deferProcessing?: boolean;
   matchPort?: PlanMatchPort;
@@ -928,7 +933,68 @@ export async function planTool(input: Readonly<{
   payload: PlanToolInput;
   scope: CapabilityScope;
   store: AgenticStore;
+}>;
+
+const inflightDurableOperations = new Map<string, Promise<PlanToolSuccess | AgenticErrorResult>>();
+
+function operationProcessingResponse(operation: PlanOperationRecord) {
+  const prepared = operation.command.prepared as PreparedPlanCommand;
+  return successFromResult({ locale: prepared.locale, planHandle: prepared.planHandle,
+    result: prepared.processing, revision: operation.revision });
+}
+
+/** One admitted operation owns work independently of any transport attempt. */
+export async function runAdmittedPlanOperation(input: Readonly<{
+  store: AgenticStore; config: AgenticConfig; operationId: string; signal?: AbortSignal;
 }>): Promise<PlanToolSuccess | AgenticErrorResult> {
+  const existingWork = inflightDurableOperations.get(input.operationId);
+  if (existingWork) return existingWork;
+  const operation = await input.store.getPlanOperation(input.operationId);
+  if (!operation) return businessError({ reasonCode: "not_found", message: "Matching operation not found." });
+  if (operation.status === "complete") return operation.response as PlanToolSuccess;
+  if (operation.status === "cancelled" || operation.status === "failed") return (operation.error as AgenticErrorResult | null) ?? businessError({ reasonCode: "stale_revision", message: "This matching operation is no longer active. Reload the plan." });
+  const claim = await claimPlanOperation(input.store, operation.id, nextTestUuid(), new Date().toISOString());
+  if (!claim) return operationProcessingResponse(operation);
+  const controller = new AbortController();
+  const signal = input.signal ? AbortSignal.any([input.signal, controller.signal]) : controller.signal;
+  const attempt: PlanAttempt = { correlationId: `plan-operation:${claim.id}`, signal, releases: new Set(), operation: claim };
+  const prepared = claim.command.prepared as PreparedPlanCommand;
+  const work = withRequestLifetime({ signal, correlationId: attempt.correlationId }, () => planAttempts.run(attempt, async () => {
+    try {
+      const result = await completePreparedPlan(prepared, {
+        config: input.config, now: claim.createdAt, payload: claim.command.payload as PlanToolInput,
+        scope: claim.command.scope, store: input.store
+      }, !(claim.command.payload as PlanToolInput).planHandle, Date.now());
+      if (isAgenticErrorResult(result)) {
+        const status = result.error.retryable ? "retryable" : "failed";
+        await updateClaimedOperation(input.store, claim, { status, error: result }, new Date().toISOString());
+      }
+      return result;
+    } catch (error) {
+      const result = businessError({ reasonCode: "temporarily_unavailable", retryable: true,
+        message: "Matching could not finish. Retry this operation with the same key and unchanged request." });
+      await failPlanOperation(input.store, claim, result, new Date().toISOString());
+      console.error("[agentic-plan-operation]", { operationId: claim.id, origin: error instanceof Error ? error.name : "unknown", message: error instanceof Error ? error.message : "operation_failed" });
+      return result;
+    }
+  })).finally(() => { inflightDurableOperations.delete(claim.id); releaseAttempt(attempt); });
+  inflightDurableOperations.set(claim.id, work);
+  return work;
+}
+
+async function admittedResponse(input: PlanExecutionInput, operation: PlanOperationRecord) {
+  if (operation.status === "complete") return operation.response as PlanToolSuccess;
+  const work = runAdmittedPlanOperation({ config: input.config, store: input.store, operationId: operation.id });
+  if (input.payload.operation === "get") {
+    void work.catch(() => undefined);
+    return operationProcessingResponse(operation);
+  }
+  const handoff = waitForServiceDelay(PLAN_MATCH_RETURN_BUDGET_MS);
+  try { return await Promise.race([work, handoff.then(() => operationProcessingResponse(operation))]); }
+  finally { handoff.cancel(); }
+}
+
+export async function planTool(input: PlanExecutionInput): Promise<PlanToolSuccess | AgenticErrorResult> {
   if (input.scope.principalScope?.startsWith("qa-v3:")) {
     setQueryNamespace(input.scope.principalScope);
   }
@@ -1014,6 +1080,21 @@ async function executePlanTool(input: Readonly<{
   const loadLiveCatalogue =
     !input.matchPort && !input.payload.planHandle;
   const ownerScope = `${input.scope.environment}:${input.scope.tenantScope}:${input.scope.principalScope ?? "anon"}`;
+  if (!input.matchPort && input.payload.idempotencyKey) {
+    const admitted = await input.store.getPlanOperationByKey(ownerScope, input.payload.idempotencyKey);
+    if (admitted) {
+      if (admitted.requestHash !== canonicalRequestHash(input.payload)) return businessError({ fieldPath: "idempotencyKey", reasonCode: "idempotency_conflict", message: "This key belongs to a different request." });
+      return admittedResponse(input, admitted);
+    }
+  }
+  if (!input.matchPort && input.payload.operation === "get" && input.payload.planHandle) {
+    const capability = await resolveCapability({ action: "plan.read", config: input.config, handle: input.payload.planHandle,
+      now: input.now, resourceType: "plan", scope: input.scope, store: input.store });
+    if (!capability) return businessError({ reasonCode: "not_found", message: "Not found." });
+    const active = await input.store.getActivePlanOperation(capability.resourceId);
+    if (active && active.status !== "retryable") return admittedResponse(input, active);
+    if (active?.status === "retryable" && active.expectedRevision === active.revision) return active.error as AgenticErrorResult;
+  }
   const skipIdempotency =
     input.payload.operation === "get" || !input.payload.idempotencyKey;
   const replay = skipIdempotency
@@ -1353,7 +1434,7 @@ async function executePlanTool(input: Readonly<{
       }
     }
 
-    return {
+    const prepared: PreparedPlanCommand = {
       effectiveRequest,
       answers,
       ack,
@@ -1370,12 +1451,26 @@ async function executePlanTool(input: Readonly<{
       selectOptionId,
       shownRevision,
       state
-    } satisfies PreparedPlanCommand;
+    };
+    if (!input.matchPort && payload.operation !== "get" && payload.idempotencyKey) {
+      const operation = await admitPlanOperation(store, {
+        planId, ownerScope, key: payload.idempotencyKey, payload: input.payload,
+        expectedRevision: existingPlan?.currentRevision ?? revision, revision,
+        prepared, scope: input.scope, now: input.now
+      });
+      return { ...prepared, operationId: operation.id };
+    }
+    return prepared;
     });
   }
 
   if (!prepared || typeof prepared !== "object" || !("planId" in prepared)) {
     return prepared as AgenticErrorResult;
+  }
+  if (prepared.operationId) {
+    const operation = await input.store.getPlanOperation(prepared.operationId);
+    if (!operation) throw new Error("Admitted plan operation disappeared");
+    return admittedResponse(input, operation);
   }
 
   if (!prepared.resume && prepared.previous && isTerminalPlanStatus(prepared.previous.status)) {
@@ -1741,6 +1836,16 @@ async function completePreparedPlan(
     acceptedGaps: state.acceptedGaps.map((gap) => ({ ...gap, revision }))
   };
 
+  const activeOperation = planAttempts.getStore()?.operation;
+  if (activeOperation) {
+    const { matcherSafetyReferenceIdentity } = await import("@/lib/matcher/safety-ceilings");
+    const saved = await updateClaimedOperation(input.store, activeOperation, {
+      catalogueIdentity: catalogueSnapshotId(snapshot), referenceIdentity: matcherSafetyReferenceIdentity()?.fingerprint ?? null,
+      checkpoint: { stage: "normalized", state, catalogueId: catalogueSnapshotId(snapshot) }
+    }, new Date().toISOString());
+    if (!saved) return businessError({ reasonCode: "stale_revision", message: "This matching operation was cancelled or superseded. Reload the plan." });
+  }
+
   if (state.requirements.productDoses?.length) {
     const canonical = toCanonicalRequest(state);
     if ("error" in canonical) return businessError({ fieldPath: "request.requirements.productDoses", reasonCode: "invalid_request", message: canonical.error });
@@ -1821,6 +1926,13 @@ async function persistTerminalPlan(input: Readonly<{
   const response = await input.input.store.transaction(async (store) => {
     const plan = await store.getPlanForUpdate(input.planId);
     if (!plan) return businessError({ message: "Not found.", reasonCode: "not_found" });
+    const operationClaim = planAttempts.getStore()?.operation;
+    if (operationClaim) {
+      const active = await store.getPlanOperation(operationClaim.id);
+      if (!active || active.status !== "running" || active.leaseToken !== operationClaim.leaseToken || Date.parse(active.leaseExpiresAt ?? "") <= Date.now()) {
+        return businessError({ reasonCode: "stale_revision", message: "This matching operation no longer owns publication. Reload the plan." });
+      }
+    }
 
     const key = input.input.payload.idempotencyKey;
     if (key) {
@@ -1873,6 +1985,9 @@ async function persistTerminalPlan(input: Readonly<{
         key, now: input.input.now, ownerScope: input.ownerScope,
         payload: input.input.payload, planId: input.planId, response: success, store
       });
+    }
+    if (operationClaim && !await updateClaimedOperation(store, operationClaim, { status: "complete", response: success, error: null }, new Date().toISOString())) {
+      throw new Error("Plan operation lost publication ownership");
     }
     planAttempts.getStore()?.signal?.throwIfAborted();
     throwIfAborted(planCorrelationId(key));
