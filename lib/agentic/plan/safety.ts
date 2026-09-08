@@ -208,7 +208,7 @@ function guidance(input: Readonly<{
     productIds: input.productIds,
     ruleId: input.ruleId ?? family,
     rulesVersion: input.rulesVersion ?? GUIDANCE_RULES_VERSION,
-    severity: input.severity === "blocking" ? "high" : input.severity,
+    severity: missingReference ? "info" : input.severity === "blocking" ? "high" : input.severity,
     sourceScope: input.sourceScope ?? null,
     supplementIds: input.supplementIds,
     threshold: input.threshold ?? null,
