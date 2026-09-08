@@ -14,10 +14,11 @@ const globalDb = globalThis as typeof globalThis & {
 const BENIGN_SCHEMA_NOTICE_CODES = new Set(["42P07", "42701", "42710"]);
 const DEFAULT_DB_CONNECT_TIMEOUT_SECONDS = 5;
 const DEFAULT_DB_POOL_IDLE_TIMEOUT_SECONDS = 120;
-// Match DigitalOcean PgBouncer pool sizes: mn-dev=6, mn-uat=8, mn-pool-prd=8.
+// Runtime configuration matches PgBouncer: DEV/UAT=30, PRD=37.
+// Retain conservative fallbacks for unconfigured scripts and local clients.
 const DEFAULT_DB_POOL_MAX = 6;
 const DEFAULT_DB_WORKER_POOL_MAX = 6;
-const MAX_DB_POOL_MAX = 8;
+const MAX_DB_POOL_MAX = 37;
 const DEFAULT_DB_STATEMENT_TIMEOUT_MS = 15_000;
 const DEFAULT_DB_LOCK_TIMEOUT_MS = 2_000;
 const DEFAULT_DB_IDLE_IN_TXN_TIMEOUT_MS = 10_000;
