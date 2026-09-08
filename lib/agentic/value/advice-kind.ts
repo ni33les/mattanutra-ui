@@ -8,6 +8,7 @@ const RULE_KINDS: Record<SafetyGuidance["code"], AdviceKind> = {
 };
 /** Classification follows the generating rule; overlapping products alone do
  * not become evidence of a reference breach. Historical unknown rules survive. */
-export function adviceKind(row: Pick<SafetyGuidance, "code">): AdviceKind {
+export function adviceKind(row: Pick<SafetyGuidance, "code"> & { ruleId?: string }): AdviceKind {
+  if (row.code === "dose_review_required" && row.ruleId?.startsWith("ul:missing:")) return "incomplete_information";
   return RULE_KINDS[row.code] ?? "other";
 }

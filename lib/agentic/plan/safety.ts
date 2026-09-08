@@ -132,7 +132,8 @@ function guidance(input: Readonly<{
     input.code === "dose_review_required" &&
     input.action === "block" &&
     input.threshold === 0;
-  const messageKey = informationalOverlap
+  const missingReference = adviceKind(input) === "incomplete_information" && input.ruleId?.startsWith("ul:missing:");
+  const messageKey = missingReference ? "guidance.reference_unknown" : informationalOverlap
     ? "guidance.informational_overlap"
     : remainingZero
       ? "guidance.dose_review_required_remaining_zero"
@@ -194,8 +195,8 @@ function guidance(input: Readonly<{
     guidanceId,
     message: agenticMessage(input.locale, messageKey, {
       contributors: contributorLabel,
-      threshold: input.threshold ?? 0,
-      exposure: input.exposure ?? 0,
+      threshold: input.threshold ?? "unknown",
+      exposure: input.exposure ?? "unknown",
       nextAction,
       nutrientName: input.nutrientName ?? "",
       overflow: input.overflow ?? 0,

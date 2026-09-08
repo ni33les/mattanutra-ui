@@ -59,7 +59,7 @@ export const CONVERSATION_COVERAGE_KEYS = ["name", "unit", "basis", "requestedTa
 const conversationBasket = Type.Pick(BASKET_ITEM_SCHEMA, CONVERSATION_BASKET_KEYS);
 const conversationCoverage = Type.Pick(coverage, CONVERSATION_COVERAGE_KEYS);
 const conversationOption = o({ ...Type.Pick(OPTION_SCHEMA, ["optionId", "roles", "role", "selected", "recommended", "purchaseEligible", "stackSummary", "coveragePercent", "coverageSummary", "preferenceAssessment"]).properties,
-  basket: p(a(conversationBasket)), coverage: p(a(conversationCoverage)), adviceIds: Type.Array(s, { description: "Resolve these IDs in this response’s advice array; no detail call is required to review this option’s findings." }),
+  basket: p(a(conversationBasket)), coverage: p(a(conversationCoverage)), adviceIds: Type.Array(s, { description: "Inline advice for the selected and highlighted options. Empty on background options does not mean no findings: select an option or request its advice details. Missing-reference notices may summarize several original findings." }),
   shippingMinor: pn(money), firstOrderTotalMinor: pn(money) });
 const detailSections = e(["request", "products", "coverage", "advice", "score", "economics"] as const);
 const presentationBase = { ok: Type.Literal(true), planHandle: s, revision: int, resultVersion: s, contractVersion: s, locale: s, status };
