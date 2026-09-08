@@ -402,9 +402,9 @@ export function reviewFrontier(states: readonly SearchState[], request: Canonica
   const targetIds = new Set(request.targets.map(row => row.subjectId));
   const focusedIds = new Set(groups.filter(group => {
     const facts = group.product.labelledContributions.filter(row => row.amount != null && row.amount > 0);
-    return facts.length > 0 && facts.every(row => targetIds.has(row.subjectId));
+    return facts.length > 0 && facts.every(row => row.subjectId !== null && targetIds.has(row.subjectId));
   }).map(group => group.productId));
-  const focused = nonempty.filter(row => row.count === 1 && row.selectedProductIds.some(id => focusedIds.has(id))).sort(order)[0];
+  const focused = nonempty.filter(row => row.count === 1 && row.selectedProductIds?.some(id => focusedIds.has(id))).sort(order)[0];
   if (focused) chosen.add(focused);
   for (const compare of [
     (a: SearchState, b: SearchState) => a.price - b.price || order(a, b),
