@@ -259,6 +259,16 @@
       "cases": [
         "PAY-HANDOFF-01"
       ]
+    },
+    {
+      "file": "test/mcp-agent-surface/compatibility.test.ts",
+      "slice": "compatibility",
+      "database": false,
+      "reason": "One-release expiry and precise rejection of malformed/future presentation version pins.",
+      "expectedCases": 1,
+      "cases": [
+        "AG72-COMPAT-01"
+      ]
     }
   ]
 }

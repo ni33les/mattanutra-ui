@@ -31,7 +31,7 @@ describe("MCP client and HTTP contract", () => {
     }
     for (const tool of toolList()) {
       assert.equal(new Ajv({ strict: false, validateFormats: false }).compile(tool.outputSchema)({}), false, "Every response variant requires ok");
-      assert.equal(tool.annotations.readOnlyHint, ["info", "order"].includes(tool.name));
+      assert.equal(tool.annotations.readOnlyHint, ["info", "order", "evidence"].includes(tool.name));
     }
   });
 

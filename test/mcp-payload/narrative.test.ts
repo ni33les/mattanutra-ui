@@ -69,7 +69,7 @@ for (const locale of ["en", "th", "zh-CN"]) test(`PAY-SCHEMA-05 ${locale} publis
   const detailedOptions = details.options as Record<string, unknown>[];
   assert.equal(detailedOptions.length, 1); assert.equal(detailedOptions[0].optionId, option.optionId);
   assert.ok(detailedOptions[0].doseFit); assert.ok(Array.isArray(detailedOptions[0].advice)); assert.ok(!Object.hasOwn(detailedOptions[0], "basket"));
-  const full = await call("plan", { operation: "get", planHandle: plan.planHandle });
+  const full = await call("plan", { operation: "get", planHandle: plan.planHandle, responseView: "full" });
   assert.deepEqual(details.claimIds, full.claimIds);
   const selected = await call("plan", { ...example("select"), planHandle: plan.planHandle, expectedRevision: plan.revision, optionId: option.optionId, idempotencyKey: `narrative-select-${locale}` });
   // The isolated test persona confirms the exact selected revision.

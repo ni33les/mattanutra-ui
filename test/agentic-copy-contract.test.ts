@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import { AGENTIC_TOOL_DESCRIPTIONS } from "../lib/agentic/contract/instructions.ts";
 import { CONNECTOR_COPY } from "../lib/agentic/discovery/content.ts";
 import { RESPONSIBILITY_VERSION } from "../lib/agentic/discovery/versions.ts";
 import { infoTool } from "../lib/agentic/info.ts";
@@ -55,6 +56,7 @@ describe("Slice A connector copy contract", () => {
       descriptions.push(String(info?.description ?? ""));
     }
     assert.equal(new Set(descriptions).size, 1);
-    assert.equal(descriptions[0], CONNECTOR_COPY.en);
+    assert.equal(descriptions[0], AGENTIC_TOOL_DESCRIPTIONS.info);
+    assert.match(descriptions[0], /Service card.*Call first/);
   });
 });

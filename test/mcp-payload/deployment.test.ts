@@ -7,7 +7,7 @@ import { readPayloadProof, compiledBuildIdentity, PAYLOAD_STAGES, PAYLOAD_ARTIFA
 
 test("PAY-AX-02 deployment rejects missing, altered, stale and wrong-environment package evidence", () => {
   const directory = mkdtempSync(join(tmpdir(), "payload-proof-"));
-  const expected = { sourceSha256: "s", releaseBaseCommit: "b", contractSha256: "c", inventorySha256: "i", inputSha256: "f" };
+  const expected = { contractVersion: "7.2.0", sourceSha256: "s", releaseBaseCommit: "b", contractSha256: "c", inventorySha256: "i", inputSha256: "f" };
   const save = (file: string, data: unknown) => writeFileSync(join(directory, file), JSON.stringify(data));
   const execution = { passed: true, files: 1, cases: 1, failures: [] };
   const fixtures: Record<string, unknown> = {
@@ -19,11 +19,11 @@ test("PAY-AX-02 deployment rejects missing, altered, stale and wrong-environment
     "report.json": { rows: Array.from({ length: 18 }, () => ({ wholeReduction: .65, responseReduction: .65 })) }
   };
   for (const file of PAYLOAD_ARTIFACTS) save(file, fixtures[file] ?? {});
-  const proof = { version: "dev-mcp-payload-1", environment: "dev", contractVersion: "7.1.0", scope: "mcp_payload_and_direct_readers", ...expected,
+  const proof = { version: "dev-mcp-payload-1", environment: "dev", contractVersion: "7.2.0", scope: "mcp_payload_and_direct_readers", ...expected,
     passed: true, unchangedSource: true, stages: PAYLOAD_STAGES.map(label => ({ label, passed: true })), artifacts: PAYLOAD_ARTIFACTS.map(file => ({ file, sha256: payloadHash(readFileSync(join(directory, file))) })) };
   const path = join(directory, "attestation.json");
   save("attestation.json", proof); assert.doesNotThrow(() => readPayloadProof(path, expected));
-  for (const patch of [{ environment: "uat" }, { version: "dev-ax-refinement-1" }, { sourceSha256: "stale" }, { stages: proof.stages.slice(1) }, { artifacts: proof.artifacts.slice(1) }, { passed: false }]) {
+  for (const patch of [{ contractVersion: "7.1.0" }, { environment: "uat" }, { version: "dev-ax-refinement-1" }, { sourceSha256: "stale" }, { stages: proof.stages.slice(1) }, { artifacts: proof.artifacts.slice(1) }, { passed: false }]) {
     save("attestation.json", { ...proof, ...patch }); assert.throws(() => readPayloadProof(path, expected));
   }
   save("attestation.json", proof); save("semantic-comparison.json", { passed: false });

@@ -5,10 +5,10 @@ import { toolList, handleLightweightJsonRpc } from "../../lib/agentic/mcp/rpc.ts
 import { loadAgenticConfig } from "../../lib/agentic/config.ts";
 import { baseline, bytes } from "./fixtures.ts";
 
-test("PAY-SCHEMA-01 discovery preserves six complete contracts within 65% of baseline bytes", () => {
+test("PAY-SCHEMA-01 discovery publishes seven complete contracts within 65% of baseline bytes", () => {
   const original = baseline.cases.find(row => row.caseId === "A1-en")!.discovery![1].response.result.tools;
   const tools = toolList();
-  assert.deepEqual(tools.map(row => row.name), ["info", "plan", "execute", "order", "support", "feedback"]);
+  assert.deepEqual(tools.map(row => row.name), ["info", "plan", "execute", "order", "support", "feedback", "evidence"]);
   assert.ok(bytes(tools) <= bytes(original) * .65, `${bytes(tools)} exceeds ${Math.floor(bytes(original) * .65)}`);
   const ajv = new Ajv({ strict: false, validateFormats: false });
   for (const tool of tools) { ajv.compile(tool.inputSchema); ajv.compile(tool.outputSchema); }
