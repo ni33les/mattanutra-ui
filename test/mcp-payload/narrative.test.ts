@@ -28,7 +28,8 @@ test("PAY-SCHEMA-04 narrative identifies detail-only fields and publishes distin
   assert.ok(!text.includes("Supporting sources, evidence, claim IDs and uncertainty are returned in plan response fields."));
 });
 
-for (const locale of ["en", "th", "zh-CN"]) test(`PAY-SCHEMA-05 ${locale} published view examples continue admitted work and retrieve only the promised fields`, { timeout: 60000 }, async () => {
+for (const locale of ["en", "th", "zh-CN"]) test(`PAY-SCHEMA-05 ${locale} published view examples continue admitted work and retrieve only the promised fields`, { timeout: 60000 }, async (t) => {
+  t.mock.timers.enable({ apis: ["Date"], now: new Date("2026-09-07T00:00:00Z") });
   await installRealCatalogue("dev");
   const app = { ...runtime(`narrative-${locale}`), isolatedInfo: { conditionCodes: [], medicationCodes: [], supportedCountries: [{ countryCode: "TH", countryName: "Thailand", currency: "THB" }] } };
   const ajv = new Ajv({ strict: false, validateFormats: false });

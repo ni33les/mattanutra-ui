@@ -8,7 +8,8 @@ import { toolResult } from "../../lib/agentic/mcp/rpc.ts";
 import { bytes } from "./fixtures.ts";
 
 afterEach(() => { resetPlanCreateInflightForTests(); uninstallRealCatalogue(); });
-test("PAY-POLL-01 unchanged reads are small, ownership fenced and failure/cancellation cannot hide behind the committed revision", async () => {
+test("PAY-POLL-01 unchanged reads are small, ownership fenced and failure/cancellation cannot hide behind the committed revision", async (t) => {
+  t.mock.timers.enable({ apis: ["Date"], now: new Date("2026-09-07T00:00:00Z") });
   await installRealCatalogue("dev");
   const app = runtime("payload-status"), key = "payload-status-create-01";
   const created = await rpc(app, "plan", { operation: "create", idempotencyKey: key, request: profile("A6") });

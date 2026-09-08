@@ -32,6 +32,9 @@ card identities and retrieve exact quantities before relying on them.
 PAY-POLL's former relative ten-percent byte ratio assumed large conversations;
 it now requires status below 2,000 bytes and smaller than conversation. It still
 checks ownership, unchanged versions, failure and cancellation.
+Those operation fixtures now control Date at their frozen Sep 7 epoch. The first
+scoped run exposed previously admitted fixture work expiring against Sep 8 wall
+time; timeout and pending assertions are preserved, not removed.
 
 `impact.json` maps the 58 selected cases to affected behaviour. No full suite or
 expanded-search matrix is claimed. Clinical rules, quantities, prices and stored
