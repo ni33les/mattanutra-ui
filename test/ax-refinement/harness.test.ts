@@ -5,6 +5,12 @@ import { test } from "node:test";
 import { validateImpact, validateSelection, semanticValue } from "../../scripts/run-ax-refinement-tests.mjs";
 import { experimentHygiene } from "../../scripts/run-matcher-experiment-tests.mjs";
 
+test("AXR-HYG-01 rejects changed work-package tests omitted from the scoped inventory", () => {
+  const impact = JSON.parse(readFileSync(new URL("./impact.json", import.meta.url), "utf8"));
+  assert.throws(() => validateImpact(impact, ["test/missing-affected.test.ts"]), /Changed test.*missing-affected/);
+  assert.doesNotThrow(() => validateImpact(impact, ["test/ax-refinement/harness.test.ts"]));
+});
+
 test("AXR-HYG-01 preserves the complete requirement inventory and detects omitted execution", () => {
   const impact = JSON.parse(readFileSync(new URL("./impact.json", import.meta.url), "utf8"));
   validateImpact(impact);
