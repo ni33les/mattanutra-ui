@@ -12,3 +12,9 @@ assert.equal(createHash("sha256").update(raw).digest("hex"), manifest.sha256, "F
 export const baseline = JSON.parse(raw.toString()) as { cases: { caseId: string; request: PlanRequest; plan: PlanSuccessWire; discovery?: { request: unknown; response: { result: Record<string, unknown> } }[] }[] };
 assert.equal(baseline.cases.length, 18);
 export const bytes = (value: unknown) => Buffer.byteLength(JSON.stringify(value), "utf8");
+
+const journeyData = gunzipSync(readFileSync(new URL("../fixtures/mcp-payload/journeys.json.gz", import.meta.url)));
+const journeyManifest = JSON.parse(readFileSync(new URL("../fixtures/mcp-payload/journeys-manifest.json", import.meta.url), "utf8"));
+assert.equal(createHash("sha256").update(journeyData).digest("hex"), journeyManifest.decodedSha256);
+export const baselineJourneys = JSON.parse(journeyData.toString("utf8"));
+assert.equal(baselineJourneys.length, 18);

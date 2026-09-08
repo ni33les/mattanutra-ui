@@ -1,0 +1,28 @@
+{
+  "kind": "fresh_isolated_pre_change_whole_journeys",
+  "source": "23b4e4cd7c2838af09a6aa8555d36f9402e08158",
+  "cases": [
+    "A1-en",
+    "A1-th",
+    "A1-zh-CN",
+    "A2-en",
+    "A2-th",
+    "A2-zh-CN",
+    "A3-en",
+    "A3-th",
+    "A3-zh-CN",
+    "A4-en",
+    "A4-th",
+    "A4-zh-CN",
+    "A5-en",
+    "A5-th",
+    "A5-zh-CN",
+    "A6-en",
+    "A6-th",
+    "A6-zh-CN"
+  ],
+  "decodedSha256": "2e4d2f7eba9453811ff45c13e3136683b8efca265997df4b32eff2ab49fe82ac",
+  "decodedBytes": 44239492,
+  "harnessSource": "scripts/mcp-payload/freeze-journeys.mjs",
+  "clinicalAndCatalogueInputs": "same immutable corrected DEV fixtures as baseline.json.gz; no live reads or mutations"
+}

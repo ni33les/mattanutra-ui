@@ -9,12 +9,13 @@ import { beginDeterministicIdsForTests, endDeterministicIdsForTests } from "../.
 import { runAdmittedPlanOperation, resetPlanCreateInflightForTests } from "../../lib/agentic/plan/service.ts";
 import { simulatePayment } from "../../lib/agentic/qa/simulate.ts";
 import { measureJourney } from "../../scripts/mcp-payload/measure.mjs";
-import { baseline } from "./fixtures.ts";
+import { baseline, baselineJourneys } from "./fixtures.ts";
 
 afterEach(() => { uninstallRealCatalogue(); endDeterministicIdsForTests(); resetPlanCreateInflightForTests(); });
 for (const locale of ["en", "th", "zh-CN"] as const) for (const fixture of profiles) test(`PAY-AX-01 ${fixture.id} ${locale} documented clients preserve decisions and payment recovery with smaller whole journeys`, { timeout: 120000 }, async () => {
-  const outcomes = [];
-  for (const mode of ["full", "conversation"] as const) {
+  const outcomes = [baselineJourneys.find(row => row.caseId === `${fixture.id}-${locale}`)];
+  assert.ok(outcomes[0]);
+  for (const mode of ["conversation"] as const) {
     await installRealCatalogue("dev"); beginDeterministicIdsForTests(); resetPlanCreateInflightForTests();
     const app = { ...runtime(`payload-journey-${fixture.id}-${locale}`), deferProcessing: true, isolatedInfo: { conditionCodes: [], medicationCodes: [], supportedCountries: [{ countryCode: "TH", countryName: "Thailand", currency: "THB" }] } };
     const calls: { request: unknown; response: unknown }[] = [];
@@ -44,7 +45,7 @@ for (const locale of ["en", "th", "zh-CN"] as const) for (const fixture of profi
   }
   const [full, concise] = outcomes;
   assert.deepEqual(concise.outcome.confirmation, full.outcome.confirmation);
-  assert.deepEqual(concise.outcome.trace, full.outcome.trace);
+  assert.deepEqual(JSON.parse(JSON.stringify(concise.outcome.trace)), full.outcome.trace, "Compare serialized protocol transitions; undefined is not a JSON field");
   assert.equal(concise.measurement.calls, full.measurement.calls, "Ordinary conversation requires no extra call");
   assert.equal(concise.outcome.decisions.length, full.outcome.decisions.length);
   for (const [i, value] of concise.outcome.decisions.entries()) {
@@ -55,8 +56,8 @@ for (const locale of ["en", "th", "zh-CN"] as const) for (const fixture of profi
   }
   const frozen = baseline.cases.find(row => row.caseId === `${fixture.id}-${locale}`)!;
   assert.deepEqual(full.outcome.decisions[0].options.map(row => [row.optionId, row.basket, row.coverage, row.advice, row.stackSummary]), frozen.plan.options!.map(row => [row.optionId,row.basket,row.coverage,row.advice,row.stackSummary]), "Initial full business facts match the immutable pre-change baseline");
-  // Both measured modes share today's smaller discovery. This comparison is
-  // conservative: no historic discovery inflation is added to the reference.
+  // The control is an actual unchanged-source execution at the release base,
+  // including its own discovery, guide, detail and payment recovery calls.
   assert.ok(concise.measurement.responseBytes <= full.measurement.responseBytes * .4, `${fixture.id} ${locale}: ${concise.measurement.responseBytes}/${full.measurement.responseBytes}`);
   if (process.env.MCP_PAYLOAD_EVIDENCE_DIR) writeFileSync(join(process.env.MCP_PAYLOAD_EVIDENCE_DIR, `journey-${fixture.id}-${locale}.json`), JSON.stringify({ outcomes }), { flag: "wx" });
 });

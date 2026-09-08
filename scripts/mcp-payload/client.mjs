@@ -11,7 +11,7 @@ export async function payloadJourney({ rpc, request, key, view = "conversation",
   assert.deepEqual(discovery.tools.map(tool => tool.name), ["info", "plan", "execute", "order", "support", "feedback"]);
   const ajv = new Ajv({ strict: false, validateFormats: false });
   const validators = new Map(discovery.tools.map(tool => [tool.name, { input: ajv.compile(tool.inputSchema), output: ajv.compile(tool.outputSchema) }]));
-  async function tool(name, args, expectError = false) {
+  async function tool(name, args, expectError = false, purpose = "decision") {
     const check = validators.get(name); assert.ok(check);
     assert.ok(check.input(args), `${name} input: ${JSON.stringify(check.input.errors)}`);
     const result = await rpc("tools/call", { name, arguments: args });
@@ -19,7 +19,7 @@ export async function payloadJourney({ rpc, request, key, view = "conversation",
     assert.deepEqual(value, result.structuredContent, "Text continuation must preserve the exact wire result");
     assert.ok(check.output(value), `${name} output: ${JSON.stringify(check.output.errors)}`);
     assert.equal(value.ok, !expectError, JSON.stringify(value));
-    trace.push({ tool: name, operation: args.operation, status: value.status ?? value.paymentStatus, revision: value.revision, nextAction: value.operationalDecision?.nextAction ?? value.nextAction, error: value.error?.reasonCode });
+    trace.push({ tool: name, purpose, operation: args.operation, status: value.status ?? value.paymentStatus, revision: value.revision, nextAction: purpose === "details" ? undefined : value.operationalDecision?.nextAction ?? value.nextAction, error: value.error?.reasonCode });
     return value;
   }
   const info = await tool("info", { locale: request.locale });
@@ -58,7 +58,7 @@ export async function payloadJourney({ rpc, request, key, view = "conversation",
   const productId = chosen.basket[0].productId;
   // Asking about label basis is explicit detail work, never an ordinary review prerequisite.
   const details = await tool("plan", view === "conversation" ? { operation: "get", planHandle: plan.planHandle, expectedRevision: plan.revision,
-    responseView: "details", sections: ["products", "advice"], optionIds: [chosen.optionId] } : { operation: "get", planHandle: plan.planHandle });
+    responseView: "details", sections: ["products", "advice"], optionIds: [chosen.optionId] } : { operation: "get", planHandle: plan.planHandle }, false, "details");
   const product = details.options.find(option => option.optionId === chosen.optionId).basket.find(item => item.productId === productId);
   assert.equal(product.servingsPerDay, chosen.basket[0].servingsPerDay);
   const proposal = { operation: "revise", planHandle: plan.planHandle, expectedRevision: plan.revision, idempotencyKey: `${key}-quantity`,
@@ -79,9 +79,9 @@ export async function payloadJourney({ rpc, request, key, view = "conversation",
   const confirmation = { revision: plan.revision, optionId: chosen.optionId, basket: chosen.basket.map(item => ({ productId: item.productId, servingsPerDay: item.servingsPerDay, quantity: item.quantity, lineTotalMinor: item.lineTotalMinor })) };
   const execute = { planHandle: plan.planHandle, expectedRevision: plan.revision, idempotencyKey: `${key}-checkout` };
   const checkout = await tool("execute", execute);
-  const order = await tool("order", { orderHandle: checkout.orderHandle, ...presentation });
+  const order = await tool("order", { orderHandle: checkout.orderHandle, ...presentation, ...(view === "conversation" ? { locale: request.locale } : {}) });
   assert.equal(order.paymentStatus, "unpaid");
-  const paid = await tool("order", { orderHandle: checkout.orderHandle, ...presentation });
+  const paid = await tool("order", { orderHandle: checkout.orderHandle, ...presentation, ...(view === "conversation" ? { locale: request.locale } : {}) });
   assert.equal(paid.paymentStatus, "paid");
   const replay = await tool("execute", execute);
   assert.equal(replay.orderHandle, checkout.orderHandle); assert.deepEqual(replay.frozenPlan, checkout.frozenPlan);

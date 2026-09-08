@@ -1,0 +1,208 @@
+{
+  "version": "mcp-payload-impact-1",
+  "releaseBase": "23b4e4cd7c2838af09a6aa8555d36f9402e08158",
+  "scope": "mcp_payload_and_direct_readers",
+  "fullSuite": "not_requested; deliberately not executed",
+  "browser": "No browser caller was changed; existing full response remains compatible. No unrelated browser suites selected.",
+  "files": [
+    {
+      "file": "test/mcp-payload/harness.test.ts",
+      "slice": "baseline",
+      "database": false,
+      "reason": "UTF-8 byte accounting, complete calls and missing case detection.",
+      "expectedCases": 3,
+      "cases": [
+        "PAY-BASE-01",
+        "PAY-BASE-02",
+        "PAY-BASE-03"
+      ]
+    },
+    {
+      "file": "test/mcp-payload/discovery.test.ts",
+      "slice": "discovery",
+      "database": false,
+      "reason": "Published schema factoring and minimal tools-only operation help.",
+      "expectedCases": 3,
+      "cases": [
+        "PAY-SCHEMA-01",
+        "PAY-SCHEMA-02",
+        "PAY-SCHEMA-03"
+      ]
+    },
+    {
+      "file": "test/mcp-payload/projection.test.ts",
+      "slice": "projection",
+      "database": false,
+      "reason": "Lossless concise projection, details, exact exposures and complete advice.",
+      "expectedCases": 4,
+      "cases": [
+        "PAY-VIEW-01",
+        "PAY-VIEW-02",
+        "PAY-VIEW-03",
+        "PAY-VIEW-04"
+      ]
+    },
+    {
+      "file": "test/mcp-payload/transport.test.ts",
+      "slice": "readers",
+      "database": false,
+      "reason": "Plan/order response views, replay identity, revision fences and frozen recovery.",
+      "expectedCases": 4,
+      "cases": [
+        "PAY-TRANSPORT-01",
+        "PAY-TRANSPORT-02",
+        "PAY-TRANSPORT-03",
+        "PAY-TRANSPORT-04"
+      ]
+    },
+    {
+      "file": "test/mcp-payload/status.test.ts",
+      "slice": "readers",
+      "database": false,
+      "reason": "Plan/order response views, replay identity, revision fences and frozen recovery.",
+      "expectedCases": 1,
+      "cases": [
+        "PAY-POLL-01"
+      ]
+    },
+    {
+      "file": "test/mcp-payload/order.test.ts",
+      "slice": "readers",
+      "database": false,
+      "reason": "Plan/order response views, replay identity, revision fences and frozen recovery.",
+      "expectedCases": 1,
+      "cases": [
+        "PAY-POLL-02"
+      ]
+    },
+    {
+      "file": "test/mcp-payload/postgres.integration.test.ts",
+      "slice": "database",
+      "database": true,
+      "reason": "Durable PostgreSQL lifecycle and catalogue freshness used by the new status reader.",
+      "expectedCases": 1,
+      "cases": [
+        "PAY-POLL-03"
+      ]
+    },
+    {
+      "file": "test/mcp-payload/deployment.test.ts",
+      "slice": "deployment",
+      "database": false,
+      "reason": "DEV-only scoped attestation rejects stale, altered and incomplete evidence.",
+      "expectedCases": 2,
+      "cases": [
+        "PAY-AX-02",
+        "PAY-AX-03"
+      ]
+    },
+    {
+      "file": "test/mcp-payload/journeys.test.ts",
+      "slice": "journeys",
+      "database": false,
+      "reason": "All changed contract views through multilingual documented client journeys and legacy equivalence.",
+      "expectedCases": 18,
+      "cases": [
+        "PAY-AX-01"
+      ]
+    },
+    {
+      "file": "test/agentic-contract.test.ts",
+      "slice": "consumers",
+      "database": false,
+      "reason": "Generated schemas, native discovery, instructions and legacy request validation all change in this package.",
+      "expectedCases": 9,
+      "cases": [
+        "exposes the installed-connector public tools",
+        "keeps the checked-in contract snapshot in sync",
+        "initialize reports contract instructions and version",
+        "uses polling-only UAT instructions without the DEV harness",
+        "uses live PRD instructions without Stripe Test Mode",
+        "accepts bare, single-prefixed and double-prefixed tools/call names",
+        "tools/list advertises complete operation contracts",
+        "rejects unexpected properties on every tool",
+        "info never advertises QA mutation controls"
+      ]
+    },
+    {
+      "file": "test/ax-refinement/contract.test.ts",
+      "slice": "consumers",
+      "database": false,
+      "reason": "Preserve AX IDs and historical artifacts while validating the additive 7.1 projection inputs.",
+      "expectedCases": 4,
+      "cases": [
+        "AXR-SPEC-01",
+        "AXR-SPEC-02"
+      ]
+    },
+    {
+      "file": "test/agentic-ident-contract.test.ts",
+      "slice": "consumers",
+      "database": false,
+      "reason": "Info and generated schema checksums change; identity and locale invariants must remain valid.",
+      "expectedCases": 7,
+      "cases": [
+        "IDENT-01 public info always contains buildId and schemaChecksum when ok=true",
+        "IDENT-02 buildId equals the pipeline identifier and matches the full SHA format",
+        "IDENT-03 schemaChecksum is a lowercase 64-character SHA-256 of the served schema bundle",
+        "IDENT-04 repeated serialization of the same release manifest is byte-identical",
+        "IDENT-05 locale invariance of identity fields",
+        "IDENT-06 missing build metadata never produces ok=true with omitted identity",
+        "IDENT-07 public info and QA preflight read the same release manifest"
+      ]
+    },
+    {
+      "file": "test/agentic-copy-contract.test.ts",
+      "slice": "consumers",
+      "database": false,
+      "reason": "Shared concise discovery changes the connector copy path and must preserve its wellness boundaries.",
+      "expectedCases": 5,
+      "cases": [
+        "COPY-RED-01 required proposition words product stock safety",
+        "COPY-RED-02 publishes the exact responsibilityVersion as a contract field",
+        "COPY-RED-03 word budget is at most 45 English words",
+        "COPY-RED-04 boundary copy states wellness guidance and excludes diagnosis pharmacy clinical advice",
+        "COPY-RED-05 twenty tools/list sessions are byte-identical"
+      ]
+    },
+    {
+      "file": "test/agentic-execute-reuse.test.ts",
+      "slice": "consumers",
+      "database": false,
+      "reason": "The presentation compatibility check affects the existing frozen checkout and execute replay readers.",
+      "expectedCases": 5,
+      "cases": [
+        "requires explicit refresh before a new checkout for a legacy unexecuted plan",
+        "resumes an existing unpaid legacy checkout before applying new-version gates",
+        "returns the same orderHandle for two execute keys on one plan revision",
+        "replays execute with the live payment state after pay",
+        "does not mint a second chargeable order after pay"
+      ]
+    },
+    {
+      "file": "test/agentic-mcp-transport-reliability.test.ts",
+      "slice": "consumers",
+      "database": false,
+      "reason": "Factored output variants affect native transport, both representations and request boundary regression assertions.",
+      "expectedCases": 6,
+      "cases": [
+        "gives text-only clients every continuation field and error detail",
+        "negotiates structured-output support and keeps the older client version",
+        "ANNA-AX-09 forwards tools-only guide and operation schema views through lightweight discovery",
+        "rejects batches before dispatching any calls",
+        "caps streamed bodies even without a content-length header",
+        "stops reading a stalled body when the client disconnects"
+      ]
+    },
+    {
+      "file": "test/ax-refinement/polling.test.ts",
+      "slice": "consumers",
+      "database": false,
+      "reason": "The unchanged full view must still report failed refinements correctly beside the new status reader.",
+      "expectedCases": 1,
+      "cases": [
+        "AXR-REL-03 polling reports failed refinement instead of returning the previous ready revision"
+      ]
+    }
+  ]
+}

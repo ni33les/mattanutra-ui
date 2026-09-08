@@ -1,6 +1,6 @@
 # MCP payload reduction: scoped TDD work package
 
-Planning baseline: `dev` at `41e1bdceeb6eaa0a8c7054ae57833fe2ed109764`, public contract 7.0.0, 8 September 2026. Status: proposed implementation; only read-only profiling has been performed. No tests or deployments were run for this planning exercise.
+Planning baseline: `dev` at `41e1bdceeb6eaa0a8c7054ae57833fe2ed109764`, public contract 7.0.0, 8 September 2026. Historical planning status: proposed implementation; only read-only profiling had been performed. Implementation progress and intentional expectation changes are recorded in [mcp-payload-evidence.md](mcp-payload-evidence.md); the implementation release base follows the completed DB-pool change at `23b4e4cd`.
 
 1. **Objective and measured starting point**
 

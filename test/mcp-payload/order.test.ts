@@ -25,6 +25,8 @@ test("PAY-POLL-02 order status avoids frozen projection and histories while deta
   const first = await rpc(app, "order", { orderHandle: handle, responseView: "status" });
   const same = await rpc(app, "order", { orderHandle: handle, responseView: "status", knownResultVersion: first.resultVersion });
   assert.equal(same.unchanged, true); assert.equal(itemReads, 0);
+  const translated = await rpc(app, "order", { orderHandle: handle, responseView: "status", locale: "th", knownResultVersion: first.resultVersion });
+  assert.equal(translated.unchanged, false); assert.equal(translated.locale, "th");
   assert.ok(bytes(toolResult(same)) <= 4096); assert.ok(bytes(toolResult(same)) < bytes(toolResult(full)) * .1);
   const detail = await rpc(app, "order", { orderHandle: handle, responseView: "details", sections: ["frozen_order", "events"] });
   assert.equal(detail.ok, true); assert.deepEqual(detail.frozenOrder, full.frozenOrder); assert.deepEqual(detail.events, full.events);
