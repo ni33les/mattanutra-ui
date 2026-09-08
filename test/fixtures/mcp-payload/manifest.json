@@ -1,0 +1,40 @@
+{
+  "source": "ee9d0a27cdc81bacb71af845fb9e0cd4c06ce887",
+  "releaseBase": "23b4e4cd7c2838af09a6aa8555d36f9402e08158",
+  "kind": "fresh_isolated_pre_change_baseline",
+  "cases": [
+    "A1-en",
+    "A2-en",
+    "A3-en",
+    "A4-en",
+    "A5-en",
+    "A6-en",
+    "A1-th",
+    "A2-th",
+    "A3-th",
+    "A4-th",
+    "A5-th",
+    "A6-th",
+    "A1-zh-CN",
+    "A2-zh-CN",
+    "A3-zh-CN",
+    "A4-zh-CN",
+    "A5-zh-CN",
+    "A6-zh-CN"
+  ],
+  "sha256": "d8616d41f18c2724a9839cf6b01bc38cdea1eef9acb649c6287228c6da83fcba",
+  "inputs": [
+    {
+      "file": "test/fixtures/ax-refinement/six-profiles.json",
+      "sha256": "73e2f99a0ded1ecca68050cadaa9256862ba6fab91419d67f958997a78df1a57"
+    },
+    {
+      "file": "test/fixtures/ax-refinement/dev-corrections.json",
+      "sha256": "59264522fb8a6ec50d7dfbec4bbfa41601a7d6703ac51b8e431a83e9124502e2"
+    },
+    {
+      "file": "test/fixtures/matcher-experiments/anna-dev.json",
+      "sha256": "b499733107d829ad284b06a839a4a11f46421396a18aa9cec5c9edc57c7cf851"
+    }
+  ]
+}
