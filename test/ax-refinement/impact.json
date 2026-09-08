@@ -1,0 +1,234 @@
+{
+  "version": "ax-refinement-impact-1",
+  "scope": "dev_ax_refinement_and_direct_consumers",
+  "fullSuite": "deferred_by_explicit_user_scope",
+  "requirements": [
+    {
+      "id": "AXR-REL-01",
+      "slice": "reliability",
+      "file": "test/ax-refinement/reliability.test.ts"
+    },
+    {
+      "id": "AXR-REL-02",
+      "slice": "reliability",
+      "file": "test/ax-refinement/reliability.test.ts"
+    },
+    {
+      "id": "AXR-REL-03",
+      "slice": "reliability",
+      "file": "test/ax-refinement/reliability.test.ts"
+    },
+    {
+      "id": "AXR-REL-04",
+      "slice": "reliability",
+      "file": "test/ax-refinement/reliability.test.ts"
+    },
+    {
+      "id": "AXR-REL-05",
+      "slice": "reliability",
+      "file": "test/ax-refinement/reliability.test.ts"
+    },
+    {
+      "id": "AXR-ALT-01",
+      "slice": "choices",
+      "file": "test/ax-refinement/choices.test.ts"
+    },
+    {
+      "id": "AXR-ALT-02",
+      "slice": "choices",
+      "file": "test/ax-refinement/choices.test.ts"
+    },
+    {
+      "id": "AXR-ALT-03",
+      "slice": "choices",
+      "file": "test/ax-refinement/choices.test.ts"
+    },
+    {
+      "id": "AXR-DATA-01",
+      "slice": "catalogue",
+      "file": "test/ax-refinement/catalogue.test.ts"
+    },
+    {
+      "id": "AXR-DATA-02",
+      "slice": "catalogue",
+      "file": "test/ax-refinement/catalogue.test.ts"
+    },
+    {
+      "id": "AXR-DATA-03",
+      "slice": "catalogue",
+      "file": "test/ax-refinement/catalogue.test.ts"
+    },
+    {
+      "id": "AXR-NOP-01",
+      "slice": "choices",
+      "file": "test/ax-refinement/choices.test.ts"
+    },
+    {
+      "id": "AXR-NOP-02",
+      "slice": "choices",
+      "file": "test/ax-refinement/choices.test.ts"
+    },
+    {
+      "id": "AXR-ADV-01",
+      "slice": "contract",
+      "file": "test/ax-refinement/advice.test.ts"
+    },
+    {
+      "id": "AXR-ADV-02",
+      "slice": "contract",
+      "file": "test/ax-refinement/advice.test.ts"
+    },
+    {
+      "id": "AXR-ADV-03",
+      "slice": "contract",
+      "file": "test/ax-refinement/advice.test.ts"
+    },
+    {
+      "id": "AXR-TERM-01",
+      "slice": "contract",
+      "file": "test/ax-refinement/terminology.test.ts"
+    },
+    {
+      "id": "AXR-TERM-02",
+      "slice": "contract",
+      "file": "test/ax-refinement/terminology.test.ts"
+    },
+    {
+      "id": "AXR-SPEC-01",
+      "slice": "contract",
+      "file": "test/ax-refinement/contract.test.ts"
+    },
+    {
+      "id": "AXR-SPEC-02",
+      "slice": "contract",
+      "file": "test/ax-refinement/contract.test.ts"
+    },
+    {
+      "id": "AXR-REG-01",
+      "slice": "journeys",
+      "file": "test/ax-refinement/journeys.test.ts"
+    },
+    {
+      "id": "AXR-REG-02",
+      "slice": "journeys",
+      "file": "test/ax-refinement/journeys.test.ts"
+    },
+    {
+      "id": "AXR-REG-03",
+      "slice": "baseline",
+      "file": "test/ax-refinement/harness.test.ts"
+    },
+    {
+      "id": "AXR-HYG-01",
+      "slice": "baseline",
+      "file": "test/ax-refinement/harness.test.ts"
+    },
+    {
+      "id": "AXR-HYG-02",
+      "slice": "baseline",
+      "file": "test/ax-refinement/harness.test.ts"
+    },
+    {
+      "id": "AXR-SRCH-01",
+      "slice": "search",
+      "file": "test/ax-refinement/search.test.ts"
+    },
+    {
+      "id": "AXR-SRCH-02",
+      "slice": "search",
+      "file": "test/ax-refinement/search.test.ts"
+    },
+    {
+      "id": "AXR-SRCH-03",
+      "slice": "search",
+      "file": "test/ax-refinement/search.test.ts"
+    },
+    {
+      "id": "AXR-SRCH-04",
+      "slice": "search",
+      "file": "test/ax-refinement/search.test.ts"
+    },
+    {
+      "id": "AXR-SRCH-05",
+      "slice": "search",
+      "file": "test/ax-refinement/search.test.ts"
+    },
+    {
+      "id": "AXR-SRCH-06",
+      "slice": "search",
+      "file": "test/ax-refinement/search.test.ts"
+    },
+    {
+      "id": "AXR-DEPLOY-01",
+      "slice": "release",
+      "file": "test/ax-refinement/deployment.test.ts"
+    },
+    {
+      "id": "AXR-DEPLOY-02",
+      "slice": "release",
+      "file": "test/ax-refinement/deployment.test.ts"
+    }
+  ],
+  "files": [
+    {
+      "file": "test/ax-refinement/advice.test.ts",
+      "slice": "contract",
+      "reason": "Directly asserts the contract behaviour of this approved DEV work package.",
+      "database": false
+    },
+    {
+      "file": "test/ax-refinement/catalogue.test.ts",
+      "slice": "catalogue",
+      "reason": "Directly asserts the catalogue behaviour of this approved DEV work package.",
+      "database": false
+    },
+    {
+      "file": "test/ax-refinement/choices.test.ts",
+      "slice": "choices",
+      "reason": "Directly asserts the choices behaviour of this approved DEV work package.",
+      "database": false
+    },
+    {
+      "file": "test/ax-refinement/contract.test.ts",
+      "slice": "contract",
+      "reason": "Directly asserts the contract behaviour of this approved DEV work package.",
+      "database": false
+    },
+    {
+      "file": "test/ax-refinement/deployment.test.ts",
+      "slice": "release",
+      "reason": "Directly asserts the release behaviour of this approved DEV work package.",
+      "database": false
+    },
+    {
+      "file": "test/ax-refinement/harness.test.ts",
+      "slice": "baseline",
+      "reason": "Directly asserts the baseline behaviour of this approved DEV work package.",
+      "database": false
+    },
+    {
+      "file": "test/ax-refinement/journeys.test.ts",
+      "slice": "journeys",
+      "reason": "Directly asserts the journeys behaviour of this approved DEV work package.",
+      "database": false
+    },
+    {
+      "file": "test/ax-refinement/reliability.test.ts",
+      "slice": "reliability",
+      "reason": "Directly asserts the reliability behaviour of this approved DEV work package.",
+      "database": false
+    },
+    {
+      "file": "test/ax-refinement/search.test.ts",
+      "slice": "search",
+      "reason": "Directly asserts the search behaviour of this approved DEV work package.",
+      "database": false
+    },
+    {
+      "file": "test/ax-refinement/terminology.test.ts",
+      "slice": "contract",
+      "reason": "Directly asserts the contract behaviour of this approved DEV work package.",
+      "database": false
+    }
+  ]
+}
