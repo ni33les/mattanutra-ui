@@ -1,4 +1,4 @@
-import { isDeepStrictEqual } from "node:util";
+import { exactValueEqual } from "@/lib/matcher/exact-values";
 import type { ProductGroup, SearchState } from "@/lib/matcher/types";
 
 /** Commercial comparison of an already explored physical basket. It neither
@@ -16,11 +16,11 @@ export function equivalentSellerOffers(state: SearchState, source: readonly Prod
     if (sellerId === selected[0]!.group.sellerId) continue;
     const replacements = selected.map(({ group, variant }) => {
       const other = offers.find(row => row.sellerId === sellerId && row.productId === group.productId && !row.product.incompleteCommercialFacts);
-      if (!other || !isDeepStrictEqual(other.product.administration, group.product.administration) ||
-        !isDeepStrictEqual(other.product.labelledContributions, group.product.labelledContributions) ||
+      if (!other || !exactValueEqual(other.product.administration, group.product.administration) ||
+        !exactValueEqual(other.product.labelledContributions, group.product.labelledContributions) ||
         other.product.pillCountKnown !== group.product.pillCountKnown) return null;
       const replacement = other.variants.find(row => row.dailyUnits === variant.dailyUnits);
-      if (!replacement || !isDeepStrictEqual({ ...replacement, variantId: "" }, { ...variant, variantId: "" })) return null;
+      if (!replacement || !exactValueEqual({ ...replacement, variantId: "" }, { ...variant, variantId: "" })) return null;
       return { group: other, variant: replacement };
     });
     if (replacements.some(row => row === null)) continue;

@@ -1,3 +1,4 @@
+import { decodeMatchCursor, encodeMatchCursor } from "@/lib/matcher/cursor-codec-server";
 import { createHash } from "node:crypto";
 import type { CatalogueProduct, CatalogueSnapshot } from "@/lib/agentic/catalogue/types";
 import { catalogueSnapshotId, freezeCatalogueSnapshot } from "@/lib/agentic/catalogue/freeze";
@@ -16,7 +17,7 @@ import {
   productIsDedicatedForTarget,
   variantPillBurden
 } from "@/lib/matcher/candidates";
-import { createMatchCursor, advanceMatchCursor, matchCursorIdentity, matchCursorAttempts, decodeMatchCursor, encodeMatchCursor, expandMatchCursor, type MatchCursor } from "@/lib/matcher/match-cursor";
+import { createMatchCursor, advanceMatchCursor, matchCursorIdentity, matchCursorAttempts, expandMatchCursor, type MatchCursor } from "@/lib/matcher/match-cursor";
 import { DEFAULT_MATCHER_CONFIG } from "@/lib/matcher/config";
 import { COVERED_THRESHOLD } from "@/lib/matcher/config";
 import { displayCoveragePercent } from "@/lib/marketing-coverage";

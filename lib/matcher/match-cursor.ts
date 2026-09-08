@@ -1,6 +1,5 @@
-import { createHash } from "node:crypto";
-import { deflateSync, inflateSync } from "node:zlib";
-import { serialize, deserialize } from "node:v8";
+import { sha256Hex } from "@/lib/sha256";
+import { serializeExactValue } from "@/lib/matcher/exact-values";
 import { compileGroups, groupsBySeller } from "@/lib/matcher/candidates";
 import { orderInvariantRequest } from "@/lib/matcher/canonicalizer";
 import { createSearchCursor, advanceSearchCursor, extendSearchCursor, type SearchCursor } from "@/lib/matcher/search-cursor";
@@ -15,7 +14,7 @@ function allocation(budget: number, count: number, index: number) {
   return Math.floor(budget / count) + (index < budget % count ? 1 : 0);
 }
 export function matchCursorIdentity(request: CanonicalRequest, catalog: CatalogSnapshot, config: MatcherConfig) {
-  return createHash("sha256").update(serialize({ version: "match-cursor-1", request: { ...orderInvariantRequest(request), searchEffort: undefined }, catalog, config })).digest("hex");
+  return sha256Hex(JSON.stringify(serializeExactValue({ version: "match-cursor-1", request: { ...orderInvariantRequest(request), searchEffort: undefined }, catalog, config })));
 }
 export function createMatchCursor(request: CanonicalRequest, catalog: CatalogSnapshot, config: MatcherConfig, compiledGroups?: readonly ProductGroup[]): MatchCursor {
   request = orderInvariantRequest(request);
@@ -51,12 +50,5 @@ export function advanceMatchCursor(cursor: MatchCursor, request: CanonicalReques
     if (!seller.cursor.done) advanceSearchCursor(seller.cursor, request, chunkBudget - (matchCursorAttempts(cursor) - start));
     if (seller.cursor.done) cursor.seller++;
   }
-  return cursor;
-}
-export function encodeMatchCursor(cursor: MatchCursor) { return deflateSync(serialize(cursor), { level: 1 }).toString("base64"); }
-export function decodeMatchCursor(encoded: string, identity: string): MatchCursor {
-  const cursor = deserialize(inflateSync(Buffer.from(encoded, "base64"))) as MatchCursor;
-  if (cursor.version !== "match-cursor-1" || cursor.identity !== identity) throw new Error("Matching checkpoint identity changed");
-  if (!Number.isSafeInteger(cursor.expansionBudget) || matchCursorAttempts(cursor) > cursor.expansionBudget) throw new Error("Invalid checkpoint work budget");
   return cursor;
 }

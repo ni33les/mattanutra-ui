@@ -1,6 +1,7 @@
+import { encodeSearchCursor, decodeSearchCursor } from "../../lib/matcher/cursor-codec-server.ts";
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { createSearchCursor, advanceSearchCursor, searchCursorResult, encodeSearchCursor, decodeSearchCursor, extendSearchCursor } from "../../lib/matcher/search-cursor.ts";
+import { createSearchCursor, advanceSearchCursor, searchCursorResult, extendSearchCursor } from "../../lib/matcher/search-cursor.ts";
 import { compileGroups } from "../../lib/matcher/candidates.ts";
 import { canonicalizeTargets } from "../../lib/matcher/canonicalizer.ts";
 import { DEFAULT_MATCHER_CONFIG } from "../../lib/matcher/config.ts";

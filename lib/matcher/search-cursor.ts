@@ -1,5 +1,5 @@
-import { createHash } from "node:crypto";
-import { serialize as encodeValue, deserialize as decodeValue } from "node:v8";
+import { sha256Hex } from "@/lib/sha256";
+import { serializeExactValue } from "@/lib/matcher/exact-values";
 import { compileVariant, isDeferredConditional } from "@/lib/matcher/candidates";
 import { servingIncrement } from "@/lib/matcher/serving-grid";
 import { targetDoseTicks } from "@/lib/matcher/target-basis";
@@ -27,23 +27,6 @@ export type SearchCursor = {
   repaired: SearchState[]; second: SearchState[]; secondIndex: number;
   exactStack: ExactFrame[];
 };
-
-function serialize(value: unknown): unknown {
-  if (typeof value === "bigint") return { $bigint: String(value) };
-  if (value instanceof Map) return { $map: [...value].map(([key, child]) => [key, serialize(child)]) };
-  if (Array.isArray(value)) return value.map(serialize);
-  if (value && typeof value === "object") return Object.fromEntries(Object.keys(value).sort().map(key => [key, serialize((value as Record<string, unknown>)[key])]));
-  return value;
-}
-// The versioned binary envelope preserves shared immutable states, Maps and
-// exact integers without duplicating each archive entry in every frontier.
-export function encodeSearchCursor(cursor: SearchCursor) { return encodeValue(cursor).toString("base64"); }
-export function decodeSearchCursor(text: string, expectedIdentity: string): SearchCursor {
-  const cursor = decodeValue(Buffer.from(text, "base64")) as SearchCursor;
-  if (cursor.version !== "search-cursor-1" || cursor.identity !== expectedIdentity) throw new Error("Search cursor identity changed");
-  if (!Number.isSafeInteger(cursor.expansionBudget) || !Number.isSafeInteger(cursor.expansionAttempts) || cursor.expansionAttempts < 0 || cursor.expansionAttempts > cursor.expansionBudget) throw new Error("Invalid search cursor budget");
-  return cursor;
-}
 
 function indexFor(values: string[], indices: Map<string, number>, id: string) {
   const found = indices.get(id); if (found != null) return found;
@@ -89,7 +72,7 @@ function explorationLimit(cursor: SearchCursor) { return cursor.expansionBudget 
 
 export function createSearchCursor(groups: readonly ProductGroup[], request: CanonicalRequest, config: MatcherConfig): SearchCursor {
   const copy = structuredClone([...groups]);
-  const identity = createHash("sha256").update(JSON.stringify(serialize({ version: "search-cursor-1", groups, request: { ...request, searchEffort: undefined }, config: { ...config, expansionBudget: undefined } }))).digest("hex");
+  const identity = sha256Hex(JSON.stringify(serializeExactValue({ version: "search-cursor-1", groups, request: { ...request, searchEffort: undefined }, config: { ...config, expansionBudget: undefined } })));
   const exact = groups.length <= config.exactGroupLimit && groups.reduce((sum, group) => sum + group.variants.length, 0) <= config.exactVariantLimit;
   const seed = seedState(request);
   const cursor: SearchCursor = { version: "search-cursor-1", identity, groups: copy, baseline: copy.map(group => group.variants.map(row => row.variantId)), config: { ...config },

@@ -349,6 +349,12 @@
       "slice": "consumers",
       "reason": "Changed explicit algae source assertions and existing ontology/oversupply selections directly consume the shared matcher and alias behaviour.",
       "database": false
+    },
+    {
+      "file": "test/ax-refinement/browser-boundary.test.ts",
+      "slice": "browser_boundary",
+      "reason": "Protects the actual shared web matcher import graph from Node-only checkpoint codecs and verifies exact portable seller-fact equality.",
+      "database": false
     }
   ]
 }
