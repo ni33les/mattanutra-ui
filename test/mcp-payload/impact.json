@@ -214,6 +214,17 @@
       "cases": [
         "PAY-TRANSPORT-05"
       ]
+    },
+    {
+      "file": "test/mcp-payload/narrative.test.ts",
+      "slice": "narrative",
+      "database": false,
+      "reason": "Published review/poll/detail examples and field locations exercised through the actual dispatcher in English, Thai and Chinese.",
+      "expectedCases": 4,
+      "cases": [
+        "PAY-SCHEMA-04",
+        "PAY-SCHEMA-05"
+      ]
     }
   ]
 }

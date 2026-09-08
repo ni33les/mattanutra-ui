@@ -30,7 +30,7 @@ test("PAY-SCHEMA-02 overview offers one starting example and operation help work
     for (const planOperation of ["create", "get", "revise", "answer", "select"]) {
       const help = await info({ locale, view: "plan_schema", planOperation });
       assert.ok(help.planSchemaJson);
-      assert.equal(help.clientExamples.length, 1);
+      assert.equal(help.clientExamples.length, planOperation === "get" ? 3 : 1);
       assert.equal(help.clientExamples[0].arguments.operation, planOperation);
       assert.ok(!help.clientInstructions.includes("Help the customer explore"), "Detail view must not repeat the entire overview");
     }
