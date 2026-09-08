@@ -1,0 +1,41 @@
+{
+  "scope": "mcp_tool_card_publication",
+  "releaseBase": "fab0e5a0c0d3b6d593404c4fe13e3849b7da752b",
+  "testPolicy": "Tool publication only; no matcher, commerce, browser or expanded search suites. No skips or retries. Real installed-host evidence remains distinct from direct tools/list JSON.",
+  "files": [
+    {
+      "file": "test/mcp-tool-card/listing.test.ts",
+      "expectedCases": 3,
+      "reason": "Named public JSON checks and exact shared operation schemas and eight-line overview"
+    },
+    {
+      "file": "test/mcp-tool-card/publication.test.ts",
+      "expectedCases": 2,
+      "reason": "Production build repairs stale publication and server startup does not write it"
+    },
+    {
+      "file": "test/mcp-tool-card/deployment.test.ts",
+      "expectedCases": 1,
+      "reason": "DEV-only proof binds this publication work package"
+    },
+    {
+      "file": "test/mcp-agent-surface/contracts.test.ts",
+      "expectedCases": 3,
+      "reason": "Affected seven-tool descriptions, overview, public schema matrix and versions"
+    },
+    {
+      "file": "test/mcp-agent-surface/compatibility.test.ts",
+      "expectedCases": 1,
+      "reason": "Unchanged omitted and explicit presentation semantics across patch version"
+    },
+    {
+      "file": "test/mcp-7-2-1/connector.test.ts",
+      "expectedCases": 3,
+      "reason": "Seven-tool generated projections and rejection of old descriptions and get schemas"
+    }
+  ],
+  "inputs": [
+    "contract/mcp/7.2.3/schema.json",
+    "contract/mcp/7.2.3/tools.json"
+  ]
+}

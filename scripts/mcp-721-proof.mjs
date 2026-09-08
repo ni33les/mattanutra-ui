@@ -6,6 +6,7 @@ import { payloadHash } from "./mcp-payload/proof.mjs";
 export const MCP721_BASE = "22f3ce60f17158c68a251abe4070f582dd39253a";
 export const MCP_PACKAGES = {
   "721": { version: "7.2.1", directory: "test/mcp-7-2-1", base: MCP721_BASE, scope: "mcp_721_alignment_and_routines" },
+  "724": { version: "7.2.4", directory: "test/mcp-tool-card", base: "fab0e5a0c0d3b6d593404c4fe13e3849b7da752b", scope: "mcp_tool_card_publication" },
   "723": { version: "7.2.3", directory: "test/mcp-7-2-3", base: "380a1dd08ededd7dfcf25aef45ab3c4649b65b2b", scope: "mcp_723_refinement_and_conversation" },
   "722": { version: "7.2.2", directory: "test/mcp-7-2-2", base: "391ba2beafc01a49d119a85b5f632a8a6f737944", scope: "mcp_722_open_points" }
 };

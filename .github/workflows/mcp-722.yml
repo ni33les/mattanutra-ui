@@ -1,4 +1,4 @@
-name: MCP affected contract and matching checks
+name: MCP public tool card checks
 on:
   push:
     branches: [dev]
@@ -22,10 +22,10 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci --include=dev
-      - run: npm run test:mcp:723 -- --output "$RUNNER_TEMP/mcp-723-evidence"
+      - run: npm run test:mcp:tool-card -- --output "$RUNNER_TEMP/mcp-tool-card-evidence"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: mcp-723-scoped-evidence
-          path: ${{ runner.temp }}/mcp-723-evidence
+          name: mcp-tool-card-scoped-evidence
+          path: ${{ runner.temp }}/mcp-tool-card-evidence
           if-no-files-found: error
