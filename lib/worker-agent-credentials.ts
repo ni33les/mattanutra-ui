@@ -88,6 +88,7 @@ export const RUNTIME_WORKER_PROFILES: readonly RuntimeWorkerCredentialProfile[] 
     "customer_chat_reply"
   ]),
   profile("products", "productMatcher", "WORKER_PRODUCTS_AGENT_API_KEY", "platform_agent", [
+    "match_agentic_plan",
     "generate_product_recommendations",
     "source_product_fda_approvals",
     "source_product_identifiers"

@@ -346,7 +346,7 @@ describe("matcher phase 2 oversupply, source, and ontology", () => {
     const result = match(
       request({
         optimization: "best_coverage",
-        omega3SourcePreference: impliedOmegaPreference("any", "any", [algaeTarget.name]),
+        omega3SourcePreference: impliedOmegaPreference("any", "algae_only", [algaeTarget.name]),
         targets: [algaeTarget]
       }),
       catalog([G_O3_FISH_1000, G_O3_ALGAE_500])
@@ -356,14 +356,14 @@ describe("matcher phase 2 oversupply, source, and ontology", () => {
     assert.equal(result.selected?.productIds.includes("G-O3-FISH-1000"), false);
   });
 
-  it("algae-named targets imply algae_only unless vegan already did", () => {
+  it("source preferences remain explicit while target wording stays recognizable", () => {
     assert.equal(targetImpliesAlgaeOmega("Algae omega-3"), true);
     assert.equal(targetImpliesAlgaeOmega("Algal DHA"), true);
     assert.equal(targetImpliesAlgaeOmega("Omega-3"), false);
-    assert.equal(impliedOmegaPreference("any", "any", ["Algae omega-3"]), "algae_only");
-    assert.equal(impliedOmegaPreference("any", "fish_allowed", ["Algae omega-3"]), "algae_only");
+    assert.equal(impliedOmegaPreference("any", "any", ["Algae omega-3"]), "any");
+    assert.equal(impliedOmegaPreference("any", "fish_allowed", ["Algae omega-3"]), "fish_allowed");
     assert.equal(impliedOmegaPreference("any", "any", ["Omega-3"]), "any");
-    assert.equal(impliedOmegaPreference("vegan", "any", ["Omega-3"]), "algae_only");
+    assert.equal(impliedOmegaPreference("vegan", "any", ["Omega-3"]), "any");
     assert.equal(impliedOmegaPreference("any", "algae_only", ["Omega-3"]), "algae_only");
   });
 

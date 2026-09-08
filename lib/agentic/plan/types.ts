@@ -408,6 +408,7 @@ export type CoverageRow = Readonly<{
 }>;
 
 export type SafetyGuidance = Readonly<{
+  kind?: import("@/lib/agentic/value/advice-kind").AdviceKind;
   referenceConfidence?: "high" | "moderate" | "low";
   basisRationale?: string | null;
   comparator?: "gt" | "gte" | "lt" | "lte" | "eq" | null;

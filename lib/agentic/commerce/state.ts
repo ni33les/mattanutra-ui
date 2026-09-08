@@ -384,6 +384,7 @@ function fulfilmentReason(events: readonly FulfilmentEventRecord[]) {
 
 export function orderPollView(input: Readonly<{
   checkoutUrl: string | null;
+  includeFrozen?: boolean;
   found: boolean;
   fulfilmentEvents?: readonly FulfilmentEventRecord[];
   localeMessage: (key: string) => string;
@@ -447,10 +448,10 @@ export function orderPollView(input: Readonly<{
         ? "open_checkout"
         : "poll";
 
-  const frozenOrder = publicFrozenOrder(order.frozenPlan);
+  const frozenOrder = input.includeFrozen === false ? undefined : publicFrozenOrder(order.frozenPlan);
   const frozenRecord =
-    frozenOrder && typeof frozenOrder === "object"
-      ? (frozenOrder as Record<string, unknown>)
+    order.frozenPlan && typeof order.frozenPlan === "object"
+      ? (order.frozenPlan as Record<string, unknown>)
       : {};
   const channel =
     frozenRecord.channel === "agentic" || frozenRecord.channel === "web"
@@ -463,7 +464,7 @@ export function orderPollView(input: Readonly<{
     channel,
     checkoutExpiresAt: order.checkoutExpiresAt,
     checkoutUrl: input.checkoutUrl,
-    frozenOrder,
+    ...(input.includeFrozen === false ? {} : { frozenOrder }),
     fulfilment: {
       deliveryWindow: null,
       reasonCode,

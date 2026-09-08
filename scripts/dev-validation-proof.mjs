@@ -17,7 +17,7 @@ export const REQUIRED_VALIDATION_ARTIFACTS = ["source-before.json", "source-afte
 /** Reuse complete evidence only for byte-identical source; a commit alone is insufficient. */
 export function readDevValidationProof(file, sourceSha256) {
   const proof = JSON.parse(readFileSync(file, "utf8"));
-  if (proof.version !== "dev-advisory-validation-3" || proof.contractVersion !== "6.0.0" || !/^[a-f0-9]{40}$/.test(proof.releaseBaseCommit ?? "") || ["releaseLintSha256", "testInventorySha256", "databaseSchemaSha256", "catalogueSha256"].some(key => !/^[a-f0-9]{64}$/.test(proof[key] ?? "")) || proof.environment !== "dev" ||
+  if (proof.version !== "dev-advisory-validation-3" || proof.contractVersion !== "7.0.0" || !/^[a-f0-9]{40}$/.test(proof.releaseBaseCommit ?? "") || ["releaseLintSha256", "testInventorySha256", "databaseSchemaSha256", "catalogueSha256"].some(key => !/^[a-f0-9]{64}$/.test(proof[key] ?? "")) || proof.environment !== "dev" ||
       proof.candidateOrigin !== "http://127.0.0.1:3100" || proof.passed !== true ||
       proof.unchangedSource !== true || proof.sourceSha256 !== sourceSha256 ||
       proof.buildId !== sourceSha256.slice(0, 40) || !proof.schemaChecksum) {

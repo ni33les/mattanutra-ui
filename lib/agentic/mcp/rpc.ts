@@ -1,3 +1,4 @@
+import { createLogger } from "@/lib/logger";
 import { AGENTIC_CONTRACT_REGISTRY } from "@/lib/agentic/contract/registry";
 import { CONTRACT_RESOURCES, readContractResource } from "@/lib/agentic/contract/guide";
 import type { AgenticConfig, AgenticEnvironment } from "@/lib/agentic/config";
@@ -108,7 +109,7 @@ export function toolList(environment: AgenticEnvironment = "dev", locale?: strin
     description: descriptions[name],
     ...AGENTIC_CONTRACT_REGISTRY[name],
     annotations: {
-      readOnlyHint: ["info", "order", "evidence"].includes(name),
+      readOnlyHint: ["info", "order"].includes(name),
       destructiveHint: false,
       idempotentHint: true,
       openWorldHint: true
@@ -150,24 +151,13 @@ export function toolText(value: unknown) {
     return recordValue.message;
   }
 
-  const paid =
-    recordValue.paymentStatus === "paid" ||
-    recordValue.orderStatus === "completed";
-
-  if (paid && typeof recordValue.orderReference === "string") {
-    return `Order ${recordValue.orderReference} is completed and paid.`;
+  if (typeof recordValue.message === "string" && recordValue.message.trim()) return recordValue.message;
+  if (typeof recordValue.orderReference === "string" && typeof recordValue.paymentStatus === "string") {
+    const fulfilment = record(recordValue.fulfilment).status;
+    return `Order ${recordValue.orderReference}: payment=${recordValue.paymentStatus}${typeof fulfilment === "string" ? `; fulfilment=${fulfilment}` : ""}.`;
   }
-
-  if (
-    typeof recordValue.orderReference === "string" &&
-    recordValue.checkoutUrl &&
-    recordValue.paymentStatus !== "paid"
-  ) {
-    return `Checkout ready for ${recordValue.orderReference}. Poll the order; the browser is not payment truth.`;
-  }
-
-  if (typeof recordValue.paymentStatus === "string") {
-    return `Order paymentStatus=${recordValue.paymentStatus} stateVersion=${recordValue.stateVersion ?? "?"}.`;
+  if (recordValue.responseView === "status" && typeof recordValue.planHandle === "string") {
+    return `Plan revision ${recordValue.revision}; refinement=${recordValue.operationStatus ?? recordValue.status}.`;
   }
 
   if (typeof recordValue.serviceName === "string") {
@@ -181,14 +171,20 @@ export function toolText(value: unknown) {
   return "ok";
 }
 
-export function toolResult(value: unknown, isError = false) {
+const responseLog = createLogger("agentic.mcp.payload");
+export function toolResult(value: unknown, isError = false, tool?: string) {
+  const serialized = JSON.stringify(value);
+  if (tool && process.env.NODE_ENV !== "test") {
+    const view = record(value).responseView ?? "full";
+    responseLog.info("response_bytes", { tool, view, structuredBytes: Buffer.byteLength(serialized, "utf8"), isError });
+  }
   return {
     content: [
       {
         text: toolText(value),
         type: "text"
       },
-      { type: "text", text: JSON.stringify(value) }
+      { type: "text", text: serialized }
     ],
     isError,
     structuredContent: value
@@ -323,7 +319,7 @@ export async function handleLightweightJsonRpc(
     const response = validateToolInput(AGENTIC_OUTPUT_SCHEMAS.info, value)
       ? businessError({ message: "The capability response is temporarily unavailable.", reasonCode: "temporarily_unavailable", nextActions: ["retry"] })
       : value;
-    return { id, jsonrpc: "2.0", result: toolResult(response, isAgenticErrorResult(response)) };
+    return { id, jsonrpc: "2.0", result: toolResult(response, isAgenticErrorResult(response), "info") };
   }
 
   return undefined;

@@ -15,6 +15,10 @@ import type { PlanResult } from "@/lib/agentic/plan/types";
 
 export type EvidenceMode = "sources" | "summary";
 
+export function evidenceHandleFor(planId: string, revision: number, tenantScope: string) {
+  return `cap_${createHash("sha256").update(`evidence:${planId}:${revision}:${tenantScope}`).digest("base64url").slice(0, 43)}`;
+}
+
 export async function issueEvidenceCapability(input: Readonly<{
   config: AgenticConfig;
   now: string;
@@ -23,11 +27,7 @@ export async function issueEvidenceCapability(input: Readonly<{
   scope: CapabilityScope;
   store: AgenticStore;
 }>) {
-  const digest = createHash("sha256")
-    .update(`evidence:${input.planId}:${input.revision}:${input.scope.tenantScope}`)
-    .digest("base64url")
-    .slice(0, 43);
-  const handle = `cap_${digest}`;
+  const handle = evidenceHandleFor(input.planId, input.revision, input.scope.tenantScope);
   const hash = hashCapability(input.config.capabilitySecret, handle);
   const existing = await input.store.getCapabilityByHash(hash);
   if (existing) {

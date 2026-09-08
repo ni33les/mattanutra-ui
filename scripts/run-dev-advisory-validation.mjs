@@ -119,7 +119,7 @@ async function main() {
       if (candidateError || candidate.exitCode !== null || candidate.signalCode !== null) throw new Error(candidateError?.message ?? "Candidate exited before readiness.");
       try {
         const probe = await rpc(`${ORIGIN}/api/mcp`, "info", {}, env);
-        if (probe.result.buildId !== buildId || probe.result.contractVersion !== "6.0.0") throw new Error("Candidate identity differs from the built source.");
+        if (probe.result.buildId !== buildId || probe.result.contractVersion !== "7.0.0") throw new Error("Candidate identity differs from the built source.");
         schemaChecksum = probe.result.schemaChecksum;
         writeJson(join(evidence, "candidate-identity.json"), probe);
         return;
@@ -204,7 +204,7 @@ async function main() {
     const unchangedSource = Boolean(before && before.sha256 === after?.sha256);
     const passed = !failure && !interrupted && unchangedSource && REQUIRED_VALIDATION_STAGES.every(label => steps.filter(step => step.label === label && step.passed).length === 1) && steps.every(step => step.passed);
     writeJson(join(evidence, "stage-results.json"), { passed, failure: failure ?? null, interrupted, steps });
-    const attestation = { version: "dev-advisory-validation-3", contractVersion: "6.0.0", releaseBaseCommit: releaseLint?.baseCommit ?? null, releaseLintSha256: releaseLint?.sha256 ?? null, testInventorySha256: inventory?.sha256 ?? null, databaseSchemaSha256: dataBefore?.schemaSha256 ?? null, catalogueSha256: dataBefore?.catalogueSha256 ?? null, environment: "dev", candidateOrigin: ORIGIN, sourceSha256: before?.sha256 ?? null, buildId: buildId ?? null, schemaChecksum: schemaChecksum ?? null, gitCommit: execFileSync("git", ["rev-parse", "HEAD"], { cwd: ROOT, encoding: "utf8" }).trim(), unchangedSource, passed, finishedAt: new Date().toISOString(), steps, failure: failure ?? null, artifacts: hashFiles(evidence) };
+    const attestation = { version: "dev-advisory-validation-3", contractVersion: "7.0.0", releaseBaseCommit: releaseLint?.baseCommit ?? null, releaseLintSha256: releaseLint?.sha256 ?? null, testInventorySha256: inventory?.sha256 ?? null, databaseSchemaSha256: dataBefore?.schemaSha256 ?? null, catalogueSha256: dataBefore?.catalogueSha256 ?? null, environment: "dev", candidateOrigin: ORIGIN, sourceSha256: before?.sha256 ?? null, buildId: buildId ?? null, schemaChecksum: schemaChecksum ?? null, gitCommit: execFileSync("git", ["rev-parse", "HEAD"], { cwd: ROOT, encoding: "utf8" }).trim(), unchangedSource, passed, finishedAt: new Date().toISOString(), steps, failure: failure ?? null, artifacts: hashFiles(evidence) };
     writeJson(join(evidence, "attestation.json"), attestation);
     console.log(JSON.stringify({ passed, evidence, attestation: join(evidence, "attestation.json"), failure: failure ?? null }));
     if (!passed) process.exitCode = 1;

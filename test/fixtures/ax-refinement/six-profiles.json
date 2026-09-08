@@ -1,0 +1,296 @@
+[
+  {
+    "id": "A1",
+    "request": {
+      "conditionCodes": [
+        "perimenopause",
+        "high_cholesterol"
+      ],
+      "currentSupplements": [],
+      "destinationCountry": "TH",
+      "intake": [
+        {
+          "certainty": "unknown",
+          "description": "Fictional customer; dietary quantities unknown. Agreed exploratory supplement-only targets.",
+          "source": "diet"
+        }
+      ],
+      "locale": "en",
+      "medicationCodes": [
+        "paracetamol"
+      ],
+      "optimization": "balanced",
+      "profile": {
+        "ageYears": 47,
+        "goals": [
+          "skin_health",
+          "hair_health"
+        ],
+        "lifeStage": "adult",
+        "sex": "female"
+      },
+      "requirements": {
+        "maxDailyPills": 2,
+        "maxProductCount": 2
+      },
+      "targets": [
+        {
+          "amount": 40,
+          "basis": "supplemental",
+          "name": "Vitamin C",
+          "unit": "mg"
+        },
+        {
+          "amount": 200,
+          "basis": "supplemental",
+          "name": "Folate",
+          "unit": "mcg"
+        },
+        {
+          "amount": 10,
+          "basis": "supplemental",
+          "name": "Vitamin D3",
+          "unit": "mcg"
+        },
+        {
+          "amount": 5,
+          "basis": "supplemental",
+          "name": "Zinc",
+          "unit": "mg"
+        }
+      ]
+    }
+  },
+  {
+    "id": "A2",
+    "request": {
+      "conditionCodes": [],
+      "currentSupplements": [],
+      "destinationCountry": "TH",
+      "intake": [
+        {
+          "certainty": "unknown",
+          "description": "Fictional customer; dietary quantities unknown. Agreed exploratory supplement-only targets.",
+          "source": "diet"
+        }
+      ],
+      "locale": "en",
+      "medicationCodes": [],
+      "optimization": "balanced",
+      "profile": {
+        "ageYears": 29,
+        "goals": [
+          "general_wellbeing"
+        ],
+        "lifeStage": "adult",
+        "sex": "female"
+      },
+      "requirements": {
+        "dietaryPreference": "vegan",
+        "omega3SourcePreference": "algae_only"
+      },
+      "targets": [
+        {
+          "amount": 50,
+          "basis": "supplemental",
+          "name": "Vitamin B12",
+          "unit": "mcg"
+        },
+        {
+          "amount": 10,
+          "basis": "supplemental",
+          "name": "Vitamin D3",
+          "unit": "mcg"
+        },
+        {
+          "amount": 250,
+          "basis": "supplemental",
+          "name": "Algae Omega-3",
+          "unit": "mg"
+        }
+      ]
+    }
+  },
+  {
+    "id": "A3",
+    "request": {
+      "conditionCodes": [],
+      "currentSupplements": [],
+      "destinationCountry": "TH",
+      "intake": [
+        {
+          "certainty": "unknown",
+          "description": "Fictional customer; dietary quantities unknown. Agreed exploratory supplement-only targets.",
+          "source": "diet"
+        }
+      ],
+      "locale": "en",
+      "medicationCodes": [],
+      "optimization": "balanced",
+      "profile": {
+        "ageYears": 34,
+        "goals": [
+          "fitness"
+        ],
+        "lifeStage": "adult",
+        "sex": "male"
+      },
+      "requirements": {
+        "maxProductCount": 2
+      },
+      "targets": [
+        {
+          "amount": 3000,
+          "basis": "supplemental",
+          "name": "Creatine",
+          "unit": "mg"
+        },
+        {
+          "amount": 100,
+          "basis": "supplemental",
+          "name": "Magnesium",
+          "unit": "mg"
+        }
+      ]
+    }
+  },
+  {
+    "id": "A4",
+    "request": {
+      "conditionCodes": [],
+      "currentSupplements": [],
+      "destinationCountry": "TH",
+      "intake": [
+        {
+          "certainty": "unknown",
+          "description": "Fictional customer; dietary quantities unknown. Agreed exploratory supplement-only targets.",
+          "source": "diet"
+        }
+      ],
+      "locale": "en",
+      "medicationCodes": [],
+      "optimization": "balanced",
+      "profile": {
+        "ageYears": 68,
+        "goals": [
+          "bone_health"
+        ],
+        "lifeStage": "adult",
+        "sex": "female"
+      },
+      "requirements": {
+        "maxDailyPills": 1
+      },
+      "targets": [
+        {
+          "amount": 300,
+          "basis": "supplemental",
+          "name": "Calcium",
+          "unit": "mg"
+        },
+        {
+          "amount": 20,
+          "basis": "supplemental",
+          "name": "Vitamin D3",
+          "unit": "mcg"
+        }
+      ]
+    }
+  },
+  {
+    "id": "A5",
+    "request": {
+      "conditionCodes": [
+        "af"
+      ],
+      "currentSupplements": [],
+      "destinationCountry": "TH",
+      "intake": [
+        {
+          "certainty": "unknown",
+          "description": "Fictional customer; dietary quantities unknown. Agreed exploratory supplement-only targets.",
+          "source": "diet"
+        }
+      ],
+      "locale": "en",
+      "medicationCodes": [
+        "apixaban"
+      ],
+      "optimization": "balanced",
+      "profile": {
+        "ageYears": 52,
+        "goals": [
+          "general_wellbeing"
+        ],
+        "lifeStage": "adult",
+        "sex": "male"
+      },
+      "requirements": {},
+      "targets": [
+        {
+          "amount": 100,
+          "basis": "supplemental",
+          "name": "Magnesium",
+          "unit": "mg"
+        },
+        {
+          "amount": 10,
+          "basis": "supplemental",
+          "name": "Vitamin D3",
+          "unit": "mcg"
+        }
+      ]
+    }
+  },
+  {
+    "id": "A6",
+    "request": {
+      "conditionCodes": [],
+      "currentSupplements": [
+        {
+          "dailyAmount": 10,
+          "daysRemaining": 90,
+          "name": "Vitamin D3",
+          "unit": "mcg"
+        }
+      ],
+      "destinationCountry": "TH",
+      "intake": [
+        {
+          "certainty": "unknown",
+          "description": "Fictional customer; dietary quantities unknown. Agreed exploratory supplement-only targets.",
+          "source": "diet"
+        }
+      ],
+      "locale": "en",
+      "medicationCodes": [],
+      "optimization": "lowest_cost",
+      "profile": {
+        "ageYears": 38,
+        "goals": [
+          "general_wellbeing"
+        ],
+        "lifeStage": "adult",
+        "sex": "male"
+      },
+      "requirements": {
+        "maxPriceMinor": 50000,
+        "maxProductCount": 1
+      },
+      "targets": [
+        {
+          "amount": 10,
+          "basis": "supplemental",
+          "name": "Vitamin D3",
+          "unit": "mcg"
+        },
+        {
+          "amount": 40,
+          "basis": "supplemental",
+          "name": "Vitamin C",
+          "unit": "mg"
+        }
+      ]
+    }
+  }
+]

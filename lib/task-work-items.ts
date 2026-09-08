@@ -63,8 +63,6 @@ import { loadActivePlanGuidanceAdjustments } from "@/lib/plan-guidance-adjustmen
 import {
   buildProductNeeds,
   normalizeProductStackPreference,
-  productFactAliasKeys,
-  productKeysMatch,
   type ProductCandidate,
   type ProductClientSex,
   type ProductRecommendationClientContext,
@@ -424,6 +422,7 @@ export type RetailOperationsReviewWorkItem = Readonly<{
 }>;
 
 export type TaskWorkItem =
+  | Readonly<{ taskId: string; taskType: "match_agentic_plan"; operationId: string }>
   | Readonly<{ taskId: string; taskType: "send_healthscore_email"; deliveryRequestId: string }>
   | Readonly<{ taskId: string; taskType: "fulfill_web_payment"; paymentId: string }>
   | Readonly<{ taskId: string; taskType: "superseded_generation" }>
@@ -2127,57 +2126,6 @@ async function buildAdminCatalogueOptimizationWorkItem(task: TaskRecord) {
   } satisfies AdminCatalogueOptimizationWorkItem;
 }
 
-async function enrichProductNeedsWithAliases(
-  needs: readonly ProductRecommendationNeed[]
-): Promise<ProductRecommendationNeed[]> {
-  const sql = getSql();
-
-  if (!sql || needs.length < 1) {
-    return [...needs];
-  }
-
-  const rows = await sql<Array<{
-    normalized_aliases: string[];
-    normalized_name: string;
-  }>>`
-    select
-      supplements.normalized_name,
-      array_remove(array_agg(distinct supplement_aliases.normalized_alias), null) as normalized_aliases
-    from public.supplements
-    left join public.supplement_aliases
-      on supplement_aliases.supplement_id = supplements.id
-    group by supplements.id, supplements.normalized_name
-  `;
-
-  return needs.map((need) => {
-    if (need.itemType !== "supplement") {
-      return need;
-    }
-
-    const needAliases = productFactAliasKeys(need.displayName, need.aliasKeys);
-    const matches = rows.filter((row) =>
-      productKeysMatch(
-        need.displayName,
-        row.normalized_name,
-        needAliases,
-        row.normalized_aliases
-      )
-    );
-    const aliasKeys = [
-      ...needAliases,
-      ...matches.flatMap((row) => [
-        row.normalized_name,
-        ...row.normalized_aliases
-      ])
-    ];
-
-    return {
-      ...need,
-      aliasKeys: [...new Set(aliasKeys.flatMap((alias) => productFactAliasKeys(alias)))]
-    };
-  });
-}
-
 async function buildNutritionPlanRefinementWorkItem(task: TaskRecord) {
   if (!task.planId) {
     throw new Error("Nutrition plan refinement task is missing a plan");
@@ -2338,6 +2286,7 @@ function buildWebPaymentFulfillmentWorkItem(task: TaskRecord) {
 }
 
 const taskWorkItemHandlers: Readonly<Record<string, TaskWorkItemBuilder>> = {
+  match_agentic_plan: task => ({ taskId: task.id, taskType: "match_agentic_plan", operationId: payloadText(task.payload, "operationId") }),
   [ADMIN_CATALOGUE_OPTIMIZATION_TASK_TYPE]: buildAdminCatalogueOptimizationWorkItem,
   analyze_healthscore: buildHealthScoreWorkItem,
   carrier_event_process: buildCarrierShipmentWorkItem,

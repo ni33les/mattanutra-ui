@@ -1,12 +1,15 @@
 import { matchingDiagnosticsFor } from "@/lib/matcher/diagnostics";
 import { ProductDoseValidationError, validateProductDoseProposals } from "@/lib/matcher/serving-grid";
-import { compileGroups, groupsBySeller, isDeferredConditional } from "@/lib/matcher/candidates";
+import { compileGroups, isDeferredConditional } from "@/lib/matcher/candidates";
 import { orderInvariantRequest } from "@/lib/matcher/canonicalizer";
 import { DEFAULT_MATCHER_CONFIG } from "@/lib/matcher/config";
 import { rejectedCandidatesFor } from "@/lib/matcher/explainer";
 import { amountFromScaled } from "@/lib/matcher/dose";
 import { knownTargetExposure } from "@/lib/matcher/target-basis";
-import { searchGroups, seedState } from "@/lib/matcher/search";
+import { equivalentSellerOffers } from "@/lib/matcher/seller-offers";
+import { seedState } from "@/lib/matcher/search";
+import { searchCursorResult, archivedSearchStates } from "@/lib/matcher/search-cursor";
+import { createMatchCursor, advanceMatchCursor, matchCursorAttempts, type MatchCursor } from "@/lib/matcher/match-cursor";
 import { compareBaskets, hasFewerConcerns, scoreState, selectOptions } from "@/lib/matcher/selector";
 import type { CanonicalRequest, CatalogSnapshot, LossCertificate, MatchResult, MatcherConfig, MatcherLeftover, ProductGroup, ScoredBasket, SearchState } from "@/lib/matcher/types";
 
@@ -92,42 +95,49 @@ function leftoversFor(
  * machine must not publish a different completed basket from the same inputs.
  */
 export function match(request: CanonicalRequest, catalog: CatalogSnapshot,
-  config: MatcherConfig = DEFAULT_MATCHER_CONFIG, compiledGroups?: readonly ProductGroup[]): MatchResult {
+  config: MatcherConfig = DEFAULT_MATCHER_CONFIG, compiledGroups?: readonly ProductGroup[],
+  observeCandidate?: (sellerId: string, state: SearchState, groups: readonly ProductGroup[]) => void, completedCursor?: MatchCursor): MatchResult {
   const proposalIssues = validateProductDoseProposals(request, catalog);
   if (proposalIssues.length) throw new ProductDoseValidationError(proposalIssues);
   request = orderInvariantRequest(request);
   const groups = compiledGroups ? [...compiledGroups] : compileGroups(request, catalog);
-  const sellers = groupsBySeller(groups, request, config.sellerGroupLimit);
+  const cursor = completedCursor ?? createMatchCursor(request, catalog, config, groups);
+  while (!cursor.done) advanceMatchCursor(cursor, request, 8_000);
   const scored: ScoredBasket[] = [];
+  const sourceStates = new Map<string, { state: SearchState; groups: readonly ProductGroup[] }>();
   const empty = scoreState({ groups: [], request, sellerId: "", state: seedState(request) });
   if (empty) scored.push(empty);
   let trimmed = false;
   const searchStatus: { mode: MatchResult["searchMode"] } = { mode: "exact" };
-  let expansionAttempts = 0;
-  const effort = request.searchEffort ?? "standard";
-  const standardBudget = Math.max(0, Math.floor(config.expansionBudget));
-  const expansionBudget = effort === "expanded" ? Math.max(64_000, standardBudget) : standardBudget;
-  const perSellerStates = new Map<string, readonly SearchState[]>();
-  const perSellerGroups = new Map(sellers.map(seller => [seller.sellerId, seller.groups as readonly ProductGroup[]]));
-  const runPass = (budget: number, expanded: boolean) => {
-    for (const [index, seller] of sellers.entries()) {
-      const allocation = Math.floor(budget / sellers.length) + (index < budget % sellers.length ? 1 : 0);
-      const run = searchGroups(perSellerGroups.get(seller.sellerId)!, request, { ...config, expansionBudget: allocation,
-        ...(expanded ? { initialBeamWidth: config.maxBeamWidth } : {}) }, perSellerStates.get(seller.sellerId));
-      perSellerStates.set(seller.sellerId, run.complete);
-      perSellerGroups.set(seller.sellerId, run.groups);
-      expansionAttempts += run.expansionAttempts;
-      trimmed ||= run.trimmed;
-      if (run.mode === "bounded") searchStatus.mode = "bounded";
+  const expansionAttempts = matchCursorAttempts(cursor), expansionBudget = cursor.expansionBudget, effort = cursor.effort;
+  const perSellerGroups = new Map<string, readonly ProductGroup[]>();
+  for (const seller of cursor.sellers) {
+    const run = searchCursorResult(seller.cursor, request);
+    perSellerGroups.set(seller.sellerId, run.groups);
+    trimmed ||= run.trimmed;
+    if (run.mode === "bounded") searchStatus.mode = "bounded";
+    if (observeCandidate) for (const state of archivedSearchStates(seller.cursor)) observeCandidate(seller.sellerId, state, run.groups);
+    for (const state of run.complete) {
+      const basket = scoreState({ groups: run.groups, request, sellerId: seller.sellerId, state });
+      if (basket && basket.productCount > 0) {
+        scored.push(basket);
+        sourceStates.set(basket.variantIds.join("|"), { state, groups: run.groups });
+      }
     }
-  };
-  runPass(standardBudget, false);
-  if (effort === "expanded" && expansionBudget > standardBudget) runPass(expansionBudget - standardBudget, true);
-  for (const seller of sellers) for (const state of perSellerStates.get(seller.sellerId) ?? []) {
-    const basket = scoreState({ groups: perSellerGroups.get(seller.sellerId)!, request, sellerId: seller.sellerId, state });
-    if (basket && basket.productCount > 0) scored.push(basket);
   }
   const exploredGroups = [...perSellerGroups.values()].flat();
+  const preliminary = selectOptions({ baskets: scored, request, config });
+  // Recover commercial ties only for retained role candidates. This bounded
+  // projection compares quotes for existing baskets, with no extra dose search.
+  for (const basket of [preliminary.selected, ...preliminary.alternatives]) {
+    if (!basket) continue;
+    const source = sourceStates.get(basket.variantIds.join("|"));
+    if (!source) continue;
+    for (const offer of equivalentSellerOffers(source.state, source.groups, exploredGroups)) {
+      const priced = scoreState({ ...offer, request });
+      if (priced) scored.push(priced);
+    }
+  }
   const winner = selectOptions({ baskets: scored, request, config });
   const targetFrontiers = request.targets.filter((target) => !isDeferredConditional(target)).map((target) => ({
     subjectId: target.subjectId, name: target.name,

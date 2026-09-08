@@ -1,4 +1,4 @@
-import { assessPreferences } from "@/lib/matcher/preferences";
+import { assessPreferences, verifiedPillLowerBound } from "@/lib/matcher/preferences";
 import { administrationDailyPills } from "@/lib/product-administration";
 import { sha256Hex } from "@/lib/sha256";
 import { webHealthAdvice } from "@/lib/web-health-advice";
@@ -604,7 +604,8 @@ export function recommendWithMatcher(
       return candidate && !toMatcherProduct(candidate).incompleteCommercialFacts;
     });
     return {
-      preferences: assessPreferences(request, { productCount: basket.productCount, dailyPills, firstOrderGoodsPriceMinor: completePrice ? basket.priceMinor : null, currency: request.currency }),
+      preferences: assessPreferences(request, { productCount: basket.productCount, dailyPills,
+        dailyPillsLowerBound: verifiedPillLowerBound((basket.variantDoses ?? []).map(dose => ({ dailyPills: dose.dailyPills, pillCountKnown: byId.has(dose.productId) && toMatcherProduct(byId.get(dose.productId)!).pillCountKnown !== false }))), firstOrderGoodsPriceMinor: completePrice ? basket.priceMinor : null, currency: request.currency }),
       roles: basket.roles, purchaseEligible: basket.productIds.length > 0,
       optionId: `webopt_${sha256Hex([...basket.variantIds].sort().join("|")).slice(0, 20)}`,
       productIds: [...basket.productIds], dailyServings: basket.productIds.map(id => servingMultiplierFromBasket(id, basket)),

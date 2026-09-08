@@ -1,0 +1,76 @@
+{
+  "version": 1,
+  "environment": "dev",
+  "corrections": [
+    {
+      "correctionId": "ax-v7-dev-relacza-administration",
+      "entityTable": "products",
+      "entityId": "50265f47-8be5-51c4-96f9-07a01d746dab",
+      "before": {
+        "id": "50265f47-8be5-51c4-96f9-07a01d746dab",
+        "administration": null
+      },
+      "after": {
+        "id": "50265f47-8be5-51c4-96f9-07a01d746dab",
+        "administration": {
+          "route": "oral",
+          "physicalUnit": "capsule",
+          "unitsPerServing": 1,
+          "doseIncrement": 1,
+          "packQuantity": null,
+          "provenance": {
+            "status": "verified",
+            "sourceUrl": "https://www.vistra.co.th/product/vistra-relacza-plus/",
+            "sourceText": "Manufacturer specifies composition per capsule and oral use. Matching composition: GABA 125 mg, theanine 100 mg, B6 1 mg, B12 1 mcg, B1 0.75 mg. Pack size is not verified for this seller variant.",
+            "verifiedAt": "2026-09-08T00:00:00Z"
+          }
+        }
+      },
+      "beforeFingerprint": "ef9c43b2a62cfb0668a96606733c6e24817c9f06ba3b4288ea97b5f9dd5a31d2",
+      "afterFingerprint": "1f4b0205dc192bb3e4f4dc5b9f84a9a655107e04bc1ee651e608f91e4beee41a",
+      "evidence": {
+        "sourceUrl": "https://www.vistra.co.th/product/vistra-relacza-plus/",
+        "checkedAt": "2026-09-08T00:00:00Z",
+        "summary": "Verify oral capsule and per-capsule composition. Keep pack size unknown; preserve all nutrient confidence values and prices."
+      }
+    },
+    {
+      "correctionId": "ax-v7-dev-bacopa-b12-conflict",
+      "entityTable": "product_facts",
+      "entityId": "9dde5756-dcb6-458e-b203-1de1b2ee7446",
+      "before": {
+        "id": "9dde5756-dcb6-458e-b203-1de1b2ee7446",
+        "product_id": "65fd0d62-45a0-4430-aae7-54932a9c3f28",
+        "name": "Vitamin B12",
+        "amount": 1,
+        "unit": "mcg",
+        "supplement_id": "7ddcc4f2-708f-5905-99a4-02d80e935adf",
+        "confidence": "high",
+        "source": "admin",
+        "source_url": null,
+        "source_text": "page_text: วิตามินบี 12 1 มคก.",
+        "serving_label": null
+      },
+      "after": {
+        "id": "9dde5756-dcb6-458e-b203-1de1b2ee7446",
+        "product_id": "65fd0d62-45a0-4430-aae7-54932a9c3f28",
+        "name": "Vitamin B12",
+        "amount": 1,
+        "unit": "mcg",
+        "supplement_id": "7ddcc4f2-708f-5905-99a4-02d80e935adf",
+        "confidence": "high",
+        "source": "catalogue_conflict_review",
+        "source_url": "https://www.vistra.co.th/product/vistra-bacopa-extract/",
+        "source_text": "Manufacturer composition is internally contradictory: 2 mg of 0.1% B12 premix implies 2 mcg, but the same line declares 1 mcg. Preserve original amount and confidence as historical label information; do not establish verified B12 coverage until variant evidence resolves the conflict.",
+        "serving_label": null
+      },
+      "beforeFingerprint": "502a32fb1bdbbeed57052a9c4324b4a94bf8eaa1e8a82f5f7a93748e9d747e33",
+      "afterFingerprint": "b4badf22d2be6e1b4b61b2a0bc342a6b02ddb7875e9d827e05ef3ba74c8c49cc",
+      "evidence": {
+        "sourceUrl": "https://www.vistra.co.th/product/vistra-bacopa-extract/",
+        "checkedAt": "2026-09-08T00:00:00Z",
+        "summary": "Retain the source-declared quantity without asserting verified coverage from contradictory evidence. No replacement quantity is invented. Prior fact identity read from the isolated preserved DEV database; the live before-fingerprint must independently match before application."
+      }
+    }
+  ]
+}

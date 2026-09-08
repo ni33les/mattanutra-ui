@@ -1,3 +1,5 @@
+import { projectOrder, orderResultVersion, type OrderViewInput } from "@/lib/agentic/presentation/order";
+import type { OrderSuccessWire } from "@/lib/agentic/contract/outputs";
 import type { AgenticConfig } from "@/lib/agentic/config";
 import { resolveCapability, type CapabilityScope } from "@/lib/agentic/capabilities";
 import { agenticMessage, negotiateLocale } from "@/lib/agentic/i18n";
@@ -16,7 +18,7 @@ import { runObservedRequest } from "@/lib/agentic/qa/request-trace";
 
 let orderRequestSeq = 0;
 
-export async function orderTool(input: Readonly<{
+export async function orderTool(input: OrderViewInput & Readonly<{
   config: AgenticConfig;
   locale?: string;
   now: string;
@@ -28,7 +30,7 @@ export async function orderTool(input: Readonly<{
   return runObservedRequest(correlation, () => orderToolBody(input));
 }
 
-async function orderToolBody(input: Readonly<{
+async function orderToolBody(input: OrderViewInput & Readonly<{
   config: AgenticConfig;
   locale?: string;
   now: string;
@@ -55,15 +57,22 @@ async function orderToolBody(input: Readonly<{
     });
   }
 
+  const lightweight = input.responseView === "status" || input.responseView === "conversation";
   const {order, fulfilmentEvents, paymentAttempts, items} = await input.store.transaction(async store => {
     const loaded = await store.getOrder(capability.resourceId);
     const order = await expireCheckoutIfDue({now: input.now, order: loaded, store});
     const [fulfilmentEvents, paymentAttempts, items] = order ? await Promise.all([
-      store.listFulfilmentEvents(order.id), store.listPaymentAttempts(order.id), store.getOrderItems(order.id)
+      store.listFulfilmentEvents(order.id), store.listPaymentAttempts(order.id), lightweight ? Promise.resolve([]) : store.getOrderItems(order.id)
     ]) : [[], [], []];
     return {order, fulfilmentEvents, paymentAttempts, items};
   });
   const locale = negotiateLocale(input.locale);
+  if (lightweight && order) {
+    const view = orderPollView({ checkoutUrl: order.checkoutUrl, found: true, includeFrozen: false,
+      fulfilmentEvents, localeMessage: key => agenticMessage(locale, key), order });
+    if (view.ok !== true) return view;
+    return projectOrder(view as OrderSuccessWire, input, order, orderResultVersion(order, fulfilmentEvents, paymentAttempts, locale), locale);
+  }
   const settlement =
     order &&
     (order.paymentStatus === "paid" ||
@@ -117,7 +126,7 @@ async function orderToolBody(input: Readonly<{
     return view;
   }
 
-  return {
+  const complete = {
     ...view,
     acquisitionMinor,
     attribution: frozen?.attribution ?? attribution,
@@ -131,4 +140,5 @@ async function orderToolBody(input: Readonly<{
     shippingSubsidyMinor,
     timeline: projection.timeline
   };
+  return projectOrder(complete as OrderSuccessWire, input, order, orderResultVersion(order, fulfilmentEvents, paymentAttempts, locale), locale);
 }

@@ -1,4 +1,6 @@
-import { assessPreferences, type NumericPreferences } from "@/lib/matcher/preferences";
+import { adviceKind } from "@/lib/agentic/value/advice-kind";
+import { continuedIntakeCoversTargets } from "@/lib/agentic/value/customer-choice";
+import { assessPreferences, verifiedPillLowerBound, type NumericPreferences } from "@/lib/matcher/preferences";
 import { matchingExplanationFor } from "@/lib/agentic/value/matching-explanation";
 import { parseProductAdministration } from "@/lib/product-administration";
 import { operationalDecision } from "@/lib/agentic/value/operational-decision";
@@ -55,7 +57,7 @@ function compactPublic(
     }
     if (key === "administration" || key === "labelledFacts" || key === "originalRequest" || key === "preferenceAssessment" || key === "matchingDiagnostics" || key === "matchingExplanation") { out[key] = nested; continue; }
     if (nested == null) {
-      if (nested === null && ["administration", "pills", "dailyPills", "pillsPerServing", "totalDailyPills", "pillDelta", "dailyPillsDelta", "dailyCostMinor", "supplyDays", "totalExposureAmount", "supplementId", "exposure", "threshold", "nextReplenishmentDay", "cash30DayMinor", "cash90DayMinor", "cash90DayDeltaMinor"].includes(key)) out[key] = null;
+      if (nested === null && ["highlightedAlternativeOptionId", "administration", "pills", "dailyPills", "pillsPerServing", "totalDailyPills", "pillDelta", "dailyPillsDelta", "dailyCostMinor", "supplyDays", "totalExposureAmount", "supplementId", "exposure", "threshold", "nextReplenishmentDay", "cash30DayMinor", "cash90DayMinor", "cash90DayDeltaMinor"].includes(key)) out[key] = null;
       continue;
     }
     if (stripEmptyArrays && Array.isArray(nested) && nested.length === 0) {
@@ -714,6 +716,7 @@ export function publicOption(
   const pillComparisonKnown = comparedPillDelta(option, selected) != null;
   const counts = requestedTargetCoverage(option.coverage);
   const preferenceAssessment = assessPreferences(preferences, { productCount: option.basket.length,
+    dailyPillsLowerBound: verifiedPillLowerBound(option.basket),
     dailyPills: option.basket.some(item => item.pillCountKnown === false || item.dailyPills == null) ? null : option.dailyPills,
     firstOrderGoodsPriceMinor: option.basket.some(item => item.incompleteCommercialFacts) ? null : option.basket.reduce((sum, item) => sum + item.lineTotalMinor, 0), currency }, locale).filter(row => row.status !== "not_requested");
   return {
@@ -725,7 +728,9 @@ export function publicOption(
     basket: option.basket.map(item => publicBasketItem(item, locale)),
     ...(option.safety ? { advice: option.safety.guidance.map(item => publicSafetyGuidance(item)) } : {}),
     optionId: option.optionId,
-    reason: reason.message,
+    reason: option.basket.length > 0 && counts.coveragePercent === 0
+      ? (locale === "th" ? "ตัวเลือกนี้ไม่ครอบคลุมสารอาหารตามเป้าหมายที่ขอ" : locale === "zh-CN" ? "此选项未覆盖所请求的营养目标。" : "This option does not cover the requested targets.")
+      : reason.message,
     reasonCode: reason.code,
     reasonKey: reason.key,
     recommended: Boolean(option.recommended),
@@ -776,6 +781,7 @@ export function publicSafetyGuidance(
     ...(row.referenceBasis ? { referenceBasis: row.referenceBasis } : {}),
     acknowledgementStatus: "not_required",
     code: row.code,
+    kind: adviceKind(row),
     guidanceId: row.guidanceId,
     message: row.message,
     messageKey: row.messageKey,
@@ -871,6 +877,7 @@ function publicLeftovers(
     }
     out.push({
       name: item.name,
+      ...(item.note ? { note: item.note } : {}),
       reason: item.reason,
       unit,
       requestedAmount,
@@ -968,7 +975,8 @@ export function publicPlanFields(result: Pick<
   const horizonUnavailable = result.horizon?.complete === false || Boolean(result.horizon?.durationUnknown);
   const horizonUnavailableReason = result.horizon?.unavailableReasons?.[0]?.reasonCode ?? (result.horizon?.durationUnknown ? "current_inventory_duration_unknown" : "current_inventory_information_incomplete");
   const horizonReasons = [...(result.horizon?.unavailableReasons ?? []), ...(selected?.economics?.unavailableReasons ?? [])].filter((item, index, all) => all.findIndex(other => JSON.stringify(other) === JSON.stringify(item)) === index);
-  const replenishesLater = !horizonUnavailable && Boolean(
+  const continuedTargetsCovered = !selected?.basket.length && continuedIntakeCoversTargets(result.coverage);
+  const replenishesLater = continuedTargetsCovered ? (result.horizon?.nextReplenishmentDay ?? 0) > 0 : !horizonUnavailable && Boolean(
     result.horizon?.orders.some((item) => item.day > 0 && item.day < 90) ||
       (typeof result.horizon?.nextReplenishmentDay === "number" &&
         result.horizon.nextReplenishmentDay > 0 &&
@@ -979,7 +987,7 @@ export function publicPlanFields(result: Pick<
     empty: !selected?.basket.length, hasPurchaseOptions, canExpand: (result as PlanResult).searchSummary?.canExpand,
     durationUnknown: result.horizon?.durationUnknown,
     hasUnmetTargets: result.coverage.some(row => row.remainingGap > 0 || row.unresolved), locale });
-  const decision = operationalDecision({ canRefine: matchingExplanation?.recoveryActions.includes("refine_request"), status: result.status, hasSelectedOption: Boolean(selected?.basket.length), hasPurchaseOptions: alternatives.some(option => option.basket.length > 0 && option.purchaseEligible !== false), hasQuestions: result.questions.length > 0, purchaseRequiredNow: result.horizon?.purchaseRequiredNow, replenishesLater, tooBroad });
+  const decision = operationalDecision({ continuedTargetsCovered, canRefine: matchingExplanation?.recoveryActions.includes("refine_request"), status: result.status, hasSelectedOption: Boolean(selected?.basket.length), hasPurchaseOptions: alternatives.some(option => option.basket.length > 0 && option.purchaseEligible !== false), hasQuestions: result.questions.length > 0, purchaseRequiredNow: result.horizon?.purchaseRequiredNow, replenishesLater, tooBroad });
   if (decision.status !== result.status) result = { ...result, status: decision.status,
     summary: agenticMessage(negotiateLocale(locale), `plan.summary.${decision.status}`) };
   const quoteBasket =
@@ -1008,6 +1016,7 @@ export function publicPlanFields(result: Pick<
   const claimIds = compactApplicable ? planClaimIds(result) : [];
 
   const preferenceAssessment = assessPreferences(snapshot?.requirements ?? {}, { productCount: selected?.basket.length ?? 0,
+    dailyPillsLowerBound: verifiedPillLowerBound(selected?.basket ?? []),
     dailyPills: selected?.basket.some(item => item.pillCountKnown === false || item.dailyPills == null) ? null : selected?.dailyPills ?? 0,
     firstOrderGoodsPriceMinor: selected?.basket.some(item => item.incompleteCommercialFacts) ? null : selected?.basket.reduce((sum, item) => sum + item.lineTotalMinor, 0) ?? 0,
     currency }, locale).filter(row => row.status !== "not_requested");

@@ -123,6 +123,22 @@ export function waitUntilDeadline(correlationId: string): DeadlineWait {
   return promise;
 }
 
+/** Cancellable monotonic wait shared by production handoff and controlled tests. */
+export function waitForServiceDelay(delayMs: number): DeadlineWait {
+  const started = serviceClockMs();
+  let finish!: () => void;
+  const promise = new Promise<void>(resolve => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const check = () => { if (serviceClockMs() - started >= delayMs) finish(); };
+    finish = () => { watchers.delete(check); if (timer) clearTimeout(timer); resolve(); };
+    watchers.add(check);
+    if (clockMode === "live") timer = setTimeout(finish, Math.max(0, delayMs));
+    check();
+  }) as DeadlineWait;
+  promise.cancel = () => finish();
+  return promise;
+}
+
 export function serviceDeadlineError(correlationId: string): AgenticErrorResult {
   const error = businessError({
     correlationId,

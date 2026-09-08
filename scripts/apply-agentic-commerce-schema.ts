@@ -31,6 +31,49 @@ create table if not exists public.agentic_plan_revisions (
   primary key (plan_id, revision)
 );
 
+create table if not exists public.agentic_plan_operations (
+  id uuid primary key,
+  plan_id uuid not null references public.agentic_plans(id) on delete restrict,
+  owner_scope text not null,
+  idempotency_key text not null,
+  status text not null check (status in ('queued','running','retryable','complete','failed','cancelled')),
+  version integer not null check (version > 0),
+  record_json jsonb not null,
+  created_at timestamptz not null,
+  updated_at timestamptz not null,
+  unique(owner_scope,idempotency_key)
+);
+-- Already-compressed checkpoint bytes do not belong in frequently updated JSONB.
+-- Readers retain the legacy inline fallback; no large backfill transaction is needed.
+alter table public.agentic_plan_operations add column if not exists checkpoint_cursor bytea;
+alter table public.agentic_plan_operations alter column checkpoint_cursor set storage external;
+create index if not exists agentic_plan_operations_failed_idx on public.agentic_plan_operations(plan_id,(record_json->>'expectedRevision'),created_at desc)
+  where status in ('failed','cancelled');
+create index if not exists agentic_plan_operations_active_idx on public.agentic_plan_operations(plan_id,created_at,id)
+  where status in ('queued','running','retryable');
+create index if not exists agentic_plan_operations_completed_idx on public.agentic_plan_operations(plan_id,(record_json->>'revision'),created_at desc)
+  where status='complete';
+create index if not exists agentic_plan_operations_task_idx on public.agentic_plan_operations((record_json->>'taskId'));
+
+create or replace function public.fence_cancelled_agentic_plan_task() returns trigger language plpgsql as $$
+begin
+  if new.task_type='match_agentic_plan' and new.status='cancelled' and old.status is distinct from new.status then
+    update public.agentic_plan_operations
+    set status='cancelled',version=version+1,updated_at=clock_timestamp(),
+      record_json=record_json || jsonb_build_object('status','cancelled','version',version+1,
+        'leaseToken',null,'leaseExpiresAt',null,'updatedAt',clock_timestamp())
+    where record_json->>'taskId'=new.id::text and status in ('queued','running','retryable');
+  end if;
+  return new;
+end $$;
+do $$ begin
+  if to_regclass('public.tasks') is not null then
+    drop trigger if exists fence_cancelled_agentic_plan_task on public.tasks;
+    create trigger fence_cancelled_agentic_plan_task after update of status on public.tasks
+      for each row execute function public.fence_cancelled_agentic_plan_task();
+  end if;
+end $$;
+
 create table if not exists public.agentic_capabilities (
   id uuid primary key,
   capability_hash text not null unique,
@@ -414,6 +457,7 @@ begin
       public.agentic_catalogue_snapshots,
       public.agentic_plans,
       public.agentic_plan_revisions,
+      public.agentic_plan_operations,
       public.agentic_capabilities,
       public.agentic_idempotency_records,
       public.agentic_orders,

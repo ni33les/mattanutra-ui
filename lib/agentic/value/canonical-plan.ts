@@ -8,7 +8,7 @@ import { amountFromScaled, scaleAmount } from "@/lib/matcher/dose";
 import type { MatcherUnit } from "@/lib/matcher/types";
 
 export const CUSTOMER_VALUE_PACK_VERSION = "dev-customer-value-v4.0";
-export const CANONICAL_PLAN_VERSION = "cv-3.0";
+export const CANONICAL_PLAN_VERSION = "cv-4.0";
 
 function canonicalContributors(
   items: readonly Readonly<{

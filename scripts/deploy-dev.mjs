@@ -1,4 +1,9 @@
-import { mkdir, writeFile } from "node:fs/promises";
+import { payloadExpectedIdentity, readPayloadProof, compiledBuildIdentity } from "./mcp-payload/proof.mjs";
+import { RELEASE_BASE as PAYLOAD_RELEASE_BASE } from "./mcp-payload/run-tests.mjs";
+import { mkdir, writeFile, readFile } from "node:fs/promises";
+import { dirname, resolve } from "node:path";
+import { sourceManifest } from "./run-full-test-suite.mjs";
+import { axExpectedIdentity, readAxValidationProof } from "./ax-validation-proof.mjs";
 import { npmCommand, npmRun, run, runCapture } from "./dev-cycle-utils.mjs";
 
 const serviceName = "mattanutra-ui-dev.service";
@@ -110,16 +115,46 @@ async function main() {
   }
 
   console.log(`[deploy:dev] Branch: ${branch}`);
-  await npmRun("verify:dev");
-  await applyOrVerifyRuntimeSchema();
+  const scopedIndex = process.argv.indexOf("--ax-refinement-attestation");
+  const payloadIndex = process.argv.indexOf("--mcp-payload-attestation");
+  if (payloadIndex >= 0) {
+    if (scopedIndex >= 0 || branch !== "dev" || process.env.MATTANUTRA_ENV !== "dev") throw new Error("MCP payload proof is DEV-only and cannot be combined with another bypass/path");
+    const file = process.argv[payloadIndex + 1];
+    if (!file?.startsWith("/")) throw new Error("Pass the absolute MCP payload attestation path");
+    const proof = readPayloadProof(file, payloadExpectedIdentity(sourceManifest().sha256, PAYLOAD_RELEASE_BASE));
+    if (await runCapture("git", ["status", "--porcelain"])) throw new Error("Validated source must remain clean");
+    if (proof.sourceCommit !== await runCapture("git", ["rev-parse", "HEAD"])) throw new Error("Validated commit changed");
+    const build = JSON.parse(await readFile(resolve(dirname(file), "build-identity.json"), "utf8"));
+    if (build.nextBuildId !== (await readFile(".next/BUILD_ID", "utf8")).trim()) throw new Error("Validated build changed");
+    if (build.buildSha256 !== compiledBuildIdentity()) throw new Error("Validated compiled artifacts changed");
+    console.log(`[deploy:dev] Verified MCP payload work-package evidence: ${file}`);
+  } else if (scopedIndex >= 0) {
+    if (branch !== "dev" || process.env.MATTANUTRA_ENV !== "dev") throw new Error("AX work-package deployment requires the DEV environment and dev branch");
+    const file = process.argv[scopedIndex + 1];
+    if (!file || !file.startsWith("/")) throw new Error("Pass the absolute AX attestation path");
+    const base = await runCapture("git", ["rev-parse", "22bce180"]);
+    const proof = readAxValidationProof(file, axExpectedIdentity(sourceManifest().sha256, base));
+    if (await runCapture("git", ["status", "--porcelain"])) throw new Error("Validated deployment source must remain clean");
+    if (proof.sourceCommit !== await runCapture("git", ["rev-parse", "HEAD"])) throw new Error("Validated deployment commit changed");
+    const build = JSON.parse(await readFile(resolve(dirname(file), "build-identity.json"), "utf8"));
+    if (build.nextBuildId !== (await readFile(".next/BUILD_ID", "utf8")).trim()) throw new Error("Validated production build is missing or changed");
+    console.log(`[deploy:dev] Verified AX work-package evidence: ${file}`);
+  } else {
+    await npmRun("verify:dev");
+  }
+  if (payloadIndex >= 0) {
+    // This presentation-only package has no migrations or catalogue changes.
+    await npmRun("dev-runtime-schema:verify");
+  } else await applyOrVerifyRuntimeSchema();
   const sha = (await runCapture("git", ["rev-parse", "HEAD"])).trim();
   const dropInDir = "/etc/systemd/system/mattanutra-ui-dev.service.d";
   await mkdir(dropInDir, { recursive: true });
   await writeFile(
     `${dropInDir}/agentic-build.conf`,
-    `[Service]\nEnvironment=AGENTIC_BUILD_ID=${sha}\n`,
+    `[Service]\nEnvironment=AGENTIC_BUILD_ID=${sha}\nEnvironment=AGENTIC_WORKER_VERSION=${sha}\n`,
     "utf8"
   );
+  if (payloadIndex >= 0) await writeFile(`${dropInDir}/mcp-payload-worker-version.conf`, `[Service]\nEnvironment=WORKER_VERSION=${sha}\nEnvironment=AGENTIC_WORKER_VERSION=${sha}\n`, "utf8");
   await run("systemctl", ["daemon-reload"]);
   console.log(`[deploy:dev] AGENTIC_BUILD_ID=${sha}`);
   console.log(`[deploy:dev] Restarting ${serviceName}...`);

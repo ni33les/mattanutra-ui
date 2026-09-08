@@ -9,6 +9,7 @@ export type PreferenceAssessment = Readonly<{
   kind: "product_count" | "daily_pills" | "first_order_goods_price";
   preferred: number | null;
   actual: number | null;
+  actualLowerBound?: number;
   unit: string;
   complete: boolean;
   delta: number | null;
@@ -30,15 +31,16 @@ function fraction(value: number) {
     : { numerator: BigInt(whole! + decimal) * BigInt(10) ** BigInt(-scale), denominator: BigInt(1) };
 }
 
-export function preferenceMessage(row: Pick<PreferenceAssessment, "messageKey" | "kind" | "actual" | "preferred" | "unit">, localeInput?: string) {
+export function preferenceMessage(row: Pick<PreferenceAssessment, "messageKey" | "kind" | "actual" | "preferred" | "unit" | "actualLowerBound">, localeInput?: string) {
   const locale = negotiateLocale(localeInput);
-  return agenticMessage(locale, row.messageKey, { actual: row.actual ?? "?", preferred: row.preferred ?? "?",
+  return agenticMessage(locale, row.messageKey, { actual: row.actual ?? "?", lowerBound: row.actualLowerBound ?? "?", preferred: row.preferred ?? "?",
     preference: agenticMessage(locale, `plan.preference.${row.kind}`), unit: row.unit });
 }
 
 export function assessPreferences(preferences: NumericPreferences, actual: Readonly<{
   productCount: number;
   dailyPills: number | null;
+  dailyPillsLowerBound?: number;
   firstOrderGoodsPriceMinor: number | null;
   currency: string;
 }>, localeInput?: string): PreferenceAssessment[] {
@@ -50,17 +52,24 @@ export function assessPreferences(preferences: NumericPreferences, actual: Reado
   ] as const).map(row => {
     const preferred = row.preferred ?? null;
     const amount = row.actual != null && Number.isFinite(row.actual) ? row.actual : null;
+    const actualLowerBound = amount == null && row.kind === "daily_pills" && actual.dailyPillsLowerBound != null &&
+      Number.isFinite(actual.dailyPillsLowerBound) && actual.dailyPillsLowerBound >= 0 ? actual.dailyPillsLowerBound : undefined;
     const delta = preferred == null || amount == null ? null : amount - preferred;
     const status = preferred == null ? "not_requested" : amount == null ? "unknown" : amount > preferred ? "above_preference" : "within_preference";
     let prominent = false;
-    if (status === "above_preference" && amount != null && preferred != null) {
-      const a = fraction(amount), p = fraction(preferred);
+    const confirmed = amount ?? actualLowerBound;
+    if (confirmed != null && preferred != null && confirmed > preferred) {
+      const a = fraction(confirmed), p = fraction(preferred);
       prominent = preferred === 0 || a.numerator * p.denominator * BigInt(5) > p.numerator * a.denominator * BigInt(6);
     }
-    const messageKey = `plan.preference.${status}`;
-    return { kind: row.kind, preferred, actual: amount, unit: row.unit, complete: amount != null, delta,
+    const messageKey = status === "unknown" && (actualLowerBound ?? 0) > 0 ? "plan.preference.unknown_lower_bound" : `plan.preference.${status}`;
+    return { ...(actualLowerBound != null ? { actualLowerBound } : {}), kind: row.kind, preferred, actual: amount, unit: row.unit, complete: amount != null, delta,
       percent: delta != null && preferred != null && preferred > 0 ? delta / preferred * 100 : null,
       status, prominent, messageKey,
-      message: preferenceMessage({ ...row, actual: amount, preferred, messageKey }, locale) };
+      message: preferenceMessage({ ...row, actual: amount, actualLowerBound, preferred, messageKey }, locale) };
   });
+}
+
+export function verifiedPillLowerBound(items: readonly Readonly<{ dailyPills: number | null; pillCountKnown?: boolean }>[]) {
+  return items.reduce((sum, item) => sum + (item.pillCountKnown !== false && item.dailyPills != null && Number.isFinite(item.dailyPills) && item.dailyPills >= 0 ? item.dailyPills : 0), 0);
 }

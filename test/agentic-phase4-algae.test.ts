@@ -37,14 +37,13 @@ function testConfig(): AgenticConfig {
   };
 }
 
-describe("Phase 4 algae source is intrinsic to the target name", () => {
-  it("keeps algae_only as its own flag and deletes the Omega-3 rewrite copy", () => {
+describe("Phase 4 source preservation under contract 7", () => {
+  it("documents the explicit source choice required by the exact algae alias", () => {
     const resource = readContractResource(CLIENT_GUIDE_URI);
     assert.ok(resource);
     const planCopy = resource.contents[0].text;
-    assert.match(planCopy, /algae-named omega-3(?: target)? implies algae_only/i);
-    assert.doesNotMatch(planCopy, /Algae omega-3 matches Omega-3/);
-    assert.match(planCopy, /plant-based source requirements do not need a redundant question/i);
+    assert.match(planCopy, /Algae Omega-3.*explicit algae_only/i);
+    assert.match(planCopy, /source.*preserv/i);
     assert.ok(AGENTIC_SERVER_INSTRUCTIONS.includes(CLIENT_GUIDE_URI));
     assert.match(
       AGENTIC_TOOL_DESCRIPTIONS.plan,
@@ -68,11 +67,8 @@ describe("Phase 4 algae source is intrinsic to the target name", () => {
         ]
       })
     );
-    assert.equal("error" in request, false);
-    if ("error" in request) {
-      return;
-    }
-    assert.equal(request.omega3SourcePreference, "algae_only");
+    assert.ok(!("error" in request));
+    assert.equal(request.omega3SourcePreference, "fish_allowed");
     assert.equal(targetImpliesAlgaeOmega("Algae omega-3"), true);
     assert.equal(targetImpliesAlgaeOmega(omega.name), false);
   });
@@ -93,14 +89,11 @@ describe("Phase 4 algae source is intrinsic to the target name", () => {
         ]
       })
     );
-    assert.equal("error" in request, false);
-    if ("error" in request) {
-      return;
-    }
+    assert.ok(!("error" in request));
     assert.equal(request.omega3SourcePreference, "fish_allowed");
   });
 
-  it("normalize infers algae_only from Algae omega-3 even when fish_allowed is set", async () => {
+  it("normalize preserves fish_allowed and explains the unresolved algae alias", async () => {
     const normalized = await normalizePlanRequest({
       config: testConfig(),
       snapshot: fixtureSnapshot(),
@@ -113,20 +106,15 @@ describe("Phase 4 algae source is intrinsic to the target name", () => {
         targets: [{ amount: 1000, name: "Algae omega-3", unit: "mg" }]
       }
     });
-    assert.equal("error" in normalized, false);
-    if ("error" in normalized) {
-      return;
-    }
-    assert.equal(normalized.state.targets[0]?.name, "Omega-3");
-    assert.equal(normalized.state.targets[0]?.requestedName, "Algae omega-3");
-    assert.equal(normalized.state.requirements.omega3SourcePreference, "algae_only");
+    assert.ok(!("error" in normalized));
+    assert.equal(normalized.state.targets.length, 0);
+    assert.equal(normalized.state.leftovers[0]?.name, "Algae omega-3");
+    assert.match(normalized.state.leftovers[0]?.note ?? "", /algae_only/);
+    assert.equal(normalized.state.requirements.omega3SourcePreference, "fish_allowed");
 
     const request = toCanonicalRequest(normalized.state);
-    assert.equal("error" in request, false);
-    if ("error" in request) {
-      return;
-    }
-    assert.equal(request.omega3SourcePreference, "algae_only");
+    assert.ok(!("error" in request));
+    assert.equal(request.omega3SourcePreference, "fish_allowed");
   });
 
   it("does not select fish oil for an algae-named target after name rewrite", () => {
@@ -136,6 +124,7 @@ describe("Phase 4 algae source is intrinsic to the target name", () => {
       snapshot,
       state: {
         ...aug25PlanState({
+          requirements: { omega3SourcePreference: "algae_only" },
           targets: [
             {
               amount: 1000,
@@ -160,6 +149,7 @@ describe("Phase 4 algae source is intrinsic to the target name", () => {
   it("E-02 still selects G-O3-ALGAE-500 for an algae-named target", () => {
     const result = match(
       qaRequest({
+        omega3SourcePreference: "algae_only",
         targets: [qaTarget("omega", 500, "mg", "Algae omega-3")]
       }),
       QA_GOLD_CATALOG

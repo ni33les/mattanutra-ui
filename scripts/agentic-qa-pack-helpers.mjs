@@ -57,7 +57,7 @@ export function isFixtureLine(line) {
 }
 
 export function exactToolNames(names) {
-  return names.join(",") === "info,plan,execute,order,support,feedback,evidence";
+  return names.join(",") === "info,plan,execute,order,support,feedback";
 }
 
 export function planProfileHasSex(planTool) {

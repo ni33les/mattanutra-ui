@@ -1,8 +1,13 @@
+import { planContractCompatible } from "@/lib/agentic/presentation/compatibility";
+import { withoutOperationCursor } from "@/lib/agentic/store/operation-checkpoint";
+import { planReturnWaitMs } from "@/lib/agentic/plan/operations";
 import { catalogueSnapshotId } from "@/lib/agentic/catalogue/freeze";
 import { validateProductDoseProposals } from "@/lib/matcher/serving-grid";
 import { toMatcherProduct } from "@/lib/agentic/plan/to-matcher-product";
 import { mergeRequestPatch, originalRequestFor } from "@/lib/agentic/plan/request-patch";
-import { requestLifetime } from "@/lib/request-lifetime";
+import { requestLifetime, withRequestLifetime } from "@/lib/request-lifetime";
+import { admitPlanOperation, claimPlanOperation, failPlanOperation, updateClaimedOperation } from "@/lib/agentic/plan/operations";
+import type { PlanOperationRecord } from "@/lib/agentic/store/types";
 import { AsyncLocalStorage } from "node:async_hooks";
 import type { Locale } from "@/lib/i18n";
 import type { AgenticConfig } from "@/lib/agentic/config";
@@ -50,12 +55,12 @@ import {
 import { evaluateSafety, planStatus, safetyQuestions } from "@/lib/agentic/plan/safety";
 import { persistMatcherTelemetry } from "@/lib/agentic/plan/telemetry";
 import { publicPlanFields } from "@/lib/agentic/public-mapper";
-import { matchPlanInWorker, MatcherUnavailableError } from "@/lib/agentic/plan/match-worker-pool";
-import { issueEvidenceCapability } from "@/lib/agentic/evidence/tool";
+import { matchPlanInWorker, matchPlanChunkInWorker, MatcherUnavailableError } from "@/lib/agentic/plan/match-worker-pool";
+import { evidenceHandleFor, issueEvidenceCapability } from "@/lib/agentic/evidence/tool";
 import { planCompactApplicable } from "@/lib/agentic/contract/plan-result";
 import { planClaimIds, planResearchVersion } from "@/lib/agentic/value/compact-decision";
 import { commitFunnelEvent } from "@/lib/agentic/funnel/ledger";
-import { setQueryNamespace } from "@/lib/agentic/plan/query-budget";
+import { setQueryNamespace, queryBudgetSnapshot } from "@/lib/agentic/plan/query-budget";
 import { acquirePermit, releasePermit } from "@/lib/agentic/qa/resource-permits";
 import { persistQueryBudget } from "@/lib/agentic/qa/persist";
 import { QA_NAMESPACE_PREFIX } from "@/lib/agentic/qa/session";
@@ -65,6 +70,7 @@ import {
   serviceDeadlineError,
   waitUntilDeadline
 } from "@/lib/agentic/qa/service-clock";
+import { requestElapsedMs, waitForServiceDelay } from "@/lib/agentic/qa/service-clock";
 import { buildHorizonPlan } from "@/lib/agentic/value/inventory-ledger";
 import { DEFAULT_MATCHER_CONFIG } from "@/lib/matcher/config";
 import { isDoseError, scaleAmount } from "@/lib/matcher/dose";
@@ -126,6 +132,8 @@ export function resetPlanCreateInflightForTests() {
 }
 
 type PlanAttempt = Readonly<{
+  operation?: PlanOperationRecord;
+  operationStore?: AgenticStore;
   correlationId: string;
   signal?: AbortSignal;
   releases: Set<() => void>;
@@ -165,13 +173,7 @@ function planCorrelationId(idempotencyKey?: string) {
 }
 
 function logicalPlanQueryCounts(namespace: string) {
-  void namespace;
-  return {
-    "catalogue.snapshot.TH": 1,
-    "plan.match": 1,
-    "plan.match.hit": 1,
-    "plan.match.miss": 0
-  };
+  return queryBudgetSnapshot(namespace);
 }
 
 async function stopIfPlanDeadline(
@@ -494,6 +496,37 @@ function targetNameGroups(
   return { groups, unsupported };
 }
 
+type DurableSearchCheckpoint = {
+  stage: "normalized" | "search"; state: CanonicalPlanState; catalogueId: string;
+  search?: import("@/lib/agentic/plan/matching").PlanSearchCheckpoint;
+  reservedAttempts?: number;
+};
+async function durableMatch(input: { snapshot: CatalogueSnapshot; state: CanonicalPlanState }) {
+  const attempt = planAttempts.getStore();
+  if (!attempt?.operation || !attempt.operationStore) return matchPlanInWorker(input);
+  const store = attempt.operationStore, claim = attempt.operation;
+  const current = await store.getPlanOperation(claim.id);
+  let checkpoint = current?.checkpoint as DurableSearchCheckpoint | null;
+  if (!checkpoint) throw new Error("Missing normalized operation checkpoint");
+  let lostAttempts = checkpoint.reservedAttempts ?? 0;
+  while (true) {
+    const remaining = (input.state.searchEffort === "expanded" ? 64_000 : checkpoint.search?.expansionBudget ?? 8_000)
+      - (checkpoint.search?.expansionAttempts ?? 0) - lostAttempts;
+    const chunkBudget = Math.min(4_000, Math.max(0, remaining));
+    const reserved = { ...checkpoint, stage: "search" as const, reservedAttempts: chunkBudget + lostAttempts };
+    if (!await updateClaimedOperation(store, claim, { checkpoint: withoutOperationCursor({ ...claim, checkpoint: reserved }).checkpoint }, new Date().toISOString())) throw new Error("Matching operation lease lost");
+    const reply = await matchPlanChunkInWorker(input, { checkpoint: checkpoint.search, chunkBudget: Math.max(1, chunkBudget), lostAttempts });
+    checkpoint = { ...checkpoint, stage: "search", search: reply.checkpoint, reservedAttempts: 0 };
+    if (!await updateClaimedOperation(store, claim, { checkpoint }, new Date().toISOString())) throw new Error("Matching operation lease lost");
+    lostAttempts = 0;
+    console.info("[agentic-plan-checkpoint]", { operationId: claim.id, attempts: reply.expansionAttempts, budget: reply.checkpoint.expansionBudget, checkpointBytes: reply.checkpoint.cursor.length, complete: reply.done });
+    if (reply.done) {
+      if (!reply.result) throw new Error("Completed matcher chunk has no result");
+      return reply.result;
+    }
+  }
+}
+
 async function buildResult(input: Readonly<{
   catalogueMs?: number;
   locale: Locale;
@@ -519,9 +552,9 @@ async function buildResult(input: Readonly<{
           state: input.state
         })
       }
-    : process.env.NODE_TEST_CONTEXT
+    : process.env.NODE_TEST_CONTEXT && process.env.AX_REFINEMENT_REAL_WORKERS !== "1"
       ? matchPlan({ snapshot: input.snapshot, state: input.state })
-      : await matchPlanInWorker({ snapshot: input.snapshot, state: input.state });
+      : await durableMatch({ snapshot: input.snapshot, state: input.state });
   const searchMs = Math.max(0, Date.now() - searchStartedAt);
   const matchMs =
     input.matchStartedAt != null ? Math.max(0, Date.now() - input.matchStartedAt) : searchMs;
@@ -901,6 +934,7 @@ async function commitTerminalIdempotency(input: Readonly<{
 }
 
 type PreparedPlanCommand = Readonly<{
+  operationId?: string;
   effectiveRequest?: PlanRequest;
   answers: readonly PlanAnswer[];
   ack: SafetyAcknowledgement | null;
@@ -920,7 +954,7 @@ type PreparedPlanCommand = Readonly<{
   state: CanonicalPlanState;
 }>;
 
-export async function planTool(input: Readonly<{
+type PlanExecutionInput = Readonly<{
   config: AgenticConfig;
   deferProcessing?: boolean;
   matchPort?: PlanMatchPort;
@@ -928,7 +962,79 @@ export async function planTool(input: Readonly<{
   payload: PlanToolInput;
   scope: CapabilityScope;
   store: AgenticStore;
+}>;
+
+const inflightDurableOperations = new Map<string, Promise<PlanToolSuccess | AgenticErrorResult>>();
+
+function operationProcessingResponse(operation: PlanOperationRecord) {
+  const prepared = operation.command.prepared as PreparedPlanCommand;
+  return successFromResult({ locale: prepared.locale, planHandle: prepared.planHandle,
+    result: prepared.processing, revision: operation.revision });
+}
+
+/** One admitted operation owns work independently of any transport attempt. */
+export async function runAdmittedPlanOperation(input: Readonly<{
+  store: AgenticStore; config: AgenticConfig; operationId: string; signal?: AbortSignal;
 }>): Promise<PlanToolSuccess | AgenticErrorResult> {
+  const existingWork = inflightDurableOperations.get(input.operationId);
+  if (existingWork) return existingWork;
+  const operation = await input.store.getPlanOperation(input.operationId, { includeCursor: false });
+  if (!operation) return businessError({ reasonCode: "not_found", message: "Matching operation not found." });
+  if (operation.status === "complete") return operation.response as PlanToolSuccess;
+  if (operation.status === "cancelled" || operation.status === "failed") return (operation.error as AgenticErrorResult | null) ?? businessError({ reasonCode: "stale_revision", message: "This matching operation is no longer active. Reload the plan." });
+  const claim = await claimPlanOperation(input.store, operation.id, nextTestUuid(), new Date().toISOString());
+  if (!claim) return operationProcessingResponse(operation);
+  const controller = new AbortController();
+  const signal = input.signal ? AbortSignal.any([input.signal, controller.signal]) : controller.signal;
+  const attempt: PlanAttempt = { correlationId: `plan-operation:${claim.id}`, signal, releases: new Set(), operation: claim, operationStore: input.store };
+  const prepared = claim.command.prepared as PreparedPlanCommand;
+  const work = withRequestLifetime({ signal, correlationId: attempt.correlationId }, () => planAttempts.run(attempt, async () => {
+    try {
+      const result = await completePreparedPlan(prepared, {
+        config: input.config, now: claim.createdAt, payload: claim.command.payload as PlanToolInput,
+        scope: claim.command.scope, store: input.store
+      }, !(claim.command.payload as PlanToolInput).planHandle, Date.now());
+      if (isAgenticErrorResult(result)) {
+        const status = result.error.retryable ? "retryable" : "failed";
+        await updateClaimedOperation(input.store, claim, { status, error: result }, new Date().toISOString());
+      }
+      return result;
+    } catch (error) {
+      const result = businessError({ reasonCode: "temporarily_unavailable", retryable: true,
+        message: "Matching could not finish. Retry this operation with the same key and unchanged request." });
+      await failPlanOperation(input.store, claim, result, new Date().toISOString());
+      console.error("[agentic-plan-operation]", { operationId: claim.id, origin: error instanceof Error ? error.name : "unknown", message: error instanceof Error ? error.message : "operation_failed" });
+      return result;
+    }
+  })).finally(() => { inflightDurableOperations.delete(claim.id); releaseAttempt(attempt); });
+  inflightDurableOperations.set(claim.id, work);
+  return work;
+}
+
+function operationFailureResponse(operation: PlanOperationRecord, currentRevision = operation.expectedRevision) {
+  const failure = isAgenticErrorResult(operation.error) ? operation.error : businessError({
+    reasonCode: "stale_revision", message: "This refinement did not complete. Revise the last committed plan with a new idempotency key." });
+  return { ...failure, error: { ...failure.error, currentRevision,
+    requestedRevision: operation.revision, nextActions: failure.error.nextActions ?? ["refresh_plan"] } };
+}
+
+async function admittedResponse(input: PlanExecutionInput, operation: PlanOperationRecord) {
+  if (operation.status === "complete") return operation.response as PlanToolSuccess;
+  if (operation.status === "failed" || operation.status === "cancelled") {
+    const current = await input.store.getPlan(operation.planId);
+    return operationFailureResponse(operation, current?.currentRevision);
+  }
+  const work = runAdmittedPlanOperation({ config: input.config, store: input.store, operationId: operation.id });
+  if (input.payload.operation === "get") {
+    void work.catch(() => undefined);
+    return operationProcessingResponse(operation);
+  }
+  const handoff = waitForServiceDelay(Math.min(PLAN_MATCH_RETURN_BUDGET_MS, planReturnWaitMs(requestElapsedMs(planCorrelationId(input.payload.idempotencyKey)))));
+  try { return await Promise.race([work, handoff.then(() => operationProcessingResponse(operation))]); }
+  finally { handoff.cancel(); }
+}
+
+export async function planTool(input: PlanExecutionInput): Promise<PlanToolSuccess | AgenticErrorResult> {
   if (input.scope.principalScope?.startsWith("qa-v3:")) {
     setQueryNamespace(input.scope.principalScope);
   }
@@ -1014,6 +1120,25 @@ async function executePlanTool(input: Readonly<{
   const loadLiveCatalogue =
     !input.matchPort && !input.payload.planHandle;
   const ownerScope = `${input.scope.environment}:${input.scope.tenantScope}:${input.scope.principalScope ?? "anon"}`;
+  if (!input.matchPort && input.payload.idempotencyKey) {
+    const admitted = await input.store.getPlanOperationByKey(ownerScope, input.payload.idempotencyKey);
+    if (admitted) {
+      if (admitted.requestHash !== canonicalRequestHash(input.payload)) return businessError({ fieldPath: "idempotencyKey", reasonCode: "idempotency_conflict", message: "This key belongs to a different request." });
+      return admittedResponse(input, admitted);
+    }
+  }
+  if (!input.matchPort && input.payload.operation === "get" && input.payload.planHandle) {
+    const capability = await resolveCapability({ action: "plan.read", config: input.config, handle: input.payload.planHandle,
+      now: input.now, resourceType: "plan", scope: input.scope, store: input.store });
+    if (!capability) return businessError({ reasonCode: "not_found", message: "Not found." });
+    const active = await input.store.getActivePlanOperation(capability.resourceId);
+    if (active) return admittedResponse(input, active);
+    const plan = await input.store.getPlan(capability.resourceId);
+    if (plan) {
+      const failed = await input.store.getFailedPlanOperation(plan.id, plan.currentRevision);
+      if (failed) return operationFailureResponse(failed);
+    }
+  }
   const skipIdempotency =
     input.payload.operation === "get" || !input.payload.idempotencyKey;
   const replay = skipIdempotency
@@ -1168,6 +1293,11 @@ async function executePlanTool(input: Readonly<{
         });
       }
 
+      if (!input.matchPort && payload.operation !== "get") {
+        const pending = await store.getActivePlanOperation(plan.id);
+        if (pending) return businessError({ reasonCode: "stale_revision", currentRevision: plan.currentRevision,
+          nextActions: ["reload_plan"], message: "A refinement is still pending. Poll this plan before submitting another change." });
+      }
       const current = await store.getPlanRevision(plan.id, plan.currentRevision);
 
       if (!current) {
@@ -1175,7 +1305,7 @@ async function executePlanTool(input: Readonly<{
       }
 
       previous = previousResult(current.result);
-      if (previous && previous.contractVersion !== AGENTIC_CONTRACT_VERSION && current.status !== "processing") {
+      if (previous && !planContractCompatible(previous.contractVersion) && current.status !== "processing") {
         const existingOrder = await store.getActiveOrderForPlanRevision(plan.id, plan.currentRevision);
         previous = { ...previous, sourceContractVersion: previous.contractVersion ?? "3.0.0", refreshRequired: !existingOrder };
       }
@@ -1353,7 +1483,7 @@ async function executePlanTool(input: Readonly<{
       }
     }
 
-    return {
+    const prepared: PreparedPlanCommand = {
       effectiveRequest,
       answers,
       ack,
@@ -1370,12 +1500,26 @@ async function executePlanTool(input: Readonly<{
       selectOptionId,
       shownRevision,
       state
-    } satisfies PreparedPlanCommand;
+    };
+    if (!input.matchPort && payload.operation !== "get" && payload.idempotencyKey) {
+      const operation = await admitPlanOperation(store, {
+        planId, ownerScope, key: payload.idempotencyKey, payload: input.payload,
+        expectedRevision: existingPlan?.currentRevision ?? revision, revision,
+        prepared, scope: input.scope, now: input.now
+      });
+      return { ...prepared, operationId: operation.id };
+    }
+    return prepared;
     });
   }
 
   if (!prepared || typeof prepared !== "object" || !("planId" in prepared)) {
     return prepared as AgenticErrorResult;
+  }
+  if (prepared.operationId) {
+    const operation = await input.store.getPlanOperation(prepared.operationId, { includeCursor: false });
+    if (!operation) throw new Error("Admitted plan operation disappeared");
+    return admittedResponse(input, operation);
   }
 
   if (!prepared.resume && prepared.previous && isTerminalPlanStatus(prepared.previous.status)) {
@@ -1611,7 +1755,7 @@ async function completePreparedPlan(
     if (hasFullRequest(input.payload) && !prepared.resume) {
       const merged = applyPlanAnswers(prepared.state, { answers });
       pinPrevious = Boolean(
-        previous && previous.contractVersion === AGENTIC_CONTRACT_VERSION &&
+        previous && planContractCompatible(previous.contractVersion) &&
         (isolated || previous.selected?.snapshotId === catalogueSnapshotId(snapshot)) &&
           planRematchFingerprint(previous.requestSnapshot) ===
             planRematchFingerprint(merged)
@@ -1646,7 +1790,7 @@ async function completePreparedPlan(
 
     const merged = applyPlanAnswers(normalized.state, { answers });
     pinPrevious = Boolean(
-      previous && previous.contractVersion === AGENTIC_CONTRACT_VERSION &&
+      previous && planContractCompatible(previous.contractVersion) &&
         (isolated || previous.selected?.snapshotId === catalogueSnapshotId(snapshot)) &&
         planRematchFingerprint(previous.requestSnapshot) ===
           planRematchFingerprint(merged)
@@ -1741,6 +1885,27 @@ async function completePreparedPlan(
     acceptedGaps: state.acceptedGaps.map((gap) => ({ ...gap, revision }))
   };
 
+  const activeOperation = planAttempts.getStore()?.operation;
+  if (activeOperation) {
+    const { matcherSafetyReferenceIdentity } = await import("@/lib/matcher/safety-ceilings");
+    let checkpoint = activeOperation.checkpoint as DurableSearchCheckpoint | null;
+    if (!checkpoint && state.searchEffort === "expanded" && activeOperation.expectedRevision > 0) {
+      const predecessor = await input.store.getCompletedPlanOperation(activeOperation.planId, activeOperation.expectedRevision);
+      const candidate = predecessor?.checkpoint as DurableSearchCheckpoint | null;
+      const { planCheckpointInputIdentity } = await import("@/lib/agentic/plan/matching");
+      if (candidate?.search?.inputIdentity === planCheckpointInputIdentity({ snapshot, state })) checkpoint = candidate;
+    }
+    if (checkpoint && (checkpoint.catalogueId !== catalogueSnapshotId(snapshot) ||
+      activeOperation.referenceIdentity && activeOperation.referenceIdentity !== matcherSafetyReferenceIdentity()?.fingerprint)) {
+      return businessError({ reasonCode: "stale_revision", message: "Catalogue or reference inputs changed during matching. Reload the plan." });
+    }
+    const saved = await updateClaimedOperation(input.store, activeOperation, {
+      catalogueIdentity: catalogueSnapshotId(snapshot), referenceIdentity: matcherSafetyReferenceIdentity()?.fingerprint ?? null,
+      checkpoint: activeOperation.checkpoint ? withoutOperationCursor(activeOperation).checkpoint : checkpoint ?? { stage: "normalized", state, catalogueId: catalogueSnapshotId(snapshot) }
+    }, new Date().toISOString());
+    if (!saved) return businessError({ reasonCode: "stale_revision", message: "This matching operation was cancelled or superseded. Reload the plan." });
+  }
+
   if (state.requirements.productDoses?.length) {
     const canonical = toCanonicalRequest(state);
     if ("error" in canonical) return businessError({ fieldPath: "request.requirements.productDoses", reasonCode: "invalid_request", message: canonical.error });
@@ -1780,8 +1945,11 @@ async function completePreparedPlan(
   } catch (error) {
     if (error instanceof MatcherUnavailableError) {
       return businessError({
-        message: "Matching is temporarily busy. Retry with the same idempotency key.",
-        reasonCode: "temporarily_unavailable", retryable: true
+        message: error.reason === "checkpoint_mismatch" ? "Matching inputs changed. Reload the plan before refining it."
+          : error.reason === "capacity" ? "Matching capacity is temporarily occupied. Retry with the same idempotency key."
+          : error.reason === "timeout" ? "The matching worker timed out. Retry with the same idempotency key to resume."
+          : "The matching worker failed. Retry with the same idempotency key to resume.",
+        reasonCode: error.reason === "checkpoint_mismatch" ? "stale_revision" : "temporarily_unavailable", retryable: error.reason !== "checkpoint_mismatch"
       });
     }
     throw error;
@@ -1818,9 +1986,24 @@ async function persistTerminalPlan(input: Readonly<{
   skipSideEffects?: boolean;
 }>): Promise<PlanToolSuccess | AgenticErrorResult> {
   let committedResult: PlanResult | null = null;
+  const needsEvidence = planCompactApplicable(input.result.status) && !input.result.evidenceHandle;
+  const terminalResult = needsEvidence ? { ...input.result,
+    evidenceHandle: evidenceHandleFor(input.planId, input.revision, input.input.scope.tenantScope),
+    claimIds: planClaimIds(input.result), researchVersion: planResearchVersion() } : input.result;
+  // Render before acquiring the publication lock. Only the capability, revision
+  // and receipt writes belong to the atomic commit.
+  const projectedSuccess = successFromResult({ locale: input.locale, planHandle: input.planHandle,
+    result: terminalResult, revision: input.revision });
   const response = await input.input.store.transaction(async (store) => {
     const plan = await store.getPlanForUpdate(input.planId);
     if (!plan) return businessError({ message: "Not found.", reasonCode: "not_found" });
+    const operationClaim = planAttempts.getStore()?.operation;
+    if (operationClaim) {
+      const active = await store.getPlanOperation(operationClaim.id, { includeCursor: false });
+      if (!active || active.status !== "running" || active.leaseToken !== operationClaim.leaseToken || Date.parse(active.leaseExpiresAt ?? "") <= Date.now()) {
+        return businessError({ reasonCode: "stale_revision", message: "This matching operation no longer owns publication. Reload the plan." });
+      }
+    }
 
     const key = input.input.payload.idempotencyKey;
     if (key) {
@@ -1853,17 +2036,12 @@ async function persistTerminalPlan(input: Readonly<{
         nextActions: ["retry_same_key", "refresh_plan"]
       });
     }
-    let result = input.result;
-    if (planCompactApplicable(result.status) && !result.evidenceHandle) {
-      const evidenceHandle = await issueEvidenceCapability({
-        config: input.input.config, now: input.input.now, planId: input.planId,
-        revision: input.revision, scope: input.input.scope, store
-      });
-      result = { ...result, claimIds: planClaimIds(result), evidenceHandle, researchVersion: planResearchVersion() };
+    const result = terminalResult;
+    if (needsEvidence) {
+      await issueEvidenceCapability({ config: input.input.config, now: input.input.now,
+        planId: input.planId, revision: input.revision, scope: input.input.scope, store });
     }
-    const success = successFromResult({
-      locale: input.locale, planHandle: input.planHandle, result, revision: input.revision
-    });
+    const success = projectedSuccess;
     const record = revisionRecord(input.planId, input.revision, result, current?.createdAt ?? input.input.now);
     if (current) await store.updatePlanRevision(record);
     else await store.insertPlanRevision(record);
@@ -1873,6 +2051,9 @@ async function persistTerminalPlan(input: Readonly<{
         key, now: input.input.now, ownerScope: input.ownerScope,
         payload: input.input.payload, planId: input.planId, response: success, store
       });
+    }
+    if (operationClaim && !await updateClaimedOperation(store, operationClaim, { status: "complete", response: success, error: null }, new Date().toISOString())) {
+      throw new Error("Plan operation lost publication ownership");
     }
     planAttempts.getStore()?.signal?.throwIfAborted();
     throwIfAborted(planCorrelationId(key));

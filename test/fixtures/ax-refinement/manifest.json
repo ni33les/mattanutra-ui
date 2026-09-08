@@ -1,0 +1,16 @@
+{
+  "version": "ax-refinement-fixtures-1",
+  "sourceAttachmentSha256": "b27b3feace28b7a450eb23e70d89a6f60e4e821dcb2143259faa47af2c2e6944",
+  "sourceReportSha256": "3c2aa07a16d583ea8675cdccdf0307b7e0816e638cad919337edd6291bca4f48",
+  "originalReportStatus": "ORIGINAL_DATA_UNAVAILABLE",
+  "originalCatalogueId": "snap_4bab6493652b0fa5",
+  "originalCatalogueContentHash": null,
+  "controlCommit": "22bce180e79c01147c95ace332af2211ada90038",
+  "startingCommit": "6baeab0e175109411585f833cbd34c12f4ca0775",
+  "clock": "2026-09-07T00:00:00Z",
+  "profilesSha256": "73e2f99a0ded1ecca68050cadaa9256862ba6fab91419d67f958997a78df1a57",
+  "reconstruction": "test/fixtures/matcher-experiments/manifest.json",
+  "reconstructionLabel": "reconstructed corrected baselines; not the exact six-profile UAT capture",
+  "standardAttempts": 8000,
+  "expandedAttempts": 64000
+}

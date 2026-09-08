@@ -32,6 +32,7 @@ export const AGENT_CAPABILITIES = {
   nutritionPlanRefinement: "nutrition_plan_refinement",
   nutritionReportGeneration: "nutrition_report_generation",
   productRecommendation: "product_recommendation",
+  agenticPlanMatching: "match_agentic_plan",
   productRecommendationFullBeam: "product_recommendation_full_beam",
   productReview: "product_review",
   reassessmentEmailSend: "reassessment_email_send",
@@ -258,6 +259,7 @@ export const SYSTEM_AGENTS: Readonly<Record<SystemAgentKey, SystemAgentDefinitio
   },
   productMatcher: {
     capabilities: [
+      AGENT_CAPABILITIES.agenticPlanMatching,
       AGENT_CAPABILITIES.doseNormalization,
       AGENT_CAPABILITIES.productRecommendationFullBeam,
       AGENT_CAPABILITIES.productRecommendation,
@@ -326,6 +328,7 @@ export type WorkTaskRegistryEntry = Readonly<{
 }>;
 
 export const WORK_TASK_REGISTRY = {
+  match_agentic_plan: { agentKey: "productMatcher", requiredCapabilities: [AGENT_CAPABILITIES.agenticPlanMatching] },
   fulfill_web_payment: { agentKey: "scheduler", requiredCapabilities: [AGENT_CAPABILITIES.webPaymentFulfillment] },
   admin_catalogue_optimization_job: {
     agentKey: "analytics",
