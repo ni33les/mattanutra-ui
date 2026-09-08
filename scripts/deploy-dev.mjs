@@ -119,16 +119,18 @@ async function main() {
   const scopedIndex = process.argv.indexOf("--ax-refinement-attestation");
   const payloadIndex = process.argv.indexOf("--mcp-payload-attestation");
   const patchIndex = process.argv.indexOf("--mcp-721-attestation");
-  if ([scopedIndex, payloadIndex, patchIndex].filter(index => index >= 0).length > 1) throw new Error("Choose exactly one release attestation path");
-  if (patchIndex >= 0) {
-    if (branch !== "dev" || process.env.MATTANUTRA_ENV !== "dev") throw new Error("MCP 7.2.1 work-package proof is DEV-only");
-    const file = process.argv[patchIndex + 1];
-    if (!file?.startsWith("/")) throw new Error("Pass the absolute MCP 7.2.1 attestation path");
+  const currentPatchIndex = process.argv.indexOf("--mcp-722-attestation");
+  if ([scopedIndex, payloadIndex, patchIndex, currentPatchIndex].filter(index => index >= 0).length > 1) throw new Error("Choose exactly one release attestation path");
+  if (patchIndex >= 0 || currentPatchIndex >= 0) {
+    const packageId = currentPatchIndex >= 0 ? "722" : "721";
+    if (branch !== "dev" || process.env.MATTANUTRA_ENV !== "dev") throw new Error("MCP work-package proof is DEV-only");
+    const file = process.argv[(currentPatchIndex >= 0 ? currentPatchIndex : patchIndex) + 1];
+    if (!file?.startsWith("/")) throw new Error("Pass the absolute MCP work-package attestation path");
     if (await runCapture("git", ["status", "--porcelain"])) throw new Error("Validated source must remain clean");
-    checkMcp721Proof(file, mcp721Identity(sourceManifest().sha256, await runCapture("git", ["rev-parse", "HEAD"])));
+    checkMcp721Proof(file, mcp721Identity(sourceManifest().sha256, await runCapture("git", ["rev-parse", "HEAD"]), packageId), packageId);
     const build = JSON.parse(await readFile(resolve(dirname(file), "build.json"), "utf8"));
     if (build.nextBuildId !== (await readFile(".next/BUILD_ID", "utf8")).trim() || build.buildSha256 !== compiledBuildIdentity()) throw new Error("Validated compiled build changed");
-    console.log(`[deploy:dev] Verified scoped MCP 7.2.1 evidence: ${file}`);
+    console.log(`[deploy:dev] Verified scoped MCP ${packageId} evidence: ${file}`);
   } else if (payloadIndex >= 0) {
     if (scopedIndex >= 0 || branch !== "dev" || process.env.MATTANUTRA_ENV !== "dev") throw new Error("MCP payload proof is DEV-only and cannot be combined with another bypass/path");
     const file = process.argv[payloadIndex + 1];
@@ -166,7 +168,7 @@ async function main() {
     `[Service]\nEnvironment=AGENTIC_BUILD_ID=${sha}\nEnvironment=AGENTIC_WORKER_VERSION=${sha}\n`,
     "utf8"
   );
-  if (payloadIndex >= 0 || patchIndex >= 0) await writeFile(`${dropInDir}/mcp-payload-worker-version.conf`, `[Service]\nEnvironment=WORKER_VERSION=${sha}\nEnvironment=AGENTIC_WORKER_VERSION=${sha}\n`, "utf8");
+  if (payloadIndex >= 0 || patchIndex >= 0 || currentPatchIndex >= 0) await writeFile(`${dropInDir}/mcp-payload-worker-version.conf`, `[Service]\nEnvironment=WORKER_VERSION=${sha}\nEnvironment=AGENTIC_WORKER_VERSION=${sha}\n`, "utf8");
   await run("systemctl", ["daemon-reload"]);
   console.log(`[deploy:dev] AGENTIC_BUILD_ID=${sha}`);
   console.log(`[deploy:dev] Restarting ${serviceName}...`);

@@ -291,7 +291,7 @@ export function requestWithoutOptionalPurchases(request: CanonicalRequest): Cano
 
 function selectedReason(request: CanonicalRequest) {
   if (request.optimization === "lowest_cost") return "Closest dose fit with a target-focused daily routine; lower-cost trade-offs remain available";
-  if (request.optimization === "fewest_pills") return "Fewest daily pills among the best dose-fit baskets";
+  if (request.optimization === "fewest_pills") return "Closest dose fit with a target-focused daily routine; simpler trade-offs remain available";
   return "Closest overall fit to the agreed daily targets";
 }
 

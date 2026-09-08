@@ -6,15 +6,23 @@ import { resetPlanCreateInflightForTests } from "../../lib/agentic/plan/service.
 import { useLiveServiceClock } from "../../lib/agentic/qa/service-clock.ts";
 
 const app = runtime("m722-expanded");
-let initial: Record<string, unknown>, concurrent: Record<string, unknown>, completed: Record<string, unknown>, elapsedMs: number;
-before(async () => { await installRealCatalogue("dev"); useLiveServiceClock(); });
+let initial: Record<string, unknown>, concurrent: Record<string, unknown>, completed: Record<string, unknown>, elapsedMs: number, initialRevision: number;
+before(async () => { process.env.AX_REFINEMENT_REAL_WORKERS = "1"; await installRealCatalogue("dev"); useLiveServiceClock(); });
 after(() => { resetPlanCreateInflightForTests(); uninstallRealCatalogue(); });
 const request = profile("A2");
 request.targets = request.targets.map(row => row.name === "Algae Omega-3" ? { ...row, name: "Omega-3" } : row);
 request.requirements = { ...request.requirements, excludeProductIds: ["prd_50265f478be551c496f907a01d746dab"] };
 test("test_expanded_single_job_reaches_terminal_state", { timeout: 185000 }, async () => {
+  let base = await rpc(app, "plan", { operation: "create", idempotencyKey: "m722-expanded-base-01", request: { ...request, requirements: { ...request.requirements, excludeProductIds: [] } } });
+  const baseStarted = performance.now();
+  while (base.status === "processing" && performance.now() - baseStarted < 30000) {
+    await delay(1000); base = await rpc(app, "plan", { operation: "get", planHandle: base.planHandle });
+  }
+  assert.equal(base.ok, true); assert.notEqual(base.status, "processing", "A committed standard revision is required");
   const start = performance.now();
-  initial = await rpc(app, "plan", { operation: "create", idempotencyKey: "m722-expanded-create-01", searchEffort: "expanded", request });
+  initial = await rpc(app, "plan", { operation: "revise", planHandle: base.planHandle, expectedRevision: base.revision,
+    idempotencyKey: "m722-expanded-revise-01", searchEffort: "expanded", requestPatch: { requirements: { excludeProductIds: request.requirements.excludeProductIds } } });
+  initialRevision = Number(base.revision);
   assert.equal(initial.status, "processing", "Concurrent request requires active expanded work");
   concurrent = await rpc(app, "plan", { operation: "revise", planHandle: initial.planHandle, expectedRevision: initial.revision, idempotencyKey: "m722-expanded-competing", searchEffort: "expanded", requestPatch: { requirements: { excludeProductIds: [] } } });
   completed = initial;
@@ -31,7 +39,8 @@ test("test_expanded_single_job_reaches_terminal_state", { timeout: 185000 }, asy
 test("test_second_expanded_while_processing_is_rejected_or_coalesced", async () => {
   assert.ok(initial && completed && concurrent, "Expanded fixture must have executed");
   assert.equal(concurrent.ok, false); assert.equal((concurrent.error as { reasonCode: string }).reasonCode, "stale_revision");
-  const replay = await rpc(app, "plan", { operation: "create", idempotencyKey: "m722-expanded-create-01", searchEffort: "expanded", request });
+  const replay = await rpc(app, "plan", { operation: "revise", planHandle: initial.planHandle, expectedRevision: initialRevision,
+    idempotencyKey: "m722-expanded-revise-01", searchEffort: "expanded", requestPatch: { requirements: { excludeProductIds: request.requirements.excludeProductIds } } });
   assert.equal(replay.planHandle, initial.planHandle); assert.equal(replay.revision, completed.revision);
   assert.deepEqual(replay.searchSummary, completed.searchSummary);
 });

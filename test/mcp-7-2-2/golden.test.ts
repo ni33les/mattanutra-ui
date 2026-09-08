@@ -50,14 +50,23 @@ test("test_highlighted_alternative_present_when_alternativeSearch_found", () => 
   assert.ok(id && id !== conversation.selectedOptionId);
   assert.ok(full.options!.some(option => option.optionId === id && option.purchaseEligible && option.coveragePercent > 0));
 });
-test("L4_L7_standard_D3_default_views_status_bytes_and_localized_advice", async () => {
-  assert.ok(elapsedMs < 15000, `Standard took ${elapsedMs}ms`);
+test("L4_omit_create_defaults_to_conversation", () => {
+  const first = calls[0] as { reply: { result: { structuredContent: { responseView: string } } } };
+  assert.equal(first.reply.result.structuredContent.responseView, "conversation");
+});
+test("L5_omit_get_defaults_to_conversation", () => { assert.equal(conversation.responseView, "conversation"); });
+test("L6_status_known_version_is_a_small_envelope", async () => {
+  let status = await call({ operation: "get", planHandle: conversation.planHandle, responseView: "status" });
+  status = await call({ operation: "get", planHandle: conversation.planHandle, responseView: "status", knownResultVersion: status.value.resultVersion });
+  assert.equal(status.value.unchanged, true); assert.ok(Buffer.byteLength(JSON.stringify(status.value)) < 2000);
+});
+test("L7_standard_D3_reaches_terminal_within_15_seconds", () => {
+  assert.ok(elapsedMs < 15000, `Standard took ${elapsedMs}ms`); assert.ok(["ready", "needs_input"].includes(String(conversation.status)));
+});
+test("D3_payload_and_localized_advice_budget", async () => {
   assert.ok(Buffer.byteLength(JSON.stringify(conversation)) < 20000);
   const response = await call({ operation: "get", planHandle: conversation.planHandle });
   assert.ok(Buffer.byteLength(JSON.stringify(response.reply)) < 22000);
-  let status = await call({ operation: "get", planHandle: conversation.planHandle, responseView: "status" });
-  status = await call({ operation: "get", planHandle: conversation.planHandle, responseView: "status", knownResultVersion: status.value.resultVersion });
-  assert.equal(status.value.unchanged, true); assert.ok(Buffer.byteLength(JSON.stringify(status.reply)) < 2000);
   for (const locale of ["en", "th", "zh-CN"]) {
     const projected = projectPlan({ ...full, locale }, { responseView: "conversation" });
     assert.ok(projected.advice.length <= 5); assert.equal(projected.advice.filter(row => row.kind === "incomplete_information").length, 1);
