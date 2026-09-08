@@ -2855,6 +2855,15 @@
       }
     },
     {
+      "name": "read-attached-evidence",
+      "tool": "evidence",
+      "arguments": {
+        "evidenceHandle": "cap_replace_with_evidence_handle_from_plan",
+        "mode": "sources",
+        "locale": "en"
+      }
+    },
+    {
       "name": "read-plan-score-and-sources",
       "tool": "plan",
       "arguments": {

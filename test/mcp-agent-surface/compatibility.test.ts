@@ -12,7 +12,7 @@ test("AG72-COMPAT-01 legacy omission retires after one release and cannot accept
   assert.equal(planResponseView(undefined), "conversation");
   for (const pin of ["", "banana", "7", "07.1.0", "7.2.1", "7.3.0", "8.0.0"]) {
     const result = planResponseView(undefined, pin, "7.2.0");
-    assert.notEqual(typeof result, "string", `Reject invalid/future pin ${pin}`);
+    assert.ok(typeof result !== "string", `Reject invalid/future pin ${pin}`);
     assert.equal(result.error.reasonCode, "invalid_request");
     assert.equal(result.error.fieldPath, CLIENT_CONTRACT_VERSION_HEADER);
   }

@@ -90,7 +90,7 @@
       "file": "test/mcp-payload/deployment.test.ts",
       "slice": "deployment",
       "database": false,
-      "reason": "DEV-only scoped attestation rejects stale, altered and incomplete evidence.",
+      "reason": "DEV-only scoped attestation binds the published version/schema and rejects stale, altered and incomplete evidence.",
       "expectedCases": 2,
       "cases": [
         "PAY-AX-02",
@@ -101,7 +101,7 @@
       "file": "test/mcp-payload/journeys.test.ts",
       "slice": "journeys",
       "database": false,
-      "reason": "All changed contract views through multilingual documented client journeys and legacy equivalence.",
+      "reason": "All changed views through multilingual documented clients using omitted plan views; preserve frozen business decisions, order recovery and baseline prices.",
       "expectedCases": 18,
       "cases": [
         "PAY-AX-01"
@@ -129,7 +129,7 @@
       "file": "test/ax-refinement/contract.test.ts",
       "slice": "consumers",
       "database": false,
-      "reason": "Preserve AX IDs and historical artifacts while validating the additive 7.1 projection inputs.",
+      "reason": "Preserve AX IDs and historical v4\u2013v7.1 artifacts while publishing seven tools and concise 7.2 essentials with tools-only detail access.",
       "expectedCases": 4,
       "cases": [
         "AXR-SPEC-01",

@@ -19,7 +19,7 @@ test("PAY-AX-02 deployment rejects missing, altered, stale and wrong-environment
     "report.json": { rows: Array.from({ length: 18 }, () => ({ wholeReduction: .65, responseReduction: .65 })) }
   };
   for (const file of PAYLOAD_ARTIFACTS) save(file, fixtures[file] ?? {});
-  const proof = { version: "dev-mcp-payload-1", environment: "dev", contractVersion: "7.2.0", scope: "mcp_payload_and_direct_readers", ...expected,
+  const proof = { version: "dev-mcp-payload-1", environment: "dev", scope: "mcp_payload_and_direct_readers", ...expected,
     passed: true, unchangedSource: true, stages: PAYLOAD_STAGES.map(label => ({ label, passed: true })), artifacts: PAYLOAD_ARTIFACTS.map(file => ({ file, sha256: payloadHash(readFileSync(join(directory, file))) })) };
   const path = join(directory, "attestation.json");
   save("attestation.json", proof); assert.doesNotThrow(() => readPayloadProof(path, expected));

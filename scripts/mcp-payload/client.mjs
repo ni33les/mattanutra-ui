@@ -8,7 +8,7 @@ export async function payloadJourney({ rpc, request, key, view = "conversation",
   const initialize = await rpc("initialize", { protocolVersion: "2025-06-18" });
   assert.ok(initialize.instructions.includes("plan"));
   const discovery = await rpc("tools/list", {});
-  assert.deepEqual(discovery.tools.map(tool => tool.name), ["info", "plan", "execute", "order", "support", "feedback"]);
+  assert.deepEqual(discovery.tools.map(tool => tool.name), ["info", "plan", "execute", "order", "support", "feedback", "evidence"]);
   const ajv = new Ajv({ strict: false, validateFormats: false });
   const validators = new Map(discovery.tools.map(tool => [tool.name, { input: ajv.compile(tool.inputSchema), output: ajv.compile(tool.outputSchema) }]));
   async function tool(name, args, expectError = false, purpose = "decision") {
@@ -29,7 +29,7 @@ export async function payloadJourney({ rpc, request, key, view = "conversation",
     const guide = await rpc("resources/read", { uri: info.clientGuide });
     assert.ok(guide.contents[0].text.includes("requestPatch"));
   }
-  const presentation = view === "conversation" ? { responseView: "conversation" } : {};
+  const presentation = view === "conversation" ? {} : { responseView: "full" };
   async function settlePlan(plan) {
     for (let polls = 0; plan.status === "processing" && polls < 4; polls++) {
       plan = await tool("plan", { operation: "get", planHandle: plan.planHandle, ...presentation });
@@ -38,7 +38,7 @@ export async function payloadJourney({ rpc, request, key, view = "conversation",
     decisions.push(plan); return plan;
   }
   const create = { ...structuredClone(info.clientExamples.find(example => example.tool === "plan" && example.arguments.operation === "create").arguments), operation: "create", idempotencyKey: `${key}-create`, request, ...presentation };
-  if (view === "full") delete create.responseView;
+  if (view === "conversation") delete create.responseView;
   let plan = await settlePlan(await tool("plan", create));
   const initial = plan;
   const selectedId = value => value.selectedOptionId ?? value.optionId;
@@ -58,7 +58,7 @@ export async function payloadJourney({ rpc, request, key, view = "conversation",
   const productId = chosen.basket[0].productId;
   // Asking about label basis is explicit detail work, never an ordinary review prerequisite.
   const details = await tool("plan", view === "conversation" ? { operation: "get", planHandle: plan.planHandle, expectedRevision: plan.revision,
-    responseView: "details", sections: ["products", "advice"], optionIds: [chosen.optionId] } : { operation: "get", planHandle: plan.planHandle }, false, "details");
+    responseView: "details", sections: ["products", "advice"], optionIds: [chosen.optionId] } : { operation: "get", planHandle: plan.planHandle, responseView: "full" }, false, "details");
   const product = details.options.find(option => option.optionId === chosen.optionId).basket.find(item => item.productId === productId);
   assert.equal(product.servingsPerDay, chosen.basket[0].servingsPerDay);
   const proposal = { operation: "revise", planHandle: plan.planHandle, expectedRevision: plan.revision, idempotencyKey: `${key}-quantity`,

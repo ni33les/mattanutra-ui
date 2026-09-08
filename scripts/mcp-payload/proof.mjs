@@ -11,14 +11,16 @@ export function payloadInputIdentity(root = process.cwd()) {
   return files.map(file => ({ file, sha256: payloadHash(readFileSync(resolve(root, file))) }));
 }
 export function payloadExpectedIdentity(sourceSha256, releaseBaseCommit, root = process.cwd()) {
-  return { sourceSha256, releaseBaseCommit, contractSha256: payloadHash(readFileSync(resolve(root, "contract/mcp/7.1.0/schema.json"))),
+  const { contractVersion } = JSON.parse(readFileSync(resolve(root, "public/.well-known/mcp.json"), "utf8"));
+  if (!/^\d+\.\d+\.\d+$/.test(contractVersion)) throw new Error("Invalid published contract version");
+  return { sourceSha256, releaseBaseCommit, contractVersion, contractSha256: payloadHash(readFileSync(resolve(root, `contract/mcp/${contractVersion}/schema.json`))),
     inventorySha256: payloadHash(readFileSync(resolve(root, "test/mcp-payload/impact.json"))), inputSha256: payloadHash(JSON.stringify(payloadInputIdentity(root))) };
 }
 export function readPayloadProof(file, expected) {
   const proof = JSON.parse(readFileSync(file, "utf8"));
-  if (proof.version !== "dev-mcp-payload-1" || proof.environment !== "dev" || proof.contractVersion !== "7.1.0" ||
+  if (proof.version !== "dev-mcp-payload-1" || proof.environment !== "dev" ||
     proof.scope !== "mcp_payload_and_direct_readers" || proof.passed !== true || proof.unchangedSource !== true) throw new Error("Incomplete or non-DEV MCP payload work-package proof");
-  for (const field of ["sourceSha256", "releaseBaseCommit", "contractSha256", "inventorySha256", "inputSha256"]) {
+  for (const field of ["sourceSha256", "releaseBaseCommit", "contractVersion", "contractSha256", "inventorySha256", "inputSha256"]) {
     if (!expected[field] || proof[field] !== expected[field]) throw new Error(`MCP payload proof identity changed: ${field}`);
   }
   if (!Array.isArray(proof.stages) || proof.stages.some(row => row.passed !== true) || PAYLOAD_STAGES.some(label => proof.stages.filter(row => row.label === label && row.passed).length !== 1)) throw new Error("MCP payload proof is missing a passing stage");

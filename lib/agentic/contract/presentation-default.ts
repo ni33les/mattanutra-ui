@@ -15,7 +15,9 @@ function version(value: string) {
 export function planResponseView(explicit: View | undefined, pin?: string, current = AGENTIC_CONTRACT_VERSION): View | AgenticErrorResult {
   const active = version(current)!;
   const requested = pin === undefined ? null : version(pin);
-  if (pin !== undefined && (!requested || requested[0] > active[0] || (requested[0] === active[0] && requested[1] > active[1]))) {
+  const newer = requested && (requested[0] > active[0] || (requested[0] === active[0] &&
+    (requested[1] > active[1] || (requested[1] === active[1] && requested[2] > active[2]))));
+  if (pin !== undefined && (!requested || newer)) {
     return businessError({ reasonCode: "invalid_request", fieldPath: CLIENT_CONTRACT_VERSION_HEADER,
       message: `Use a valid contract version no newer than ${current}, or omit the header.` });
   }
