@@ -1,5 +1,6 @@
 import { planContractCompatible } from "@/lib/agentic/presentation/compatibility";
 import { withoutOperationCursor } from "@/lib/agentic/store/operation-checkpoint";
+import { expirePlanOperation, operationDeadlineRemaining, planOperationDeadlineError } from "@/lib/agentic/plan/operations";
 import { planReturnWaitMs } from "@/lib/agentic/plan/operations";
 import { catalogueSnapshotId } from "@/lib/agentic/catalogue/freeze";
 import { validateProductDoseProposals } from "@/lib/matcher/serving-grid";
@@ -980,11 +981,13 @@ export async function runAdmittedPlanOperation(input: Readonly<{
   if (existingWork) return existingWork;
   const operation = await input.store.getPlanOperation(input.operationId, { includeCursor: false });
   if (!operation) return businessError({ reasonCode: "not_found", message: "Matching operation not found." });
+  if (await expirePlanOperation(input.store, operation.id, new Date().toISOString())) return planOperationDeadlineError();
   if (operation.status === "complete") return operation.response as PlanToolSuccess;
   if (operation.status === "cancelled" || operation.status === "failed") return (operation.error as AgenticErrorResult | null) ?? businessError({ reasonCode: "stale_revision", message: "This matching operation is no longer active. Reload the plan." });
   const claim = await claimPlanOperation(input.store, operation.id, nextTestUuid(), new Date().toISOString());
   if (!claim) return operationProcessingResponse(operation);
   const controller = new AbortController();
+  const deadline = setTimeout(() => controller.abort(new Error("Matching operation deadline exceeded")), operationDeadlineRemaining(claim));
   const signal = input.signal ? AbortSignal.any([input.signal, controller.signal]) : controller.signal;
   const attempt: PlanAttempt = { correlationId: `plan-operation:${claim.id}`, signal, releases: new Set(), operation: claim, operationStore: input.store };
   const prepared = claim.command.prepared as PreparedPlanCommand;
@@ -995,18 +998,26 @@ export async function runAdmittedPlanOperation(input: Readonly<{
         scope: claim.command.scope, store: input.store
       }, !(claim.command.payload as PlanToolInput).planHandle, Date.now());
       if (isAgenticErrorResult(result)) {
+        if (operationDeadlineRemaining(claim) === 0) {
+          await expirePlanOperation(input.store, claim.id, new Date().toISOString());
+          return planOperationDeadlineError();
+        }
         const status = result.error.retryable ? "retryable" : "failed";
         await updateClaimedOperation(input.store, claim, { status, error: result }, new Date().toISOString());
       }
       return result;
     } catch (error) {
+      if (operationDeadlineRemaining(claim) === 0) {
+        await expirePlanOperation(input.store, claim.id, new Date().toISOString());
+        return planOperationDeadlineError();
+      }
       const result = businessError({ reasonCode: "temporarily_unavailable", retryable: true,
         message: "Matching could not finish. Retry this operation with the same key and unchanged request." });
       await failPlanOperation(input.store, claim, result, new Date().toISOString());
       console.error("[agentic-plan-operation]", { operationId: claim.id, origin: error instanceof Error ? error.name : "unknown", message: error instanceof Error ? error.message : "operation_failed" });
       return result;
     }
-  })).finally(() => { inflightDurableOperations.delete(claim.id); releaseAttempt(attempt); });
+  })).finally(() => { clearTimeout(deadline); inflightDurableOperations.delete(claim.id); releaseAttempt(attempt); });
   inflightDurableOperations.set(claim.id, work);
   return work;
 }
@@ -1019,6 +1030,7 @@ function operationFailureResponse(operation: PlanOperationRecord, currentRevisio
 }
 
 async function admittedResponse(input: PlanExecutionInput, operation: PlanOperationRecord) {
+  if (await expirePlanOperation(input.store, operation.id, new Date().toISOString())) return planOperationDeadlineError();
   if (operation.status === "complete") return operation.response as PlanToolSuccess;
   if (operation.status === "failed" || operation.status === "cancelled") {
     const current = await input.store.getPlan(operation.planId);
@@ -1505,7 +1517,7 @@ async function executePlanTool(input: Readonly<{
       const operation = await admitPlanOperation(store, {
         planId, ownerScope, key: payload.idempotencyKey, payload: input.payload,
         expectedRevision: existingPlan?.currentRevision ?? revision, revision,
-        prepared, scope: input.scope, now: input.now
+        prepared, scope: input.scope, now: input.now, admittedAt: new Date().toISOString()
       });
       return { ...prepared, operationId: operation.id };
     }
