@@ -1,4 +1,5 @@
 import { assessedSafetyCodes } from "@/lib/agentic/plan/safety";
+import { routineTradeoff } from "@/lib/agentic/value/routine-tradeoff";
 import { adviceKind } from "@/lib/agentic/value/advice-kind";
 import { continuedIntakeCoversTargets } from "@/lib/agentic/value/customer-choice";
 import { assessPreferences, verifiedPillLowerBound, type NumericPreferences } from "@/lib/matcher/preferences";
@@ -1049,7 +1050,7 @@ export function publicPlanFields(result: Pick<
     ...((result as PlanResult).searchSummary ? { searchSummary: (result as PlanResult).searchSummary } : {}),
     ...(selected?.doseFit ? { doseFit: selected.doseFit } : {}),
     status: result.status,
-    summary: matchingExplanation && result.status === "no_purchase" ? matchingExplanation.message : decision.nextAction === "review_options" ? agenticMessage(negotiateLocale(locale), "plan.summary.review_options") : result.summary,
+    summary: matchingExplanation && result.status === "no_purchase" ? matchingExplanation.message : decision.nextAction === "review_options" ? agenticMessage(negotiateLocale(locale), "plan.summary.review_options") : [result.summary, result.status === "ready" ? routineTradeoff(selected, advertisedOptions, locale) : ""].filter(Boolean).join(" "),
     ...(snapshot?.currentSupplements
       ? {
           comparisonBasis: {
