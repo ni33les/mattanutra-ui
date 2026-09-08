@@ -2,8 +2,14 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { createMemoryStore } from "../../lib/agentic/store/memory.ts";
 import { admitPlanOperation, claimPlanOperation, failPlanOperation, cancelPlanOperation, updateClaimedOperation } from "../../lib/agentic/plan/operations.ts";
+import { planReturnWaitMs } from "../../lib/agentic/plan/operations.ts";
 
 const now = "2026-09-07T00:00:00Z";
+test("AXR-REL-02 handoff leaves response time inside the unchanged request deadline", () => {
+  assert.equal(planReturnWaitMs(0), 3000);
+  assert.equal(planReturnWaitMs(59000), 900);
+  assert.equal(planReturnWaitMs(59950), 0);
+});
 async function fixture() {
   const store = createMemoryStore();
   await store.insertPlan({ id: "00000000-0000-4000-8000-000000000001", environment: "dev", tenantScope: "mattanutra", principalScope: "ax-operations", currentRevision: 3, createdAt: now, updatedAt: now });
