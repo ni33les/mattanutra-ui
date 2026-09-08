@@ -260,6 +260,12 @@ export function compareBaskets(left: ScoredBasket, right: ScoredBasket, request:
   void _config;
   const fit = compareDoseFit(fitOf(left, request), fitOf(right, request));
   if (fit !== 0) return fit;
+  // For a single requested nutrient, prefer an equally accurate dedicated
+  // product to a stack assembled from incidental ingredients. Unknown pills
+  // remain unknown; this is product focus, never a fabricated pill comparison.
+  const focusedSingle = (basket: ScoredBasket) => request.targets.length === 1 && basket.productCount === 1 && basket.incidentalCount === 0;
+  const focus = Number(focusedSingle(right)) - Number(focusedSingle(left));
+  if (focus) return focus;
   // Dose accuracy remains first. Price-led alternatives are selected below;
   // an equally accurate default should not demand a harder daily routine.
   return comparePillCounts(left.dailyPills, left.pillCountKnown, right.dailyPills, right.pillCountKnown) ||
@@ -284,7 +290,7 @@ export function materiallyDifferent(left: ScoredBasket, right: ScoredBasket) {
 export function requestWithoutOptionalPurchases(request: CanonicalRequest): CanonicalRequest { return request; }
 
 function selectedReason(request: CanonicalRequest) {
-  if (request.optimization === "lowest_cost") return "Lowest-cost option among the best dose-fit baskets";
+  if (request.optimization === "lowest_cost") return "Closest dose fit with a target-focused daily routine; lower-cost trade-offs remain available";
   if (request.optimization === "fewest_pills") return "Fewest daily pills among the best dose-fit baskets";
   return "Closest overall fit to the agreed daily targets";
 }

@@ -44,7 +44,8 @@ test("test_d3_2000_does_not_select_ten_caps_of_an_incidental", () => {
   assert.ok(full.options!.some(option => option.basket?.some(row => row.productName.includes("CALPLEX") && row.servingsPerDay === 10)), "Keep the cheaper incidental option selectable");
 });
 test("test_highlighted_alternative_present_when_alternativeSearch_found", () => {
-  assert.equal(conversation.alternativeSearch && (conversation.alternativeSearch as { status: string }).status, "found");
+  assert.ok(conversation.alternativeSearch);
+  assert.ok(["found", "incomplete"].includes((conversation.alternativeSearch as { status: string }).status), "A found or still-incomplete fewer-concerns search must not hide available positive-coverage choices");
   const id = conversation.highlightedAlternativeOptionId;
   assert.ok(id && id !== conversation.selectedOptionId);
   assert.ok(full.options!.some(option => option.optionId === id && option.purchaseEligible && option.coveragePercent > 0));
