@@ -23,14 +23,11 @@ export const AGENTIC_UAT_TOOL_DESCRIPTIONS = {
   evidence: AGENTIC_TOOL_DESCRIPTIONS.evidence,
   execute:
     "Freeze exactly one ready plan revision and create one external MattaNutra checkout. Send only planHandle, expectedRevision and a stable idempotencyKey. After checkoutUrl returns, the customer pays in Stripe Test Mode on the merchant checkout. Unpaid after execute is not a UAT pass. Do not call for needs_input or blocked plans.",
-  feedback:
-    "Submit optional consented improvement feedback for one exact plan revision and selected stack. This never changes a plan, checkout or order. Require consentConfirmed=true.",
+  feedback: AGENTIC_TOOL_DESCRIPTIONS.feedback,
   info: "Check MattaNutra availability, supported destinations, currencies, locales and the purchasing flow before planning. continuation is polling_only. supportedCountries is the live deliverable set from active retailers. If the customer is outside those countries, tell them politely that MattaNutra cannot deliver there yet. This tool does not list a catalogue dump.",
-  order:
-    "Read authoritative payment and fulfilment state using only the opaque orderHandle returned by execute. Poll no faster than pollAfterSeconds while terminal is false, including after payment; stop when terminal is true. Do not infer payment success from the browser, and do not use callbacks or any other continuation method.",
+  order: AGENTIC_TOOL_DESCRIPTIONS.order,
   plan: "Create or refine a purchasable supplement stack from the person’s agreed targets, profile, medications, conditions and constraints. Send profile.ageYears (not profile.age), profile.sex (female or male; omit the field if unknown), and profile.lifeStage. Send medications as request.medicationCodes and conditions as request.conditionCodes — not profile.medications or profile.conditions. Exclusions are request.requirements.excludeSupplementIds. request.optimization is one of balanced, best_coverage, lowest_cost, fewest_pills. requirements.dietaryPreference=vegan excludes animal SKUs independently of source preferences. Exact Algae Omega-3 resolves to Omega-3 only with explicit omega3SourcePreference=algae_only. Preserve omitted or conflicting source choices and explain the ambiguity without blocking other targets. destinationCountry must be a country from info.supportedCountries; otherwise plan returns unsupported_country and a polite cannot-deliver message instead of substituting another country. Omit planHandle to create; include planHandle and expectedRevision to revise. This tool never purchases.",
-  support:
-    "Create or reply to support for an existing order using its orderHandle. Omit supportHandle to create a case; include it to reply."
+  support: AGENTIC_TOOL_DESCRIPTIONS.support
 } as const;
 
 export const AGENTIC_PRD_SERVER_INSTRUCTIONS = `${GUIDE_ESSENTIALS} The customer pays the merchant checkout; do not use test cards. Feedback requires explicit consent.`;

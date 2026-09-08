@@ -12,6 +12,12 @@ test("PAY-SCHEMA-01 discovery preserves six complete contracts within 65% of bas
   assert.ok(bytes(tools) <= bytes(original) * .65, `${bytes(tools)} exceeds ${Math.floor(bytes(original) * .65)}`);
   const ajv = new Ajv({ strict: false, validateFormats: false });
   for (const tool of tools) { ajv.compile(tool.inputSchema); ajv.compile(tool.outputSchema); }
+  for (const locale of ["en", "th", "zh-CN"]) {
+    const current = toolList("dev", locale);
+    for (const environment of ["uat", "prd"] as const) {
+      assert.deepEqual(toolList(environment, locale), current, `${environment} must publish the current view instructions and complete contracts`);
+    }
+  }
 });
 
 test("PAY-SCHEMA-02 overview offers one starting example and operation help works without resources", async () => {
