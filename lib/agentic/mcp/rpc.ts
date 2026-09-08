@@ -1,8 +1,10 @@
+import { computeSchemaChecksum } from "@/lib/agentic/release-manifest";
 import { createLogger } from "@/lib/logger";
 import { AGENTIC_CONTRACT_REGISTRY } from "@/lib/agentic/contract/registry";
 import { CONTRACT_RESOURCES, readContractResource } from "@/lib/agentic/contract/guide";
 import type { AgenticConfig, AgenticEnvironment } from "@/lib/agentic/config";
 import {
+  AGENTIC_CONTRACT_VERSION,
   AGENTIC_SERVICE_NAME,
   AGENTIC_SERVICE_VERSION
 } from "@/lib/agentic/config";
@@ -278,6 +280,8 @@ export async function handleLightweightJsonRpc(
       jsonrpc: "2.0",
       result: {
         responsibilityVersion: RESPONSIBILITY_VERSION,
+        contractVersion: AGENTIC_CONTRACT_VERSION,
+        schemaChecksum: computeSchemaChecksum(),
         tools: toolList(
           config.environment,
           typeof params.locale === "string" ? params.locale : undefined
