@@ -2836,12 +2836,39 @@
       }
     },
     {
-      "name": "get-current-or-processing",
+      "name": "get-current-decision",
       "tool": "plan",
       "arguments": {
         "operation": "get",
         "planHandle": "cap_replace_with_plan_handle_from_create",
         "responseView": "conversation"
+      }
+    },
+    {
+      "name": "poll-plan-status",
+      "tool": "plan",
+      "arguments": {
+        "operation": "get",
+        "planHandle": "cap_replace_with_plan_handle_from_create",
+        "responseView": "status",
+        "knownResultVersion": "replace_with_returned_resultVersion"
+      }
+    },
+    {
+      "name": "read-plan-score-and-sources",
+      "tool": "plan",
+      "arguments": {
+        "operation": "get",
+        "planHandle": "cap_replace_with_plan_handle_from_create",
+        "responseView": "details",
+        "expectedRevision": 1,
+        "sections": [
+          "score",
+          "advice"
+        ],
+        "optionIds": [
+          "opt_replace_with_current_optionId"
+        ]
       }
     },
     {
@@ -2921,7 +2948,30 @@
       "tool": "order",
       "arguments": {
         "orderHandle": "cap_replace_with_order_handle_from_execute",
+        "locale": "en",
         "responseView": "conversation"
+      }
+    },
+    {
+      "name": "poll-order-status",
+      "tool": "order",
+      "arguments": {
+        "orderHandle": "cap_replace_with_order_handle_from_execute",
+        "locale": "en",
+        "responseView": "status",
+        "knownResultVersion": "replace_with_returned_resultVersion"
+      }
+    },
+    {
+      "name": "read-frozen-order",
+      "tool": "order",
+      "arguments": {
+        "orderHandle": "cap_replace_with_order_handle_from_execute",
+        "locale": "en",
+        "responseView": "details",
+        "sections": [
+          "frozen_order"
+        ]
       }
     },
     {

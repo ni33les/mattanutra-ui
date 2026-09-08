@@ -1,12 +1,21 @@
 # MattaNutra client interaction guide 7.1.0
 
-Help the customer explore and refine a supplement basket in their own words. Use info first, agree provisional nutrient targets, then plan(create). Do not require a health questionnaire, exact food labels or missing quantities merely to explore. Ask a question only when its answer materially changes the next decision; use already disclosed context. Present the closest_dose recommendation, important advice and the existing option identified by highlightedAlternativeOptionId (compactDecision.highlightedAlternativeOptionId in full responses) together. The pointer never invents another basket. Explain per-target gaps, product quantities, comparable goods prices and pill uncertainty. advice.kind distinguishes dose_review, interaction, overlap, incomplete_information and product_data; overlap alone is not a reference breach. An incomplete pill preferenceAssessment.actualLowerBound means at least that many; the total remains unknown. Health limits, interactions, unknown intake and incomplete coverage are advice, never purchase blocks or mandatory acknowledgements. Ready means technically purchasable, never medically approved. Read operationalDecision for the next action. If it says review_options, a nonempty purchase choice exists even when the closest recommendation is empty. When continued intake covers the targets, finish naturally with no_purchase or replenish_later: purchaseRequiredNow=false and highlightedAlternativeOptionId=null. Optional purchases remain possible if the customer asks; do not direct them to buy merely to complete the conversation. Use returned option IDs and the current revision. Refine with requestPatch to preserve targets, medications and constraints; a productDoses proposal evaluates quantities before selection. Targets default to basis=total_daily (quantified diet plus continued supplements plus new products); set basis=supplemental for continued supplements plus new products only. Unknown diet stays unknown and never establishes zero. There is no default product count limit. maxProductCount, maxDailyPills and maxPriceMinor are advisory preferences, including explicit zero: never exclude or block purchase because of them. Explain a deviation above 20% prominently; any positive amount above a zero preference is prominent. Unknown actual amounts stay unknown. Never silently substitute products or relax a customer constraint. Confirm the exact current basket with the customer before execute, open its external checkout, then track or recover through order(orderHandle). A processing response means durable work was admitted; poll the existing planHandle and respect pollAfterSeconds. The last committed revision is preserved while refinement is pending. Do not submit a separate match during processing. Omitted searchEffort on a revision preserves the previous effort, including expanded. Retry interrupted mutations with the same idempotency key, expectedRevision and unchanged payload; dependency or worker failures do not erase the last good plan. Poll at pollAfterSeconds or slower; polling is the only continuation method. Use only the six short tool names: info, plan, execute, order, support, feedback; never prefix a server name. Supporting sources, evidence, claim IDs and uncertainty are returned in plan response fields. Ordinary info({locale}) supplies concise essentials and one create example. Request each operation template through info(view=plan_schema,planOperation=...). For clients with current schemas, info(view=client_guide) returns the guide and info(view=plan_schema,planOperation=create|get|revise|answer|select) returns that operation schema. Native MCP clients may also use resources/read. Responsibility boundaries follow responsibility-4.0.0.
+Help the customer explore and refine a supplement basket in their own words. Use info first, agree provisional nutrient targets, then plan(create). Do not require a health questionnaire, exact food labels or missing quantities merely to explore. Ask a question only when its answer materially changes the next decision; use already disclosed context. Present the closest_dose recommendation, important advice and the existing option identified by highlightedAlternativeOptionId (compactDecision.highlightedAlternativeOptionId in full responses) together. The pointer never invents another basket. Explain per-target gaps, product quantities, comparable goods prices and pill uncertainty. advice.kind distinguishes dose_review, interaction, overlap, incomplete_information and product_data; overlap alone is not a reference breach. An incomplete pill preferenceAssessment.actualLowerBound means at least that many; the total remains unknown. Health limits, interactions, unknown intake and incomplete coverage are advice, never purchase blocks or mandatory acknowledgements. Ready means technically purchasable, never medically approved. Read operationalDecision for the next action. If it says review_options, a nonempty purchase choice exists even when the closest recommendation is empty. When continued intake covers the targets, finish naturally with no_purchase or replenish_later: purchaseRequiredNow=false and highlightedAlternativeOptionId=null. Optional purchases remain possible if the customer asks; do not direct them to buy merely to complete the conversation. Use returned option IDs and the current revision. Refine with requestPatch to preserve targets, medications and constraints; a productDoses proposal evaluates quantities before selection. Targets default to basis=total_daily (quantified diet plus continued supplements plus new products); set basis=supplemental for continued supplements plus new products only. Unknown diet stays unknown and never establishes zero. There is no default product count limit. maxProductCount, maxDailyPills and maxPriceMinor are advisory preferences, including explicit zero: never exclude or block purchase because of them. Explain a deviation above 20% prominently; any positive amount above a zero preference is prominent. Unknown actual amounts stay unknown. Never silently substitute products or relax a customer constraint. Confirm the exact current basket with the customer before execute, open its external checkout, then track or recover through order(orderHandle). A processing response means durable work was admitted; poll the existing planHandle with responseView=status and knownResultVersion at pollAfterSeconds. Fetch conversation after the completed result changes. The last committed revision is preserved while refinement is pending. Do not submit a separate match during processing. Omitted searchEffort on a revision preserves the previous effort, including expanded. Retry interrupted mutations with the same idempotency key, expectedRevision and unchanged payload; dependency or worker failures do not erase the last good plan. Poll at pollAfterSeconds or slower; polling is the only continuation method. Use only the six short tool names: info, plan, execute, order, support, feedback; never prefix a server name. Conversation includes decision-critical advice, source references and uncertainty. Retrieve claimIds and full sources with details.sections=[advice], or doseFit with details.sections=[score]; these detail-only fields are absent from conversation. Ordinary info({locale}) supplies concise essentials and one create example. Request each operation template through info(view=plan_schema,planOperation=...). For clients with current schemas, info(view=client_guide) returns the guide and info(view=plan_schema,planOperation=create|get|revise|answer|select) returns that operation schema. Native MCP clients may also use resources/read. Responsibility boundaries follow responsibility-4.0.0.
 
 ## Minimal response views
 
-Examples explicitly use responseView=conversation. Omitting responseView retains the compatible full response. Mutation inputs permit conversation or full; presentation does not affect the business idempotency key. A conversation is self-contained: options preserve their IDs/order, selectedOptionId identifies the selected basket, highlightedAlternativeOptionId identifies the useful alternative, and adviceIds resolve in the same response's advice table. Other options remain selectable; selection returns their exact basket before customer confirmation. Coverage preserves requested/current/new/quantified amounts and uncertainty. Full label text, arithmetic and schedules are available when needed.
+Review and mutation examples use responseView=conversation; polling examples use status and requested-information examples use details. Omitting responseView retains the compatible full response. Mutation inputs permit conversation or full; presentation does not affect the business idempotency key. A conversation is self-contained: options preserve their IDs/order, selectedOptionId identifies the selected basket, highlightedAlternativeOptionId identifies the useful alternative, and adviceIds resolve in the same response's advice table. Other options remain selectable; selection returns their exact basket before customer confirmation. Coverage preserves requested/current/new/quantified amounts and uncertainty. Full label text, arithmetic and schedules are available when needed.
 
-Use plan(get,responseView=details,expectedRevision=<current>,sections=[products,coverage,advice,score,economics,request],optionIds=[<returned IDs>]) for a batch of only the needed sections; optionIds omission includes all options. Details are stored results, never a new match. They return stale_revision when expectedRevision is no longer current. Request products before proposing a different physical quantity if its label basis is unknown. No detail call is needed for ordinary review, refinement or selecting another returned choice.
+| Information | Conversation | Details |
+| --- | --- | --- |
+| `doseFit` | Not returned | `sections=["score"]` |
+| `claimIds` | Not returned | `sections=["advice"]` |
+| Labels and administration | Short basket only | `sections=["products"]` |
+| Schedules and full economics | Current totals only | `sections=["economics"]` |
+
+These fields also remain available in the compatible full view.
+
+Use plan(get,responseView=details,expectedRevision=<current>,sections=<only needed sections>,optionIds=[<returned IDs>]) for a batch. Pass selectedOptionId when asking about the selected choice; omitting optionIds retrieves all options. Available sections are request, products, coverage, advice, score and economics. Details are stored results, never a new match. They return stale_revision when expectedRevision is no longer current. Request products before proposing a different physical quantity if its label basis is unknown. No detail call is needed for ordinary review, refinement or selecting another returned choice.
 
 Use plan(get,responseView=status,knownResultVersion=<previous>) during processing. unchanged=true means the committed result and pending operation have not visibly changed; revision remains the committed revision and pendingRevision identifies admitted refinement. A failed operation includes error and operationStatus even if the last committed result remains ready. When changed and complete, get conversation. Polls observe admitted work and do not start another match. For order, conversation returns checkout/recovery and totals; status omits frozen lines; details sections frozen_order and events retrieve the frozen order and complete recorded history. Locale participates in order status identity. Every view retains ordinary authorization.
 
@@ -29,7 +38,7 @@ Space automated requests by at least one second across tools and discovery calls
 
 ## Doses, uncertainty and bounded search
 
-Quantities are daily labelled servings, not packs purchased. Product administration supplies route, physical unit, units per serving, measurable increment, pack quantity and verification. Unknown metadata is unknown: do not infer capsules, split a capsule, parse a title as pack size or invent alternate-day schedules. Invalid proposals return a precise field error; revise the quantity or remove the proposal. Labels and reference limits remain serious advice, not hidden quantity ceilings. Symmetric proportional underdose/overdose penalties and the additional 2× applicable safety-limit excess penalty remain visible in doseFit. Acceptable ranges use their stated units and must contain the target; withinAgreedRange is separate from fully met. Required/core targets take default priority; optional targets stay in coverage.
+Quantities are daily labelled servings, not packs purchased. Product administration supplies route, physical unit, units per serving, measurable increment, pack quantity and verification. Unknown metadata is unknown: do not infer capsules, split a capsule, parse a title as pack size or invent alternate-day schedules. Invalid proposals return a precise field error; revise the quantity or remove the proposal. Labels and reference limits remain serious advice, not hidden quantity ceilings. Symmetric proportional underdose/overdose penalties and the additional 2× applicable safety-limit excess penalty apply in every view. Retrieve the complete doseFit calculation in full or details with sections=[score]; conversation reports coverage, gaps, excess and advice without the arithmetic trace. Acceptable ranges use their stated units and must contain the target; withinAgreedRange is separate from fully met. Required/core targets take default priority; optional targets stay in coverage.
 
 Known, estimated and unknown intake remain distinct. Never turn missing intake into zero or a repetitive diet into a deficiency. Each coverage row separates currentAmount, deliveredAmount, total quantified exposure, remainingGap and excess. Coverage counts every requested target, including unresolved and optional ones; four fully met out of five is 80%. Excess cannot cover a different missing target. Savings require equivalent coverage, time period and delivery costs; explain when unavailable.
 
@@ -38,7 +47,7 @@ searchEffort is an operation envelope field, not a customer basket limit. Standa
 ## Plan operations
 
 - create: a full request and new stable idempotencyKey; no purchase occurs.
-- get: current plan by handle; processing uses pollAfterSeconds. No revision change.
+- get: conversation retrieves the current decision; status polls processing with knownResultVersion; details retrieves requested sections for expectedRevision. Respect pollAfterSeconds. No revision change.
 - revise: expectedRevision and exactly one full request (replacement) or requestPatch (object merge). Arrays replace; omission preserves in patches; [] clears arrays. Null clears only requirements.maxProductCount, maxDailyPills and maxPriceMinor. Null elsewhere is invalid. Create/full replacement omission leaves product count unrestricted; explicit 0 is an advisory zero preference and does not prevent adding products. Patches preserve undisclosed targets and medication context. A successful edit advances revision.
 - answer: send only questionId/choice pairs returned for the current revision. Questions concern a decision, never mandatory health acknowledgement.
 - select: choose an optionId returned for the expectedRevision. It advances revision while retaining the selected basket. Option IDs describe products and dosage; always use the revision returned by the server.
@@ -59,7 +68,7 @@ If the customer is deciding whether to include a provisional target, the ask-cus
 
 ## Executable request templates
 
-Examples use response placeholders for opaque handles, IDs, revisions and returned answers. The scripted client substitutes these from prior responses; no internal catalogue or database access is needed.
+Examples use response placeholders for opaque handles, IDs, revisions, resultVersion and returned answers. Copy knownResultVersion from the last response; omit it on a first poll if no version is available. Ask for score/advice details only when the customer requests calculations or sources; the corresponding example retrieves both in one batch. The scripted client substitutes these from prior responses; no internal catalogue or database access is needed.
 
 ### discover
 
@@ -235,7 +244,7 @@ Examples use response placeholders for opaque handles, IDs, revisions and return
 }
 ```
 
-### get-current-or-processing
+### get-current-decision
 
 ```json
 {
@@ -246,6 +255,47 @@ Examples use response placeholders for opaque handles, IDs, revisions and return
       "operation": "get",
       "planHandle": "cap_replace_with_plan_handle_from_create",
       "responseView": "conversation"
+    }
+  }
+}
+```
+
+### poll-plan-status
+
+```json
+{
+  "method": "tools/call",
+  "params": {
+    "name": "plan",
+    "arguments": {
+      "operation": "get",
+      "planHandle": "cap_replace_with_plan_handle_from_create",
+      "responseView": "status",
+      "knownResultVersion": "replace_with_returned_resultVersion"
+    }
+  }
+}
+```
+
+### read-plan-score-and-sources
+
+```json
+{
+  "method": "tools/call",
+  "params": {
+    "name": "plan",
+    "arguments": {
+      "operation": "get",
+      "planHandle": "cap_replace_with_plan_handle_from_create",
+      "responseView": "details",
+      "expectedRevision": 1,
+      "sections": [
+        "score",
+        "advice"
+      ],
+      "optionIds": [
+        "opt_replace_with_current_optionId"
+      ]
     }
   }
 }
@@ -367,7 +417,44 @@ Examples use response placeholders for opaque handles, IDs, revisions and return
     "name": "order",
     "arguments": {
       "orderHandle": "cap_replace_with_order_handle_from_execute",
+      "locale": "en",
       "responseView": "conversation"
+    }
+  }
+}
+```
+
+### poll-order-status
+
+```json
+{
+  "method": "tools/call",
+  "params": {
+    "name": "order",
+    "arguments": {
+      "orderHandle": "cap_replace_with_order_handle_from_execute",
+      "locale": "en",
+      "responseView": "status",
+      "knownResultVersion": "replace_with_returned_resultVersion"
+    }
+  }
+}
+```
+
+### read-frozen-order
+
+```json
+{
+  "method": "tools/call",
+  "params": {
+    "name": "order",
+    "arguments": {
+      "orderHandle": "cap_replace_with_order_handle_from_execute",
+      "locale": "en",
+      "responseView": "details",
+      "sections": [
+        "frozen_order"
+      ]
     }
   }
 }

@@ -5,6 +5,7 @@ import { runtime, rpc, installRealCatalogue, uninstallRealCatalogue, profile } f
 import { CLIENT_GUIDE_URI, readContractResource } from "../../lib/agentic/contract/guide.ts";
 import { toolList } from "../../lib/agentic/mcp/rpc.ts";
 import { runAdmittedPlanOperation, resetPlanCreateInflightForTests } from "../../lib/agentic/plan/service.ts";
+import { admitPlanOperation } from "../../lib/agentic/plan/operations.ts";
 
 afterEach(() => { resetPlanCreateInflightForTests(); uninstallRealCatalogue(); });
 
@@ -29,7 +30,7 @@ test("PAY-SCHEMA-04 narrative identifies detail-only fields and publishes distin
 
 for (const locale of ["en", "th", "zh-CN"]) test(`PAY-SCHEMA-05 ${locale} published view examples continue admitted work and retrieve only the promised fields`, { timeout: 60000 }, async () => {
   await installRealCatalogue("dev");
-  const app = { ...runtime(`narrative-${locale}`), deferProcessing: true, isolatedInfo: { conditionCodes: [], medicationCodes: [], supportedCountries: [{ countryCode: "TH", countryName: "Thailand", currency: "THB" }] } };
+  const app = { ...runtime(`narrative-${locale}`), isolatedInfo: { conditionCodes: [], medicationCodes: [], supportedCountries: [{ countryCode: "TH", countryName: "Thailand", currency: "THB" }] } };
   const ajv = new Ajv({ strict: false, validateFormats: false });
   const validators = new Map(toolList().map(row => [row.name, { input: ajv.compile(row.inputSchema), output: ajv.compile(row.outputSchema) }]));
   const call = async (name: string, args: Record<string, unknown>) => {
@@ -43,15 +44,24 @@ for (const locale of ["en", "th", "zh-CN"]) test(`PAY-SCHEMA-05 ${locale} publis
   const getHelp = await call("info", { locale, view: "plan_schema", planOperation: "get" });
   assert.deepEqual((getHelp.clientExamples as typeof examples).map(row => row.arguments.responseView), ["conversation", "status", "details"]);
   const key = `narrative-create-${locale}`;
-  const pending = await call("plan", { ...example("create"), idempotencyKey: key, request: { ...profile("A6"), locale } });
-  assert.equal(pending.status, "processing");
-  const statusArgs = { ...example("poll-plan-status"), planHandle: pending.planHandle, knownResultVersion: pending.resultVersion };
+  const created = await call("plan", { ...example("create"), idempotencyKey: key, request: { ...profile("A6"), locale } });
+  assert.equal(created.status, "ready");
+  const ownerScope = `dev:mattanutra:${app.scope.principalScope}`;
+  const initial = await app.store.getPlanOperationByKey(ownerScope, key); assert.ok(initial);
+  // External harness admits a queued revision so polling never depends on
+  // whether matching happens to finish before the handoff timer.
+  const operation = await admitPlanOperation(app.store, { planId: initial.planId, ownerScope, key: `narrative-refine-${locale}`,
+    payload: { operation: "revise", planHandle: created.planHandle, expectedRevision: 1, idempotencyKey: `narrative-refine-${locale}`, requestPatch: {} }, expectedRevision: 1, revision: 2,
+    prepared: { ...initial.command.prepared, revision: 2, existingPlan: await app.store.getPlan(initial.planId), previous: (await app.store.getPlanRevision(initial.planId, 1))!.result }, scope: app.scope, now: app.now! });
+  const firstPoll = await call("plan", { ...example("poll-plan-status"), planHandle: created.planHandle, knownResultVersion: created.resultVersion });
+  assert.equal(firstPoll.status, "processing"); assert.equal(firstPoll.unchanged, false);
+  const statusArgs = { ...example("poll-plan-status"), planHandle: created.planHandle, knownResultVersion: firstPoll.resultVersion };
   const status = await call("plan", statusArgs);
   assert.equal(status.status, "processing"); assert.equal(status.unchanged, true); assert.ok(!Object.hasOwn(status, "options"));
-  const operation = await app.store.getPlanOperationByKey(`dev:mattanutra:${app.scope.principalScope}`, key); assert.ok(operation);
-  assert.equal((await runAdmittedPlanOperation({ store: app.store, config: app.config, operationId: operation.id })).ok, true);
+  const completion = await runAdmittedPlanOperation({ store: app.store, config: app.config, operationId: operation.id });
+  assert.equal(completion.ok, true, JSON.stringify(completion));
   const completed = await call("plan", statusArgs); assert.equal(completed.unchanged, false); assert.notEqual(completed.status, "processing");
-  const plan = await call("plan", { ...example("get-current-decision"), planHandle: pending.planHandle });
+  const plan = await call("plan", { ...example("get-current-decision"), planHandle: created.planHandle });
   const options = plan.options as Record<string, unknown>[]; assert.ok(options.length > 1);
   assert.ok(options.every(row => !Object.hasOwn(row, "doseFit"))); assert.ok(!Object.hasOwn(plan, "claimIds"));
   const option = options.find(row => row.purchaseEligible); assert.ok(option);

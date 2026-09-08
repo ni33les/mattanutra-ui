@@ -17,7 +17,9 @@ test("AXR-SPEC-01 contract 7.1 preserves six public tools, legacy request accept
   const v7 = JSON.parse(readFileSync(new URL("../../contract/mcp/7.0.0/tools.json", import.meta.url), "utf8"));
   // Historical exact-input assertion remains attached to the historical release.
   for (const tool of AGENTIC_PUBLIC_TOOLS) assert.deepEqual(v7.tools.find((row: { name: string }) => row.name === tool).inputSchema, old.tools.find((row: { name: string }) => row.name === tool).inputSchema);
-  for (const example of CLIENT_EXAMPLES) { const legacy = { ...example.arguments }; delete legacy.responseView; assert.ok(ajv.validate(AGENTIC_TOOL_SCHEMAS[example.tool], legacy), example.name); }
+  const legacyExamples = JSON.parse(readContractResource("mattanutra://contract/7.0.0/schema")!.contents[0].text).examples;
+  assert.ok(legacyExamples.length > 0);
+  for (const example of legacyExamples) assert.ok(ajv.validate(AGENTIC_TOOL_SCHEMAS[example.tool], example.arguments), example.name);
   assert.ok(Object.hasOwn(AGENTIC_TOOL_SCHEMAS, "evidence"), "legacy evidence schema remains available internally");
   for (const version of ["4.0.0", "5.0.0", "6.0.0", "7.0.0"]) for (const suffix of ["client-guide", "schema"]) {
     const resource = readContractResource(`mattanutra://contract/${version}/${suffix}`);
