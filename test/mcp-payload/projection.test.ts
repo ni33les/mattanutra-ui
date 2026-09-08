@@ -59,3 +59,12 @@ test("PAY-VIEW-03 advice with identical rule IDs but different exposure, source 
   assert.equal(advice.length, plan.options![0].advice!.length);
   assert.ok(advice.some(row => row.exposure === 999 && row.threshold === 100));
 });
+
+test("PAY-VIEW-04 plan-wide advice survives empty and processing decisions without a product option", () => {
+  const plan = structuredClone(baseline.cases[0].plan);
+  plan.options = []; plan.basket = []; plan.status = "processing";
+  assert.ok(plan.safetyGuidance!.length > 0);
+  const compact = projectPlan(plan, { responseView: "conversation" });
+  for (const finding of plan.safetyGuidance!) assert.ok(compact.advice.some(row => row.guidanceId === finding.guidanceId && row.message === finding.message && row.exposure === finding.exposure));
+  assert.ok(compact.planAdviceIds.length > 0);
+});
