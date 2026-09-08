@@ -296,7 +296,9 @@ async function callTool(
 
     if (canonical === "plan" && value && typeof value === "object" && "ok" in value && value.ok === true && params.responseView && params.responseView !== "full" && params.responseView !== "status" && !("responseView" in value)) {
       const full = value as PlanSuccessWire;
-      const state = await readPlanPresentation(runtime, full.planHandle, full.revision);
+      // Pending edits have an admitted operation, but intentionally no result
+      // row yet. Read the committed revision and operation for their version.
+      const state = await readPlanPresentation(runtime, full.planHandle, full.status === "processing" ? undefined : full.revision);
       if (isAgenticErrorResult(state)) value = state;
       else if (params.responseView === "details" && state.plan.currentRevision !== params.expectedRevision) value = businessError({ reasonCode: "stale_revision", fieldPath: "expectedRevision", currentRevision: state.plan.currentRevision, requestedRevision: Number(params.expectedRevision), message: "Reload the plan before requesting its details." });
       else {

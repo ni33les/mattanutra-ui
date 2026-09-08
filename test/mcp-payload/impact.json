@@ -225,6 +225,16 @@
         "PAY-SCHEMA-04",
         "PAY-SCHEMA-05"
       ]
+    },
+    {
+      "file": "test/mcp-payload/refinement-handoff.test.ts",
+      "slice": "handoff",
+      "database": false,
+      "reason": "Live UAT processing response regression: pending refinement projection must read the committed state and retain the admitted operation.",
+      "expectedCases": 1,
+      "cases": [
+        "PAY-HANDOFF-01"
+      ]
     }
   ]
 }
