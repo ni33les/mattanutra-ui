@@ -8,7 +8,7 @@ import { toMatcherProduct } from "../../lib/agentic/plan/to-matcher-product.ts";
 import { match } from "../../lib/matcher/index.ts";
 import { setMatcherSafetyCeilings, resetMatcherSafetyCeilings } from "../../lib/matcher/safety-ceilings.ts";
 
-test("AXR-SRCH-01 preserved Anna control basket cannot lose its equal-dose commercial advantage", async () => {
+test("AXR-SRCH-01 preserved Anna control with complete references keeps dose and commercial quality", async () => {
   const raw = await loadFrozenAnnaInput("uat"), frozen = reconstructAnnaSnapshot(raw);
   setMatcherSafetyCeilings(frozen.ceilings);
   try {
@@ -21,8 +21,11 @@ test("AXR-SRCH-01 preserved Anna control basket cannot lose its equal-dose comme
       if (state.selectedProductIds?.length === 3 && products.every(id => state.selectedProductIds?.includes(id))) explored = true;
     });
     assert.ok(result.selected);
-    assert.ok(result.selected.doseFit!.total <= .625, JSON.stringify({ fit: result.selected.doseFit, price: result.selected.priceMinor, products: result.selected.productIds, explored }));
-    assert.ok(result.selected.doseFit!.total < .625 || result.selected.priceMinor <= 102000, `An equal-dose basket became more expensive; control combination explored=${explored}`);
+    // Independent arithmetic: D3 gap 2.5/10, C excess 20/40, zinc excess
+    // 2.5/5, plus 2 * (301.5 + 52.8 - 350)/350 supplemental magnesium.
+    const controlLoss = .25 + .5 + .5 + 2 * 4.3 / 350;
+    assert.ok(result.selected.doseFit!.total <= controlLoss);
+    assert.ok(result.selected.doseFit!.total < controlLoss || result.selected.priceMinor <= 53700, `An equal-dose basket became more expensive; earlier exploratory combination explored=${explored}`);
     assert.ok(result.searchSummary!.expansionAttempts <= 8000);
   } finally { resetMatcherSafetyCeilings(); }
 });

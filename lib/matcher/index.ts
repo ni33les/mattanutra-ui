@@ -6,6 +6,7 @@ import { DEFAULT_MATCHER_CONFIG } from "@/lib/matcher/config";
 import { rejectedCandidatesFor } from "@/lib/matcher/explainer";
 import { amountFromScaled } from "@/lib/matcher/dose";
 import { knownTargetExposure } from "@/lib/matcher/target-basis";
+import { equivalentSellerOffers } from "@/lib/matcher/seller-offers";
 import { seedState } from "@/lib/matcher/search";
 import { searchCursorResult, archivedSearchStates } from "@/lib/matcher/search-cursor";
 import { createMatchCursor, advanceMatchCursor, matchCursorAttempts, type MatchCursor } from "@/lib/matcher/match-cursor";
@@ -103,6 +104,7 @@ export function match(request: CanonicalRequest, catalog: CatalogSnapshot,
   const cursor = completedCursor ?? createMatchCursor(request, catalog, config, groups);
   while (!cursor.done) advanceMatchCursor(cursor, request, 8_000);
   const scored: ScoredBasket[] = [];
+  const sourceStates = new Map<string, { state: SearchState; groups: readonly ProductGroup[] }>();
   const empty = scoreState({ groups: [], request, sellerId: "", state: seedState(request) });
   if (empty) scored.push(empty);
   let trimmed = false;
@@ -117,10 +119,25 @@ export function match(request: CanonicalRequest, catalog: CatalogSnapshot,
     if (observeCandidate) for (const state of archivedSearchStates(seller.cursor)) observeCandidate(seller.sellerId, state, run.groups);
     for (const state of run.complete) {
       const basket = scoreState({ groups: run.groups, request, sellerId: seller.sellerId, state });
-      if (basket && basket.productCount > 0) scored.push(basket);
+      if (basket && basket.productCount > 0) {
+        scored.push(basket);
+        sourceStates.set(basket.variantIds.join("|"), { state, groups: run.groups });
+      }
     }
   }
   const exploredGroups = [...perSellerGroups.values()].flat();
+  const preliminary = selectOptions({ baskets: scored, request, config });
+  // Recover commercial ties only for retained role candidates. This bounded
+  // projection compares quotes for existing baskets, with no extra dose search.
+  for (const basket of [preliminary.selected, ...preliminary.alternatives]) {
+    if (!basket) continue;
+    const source = sourceStates.get(basket.variantIds.join("|"));
+    if (!source) continue;
+    for (const offer of equivalentSellerOffers(source.state, source.groups, exploredGroups)) {
+      const priced = scoreState({ ...offer, request });
+      if (priced) scored.push(priced);
+    }
+  }
   const winner = selectOptions({ baskets: scored, request, config });
   const targetFrontiers = request.targets.filter((target) => !isDeferredConditional(target)).map((target) => ({
     subjectId: target.subjectId, name: target.name,

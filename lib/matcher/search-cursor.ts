@@ -73,11 +73,12 @@ export function* archivedSearchStates(cursor: SearchCursor) {
   for (const packed of cursor.archive.values()) yield restoreState(cursor, packed);
 }
 function remember(cursor: SearchCursor, state: SearchState) {
-  const key = createHash("sha256").update([...state.selectedVariantIds].sort().join("|")).digest("base64url");
+  const ids = state.selectedVariantIds.map(id => indexFor(cursor.variantIds, cursor.variantIndex, id));
+  const key = [...ids].sort((a, b) => a - b).join(",");
   if (!cursor.archive.has(key)) {
     const exposure = packedExposure(cursor, state.exposure);
     cursor.archive.set(key, [state.nextGroupIndex, state.price, state.pills, state.count, state.pillCountKnown !== false,
-      state.selectedVariantIds.map(id => indexFor(cursor.variantIds, cursor.variantIndex, id)), exposure,
+      ids, exposure,
       state.delivered === state.exposure ? exposure : packedExposure(cursor, state.delivered), [...(state.unknownProductIds ?? [])]]);
     cursor.unreviewed.push(state);
   }
@@ -128,8 +129,9 @@ function variantsFor(cursor: SearchCursor, index: number, state: SearchState, re
 }
 
 function add(cursor: SearchCursor, state: SearchState, groupIndex: number, id: string, request: CanonicalRequest) {
-  const edge = createHash("sha256").update([...state.selectedVariantIds].sort().join("|") + ">" + id).digest("base64url");
-  if (cursor.edges.has(edge)) { const key = cursor.edges.get(edge); return key ? restoreState(cursor, cursor.archive.get(key)!) : null; }
+  const ids = state.selectedVariantIds.map(selected => indexFor(cursor.variantIds, cursor.variantIndex, selected)).sort((a, b) => a - b);
+  const edge = ids.join(",") + ">" + indexFor(cursor.variantIds, cursor.variantIndex, id);
+  if (cursor.edges.has(edge)) { const key = cursor.edges.get(edge); return key != null ? restoreState(cursor, cursor.archive.get(key)!) : null; }
   cursor.expansionAttempts++;
   let next = tryAddVariant(state, variant(cursor, groupIndex, id), cursor.groups[groupIndex]!, request);
   if (next && next.delivered.size === next.exposure.size && [...next.delivered].every(([key, value]) => next!.exposure.get(key) === value)) {
