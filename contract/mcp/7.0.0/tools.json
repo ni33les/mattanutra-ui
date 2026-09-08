@@ -1,7 +1,7 @@
 {
-  "contractVersion": "7.0.0",
-  "name": "mattanutra_dev",
   "schemaChecksum": "d4e12b81a983e0621b9b749b943ee61b55698abdf4ba09f400f0a09853c19097",
+  "contractVersion": "7.0.0",
+  "instructions": "Help the customer explore and refine a supplement basket in their own words. Use info first, agree provisional nutrient targets, then plan(create). Do not require a health questionnaire, exact food labels or missing quantities merely to explore. Ask a question only when its answer materially changes the next decision; use already disclosed context. Present the closest_dose recommendation, important advice and the existing option identified by compactDecision.highlightedAlternativeOptionId together. The pointer never invents another basket. Explain per-target gaps, product quantities, comparable goods prices and pill uncertainty. advice.kind distinguishes dose_review, interaction, overlap, incomplete_information and product_data; overlap alone is not a reference breach. An incomplete pill preferenceAssessment.actualLowerBound means at least that many; the total remains unknown. Health limits, interactions, unknown intake and incomplete coverage are advice, never purchase blocks or mandatory acknowledgements. Ready means technically purchasable, never medically approved. Read operationalDecision for the next action. If it says review_options, a nonempty purchase choice exists even when the closest recommendation is empty. When continued intake covers the targets, finish naturally with no_purchase or replenish_later: purchaseRequiredNow=false and highlightedAlternativeOptionId=null. Optional purchases remain possible if the customer asks; do not direct them to buy merely to complete the conversation. Use returned option IDs and the current revision. Refine with requestPatch to preserve targets, medications and constraints; a productDoses proposal evaluates quantities before selection. Targets default to basis=total_daily (quantified diet plus continued supplements plus new products); set basis=supplemental for continued supplements plus new products only. Unknown diet stays unknown and never establishes zero. There is no default product count limit. maxProductCount, maxDailyPills and maxPriceMinor are advisory preferences, including explicit zero: never exclude or block purchase because of them. Explain a deviation above 20% prominently; any positive amount above a zero preference is prominent. Unknown actual amounts stay unknown. Never silently substitute products or relax a customer constraint. Confirm the exact current basket with the customer before execute, open its external checkout, then track or recover through order(orderHandle). A processing response means durable work was admitted; poll the existing planHandle and respect pollAfterSeconds. The last committed revision is preserved while refinement is pending. Do not submit a separate match during processing. Omitted searchEffort on a revision preserves the previous effort, including expanded. Retry interrupted mutations with the same idempotency key, expectedRevision and unchanged payload; dependency or worker failures do not erase the last good plan. Poll at pollAfterSeconds or slower; polling is the only continuation method. Use only the seven short tool names: info, plan, execute, order, support, feedback, evidence; never prefix a server name. Supporting sources use the returned evidenceHandle. Ordinary info({locale}) includes these essentials and copyable operation examples. For clients with current schemas, info(view=client_guide) returns the guide and info(view=plan_schema,planOperation=create|get|revise|answer|select) returns that operation schema. Native MCP clients may also use resources/read. Responsibility boundaries follow responsibility-4.0.0. Guide: mattanutra://contract/7.0.0/client-guide. Schema: mattanutra://contract/7.0.0/schema. DEV uses Stripe Test Mode; explicit customer confirmation of the exact current option/revision is required before execute. Feedback remains optional and requires explicit consent.",
   "tools": [
     {
       "description": "MattaNutra matches real products to agreed nutrient targets, optimising overlap, current stock and cost. Safety advice follows responsibility-4.0.0 boundaries; it provides wellness guidance, not diagnosis, pharmacy services or clinical advice.",
@@ -15819,57 +15819,5 @@
       },
       "name": "evidence"
     }
-  ],
-  "resources": [
-    {
-      "uri": "mattanutra://contract/7.0.0/client-guide",
-      "name": "MattaNutra v7 client guide",
-      "mimeType": "text/markdown",
-      "description": "Workflow, complete operation semantics, advice and payment recovery examples."
-    },
-    {
-      "uri": "mattanutra://contract/7.0.0/schema",
-      "name": "MattaNutra v7 complete contract",
-      "mimeType": "application/schema+json",
-      "description": "Input and response contracts for all seven tools and individual plan operations."
-    },
-    {
-      "uri": "mattanutra://contract/4.0.0/client-guide",
-      "name": "MattaNutra v4 client guide",
-      "mimeType": "text/markdown",
-      "description": "Workflow, complete operation semantics, advice and payment recovery examples."
-    },
-    {
-      "uri": "mattanutra://contract/4.0.0/schema",
-      "name": "MattaNutra v4 complete contract",
-      "mimeType": "application/schema+json",
-      "description": "Input and response contracts for all seven tools and individual plan operations."
-    },
-    {
-      "uri": "mattanutra://contract/5.0.0/client-guide",
-      "name": "MattaNutra v5 client-guide",
-      "mimeType": "text/markdown",
-      "description": "Frozen published contract 5.0.0 resource."
-    },
-    {
-      "uri": "mattanutra://contract/5.0.0/schema",
-      "name": "MattaNutra v5 schema",
-      "mimeType": "application/schema+json",
-      "description": "Frozen published contract 5.0.0 resource."
-    },
-    {
-      "uri": "mattanutra://contract/6.0.0/client-guide",
-      "name": "MattaNutra v6 client-guide",
-      "mimeType": "text/markdown",
-      "description": "Frozen published contract 6.0.0 resource."
-    },
-    {
-      "uri": "mattanutra://contract/6.0.0/schema",
-      "name": "MattaNutra v6 schema",
-      "mimeType": "application/schema+json",
-      "description": "Frozen published contract 6.0.0 resource."
-    }
-  ],
-  "transport": "streamable-http",
-  "url": "https://dev.mattanutra.com/api/mcp"
+  ]
 }
