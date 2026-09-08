@@ -22,7 +22,7 @@ test("PAY-TRANSPORT-01 create replay changes presentation without new work, get 
   const another = details.options[1];
   const selected = await rpc(app, "plan", { operation: "select", planHandle: full.planHandle, expectedRevision: full.revision, optionId: another.optionId, idempotencyKey: "payload-select-other-01", responseView: "conversation" });
   assert.equal(selected.ok, true); assert.equal(selected.selectedOptionId, another.optionId);
-  const conflict = await rpc(app, "plan", { ...args, request: { ...args.request, optimization: "lowest_cost" }, responseView: "conversation" });
+  const conflict = await rpc(app, "plan", { ...args, request: { ...args.request, optimization: "fewest_pills" }, responseView: "conversation" });
   assert.equal(conflict.ok, false); assert.equal(conflict.error.reasonCode, "idempotency_conflict");
 });
 

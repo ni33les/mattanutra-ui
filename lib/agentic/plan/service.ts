@@ -1,3 +1,4 @@
+import { planContractCompatible } from "@/lib/agentic/presentation/compatibility";
 import { withoutOperationCursor } from "@/lib/agentic/store/operation-checkpoint";
 import { planReturnWaitMs } from "@/lib/agentic/plan/operations";
 import { catalogueSnapshotId } from "@/lib/agentic/catalogue/freeze";
@@ -1304,7 +1305,7 @@ async function executePlanTool(input: Readonly<{
       }
 
       previous = previousResult(current.result);
-      if (previous && previous.contractVersion !== AGENTIC_CONTRACT_VERSION && current.status !== "processing") {
+      if (previous && !planContractCompatible(previous.contractVersion) && current.status !== "processing") {
         const existingOrder = await store.getActiveOrderForPlanRevision(plan.id, plan.currentRevision);
         previous = { ...previous, sourceContractVersion: previous.contractVersion ?? "3.0.0", refreshRequired: !existingOrder };
       }
@@ -1754,7 +1755,7 @@ async function completePreparedPlan(
     if (hasFullRequest(input.payload) && !prepared.resume) {
       const merged = applyPlanAnswers(prepared.state, { answers });
       pinPrevious = Boolean(
-        previous && previous.contractVersion === AGENTIC_CONTRACT_VERSION &&
+        previous && planContractCompatible(previous.contractVersion) &&
         (isolated || previous.selected?.snapshotId === catalogueSnapshotId(snapshot)) &&
           planRematchFingerprint(previous.requestSnapshot) ===
             planRematchFingerprint(merged)
@@ -1789,7 +1790,7 @@ async function completePreparedPlan(
 
     const merged = applyPlanAnswers(normalized.state, { answers });
     pinPrevious = Boolean(
-      previous && previous.contractVersion === AGENTIC_CONTRACT_VERSION &&
+      previous && planContractCompatible(previous.contractVersion) &&
         (isolated || previous.selected?.snapshotId === catalogueSnapshotId(snapshot)) &&
         planRematchFingerprint(previous.requestSnapshot) ===
           planRematchFingerprint(merged)

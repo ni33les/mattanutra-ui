@@ -1,6 +1,7 @@
+import { planContractCompatible } from "@/lib/agentic/presentation/compatibility";
 import { catalogueSnapshotId } from "@/lib/agentic/catalogue/freeze";
 import type { AgenticConfig } from "@/lib/agentic/config";
-import { AGENTIC_CONTRACT_VERSION, AGENTIC_POLL_AFTER_SECONDS } from "@/lib/agentic/config";
+import { AGENTIC_POLL_AFTER_SECONDS } from "@/lib/agentic/config";
 import { RESPONSIBILITY_VERSION } from "@/lib/agentic/discovery/versions";
 import { responsibilitySnapshot } from "@/lib/agentic/responsibility/matrix";
 import { businessError, isAgenticErrorResult, type AgenticErrorResult } from "@/lib/agentic/contract/errors";
@@ -428,7 +429,7 @@ async function executeFresh(
   // Existing frozen checkout work must remain resumable even when old plan
   // policy or current catalogue availability differs.
   const peekedOrder = await input.store.getActiveOrderForPlanRevision(peekedPlan.id, peekedPlan.currentRevision);
-  const snapshot = !peekedOrder && peekedResult.contractVersion === AGENTIC_CONTRACT_VERSION && peekedRevision.status === "ready"
+  const snapshot = !peekedOrder && planContractCompatible(peekedResult.contractVersion) && peekedRevision.status === "ready"
     ? await ensureCatalogueSnapshot(input.config.environment, peekedResult.requestSnapshot.destinationCountry)
     : null;
 
@@ -496,7 +497,7 @@ async function executeFresh(
       return stored;
     }
 
-    if (result.contractVersion !== AGENTIC_CONTRACT_VERSION) {
+    if (!planContractCompatible(result.contractVersion)) {
       return businessError({ reasonCode: "contract_refresh_required",
         message: "Refresh this unexecuted plan with revise, its expectedRevision and requestPatch:{} before creating checkout.",
         nextAction: "revise_plan", fieldPath: "expectedRevision" });

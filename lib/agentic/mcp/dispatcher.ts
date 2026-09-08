@@ -1,3 +1,8 @@
+import { publicPlanFields } from "@/lib/agentic/public-mapper";
+import type { OrderViewInput } from "@/lib/agentic/presentation/order";
+import { readPlanStatus, readPlanPresentation } from "@/lib/agentic/presentation/plan-read";
+import { projectPlan, type PlanViewInput } from "@/lib/agentic/presentation/plan";
+import type { PlanSuccessWire } from "@/lib/agentic/contract/outputs";
 import {
   AGENTIC_INPUT_SCHEMAS,
   AGENTIC_OUTPUT_SCHEMAS,
@@ -155,6 +160,24 @@ async function callTool(
         });
         break;
       case "plan": {
+        if (params.operation === "get" && params.responseView === "status") {
+          value = await readPlanStatus(runtime, String(params.planHandle), typeof params.knownResultVersion === "string" ? params.knownResultVersion : undefined);
+          break;
+        }
+        if (params.operation === "get" && params.responseView === "details") {
+          const state = await readPlanPresentation(runtime, String(params.planHandle));
+          if (isAgenticErrorResult(state)) value = state;
+          else {
+            const request = Array.isArray(params.sections) && params.sections.includes("request") ? state.originalRequest() : undefined;
+            if (isAgenticErrorResult(request)) value = request;
+            else {
+              const projected = projectPlan({ ...publicPlanFields(state.result), ok: true, planHandle: String(params.planHandle), revision: state.revision.revision,
+                ...(request ? { originalRequest: request } : {}) } as PlanSuccessWire, params as PlanViewInput & { responseView: "details" });
+              value = isAgenticErrorResult(projected) ? projected : { ...projected, resultVersion: state.resultVersion };
+            }
+          }
+          break;
+        }
         const planKey =
           typeof params.idempotencyKey === "string" && params.idempotencyKey.trim()
             ? params.idempotencyKey
@@ -225,6 +248,7 @@ async function callTool(
         break;
       case "order":
         value = await orderTool({
+          ...(params as OrderViewInput),
           config: runtime.config,
           now,
           orderHandle: String(params.orderHandle),
@@ -270,6 +294,20 @@ async function callTool(
         });
     }
 
+    if (canonical === "plan" && value && typeof value === "object" && "ok" in value && value.ok === true && params.responseView && params.responseView !== "full" && params.responseView !== "status" && !("responseView" in value)) {
+      const full = value as PlanSuccessWire;
+      const state = await readPlanPresentation(runtime, full.planHandle, full.revision);
+      if (isAgenticErrorResult(state)) value = state;
+      else if (params.responseView === "details" && state.plan.currentRevision !== params.expectedRevision) value = businessError({ reasonCode: "stale_revision", fieldPath: "expectedRevision", currentRevision: state.plan.currentRevision, requestedRevision: Number(params.expectedRevision), message: "Reload the plan before requesting its details." });
+      else {
+        const request = params.responseView === "details" && Array.isArray(params.sections) && params.sections.includes("request") ? state.originalRequest() : undefined;
+        if (isAgenticErrorResult(request)) value = request;
+        else {
+          const projected = projectPlan({ ...full, ...(request ? { originalRequest: request as PlanSuccessWire["originalRequest"] } : {}) }, params as PlanViewInput);
+          value = isAgenticErrorResult(projected) ? projected : { ...projected, resultVersion: state.resultVersion };
+        }
+      }
+    }
     const outputIssues = validateToolIssues(AGENTIC_OUTPUT_SCHEMAS[canonical], value);
     if (outputIssues.length > 0) {
       log.error("contract_output_invalid", { tool: canonical, fields: outputIssues.map(issue => issue.fieldPath) });

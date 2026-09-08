@@ -79,23 +79,34 @@ export type PlanRequestPatchWire = Static<typeof PLAN_REQUEST_PATCH>;
 const key = Type.String({ minLength: 16, maxLength: 128 });
 const handle = Type.String({ minLength: 32, maxLength: 4096 });
 const revision = Type.Integer({ minimum: 1 });
+export const MUTATION_VIEW = optional({ ...enumeration(["conversation", "full"] as const), default: "full", description: "Presentation only; omitted means the compatible full response. Use conversation for routine dialogue. Does not change matching or idempotency." });
+export const PLAN_DETAIL_SECTIONS = Type.Array(enumeration(["request", "products", "coverage", "advice", "score", "economics"] as const), { minItems: 1, uniqueItems: true, description: "Batch only the sections needed. Reads stored facts without rematching." });
+const readVersion = optional(Type.String({ minLength: 1, maxLength: 128, description: "Previous returned resultVersion; unchanged is true only for the same visible state and representation identity." }));
 export const PLAN_OPERATION_SCHEMAS = {
-  create: object({ operation: Type.Literal("create"), idempotencyKey: key, searchEffort: optional(SEARCH_EFFORT_SCHEMA), request: PLAN_REQUEST }),
-  get: object({ operation: Type.Literal("get"), planHandle: handle }),
-  revise: Type.Union([
-    object({ operation: Type.Literal("revise"), idempotencyKey: key, planHandle: handle, expectedRevision: revision, searchEffort: optional(SEARCH_EFFORT_SCHEMA), request: PLAN_REQUEST }),
-    object({ operation: Type.Literal("revise"), idempotencyKey: key, planHandle: handle, expectedRevision: revision, searchEffort: optional(SEARCH_EFFORT_SCHEMA), requestPatch: PLAN_REQUEST_PATCH })
+  create: object({ responseView: MUTATION_VIEW, operation: Type.Literal("create"), idempotencyKey: key, searchEffort: optional(SEARCH_EFFORT_SCHEMA), request: PLAN_REQUEST }),
+  get: Type.Union([
+    object({ operation: Type.Literal("get"), planHandle: handle, responseView: MUTATION_VIEW }),
+    object({ operation: Type.Literal("get"), planHandle: handle, responseView: Type.Literal("status"), knownResultVersion: readVersion }),
+    object({ operation: Type.Literal("get"), planHandle: handle, responseView: Type.Literal("details"), expectedRevision: revision, sections: PLAN_DETAIL_SECTIONS, optionIds: optional(Type.Array(Type.String({ minLength: 8, maxLength: 128 }), { minItems: 1, uniqueItems: true })) })
   ]),
-  answer: object({ operation: Type.Literal("answer"), idempotencyKey: key, planHandle: handle, expectedRevision: revision, answers: { ...PLAN_ANSWERS, minItems: 1 }, safetyAcknowledgement: optional(PLAN_SAFETY_ACK) }),
-  select: object({ operation: Type.Literal("select"), idempotencyKey: key, planHandle: handle, expectedRevision: revision, optionId: Type.String({ minLength: 8, maxLength: 128 }) })
+  revise: Type.Union([
+    object({ responseView: MUTATION_VIEW, operation: Type.Literal("revise"), idempotencyKey: key, planHandle: handle, expectedRevision: revision, searchEffort: optional(SEARCH_EFFORT_SCHEMA), request: PLAN_REQUEST }),
+    object({ responseView: MUTATION_VIEW, operation: Type.Literal("revise"), idempotencyKey: key, planHandle: handle, expectedRevision: revision, searchEffort: optional(SEARCH_EFFORT_SCHEMA), requestPatch: PLAN_REQUEST_PATCH })
+  ]),
+  answer: object({ responseView: MUTATION_VIEW, operation: Type.Literal("answer"), idempotencyKey: key, planHandle: handle, expectedRevision: revision, answers: { ...PLAN_ANSWERS, minItems: 1 }, safetyAcknowledgement: optional(PLAN_SAFETY_ACK) }),
+  select: object({ responseView: MUTATION_VIEW, operation: Type.Literal("select"), idempotencyKey: key, planHandle: handle, expectedRevision: revision, optionId: Type.String({ minLength: 8, maxLength: 128 }) })
 } as const;
 // MCP requires an object root; the discriminated branches specify each operation completely.
 export const PLAN_INPUT_SCHEMA = { type: "object", anyOf: Object.values(PLAN_OPERATION_SCHEMAS) } as const;
 export const PLAN_ADVERTISED_SCHEMA = PLAN_INPUT_SCHEMA;
-export const INFO_INPUT_SCHEMA = object({ locale: optional(Type.String({ minLength: 2, maxLength: 35 })), view: optional({ ...enumeration(["overview", "client_guide", "plan_schema"] as const), default: "overview", description: "Ordinary info already returns essential instructions and operation examples. Request guide text or one plan-operation schema without resources/read." }), planOperation: optional(enumeration(["create", "get", "revise", "answer", "select"] as const)) });
+export const INFO_INPUT_SCHEMA = object({ locale: optional(Type.String({ minLength: 2, maxLength: 35 })), view: optional({ ...enumeration(["overview", "client_guide", "plan_schema"] as const), default: "overview", description: "Ordinary info returns concise essentials and one create example. Request guide text or one plan-operation schema without resources/read." }), planOperation: optional(enumeration(["create", "get", "revise", "answer", "select"] as const)) });
 export const EVIDENCE_INPUT_SCHEMA = object({ evidenceHandle: handle, claimIds: optional(strings()), locale: optional(text(35)), mode: optional({ ...enumeration(["summary", "sources"] as const), default: "summary" }) });
 export const EXECUTE_INPUT_SCHEMA = object({ planHandle: handle, expectedRevision: revision, idempotencyKey: key });
-export const ORDER_INPUT_SCHEMA = object({ orderHandle: handle });
+export const ORDER_INPUT_SCHEMA = { type: "object", ...Type.Union([
+  object({ orderHandle: handle, locale: optional(text(35)), responseView: MUTATION_VIEW }),
+  object({ orderHandle: handle, locale: optional(text(35)), responseView: Type.Literal("status"), knownResultVersion: readVersion }),
+  object({ orderHandle: handle, locale: optional(text(35)), responseView: Type.Literal("details"), sections: Type.Array(enumeration(["frozen_order", "events"] as const), { minItems: 1, uniqueItems: true }) })
+]) };
 export const SUPPORT_INPUT_SCHEMA = object({ orderHandle: handle, supportHandle: optional(handle), idempotencyKey: key, message: text(4000) });
 export const FEEDBACK_INPUT_SCHEMA = object({ planHandle: handle, expectedRevision: revision, idempotencyKey: key, consentConfirmed: Type.Literal(true), optionId: optional(Type.String({ minLength: 8, maxLength: 128 })), points: optional(Type.Array(text(240), { maxItems: 8, uniqueItems: true })), rating: optional(Type.Integer({ minimum: 1, maximum: 5 })), summary: optional(text(1000)) });
 export const AGENTIC_INPUT_SCHEMAS = { info: INFO_INPUT_SCHEMA, plan: PLAN_INPUT_SCHEMA, execute: EXECUTE_INPUT_SCHEMA, order: ORDER_INPUT_SCHEMA, support: SUPPORT_INPUT_SCHEMA, feedback: FEEDBACK_INPUT_SCHEMA, evidence: EVIDENCE_INPUT_SCHEMA } as const;

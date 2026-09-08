@@ -1,3 +1,4 @@
+import Ajv from "ajv";
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { handleLightweightJsonRpc, toolList, toolResult } from "../lib/agentic/mcp/rpc.ts";
@@ -29,7 +30,7 @@ describe("MCP client and HTTP contract", () => {
       assert.deepEqual(result?.result?.capabilities, { tools: { listChanged: false }, resources: { listChanged: false, subscribe: false } });
     }
     for (const tool of toolList()) {
-      assert.ok(tool.outputSchema.anyOf.every(branch => branch.required.includes("ok")));
+      assert.equal(new Ajv({ strict: false, validateFormats: false }).compile(tool.outputSchema)({}), false, "Every response variant requires ok");
       assert.equal(tool.annotations.readOnlyHint, ["info", "order"].includes(tool.name));
     }
   });

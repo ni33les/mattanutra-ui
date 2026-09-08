@@ -30,12 +30,12 @@ test("PAY-POLL-01 unchanged reads are small, ownership fenced and failure/cancel
   await updateClaimedOperation(app.store, claim, { status: "failed", error: businessError({ reasonCode: "temporarily_unavailable", message: "Dependency failed" }) }, app.now!);
   const failed = await rpc(app, "plan", { ...args, knownResultVersion: pending.resultVersion });
   assert.equal(failed.unchanged, false); assert.equal(failed.operationStatus, "failed"); assert.equal(failed.error.message, "Dependency failed"); assert.equal(failed.revision, 1);
-  const replacement = await admitPlanOperation(app.store, { planId: operation.planId, ownerScope, key: "payload-pending-revision-03", payload: { operation: "revise", requestPatch: {} }, expectedRevision: 1, revision: 2, prepared: operation.command.prepared, scope: app.scope, now: app.now! });
+  const replacement = await admitPlanOperation(app.store, { planId: operation.planId, ownerScope, key: "payload-pending-revision-03", payload: { operation: "revise", requestPatch: {} }, expectedRevision: 1, revision: 2, prepared: operation.command.prepared, scope: app.scope, now: "2026-09-07T00:00:01Z" });
   await cancelPlanOperation(app.store, replacement.id, app.now!);
   const cancelled = await rpc(app, "plan", { ...args, knownResultVersion: failed.resultVersion });
   assert.equal(cancelled.unchanged, false); assert.equal(cancelled.operationStatus, "cancelled");
   const before = await app.store.getPlanRevision(operation.planId, 1); assert.ok(before);
-  await app.store.updatePlanRevision(operation.planId, 1, { result: { ...before.result, summary: "Updated visible advice" } });
+  await app.store.updatePlanRevision({ ...before, result: { ...(before.result as object), summary: "Updated visible advice" } });
   const changed = await rpc(app, "plan", { ...args, knownResultVersion: cancelled.resultVersion });
   assert.equal(changed.unchanged, false);
 });

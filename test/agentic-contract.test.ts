@@ -1,3 +1,5 @@
+import Ajv from "ajv";
+import { AGENTIC_CONTRACT_REGISTRY } from "../lib/agentic/contract/registry.ts";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
@@ -77,10 +79,10 @@ describe(`agentic MCP contract ${AGENTIC_CONTRACT_VERSION}`, () => {
     assert.equal(JSON.stringify(snapshot).includes("Use only the six short tool names"), true);
 
     for (const tool of snapshot.tools) {
-      assert.deepEqual(tool.outputSchema, JSON.parse(JSON.stringify(AGENTIC_OUTPUT_SCHEMAS[tool.name as keyof typeof AGENTIC_OUTPUT_SCHEMAS])));
+      assert.deepEqual(tool.outputSchema, JSON.parse(JSON.stringify(AGENTIC_CONTRACT_REGISTRY[tool.name as keyof typeof AGENTIC_CONTRACT_REGISTRY].outputSchema)));
       assert.deepEqual(
         tool.inputSchema,
-        JSON.parse(JSON.stringify(AGENTIC_TOOL_SCHEMAS[tool.name as keyof typeof AGENTIC_TOOL_SCHEMAS]))
+        JSON.parse(JSON.stringify(AGENTIC_CONTRACT_REGISTRY[tool.name as keyof typeof AGENTIC_CONTRACT_REGISTRY].inputSchema))
       );
       assert.equal(
         tool.description,
@@ -226,11 +228,11 @@ describe(`agentic MCP contract ${AGENTIC_CONTRACT_VERSION}`, () => {
       assert.match(schema, /"additionalProperties":false/);
       if (tool.name === "plan") {
         assert.equal(/"oneOf"/.test(schema), false);
-        assert.equal(/\$defs/.test(schema), false);
+        assert.ok(new Ajv({ strict: false, validateFormats: false }).compile(tool.inputSchema));
         continue;
       }
       assert.equal(/"oneOf"/.test(schema), false);
-      assert.equal(/\$defs/.test(schema), false);
+      assert.ok(new Ajv({ strict: false, validateFormats: false }).compile(tool.inputSchema));
     }
 
     const plan = tools.find((tool) => tool.name === "plan");

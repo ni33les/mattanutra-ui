@@ -77,8 +77,19 @@ export const PLAN_STATUS_SCHEMA = o({ ...presentationBase, responseView: Type.Li
 export type PlanConversationWire = Static<typeof PLAN_CONVERSATION_SCHEMA>;
 export type PlanDetailsWire = Static<typeof PLAN_DETAILS_SCHEMA>;
 export type PlanStatusWire = Static<typeof PLAN_STATUS_SCHEMA>;
+const orderReadBase = { ok: Type.Literal(true), orderHandle: s, resultVersion: s, contractVersion: s, locale: s };
+export const ORDER_CONVERSATION_SCHEMA = o({ ...orderReadBase, responseView: Type.Literal("conversation"),
+  ...Type.Pick(ORDER_SUCCESS, ["orderReference", "orderStatus", "paymentStatus", "fulfilment", "checkoutUrl", "checkoutExpiresAt", "message", "nextAction", "pollAfterSeconds", "terminal", "retryable", "stateVersion", "receipt", "latestPaymentReason"]).properties,
+  currency: s, totalPriceMinor: money, subtotalMinor: n(money), shippingMinor: n(money), taxMinor: n(money), availableDetails: a(e(["frozen_order", "events"] as const)) });
+export const ORDER_STATUS_SCHEMA = o({ ...orderReadBase, responseView: Type.Literal("status"), unchanged: bool,
+  ...Type.Pick(ORDER_SUCCESS, ["orderReference", "orderStatus", "paymentStatus", "fulfilment", "nextAction", "pollAfterSeconds", "terminal", "retryable", "stateVersion", "latestPaymentReason"]).properties });
+export const ORDER_DETAILS_SCHEMA = o({ ...orderReadBase, responseView: Type.Literal("details"), sections: a(e(["frozen_order", "events"] as const)),
+  frozenOrder: p(frozen), events: ORDER_SUCCESS.properties.events });
+export type OrderConversationWire = Static<typeof ORDER_CONVERSATION_SCHEMA>;
+export type OrderStatusWire = Static<typeof ORDER_STATUS_SCHEMA>;
+export type OrderDetailsWire = Static<typeof ORDER_DETAILS_SCHEMA>;
 const result = <T extends TSchema>(success: T) => ({ type: "object", anyOf: [success, ERROR_SCHEMA] } as const);
-export const AGENTIC_OUTPUT_SCHEMAS = { info: result(INFO_SUCCESS), plan: { type: "object", anyOf: [PLAN_SUCCESS_SCHEMA, PLAN_CONVERSATION_SCHEMA, PLAN_DETAILS_SCHEMA, PLAN_STATUS_SCHEMA, ERROR_SCHEMA] }, execute: result(EXECUTE_SUCCESS), order: result(ORDER_SUCCESS), support: result(SUPPORT_SUCCESS), feedback: result(o({ ok: Type.Literal(true), accepted: Type.Literal(true) })), evidence: result(EVIDENCE_SUCCESS) } as const;
+export const AGENTIC_OUTPUT_SCHEMAS = { info: result(INFO_SUCCESS), plan: { type: "object", anyOf: [PLAN_SUCCESS_SCHEMA, PLAN_CONVERSATION_SCHEMA, PLAN_DETAILS_SCHEMA, PLAN_STATUS_SCHEMA, ERROR_SCHEMA] }, execute: result(EXECUTE_SUCCESS), order: { type: "object", anyOf: [ORDER_SUCCESS, ORDER_CONVERSATION_SCHEMA, ORDER_STATUS_SCHEMA, ORDER_DETAILS_SCHEMA, ERROR_SCHEMA] }, support: result(SUPPORT_SUCCESS), feedback: result(o({ ok: Type.Literal(true), accepted: Type.Literal(true) })), evidence: result(EVIDENCE_SUCCESS) } as const;
 
 export type PlanSuccessWire = Static<typeof PLAN_SUCCESS_SCHEMA>;
 export type PublicErrorWire = Static<typeof ERROR_SCHEMA>;

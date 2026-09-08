@@ -8,20 +8,23 @@ import { AGENTIC_PUBLIC_TOOLS, AGENTIC_OUTPUT_SCHEMAS, AGENTIC_TOOL_SCHEMAS } fr
 import { CLIENT_GUIDE_URI, CONTRACT_SCHEMA_URI, readContractResource, CLIENT_EXAMPLES } from "../../lib/agentic/contract/guide.ts";
 import { runtime, rpc } from "./helpers.ts";
 
-test("AXR-SPEC-01 contract 7 preserves the installed public tools, five operation inputs and historical v4–v6 resources", () => {
-  assert.equal(AGENTIC_CONTRACT_VERSION, "7.0.0");
+test("AXR-SPEC-01 contract 7.1 preserves six public tools, legacy request acceptance and historical v4–v7 resources", () => {
+  assert.equal(AGENTIC_CONTRACT_VERSION, "7.1.0");
   assert.equal(GUIDANCE_RULES_VERSION, "6.0.0", "Clinical reference rules were not changed by this package");
   const old = JSON.parse(readFileSync(new URL("../../contract/mcp/6.0.0/tools.json", import.meta.url), "utf8"));
   assert.deepEqual([...AGENTIC_PUBLIC_TOOLS], ["info", "plan", "execute", "order", "support", "feedback"]);
   assert.equal(AGENTIC_PUBLIC_TOOLS.length, 6);
-  for (const tool of AGENTIC_PUBLIC_TOOLS) assert.deepEqual(JSON.parse(JSON.stringify(AGENTIC_TOOL_SCHEMAS[tool])), old.tools.find((row: { name: string }) => row.name === tool).inputSchema);
+  const v7 = JSON.parse(readFileSync(new URL("../../contract/mcp/7.0.0/tools.json", import.meta.url), "utf8"));
+  // Historical exact-input assertion remains attached to the historical release.
+  for (const tool of AGENTIC_PUBLIC_TOOLS) assert.deepEqual(v7.tools.find((row: { name: string }) => row.name === tool).inputSchema, old.tools.find((row: { name: string }) => row.name === tool).inputSchema);
+  for (const example of CLIENT_EXAMPLES) { const legacy = { ...example.arguments }; delete legacy.responseView; assert.ok(ajv.validate(AGENTIC_TOOL_SCHEMAS[example.tool], legacy), example.name); }
   assert.ok(Object.hasOwn(AGENTIC_TOOL_SCHEMAS, "evidence"), "legacy evidence schema remains available internally");
-  for (const version of ["4.0.0", "5.0.0", "6.0.0"]) for (const suffix of ["client-guide", "schema"]) {
+  for (const version of ["4.0.0", "5.0.0", "6.0.0", "7.0.0"]) for (const suffix of ["client-guide", "schema"]) {
     const resource = readContractResource(`mattanutra://contract/${version}/${suffix}`);
     assert.ok(resource, `${version}/${suffix} remains accessible`);
     assert.ok(resource.contents[0]!.text.includes(version));
   }
-  assert.ok(CLIENT_GUIDE_URI.includes("7.0.0")); assert.ok(CONTRACT_SCHEMA_URI.includes("7.0.0"));
+  assert.ok(CLIENT_GUIDE_URI.includes("7.1.0")); assert.ok(CONTRACT_SCHEMA_URI.includes("7.1.0"));
 });
 
 for (const locale of ["en", "th", "zh-CN"]) test(`AXR-SPEC-02 ${locale} tools-only info and native resources provide the same executable conversational contract`, async () => {
