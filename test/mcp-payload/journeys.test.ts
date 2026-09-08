@@ -20,7 +20,9 @@ for (const locale of ["en", "th", "zh-CN"] as const) for (const fixture of profi
     const app = { ...runtime(`payload-journey-${fixture.id}-${locale}`), deferProcessing: true, isolatedInfo: { conditionCodes: [], medicationCodes: [], supportedCountries: [{ countryCode: "TH", countryName: "Thailand", currency: "THB" }] } };
     const calls: { request: unknown; response: unknown }[] = [];
     let settled = false;
+    let virtualElapsedMs = 0;
     const outcome = await payloadJourney({ request: { ...structuredClone(fixture.request), locale }, key: `payload-${fixture.id}-${locale}`,
+      wait: async (milliseconds: number) => { assert.ok(Number.isFinite(milliseconds) && milliseconds >= 0); virtualElapsedMs += milliseconds; },
       view: mode, reader: ["A2", "A4", "A6"].includes(fixture.id) ? "text" : "structured", resources: ["A1", "A3", "A5"].includes(fixture.id),
       rpc: async (method: string, params: Record<string, unknown>) => {
         const request = { id: calls.length + 1, jsonrpc: "2.0", method, params };
@@ -41,6 +43,12 @@ for (const locale of ["en", "th", "zh-CN"] as const) for (const fixture of profi
         return response.result;
       } });
     assert.equal(settled, true);
+    const orderCalls = calls.filter(call => call.request.params?.name === "order");
+    assert.equal(orderCalls[0].request.params.arguments.responseView, "conversation");
+    assert.equal(orderCalls[1].request.params.arguments.responseView, "status");
+    assert.equal(orderCalls[1].request.params.arguments.knownResultVersion, orderCalls[0].response.result.structuredContent.resultVersion);
+    assert.ok(virtualElapsedMs >= orderCalls[0].response.result.structuredContent.pollAfterSeconds * 1000);
+    assert.ok(outcome.decisions.every(decision => decision.responseView === "conversation"));
     outcomes.push({ mode, outcome, calls, measurement: measureJourney(calls) });
   }
   const [full, concise] = outcomes;

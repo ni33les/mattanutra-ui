@@ -3,7 +3,8 @@
 import assert from "node:assert/strict";
 import Ajv from "ajv";
 
-export async function payloadJourney({ rpc, request, key, view = "conversation", reader = "structured", resources = false }) {
+export async function payloadJourney({ rpc, request, key, view = "conversation", reader = "structured", resources = false,
+  wait = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds)) }) {
   const trace = [], decisions = [];
   const initialize = await rpc("initialize", { protocolVersion: "2025-06-18" });
   assert.ok(initialize.instructions.includes("plan"));
@@ -31,10 +32,15 @@ export async function payloadJourney({ rpc, request, key, view = "conversation",
   }
   const presentation = view === "conversation" ? {} : { responseView: "full" };
   async function settlePlan(plan) {
+    let polled = false;
     for (let polls = 0; plan.status === "processing" && polls < 4; polls++) {
-      plan = await tool("plan", { operation: "get", planHandle: plan.planHandle, ...presentation });
+      await wait(Math.max(0, plan.pollAfterSeconds ?? info.pollAfterSeconds) * 1000);
+      plan = await tool("plan", { operation: "get", planHandle: plan.planHandle, responseView: "status",
+        ...(plan.resultVersion ? { knownResultVersion: plan.resultVersion } : {}) });
+      polled = true;
     }
     assert.notEqual(plan.status, "processing", "Controlled work must finish; no automatic operation retry");
+    if (polled) plan = await tool("plan", { operation: "get", planHandle: plan.planHandle, ...presentation });
     decisions.push(plan); return plan;
   }
   const create = { ...structuredClone(info.clientExamples.find(example => example.tool === "plan" && example.arguments.operation === "create").arguments), operation: "create", idempotencyKey: `${key}-create`, request, ...presentation };
@@ -79,9 +85,11 @@ export async function payloadJourney({ rpc, request, key, view = "conversation",
   const confirmation = { revision: plan.revision, optionId: chosen.optionId, basket: chosen.basket.map(item => ({ productId: item.productId, servingsPerDay: item.servingsPerDay, quantity: item.quantity, lineTotalMinor: item.lineTotalMinor })) };
   const execute = { planHandle: plan.planHandle, expectedRevision: plan.revision, idempotencyKey: `${key}-checkout` };
   const checkout = await tool("execute", execute);
-  const order = await tool("order", { orderHandle: checkout.orderHandle, ...presentation, ...(view === "conversation" ? { locale: request.locale } : {}) });
+  const order = await tool("order", { orderHandle: checkout.orderHandle, responseView: view, ...(view === "conversation" ? { locale: request.locale } : {}) });
   assert.equal(order.paymentStatus, "unpaid");
-  const paid = await tool("order", { orderHandle: checkout.orderHandle, ...presentation, ...(view === "conversation" ? { locale: request.locale } : {}) });
+  await wait(Math.max(0, order.pollAfterSeconds) * 1000);
+  const paid = await tool("order", { orderHandle: checkout.orderHandle,
+    ...(view === "conversation" ? { responseView: "status", knownResultVersion: order.resultVersion, locale: request.locale } : presentation) });
   assert.equal(paid.paymentStatus, "paid");
   const replay = await tool("execute", execute);
   assert.equal(replay.orderHandle, checkout.orderHandle); assert.deepEqual(replay.frozenPlan, checkout.frozenPlan);
