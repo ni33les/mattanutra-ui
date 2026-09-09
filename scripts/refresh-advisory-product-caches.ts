@@ -1,6 +1,6 @@
 import { readFile, writeFile } from "node:fs/promises";
 import postgres from "postgres";
-import { inspectApprovedAdvisoryCacheRefresh, refreshApprovedAdvisoryCaches, type AdvisoryCacheManifest } from "../lib/product-advisory-cache-refresh.ts";
+import { inspectApprovedAdvisoryCacheRefresh, prepareApprovedAdvisoryCaches, refreshApprovedAdvisoryCaches, type AdvisoryCacheManifest } from "../lib/product-advisory-cache-refresh.ts";
 
 const args = process.argv.slice(2);
 const apply = args.includes("--apply"), prepare = args.includes("--prepare");
@@ -26,7 +26,8 @@ try {
     console.log(JSON.stringify({ readOnly: true, reviewedCandidates: manifest.entries.length, manifest: path }));
   } else {
     const manifest = JSON.parse(await readFile(path, "utf8")) as AdvisoryCacheManifest;
-    const results = await transaction(!apply, tx => refreshApprovedAdvisoryCaches(tx, manifest, apply));
+    const prepared = await prepareApprovedAdvisoryCaches(sql, manifest);
+    const results = await transaction(!apply, tx => refreshApprovedAdvisoryCaches(tx, manifest, apply, prepared));
     console.log(JSON.stringify({ apply, results }, null, 2));
   }
 } finally { await sql.end(); }

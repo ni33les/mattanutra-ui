@@ -2,8 +2,8 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { test } from "node:test";
 import postgres from "postgres";
-import { seedPublicMatcherFixtures } from "../scripts/seed-matcher-public-fixtures.mjs";
-import { inspectApprovedAdvisoryCacheRefresh, refreshApprovedAdvisoryCaches } from "../lib/product-advisory-cache-refresh.ts";
+import { seedPublicMatcherFixtures, publicFixtureDefinition, PUBLIC_MATCHER_FIXTURES } from "../scripts/seed-matcher-public-fixtures.mjs";
+import { inspectApprovedAdvisoryCacheRefresh, prepareApprovedAdvisoryCaches, refreshApprovedAdvisoryCaches } from "../lib/product-advisory-cache-refresh.ts";
 
 const databaseUrl = process.env.TEST_DB_URL;
 assert.ok(databaseUrl, "Cache refresh tests require an isolated TEST_DB_URL");
@@ -70,14 +70,21 @@ test("CAT-CACHE-PG-02 pending approval, missing evidence and changed prior facts
 test("CAT-CACHE-PG-03 a contending ordinary product writer finishes while cache refresh rejects and releases its epoch", async () => {
   const sql = postgres(databaseUrl, { max: 1 });
   const writer = postgres(databaseUrl, { max: 1 });
-  const productId = randomUUID(), fingerprint = "0".repeat(64);
-  const correctionId = `health-advisory-v5:${productId}:${fingerprint.slice(0, 16)}`;
+  const productId = randomUUID(), factId = randomUUID();
+  let correctionId = "";
   let writerFinished: Promise<void> | null = null;
   let writerFailure: unknown;
   let refreshFailure: unknown;
   try {
-    await sql`insert into public.products (id,platform,title,normalized_title,product_url,normalized_url)
-      values (${productId},'manual','Cache contention fixture',${productId},${`https://fixture.example/${productId}`},${`https://fixture.example/${productId}`})`;
+    const fixture = publicFixtureDefinition(PUBLIC_MATCHER_FIXTURES.find(row=>row.key==="d3-high")!);
+    const [supplement] = await sql`select id from public.supplements where name='Vitamin D3'`; assert.ok(supplement);
+    await sql`insert into public.products (id,platform,title,normalized_title,product_url,normalized_url,source_url,image_url,status,label_status,validation_status,validation_reasons)
+      values (${productId},'manual','Cache contention fixture',${productId},${`https://fixture.example/${productId}`},${`https://fixture.example/${productId}`},${fixture.sourceUrl},${fixture.imageUrl},'approved','parsed','failed',ARRAY['unsafe_dose'])`;
+    await sql`insert into public.product_facts(id,product_id,item_type,supplement_id,name,normalized_name,amount,unit,serving_label,confidence,source,source_url,source_text)
+      values(${factId},${productId},'supplement',${supplement.id},'Vitamin D3','vitamin_d3',6000,'IU','1 tablet','high','synthetic fixture',${fixture.sourceUrl},${fixture.sourceText})`;
+    const manifest = await inspectApprovedAdvisoryCacheRefresh(sql, productId); assert.equal(manifest.entries.length,1);
+    correctionId = manifest.entries[0].correctionId;
+    const prepared = await prepareApprovedAdvisoryCaches(sql, manifest);
     const [before] = await sql`select to_jsonb(products) as record from public.products where id=${productId}`;
     const [{ pid: writerPid }] = await writer`select pg_backend_pid() as pid`;
     try {
@@ -98,10 +105,7 @@ test("CAT-CACHE-PG-03 a contending ordinary product writer finishes while cache 
           if (!blockedByMaintenance) await new Promise(resolve => setTimeout(resolve, 10));
         }
         assert.equal(blockedByMaintenance, true, "The writer must hold the product and wait on maintenance's epoch");
-        await refreshApprovedAdvisoryCaches(tx, { version: 1, policy: "health-advisory-v5", entries: [{
-          correctionId, productId, title: "Cache contention fixture", beforeFingerprint: fingerprint,
-          expectedValidation: { status: "pass", matchableFactCount: 1, reasons: [], summary: "fixture" }
-        }] }, true);
+        await refreshApprovedAdvisoryCaches(tx, manifest, true, prepared);
       });
     } catch (error) { refreshFailure = error; }
     await writerFinished;
@@ -118,6 +122,7 @@ test("CAT-CACHE-PG-03 a contending ordinary product writer finishes while cache 
     });
   } finally {
     await writerFinished;
+    await sql`delete from public.product_facts where id=${factId}`;
     await sql`delete from public.products where id=${productId}`;
     await writer.end();
     await sql.end();
@@ -131,9 +136,9 @@ test("LOCK-CATALOGUE-01 validation is prepared before writer fences and publicat
     const seeded=await seedPublicMatcherFixtures(tx),fixture=seeded.products.find(row=>row.key==="d3-high")!;assert.ok(fixture);
     await tx`update public.products set validation_status='failed',validation_reasons=ARRAY['unsafe_dose'] where id=${fixture.productId}`;
     const manifest=await inspectApprovedAdvisoryCacheRefresh(tx,fixture.productId);assert.equal(manifest.entries.length,1);
-    const statements:string[]=[];const observed=new Proxy(tx,{apply(target,receiver,args){statements.push(args[0].join("?"));return Reflect.apply(target,receiver,args);}});
+    const statements:string[]=[];const observed=new Proxy(tx,{apply(target,receiver,args){const query=args[0].join("?");const pending=Reflect.apply(target,receiver,args);if(typeof pending?.then==="function"){const then=pending.then.bind(pending);pending.then=(...callbacks:unknown[])=>{statements.push(query);return then(...callbacks);};}return pending;}});
     const prepared=await prepareApprovedAdvisoryCaches(observed,manifest);
-    assert.ok(statements.length>0);assert.ok(statements.every(q=>/^\s*select/i.test(q)&&!/for (?:update|share)/i.test(q)));
+    assert.ok(statements.length>0);assert.ok(statements.every(q=>/^\s*(?:select|with)\b/i.test(q)&&!/for (?:update|share)/i.test(q)));
     statements.length=0;
     assert.equal((await refreshApprovedAdvisoryCaches(observed,manifest,true,prepared))[0]?.status,"applied");
     assert.ok(statements.some(q=>/for update/.test(q)));assert.ok(statements.every(q=>!/jsonb_agg|from public.product_facts/i.test(q)),"no fact reconstruction inside writer fences");

@@ -1,7 +1,6 @@
 import type postgres from "postgres";
 import { loadProductRows } from "./admin-product-read-model.ts";
 import { rowFromDb } from "./admin-product-mappers.ts";
-import { refreshAndPersistProductValidation } from "./admin-product-writes.ts";
 import { catalogueRecordFingerprint } from "./catalogue-corrections.ts";
 
 type Db = postgres.Sql | postgres.TransactionSql;
@@ -11,9 +10,10 @@ export type AdvisoryCacheManifest = Readonly<{ version: 1; policy: "health-advis
 }>[] }>;
 
 async function readState(sql: Db, productId: string) {
-  const [product] = await sql`select * from public.products where id=${productId}::uuid`;
+  const [raw] = await sql`select p.*, to_jsonb(p)::text as database_record from public.products p where id=${productId}::uuid`;
+  const { database_record: databaseProductJson, ...product } = raw ?? {};
   const [row] = await loadProductRows(productId, { sql }) ?? [];
-  if (!product || !row) throw new Error(`Product missing during advisory cache review: ${productId}`);
+  if (!raw || !row) throw new Error(`Product missing during advisory cache review: ${productId}`);
   const validation = rowFromDb(row).validation;
   const currentValidation = { status: validation.status, matchableFactCount: validation.matchableFactCount,
     reasons: validation.reasons, summary: validation.summary };
@@ -22,7 +22,7 @@ async function readState(sql: Db, productId: string) {
     facts: [...(Array.isArray(row.facts) ? row.facts : [])].sort((a, b) => String(a.id).localeCompare(String(b.id))),
     imageUrl: row.image_url, labelStatus: row.label_status, productUrl: row.product_url, sourceUrl: row.source_url, title: row.title
   } }));
-  return { product, validation: currentValidation, record, fingerprint: catalogueRecordFingerprint(record) };
+  return { product, databaseProductJson: String(databaseProductJson), validation: currentValidation, fullValidation: validation, record, fingerprint: catalogueRecordFingerprint(record) };
 }
 
 export async function inspectApprovedAdvisoryCacheRefresh(sql: Db, productId?: string): Promise<AdvisoryCacheManifest> {
@@ -39,43 +39,82 @@ export async function inspectApprovedAdvisoryCacheRefresh(sql: Db, productId?: s
   return { version: 1, policy: "health-advisory-v5", entries };
 }
 
-/** Caller supplies a serializable transaction. Only reviewed caches change; catalogue approvals never do. */
-export async function refreshApprovedAdvisoryCaches(tx: postgres.TransactionSql, manifest: AdvisoryCacheManifest, apply: boolean) {
+type PreparedCacheEntry = Readonly<{ entry: AdvisoryCacheManifest["entries"][number]; alreadyApplied: boolean;
+  beforeProductJson: string; afterProductJson: string; beforeJson: string; afterJson: string; afterFingerprint: string;
+  validationJson: string; checkedAt: string; writtenAt: string }>;
+export type PreparedAdvisoryCacheRefresh = Readonly<{ manifestSha: string; runtimeRevision: number; entries: readonly PreparedCacheEntry[] }>;
+
+/** Validate immutable inputs and encode audit records before opening the writer transaction. */
+export async function prepareApprovedAdvisoryCaches(sql: Db, manifest: AdvisoryCacheManifest): Promise<PreparedAdvisoryCacheRefresh> {
   if (manifest.version !== 1 || manifest.policy !== "health-advisory-v5" || !Array.isArray(manifest.entries) ||
       new Set(manifest.entries.map(row => row.productId)).size !== manifest.entries.length) throw new Error("Invalid advisory cache manifest");
   const manifestSha = catalogueRecordFingerprint(manifest);
+  const [epoch] = await sql`select revision from public.catalogue_runtime_revision where singleton=true`;
+  if (!epoch) throw new Error("Catalogue revision is unavailable");
+  const entries: PreparedCacheEntry[] = [];
+  for (const entry of [...manifest.entries].sort((a,b)=>a.productId.localeCompare(b.productId))) {
+    if (!/^[a-f0-9]{64}$/.test(entry.beforeFingerprint) || entry.expectedValidation.status !== "pass" ||
+        entry.correctionId !== `health-advisory-v5:${entry.productId}:${entry.beforeFingerprint.slice(0, 16)}`) throw new Error("Invalid advisory cache entry");
+    const state = await readState(sql, entry.productId);
+    const [existing] = await sql`select manifest_sha256,after_fingerprint from public.catalogue_correction_audit where correction_id=${entry.correctionId}`;
+    if (existing) {
+      if (existing.manifest_sha256 !== manifestSha || existing.after_fingerprint !== state.fingerprint) throw new Error(`Previously refreshed product changed since review: ${entry.productId}`);
+    } else {
+      if (state.fingerprint !== entry.beforeFingerprint) throw new Error(`Product changed since review: ${entry.productId}`);
+      if (state.product.status !== "approved" || !state.product.validation_reasons?.includes("unsafe_dose") ||
+          catalogueRecordFingerprint(state.validation) !== catalogueRecordFingerprint(entry.expectedValidation)) throw new Error(`Product is not eligible for advisory cache refresh: ${entry.productId}`);
+      if (state.record.validationInput.labelStatus !== "parsed") throw new Error(`Validation inputs changed during advisory cache refresh: ${entry.productId}`);
+    }
+    const writtenAt = new Date().toISOString(), checkedAt = state.fullValidation.checkedAt;
+    const afterRecord = existing ? state.record : { ...state.record, product: { ...state.record.product,
+      status: "approved", label_status: "parsed", source_snapshot: { ...state.record.product.source_snapshot, validation: state.fullValidation },
+      validation_status: "pass", validation_reasons: state.validation.reasons, validation_summary: state.validation.summary,
+      validation_checked_at: checkedAt, updated_at: writtenAt } };
+    entries.push({ entry, alreadyApplied: Boolean(existing), beforeProductJson: state.databaseProductJson, afterProductJson: JSON.stringify(existing ? JSON.parse(state.databaseProductJson) : { ...JSON.parse(state.databaseProductJson),
+        status: "approved", label_status: "parsed", source_snapshot: afterRecord.product.source_snapshot, validation_status: "pass",
+        validation_reasons: state.validation.reasons, validation_summary: state.validation.summary, validation_checked_at: checkedAt, updated_at: writtenAt }),
+      beforeJson: JSON.stringify(state.record), afterJson: JSON.stringify(afterRecord), afterFingerprint: catalogueRecordFingerprint(afterRecord),
+      validationJson: JSON.stringify(state.fullValidation), checkedAt, writtenAt });
+  }
+  const [current] = await sql`select revision from public.catalogue_runtime_revision where singleton=true`;
+  if (Number(current?.revision) !== Number(epoch.revision)) throw new Error("Catalogue changed while preparing advisory caches; prepare again");
+  return { manifestSha, runtimeRevision: Number(epoch.revision), entries };
+}
+
+/** Legacy transaction callers may prepare first here; the production rollout supplies preparation from outside its transaction. */
+export async function refreshApprovedAdvisoryCaches(tx: postgres.TransactionSql, manifest: AdvisoryCacheManifest, apply: boolean, preparation?: PreparedAdvisoryCacheRefresh) {
+  const prepared = preparation ?? await prepareApprovedAdvisoryCaches(tx, manifest);
+  if (prepared.manifestSha !== catalogueRecordFingerprint(manifest)) throw new Error("Prepared advisory cache manifest changed");
   if (apply) {
     const [isolation] = await tx`show transaction_isolation`;
     if (isolation.transaction_isolation !== "serializable") throw new Error("Advisory cache refresh requires a serializable transaction");
   }
-  if (apply && manifest.entries.length) await tx`select revision from public.catalogue_runtime_revision where singleton=true for update`;
+  if (apply && prepared.entries.length) {
+    const [epoch] = await tx`select revision from public.catalogue_runtime_revision where singleton=true for update`;
+    if (Number(epoch?.revision) !== prepared.runtimeRevision) throw new Error("Catalogue changed since review; prepare again");
+  }
   const results: { productId: string; status: "pending" | "applied" | "already_applied" }[] = [];
-  for (const entry of manifest.entries) {
-    if (!/^[a-f0-9]{64}$/.test(entry.beforeFingerprint) || entry.expectedValidation.status !== "pass" ||
-        entry.correctionId !== `health-advisory-v5:${entry.productId}:${entry.beforeFingerprint.slice(0, 16)}`) throw new Error("Invalid advisory cache entry");
-    // Ordinary product writes hold their row before the AFTER trigger advances
-    // the epoch. Reject maintenance contention instead of waiting in that cycle.
+  for (const row of prepared.entries) {
+    const { entry } = row;
+    // Reject the product/epoch lock-order cycle instead of waiting on an ordinary writer.
     if (apply) await tx`select id from public.products where id=${entry.productId}::uuid for update nowait`;
-    const state = await readState(tx, entry.productId);
-    const [existing] = await tx`select manifest_sha256,after_fingerprint from public.catalogue_correction_audit where correction_id=${entry.correctionId}`;
-    if (existing) {
-      if (existing.manifest_sha256 !== manifestSha || existing.after_fingerprint !== state.fingerprint) throw new Error(`Previously refreshed product changed since review: ${entry.productId}`);
-      results.push({ productId: entry.productId, status: "already_applied" });
-      continue;
-    }
-    if (state.fingerprint !== entry.beforeFingerprint) throw new Error(`Product changed since review: ${entry.productId}`);
-    if (state.product.status !== "approved" || !state.product.validation_reasons?.includes("unsafe_dose") ||
-        catalogueRecordFingerprint(state.validation) !== catalogueRecordFingerprint(entry.expectedValidation)) throw new Error(`Product is not eligible for advisory cache refresh: ${entry.productId}`);
+    const [same] = await tx`select id from public.products p where id=${entry.productId}::uuid
+      and p is not distinct from jsonb_populate_record(null::public.products, ${row.beforeProductJson}::text::jsonb)`;
+    if (!same) throw new Error(`Product changed since review: ${entry.productId}`);
+    if (row.alreadyApplied) { results.push({productId:entry.productId,status:"already_applied"}); continue; }
     if (apply) {
-      const refreshed = await refreshAndPersistProductValidation(tx, entry.productId);
-      if (refreshed.status !== "approved" || refreshed.validation.status !== "pass") throw new Error(`Advisory cache refresh changed approval: ${entry.productId}`);
-      const after = await readState(tx, entry.productId);
-      if (catalogueRecordFingerprint(after.record.validationInput) !== catalogueRecordFingerprint(state.record.validationInput)) throw new Error(`Validation inputs changed during advisory cache refresh: ${entry.productId}`);
+      await tx`update public.products set status='approved',label_status='parsed',
+        source_snapshot=source_snapshot || jsonb_build_object('validation',${row.validationJson}::text::jsonb),
+        validation_status='pass',validation_reasons=${entry.expectedValidation.reasons}::text[],validation_summary=${entry.expectedValidation.summary},
+        validation_checked_at=${row.checkedAt}::timestamptz,updated_at=${row.writtenAt}::timestamptz where id=${entry.productId}::uuid`;
+      const [after] = await tx`select id from public.products p where id=${entry.productId}::uuid
+        and p is not distinct from jsonb_populate_record(null::public.products, ${row.afterProductJson}::text::jsonb)`;
+      if (!after) throw new Error(`Product publication differed from prepared audit: ${entry.productId}`);
       await tx`insert into public.catalogue_correction_audit (correction_id,manifest_sha256,entity_table,entity_id,before_fingerprint,after_fingerprint,before_record,after_record,evidence)
-        values (${entry.correctionId},${manifestSha},'products',${entry.productId},${entry.beforeFingerprint},${after.fingerprint},${tx.json(state.record)},${tx.json(after.record)},
+        values (${entry.correctionId},${prepared.manifestSha},'products',${entry.productId},${entry.beforeFingerprint},${row.afterFingerprint},${row.beforeJson}::text::jsonb,${row.afterJson}::text::jsonb,
         ${tx.json({ policy: manifest.policy, summary: "Refresh an already approved product's stale health-veto cache using current validated facts; preserve approval and all label facts." })})`;
     }
     results.push({ productId: entry.productId, status: apply ? "applied" : "pending" });
   }
-  return results;
+  return manifest.entries.map(entry=>results.find(row=>row.productId===entry.productId)!);
 }
