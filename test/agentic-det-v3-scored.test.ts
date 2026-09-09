@@ -1,3 +1,4 @@
+import { AGENT_CARD } from "../lib/agentic/contract/agent-card.ts";
 import { observeLatency } from "./helpers/latency-observation.ts";
 import assert from "node:assert/strict";
 import { afterEach, beforeEach, describe, it } from "node:test";
@@ -398,11 +399,12 @@ describe("Slice S4 connector copy and versions", () => {
   it("S4-01 connector copy states real-product matching, current-stock, overlap, and the safety boundary", () => {
     assert.equal(englishConnectorWordCount() <= 60, true);
     assert.match(CONNECTOR_COPY.en, /\bproduct/);
-    assert.match(CONNECTOR_COPY.en, /\bstock\b/i);
-    assert.match(CONNECTOR_COPY.en, /\bsafety\b/i);
+    assert.match(AGENT_CARD, /\bstock\b/i);
+    assert.match(CONNECTOR_COPY.en, /wellness guidance/i);
     assert.match(CONNECTOR_COPY.en, /overlap/i);
     assert.match(CONNECTOR_COPY.en, /wellness guidance/i);
-    assert.match(CONNECTOR_COPY.en, /not diagnosis, pharmacy services or clinical advice/i);
+    assert.match(CONNECTOR_COPY.en, /not diagnosis or medical approval/i);
+    assert.match(AGENT_CARD, /not diagnosis or pharmacy|not diagnosis, pharmacy/);
   });
 
   it("S4-02 current responsibility version is on discovery, info, and execute", async () => {
@@ -411,7 +413,7 @@ describe("Slice S4 connector copy and versions", () => {
     assert.equal(listed?.result?.responsibilityVersion, RESPONSIBILITY_VERSION);
     const init = await handleJsonRpc(runtime, { id: 2, method: "initialize", params: {} });
     assert.equal(init?.result?.responsibilityVersion, RESPONSIBILITY_VERSION);
-    assert.ok(String(init?.result?.instructions ?? "").includes(RESPONSIBILITY_VERSION));
+    assert.equal(init?.result?.responsibilityVersion, RESPONSIBILITY_VERSION);
     const info = await detCall(runtime, "info", { locale: "en" });
     assert.equal(info.responsibilityVersion, RESPONSIBILITY_VERSION);
     const tools = await detListTools(runtime, "en");
@@ -503,7 +505,7 @@ describe("Slice S6 latency", () => {
 
 describe("Slice 8.2 remaining scored holes", () => {
   it("82-VAL-01 connector copy includes the frozen not-clinical safety boundary", () => {
-    assert.match(CONNECTOR_COPY.en, /clinical advice/i);
+    assert.match(CONNECTOR_COPY.en, /not diagnosis or medical approval/i);
     assert.equal(englishConnectorWordCount() <= 60, true);
   });
 

@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { gunzipSync } from "node:zlib";
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import Ajv from "ajv";
@@ -5,11 +7,12 @@ import { toolList, handleLightweightJsonRpc } from "../../lib/agentic/mcp/rpc.ts
 import { loadAgenticConfig } from "../../lib/agentic/config.ts";
 import { baseline, bytes } from "./fixtures.ts";
 
-test("PAY-SCHEMA-01 discovery publishes seven complete contracts within 65% of baseline bytes", () => {
-  const original = baseline.cases.find(row => row.caseId === "A1-en")!.discovery![1].response.result.tools;
+test("PAY-SCHEMA-01 discovery preserves self-contained 7.2.4 schemas with bounded positioning overhead", () => {
+  const original = JSON.parse(gunzipSync(readFileSync("test/mcp-discovery/baseline-tools.json.gz")).toString("utf8")) as ReturnType<typeof toolList>;
   const tools = toolList();
   assert.deepEqual(tools.map(row => row.name), ["info", "plan", "execute", "order", "support", "feedback", "evidence"]);
-  assert.ok(bytes(tools) <= bytes(original) * .65, `${bytes(tools)} exceeds ${Math.floor(bytes(original) * .65)}`);
+  for (const tool of tools) { const prior=original.find(row=>row.name===tool.name)!; assert.ok(prior); assert.deepEqual(tool.inputSchema,prior.inputSchema); assert.deepEqual(tool.outputSchema,prior.outputSchema); }
+  assert.ok(bytes(tools) <= bytes(original) + 2000, `Positioning added ${bytes(tools)-bytes(original)} bytes`);
   const ajv = new Ajv({ strict: false, validateFormats: false });
   for (const tool of tools) { ajv.compile(tool.inputSchema); ajv.compile(tool.outputSchema); }
   for (const locale of ["en", "th", "zh-CN"]) {

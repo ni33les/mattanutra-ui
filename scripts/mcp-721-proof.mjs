@@ -8,6 +8,7 @@ import {validateUatResources} from "./service-efficiency/runtime-resources.mjs";
 
 export const MCP721_BASE = "22f3ce60f17158c68a251abe4070f582dd39253a";
 export const MCP_PACKAGES = {
+  "discovery": { version: "7.2.4", directory: "test/mcp-discovery", base: "41ed9fd07e8b9c8814d361eab33d72b27ac7c157", scope: "mcp_connector_discoverability" },
   "efficiency": { version: "7.2.4", directory: "test/service-efficiency", base: "a28f3b27d6bde5a21803fa5e33622e89ce2a708d", scope: "core_service_efficiency_and_funnel" },
   "conversation": { version: "7.2.4", directory: "test/mcp-conversation-pack", base: "1c169407ba0f3fed3a19871afa87ce0bdeecf949", scope: "mcp_conversation_payload" },
   "721": { version: "7.2.1", directory: "test/mcp-7-2-1", base: MCP721_BASE, scope: "mcp_721_alignment_and_routines" },
@@ -17,13 +18,15 @@ export const MCP_PACKAGES = {
 };
 export const MCP721_STAGES = ["affected-tests", "typecheck", "release-diff-lint", "production-build", "unchanged-source-and-inputs"];
 export function packageStages(packageId) {
+  if (packageId === "discovery") return [...MCP721_STAGES.slice(0, 3), "complete-mcp-regression", ...MCP721_STAGES.slice(3)];
   return packageId === "efficiency" ? ["isolated-schema", "affected-tests", "lock-register-verification", "typecheck", "release-diff-lint", "production-build", "affected-browser-tests", "repeated-baseline-comparison", "unchanged-source-and-inputs"] : MCP721_STAGES;
 }
 export function mcp721Identity(sourceSha256, sourceCommit, packageId = "721") {
   const definition = MCP_PACKAGES[packageId]; assert.ok(definition, "Unknown work package");
   const inventory = readFileSync(`${definition.directory}/impact.json`);
   const inputs = JSON.parse(inventory).inputs.map(file => ({ file, sha256: payloadHash(readFileSync(file)) }));
-  return { ...(packageId === "efficiency" ? { deploymentBases: JSON.parse(inventory).deploymentBases,
+  return { ...(packageId === "discovery" ? { deploymentBases: JSON.parse(inventory).deploymentBases,
+    positioningSha256: payloadHash(readFileSync("lib/agentic/discovery/positioning.ts")), connectorManifestSha256: payloadHash(readFileSync("lib/agentic/adapters/openai.json")) } : {}), ...(packageId === "efficiency" ? { deploymentBases: JSON.parse(inventory).deploymentBases,
     lockRegisterSha256: payloadHash(readFileSync("test/service-efficiency/lock-register.json")),
     schemaSha256: payloadHash(readFileSync("scripts/service-efficiency-schema.sql")), workerProtocolSha256: payloadHash(readFileSync("lib/agentic/plan/match-worker-protocol.ts")) } : {}), sourceSha256, sourceCommit, releaseBase: definition.base,
     contractSha256: payloadHash(readFileSync(`contract/mcp/${definition.version}/schema.json`)), inventorySha256: payloadHash(inventory), inputSha256: payloadHash(JSON.stringify(inputs)) };
@@ -50,6 +53,16 @@ export function checkMcp721Proof(file, expected, packageId = "721") {
   assert.equal(tests.execution.cases, inventory.files.reduce((sum, row) => sum + row.expectedCases, 0));
   assert.ok(tests.execution.cases > 0 && build.buildSha256 && build.nextBuildId);
   assert.equal(json("source-after.json").sha256, expected.sourceSha256);
+  if (packageId === "discovery") {
+    const full = json("mcp-regression/results.json"), selected = json("mcp-regression/inventory.json");
+    assert.equal(full.passed, true); assert.equal(full.unchangedSource, true); assert.equal(full.sourceSha256, expected.sourceSha256);
+    assert.ok(selected.files.length > inventory.files.length);
+    for (const file of inventory.regressionFiles) assert.ok(selected.files.includes(file), `Unexecuted discovery consumer: ${file}`);
+    assert.ok(full.results.every(row => row.passed));
+    for (const row of full.results.filter(row => row.label.startsWith("node-"))) {
+      assert.ok(row.execution?.passed && row.execution.cases > 0); assert.equal(row.skipped, 0); assert.equal(row.todo, 0); assert.equal(row.cancelled, 0);
+    }
+  }
   if (packageId === "efficiency") {
     const register = json("lock-register.json"), events = json("executed-cases.json");
     assert.equal(payloadHash(readFileSync(resolve(root, "lock-register.json"))), expected.lockRegisterSha256);

@@ -102,7 +102,7 @@ test("DISC-DET-04 generated manifests bind the versioned positioning content", (
 });
 test("DISC-DET-05 package tests have no skipped focused or empty cases", () => {
   const file="test/mcp-discovery/discovery.test.ts", source=readFileSync(file,"utf8"); assert.deepEqual(testSourceHygiene(source,file), []);
-  const ids=[...source.matchAll(/test\("(DISC-[A-Z]+-\d+)/g)].map(row=>row[1]); assert.equal(ids.length,29); assert.equal(new Set(ids).size,29);
+  const ids=[...source.matchAll(/test\("(DISC-[A-Z0-9]+-\d+)/g)].map(row=>row[1]); assert.equal(ids.length,29); assert.equal(new Set(ids).size,29);
 });
 test("DISC-TRUTH-01 positioning promises balancing rather than guaranteed optimality", () => { noGuarantees(adapter()); assert.match(adapter().shortDescription ?? "", /balanc/i); });
 test("DISC-TRUTH-02 ready and purchase eligibility never mean medical approval", async () => { const info=await call("tools/call"); assert.match(String(info.clientInstructions), /checkout-ready, not targets met or medical approval/); });

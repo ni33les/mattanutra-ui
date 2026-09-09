@@ -137,6 +137,7 @@ async function recognisedNamesForMarkets(input: Readonly<{
 type InfoView = "overview" | "client_guide" | "plan_schema";
 
 function publicCapabilityInfo(input: Readonly<{
+  environment: AgenticConfig["environment"];
   view?: InfoView;
   planOperation?: keyof typeof PLAN_OPERATION_SCHEMAS;
   buildId?: string;
@@ -149,8 +150,8 @@ function publicCapabilityInfo(input: Readonly<{
   void input.buildId;
   return {
     ok: true,
-    ...clientDiscovery(input.locale, input.view, input.planOperation),
-    ...(input.view === "client_guide" ? { clientGuideText: clientGuideMarkdown() } : {}),
+    ...clientDiscovery(input.locale, input.view, input.planOperation, input.environment),
+    ...(input.view === "client_guide" ? { clientGuideText: clientGuideMarkdown(input.locale, input.environment) } : {}),
     ...(input.view === "plan_schema" ? { planOperation: input.planOperation ?? "create", planSchemaJson: JSON.stringify(PLAN_OPERATION_SCHEMAS[input.planOperation ?? "create"]) } : {}),
     clientGuide: CLIENT_GUIDE_URI,
     contractSchema: CONTRACT_SCHEMA_URI,
@@ -272,7 +273,7 @@ export async function infoTool(input: Readonly<{
 
   if (input.isolatedInfo) {
     return publicCapabilityInfo({
-      view: input.view, planOperation: input.planOperation,
+      environment: input.config.environment, view: input.view, planOperation: input.planOperation,
       buildId: input.config.buildId,
       conditionCodes: input.isolatedInfo.conditionCodes,
       locale,
@@ -283,7 +284,7 @@ export async function infoTool(input: Readonly<{
 
   const supportedCountries = await supportedCountriesFor(input.config);
   const key = [
-    input.config.buildId,
+    input.config.buildId, input.config.environment,
     locale, input.view ?? "overview", input.planOperation ?? "create",
     supportedCountries.map((item) => item.countryCode).join(",")
   ].join(":");
@@ -292,7 +293,7 @@ export async function infoTool(input: Readonly<{
   }
 
   const value = publicCapabilityInfo({
-    view: input.view, planOperation: input.planOperation,
+    environment: input.config.environment, view: input.view, planOperation: input.planOperation,
     buildId: input.config.buildId,
     conditionCodes: RECOGNISED_CONDITION_CODES,
     locale,

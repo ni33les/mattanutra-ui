@@ -243,6 +243,8 @@ async function runImageStorageProbeIfConfigured() {
 }
 
 async function main() {
+  const discoveryIndex = process.argv.indexOf("--mcp-discovery-attestation");
+  if (discoveryIndex >= 0) return deployEfficiencyUat(process.argv[discoveryIndex + 1], uatSchemaDatabaseEnv(), "discovery");
   const efficiencyIndex = process.argv.indexOf("--service-efficiency-attestation");
   if (efficiencyIndex >= 0) return deployEfficiencyUat(process.argv[efficiencyIndex + 1], uatSchemaDatabaseEnv());
   const branch = await runCapture("git", ["branch", "--show-current"]);

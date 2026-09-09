@@ -1,3 +1,4 @@
+import { positioning } from "../../lib/agentic/discovery/positioning.ts";
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import Ajv from "ajv";
@@ -34,7 +35,7 @@ test("AG72-CARD-01 seven short descriptors and an honest overview support resour
       const tools = toolList(environment, locale);
       assert.deepEqual(tools.map(tool => tool.name), names);
       for (const tool of tools) {
-        if (tool.name === "plan") { assert.equal(tool.description, GUIDE_ESSENTIALS); assert.ok(tool.description.length < 2200); }
+        if (tool.name === "plan") { assert.equal(tool.description, `${positioning(locale).purposes.plan} ${GUIDE_ESSENTIALS}`); assert.ok(tool.description.length < 2200); }
         else assert.ok(tool.description.length < 1000, `${tool.name} needs a concise descriptor`);
       }
       const overview = await info(environment, { locale });

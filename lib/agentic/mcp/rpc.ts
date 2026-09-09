@@ -1,3 +1,4 @@
+import { positioning } from "@/lib/agentic/discovery/positioning";
 import { measureService } from "@/lib/service-metrics";
 import { computeSchemaChecksum } from "@/lib/agentic/release-manifest";
 import { createLogger } from "@/lib/logger";
@@ -109,6 +110,7 @@ export function advertisedPublicToolNames(environment: AgenticEnvironment) {
 export function toolList(environment: AgenticEnvironment = "dev", locale?: string) {
   const descriptions = agenticToolDescriptions(environment, locale);
   return AGENTIC_PUBLIC_TOOLS.map((name) => ({
+    title: positioning(locale).titles[name],
     description: descriptions[name],
     ...AGENTIC_CONTRACT_REGISTRY[name],
     annotations: {
@@ -252,11 +254,12 @@ export async function handleLightweightJsonRpc(
           tools: { listChanged: false },
           resources: { subscribe: false, listChanged: false }
         },
-        instructions: agenticServerInstructions(config.environment),
+        instructions: agenticServerInstructions(config.environment, typeof params.locale === "string" ? params.locale : undefined),
         protocolVersion: params.protocolVersion === "2025-03-26" ? "2025-03-26" : "2025-06-18",
         responsibilityVersion: RESPONSIBILITY_VERSION,
         serverInfo: {
           name: mcpServerInfoName(config.environment),
+          title: positioning().displayName,
           version: AGENTIC_SERVICE_VERSION
         },
         tools: toolList(config.environment, typeof params.locale === "string" ? params.locale : undefined)
@@ -266,7 +269,7 @@ export async function handleLightweightJsonRpc(
 
   if (method === "resources/list") return { id, jsonrpc: "2.0", result: { resources: CONTRACT_RESOURCES } };
   if (method === "resources/read") {
-    const resource = readContractResource(String(params.uri ?? ""));
+    const resource = readContractResource(String(params.uri ?? ""), typeof params.locale === "string" ? params.locale : undefined, config.environment);
     return resource ? { id, jsonrpc: "2.0", result: resource } : { id, jsonrpc: "2.0", error: { code: -32602, message: "Unknown contract resource." } };
   }
 

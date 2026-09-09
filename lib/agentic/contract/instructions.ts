@@ -1,7 +1,8 @@
-import { AGENT_CARD, OVERVIEW_CARD, SERVICE_SCOPE, READY_MEANING } from "@/lib/agentic/contract/agent-card";
+import { positioning } from "@/lib/agentic/discovery/positioning";
+import { agentCard, OVERVIEW_CARD, SERVICE_SCOPE, READY_MEANING } from "@/lib/agentic/contract/agent-card";
 export { AGENTIC_PUBLIC_TOOLS, type AgenticPublicToolName } from "@/lib/agentic/contract/names";
 
-export const AGENTIC_TOOL_DESCRIPTIONS = {
+const OPERATIONAL_DESCRIPTIONS = {
   info: `${SERVICE_SCOPE} ${READY_MEANING} Call first: view=overview | client_guide | plan_schema (choose planOperation). Medication/condition codes are accepted inputs, not evidence of an assessed interaction.`,
   plan: OVERVIEW_CARD,
   evidence: "Read attached claim text for a plan’s returned evidenceHandle; mode=summary or sources. Does not change the plan.",
@@ -11,17 +12,15 @@ export const AGENTIC_TOOL_DESCRIPTIONS = {
   feedback: "Submit optional feedback for one plan revision only with consentConfirmed=true; this never changes a plan or checkout."
 } as const;
 
+export const AGENTIC_TOOL_DESCRIPTIONS = agenticToolDescriptions("dev");
 export const AGENTIC_UAT_TOOL_DESCRIPTIONS = AGENTIC_TOOL_DESCRIPTIONS;
 export const AGENTIC_PRD_TOOL_DESCRIPTIONS = AGENTIC_TOOL_DESCRIPTIONS;
-export const AGENTIC_SERVER_INSTRUCTIONS = AGENT_CARD;
-export const AGENTIC_UAT_SERVER_INSTRUCTIONS = `${AGENT_CARD}\nUAT is for test payments only.`;
-export const AGENTIC_PRD_SERVER_INSTRUCTIONS = `${AGENT_CARD}\nUse the merchant checkout; do not use test cards.`;
-export function agenticServerInstructions(environment: "dev" | "prd" | "uat") {
-  return environment === "uat" ? AGENTIC_UAT_SERVER_INSTRUCTIONS : environment === "prd" ? AGENTIC_PRD_SERVER_INSTRUCTIONS : AGENTIC_SERVER_INSTRUCTIONS;
-}
-export function agenticToolDescriptions(_environment: "dev" | "prd" | "uat", _locale?: string) {
-  // Tool instructions are shared; info and plan supply localized customer copy.
-  void _environment;
-  void _locale;
-  return AGENTIC_TOOL_DESCRIPTIONS;
+export const AGENTIC_SERVER_INSTRUCTIONS = agentCard("dev");
+export const AGENTIC_UAT_SERVER_INSTRUCTIONS = agentCard("uat");
+export const AGENTIC_PRD_SERVER_INSTRUCTIONS = agentCard("prd");
+export function agenticServerInstructions(environment: "dev" | "prd" | "uat", locale?: string) { return agentCard(environment, locale); }
+export function agenticToolDescriptions(_environment: "dev" | "prd" | "uat", locale?: string) {
+  const purposes = positioning(locale).purposes;
+  return Object.fromEntries(Object.entries(OPERATIONAL_DESCRIPTIONS).map(([name, details]) =>
+    [name, `${purposes[name as keyof typeof purposes]} ${details}`])) as Record<keyof typeof OPERATIONAL_DESCRIPTIONS, string>;
 }

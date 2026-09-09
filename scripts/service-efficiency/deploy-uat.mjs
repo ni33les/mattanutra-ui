@@ -8,17 +8,18 @@ import { compiledBuildIdentity } from "../mcp-payload/proof.mjs";
 import { validateRolloutBinding, withUatWorkerIdentity } from "./rollout-proof.mjs";
 
 const appId = "ea15bb05-f418-47e3-9d2d-2c4161ad7cf2";
-export async function deployEfficiencyUat(file, schemaEnv) {
+export async function deployEfficiencyUat(file, schemaEnv, packageId = "efficiency") {
+  assert.ok(["efficiency", "discovery"].includes(packageId));
   assert.ok(file?.startsWith("/"), "An absolute scoped attestation is required");
   assert.equal(await runCapture("git", ["status", "--porcelain"]), "", "Validated source must remain clean");
   assert.equal(await runCapture("git", ["branch", "--show-current"]), "dev");
   const sourceCommit = await runCapture("git", ["rev-parse", "HEAD"]);
-  const identity = mcp721Identity(sourceManifest().sha256, sourceCommit, "efficiency");
-  checkMcp721Proof(file, identity, "efficiency");
+  const identity = mcp721Identity(sourceManifest().sha256, sourceCommit, packageId);
+  checkMcp721Proof(file, identity, packageId);
   const evidence = dirname(file), build = JSON.parse(readFileSync(resolve(evidence, "build.json"), "utf8"));
   assert.equal(build.buildSha256, compiledBuildIdentity());
   assert.equal(build.sourceCommit, sourceCommit);
-  const rollout = JSON.parse(readFileSync(resolve(evidence, "rollout.json"), "utf8"));
+  const rollout = packageId === "efficiency" ? JSON.parse(readFileSync(resolve(evidence, "rollout.json"), "utf8")) : null;
   assert.ok(process.env.DIGITALOCEAN_ACCESS_TOKEN, "Platform credentials are required");
   const api = async (path, method = "GET", body) => {
     const response = await fetch(`https://api.digitalocean.com/v2/${path}`, {method,
@@ -30,14 +31,15 @@ export async function deployEfficiencyUat(file, schemaEnv) {
   const {app} = await api(`apps/${appId}`);
   assert.ok(!app.in_progress_deployment && !app.pending_deployment, "Wait for the current UAT deployment");
   const activeBase = app.active_deployment.services.find(row => row.name === "mattanutra-ui")?.source_commit_hash;
-  validateRolloutBinding(rollout, identity, "uat", activeBase);
+  if (packageId === "efficiency") validateRolloutBinding(rollout, identity, "uat", activeBase);
+  else assert.ok(activeBase === identity.deploymentBases.uat || activeBase === sourceCommit, "UAT changed since discovery qualification");
   const next = withUatWorkerIdentity(app.spec, sourceCommit);
   const remote = (await runCapture("git", ["ls-remote", "origin", "refs/heads/uat"])).split(/\s+/)[0];
   assert.ok(remote === activeBase || remote === sourceCommit, "UAT branch changed since the reviewed deployment");
   await run("git", ["merge-base", "--is-ancestor", identity.deploymentBases.uat, sourceCommit]);
   const db = new URL(schemaEnv.DB_URL);
   assert.match(db.pathname, /uat/i); assert.doesNotMatch(db.pathname, /prd|prod/i);
-  await run(process.execPath, ["--experimental-strip-types", "--import", "./scripts/register-ts-path-loader.mjs", "scripts/apply-service-efficiency-schema.ts"], {env:schemaEnv});
+  if (packageId === "efficiency") await run(process.execPath, ["--experimental-strip-types", "--import", "./scripts/register-ts-path-loader.mjs", "scripts/apply-service-efficiency-schema.ts"], {env:schemaEnv});
   // Do not let the push start new source with the old injected runtime identity.
   const paused = structuredClone(app.spec);
   paused.services.find(row => row.name === "mattanutra-ui").github.deploy_on_push = false;

@@ -31,7 +31,10 @@ export function validateInstalledConnectorProjection(evidence, published) {
     if (!actual) continue;
     if (!isDeepStrictEqual(actual.inputSchema, tool.inputSchema)) failures.push(`${tool.name}:input_schema_mismatch`);
     if (actual.description !== tool.description) failures.push(`${tool.name}:description_mismatch`);
+    if (tool.title !== undefined && actual.title !== tool.title) failures.push(`${tool.name}:title_mismatch`);
   }
+  if (published?.connector && !isDeepStrictEqual(evidence?.connector, published.connector)) failures.push("connector_positioning_mismatch");
+  if (published?.instructions !== undefined && evidence?.instructions !== published.instructions) failures.push("server_instructions_mismatch");
   if (evidence?.contractVersion !== published?.contractVersion || evidence?.schemaChecksum !== published?.schemaChecksum) failures.push("contract_identity_mismatch");
   return { passed: failures.length === 0, failures };
 }

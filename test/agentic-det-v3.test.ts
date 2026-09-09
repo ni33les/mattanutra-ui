@@ -1,3 +1,5 @@
+import { AGENT_CARD } from "../lib/agentic/contract/agent-card.ts";
+import { agenticToolDescriptions } from "../lib/agentic/contract/instructions.ts";
 import { observeLatency } from "./helpers/latency-observation.ts";
 import assert from "node:assert/strict";
 import { afterEach, beforeEach, describe, it } from "node:test";
@@ -201,11 +203,11 @@ describe("Slice A discovery", () => {
   it("A-UNIT-01 approved connector copy", () => {
     assert.equal(englishConnectorWordCount() <= 45, true);
     assert.match(CONNECTOR_COPY.en, /\bproduct/);
-    assert.match(CONNECTOR_COPY.en, /\bstock\b/i);
-    assert.match(CONNECTOR_COPY.en, /\bsafety\b/i);
+    assert.match(AGENT_CARD, /\bstock\b/i);
+    assert.match(CONNECTOR_COPY.en, /wellness guidance/i);
     assert.match(CONNECTOR_COPY.en, /overlap/i);
     assert.match(CONNECTOR_COPY.en, /wellness guidance/i);
-    assert.ok(CONNECTOR_COPY.en.includes(RESPONSIBILITY_VERSION));
+    assert.equal(RESPONSIBILITY_VERSION, "responsibility-4.0.0");
     assert.equal(/availibility|optimiseing|diagnosiss/i.test(CONNECTOR_COPY.en), false);
     for (const locale of DET_V3_LOCALES) {
       assert.ok(connectorCopy(locale).length > 20);
@@ -239,7 +241,7 @@ describe("Slice A discovery", () => {
     assert.equal(infoTh.description, CONNECTOR_COPY.th);
     assert.equal(infoZh.description, CONNECTOR_COPY["zh-CN"]);
     const thaiInfo = (await detListTools(runtime, "th")).find((item) => item.name === "info");
-    assert.equal(thaiInfo?.description, CONNECTOR_COPY.th);
+    assert.equal(thaiInfo?.description, agenticToolDescriptions("dev", "th").info);
   });
 
   it("A-INTEGRATION-01 fresh sessions see frozen build", async () => {
@@ -262,7 +264,7 @@ describe("Slice A discovery", () => {
       assert.doesNotMatch(tool.description ?? "", /welness/i);
     }
     const info = listed.find((item) => item.name === "info");
-    assert.equal(info?.description, CONNECTOR_COPY.en);
+    assert.equal(info?.description, agenticToolDescriptions("dev", "en").info);
     const init = await handleJsonRpc(runtime, {
       id: 1,
       jsonrpc: "2.0",

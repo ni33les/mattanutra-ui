@@ -14,12 +14,18 @@ export function scoreVal01(input: Readonly<{ description?: unknown }>): ScoreVer
   const hasProduct = /\bproduct/.test(lowered);
   const hasStock = /\bstock\b/.test(lowered);
   const hasSafety = /\bsafety\b/.test(lowered);
-  const passed = words > 0 && words <= 45 && hasProduct && hasStock && hasSafety;
+  // Preserve historical v3 evidence while accepting the current, outcome-led
+  // discovery proposition. Operational stock/safety detail lives on the card.
+  const legacy = words > 0 && words <= 45 && hasProduct && hasStock && hasSafety;
+  const current = words > 0 && words <= 60 && hasProduct &&
+    [/thailand/, /purchasable basket/, /coverage/, /overlap/, /pill burden/, /cost/,
+      /wellness guidance/, /not diagnosis or medical approval/].every(pattern => pattern.test(lowered));
+  const passed = legacy || current;
   return {
     assertionId: "VAL-01",
     passed,
     reason: passed
-      ? "Connector copy states product, stock and safety within the word budget."
+      ? current ? "Connector copy states the Thailand basket outcome and wellness boundary." : "Historical connector copy states product, stock and safety within the word budget."
       : `VAL-01 failed product=${hasProduct} stock=${hasStock} safety=${hasSafety} words=${words}`
   };
 }

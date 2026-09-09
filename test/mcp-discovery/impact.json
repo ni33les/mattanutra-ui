@@ -1,0 +1,71 @@
+{
+  "version": 1,
+  "releaseBase": "41ed9fd07e8b9c8814d361eab33d72b27ac7c157",
+  "deploymentBases": {
+    "dev": "41ed9fd07e8b9c8814d361eab33d72b27ac7c157",
+    "uat": "41ed9fd07e8b9c8814d361eab33d72b27ac7c157"
+  },
+  "scope": "mcp_connector_discoverability",
+  "files": [
+    {
+      "file": "test/agentic-copy-contract.test.ts",
+      "expectedCases": 5,
+      "reason": "Direct discovery, contract, copy, hosted projection or publication consumer changed by this work package."
+    },
+    {
+      "file": "test/agentic-det-v3-scorer.test.ts",
+      "expectedCases": 5,
+      "reason": "Direct discovery, contract, copy, hosted projection or publication consumer changed by this work package."
+    },
+    {
+      "file": "test/agentic-installed-connector-projection.test.ts",
+      "expectedCases": 2,
+      "reason": "Direct discovery, contract, copy, hosted projection or publication consumer changed by this work package."
+    },
+    {
+      "file": "test/mcp-7-2-1/connector.test.ts",
+      "expectedCases": 3,
+      "reason": "Direct discovery, contract, copy, hosted projection or publication consumer changed by this work package."
+    },
+    {
+      "file": "test/mcp-agent-surface/contracts.test.ts",
+      "expectedCases": 3,
+      "reason": "Direct discovery, contract, copy, hosted projection or publication consumer changed by this work package."
+    },
+    {
+      "file": "test/mcp-discovery/discovery.test.ts",
+      "expectedCases": 29,
+      "reason": "Direct discovery, contract, copy, hosted projection or publication consumer changed by this work package."
+    },
+    {
+      "file": "test/mcp-payload/discovery.test.ts",
+      "expectedCases": 3,
+      "reason": "Direct discovery, contract, copy, hosted projection or publication consumer changed by this work package."
+    },
+    {
+      "file": "test/mcp-tool-card/publication.test.ts",
+      "expectedCases": 2,
+      "reason": "Direct discovery, contract, copy, hosted projection or publication consumer changed by this work package."
+    },
+    {
+      "file": "test/mcp-discovery/release.test.ts",
+      "expectedCases": 2,
+      "reason": "Discovery deployments require immutable source and complete regression attestation."
+    }
+  ],
+  "regressionFiles": [
+    "test/agentic-det-v3.test.ts",
+    "test/agentic-det-v3-scored.test.ts",
+    "test/agentic-live-trust-copy.test.ts"
+  ],
+  "inputs": [
+    "test/mcp-discovery/goldens/en.json",
+    "test/mcp-discovery/goldens/th.json",
+    "test/mcp-discovery/goldens/zh-CN.json",
+    "test/mcp-discovery/goldens/review.json",
+    "test/mcp-discovery/baseline-tools.json.gz",
+    "lib/agentic/discovery/positioning.ts",
+    "lib/agentic/adapters/openai.json",
+    "test/mcp-discovery/expectations.md"
+  ]
+}

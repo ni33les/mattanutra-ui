@@ -28,8 +28,8 @@ test("M721-HOST-02 documented host wrappers preserve complete schemas; stale get
 test("M721-HOST-03 connector artifacts advertise evidence, host names and the same honest service scope", () => {
   for (const provider of ["openai", "anthropic", "xai"]) {
     const adapter = JSON.parse(readFileSync(`lib/agentic/adapters/${provider}.json`, "utf8"));
-    assert.match(adapter.description, /evidence/); assert.match(adapter.description, /host/i);
-    assert.match(adapter.description, /checkout.ready/i); assert.match(adapter.description, /Thailand/);
+    assert.match(adapter.instructions, /evidence/); assert.match(adapter.instructions, /host/i);
+    assert.match(adapter.instructions, /checkout.ready/i); assert.match(adapter.description, /Thailand/);
     assert.doesNotMatch(adapter.description, /Never prefix|Never call mattanutra/);
     assert.deepEqual(adapter.tools, published.tools.map(row => row.name));
   }

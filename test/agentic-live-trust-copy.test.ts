@@ -1,3 +1,4 @@
+import { AGENT_CARD } from "../lib/agentic/contract/agent-card.ts";
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { getLegalContent } from "../lib/legal-content.ts";
@@ -16,11 +17,11 @@ describe("live connector and Terms consistency", () => {
     assert.equal(info.structured.ok, true);
     assert.ok(words.length >= 30, description);
     assert.match(description, /\bproduct/);
-    assert.match(description, /stock/i);
+    assert.match(AGENT_CARD, /stock/i);
     assert.match(description, /overlap/i);
-    assert.match(description, /safety/i);
     assert.match(description, /wellness guidance/i);
-    assert.match(description, /pharmacy/i);
+    assert.match(description, /wellness guidance/i);
+    assert.match(AGENT_CARD, /pharmacy/i);
     assert.equal(info.structured.responsibilityVersion, RESPONSIBILITY_VERSION);
     assert.equal(description, CONNECTOR_COPY.en);
   });
@@ -34,7 +35,8 @@ describe("live connector and Terms consistency", () => {
       ?.text.en
       .toLowerCase();
     assert.match(termsBlob, /do not manufacture, sell, dispense, or control/);
-    assert.match(connector, /not diagnosis, pharmacy services or clinical advice/);
+    assert.match(connector, /not diagnosis or medical approval/);
+    assert.match(AGENT_CARD, /pharmacy/);
     assert.match(String(fulfilment), /does not warehouse or deliver/);
     assert.equal(/matta.?nutra (is|operates) a pharmacy/i.test(connector), false);
     assert.equal(/we dispense/i.test(connector), false);
@@ -53,8 +55,9 @@ describe("live connector and Terms consistency", () => {
 describe("live connector discovery contract identity", () => {
   it("GET discovery, RPC info and the published contract agree on version and schemas", async () => {
     const response = await fetch(LIVE_PUBLIC, { headers: { accept: "application/json" }, signal: AbortSignal.timeout(30_000) });
-    assert.equal(response.status, 200);
-    const discovery = await response.json();
+    assert.equal(response.status, 405);
+    const listing = await livePost(LIVE_PUBLIC, { jsonrpc: "2.0", id: 3, method: "tools/list" });
+    const discovery = listing.structured;
     const info = await liveCall(LIVE_PUBLIC, "info", { locale: "en" });
     const resource = await livePost(LIVE_PUBLIC, { jsonrpc: "2.0", id: 2, method: "resources/read", params: { uri: CONTRACT_SCHEMA_URI } });
     assert.equal(info.structured.ok, true);
@@ -64,7 +67,7 @@ describe("live connector discovery contract identity", () => {
     assert.equal(discovery.contractVersion, AGENTIC_CONTRACT_VERSION);
     assert.equal(discovery.contractVersion, info.structured.contractVersion);
     assert.equal(discovery.contractVersion, contract.contractVersion);
-    assert.equal(discovery.tools.length, 6);
+    assert.equal(discovery.tools.length, 7);
     for (const tool of discovery.tools) {
       assert.deepEqual(tool.inputSchema, contract.tools[tool.name].inputSchema);
       assert.deepEqual(tool.outputSchema, contract.tools[tool.name].outputSchema);

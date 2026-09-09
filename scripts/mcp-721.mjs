@@ -27,7 +27,7 @@ const commit = git("rev-parse", "HEAD"), files = inventory.files.map(row => row.
 assert.equal(new Set(files).size, files.length); assert.ok(files.length > 0);
 const discovered = readdirSync(definition.directory, { recursive: true }).filter(file => file.endsWith(".test.ts")).map(file => `${definition.directory}/${file}`);
 for (const file of discovered.filter(file => !slice || files.includes(file))) assert.ok(files.includes(file), `Undeclared package test ${file}`);
-for (const file of (slice ? [] : git("diff", "--name-only", "--diff-filter=ACMR", MCP721_BASE, "--", "test").split("\n").filter(file => file.endsWith(".test.ts")))) assert.ok(files.includes(file), `Changed test omitted ${file}`);
+for (const file of (slice ? [] : git("diff", "--name-only", "--diff-filter=ACMR", MCP721_BASE, "--", "test").split("\n").filter(file => file.endsWith(".test.ts")))) assert.ok(files.includes(file) || (packageId === "discovery" && inventory.regressionFiles.includes(file)), `Changed test omitted ${file}`);
 for (const row of inventory.files) {
   assert.ok(row.reason.length > 20 && row.expectedCases > 0 && existsSync(row.file));
   assert.deepEqual(testSourceHygiene(readFileSync(row.file, "utf8"), row.file), []);
@@ -89,6 +89,12 @@ if (mode === "validate") {
   const lint = git("diff", "--name-only", "--diff-filter=ACMR", MCP721_BASE, "HEAD").split("\n").filter(file => /\.(?:[cm]?js|tsx?)$/.test(file));
   save("lint-files.json", { releaseBase: MCP721_BASE, files: lint }); assert.ok(lint.length);
   await command("release-diff-lint", ["node_modules/eslint/bin/eslint.js", ...lint]);
+  if (packageId === "discovery") {
+    assert.ok(process.env.TEST_DB_URL, "Complete MCP regression requires isolated PostgreSQL");
+    await command("complete-mcp-regression", ["scripts/run-matcher-test-suite.mjs"], { ...safe,
+      TEST_DB_URL: process.env.TEST_DB_URL, DB_URL: process.env.TEST_DB_URL, DB_WORKER_URL: process.env.TEST_DB_URL,
+      DB_ALLOW_DIRECT_CONNECTION: "true", MATCHER_TEST_EVIDENCE_DIR: resolve(output, "mcp-regression") });
+  }
   await command("production-build", ["node_modules/next/dist/bin/next", "build", "--webpack"], { ...safe, NODE_ENV: "production", NEXT_BUILD_SKIP_TYPECHECK: "1", ...(packageId === "efficiency" ? { NODE_OPTIONS: "--max-old-space-size=4096", NEXT_BUILD_CPUS: "1" } : {}) });
   if (packageId === "efficiency") {
     const { runEfficiencyBrowser } = await import("./service-efficiency/release-stages.mjs");

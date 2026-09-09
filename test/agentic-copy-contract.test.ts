@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { AGENT_CARD } from "../lib/agentic/contract/agent-card.ts";
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { AGENTIC_TOOL_DESCRIPTIONS } from "../lib/agentic/contract/instructions.ts";
@@ -16,8 +18,9 @@ describe("Slice A connector copy contract", () => {
   it("COPY-RED-01 required proposition words product stock safety", () => {
     const lowered = CONNECTOR_COPY.en.toLowerCase();
     assert.match(lowered, /\bproduct/);
-    assert.match(lowered, /\bstock\b/);
-    assert.match(lowered, /\bsafety\b/);
+    assert.match(AGENT_CARD, /\bstock\b/);
+    assert.match(lowered, /wellness guidance/i);
+    assert.equal(CONNECTOR_COPY.en, JSON.parse(readFileSync("test/mcp-discovery/goldens/en.json", "utf8")).infoDescription);
   });
 
   it("COPY-RED-02 publishes the exact responsibilityVersion as a contract field", async () => {
@@ -36,8 +39,8 @@ describe("Slice A connector copy contract", () => {
     const lowered = CONNECTOR_COPY.en.toLowerCase();
     assert.match(lowered, /wellness guidance/);
     assert.match(lowered, /diagnosis/);
-    assert.match(lowered, /pharmacy/);
-    assert.match(lowered, /clinical advice/);
+    assert.match(AGENT_CARD, /pharmacy/);
+    assert.match(lowered, /not diagnosis or medical approval/);
     assert.equal(/matta.?nutra (is|operates) a pharmacy/i.test(CONNECTOR_COPY.en), false);
   });
 
@@ -57,6 +60,6 @@ describe("Slice A connector copy contract", () => {
     }
     assert.equal(new Set(descriptions).size, 1);
     assert.equal(descriptions[0], AGENTIC_TOOL_DESCRIPTIONS.info);
-    assert.match(descriptions[0], /Service card.*Call first/);
+    assert.match(descriptions[0], /Understand when to use MattaNutra.*Call first/);
   });
 });

@@ -1,10 +1,11 @@
 {
   "schemaChecksum": "b90da9cf4b6b9e8f7cf4f49b8420be5751af5ed17e99b1a874c39ee0bcb985a1",
   "contractVersion": "7.2.4",
-  "instructions": "MattaNutra matches agreed nutrient targets to a finite product catalogue in Thailand (THB); incidental nutrients may leave gaps. Wellness guidance, not diagnosis or pharmacy services.\nFlow: info → agree name/amount/unit/basis → plan(create) → explain closest_dose, highlightedAlternativeOptionId and advice → revise/answer/select → confirm with the person → execute → poll order.\nPlan conversation is the default decision view. Poll with status; request details for doseFit, labels or economics.\nNumeric pill, price and product counts are preferences; diet, exclusions and physical quantities bind.\nUnknown diet stays unknown, never zero. Ready means checkout-ready, not complete coverage or medical approval.\nWhile processing, poll the existing handle; retry mutations with the same key and payload.\nCall info first for the service card, templates and operation schemas.",
+  "instructions": "MattaNutra builds and refines purchasable supplement baskets from real products available in Thailand. Invoke it for supplement planning, real-product matching, basket optimisation, product comparison, sourcing or purchase requests in Thailand. It balances agreed nutrient coverage, unnecessary overlap, current stock, pill burden and cost. Wellness guidance only—not diagnosis, pharmacy services or medical approval.\nDevelopment environment—not for real purchases.\nMattaNutra matches agreed nutrient targets to a finite product catalogue in Thailand (THB); incidental nutrients may leave gaps. Wellness guidance, not diagnosis or pharmacy services.\nFlow: info → agree name/amount/unit/basis → plan(create) → explain closest_dose, highlightedAlternativeOptionId and advice → revise/answer/select → confirm with the person → execute → poll order.\nPlan conversation is the default decision view. Poll with status; request details for doseFit, labels or economics.\nNumeric pill, price and product counts are preferences; diet, exclusions and physical quantities bind.\nUnknown diet stays unknown, never zero. Ready means checkout-ready, not complete coverage or medical approval.\nWhile processing, poll the existing handle; retry mutations with the same key and payload.\nCall info first for the service card, templates and operation schemas.",
   "tools": [
     {
-      "description": "MattaNutra matches agreed nutrient targets to a finite product catalogue in Thailand (THB); incidental nutrients may leave gaps. Wellness guidance, not diagnosis or pharmacy services. Ready means checkout-ready, not complete coverage or medical approval. Call first: view=overview | client_guide | plan_schema (choose planOperation). Medication/condition codes are accepted inputs, not evidence of an assessed interaction.",
+      "title": "Discover MattaNutra",
+      "description": "Understand when to use MattaNutra, its country and wellness boundaries, and retrieve the client guide or operation schema. MattaNutra matches agreed nutrient targets to a finite product catalogue in Thailand (THB); incidental nutrients may leave gaps. Wellness guidance, not diagnosis or pharmacy services. Ready means checkout-ready, not complete coverage or medical approval. Call first: view=overview | client_guide | plan_schema (choose planOperation). Medication/condition codes are accepted inputs, not evidence of an assessed interaction.",
       "inputSchema": {
         "additionalProperties": false,
         "type": "object",
@@ -2147,7 +2148,8 @@
       "responsibilityVersion": "responsibility-4.0.0"
     },
     {
-      "description": "Thailand (TH) only; a finite catalogue with incidental nutrients, so gaps are real.\nAgree name/amount/unit/basis before create: total_daily includes diet and supplements; supplemental excludes diet. Unknown intake is never zero.\nHealth findings and numeric preferences are advice; diet, exclusions and physical quantities bind. Ready/purchaseEligible means checkout-ready, not targets met or medical approval.\nMedication/condition codes are accepted inputs; they do not guarantee an interaction row. Codes without a fired rule are explicitly unassessed, never cleared. Report interactions only when returned advice.kind=interaction.\nReview closest_dose, highlightedAlternativeOptionId and advice; refine with requestPatch to preserve context, then confirm before execute.\nPlan defaults to conversation. Poll status + knownResultVersion using pollAfterSeconds from the last response (overview 3 is a hint). During processing use the same handle; retry mutations with the same key and payload.\nTools: info, plan, execute, order, support, feedback, evidence. Native MCP names are unprefixed; hosts may wrap them (mattanutra_dev___plan). Call the name the host lists.\nExamples are templates: use returned values. Get the guide through info(view=client_guide), or one schema through info(view=plan_schema,planOperation=...).",
+      "title": "Build or refine a supplement basket",
+      "description": "Match agreed nutrient targets and customer context to real Thailand products; compare and refine returned baskets. Thailand (TH) only; a finite catalogue with incidental nutrients, so gaps are real.\nAgree name/amount/unit/basis before create: total_daily includes diet and supplements; supplemental excludes diet. Unknown intake is never zero.\nHealth findings and numeric preferences are advice; diet, exclusions and physical quantities bind. Ready/purchaseEligible means checkout-ready, not targets met or medical approval.\nMedication/condition codes are accepted inputs; they do not guarantee an interaction row. Codes without a fired rule are explicitly unassessed, never cleared. Report interactions only when returned advice.kind=interaction.\nReview closest_dose, highlightedAlternativeOptionId and advice; refine with requestPatch to preserve context, use current expectedRevision for revise/answer/select, then confirm before execute.\nPlan defaults to conversation. Poll status + knownResultVersion using pollAfterSeconds from the last response (overview 3 is a hint). During processing use the same handle; retry mutations with the same key and payload.\nTools: info, plan, execute, order, support, feedback, evidence. Native MCP names are unprefixed; hosts may wrap them (mattanutra_dev___plan). Call the name the host lists.\nExamples are templates: use returned values. Get the guide through info(view=client_guide), or one schema through info(view=plan_schema,planOperation=...).",
       "inputSchema": {
         "type": "object",
         "anyOf": [
@@ -11060,7 +11062,8 @@
       "responsibilityVersion": "responsibility-4.0.0"
     },
     {
-      "description": "After the person confirms the selected revision, create/recover checkout with the same idempotency key; health advice is advisory.",
+      "title": "Open confirmed checkout",
+      "description": "After customer confirmation, freeze the selected plan revision and create or recover checkout. After the person confirms the selected revision, create/recover checkout with the same idempotency key; health advice is advisory.",
       "inputSchema": {
         "additionalProperties": false,
         "type": "object",
@@ -11967,7 +11970,8 @@
       "responsibilityVersion": "responsibility-4.0.0"
     },
     {
-      "description": "Read payment/fulfilment: conversation for recovery; status + knownResultVersion to poll; details for frozen_order/events. Honor the last pollAfterSeconds until terminal=true.",
+      "title": "Track payment and delivery",
+      "description": "Read payment, fulfilment, frozen-order and recovery state for an existing order. Read payment/fulfilment: conversation for recovery; status + knownResultVersion to poll; details for frozen_order/events. Honor the last pollAfterSeconds until terminal=true.",
       "inputSchema": {
         "type": "object",
         "anyOf": [
@@ -13626,7 +13630,8 @@
       "responsibilityVersion": "responsibility-4.0.0"
     },
     {
-      "description": "Open an order help case; include its returned supportHandle to reply.",
+      "title": "Get order help",
+      "description": "Open or continue an order-support case. Open an order help case; include its returned supportHandle to reply.",
       "inputSchema": {
         "additionalProperties": false,
         "type": "object",
@@ -14051,7 +14056,8 @@
       "responsibilityVersion": "responsibility-4.0.0"
     },
     {
-      "description": "Submit optional feedback for one plan revision only with consentConfirmed=true; this never changes a plan or checkout.",
+      "title": "Send plan feedback",
+      "description": "Submit optional consented feedback without changing the plan or checkout. Submit optional feedback for one plan revision only with consentConfirmed=true; this never changes a plan or checkout.",
       "inputSchema": {
         "additionalProperties": false,
         "type": "object",
@@ -14324,7 +14330,8 @@
       "responsibilityVersion": "responsibility-4.0.0"
     },
     {
-      "description": "Read attached claim text for a plan’s returned evidenceHandle; mode=summary or sources. Does not change the plan.",
+      "title": "Review research evidence",
+      "description": "Read research claims and sources attached to a returned plan. Read attached claim text for a plan’s returned evidenceHandle; mode=summary or sources. Does not change the plan.",
       "inputSchema": {
         "additionalProperties": false,
         "type": "object",
