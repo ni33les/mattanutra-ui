@@ -15,7 +15,7 @@ export const MCP_PACKAGES = {
 };
 export const MCP721_STAGES = ["affected-tests", "typecheck", "release-diff-lint", "production-build", "unchanged-source-and-inputs"];
 export function packageStages(packageId) {
-  return packageId === "efficiency" ? ["isolated-schema", "affected-tests", "repeated-baseline-comparison", "typecheck", "release-diff-lint", "production-build", "affected-browser-tests", "unchanged-source-and-inputs"] : MCP721_STAGES;
+  return packageId === "efficiency" ? ["isolated-schema", "affected-tests", "typecheck", "release-diff-lint", "production-build", "affected-browser-tests", "repeated-baseline-comparison", "unchanged-source-and-inputs"] : MCP721_STAGES;
 }
 export function mcp721Identity(sourceSha256, sourceCommit, packageId = "721") {
   const definition = MCP_PACKAGES[packageId]; assert.ok(definition, "Unknown work package");

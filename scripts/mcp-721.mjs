@@ -75,11 +75,6 @@ async function command(label, args, env = safe) {
 }
 if (mode === "validate") {
   const identity = mcp721Identity(source.sha256, commit, packageId);
-  if (packageId === "efficiency") {
-    const { benchmarkServices } = await import("./service-efficiency/benchmark.mjs");
-    const comparison = await benchmarkServices(resolve(output, "benchmarks"), isolated, inventory.benchmarks);
-    save("benchmark-comparison.json", comparison); stages.push({ label: "repeated-baseline-comparison", passed: true });
-  }
   await command("typecheck", ["node_modules/typescript/bin/tsc", "--noEmit"]);
   const lint = git("diff", "--name-only", "--diff-filter=ACMR", MCP721_BASE, "HEAD").split("\n").filter(file => /\.(?:[cm]?js|tsx?)$/.test(file));
   save("lint-files.json", { releaseBase: MCP721_BASE, files: lint }); assert.ok(lint.length);
@@ -89,6 +84,11 @@ if (mode === "validate") {
     const { runEfficiencyBrowser } = await import("./service-efficiency/release-stages.mjs");
     await runEfficiencyBrowser(output, isolated, inventory.browser);
     stages.push({ label: "affected-browser-tests", passed: true });
+  }
+  if (packageId === "efficiency") {
+    const { benchmarkServices } = await import("./service-efficiency/benchmark.mjs");
+    const comparison = await benchmarkServices(resolve(output, "benchmarks"), isolated, inventory.benchmarks);
+    save("benchmark-comparison.json", comparison); stages.push({ label: "repeated-baseline-comparison", passed: true });
   }
   save("build.json", { sourceCommit: commit, nextBuildId: readFileSync(".next/BUILD_ID", "utf8").trim(), buildSha256: compiledBuildIdentity() });
   const after = sourceManifest(); assert.deepEqual(after, source); assert.deepEqual(mcp721Identity(after.sha256, commit, packageId), identity);

@@ -78,6 +78,6 @@ test("EFF-PACK-06 database benchmarks exclude background setup queries and retai
   assert.equal(measured.measurements().sqlStatements, 1);
   assert.equal(measured.measurements().rowBytes, Buffer.byteLength(JSON.stringify([{ text: "select current_poll" }])));
   measured.reset();
-  await measured.observe(async () => { measured.sql`current_timestamp`; });
+  await measured.observe(async () => { const fragment = measured.sql`current_timestamp`; assert.ok(fragment); });
   assert.equal(measured.measurements().sqlStatements, 0);
 });

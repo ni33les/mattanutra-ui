@@ -51,10 +51,10 @@ try {
   if (id === "reads" || id === "funnel") {
     const database = await openMeasuredDatabase(load); close = database.close;
     const reader = id === "reads" ? await seedPlanReader(load, database.sql) : await seedFunnelReader(load, database.sql, hash);
-    database.reset(); const coldStart = performance.now(); await reader.poll();
+    database.reset(); const coldStart = performance.now(); await database.observe(() => reader.poll());
     extra.cold = { wallMs: performance.now() - coldStart, ...database.measurements() };
     database.reset(); const warmStart = performance.now(); const values = [];
-    for (let n = 0; n < 20; n++) values.push(await reader.poll());
+    for (let n = 0; n < 20; n++) values.push(await database.observe(() => reader.poll()));
     extra.warm = { wallMs: performance.now() - warmStart, reads: 20, ...database.measurements() };
     semantic = comparableStatus(values.at(-1)); inputSha256 = hash(reader.input);
   } else {
@@ -77,9 +77,9 @@ try {
     if (id === "mixed") {
       const database = await openMeasuredDatabase(load), reader = await seedPlanReader(load, database.sql);
       const closePool = close; close = async () => { await closePool(); await database.close(); };
-      await reader.poll(); database.reset();
+      await database.observe(() => reader.poll()); database.reset();
       const polls = (async () => { const values = []; for (let n = 0; n < 40; n++) {
-        values.push(comparableStatus(await reader.poll())); await new Promise(resolve => setTimeout(resolve, 20));
+        values.push(comparableStatus(await database.observe(() => reader.poll()))); await new Promise(resolve => setTimeout(resolve, 20));
       } return values; })();
       const [matches, statuses] = await Promise.all([Promise.all([run("one"), run("two")]), polls]);
       semantic = { matches, statuses }; extra.polls = { reads: 40, ...database.measurements() };
