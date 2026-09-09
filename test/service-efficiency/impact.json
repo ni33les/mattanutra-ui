@@ -331,7 +331,7 @@
     {
       "file": "test/service-efficiency/result-preparation.test.ts",
       "slice": "result-preparation",
-      "expectedCases": 3,
+      "expectedCases": 4,
       "reason": "Audits 1/10/11: prepare immutable product rows, localized presentation and HealthScore hashes outside task/assessment publication locks"
     },
     {

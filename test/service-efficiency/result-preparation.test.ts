@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { readFileSync } from "node:fs";
 import * as completion from "../../lib/task-result-applier.ts";
-import type { TaskRecord } from "../../lib/task-service.ts";
+import type { TaskRecord, TaskServiceDb } from "../../lib/task-service.ts";
 import { FUNNEL_GENERATOR_VERSION } from "../../lib/assessment-revisions.ts";
 import { completeHealthScoreFixture } from "../fixtures/healthscore.ts";
 import { healthScoreReadProjection } from "../../lib/healthscore-readiness.ts";
@@ -39,4 +39,31 @@ test("LOCK-PREP-03 external worker completion invokes preparation before the tra
   const route = readFileSync(new URL("../../app/api/tasks/[id]/complete/route.ts", import.meta.url), "utf8");
   assert.match(route, /prepareResult:\s*prepareTaskCompletionResult/);
   assert.match(route, /preparedResult:\s*context.preparedResult/);
+});
+
+test("LOCK-PREP-04 formulation and food advice are prepared before publication and audit effects remain deferred",async()=>{
+  const reads:string[]=[];
+  const sql=(async(parts:TemplateStringsArray)=>{
+    const query=parts.join("?");reads.push(query);assert.match(query.trim(),/^select/i);assert.doesNotMatch(query,/for (?:update|share)|pg_advisory/i);
+    if(query.includes("public.assessments"))return[{answers:{country:"TH"},locale:"th",selected_plan:"precision"}];
+    return[];
+  }) as unknown as TaskServiceDb;
+  for(const locale of ["en","th","zh-CN"] as const){
+    const formulationTask=task("generate_supplement_guidance"),foodTask=task("generate_food_guidance");
+    (formulationTask.payload as {generation:{locale:string}}).generation.locale=locale;
+    (foodTask.payload as {generation:{locale:string}}).generation.locale=locale;
+    const formulation={supplementBreakdown:[{id:"unknown-label",supplement:"Unknown label",dailyDose:"200 mg",status:"add",effectivenessRank:1}]};
+    const foodGuidance={foodGuidance:[{id:"unknown-food",food:"Unknown food",serving:"100 g",frequency:"daily",status:"add",effectivenessRank:1}]};
+    const formula=await completion.prepareTaskCompletionResult({task:formulationTask,resultPayload:{analysis:{formulation}},sql});
+    const food=await completion.prepareTaskCompletionResult({task:foodTask,resultPayload:{analysis:{foodGuidance}},sql});
+    assert.ok(formula.formulation);assert.ok(food.food);
+    assert.equal(formula.formulation.value.supplementBreakdown[0].dailyDose,"200 mg");
+    assert.equal(formula.formulation.value.supplementBreakdown[0].safety?.action,"advisory");
+    assert.equal(food.food.value.foodGuidance[0].serving,"100 g");
+    assert.equal(formula.formulation.locale,locale);assert.equal(food.food.locale,locale);
+    assert.deepEqual(JSON.parse(formula.formulation.json),formula.formulation.value);
+    assert.deepEqual(JSON.parse(food.food.json),food.food.value);
+    assert.ok(formula.formulation.afterCommit.length>0 && food.food.afterCommit.length>0,"audit effects are retained for successful publication");
+    assert.ok(reads.length>0);
+  }
 });
