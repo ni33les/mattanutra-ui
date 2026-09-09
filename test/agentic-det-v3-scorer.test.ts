@@ -34,8 +34,8 @@ function staleRunnerScore(input: typeof passGolden) {
 }
 
 describe("Slice 0 v3.0 scorer conformance", () => {
-  it("SCORE-VAL01-RED stale runner rejects the valid connector PASS golden", () => {
-    const stale = staleRunnerScore(passGolden);
+  it("SCORE-VAL01-RED legacy prose scoring rejects current positioning while historical goldens remain valid", () => {
+    const stale = staleRunnerScore({ ...passGolden, description: CONNECTOR_COPY.en });
     assert.equal(stale["VAL-01"], false, "historical runner does not recognize the current wellness boundary");
     assert.equal(/wellness guidance/i.test(CONNECTOR_COPY.en), true);
     assert.equal(scoreVal01({ description: passGolden.description }).passed, true);
@@ -58,7 +58,7 @@ describe("Slice 0 v3.0 scorer conformance", () => {
   });
 
   it("SCORE-TRUST06-RED stale runner required the version inside marketing prose", () => {
-    const stale = staleRunnerScore(passGolden);
+    const stale = staleRunnerScore({ ...passGolden, description: CONNECTOR_COPY.en });
     assert.equal(stale["TRUST-06"], false, "responsibility is a version field, not a required marketing phrase");
     assert.equal(RESPONSIBILITY_VERSION, "responsibility-4.0.0");
     assert.equal(scoreTrust06(passGolden.responsibility, "responsibility-3.0.0").passed, true);
