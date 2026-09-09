@@ -1,13 +1,13 @@
-import { readFileSync, readdirSync } from "node:fs";
+import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { createHash } from "node:crypto";
 import ts from "typescript";
 
-const locking = /\bfor\s+(?:(?:no\s+key|key)\s+)?(?:update|share)\b|\bpg_(?:try_)?advisory_(?:xact_)?lock\s*\(/i;
-function files(root, directory) {
+const locking = /\bfor\s+(?:(?:no\s+key|key)\s+)?(?:update|share)\b|\bpg_(?:try_)?advisory_(?:xact_)?lock(?:_shared)?\s*\(|\block\s+table\b/i;
+function files(root, directory, extension = /\.tsx?$/) {
   return readdirSync(resolve(root, directory), {withFileTypes:true}).flatMap(entry => {
     const path = `${directory}/${entry.name}`;
-    return entry.isDirectory() ? files(root, path) : /\.tsx?$/.test(path) ? [path] : [];
+    return entry.isDirectory() ? files(root, path, extension) : extension.test(path) ? [path] : [];
   });
 }
 
@@ -28,6 +28,21 @@ export function scanLockSites(root) {
       ts.forEachChild(node,child=>visit(child,owner));
     }
     visit(source);
+  }
+  const sqlFiles = [...(existsSync(resolve(root,"db-schema.sql")) ? ["db-schema.sql"] : []),
+    ...["scripts","db-rollout"].flatMap(directory => existsSync(resolve(root,directory)) ? files(root,directory,/\.sql$/) : [])];
+  for (const file of sqlFiles) {
+    const source = readFileSync(resolve(root,file),"utf8").replace(/--[^\n]*|\/\*[\s\S]*?\*\//g," ");
+    const functions = /create\s+(?:or\s+replace\s+)?function\s+([\w.\"]+)[\s\S]*?\bas\s+(\$[\w]*\$)([\s\S]*?)\2/gi;
+    for (const match of source.matchAll(functions)) for (const part of match[3].split(";")) {
+      const statement = part.replace(/\s+/g," ").trim(), owner = match[1];
+      if (locking.test(statement)) sites.push({file,owner,key:createHash("sha256").update(file+"\0"+owner+"\0"+statement).digest("hex"),statement});
+    }
+    // Catch standalone migration locks too, outside function bodies.
+    for (const part of source.replace(functions,"").split(";")) {
+      const statement = part.replace(/\s+/g," ").trim(), owner = "migration";
+      if (locking.test(statement)) sites.push({file,owner,key:createHash("sha256").update(file+"\0"+owner+"\0"+statement).digest("hex"),statement});
+    }
   }
   return sites.sort((a,b)=>a.file.localeCompare(b.file)||a.owner.localeCompare(b.owner)||a.key.localeCompare(b.key));
 }
