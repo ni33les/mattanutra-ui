@@ -281,7 +281,7 @@ function keyHits(
 
   return Object.entries(value as Record<string, unknown>).flatMap(([key, child]) => {
     const next = path ? `${path}.${key}` : key;
-    return banned.has(key) ? [next] : keyHits(child, banned, next);
+    return banned.has(key) && next !== "canonical.catalogId" ? [next] : keyHits(child, banned, next);
   });
 }
 

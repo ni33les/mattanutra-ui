@@ -94,3 +94,6 @@ or historical result files were changed to obtain these passes.
   payload file after individually passing journeys; it was not a service timeout.
   The file envelope is ten minutes. Existing per-case 15s, 90s, 120s and 180s
   functional limits remain unchanged. Interrupted evidence remains incomplete.
+
+- MCP-INFRA-01–02: stop the pack-wide HTTP worker before database concurrency fixtures take ownership of task execution; each HTTP integration owns its own worker lifecycle. Paired batches start independent HTTP workers and preserve failures.
+- AX2–AX6 diagnostic-key checks: allow only the documented `canonical.catalogId` provenance field restored by the durable-serialization regression. Other catalogue diagnostic keys and paths remain forbidden. The acceptance-5 failures are retained, and that source-changing run cannot qualify deployment.

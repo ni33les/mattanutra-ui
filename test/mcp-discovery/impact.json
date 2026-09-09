@@ -153,6 +153,7 @@
     "test/mcp-payload/refinement-handoff.test.ts",
     "test/mcp-payload/transport.test.ts",
     "test/mcp-test-completed-client.test.ts",
+    "test/mcp-test-worker-isolation.test.ts",
     "test/mcp-tool-card/listing.test.ts",
     "test/published-client-journey.test.ts"
   ],

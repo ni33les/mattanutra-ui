@@ -227,7 +227,7 @@ function bannedDiagnosticHits(value: unknown, path = ""): string[] {
 
   return Object.entries(value as Record<string, unknown>).flatMap(([key, child]) => {
     const next = path ? `${path}.${key}` : key;
-    return BANNED_DIAGNOSTIC_KEYS.has(key)
+    return BANNED_DIAGNOSTIC_KEYS.has(key) && next !== "canonical.catalogId"
       ? [next]
       : bannedDiagnosticHits(child, next);
   });

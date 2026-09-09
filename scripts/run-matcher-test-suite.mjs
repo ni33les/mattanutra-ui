@@ -43,19 +43,23 @@ export async function startHttpCandidate(env, evidence) {
 
 export async function runMatcherBatches({ common, evidence, inventory, args, runs,
   start = startHttpCandidate, batch = runBatch }) {
-  const server = await start(common, evidence);
-  const httpEnv = { ...common, MCP_URL: `${server.identity.origin}/api/mcp`,
-    MCP_ISOLATED_CANDIDATE: "1", NEXT_PUBLIC_SITE_URL: server.identity.origin, SITE_URL: server.identity.origin };
   const results = [];
-  try {
-    for (const run of runs) {
+  for (const run of runs) {
+    const httpEvidence = join(evidence, `http-${run}`);
+    mkdirSync(httpEvidence, { recursive: true });
+    const server = await start(common, httpEvidence);
+    const httpEnv = { ...common, MCP_URL: `${server.identity.origin}/api/mcp`,
+      MCP_ISOLATED_CANDIDATE: "1", NEXT_PUBLIC_SITE_URL: server.identity.origin, SITE_URL: server.identity.origin };
+    try {
       results.push(await batch(`node-matcher-${run}`, [...args, ...inventory.files.filter(file => !inventory.integration.includes(file))],
         { ...httpEnv, DB_POOL_MAX: "1", DB_WORKER_POOL_MAX: "1" }, evidence));
-      results.push(await batch(`node-matcher-postgres-${run}`, [...args, ...inventory.integration],
-        { ...httpEnv, DB_POOL_MAX: "6", DB_WORKER_POOL_MAX: "6" }, evidence));
-    }
-    return results;
-  } finally { await server.stop(); }
+    } finally { await server.stop(); }
+    // These fixtures own their controlled tasks and leases. HTTP integration
+    // cases start and stop their own executor; no pack-wide worker may compete.
+    results.push(await batch(`node-matcher-postgres-${run}`, [...args, ...inventory.integration],
+      { ...common, DB_POOL_MAX: "6", DB_WORKER_POOL_MAX: "6" }, evidence));
+  }
+  return results;
 }
 
 /** Complete maintained MCP + matcher consumer gate; no browser server/build needed. */
