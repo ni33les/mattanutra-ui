@@ -58,6 +58,12 @@
       "slice": "sessions",
       "expectedCases": 2,
       "reason": "Resident worker continuation, binary checkpoint restart and exact synchronous result/attempt parity"
+    },
+    {
+      "file": "test/service-efficiency/cache.test.ts",
+      "slice": "cache",
+      "expectedCases": 3,
+      "reason": "Byte-bounded immutable reuse, concurrent owner cancellation, checkpoint fencing and failed-computation isolation"
     }
   ],
   "inputs": [
