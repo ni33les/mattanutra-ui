@@ -16,6 +16,8 @@ import {
   waitForTaskQueueWork
 } from "../lib/task-queue-signal.ts";
 import { startWorkerWakeServer } from "./wake-server.ts";
+import { loadAgenticConfig } from "../lib/agentic/config.ts";
+import { verifyWorkerBuildIdentity } from "../lib/runtime-build-identity.ts";
 import {
   isWorkerAuthConfigurationError,
   WorkerApiClient,
@@ -171,7 +173,7 @@ function workerMode(value: string | undefined): WorkerMode {
 }
 
 function workerVersion() {
-  return envText("WORKER_VERSION", envText("npm_package_version", "dev"));
+  return verifyWorkerBuildIdentity(loadAgenticConfig().buildId);
 }
 
 function instanceId(
@@ -862,7 +864,19 @@ async function runWorker(mode: WorkerMode) {
 
 const mode = workerMode(process.argv[2] ?? process.env.WORKER_MODE);
 
-runWorker(mode).catch((error) => {
+async function main() {
+  const config = loadAgenticConfig();
+  const version = verifyWorkerBuildIdentity(config.buildId);
+  if (process.argv.includes("--check-runtime")) {
+    console.log(JSON.stringify({ buildId: config.buildId, workerVersion: version,
+      environment: config.environment,
+      taskTypes: [...new Set((mode === "all" ? WORKER_PROFILE_MODES : [mode]).flatMap(profileMode => runtimeWorkerProfileForMode(profileMode as WorkerProfileMode)?.taskTypes ?? []))] }));
+    return;
+  }
+  await runWorker(mode);
+}
+
+main().catch((error) => {
   console.error(error);
   void markSessionsOffline().finally(() => process.exit(1));
 });

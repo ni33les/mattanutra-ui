@@ -10,6 +10,7 @@ import {
   RESPONSIBILITY_VERSION
 } from "@/lib/agentic/discovery/versions";
 import { canonicalHash, canonicalJson } from "@/lib/agentic/value/canonical";
+import { runtimeBuildIdentity } from "@/lib/runtime-build-identity";
 
 export const RELEASE_MANIFEST_VERSION = "ident-1.0";
 export const BUILD_ID_PATTERN = /^[0-9a-f]{40}$/;
@@ -55,18 +56,7 @@ export function computeSchemaChecksum(bundle: unknown = servedSchemaBundle()) {
 }
 
 export function pipelineBuildId() {
-  const injected =
-    process.env.AGENTIC_BUILD_ID?.trim() ||
-    process.env.COMMIT_SHA?.trim() ||
-    process.env.COMMIT_HASH?.trim() ||
-    "";
-  if (injected) {
-    return injected.toLowerCase();
-  }
-  if (process.env.NODE_TEST_CONTEXT) {
-    return TEST_RELEASE_BUILD_ID;
-  }
-  return "";
+  return runtimeBuildIdentity();
 }
 
 export function buildReleaseManifest(input: Readonly<{

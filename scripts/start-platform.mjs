@@ -366,6 +366,11 @@ async function main() {
     throw new Error(`Invalid PORT/NEXT_PORT value: ${process.env.PORT}`);
   }
 
+  await runOneShotProcess("worker runtime identity", process.execPath, [
+    "--experimental-strip-types", "--import", "./scripts/register-ts-path-loader.mjs",
+    "workers/runner.ts", "--check-runtime",
+  ]);
+
   startProcess("web", process.execPath, [
     "node_modules/next/dist/bin/next",
     "start",
