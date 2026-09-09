@@ -41,6 +41,23 @@ export async function startHttpCandidate(env, evidence) {
   } catch (error) { await stop(); throw error; }
 }
 
+export async function runMatcherBatches({ common, evidence, inventory, args, runs,
+  start = startHttpCandidate, batch = runBatch }) {
+  const server = await start(common, evidence);
+  const httpEnv = { ...common, MCP_URL: `${server.identity.origin}/api/mcp`,
+    MCP_ISOLATED_CANDIDATE: "1", NEXT_PUBLIC_SITE_URL: server.identity.origin, SITE_URL: server.identity.origin };
+  const results = [];
+  try {
+    for (const run of runs) {
+      results.push(await batch(`node-matcher-${run}`, [...args, ...inventory.files.filter(file => !inventory.integration.includes(file))],
+        { ...httpEnv, DB_POOL_MAX: "1", DB_WORKER_POOL_MAX: "1" }, evidence));
+      results.push(await batch(`node-matcher-postgres-${run}`, [...args, ...inventory.integration],
+        { ...httpEnv, DB_POOL_MAX: "6", DB_WORKER_POOL_MAX: "6" }, evidence));
+    }
+    return results;
+  } finally { await server.stop(); }
+}
+
 /** Complete maintained MCP + matcher consumer gate; no browser server/build needed. */
 async function main() {
   process.chdir(ROOT);
@@ -70,20 +87,9 @@ async function main() {
   if (!fixture.passed) throw new Error("Public matcher fixture preparation failed");
   const fingerprints = await runBatch("catalogue-inputs", ["scripts/validation-data-fingerprints.mjs", join(evidence, "catalogue-inputs.json")], common, evidence);
   if (!fingerprints.passed) throw new Error("Frozen catalogue/schema fingerprint evidence is missing");
-  const server = await startHttpCandidate(common, evidence);
-  common.MCP_URL = `${server.identity.origin}/api/mcp`;
-  common.MCP_ISOLATED_CANDIDATE = "1";
-  common.NEXT_PUBLIC_SITE_URL = server.identity.origin;
-  common.SITE_URL = server.identity.origin;
-  const results = [prerequisites, fixture, fingerprints];
-  try {
   const runs = process.argv.includes("--twice") ? ["a", "b"] : ["a"];
-  for (const run of runs) {
-    results.push(await runBatch(`node-matcher-${run}`, [...args, ...inventory.files.filter(file => !inventory.integration.includes(file))],
-      { ...common, DB_POOL_MAX: "1", DB_WORKER_POOL_MAX: "1" }, evidence));
-    results.push(await runBatch(`node-matcher-postgres-${run}`, [...args, ...inventory.integration],
-      { ...common, DB_POOL_MAX: "6", DB_WORKER_POOL_MAX: "6" }, evidence));
-  }
+  const results = [prerequisites, fixture, fingerprints,
+    ...await runMatcherBatches({ common, evidence, inventory, args, runs })];
   let identicalNonLatency = null;
   if (runs.length === 2) {
     const canonical = run => ["node-matcher", "node-matcher-postgres"].flatMap(batch => readFileSync(join(evidence, `${batch}-${run}-events.jsonl`), "utf8").trim().split("\n").filter(Boolean).map(line => JSON.stringify(JSON.parse(line)))).sort();
@@ -98,7 +104,6 @@ async function main() {
   writeFileSync(join(evidence, "results.json"), JSON.stringify(result, null, 2), { flag: "wx" });
   console.log(JSON.stringify({ evidence, passed: result.passed, unchangedSource, identicalNonLatency }));
   if (!result.passed) process.exitCode = 1;
-  } finally { await server.stop(); }
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main().catch(error => { console.error(error.message); process.exitCode = 1; });
