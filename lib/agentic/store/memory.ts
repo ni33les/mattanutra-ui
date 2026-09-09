@@ -1,5 +1,6 @@
 import { operationCursor, withoutOperationCursor, withOperationCursor } from "@/lib/agentic/store/operation-checkpoint";
 import { AsyncLocalStorage } from "node:async_hooks";
+import { planStatusProjection } from "@/lib/agentic/presentation/status-projection";
 import type {
   AgenticStore,
   CapabilityRecord,
@@ -58,6 +59,22 @@ export function createMemoryStore(): AgenticStore {
   const maps = [catalogues, capabilities, checkouts, feedback, fulfilment, idempotency, orderItems, orders, outbox, paymentAttempts, paymentAudits, plans, operations, providerEvents, retailLinks, revisions, supportCases, supportMessages] as Map<string, unknown>[];
 
   const store: AgenticStore = {
+    async getPlanReadState(planId, requestedRevision, includeResult = false) {
+      const plan = plans.get(planId); if (!plan) return null;
+      const revision = revisions.get(revisionKey(planId, requestedRevision ?? plan.currentRevision)); if (!revision) return null;
+      const candidates = [...operations.values()].filter(row => row.planId === planId);
+      const active = candidates.filter(row => ["queued", "running", "retryable"].includes(row.status))
+        .sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id))[0];
+      const op = active ?? candidates.filter(row => row.expectedRevision === plan.currentRevision && ["failed", "cancelled"].includes(row.status))
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt) || b.id.localeCompare(a.id))[0];
+      const projection = revision.statusProjection ?? null;
+      return clone({ plan, revision: revision.revision, projection,
+        result: includeResult || !projection ? revision.result : null,
+        operation: op ? { id: op.id, revision: op.revision, status: op.status, error: op.error, createdAt: op.createdAt, deadlineAt: op.deadlineAt } : null,
+        frozen: [...orders.values()].some(row => row.planId === planId && row.planRevision === revision.revision &&
+          !["expired", "cancelled"].includes(row.orderStatus) && !row.cancelledAt && !row.expiredAt),
+        catalogueRevision: projection?.catalogueRevision ?? null });
+    },
     async getPlanOperation(id, options) {
       const record = operations.get(id);
       return record ? clone(options?.includeCursor === false ? withoutOperationCursor(record) : record) : null;
@@ -371,7 +388,7 @@ export function createMemoryStore(): AgenticStore {
       plans.set(record.id, clone(record));
     },
     async insertPlanRevision(record) {
-      revisions.set(revisionKey(record.planId, record.revision), clone(record));
+      revisions.set(revisionKey(record.planId, record.revision), clone({ ...record, statusProjection: record.statusProjection ?? planStatusProjection(record.result) }));
     },
     async insertProviderEvent(record) {
       const key = `${record.provider}:${record.providerEventId}`;
@@ -443,7 +460,7 @@ export function createMemoryStore(): AgenticStore {
         throw new Error("plan_revision_missing");
       }
 
-      revisions.set(key, clone(record));
+      revisions.set(key, clone({ ...record, statusProjection: planStatusProjection(record.result) }));
     },
     async updateSupportCase(record) {
       supportCases.set(record.id, clone(record));

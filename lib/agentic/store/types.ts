@@ -65,6 +65,7 @@ export type PlanOperationRecord = Readonly<{
 }>;
 
 export type PlanRevisionRecord = Readonly<{
+  statusProjection?: import("@/lib/agentic/presentation/status-projection").PlanStatusProjection | null;
   availabilityAsOf: string;
   catalogueVersion: string;
   createdAt: string;
@@ -225,6 +226,8 @@ export type FeedbackRecord = Readonly<{
 }>;
 
 export type AgenticStore = {
+  /** Coherent MVCC presentation read; never locks rows or includes commands/cursors. */
+  getPlanReadState(planId: string, revision?: number, includeResult?: boolean): Promise<import("@/lib/agentic/presentation/status-projection").PlanReadState | null>;
   getPlanOperation(id: string, options?: { includeCursor: boolean }): Promise<PlanOperationRecord | null>;
   getPlanOperationByKey(ownerScope: string, key: string): Promise<PlanOperationRecord | null>;
   getActivePlanOperation(planId: string): Promise<PlanOperationRecord | null>;

@@ -1,3 +1,4 @@
+import { planStatusProjection } from "@/lib/agentic/presentation/status-projection";
 import { planContractCompatible } from "@/lib/agentic/presentation/compatibility";
 import { withoutOperationCursor } from "@/lib/agentic/store/operation-checkpoint";
 import { expirePlanOperation, operationDeadlineRemaining, planOperationDeadlineError } from "@/lib/agentic/plan/operations";
@@ -2006,6 +2007,7 @@ async function persistTerminalPlan(input: Readonly<{
   // and receipt writes belong to the atomic commit.
   const projectedSuccess = successFromResult({ locale: input.locale, planHandle: input.planHandle,
     result: terminalResult, revision: input.revision });
+  const statusProjection = planStatusProjection(terminalResult);
   const response = await input.input.store.transaction(async (store) => {
     const plan = await store.getPlanForUpdate(input.planId);
     if (!plan) return businessError({ message: "Not found.", reasonCode: "not_found" });
@@ -2054,7 +2056,7 @@ async function persistTerminalPlan(input: Readonly<{
         planId: input.planId, revision: input.revision, scope: input.input.scope, store });
     }
     const success = projectedSuccess;
-    const record = revisionRecord(input.planId, input.revision, result, current?.createdAt ?? input.input.now);
+    const record = { ...revisionRecord(input.planId, input.revision, result, current?.createdAt ?? input.input.now), statusProjection };
     if (current) await store.updatePlanRevision(record);
     else await store.insertPlanRevision(record);
     await store.updatePlan({ ...plan, currentRevision: input.revision, updatedAt: input.input.now });

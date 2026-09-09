@@ -2,62 +2,50 @@ import type { AgenticRuntime } from "@/lib/agentic/runtime";
 import { resolveCapability } from "@/lib/agentic/capabilities";
 import { businessError, isAgenticErrorResult } from "@/lib/agentic/contract/errors";
 import { AGENTIC_CONTRACT_VERSION } from "@/lib/agentic/config";
-import { canonicalHash } from "@/lib/agentic/value/canonical";
-import { pinnedSnapshotIdFromResult, getPinnedCatalogueSnapshot } from "@/lib/agentic/catalogue/pin";
 import { originalRequestFor } from "@/lib/agentic/plan/request-patch";
 import type { PlanResult } from "@/lib/agentic/plan/types";
 import type { PlanStatusWire } from "@/lib/agentic/contract/outputs";
 import { planContractCompatible } from "@/lib/agentic/presentation/compatibility";
-import { expirePlanOperation } from "@/lib/agentic/plan/operations";
-import { PLAN_PRESENTATION_VERSION } from "@/lib/agentic/presentation/version";
-import { planOperationalContext } from "@/lib/agentic/value/operational-decision";
+import { operationForRead, planStatusProjection, projectedResultVersion } from "@/lib/agentic/presentation/status-projection";
+import { getPinnedCatalogueSnapshot } from "@/lib/agentic/catalogue/pin";
 
-/** Reads committed data and the admitted operation without building baskets,
- * advice or schedules. No matching, network calls or shared customer cache. */
-export async function readPlanPresentation(runtime: AgenticRuntime, planHandle: string, requestedRevision?: number) {
+async function readState(runtime: AgenticRuntime, planHandle: string, requestedRevision?: number, includeResult = false) {
   const capability = await resolveCapability({ action: "plan.read", config: runtime.config, handle: planHandle,
     now: runtime.now ?? new Date().toISOString(), resourceType: "plan", scope: runtime.scope, store: runtime.store });
   if (!capability) return businessError({ reasonCode: "not_found", message: "Not found." });
-  const state = await runtime.store.transaction(async store => {
-    const plan = await store.getPlan(capability.resourceId);
-    if (!plan) return null;
-    const revision = await store.getPlanRevision(plan.id, requestedRevision ?? plan.currentRevision);
-    let active = await store.getActivePlanOperation(plan.id);
-    if (active && await expirePlanOperation(store, active.id, new Date().toISOString())) active = null;
-    const operation = active ?? await store.getFailedPlanOperation(plan.id, plan.currentRevision);
-    const order = await store.getActiveOrderForPlanRevision(plan.id, requestedRevision ?? plan.currentRevision);
-    const snapshotId = revision ? pinnedSnapshotIdFromResult(revision.result as PlanResult) : "";
-    const snapshot = snapshotId ? getPinnedCatalogueSnapshot(snapshotId)?.snapshot ?? await store.getCatalogueSnapshot(snapshotId) : null;
-    const current = snapshot?.runtimeRevision === undefined || !store.isCatalogueRevisionCurrent
-      ? true : await store.isCatalogueRevisionCurrent(snapshot.runtimeRevision);
-    return { plan, revision, operation, frozen: Boolean(order), current };
-  });
-  if (!state?.revision) return businessError({ reasonCode: "not_found", message: "Plan revision not found." });
-  const result = state.revision.result as PlanResult;
-  const refreshRequired = !state.frozen && (Boolean(result.refreshRequired) || !planContractCompatible(result.contractVersion) || !state.current);
-  const operation = state.operation;
-  const operationState = operation ? { id: operation.id, status: operation.status, revision: operation.revision, error: operation.error } : null;
-  // Search diagnostics and archives are not customer-visible identity inputs.
-  // The returned options, quantities, advice, request and searchSummary remain
-  // below; content fingerprints fence the underlying catalogue facts.
-  const telemetry = { snapshotId: result.matcherTelemetry.snapshotId, matcherVersion: result.matcherTelemetry.matcherVersion,
-    factLedgerHash: result.matcherTelemetry.factLedgerHash };
-  const resultVersion = canonicalHash({ presentation: PLAN_PRESENTATION_VERSION, revision: state.revision.revision,
-    currentRevision: state.plan.currentRevision, result: { ...result, matcherTelemetry: telemetry }, operation: operationState, refreshRequired });
-  return { ...state, revision: state.revision, result, resultVersion, refreshRequired, originalRequest: () => originalRequestFor(result) };
+  const stored = await runtime.store.getPlanReadState(capability.resourceId, requestedRevision, includeResult);
+  if (!stored) return businessError({ reasonCode: "not_found", message: "Plan revision not found." });
+  // Legacy fallback is read-only. The bounded backfill persists the projection.
+  const projection = stored.projection ?? planStatusProjection(stored.result);
+  if (!projection) return businessError({ reasonCode: "not_found", message: "Plan revision not found." });
+  if (!stored.projection && projection.snapshotId) {
+    const snapshot = getPinnedCatalogueSnapshot(projection.snapshotId)?.snapshot ?? await runtime.store.getCatalogueSnapshot(projection.snapshotId);
+    projection.catalogueRevision = snapshot?.runtimeRevision ?? null;
+  }
+  const state = { ...stored, operation: operationForRead(stored.operation) };
+  const current = projection.catalogueRevision === null || state.catalogueRevision === projection.catalogueRevision;
+  const refreshRequired = !state.frozen && (projection.refreshRequired || !planContractCompatible(projection.contractVersion) || !current);
+  return { ...state, projection, current, refreshRequired, resultVersion: projectedResultVersion(state, projection, refreshRequired) };
+}
+
+/** One coherent, ordinary database read after capability validation. */
+export async function readPlanPresentation(runtime: AgenticRuntime, planHandle: string, requestedRevision?: number) {
+  const state = await readState(runtime, planHandle, requestedRevision, true);
+  if (isAgenticErrorResult(state)) return state;
+  const result = state.result as PlanResult;
+  return { ...state, revision: { revision: state.revision, result }, result, originalRequest: () => originalRequestFor(result) };
 }
 
 export async function readPlanStatus(runtime: AgenticRuntime, planHandle: string, knownResultVersion?: string): Promise<PlanStatusWire | ReturnType<typeof businessError>> {
-  const state = await readPlanPresentation(runtime, planHandle);
+  const state = await readState(runtime, planHandle);
   if (isAgenticErrorResult(state)) return state;
-  const { result, revision, operation, resultVersion, refreshRequired } = state;
+  const { projection, revision, operation, resultVersion, refreshRequired } = state;
   const active = operation && ["queued", "running", "retryable"].includes(operation.status);
   const error = operation && isAgenticErrorResult(operation.error) ? operation.error.error : undefined;
-  const { decision } = planOperationalContext(result);
-  return { ok: true, responseView: "status", planHandle, revision: revision.revision, resultVersion,
-    contractVersion: AGENTIC_CONTRACT_VERSION, locale: result.requestSnapshot.locale,
-    status: active ? "processing" : decision.status, unchanged: knownResultVersion === resultVersion,
+  return { ok: true, responseView: "status", planHandle, revision, resultVersion,
+    contractVersion: AGENTIC_CONTRACT_VERSION, locale: projection.locale,
+    status: active ? "processing" : projection.decision.status, unchanged: knownResultVersion === resultVersion,
     pendingRevision: operation?.revision ?? null, operationStatus: operation?.status ?? null,
-    nextActions: error || operation?.status === "cancelled" || refreshRequired ? ["refresh_plan"] : active ? ["poll_plan"] : [decision.nextAction],
+    nextActions: error || operation?.status === "cancelled" || refreshRequired ? ["refresh_plan"] : active ? ["poll_plan"] : [projection.decision.nextAction],
     pollAfterSeconds: active ? 2 : 0, refreshRequired, ...(error ? { error: JSON.parse(JSON.stringify(error)) as PlanStatusWire["error"] } : {}) };
 }

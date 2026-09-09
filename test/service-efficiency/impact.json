@@ -14,6 +14,13 @@
       "slice": "reads",
       "expectedCases": 3,
       "reason": "Lockless projection reads, unchanged versions, preserved expiry state and full conversation compatibility"
+    },
+    {
+      "file": "test/service-efficiency/reads.integration.test.ts",
+      "slice": "reads-pg",
+      "database": true,
+      "expectedCases": 2,
+      "reason": "Actual PostgreSQL locks retained for mutations, nonblocking status and two small SELECTs"
     }
   ],
   "inputs": [
