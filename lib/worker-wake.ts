@@ -5,7 +5,10 @@ import type { TaskQueueSignal } from "@/lib/task-queue-signal";
 const wakeLog = createLogger("worker.wake");
 const WAKE_TIMEOUT_MS = 1_500;
 
-export async function pingRegisteredWorkerWakes(signal: TaskQueueSignal) {
+const dispatchWake = coalescedWorkerWake(sendRegisteredWorkerWakes);
+export function pingRegisteredWorkerWakes(signal: TaskQueueSignal) { return dispatchWake(signal); }
+
+async function sendRegisteredWorkerWakes(signal: TaskQueueSignal) {
   const taskType = signal.taskType.trim();
 
   if (!taskType) {
@@ -67,4 +70,23 @@ async function pingWakeUrl(url: string, signal: TaskQueueSignal) {
   } finally {
     clearTimeout(timeout);
   }
+}
+
+/** One bounded burst per task type; notifications remain a hint, DB leases own work. */
+export function coalescedWorkerWake(deliver: (signal: TaskQueueSignal) => Promise<void>) {
+  const pending = new Map<string, { next: TaskQueueSignal | null; promise: Promise<void> }>();
+  return (signal: TaskQueueSignal): Promise<void> => {
+    const key = signal.taskType.trim(); if (!key) return Promise.resolve();
+    const existing = pending.get(key);
+    if (existing) {
+      existing.next = existing.next && existing.next.taskId !== signal.taskId ? { taskType: key } : { ...signal, taskType: key };
+      return existing.promise;
+    }
+    if (pending.size >= 256) return Promise.resolve(); // Periodic durable discovery remains authoritative.
+    const entry = { next: { ...signal, taskType: key } as TaskQueueSignal | null, promise: Promise.resolve() };
+    entry.promise = Promise.resolve().then(async () => {
+      while (entry.next) { const next = entry.next; entry.next = null; await deliver(next); }
+    }).finally(() => pending.delete(key));
+    pending.set(key, entry); return entry.promise;
+  };
 }

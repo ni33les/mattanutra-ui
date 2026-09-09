@@ -1,3 +1,4 @@
+import { MATCH_WORKER_PROTOCOL } from "../lib/agentic/plan/match-worker-protocol.ts";
 import { parentPort } from "node:worker_threads";
 import { matchPlan, matchPlanChunk, createResidentPlanSession, advanceResidentPlanSession } from "../lib/agentic/plan/matching.ts";
 import { matchCursorAttempts } from "../lib/matcher/match-cursor.ts";
@@ -13,6 +14,7 @@ function arm(id: string, entry: Resident) {
   clearTimeout(entry.expiry); entry.expiry = setTimeout(() => release(id), 60_000); entry.expiry.unref();
 }
 parentPort.on("message", (job: MatchCommand) => {
+  if ("kind" in job && job.protocol !== MATCH_WORKER_PROTOCOL) { parentPort!.postMessage({ error: "worker_protocol_mismatch" }); return; }
   if ("kind" in job && job.kind === "session-release") { release(job.sessionId); return; }
   let reply: MatchReply;
   try {

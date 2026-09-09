@@ -7,6 +7,9 @@ export async function register() {
     return;
   }
 
+  const { startServiceMeasurementReporting } = await import("./lib/service-metrics");
+  startServiceMeasurementReporting(value => console.info("[service-efficiency]", JSON.stringify(value)));
+
   const { keepDatabaseWarm } = await import("./lib/db");
   await keepDatabaseWarm();
   void import("./lib/task-sweep-loop")

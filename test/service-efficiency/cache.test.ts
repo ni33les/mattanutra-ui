@@ -76,7 +76,9 @@ test("EFF-CACHE-06 durable result identities fence locale, effort, scope, facts 
     assert.notEqual(matchingResultIdentity({ ...job, state: { ...job.state, locale: "th" } }, "dev:tenant-a"), key);
     assert.notEqual(matchingResultIdentity({ ...job, state: { ...job.state, searchEffort: "expanded" } }, "dev:tenant-a"), key);
     assert.notEqual(matchingResultIdentity({ ...job, snapshot: { ...job.snapshot, availabilityAsOf: "2026-09-09T00:00:00Z" } }, "dev:tenant-a"), key);
+    resetMatcherSafetyCeilings();
+    const noReferences = matchingResultIdentity(job, "dev:tenant-a");
     setMatcherSafetyCeilingsUnavailable();
-    assert.notEqual(matchingResultIdentity(job, "dev:tenant-a"), key);
+    assert.notEqual(matchingResultIdentity(job, "dev:tenant-a"), noReferences);
   } finally { resetMatcherSafetyCeilings(); }
 });

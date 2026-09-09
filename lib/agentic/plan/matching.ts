@@ -45,6 +45,7 @@ import {
   catalogBandRulesVersion,
   matcherSafetyCeilings,
   matcherSafetyReferenceIdentity,
+  matcherSafetyCeilingsUnavailable,
   safetyCeilingFor
 } from "@/lib/matcher/safety-ceilings";
 import { agenticMessage, negotiateLocale } from "@/lib/agentic/i18n";
@@ -1343,5 +1344,5 @@ export function planCheckpointInputIdentity(input: Parameters<typeof matchPlan>[
  * deliberately excludes that diagnostic clock for legacy checkpoint recovery. */
 export function matchingResultIdentity(input: Parameters<typeof matchPlan>[0], scope: string) {
   return createHash("sha256").update(JSON.stringify([scope, matchPlanCacheKey(input.state, input.snapshot),
-    input.snapshot.availabilityAsOf])).digest("hex");
+    input.snapshot.availabilityAsOf, matcherSafetyCeilingsUnavailable(), matcherSafetyReferenceIdentity()])).digest("hex");
 }

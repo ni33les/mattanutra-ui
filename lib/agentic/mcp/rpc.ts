@@ -1,3 +1,4 @@
+import { measureService } from "@/lib/service-metrics";
 import { computeSchemaChecksum } from "@/lib/agentic/release-manifest";
 import { createLogger } from "@/lib/logger";
 import { AGENTIC_CONTRACT_REGISTRY } from "@/lib/agentic/contract/registry";
@@ -173,6 +174,7 @@ export function toolText(value: unknown) {
   return "ok";
 }
 
+let responseSample = 0;
 const responseLog = createLogger("agentic.mcp.payload");
 function structuredSummary(value: unknown) {
   const row = record(value);
@@ -188,18 +190,21 @@ function structuredSummary(value: unknown) {
 }
 
 export function toolResult(value: unknown, isError = false, tool?: string, resultContent?: "structured") {
-  const serialized = JSON.stringify(value);
   const view = record(value).responseView ?? "full";
   void resultContent; // Legacy opt-in remains accepted; concise views now always avoid JSON clones.
   const concise = !isError && (view === "conversation" || view === "status");
+  const sampled = Boolean(tool && process.env.NODE_ENV !== "test" && responseSample++ % 64 === 0);
+  const finish = measureService("serialization.ms");
+  const serialized = !concise || sampled ? JSON.stringify(value) : "";
+  finish();
   const content = concise ? [{ type: "text", text: structuredSummary(value) }] : [
     { type: "text", text: toolText(value) }, { type: "text", text: serialized }
   ];
   const result = { content, isError, structuredContent: value };
-  if (tool && process.env.NODE_ENV !== "test") {
+  if (sampled) {
     responseLog.info("response_bytes", { tool, view, structuredBytes: Buffer.byteLength(serialized, "utf8"),
       textBytes: content.reduce((sum, row) => sum + Buffer.byteLength(row.text, "utf8"), 0),
-      responseBytes: Buffer.byteLength(JSON.stringify(result), "utf8"), concise, isError });
+      responseBytes: Buffer.byteLength(JSON.stringify({ content, isError, structuredContent: null }), "utf8") - 4 + Buffer.byteLength(serialized, "utf8"), sampleEvery: 64, concise, isError });
   }
   return result;
 }

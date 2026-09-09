@@ -1,3 +1,4 @@
+import { MATCH_WORKER_PROTOCOL } from "@/lib/agentic/plan/match-worker-protocol";
 import { resolve } from "node:path";
 import { Worker } from "node:worker_threads";
 import { ThreadPool } from "@/lib/thread-pool";
@@ -15,9 +16,9 @@ export type MatchJob = MatchInput & {
   safetyUnavailable: boolean;
 };
 type MatchValue = MatchResult | PlanMatchChunk | ResidentPlanMatchChunk;
-export type MatchCommand = MatchJob | (Omit<MatchJob, "chunk"> & { kind: "session-start"; sessionId: string; chunk: ResidentChunkOptions })
-  | { kind: "session-continue"; sessionId: string; expectedAttempts: number; chunkBudget: number; lostAttempts?: number }
-  | { kind: "session-release"; sessionId: string };
+export type MatchCommand = MatchJob | (Omit<MatchJob, "chunk"> & { protocol: typeof MATCH_WORKER_PROTOCOL; kind: "session-start"; sessionId: string; chunk: ResidentChunkOptions })
+  | { protocol: typeof MATCH_WORKER_PROTOCOL; kind: "session-continue"; sessionId: string; expectedAttempts: number; chunkBudget: number; lostAttempts?: number }
+  | { protocol: typeof MATCH_WORKER_PROTOCOL; kind: "session-release"; sessionId: string };
 export type MatchReply = { result: ReferenceJobCompletion<MatchValue>; error?: never } | { error: string; result?: never };
 
 export { ThreadPoolUnavailableError as MatcherUnavailableError } from "@/lib/thread-pool";
@@ -61,9 +62,9 @@ export class MatchWorkerPool {
       input.snapshot.products.length > 0 && input.snapshot.products.every(product => product.source === "fixture"));
     const checkpoint = reuse ? undefined : chunk.checkpoint && typeof chunk.checkpoint.cursor !== "string"
       ? { ...chunk.checkpoint, cursor: Uint8Array.from(chunk.checkpoint.cursor) } : chunk.checkpoint;
-    const command: MatchCommand = reuse ? { kind: "session-continue", sessionId, expectedAttempts: chunk.checkpoint?.expansionAttempts ?? 0,
+    const command: MatchCommand = reuse ? { protocol: MATCH_WORKER_PROTOCOL, kind: "session-continue", sessionId, expectedAttempts: chunk.checkpoint?.expansionAttempts ?? 0,
       chunkBudget: chunk.chunkBudget, lostAttempts: chunk.lostAttempts }
-      : { ...input, kind: "session-start", sessionId, chunk: { ...chunk, checkpoint }, referenceIdentity,
+      : { ...input, protocol: MATCH_WORKER_PROTOCOL, kind: "session-start", sessionId, chunk: { ...chunk, checkpoint }, referenceIdentity,
         ceilings: matcherSafetyCeilings(), safetyUnavailable: matcherSafetyCeilingsUnavailable() };
     this.sessions.set(sessionId, { input, referenceIdentity });
     try {
@@ -84,7 +85,7 @@ export class MatchWorkerPool {
   }
   closeResidentSession(sessionId: string) {
     clearTimeout(this.sessions.get(sessionId)?.idleTimer);
-    this.sessions.delete(sessionId); this.pool.releaseAffinity(sessionId, { kind: "session-release", sessionId });
+    this.sessions.delete(sessionId); this.pool.releaseAffinity(sessionId, { protocol: MATCH_WORKER_PROTOCOL, kind: "session-release", sessionId });
   }
   close() { for (const sessionId of this.sessions.keys()) this.closeResidentSession(sessionId); return this.pool.close(); }
 }

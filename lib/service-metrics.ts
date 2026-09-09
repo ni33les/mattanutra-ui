@@ -35,3 +35,13 @@ export function measureService(name: ServiceMetric) {
   const start = performance.now();
   return () => recordServiceMetric(name, performance.now() - start);
 }
+
+let reportTimer: ReturnType<typeof setInterval> | undefined;
+/** A single aggregate record per minute; values never contain request inputs. */
+export function startServiceMeasurementReporting(write: (value: ReturnType<typeof serviceProcessMeasurements>) => void) {
+  if (reportTimer) return () => {};
+  serviceProcessMeasurements();
+  reportTimer = setInterval(() => { write(serviceProcessMeasurements()); }, 60_000);
+  reportTimer.unref?.();
+  return () => { clearInterval(reportTimer); reportTimer = undefined; eventLoop?.disable(); eventLoop = undefined; };
+}
