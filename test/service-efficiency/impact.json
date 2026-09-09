@@ -33,6 +33,13 @@
       "slice": "wakeup",
       "expectedCases": 3,
       "reason": "Lost task notification reproduction, bounded coalescing and single-consumer wakeups"
+    },
+    {
+      "file": "test/service-efficiency/operations.integration.test.ts",
+      "slice": "operations-pg",
+      "database": true,
+      "expectedCases": 2,
+      "reason": "Bounded atomic lease and checkpoint statements with preserved commands, cursor and stale-owner rejection"
     }
   ],
   "inputs": [
