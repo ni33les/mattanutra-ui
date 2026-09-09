@@ -255,8 +255,8 @@
   "browser": [
     {
       "file": "test/e2e/web-funnel-recovery.spec.ts",
-      "grep": "fresh browser|capture failure|ordinary checkout|prepaid reservation|progress and reveal",
-      "expectedCases": 9,
+      "grep": "fresh browser|capture failure|ordinary checkout|prepaid reservation|progress and reveal|no-purchase formulation",
+      "expectedCases": 10,
       "reason": "Capture/resume/reload, shared status and reveal/payment/email recovery in en/th/zh-CN without repeating matching",
       "excluded": "Three ANNA-BROWSER-06 numeric preference/exclusion matching scenarios remain maintained and outside this polling/infrastructure browser scope"
     }

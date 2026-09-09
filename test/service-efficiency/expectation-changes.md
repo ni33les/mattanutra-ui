@@ -15,3 +15,5 @@ Historical evidence and prices are unchanged.
 
 - EFF-TXN-PG-02 now compares exact checkpoint bytes independently of base64 transport. BYTEA reads remain binary; historical JSON/base64 readers stay supported.
 - EFF-CACHE-07 initial attempts used an invalid short idempotency key and were prerequisite failures, not product RED evidence. The corrected real-worker test proves two owners coalesce and a third reuses completed matching facts without sharing capability access.
+
+- Final inventory includes the existing completed no-purchase reveal browser regression (ten affected browser cases in total). `acceptance-1` was deliberately interrupted to correct its omission before deployment; its partial execution is not an attestation.
