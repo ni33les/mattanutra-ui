@@ -1,3 +1,6 @@
+import { canonicalHash } from "../lib/agentic/value/canonical.ts";
+import { runWithMatcherSafetySnapshot } from "../lib/matcher/safety-ceilings-server.ts";
+import { captureMatcherSafetySnapshot } from "../lib/matcher/safety-ceilings.ts";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
@@ -12,7 +15,8 @@ import {
   replaceCatalogueSnapshot
 } from "../lib/agentic/catalogue/snapshot.ts";
 import type { CatalogueSnapshot } from "../lib/agentic/catalogue/types.ts";
-import { matchPlan, evaluateSafety, planTool } from "./helpers/recording-mcp-dispatcher.ts";
+import { completedPlanTool as planTool } from "./helpers/completed-mcp-client.ts";
+import { matchPlan, evaluateSafety } from "./helpers/recording-mcp-dispatcher.ts";
 import { PLAN_MATCH_RETURN_BUDGET_MS } from "../lib/agentic/plan/service.ts";
 import { captureMcpTranscript, type RecordedMcpTranscript } from "./helpers/mcp-evidence.ts";
 import { normalizePublishedClientResult } from "../scripts/published-client-semantics.mjs";
@@ -331,7 +335,10 @@ export async function pinWithoutRematch(snapshot: CatalogueSnapshot, store = cre
     tenantScope: "mattanutra"
   };
   const now = "2026-08-27T00:00:00.000Z";
-  const created = await planTool({
+  const captured = captureMatcherSafetySnapshot();
+  const references = { ...captured, identity: snapshot.runtimeRevision == null ? captured.identity : { runtimeRevision: snapshot.runtimeRevision, fingerprint: canonicalHash(captured.ceilings) } };
+  const evaluate: typeof planTool = input => runWithMatcherSafetySnapshot(references, () => planTool(input));
+  const created = await evaluate({
     config,
     now,
     payload: {
@@ -348,7 +355,7 @@ export async function pinWithoutRematch(snapshot: CatalogueSnapshot, store = cre
 
   const question = created.questions?.[0];
   const choice = question?.choices?.[0]?.choice;
-  const pinned = await planTool({
+  const pinned = await evaluate({
     config,
     now,
     payload:
