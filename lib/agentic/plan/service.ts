@@ -60,7 +60,7 @@ import { persistMatcherTelemetry } from "@/lib/agentic/plan/telemetry";
 import { publicPlanFields } from "@/lib/agentic/public-mapper";
 import { SharedMatchWork } from "@/lib/match-work-cache";
 import { matchingResultIdentity } from "@/lib/agentic/plan/matching";
-import { matchPlanInWorker, matchPlanResidentChunkInWorker, closePlanMatchSession, MatcherUnavailableError } from "@/lib/agentic/plan/match-worker-pool";
+import { matchPlanInWorker, matchPlanResidentChunkInWorker, closePlanMatchSession, acknowledgePlanMatchSession, MatcherUnavailableError } from "@/lib/agentic/plan/match-worker-pool";
 import { evidenceHandleFor, issueEvidenceCapability } from "@/lib/agentic/evidence/tool";
 import { planCompactApplicable } from "@/lib/agentic/contract/plan-result";
 import { planClaimIds, planResearchVersion } from "@/lib/agentic/value/compact-decision";
@@ -503,6 +503,7 @@ async function durableMatch(input: { snapshot: CatalogueSnapshot; state: Canonic
         () => context.notify({ checkpoint: reserved, reserve: true }), context.signal);
       checkpoint = { ...checkpoint, stage: "search", search: reply.checkpoint, reservedAttempts: 0 };
       await context.notify({ checkpoint, reserve: false });
+      acknowledgePlanMatchSession(sessionId);
       lostAttempts = 0;
       console.info("[agentic-plan-checkpoint]", { operationId: claim.id, attempts: reply.expansionAttempts,
         budget: reply.checkpoint.expansionBudget, checkpointBytes: reply.checkpoint.cursor.length, complete: reply.done });

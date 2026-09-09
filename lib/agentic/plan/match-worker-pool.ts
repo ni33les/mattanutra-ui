@@ -73,15 +73,16 @@ export class MatchWorkerPool {
       const value = checkedReferenceCompletion(result, referenceIdentity);
       if (!("done" in value) || !(value.checkpoint.cursor instanceof Uint8Array)) throw new Error("Missing binary session checkpoint");
       if (value.done) this.closeResidentSession(sessionId);
-      else {
-        const session = this.sessions.get(sessionId);
-        if (session) {
-          session.idleTimer = setTimeout(() => this.closeResidentSession(sessionId), this.idleSessionMs);
-          session.idleTimer.unref();
-        }
-      }
       return { ...value, checkpoint: { ...value.checkpoint, cursor: value.checkpoint.cursor }, inputTransferred: !reuse };
     } catch (error) { this.closeResidentSession(sessionId); throw error; }
+  }
+  acknowledgeResidentSession(sessionId: string) {
+    const session = this.sessions.get(sessionId);
+    if (!session) return;
+    this.pool.acknowledgeAffinity(sessionId, { protocol: MATCH_WORKER_PROTOCOL, kind: "session-release", sessionId });
+    clearTimeout(session.idleTimer);
+    session.idleTimer = setTimeout(() => this.closeResidentSession(sessionId), this.idleSessionMs);
+    session.idleTimer.unref();
   }
   closeResidentSession(sessionId: string) {
     clearTimeout(this.sessions.get(sessionId)?.idleTimer);
@@ -103,3 +104,4 @@ export function matchPlanResidentChunkInWorker(sessionId: string, input: MatchIn
   return pool.runResidentChunk(sessionId, input, chunk, signal, beforeStart);
 }
 export function closePlanMatchSession(sessionId: string) { pool.closeResidentSession(sessionId); }
+export function acknowledgePlanMatchSession(sessionId: string) { pool.acknowledgeResidentSession(sessionId); }

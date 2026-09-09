@@ -19,7 +19,7 @@ type Job<Input, Result> = {
   cleanup: () => void; controller: AbortController; settled: boolean; posted: boolean;
   startTimer: () => void;
 };
-type Slot<Input, Result> = { worker: Worker; job?: Job<Input, Result>; affinity?: string; releaseCpu?: () => void };
+type Slot<Input, Result> = { worker: Worker; job?: Job<Input, Result>; affinity?: string; acknowledged?: { releaseMessage: Input }; releaseCpu?: () => void };
 
 export class ThreadPoolUnavailableError extends Error {
   readonly reason: "capacity" | "timeout" | "worker_failure" | "checkpoint_mismatch";
@@ -59,10 +59,14 @@ export class ThreadPool<Input, Result> {
   }
 
   hasAffinity(key: string) { return [...this.slots].some(slot => slot.affinity === key && !this.terminating.has(slot)); }
+  acknowledgeAffinity(key: string, releaseMessage: Input) {
+    for (const slot of this.slots) if (slot.affinity === key && !slot.job) slot.acknowledged = { releaseMessage };
+    this.drain();
+  }
   releaseAffinity(key: string, releaseMessage?: Input) {
     for (const slot of this.slots) if (slot.affinity === key && !slot.job) {
       if (releaseMessage !== undefined && !this.terminating.has(slot)) slot.worker.postMessage(releaseMessage);
-      slot.affinity = undefined;
+      slot.affinity = undefined; slot.acknowledged = undefined;
     }
     this.drain();
   }
@@ -102,8 +106,15 @@ export class ThreadPool<Input, Result> {
         try { slot = this.spawn(); }
         catch { this.queue.splice(index, 1); this.cancel(job, new ThreadPoolUnavailableError("Matcher could not start")); continue; }
       }
+      if (!slot && !owned) {
+        slot = [...this.slots].find(item => !item.job && item.acknowledged && !this.terminating.has(item));
+        if (slot) {
+          slot.worker.postMessage(slot.acknowledged!.releaseMessage);
+          slot.affinity = undefined; slot.acknowledged = undefined;
+        }
+      }
       if (!slot) { index++; continue; }
-      this.queue.splice(index, 1); slot.job = job; slot.affinity = job.options.affinity; slot.worker.ref();
+      this.queue.splice(index, 1); slot.job = job; slot.affinity = job.options.affinity; slot.acknowledged = undefined; slot.worker.ref();
       void this.start(slot, job);
     }
   }
