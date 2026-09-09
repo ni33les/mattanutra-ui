@@ -22,3 +22,17 @@ test("LOCK-REG-02 production SQL locking sites require explicit registered justi
   assert.deepEqual(verifyLockSites(sites, register), []);
   assert.ok(verifyLockSites([...sites,{file:"lib/agentic/unregistered.ts",key:"new-lock",owner:"ordinaryRead",statement:"select id from tasks for update"}], register).length > 0);
 });
+
+test("LOCK-REG-03 trigger and migration locks cannot bypass architectural discovery", async () => {
+  const { mkdtempSync,mkdirSync,writeFileSync,rmSync }=await import("node:fs");
+  const { tmpdir }=await import("node:os");const { join }=await import("node:path");
+  const { scanLockSites,verifyLockSites }=await import("../../scripts/service-efficiency/lock-register.mjs");
+  const root=mkdtempSync(join(tmpdir(),"lock-register-sql-"));
+  try {
+    for(const directory of ["lib","app","workers","scripts","db-rollout"]) mkdirSync(join(root,directory));
+    writeFileSync(join(root,"db-schema.sql"),"create function public.guard_cycle() returns trigger language plpgsql as $$ begin perform pg_advisory_xact_lock(1,2); return new; end $$;");
+    const sites=scanLockSites(root);
+    assert.equal(sites.length,1,"SQL trigger locks are production locks too");assert.equal(sites[0].owner,"public.guard_cycle");
+    assert.deepEqual(verifyLockSites(sites,{sites:[],mechanisms:[]}),["Unregistered SQL lock: db-schema.sql:public.guard_cycle"]);
+  } finally {rmSync(root,{recursive:true,force:true});}
+});
