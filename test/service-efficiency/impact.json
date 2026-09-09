@@ -52,6 +52,12 @@
       "slice": "ownership",
       "expectedCases": 1,
       "reason": "HTTP admission persists work without starting another matching executor or owning a worker lease"
+    },
+    {
+      "file": "test/service-efficiency/sessions.test.ts",
+      "slice": "sessions",
+      "expectedCases": 2,
+      "reason": "Resident worker continuation, binary checkpoint restart and exact synchronous result/attempt parity"
     }
   ],
   "inputs": [
