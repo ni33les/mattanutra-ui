@@ -65,6 +65,12 @@ export async function issueCapability(input: Readonly<{
   scope: CapabilityScope;
   store: AgenticStore;
 }>): Promise<IssuedCapability> {
+  const issued = prepareCapability(input);
+  await input.store.insertCapability(issued.record);
+  return issued;
+}
+
+export function prepareCapability(input: Omit<Parameters<typeof issueCapability>[0], "store">): IssuedCapability {
   const handle = issueHandle();
   const record: CapabilityRecord = {
     allowedActions: input.allowedActions,
@@ -81,7 +87,6 @@ export async function issueCapability(input: Readonly<{
     tenantScope: input.scope.tenantScope
   };
 
-  await input.store.insertCapability(record);
   return { handle, record };
 }
 

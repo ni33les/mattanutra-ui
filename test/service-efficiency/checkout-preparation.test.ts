@@ -17,7 +17,7 @@ async function fixture(name: string) {
 
 test("LOCK-CHECKOUT-01 checkout preparation invokes no payment port under a transaction lock", async () => {
   const {app,call}=await fixture("lock-checkout-preparation");let locked=false,calls=0;
-  const store:AgenticStore={...app.store,transaction:work=>app.store.transaction(async tx=>{locked=true;try{return await work(tx);}finally{locked=false;}})};
+  const store:AgenticStore={...app.store,transaction:work=>app.store.transaction(async tx=>{locked=true;try{return await work({...tx,isCatalogueRevisionCurrent:async expected=>expected===11});}finally{locked=false;}})};
   const result=await executeTool({...call,store,payment:{createCheckoutSession:async input=>{calls++;assert.equal(locked,false,"payment dependencies run before acquiring plan/order locks");return app.payment.createCheckoutSession(input);}}});
   assert.equal(result.ok,true,JSON.stringify(result));assert.equal(calls,1);
 });
