@@ -465,6 +465,9 @@ function targetNameGroups(
 
 type DurableSearchCheckpoint = {
   stage: "normalized" | "search"; state: CanonicalPlanState; catalogueId: string;
+  // Preserve the exact legacy matcher identity through PostgreSQL JSONB, which
+  // otherwise reorders fact fields. Keep the old object reader for recovery.
+  referencesJson?: string;
   references?: MatcherSafetySnapshot;
   search?: import("@/lib/agentic/plan/matching").ResidentChunkOptions["checkpoint"];
   reservedAttempts?: number;
@@ -484,7 +487,8 @@ async function durableMatch(input: { snapshot: CatalogueSnapshot; state: Canonic
   const key = matchingResultIdentity(input, `${scope.environment}:${scope.tenantScope}`)
     + (initial.search || initial.reservedAttempts ? `:recovery:${claim.id}:${claim.leaseToken}` : "");
   return durableMatchingWork.run(key, { signal: requestLifetime()?.signal, checkpoint: async event => {
-    const checkpoint = { ...event.checkpoint, state: initial.state, catalogueId: initial.catalogueId, references: initial.references };
+    const checkpoint = { ...event.checkpoint, state: initial.state, catalogueId: initial.catalogueId,
+      referencesJson: initial.referencesJson, references: initial.references };
     // A subscriber joining between chunks first persists the shared acknowledged
     // cursor. Later reservations need only the small metadata update.
     const alreadyAcknowledged = initial.search?.expansionAttempts === checkpoint.search?.expansionAttempts;
@@ -1627,6 +1631,8 @@ async function completePreparedPlan(
   const isolated = Boolean(input.matchPort);
   const admittedOperation = planAttempts.getStore()?.operation;
   const savedCheckpoint = admittedOperation?.checkpoint as DurableSearchCheckpoint | null;
+  const savedReferences: MatcherSafetySnapshot | undefined = savedCheckpoint?.referencesJson
+    ? JSON.parse(savedCheckpoint.referencesJson) : savedCheckpoint?.references;
   let snapshot: CatalogueSnapshot;
   if (isolated) {
     snapshot = {
@@ -1658,11 +1664,11 @@ async function completePreparedPlan(
       GUIDANCE_RULES_VERSION, input.store
     );
   }
-  if (!isolated && !savedCheckpoint?.references && matcherSafetyCeilings().length < 1) await refreshAdminSafetyCeilings();
+  if (!isolated && !savedReferences && matcherSafetyCeilings().length < 1) await refreshAdminSafetyCeilings();
   // Capture before any asynchronous matching work. A concurrent refresh changes
   // the process cache, never this operation's advice, score or continuation input.
-  const references = savedCheckpoint?.references ?? captureMatcherSafetySnapshot(isolated ? undefined : snapshot.runtimeRevision);
-  if (savedCheckpoint?.references && (references.identity?.runtimeRevision !== snapshot.runtimeRevision ||
+  const references = savedReferences ?? captureMatcherSafetySnapshot(isolated ? undefined : snapshot.runtimeRevision);
+  if (savedReferences && (references.identity?.runtimeRevision !== snapshot.runtimeRevision ||
     admittedOperation?.referenceIdentity !== (references.identity?.fingerprint ?? null))) {
     return businessError({ reasonCode: "stale_revision", message: "The stored operation reference identity is inconsistent. Refresh the plan." });
   }
@@ -1903,7 +1909,7 @@ async function completePreparedPlan(
     }
     const saved = await updateClaimedOperation(input.store, activeOperation, {
       catalogueIdentity: catalogueSnapshotId(snapshot), referenceIdentity: matcherSafetyReferenceIdentity()?.fingerprint ?? null,
-      checkpoint: { ...(activeOperation.checkpoint ? withoutOperationCursor(activeOperation).checkpoint as DurableSearchCheckpoint : checkpoint ?? { stage: "normalized", state, catalogueId: catalogueSnapshotId(snapshot) }), references }
+      checkpoint: { ...(activeOperation.checkpoint ? withoutOperationCursor(activeOperation).checkpoint as DurableSearchCheckpoint : checkpoint ?? { stage: "normalized", state, catalogueId: catalogueSnapshotId(snapshot) }), references: undefined, referencesJson: JSON.stringify(references) }
     }, new Date().toISOString());
     if (!saved) return businessError({ reasonCode: "stale_revision", message: "This matching operation was cancelled or superseded. Reload the plan." });
   }

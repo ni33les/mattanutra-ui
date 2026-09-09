@@ -82,7 +82,7 @@ describe("external worker boundaries", () => {
     );
     assert.match(
       source,
-      /workerConcurrency\(profileMode\)/,
+      /workerProfileConcurrency\(profileMode\)/,
       "worker:all must apply real per-profile concurrency slots",
     );
     assert.match(
@@ -121,7 +121,7 @@ describe("external worker boundaries", () => {
       "healthscore workers must explicitly claim healthscore tasks from the shared profile registry",
     );
     assert.match(
-      source,
+      await readFile("lib/worker-profile-concurrency.ts", "utf8"),
       /WORKER_\$\{[a-zA-Z]+\.toUpperCase\(\)\}_CONCURRENCY/,
       "workers must allow profile-specific concurrency overrides",
     );
