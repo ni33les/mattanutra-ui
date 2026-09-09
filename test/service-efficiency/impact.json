@@ -315,6 +315,12 @@
       "slice": "duplicate-admission",
       "expectedCases": 2,
       "reason": "Audits 31/35: concurrent preparation without process Promise chains, one database-owned plan/checkout receipt"
+    },
+    {
+      "file": "test/service-efficiency/worker-capacity.test.ts",
+      "slice": "worker-capacity",
+      "expectedCases": 3,
+      "reason": "Audit 28: productive external matching concurrency follows shared CPU budget; unrelated worker concurrency retained"
     }
   ],
   "inputs": [
