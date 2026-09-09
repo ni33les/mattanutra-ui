@@ -439,7 +439,8 @@ async function applyPaidFormulationResult(
   task: TaskRecord,
   resultPayload: unknown,
   sqlOverride?: TaskServiceDb,
-  afterCommit?: AfterCommitScheduler
+  afterCommit?: AfterCommitScheduler,
+  preparedResult?: PreparedTaskCompletionResult
 ) {
   const sql = sqlOverride ?? getSql();
   const planId = task.planId;
@@ -448,7 +449,8 @@ async function applyPaidFormulationResult(
     throw new Error("Formulation completion result is missing a plan");
   }
 
-  const rows = await sql`
+  const prepared = preparedResult?.formulation;
+  const rows = prepared ? await sql`select selected_plan::text from public.assessments where plan_id=${planId}::uuid` : await sql`
     select answers, locale, selected_plan::text
     from public.assessments
     where plan_id = ${planId}::uuid
@@ -460,7 +462,7 @@ async function applyPaidFormulationResult(
     throw new Error("Assessment submission not found");
   }
 
-  const locale: Locale = generationInput(task.payload)?.locale ?? (isLocale(row.locale) ? row.locale : "en");
+  const locale: Locale = prepared?.locale ?? generationInput(task.payload)?.locale ?? (isLocale(row.locale) ? row.locale : "en");
   const taskPayload = objectValue(task.payload);
   const taskContext = objectValue(task.context);
   const taskSource =
@@ -488,7 +490,7 @@ async function applyPaidFormulationResult(
       task
     });
   });
-  const safeFormulation = await applyFormulationSafety(sql, {
+  const safeFormulation = prepared?.value ?? await applyFormulationSafety(sql, {
     afterCommit,
     audit: async ({ eventType, level, payload }) =>
       eventually(afterCommit, async () =>
@@ -501,10 +503,12 @@ async function applyPaidFormulationResult(
     planId,
     taskId: task.id
   });
+  for (const effect of prepared?.afterCommit ?? []) await eventually(afterCommit, effect);
 
   const version = await insertFormulationVersion(sql, {
     generation: generationInput(task.payload),
     formulation: safeFormulation,
+    preparedJson: prepared?.json,
     includeEmptyRecommendations: false,
     modelVersion: modelVersion(analysis),
     planId
@@ -633,7 +637,8 @@ async function applyFoodGuidanceResult(
   task: TaskRecord,
   resultPayload: unknown,
   sqlOverride?: TaskServiceDb,
-  afterCommit?: AfterCommitScheduler
+  afterCommit?: AfterCommitScheduler,
+  preparedResult?: PreparedTaskCompletionResult
 ) {
   const sql = sqlOverride ?? getSql();
   const planId = task.planId;
@@ -642,7 +647,8 @@ async function applyFoodGuidanceResult(
     throw new Error("Food guidance completion result is missing a plan");
   }
 
-  const rows = await sql`
+  const prepared = preparedResult?.food;
+  const rows = prepared ? await sql`select selected_plan::text from public.assessments where plan_id=${planId}::uuid` : await sql`
     select answers, locale, selected_plan::text
     from public.assessments
     where plan_id = ${planId}::uuid
@@ -654,7 +660,7 @@ async function applyFoodGuidanceResult(
     throw new Error("Assessment submission not found");
   }
 
-  const locale: Locale = generationInput(task.payload)?.locale ?? (isLocale(row.locale) ? row.locale : "en");
+  const locale: Locale = prepared?.locale ?? generationInput(task.payload)?.locale ?? (isLocale(row.locale) ? row.locale : "en");
   const taskPayload = objectValue(task.payload);
   const taskContext = objectValue(task.context);
   const taskSource =
@@ -676,7 +682,8 @@ async function applyFoodGuidanceResult(
     });
   });
 
-  const safeFoodGuidance = await applyFoodGuidanceSafety(sql, {
+  const safeFoodGuidance = prepared?.value ?? await applyFoodGuidanceSafety(sql, {
+    afterCommit,
     answers: row.answers,
     audit: async ({ eventType, level, payload }) =>
       eventually(afterCommit, async () =>
@@ -687,9 +694,11 @@ async function applyFoodGuidanceResult(
     planId,
     taskId: task.id
   });
+  for (const effect of prepared?.afterCommit ?? []) await eventually(afterCommit, effect);
   const version = await insertFoodGuidanceVersion(sql, {
     generation: generationInput(task.payload),
     foodGuidance: safeFoodGuidance,
+    preparedJson: prepared?.json,
     modelVersion: modelVersion(analysis),
     planId
   });
@@ -2077,15 +2086,38 @@ type PreparedProductVariant = ProductRecommendationVariantPayload & Readonly<{
   decisions: ReturnType<typeof productDecisionRowsFromRecommendationResult>; decisionsJson: string;
 }>;
 export type PreparedTaskCompletionResult = Readonly<{
+  formulation?: { value: FormulationBlueprint; json: string; locale: Locale; afterCommit: TaskAfterCommitEffect[] };
+  food?: { value: FoodGuidanceBlueprint; json: string; locale: Locale; afterCommit: TaskAfterCommitEffect[] };
   healthScore?: { json: string; projection: ReturnType<typeof healthScoreReadProjection>; locale: Locale };
   products?: { variants: PreparedProductVariant[]; selected: PreparedProductVariant | undefined; discovery: ReturnType<typeof productDiscoveryPayload>;
     discoveryNotes: string; configuredAdapters: number; countryCode: string; locale: Locale; legacyJson: string };
 }>;
 
 /** Pure projection/serialization happens before the task service opens its publication transaction. */
-export async function prepareTaskCompletionResult({ task, resultPayload }: Readonly<{ task: TaskRecord; resultPayload: unknown }>): Promise<PreparedTaskCompletionResult> {
-  if (!["analyze_healthscore", "generate_product_recommendations"].includes(task.taskType)) return {};
+export async function prepareTaskCompletionResult({ task, resultPayload, sql: sqlOverride }: Readonly<{ task: TaskRecord; resultPayload: unknown; sql?: TaskServiceDb }>): Promise<PreparedTaskCompletionResult> {
+  if (!["analyze_healthscore", "generate_product_recommendations", "generate_supplement_guidance", "generate_food_guidance"].includes(task.taskType)) return {};
   const generation = generationInput(task.payload);
+  if (["generate_supplement_guidance", "generate_food_guidance"].includes(task.taskType)) {
+    if (!generation || objectValue(resultPayload).superseded === true) return {};
+    const sql = sqlOverride ?? getSql();
+    if (!sql || !task.planId) throw new Error("Nutrition result preparation requires its saved assessment");
+    const [row] = await sql`select answers,locale,selected_plan::text from public.assessments where plan_id=${task.planId}::uuid`;
+    if (!row) throw new Error("Assessment submission not found");
+    const locale: Locale = generation?.locale ?? (isLocale(row.locale) ? row.locale : "en");
+    const effects: TaskAfterCommitEffect[] = [];
+    const common = { answers: generation?.answers ?? row.answers, locale, planId: task.planId, taskId: task.id,
+      afterCommit: (effect: TaskAfterCommitEffect) => { effects.push(effect); },
+      audit: async (event: { eventType: string; level?: AuditLevel; payload?: Record<string,unknown> }) => {
+        effects.push(() => addWorkEvent(task, event.eventType, event.level ?? "low", event.payload));
+      } };
+    if (task.taskType === "generate_supplement_guidance") {
+      const requested = payloadText(task.payload,"plan") || textValue(row.selected_plan);
+      const value = await applyFormulationSafety(sql, { ...common, formulation: analysisPayload(resultPayload).formulation, plan: requested === "pro" ? "pro" : "precision" });
+      return { formulation: { value, json: JSON.stringify(toJsonValue(value)), locale, afterCommit: effects } };
+    }
+    const value = await applyFoodGuidanceSafety(sql, { ...common, foodGuidance: foodGuidanceAnalysisPayload(resultPayload).foodGuidance });
+    return { food: { value, json: JSON.stringify(toJsonValue(value)), locale, afterCommit: effects } };
+  }
   let locale: Locale = generation?.locale ?? "en";
   let country = generation?.answers.country;
   if (!generation && task.planId) {
@@ -2385,14 +2417,14 @@ const taskCompletionResultHandlers: Readonly<Record<string, TaskCompletionResult
     await applyFoodGapSupportResult(task, resultPayload, sql, afterCommit);
     return resultPayload;
   },
-  generate_food_guidance: async (task, resultPayload, sql, afterCommit) => {
-    await applyFoodGuidanceResult(task, resultPayload, sql, afterCommit);
+  generate_food_guidance: async (task, resultPayload, sql, afterCommit, preparedResult) => {
+    await applyFoodGuidanceResult(task, resultPayload, sql, afterCommit, preparedResult);
     return resultPayload;
   },
   generate_nutrition_report: applyNutritionReportResult,
   generate_product_recommendations: applyProductRecommendationsResult,
-  generate_supplement_guidance: async (task, resultPayload, sql, afterCommit) => {
-    await applyPaidFormulationResult(task, resultPayload, sql, afterCommit);
+  generate_supplement_guidance: async (task, resultPayload, sql, afterCommit, preparedResult) => {
+    await applyPaidFormulationResult(task, resultPayload, sql, afterCommit, preparedResult);
     return resultPayload;
   },
   nutrition_plan_chat_reply: applyNutritionPlanChatResult,

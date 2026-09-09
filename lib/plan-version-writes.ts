@@ -8,6 +8,7 @@ export async function insertFormulationVersion(
   db: Db,
   input: Readonly<{
     formulation: Record<string, unknown>;
+    preparedJson?: string;
     includeEmptyRecommendations?: boolean;
     modelVersion: string;
     generation?: GenerationInput | null;
@@ -15,6 +16,7 @@ export async function insertFormulationVersion(
   }>
 ) {
   const generation = input.generation ?? await loadGenerationInput(db, input.planId);
+  const encoded = input.preparedJson ?? JSON.stringify(toJsonValue(input.formulation));
   const rows = input.includeEmptyRecommendations
     ? await db<{ version: number | string }[]>`
         with bumped as (
@@ -45,7 +47,7 @@ export async function insertFormulationVersion(
             ${generation?.revision ?? null},
             bumped.plan_id,
             bumped.version,
-            ${db.json(toJsonValue(input.formulation))},
+            ${encoded}::text::jsonb,
             ${input.modelVersion},
             now(),
             now()
@@ -104,7 +106,7 @@ export async function insertFormulationVersion(
             ${generation?.revision ?? null},
           bumped.plan_id,
           bumped.version,
-          ${db.json(toJsonValue(input.formulation))},
+          ${encoded}::text::jsonb,
           ${input.modelVersion},
           now(),
           now()
@@ -119,12 +121,14 @@ export async function insertFoodGuidanceVersion(
   db: Db,
   input: Readonly<{
     foodGuidance: Record<string, unknown>;
+    preparedJson?: string;
     modelVersion: string;
     generation?: GenerationInput | null;
     planId: string;
   }>
 ) {
   const generation = input.generation ?? await loadGenerationInput(db, input.planId);
+  const encoded = input.preparedJson ?? JSON.stringify(toJsonValue(input.foodGuidance));
   const rows = await db<{ version: number | string }[]>`
     with bumped as (
       insert into public.assessment_version_counters as counters (
@@ -153,7 +157,7 @@ export async function insertFoodGuidanceVersion(
             ${generation?.revision ?? null},
       bumped.plan_id,
       bumped.version,
-      ${db.json(toJsonValue(input.foodGuidance))},
+      ${encoded}::text::jsonb,
       ${input.modelVersion},
       now(),
       now()
