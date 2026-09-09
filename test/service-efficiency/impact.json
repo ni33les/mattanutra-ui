@@ -239,6 +239,12 @@
       "slice": "durable-cache",
       "expectedCases": 1,
       "reason": "Exercise real durable worker coalescing, independent capability ownership and warm completed-result reuse end to end"
+    },
+    {
+      "file": "test/service-efficiency/worker-identity.test.ts",
+      "slice": "identity",
+      "expectedCases": 4,
+      "reason": "Standalone UAT runtime identity must match its compiled application before worker admission"
     }
   ],
   "inputs": [
