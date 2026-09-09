@@ -2066,7 +2066,9 @@ async function persistTerminalPlan(input: Readonly<{
     }
     planAttempts.getStore()?.signal?.throwIfAborted();
     throwIfAborted(planCorrelationId(key));
-    if (input.expectedCatalogueRevision != null &&
+    // Calculation publishes its immutable snapshot even if the catalogue moved.
+    // Only selection must fence current commercial facts; reads project stale results.
+    if (input.input.payload.operation === "select" && input.expectedCatalogueRevision != null &&
       (!store.isCatalogueRevisionCurrent || !await store.isCatalogueRevisionCurrent(input.expectedCatalogueRevision))) {
       // Keep the saved processing request and its idempotency receipt. A retry
       // or handle poll loads a fresh snapshot and resumes this same revision.
