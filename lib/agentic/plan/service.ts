@@ -1162,8 +1162,10 @@ async function executePlanTool(input: Readonly<{
       return replay.response;
     }
 
+    // A legacy processing receipt may predate durable operations. Preserve the
+    // original command while attaching it to its already admitted plan.
     payload = {
-      operation: "get",
+      ...input.payload,
       expectedRevision: replay.response.revision,
       planHandle: replay.response.planHandle
     };
@@ -1196,6 +1198,16 @@ async function executePlanTool(input: Readonly<{
       throw error;
     }
 
+    // The winning transaction commits its receipt and task together. Never turn
+    // this duplicate request into a legacy GET that calculates inside HTTP.
+    if (!input.matchPort && input.payload.idempotencyKey) {
+      const admitted = await input.store.getPlanOperationByKey(ownerScope, input.payload.idempotencyKey);
+      if (admitted) {
+        if (admitted.requestHash !== canonicalRequestHash(input.payload)) return businessError({fieldPath:"idempotencyKey", reasonCode:"idempotency_conflict", message:"This key belongs to a different request."});
+        return admittedResponse(input, admitted);
+      }
+    }
+
     const raced = skipIdempotency
       ? ({ kind: "fresh" } as const)
       : await beginIdempotency<PlanToolSuccess>({
@@ -1220,7 +1232,7 @@ async function executePlanTool(input: Readonly<{
     }
 
     payload = {
-      operation: "get",
+      ...input.payload,
       expectedRevision: raced.response.revision,
       planHandle: raced.response.planHandle
     };
@@ -1572,7 +1584,7 @@ async function executePlanTool(input: Readonly<{
     return result;
   }
 
-  return runPlanMatch(prepared, input, loadLiveCatalogue, matchStartedAt);
+  return businessError({fieldPath:"idempotencyKey", reasonCode:"invalid_request", message:"Matching requires a durable operation with an idempotency key."});
 }
 
 function runPlanMatch(

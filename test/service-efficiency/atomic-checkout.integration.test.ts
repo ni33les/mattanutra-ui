@@ -56,7 +56,7 @@ test("LOCK-ATOMIC-02 simultaneous checkout owns one frozen order and stale catal
     const rollback=new Error("rollback catalogue fixture");
     await assert.rejects(sql.begin(async tx=>{
       await tx`update catalogue_runtime_revision set revision=revision+1 where singleton`;
-      const txStore=createPostgresStore(tx as unknown as postgres.Sql);
+      const txStore=createPostgresStore(tx, true);
       const recovered=await executeTool({...call,store:txStore,idempotencyKey:"atomic-checkout-recovery"});
       assert.deepEqual(recovered,results[0]);
       assert.deepEqual((await tx`select * from agentic_orders where plan_id=${plans[0]}::uuid`)[0],orders[0]);
