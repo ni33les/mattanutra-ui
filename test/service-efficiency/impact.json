@@ -19,7 +19,7 @@
       "file": "test/service-efficiency/reads.integration.test.ts",
       "slice": "reads-pg",
       "database": true,
-      "expectedCases": 5,
+      "expectedCases": 6,
       "reason": "Actual PostgreSQL locks retained for mutations, nonblocking status and two small SELECTs"
     },
     {

@@ -47,8 +47,27 @@ test("EFF-READ-PG-01 ordinary status reads complete behind held updates while mu
   try {
     const status = await readPlanStatus(app, handle);
     assert.ok(status.ok && "responseView" in status && status.responseView === "status");
-    await assert.rejects(store.transaction(tx => tx.getActiveOrderForPlanRevision(id, 1)), (error: { code?: string }) => error.code === "55P03");
+    await assert.rejects(store.transaction(tx => tx.getActiveOrderForPlanRevisionForUpdate(id, 1)), (error: { code?: string }) => error.code === "55P03");
     await assert.rejects(store.transaction(tx => tx.isCatalogueRevisionCurrent!(1)), (error: { code?: string }) => error.code === "55P03");
+  } finally { release(); await writer; }
+});
+
+test("LOCK-READ-04 ordinary active/open order lookups never wait behind checkout writers", async () => {
+  const { id, orderId } = await fixture();
+  let release!: () => void, ready!: () => void;
+  const entered = new Promise<void>(resolve => { ready = resolve; });
+  const barrier = new Promise<void>(resolve => { release = resolve; });
+  const writer = sql.begin(async tx => {
+    await tx`select id from agentic_orders where id=${orderId}::uuid for update`;
+    ready(); await barrier;
+  });
+  await entered;
+  try {
+    queries.length = 0;
+    assert.equal((await store.getActiveOrderForPlanRevision(id, 1))?.id, orderId);
+    assert.equal((await store.getOpenOrderForPlanRevision(id, 1))?.id, orderId);
+    assert.equal(queries.length, 2);
+    assert.ok(queries.every(query => /^\s*select/i.test(query) && !/for\s+(?:update|share)/i.test(query)));
   } finally { release(); await writer; }
 });
 
