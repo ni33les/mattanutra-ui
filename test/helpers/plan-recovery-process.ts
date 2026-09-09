@@ -6,7 +6,10 @@ import type { AgenticStore } from "../../lib/agentic/store/types.ts";
 import { createAgenticRuntime } from "../../lib/agentic/runtime.ts";
 import { loadAgenticConfig } from "../../lib/agentic/config.ts";
 import { handleJsonRpc } from "../../lib/agentic/mcp/dispatcher.ts";
-import { setMatcherEnteredForTests, setMatcherGateForTests } from "../../lib/agentic/plan/service.ts";
+import { setMatcherEnteredForTests, setMatcherGateForTests, runAdmittedPlanOperation } from "../../lib/agentic/plan/service.ts";
+
+import { requestAbortSignal } from "../../lib/agentic/qa/request-trace.ts";
+import { setTimeout as delay } from "node:timers/promises";
 
 const [mode, principalScope, idempotencyKey] = process.argv.slice(2);
 const database = new URL(process.env.TEST_DB_URL!);
@@ -33,11 +36,6 @@ const wrap = (store: AgenticStore): AgenticStore => ({
 if (mode === "before_match") {
   setMatcherGateForTests(never);
   setMatcherEnteredForTests(() => send({ kind: "paused", point: "before_match" }));
-} else if (mode === "retry") {
-  let release!: () => void;
-  setMatcherGateForTests(new Promise<void>(resolve => { release = resolve; }));
-  setMatcherEnteredForTests(() => send({ kind: "ready" }));
-  process.on("message", message => { if (message === "go") release(); });
 }
 
 try {
@@ -47,16 +45,32 @@ try {
     scope: { environment: "dev", tenantScope: "mattanutra", principalScope },
     now: "2026-09-06T12:00:00.000Z"
   });
-  const response = await handleJsonRpc(runtime, {
+  const request = {
     id: 1, method: "tools/call", params: { name: "plan", arguments: {
-      operation: "create", idempotencyKey,
+      operation: "create", idempotencyKey, responseView: "full",
       request: {
         destinationCountry: "TH", locale: "en", optimization: "balanced",
         profile: { ageYears: 38, lifeStage: "adult", sex: "male" }, requirements: {},
         targets: [{ name: "Vitamin D3", amount: 1000, unit: "IU" }]
       }
     } }
-  });
+  };
+  let response = await handleJsonRpc(runtime, request);
+  const operation = await base.getPlanOperationByKey(`dev:mattanutra:${principalScope}`, idempotencyKey);
+  assert.ok(operation, "Admission must persist the execution owner before the HTTP response");
+  requestAbortSignal(`plan-operation:${operation.id}`);
+  if (mode === "retry") {
+    const go = new Promise<void>(resolve => process.once("message", message => { assert.equal(message, "go"); resolve(); }));
+    send({ kind: "ready" }); await go;
+  }
+  // Independent process execution follows admission. Concurrent contenders may
+  // observe the same operation; only the durable claim owner calculates.
+  await runAdmittedPlanOperation({ store: runtime.store, config: runtime.config, operationId: operation.id });
+  for (let i = 0; i < 100; i++) {
+    response = await handleJsonRpc(runtime, request);
+    if (response?.result?.structuredContent?.status !== "processing") break;
+    await delay(50);
+  }
   send({ kind: "result", result: response?.result?.structuredContent });
 } catch (error) {
   send({ kind: "error", message: error instanceof Error ? error.message : String(error) });

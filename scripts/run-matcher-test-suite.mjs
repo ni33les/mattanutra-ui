@@ -11,9 +11,13 @@ import { unclassifiedMatcherConsumers } from "./matcher-test-inventory.mjs";
 const ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)));
 
 export async function startHttpCandidate(env, evidence) {
+  // The HTTP application is a separate runtime. Inheriting node:test's marker
+  // would activate in-process catalogue stubs instead of the isolated DB reader.
+  const applicationEnv = { ...env };
+  delete applicationEnv.NODE_TEST_CONTEXT;
   const log = createWriteStream(join(evidence, "mcp-http.log"), { flags: "wx", mode: 0o600 });
   const child = spawn(process.execPath, ["--experimental-strip-types", "--import", "./scripts/register-ts-path-loader.mjs", "--import", "./scripts/register-matcher-http-loader.mjs", "scripts/serve-matcher-test-http.ts"],
-    { cwd: ROOT, env, detached: process.platform !== "win32", stdio: ["ignore", "pipe", "pipe", "ipc"] });
+    { cwd: ROOT, env: applicationEnv, detached: process.platform !== "win32", stdio: ["ignore", "pipe", "pipe", "ipc"] });
   child.stdout.pipe(log, { end: false }); child.stderr.pipe(log, { end: false });
   const closed = new Promise(done => child.once("close", done));
   const stop = async () => {
@@ -57,15 +61,19 @@ async function main() {
   const sourceCommit = execFileSync("git", ["rev-parse", "HEAD"], { cwd: ROOT, encoding: "utf8" }).trim();
   const common = { ...isolatedValidationEnvironment(process.env), AGENTIC_BUILD_ID: sourceCommit, DB_URL: process.env.TEST_DB_URL, DB_WORKER_URL: process.env.TEST_DB_URL,
     MATTANUTRA_ENV: "dev", STRIPE_PAYMENT_MODE: "mock", NODE_ENV: "test", DB_POOL_IDLE_TIMEOUT_SECONDS: "1" };
-  const args = ["--test", "--test-concurrency=1", "--experimental-strip-types", "--import", "./test/helpers/offline-network.mjs", "--import", "./scripts/register-ts-path-loader.mjs"];
+  const args = ["--test", "--test-timeout=300000", "--test-concurrency=1", "--experimental-strip-types", "--import", "./test/helpers/offline-network.mjs", "--import", "./scripts/register-ts-path-loader.mjs"];
+  const prerequisites = await runBatch("catalogue-prerequisites", ["scripts/matcher-fixture-prerequisites.mjs", join(evidence, "catalogue-prerequisites.json")], common, evidence);
+  if (!prerequisites.passed) throw new Error("Maintained MCP catalogue/reference prerequisites are incomplete; inspect catalogue-prerequisites.log");
   const fixture = await runBatch("public-catalogue-fixtures", ["scripts/seed-matcher-public-fixtures.mjs", join(evidence, "public-catalogue-fixtures.json")], common, evidence);
   if (!fixture.passed) throw new Error("Public matcher fixture preparation failed");
+  const fingerprints = await runBatch("catalogue-inputs", ["scripts/validation-data-fingerprints.mjs", join(evidence, "catalogue-inputs.json")], common, evidence);
+  if (!fingerprints.passed) throw new Error("Frozen catalogue/schema fingerprint evidence is missing");
   const server = await startHttpCandidate(common, evidence);
   common.MCP_URL = `${server.identity.origin}/api/mcp`;
   common.MCP_ISOLATED_CANDIDATE = "1";
   common.NEXT_PUBLIC_SITE_URL = server.identity.origin;
   common.SITE_URL = server.identity.origin;
-  const results = [fixture];
+  const results = [prerequisites, fixture, fingerprints];
   try {
   const runs = process.argv.includes("--twice") ? ["a", "b"] : ["a"];
   for (const run of runs) {

@@ -8,10 +8,15 @@ import { it } from "node:test";
 import { isolatedValidationEnvironment } from "../scripts/run-dev-advisory-validation.mjs";
 import { fixtureDatabaseUrl, cleanupFixtureRelationships } from "./helpers/fixture-teardown.ts";
 import { closeSqlPool, getSql, withDatabaseTransaction } from "../lib/db.ts";
+import { seedPublicMatcherFixtures } from "../scripts/seed-matcher-public-fixtures.mjs";
 import { currentWebCheckoutRecommendations } from "../lib/retail-product-checkout.ts";
 
 it("ANNA-BROWSER-PG-01 numeric preference fixture retains real options and checkout selection identity", async () => {
   const database = fixtureDatabaseUrl();
+  process.env.DB_URL = database.href;
+  // Standalone execution must establish the same declared catalogue prerequisites
+  // as the complete runner; never depend on an earlier test leaving rows behind.
+  await withDatabaseTransaction(getSql()!, seedPublicMatcherFixtures);
   const directory = await mkdtemp(join(tmpdir(), "anna-browser-preferences-"));
   let saved: { planId: string; runId: string; orderId: string; adminAgentId: string } | undefined;
   try {

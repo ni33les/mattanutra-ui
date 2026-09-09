@@ -14,6 +14,18 @@ const sql = postgres(url.href, { max: 3, prepare: false });
 const store = createPostgresStore(sql);
 after(async () => { await sql.end(); await closeSqlPool(); });
 
+/** Binary checkpoints and the historical inline base64 representation carry
+ * exactly the same archive. Compare bytes without asking assert to render MBs. */
+function assertCheckpoint(actual: unknown, expected: { search: { cursor: string }; [key: string]: unknown }) {
+  const value = actual as typeof expected;
+  const cursor = value.search.cursor as unknown;
+  assert.ok(typeof cursor === "string" || cursor instanceof Uint8Array);
+  assert.deepEqual({ ...value, search: { ...value.search, cursor: undefined } },
+    { ...expected, search: { ...expected.search, cursor: undefined } });
+  const bytes = typeof cursor === "string" ? Buffer.from(cursor, "base64") : Buffer.from(cursor);
+  assert.equal(bytes.equals(Buffer.from(expected.search.cursor, "base64")), true, "Checkpoint archive bytes must survive unchanged");
+}
+
 test("M722-EXP-PG deadline and stale completion are fenced across PostgreSQL workers", async () => {
   const planId = randomUUID(), now = "2026-09-08T10:00:00Z", later = "2026-09-08T10:03:00Z";
   await store.insertPlan({ id: planId, environment: "dev", tenantScope: "mattanutra", principalScope: `qa-v3:ax:${planId}`, currentRevision: 1, createdAt: now, updatedAt: now });
@@ -91,10 +103,10 @@ test("AXR-REL-03 large checkpoint bytes stay out of lifecycle writes and survive
   const after = await sql.unsafe(`select distinct chunk_id from ${relation.name} order by chunk_id`);
   assert.deepEqual(after, before, "A lifecycle-only update must reuse the existing TOAST bytes");
   const resumed = await claimPlanOperation(store, operation.id, "worker-two", now); assert.ok(resumed);
-  assert.deepEqual(resumed.checkpoint, checkpoint);
+  assertCheckpoint(resumed.checkpoint, checkpoint);
   assert.equal(await updateClaimedOperation(store, claim, { checkpoint: null }, now), false, "Old leases cannot clear the checkpoint");
   assert.equal(await cancelPlanOperation(store, operation.id, now), true);
-  assert.deepEqual((await store.getPlanOperation(operation.id))?.checkpoint, checkpoint);
+  assertCheckpoint((await store.getPlanOperation(operation.id))?.checkpoint, checkpoint);
 });
 
 test("AXR-REL-03 legacy inline checkpoints migrate lazily without dropping their recovery data", async () => {
@@ -105,9 +117,9 @@ test("AXR-REL-03 legacy inline checkpoints migrate lazily without dropping their
   const checkpoint = { stage: "search", search: { cursor: randomBytes(4096).toString("base64"), expansionAttempts: 4000, expansionBudget: 64000 } };
   const legacy = { ...operation, checkpoint };
   await sql`update public.agentic_plan_operations set record_json=${sql.json(legacy)} where id=${operation.id}::uuid`;
-  assert.deepEqual((await store.getPlanOperation(operation.id))?.checkpoint, checkpoint);
+  assertCheckpoint((await store.getPlanOperation(operation.id))?.checkpoint, checkpoint);
   const claim = await claimPlanOperation(store, operation.id, "legacy-worker", now); assert.ok(claim);
-  assert.deepEqual(claim.checkpoint, checkpoint);
+  assertCheckpoint(claim.checkpoint, checkpoint);
   const [row] = await sql`select record_json,checkpoint_cursor from public.agentic_plan_operations where id=${operation.id}::uuid`;
   assert.equal(Object.hasOwn(row.record_json.checkpoint.search, "cursor"), false);
   assert.equal(row.checkpoint_cursor.toString("base64"), checkpoint.search.cursor);

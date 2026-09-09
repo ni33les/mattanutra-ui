@@ -12,7 +12,7 @@ import { replaceCatalogueSnapshot } from "../../lib/agentic/catalogue/snapshot.t
 import { ACTIVE_RETAILER_ID, ACTIVE_RETAILER_NAME } from "../../lib/agentic/catalogue/market.ts";
 import { resetExecuteLockState } from "../../lib/agentic/commerce/execute.ts";
 import { createMockPaymentAdapter } from "../../lib/agentic/commerce/payment.ts";
-import { handleJsonRpc } from "./recording-mcp-dispatcher.ts";
+import { handleCompletedFullJsonRpc as handleJsonRpc } from "./completed-mcp-client.ts";
 import type {
   BasketItem,
   PlanResult,

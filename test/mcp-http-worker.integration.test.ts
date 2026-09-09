@@ -6,9 +6,14 @@ import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { startHttpCandidate } from "../scripts/run-matcher-test-suite.mjs";
 import { isolatedValidationEnvironment } from "../scripts/run-dev-advisory-validation.mjs";
+import postgres from "postgres";
+import { seedPublicMatcherFixtures } from "../scripts/seed-matcher-public-fixtures.mjs";
 
 test("MCP-HTTP-WORKER-01 the isolated public client reaches ready through a separately registered durable worker", {timeout:35000}, async () => {
   assert.ok(process.env.TEST_DB_URL,"Isolated PostgreSQL is mandatory");
+  isolatedValidationEnvironment(process.env);
+  const fixtureDb=postgres(process.env.TEST_DB_URL,{max:1,prepare:false});
+  try { await fixtureDb.begin(seedPublicMatcherFixtures); } finally { await fixtureDb.end(); }
   const buildId=JSON.parse(readFileSync(".next/required-server-files.json","utf8")).config.env.AGENTIC_BUILD_ID;
   const output=mkdtempSync(join(tmpdir(),"mcp-http-worker-"));
   const server=await startHttpCandidate({...isolatedValidationEnvironment(process.env),AGENTIC_BUILD_ID:buildId,DB_URL:process.env.TEST_DB_URL,DB_WORKER_URL:process.env.TEST_DB_URL,MATTANUTRA_ENV:"dev",NODE_ENV:"test"},output);

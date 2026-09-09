@@ -8,7 +8,7 @@ export async function refinementJourney({ rpc, request, discovery = "tools_only"
   const transcript = [];
   const tools = (await rpc("tools/list", {})).tools;
   const first = (await rpc("tools/call", { name: "info", arguments: { locale: request.locale } })).structuredContent;
-  assert.equal(first.contractVersion, "7.0.0");
+  assert.equal(first.contractVersion, "7.2.4");
   let contract;
   if (discovery === "resources") {
     const resources = (await rpc("resources/list", {})).resources;
@@ -21,6 +21,9 @@ export async function refinementJourney({ rpc, request, discovery = "tools_only"
   const ajv = new Ajv({ strict: false, allErrors: true, validateFormats: false });
   const schemas = new Map(tools.map(tool => [tool.name, { input: ajv.compile(tool.inputSchema), output: ajv.compile(tool.outputSchema) }]));
   async function call(tool, args) {
+    // This regression verifies detailed coverage and quantities. The published
+    // schema explicitly permits full; ordinary clients still default to conversation.
+    if (tool === "plan") args = { ...args, responseView: "full" };
     const schema = schemas.get(tool); assert.ok(schema, `${tool} must be discoverable`);
     assert.ok(schema.input(args), JSON.stringify(schema.input.errors));
     const result = (await rpc("tools/call", { name: tool, arguments: args })).structuredContent;
@@ -30,7 +33,7 @@ export async function refinementJourney({ rpc, request, discovery = "tools_only"
   async function complete(result) {
     for (let polls=0; result.status === "processing" && polls < 90; polls++) {
       await wait(result.pollAfterSeconds * 1000);
-      result = await call("plan", { ...publishedExample(contract, "get-current-or-processing"), planHandle: result.planHandle });
+      result = await call("plan", { ...publishedExample(contract, "get-current-decision"), planHandle: result.planHandle });
     }
     assert.equal(result.ok, true, JSON.stringify(result)); assert.notEqual(result.status, "processing"); return result;
   }

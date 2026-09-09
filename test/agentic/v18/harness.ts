@@ -7,11 +7,11 @@ import {
   publicPlanCreate,
   structured
 } from "../v16/harness.ts";
-import { handleJsonRpc } from "../../../lib/agentic/mcp/dispatcher.ts";
+import { handleCompletedFullJsonRpc as handleJsonRpc } from "../../helpers/completed-mcp-client.ts";
 import { loadAgenticConfig } from "../../../lib/agentic/config.ts";
 import { createAgenticRuntime, setAgenticRuntimeForTests } from "../../../lib/agentic/runtime.ts";
 import { createMockPaymentAdapter } from "../../../lib/agentic/commerce/payment.ts";
-import { F_READY_EN, F_READY_TH, V18_CLOCK, v18Key } from "./manifest.ts";
+import { F_READY_EN, F_READY_TH, V18_CLOCK } from "./manifest.ts";
 import { asRecord } from "./diff.ts";
 
 export {

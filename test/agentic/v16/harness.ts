@@ -10,7 +10,7 @@ import { AGENTIC_CONTRACT_VERSION } from "../../../lib/agentic/config.ts";
 import { loadAgenticConfig } from "../../../lib/agentic/config.ts";
 import { RESEARCH_VERSION } from "../../../lib/agentic/discovery/versions.ts";
 import { AGENTIC_SCHEMA_CHECKSUM } from "../../../lib/agentic/info.ts";
-import { handleJsonRpc } from "../../../lib/agentic/mcp/dispatcher.ts";
+import { handleCompletedFullJsonRpc as handleJsonRpc } from "../../helpers/completed-mcp-client.ts";
 import { MATCHER_VERSION } from "../../../lib/matcher/config.ts";
 import { resetMatchPlanCache } from "../../../lib/agentic/plan/matching.ts";
 import { resetQueryBudget } from "../../../lib/agentic/plan/query-budget.ts";

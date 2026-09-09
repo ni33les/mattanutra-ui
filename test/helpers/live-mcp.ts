@@ -3,6 +3,8 @@ import https from "node:https";
 import { URL } from "node:url";
 import { mcpTestTarget } from "../../scripts/mcp-test-target.mjs";
 import { decodeMcpPayload } from "../../lib/agentic/mcp/transport.ts";
+import { setTimeout as delay } from "node:timers/promises";
+import assert from "node:assert/strict";
 
 const target = mcpTestTarget();
 export const LIVE_PUBLIC = target.publicUrl;
@@ -112,6 +114,25 @@ export function liveCall(
     },
     extraHeaders
   );
+}
+
+/** A completed-journey client: explicit full data, ordinary status polling,
+ * and a final full GET. Only the external worker performs calculation. */
+export async function liveCompletedFullCall(url: string, name: string, args: Record<string, unknown>, extraHeaders: Record<string, string> = {}) {
+  if (!/(^|[._])plan$/.test(name)) return liveCall(url, name, args, extraHeaders);
+  const started = Date.now();
+  let result = await liveCall(url, name, { responseView: "full", ...args }, extraHeaders);
+  const handle = result.structured.planHandle;
+  while (result.structured.ok === true && result.structured.status === "processing") {
+    assert.ok(typeof handle === "string", "Processing requires a returned plan handle");
+    assert.ok(Date.now() - started < 175_000, "Matching exceeded its published overall deadline");
+    await delay(Math.max(1, Number(result.structured.pollAfterSeconds) || 1) * 1000);
+    result = await liveCall(url, name, { operation: "get", planHandle: handle, responseView: "status" }, extraHeaders);
+  }
+  if (result.structured.responseView === "status" && result.structured.ok === true) {
+    result = await liveCall(url, name, { operation: "get", planHandle: handle, responseView: args.responseView ?? "full" }, extraHeaders);
+  }
+  return { ...result, ms: Date.now() - started };
 }
 
 export function magCurrentRequest(

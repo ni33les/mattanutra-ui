@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { AGENTIC_CONTRACT_VERSION, AGENTIC_MIGRATION_VERSION } from "@/lib/agentic/config";
 import { AGENTIC_SCHEMA_CHECKSUM, engineeringInfo, infoTool } from "@/lib/agentic/info";
 import { handleJsonRpc } from "@/lib/agentic/mcp/dispatcher";
-import { planTool } from "@/lib/agentic/plan/service";
+import { completedQaPlan as planTool } from "@/lib/agentic/qa/plan-client";
 import { executeTool } from "@/lib/agentic/commerce/execute";
 import { orderTool } from "@/lib/agentic/commerce/order";
 import { feedbackTool } from "@/lib/agentic/feedback";
@@ -297,9 +297,9 @@ export async function packProof(runtime: AgenticRuntime) {
   checks.push(
     check(
       "D4-01",
-      toolNames.length === 6 &&
+      toolNames.length === 7 &&
         toolNames[0] === "info" &&
-        !toolNames.includes("evidence") &&
+        toolNames.includes("evidence") &&
         !("supplements" in info) &&
         info.continuation === "polling_only"
     )
@@ -709,7 +709,7 @@ export async function packProof(runtime: AgenticRuntime) {
   checks.push(
     check(
       "D9-10",
-      toolNames.join(",") === "info,plan,execute,order,support,feedback"
+      toolNames.join(",") === "info,plan,execute,order,support,feedback,evidence"
     )
   );
 

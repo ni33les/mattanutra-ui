@@ -26,7 +26,7 @@ export function publishedExample(contract, name) {
 /** Reload the published resource before applying an unchanged customer patch. */
 export async function recoverPublishedPatch({ contract, intended, idempotencyKey, callPlan, current }) {
   const latest = await current(await callPlan({
-    ...publishedExample(contract, "get-current-or-processing"),
+    ...publishedExample(contract, "get-current-decision"),
     planHandle: intended.planHandle,
   }));
   if (!latest?.ok || typeof latest.planHandle !== "string" || !latest.planHandle ||

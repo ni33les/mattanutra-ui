@@ -1,13 +1,15 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
+import { readFileSync } from "node:fs";
 import { it } from "node:test";
 import { AGENTIC_CONTRACT_VERSION } from "../lib/agentic/config.ts";
 import { isolatedValidationEnvironment } from "../scripts/run-dev-advisory-validation.mjs";
 
 it("V5-INFRA-05 complete matcher pack uses real isolated HTTP handlers without a browser build", { timeout: 45_000 }, async () => {
   assert.ok(process.env.TEST_DB_URL, "The HTTP adapter regression requires the isolated PostgreSQL catalogue");
-  const env = { ...isolatedValidationEnvironment(process.env), AGENTIC_BUILD_ID: "a".repeat(40), NODE_OPTIONS: "--max-old-space-size=768" };
+  const env = { ...isolatedValidationEnvironment(process.env), AGENTIC_BUILD_ID: JSON.parse(readFileSync(".next/required-server-files.json", "utf8")).config.env.AGENTIC_BUILD_ID, NODE_OPTIONS: "--max-old-space-size=768" };
+  delete env.NODE_TEST_CONTEXT;
   const child = spawn(process.execPath, ["--experimental-strip-types", "--import", "./scripts/register-ts-path-loader.mjs", "--import", "./scripts/register-matcher-http-loader.mjs", "scripts/serve-matcher-test-http.ts"], { env, stdio: ["ignore", "pipe", "pipe", "ipc"] });
   let logs = "";
   child.stdout.on("data", data => { logs += data.toString(); }); child.stderr.on("data", data => { logs += data.toString(); });

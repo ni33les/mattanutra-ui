@@ -2,6 +2,7 @@
 import "../test/helpers/offline-network.mjs";
 import { createServer } from "node:http";
 import { Readable } from "node:stream";
+import { fork } from "node:child_process";
 import { GET, POST } from "../app/api/mcp/route.ts";
 import { GET as QA_GET, POST as QA_POST } from "../app/api/mcp/qa/route.ts";
 import { POST as PAY_POST } from "../app/api/mcp/checkout/[checkoutAccess]/pay/route.ts";
@@ -51,9 +52,17 @@ const address = server.address();
 if (!address || typeof address === "string") throw new Error("HTTP fixture listener unavailable");
 process.env.SITE_URL = `http://127.0.0.1:${address.port}`;
 process.env.NEXT_PUBLIC_SITE_URL = process.env.SITE_URL;
-const ready = { ready: true, origin: `http://127.0.0.1:${address.port}`, ...identity };
+const worker = fork("scripts/matcher-test-task-worker.ts", [], { env: process.env, stdio: ["ignore", "inherit", "inherit", "ipc"] });
+const workerIdentity = await new Promise<Record<string, unknown>>((done, reject) => {
+  const timer = setTimeout(() => reject(new Error("Isolated executor registration timed out")), 30_000);
+  worker.once("error", error => { clearTimeout(timer); reject(error); });
+  worker.once("exit", code => { clearTimeout(timer); reject(new Error(`Isolated executor exited ${code}`)); });
+  worker.once("message", message => { clearTimeout(timer); done(message as Record<string, unknown>); });
+});
+if (!workerIdentity.ready || workerIdentity.buildId !== identity.buildId) throw new Error("Isolated executor identity mismatch");
+const ready = { ready: true, origin: `http://127.0.0.1:${address.port}`, ...identity, worker: workerIdentity };
 process.send?.(ready);
 console.log(`MCP_TEST_SERVER_READY:${JSON.stringify(ready)}`);
-async function stop() { server.closeAllConnections(); await new Promise<void>(done => server.close(() => done())); await closeSqlPool(); process.exit(0); }
+async function stop() { worker.kill("SIGTERM"); server.closeAllConnections(); await new Promise<void>(done => server.close(() => done())); await closeSqlPool(); process.exit(0); }
 process.once("SIGTERM", () => { void stop(); });
 process.once("SIGINT", () => { void stop(); });

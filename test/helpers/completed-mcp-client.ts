@@ -43,7 +43,7 @@ export const completedPlanTool: typeof admitPlan = async input => {
 
 /** A separately scheduled test worker, notified only after a memory-store
  * transaction commits. Internal QA clients can then use ordinary polling. */
-export async function withMemoryTaskExecutor<T>(runtime: Parameters<typeof dispatchJsonRpc>[0], work: () => Promise<T>) {
+export function startMemoryTaskExecutor(runtime: Parameters<typeof dispatchJsonRpc>[0]) {
   const store=runtime.store, transaction=store.transaction.bind(store), insert=store.insertPlanOperation.bind(store);
   const admissions=new AsyncLocalStorage<Set<string>>(), tasks: Promise<unknown>[]=[];
   store.insertPlanOperation=async record => {
@@ -57,6 +57,13 @@ export async function withMemoryTaskExecutor<T>(runtime: Parameters<typeof dispa
     for (const operationId of ids) tasks.push(nextTurn().then(()=>runAdmittedPlanOperation({store,config:runtime.config,operationId})));
     return result;
   };
-  try { return await work(); }
-  finally { await Promise.all(tasks); store.transaction=transaction; store.insertPlanOperation=insert; }
+  return async () => {
+    try { await Promise.all(tasks); }
+    finally { store.transaction=transaction; store.insertPlanOperation=insert; }
+  };
+}
+
+export async function withMemoryTaskExecutor<T>(runtime: Parameters<typeof dispatchJsonRpc>[0], work: () => Promise<T>) {
+  const stop = startMemoryTaskExecutor(runtime);
+  try { return await work(); } finally { await stop(); }
 }

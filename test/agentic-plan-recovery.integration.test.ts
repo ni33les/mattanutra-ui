@@ -51,8 +51,9 @@ function launch(mode: string, principal: string, key: string) {
   return { child, exited, waitFor };
 }
 
-describe("MCP plan recovery across PostgreSQL processes", { skip: !databaseUrl, timeout: 45_000 }, () => {
+describe("MCP plan recovery across PostgreSQL processes", { timeout: 45_000 }, () => {
   before(() => {
+    assert.ok(databaseUrl, "Isolated PostgreSQL is mandatory; recovery tests never skip");
     const url = new URL(databaseUrl!);
     assert.equal(url.hostname, "127.0.0.1");
     assert.match(url.pathname, /^\/mattanutra_lock_review/);
@@ -82,6 +83,12 @@ describe("MCP plan recovery across PostgreSQL processes", { skip: !databaseUrl, 
       assert.equal((pending?.result as PlanResult).pendingInput?.request.targets[0]?.supplementId, undefined);
       interrupted.child.kill("SIGKILL");
       assert.equal((await interrupted.exited).signal, "SIGKILL");
+      const operation = await store.getActivePlanOperation(ids[0]!); assert.ok(operation);
+      assert.equal(operation.status, "running");
+      // A controlled expired lease exercises recovery without sleeping for 60s
+      // or extending the operation's unchanged overall deadline.
+      const expired = { ...operation, leaseExpiresAt: new Date(Date.now() - 1).toISOString(), version: operation.version + 1 };
+      assert.equal(await store.updatePlanOperation(expired, operation.version), true);
 
       const left = launch("retry", principal, key), right = launch("retry", principal, key);
       await Promise.all([left.waitFor("ready"), right.waitFor("ready")]);

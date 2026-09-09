@@ -20,7 +20,7 @@ export async function payloadJourney({ rpc, request, key, view = "conversation",
     assert.deepEqual(value, result.structuredContent, "Text continuation must preserve the exact wire result");
     assert.ok(check.output(value), `${name} output: ${JSON.stringify(check.output.errors)}`);
     assert.equal(value.ok, !expectError, JSON.stringify(value));
-    trace.push({ tool: name, purpose, operation: args.operation, status: value.status ?? value.paymentStatus, revision: value.revision, nextAction: purpose === "details" ? undefined : value.operationalDecision?.nextAction ?? value.nextAction, error: value.error?.reasonCode });
+    trace.push({ tool: name, purpose, operation: args.operation, status: value.status ?? value.paymentStatus, revision: value.revision, nextAction: purpose === "details" ? undefined : value.operationalDecision?.nextAction ?? value.nextAction ?? value.nextActions?.[0], error: value.error?.reasonCode });
     return value;
   }
   const info = await tool("info", { locale: request.locale });
@@ -35,8 +35,8 @@ export async function payloadJourney({ rpc, request, key, view = "conversation",
     let polled = false;
     for (let polls = 0; plan.status === "processing" && polls < 4; polls++) {
       await wait(Math.max(0, plan.pollAfterSeconds ?? info.pollAfterSeconds) * 1000);
-      plan = await tool("plan", { operation: "get", planHandle: plan.planHandle, responseView: "status",
-        ...(plan.resultVersion ? { knownResultVersion: plan.resultVersion } : {}) });
+      plan = await tool("plan", { operation: "get", planHandle: plan.planHandle, responseView: view === "full" ? "full" : "status",
+        ...(view === "conversation" && plan.resultVersion ? { knownResultVersion: plan.resultVersion } : {}) });
       polled = true;
     }
     assert.notEqual(plan.status, "processing", "Controlled work must finish; no automatic operation retry");
@@ -49,30 +49,33 @@ export async function payloadJourney({ rpc, request, key, view = "conversation",
   const initial = plan;
   const selectedId = value => value.selectedOptionId ?? value.optionId;
   const highlightId = value => value.highlightedAlternativeOptionId ?? value.compactDecision?.highlightedAlternativeOptionId;
-  const purchasable = value => value.options.find(option => option.optionId === highlightId(value) && option.purchaseEligible)
-    ?? value.options.find(option => option.optionId === selectedId(value) && option.purchaseEligible)
-    ?? value.options.find(option => option.purchaseEligible);
+  const purchasable = value => value.options.find(option => option.optionId === highlightId(value) && option.stackSummary.productCount > 0)
+    ?? value.options.find(option => option.optionId === selectedId(value) && option.stackSummary.productCount > 0)
+    ?? value.options.find(option => option.stackSummary.productCount > 0);
   async function select(option) {
     assert.ok(option, "Fixture must contain a useful purchase choice");
     plan = await settlePlan(await tool("plan", { operation: "select", planHandle: plan.planHandle, expectedRevision: plan.revision,
       idempotencyKey: `${key}-select-${plan.revision}`, optionId: option.optionId, ...presentation }));
     assert.equal(selectedId(plan), option.optionId);
     const chosen = plan.options.find(option => option.optionId === selectedId(plan));
-    assert.ok(chosen.basket.length > 0); return chosen;
+    assert.ok(chosen.stackSummary.productCount > 0);
+    // Products and amounts are explicitly requested for the quantity proposal
+    // and final confirmation; conversational option cards remain small.
+    const detail = await tool("plan", view === "conversation" ? { operation: "get", planHandle: plan.planHandle, expectedRevision: plan.revision, responseView: "details", sections: ["products", "coverage", "advice"], optionIds: [chosen.optionId] } : { operation: "get", planHandle: plan.planHandle, responseView: "full" }, false, "details");
+    const evaluated = detail.options.find(row => row.optionId === chosen.optionId);
+    assert.ok(evaluated?.basket?.length); return evaluated;
   }
   let chosen = await select(purchasable(plan));
   const productId = chosen.basket[0].productId;
-  // Asking about label basis is explicit detail work, never an ordinary review prerequisite.
-  const details = await tool("plan", view === "conversation" ? { operation: "get", planHandle: plan.planHandle, expectedRevision: plan.revision,
-    responseView: "details", sections: ["products", "advice"], optionIds: [chosen.optionId] } : { operation: "get", planHandle: plan.planHandle, responseView: "full" }, false, "details");
-  const product = details.options.find(option => option.optionId === chosen.optionId).basket.find(item => item.productId === productId);
-  assert.equal(product.servingsPerDay, chosen.basket[0].servingsPerDay);
+  const product = chosen.basket[0];
   const proposal = { operation: "revise", planHandle: plan.planHandle, expectedRevision: plan.revision, idempotencyKey: `${key}-quantity`,
     requestPatch: { requirements: { productDoses: [{ productId, servingsPerDay: product.servingsPerDay }] } }, ...presentation };
   plan = await settlePlan(await tool("plan", proposal));
   plan = await settlePlan(await tool("plan", { operation: "revise", planHandle: plan.planHandle, expectedRevision: plan.revision,
     idempotencyKey: `${key}-exclude`, requestPatch: { requirements: { productDoses: [], excludeProductIds: [productId] } }, ...presentation }));
-  for (const option of plan.options) assert.ok(!(option.basket ?? []).some(item => item.productId === productId));
+  const excluded = await tool("plan", view === "conversation" ? { operation: "get", planHandle: plan.planHandle, expectedRevision: plan.revision, responseView: "details", sections: ["products"] } : { operation: "get", planHandle: plan.planHandle, responseView: "full" }, false, "details");
+  assert.ok(excluded.options.length);
+  for (const option of excluded.options) { assert.ok(Array.isArray(option.basket)); assert.ok(!option.basket.some(item => item.productId === productId)); }
   plan = await settlePlan(await tool("plan", { operation: "revise", planHandle: plan.planHandle, expectedRevision: plan.revision,
     idempotencyKey: `${key}-clear`, requestPatch: { requirements: { excludeProductIds: [], maxProductCount: null } }, ...presentation }));
   const stale = await tool("plan", { operation: "select", planHandle: plan.planHandle, expectedRevision: initial.revision,

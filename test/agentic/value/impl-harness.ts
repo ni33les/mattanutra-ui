@@ -1,3 +1,6 @@
+import { runWithMatcherSafetySnapshot } from "../../../lib/matcher/safety-ceilings-server.ts";
+import { captureMatcherSafetySnapshot } from "../../../lib/matcher/safety-ceilings.ts";
+import { canonicalHash } from "../../../lib/agentic/value/canonical.ts";
 import { randomUUID } from "node:crypto";
 
 import {
@@ -6,6 +9,7 @@ import {
   loadAgenticConfig
 } from "../../../lib/agentic/config.ts";
 import { planTool } from "../../helpers/recording-mcp-dispatcher.ts";
+import { completedPlanTool } from "../../helpers/completed-mcp-client.ts";
 import { createSnapshotMemoryStore } from "./snapshot-store.ts";
 import {
   createAgenticRuntime,
@@ -161,6 +165,9 @@ export function d3OnlyRequest(
 }
 
 export async function freezeImplCatalogue() {
+  // Freeze reference inputs before the first run, including cases preceding
+  // the financial fixture. A later fixture must not silently initialise them.
+  await refreshAdminSafetyCeilings();
   const freeze = await freezeLiveThailandCatalogue("TH");
   return {
     freeze,
@@ -229,18 +236,21 @@ export function openSession(freeze: ValueCatalogueFreeze): PlanSession {
 
 export async function callPlan(
   session: PlanSession,
-  payload: Record<string, unknown>
+  payload: Record<string, unknown>,
+  complete = false
 ) {
   const snapshot = installedCatalogueSnapshot() ?? session.freeze.snapshot;
-  const result = await runWithCatalogueSnapshot(snapshot, () =>
-    planTool({
+  const captured = captureMatcherSafetySnapshot();
+  const references = { ...captured, identity: { runtimeRevision: snapshot.runtimeRevision!, fingerprint: canonicalHash(captured.ceilings) } };
+  const result = await runWithMatcherSafetySnapshot(references, () => runWithCatalogueSnapshot(snapshot, () =>
+    (complete ? completedPlanTool : planTool)({
       config: session.config,
       now: "2026-09-01T00:00:00.000Z",
       payload: payload as Parameters<typeof planTool>[0]["payload"],
       scope: session.runtime.scope,
       store: session.store
     })
-  );
+  ));
   return asRecord(result);
 }
 
@@ -254,6 +264,14 @@ export async function createPlan(
     operation: "create",
     request
   });
+}
+
+/** Completed value assertions explicitly run the separately admitted task. */
+export function callCompletedPlan(session: PlanSession, payload: Record<string, unknown>) {
+  return callPlan(session, payload, true);
+}
+export function createCompletedPlan(session: PlanSession, request: Record<string, unknown>, idempotencyKey = `cv-impl-${randomUUID()}`) {
+  return callCompletedPlan(session, { idempotencyKey, operation: "create", request });
 }
 
 export function coverageOf(plan: Record<string, unknown>) {
@@ -283,7 +301,7 @@ export function safetyGuidanceOf(plan: Record<string, unknown>) {
 
 export function identityOf(plan: Record<string, unknown>) {
   const canonical = asRecord(plan.canonical);
-  const snapshotId = String(canonical.snapshotId ?? plan.snapshotId ?? "");
+  const snapshotId = String(canonical.catalogId ?? "");
   const matcherVersion = String(canonical.matcherVersion ?? "");
   const packVersion = String(canonical.packVersion ?? "");
   const contractVersion = String(canonical.contractVersion ?? plan.contractVersion ?? "");

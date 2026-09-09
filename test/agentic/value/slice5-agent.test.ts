@@ -1,3 +1,4 @@
+import { hasContextAssessment } from "../../helpers/context-assessment.ts";
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
@@ -289,23 +290,18 @@ describe("Slice 5 agent explanation safety and determinism", () => {
     assert.ok((published.basket?.length ?? 0) > 0);
   });
 
-  it("SAFE-01.A atrial fibrillation and apixaban are assessed on every option", () => {
+  it("SAFE-01.A atrial fibrillation and apixaban remain explicitly unassessed without a matching rule", () => {
     const snapshot = sampleValueSnapshot();
     const { published, options, result } = publishPlan(snapshot, {
-      ...intentState(snapshot),
-      conditionCodes: ["atrial_fibrillation"],
-      medicationCodes: ["apixaban"]
+      ...intentState(snapshot), conditionCodes: ["atrial_fibrillation"], medicationCodes: ["apixaban"]
     });
-    assert.ok((published.assessedMedicationCodes ?? []).includes("apixaban"));
-    assert.ok((published.assessedConditionCodes ?? []).includes("atrial_fibrillation"));
+    const check = (value: Record<string, unknown>) => {
+      assert.ok(hasContextAssessment(value, "medication", "apixaban"));
+      assert.ok(hasContextAssessment(value, "condition", "atrial_fibrillation"));
+    };
+    check(published);
     assert.ok(options.length >= 1);
-    for (const option of options) {
-      assert.ok((option.safety?.assessedMedicationCodes ?? []).includes("apixaban"));
-      assert.ok((option.safety?.assessedConditionCodes ?? []).includes("atrial_fibrillation"));
-      const selected = publishSelection(result, option);
-      assert.ok(selected.assessedMedicationCodes?.includes("apixaban"));
-      assert.ok(selected.assessedConditionCodes?.includes("atrial_fibrillation"));
-    }
+    for (const option of options) check(publishSelection(result, option));
   });
 
   it("SAFE-01.B apixaban plus omega-3 preserves interaction advice across every option without acknowledgement", () => {

@@ -49,6 +49,8 @@ function validate(schema, value, name) {
   check(compiled(value), `${name} conforms to its published schema${compiled.errors ? `: ${JSON.stringify(compiled.errors)}` : ""}`);
 }
 async function call(name, arguments_) {
+  // This detailed assertion client opts into the published full view.
+  if (name === "plan") arguments_ = { ...arguments_, responseView: "full" };
   const descriptor = contract.tools[name];
   check(Boolean(descriptor), `${name} is documented`);
   validate(descriptor.inputSchema, arguments_, `${name} request`);

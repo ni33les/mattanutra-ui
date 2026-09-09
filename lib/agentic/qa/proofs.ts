@@ -1,24 +1,16 @@
 import { AGENTIC_CONTRACT_VERSION } from "@/lib/agentic/config";
 import { catalogueVersion } from "@/lib/agentic/catalogue/snapshot";
 import { planTool } from "@/lib/agentic/plan/service";
+import { completedQaPlan } from "@/lib/agentic/qa/plan-client";
 import { executeTool } from "@/lib/agentic/commerce/execute";
 import { simulatePayment } from "@/lib/agentic/qa/simulate";
 import { isAgenticErrorResult } from "@/lib/agentic/contract/errors";
 import { resolveCapability, type CapabilityScope } from "@/lib/agentic/capabilities";
 import { type AgenticRuntime } from "@/lib/agentic/runtime";
 import { addMinor, asMinor, asMinorOr, formatMinor, DEFAULT_TAX_MINOR } from "@/lib/agentic/money";
-import { infoTool } from "@/lib/agentic/info";
-import { orderTool } from "@/lib/agentic/commerce/order";
-import { feedbackTool } from "@/lib/agentic/feedback";
-import { mcpLatencySnapshot } from "@/lib/agentic/metrics";
-import {
-  LATENCY_PERCENTILE_ALGORITHM,
-  TECH07_FIXED_BUDGET,
-  TECH07_LIVE_BUDGET
-} from "@/lib/agentic/qa/latency-score";
 import { redactedOrderCounts } from "@/lib/agentic/qa/counts";
 import { QA_PACK_CLOCK } from "@/lib/agentic/qa/session";
-import { dependencyBudget, getQueryNamespace, queryBudgetSnapshot, setQueryNamespace } from "@/lib/agentic/plan/query-budget";
+import { getQueryNamespace, setQueryNamespace } from "@/lib/agentic/plan/query-budget";
 
 export function goldenPlanRequest() {
   return {
@@ -125,7 +117,7 @@ export async function checkoutContinuityProof(runtime: AgenticRuntime) {
   return withProofQueries("checkout", async () => {
   const stamp = `${Date.now()}`;
   const now = proofNow(runtime);
-  const created = await planTool({
+  const created = await completedQaPlan({
     config: runtime.config,
     now,
     payload: {
@@ -299,19 +291,6 @@ export async function checkoutContinuityProof(runtime: AgenticRuntime) {
     passed: checks.every((item) => item.passed)
   };
   });
-}
-
-function percentile(samples: readonly number[], p: number) {
-  const sorted = samples.slice().sort((left, right) => left - right);
-  if (sorted.length === 0) {
-    return 0;
-  }
-
-  const index = Math.min(
-    sorted.length - 1,
-    Math.max(0, Math.ceil((p / 100) * sorted.length) - 1)
-  );
-  return sorted[index] ?? 0;
 }
 
 export async function latencyProof(runtime: AgenticRuntime) {
