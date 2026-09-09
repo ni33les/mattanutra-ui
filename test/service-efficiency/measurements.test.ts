@@ -50,3 +50,11 @@ test("EFF-MET-04 concise transport does not serialize an unused JSON clone", asy
   const reply = toolResult(payload); assert.equal(reply.structuredContent, payload);
   assert.equal(serializations, 0); assert.match(reply.content[0].text, /confirm_with_user/);
 });
+
+test("EFF-MET-05 both application and external worker publish the bounded metric aggregates", async () => {
+  const { readFile } = await import("node:fs/promises");
+  for (const file of ["instrumentation.ts", "workers/runner.ts"]) {
+    const source = await readFile(file, "utf8");
+    assert.match(source, /startServiceMeasurementReporting\(value => console\.info\(/, `${file} must publish its process aggregates`);
+  }
+});

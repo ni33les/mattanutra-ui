@@ -6,8 +6,8 @@
     {
       "file": "test/service-efficiency/measurements.test.ts",
       "slice": "measurements",
-      "expectedCases": 4,
-      "reason": "Concurrent query measurement isolation and retained diagnostic namespace compatibility"
+      "expectedCases": 5,
+      "reason": "Concurrent request attribution, bounded aggregation and startup wiring in application and external worker processes"
     },
     {
       "file": "test/service-efficiency/reads.test.ts",
