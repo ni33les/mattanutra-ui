@@ -8,12 +8,11 @@ import type { MatchCommand, MatchReply } from "../lib/agentic/plan/match-worker-
 import { validateReferenceJobIdentity, type ReferenceJobIdentity } from "../lib/agentic/catalogue/reference-job.ts";
 
 if (!parentPort) throw new Error("MCP matcher requires a worker thread");
-type Resident = { session: ReturnType<typeof createResidentPlanSession>; referenceIdentity: ReferenceJobIdentity; expiry?: ReturnType<typeof setTimeout> };
+type Resident = { session: ReturnType<typeof createResidentPlanSession>; referenceIdentity: ReferenceJobIdentity };
 const sessions = new Map<string, Resident>();
-function release(id: string) { clearTimeout(sessions.get(id)?.expiry); sessions.delete(id); }
-function arm(id: string, entry: Resident) {
-  clearTimeout(entry.expiry); entry.expiry = setTimeout(() => release(id), 60_000); entry.expiry.unref();
-}
+// The parent owns bounded expiry and eviction after durable acknowledgement.
+// A second timer here cannot know whether its last checkpoint was committed.
+function release(id: string) { sessions.delete(id); }
 parentPort.on("message", (job: MatchCommand) => {
   if ("kind" in job && job.protocol !== MATCH_WORKER_PROTOCOL) { parentPort!.postMessage({ error: "worker_protocol_mismatch" }); return; }
   if ("kind" in job && job.kind === "session-release") { release(job.sessionId); return; }
@@ -23,7 +22,7 @@ parentPort.on("message", (job: MatchCommand) => {
       const entry = sessions.get(job.sessionId);
       if (!entry || matchCursorAttempts(entry.session.cursor) !== job.expectedAttempts) throw new Error("Session checkpoint acknowledgement changed");
       const value = advanceResidentPlanSession(entry.session, job);
-      if (value.done) release(job.sessionId); else arm(job.sessionId, entry);
+      if (value.done) release(job.sessionId);
       reply = { result: { value, referenceIdentity: entry.referenceIdentity } };
     } else {
       validateReferenceJobIdentity(job.referenceIdentity, job.ceilings, job.snapshot.runtimeRevision);
@@ -36,7 +35,7 @@ parentPort.on("message", (job: MatchCommand) => {
         const entry: Resident = { session: createResidentPlanSession(job, job.chunk.checkpoint), referenceIdentity: job.referenceIdentity };
         sessions.set(job.sessionId, entry);
         const value = advanceResidentPlanSession(entry.session, job.chunk);
-        if (value.done) release(job.sessionId); else arm(job.sessionId, entry);
+        if (value.done) release(job.sessionId);
         reply = { result: { value, referenceIdentity: job.referenceIdentity } };
       } else reply = { result: { value: job.chunk ? matchPlanChunk(job, job.chunk) : matchPlan(job), referenceIdentity: job.referenceIdentity } };
     }
