@@ -46,6 +46,12 @@
       "slice": "dispatch",
       "expectedCases": 4,
       "reason": "Pre-dispatch accounting, durable start acknowledgement, affine continuations and shared CPU capacity"
+    },
+    {
+      "file": "test/service-efficiency/ownership.test.ts",
+      "slice": "ownership",
+      "expectedCases": 1,
+      "reason": "HTTP admission persists work without starting another matching executor or owning a worker lease"
     }
   ],
   "inputs": [
