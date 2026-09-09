@@ -1,9 +1,10 @@
+import { orderForRead } from "@/lib/agentic/presentation/order-read";
 import { projectOrder, orderResultVersion, type OrderViewInput } from "@/lib/agentic/presentation/order";
 import type { OrderSuccessWire } from "@/lib/agentic/contract/outputs";
 import type { AgenticConfig } from "@/lib/agentic/config";
 import { resolveCapability, type CapabilityScope } from "@/lib/agentic/capabilities";
 import { agenticMessage, negotiateLocale } from "@/lib/agentic/i18n";
-import { expireCheckoutIfDue, orderPollView } from "@/lib/agentic/commerce/state";
+import { orderPollView } from "@/lib/agentic/commerce/state";
 import type { AgenticStore } from "@/lib/agentic/store/types";
 import { getRetailOrderByAgenticOrderId } from "@/lib/retail-product-checkout";
 import { buildOrderProjection } from "@/lib/agentic/commerce/timeline";
@@ -58,14 +59,12 @@ async function orderToolBody(input: OrderViewInput & Readonly<{
   }
 
   const lightweight = input.responseView === "status" || input.responseView === "conversation";
-  const {order, fulfilmentEvents, paymentAttempts, items} = await input.store.transaction(async store => {
-    const loaded = await store.getOrder(capability.resourceId);
-    const order = await expireCheckoutIfDue({now: input.now, order: loaded, store});
-    const [fulfilmentEvents, paymentAttempts, items] = order ? await Promise.all([
-      store.listFulfilmentEvents(order.id), store.listPaymentAttempts(order.id), lightweight ? Promise.resolve([]) : store.getOrderItems(order.id)
-    ]) : [[], [], []];
-    return {order, fulfilmentEvents, paymentAttempts, items};
-  });
+  const state = lightweight ? await input.store.getOrderReadState(capability.resourceId) : null;
+  const order = orderForRead(lightweight ? state?.order ?? null : await input.store.getOrder(capability.resourceId), input.now);
+  const [fulfilmentEvents, paymentAttempts, items] = lightweight
+    ? [state?.fulfilmentEvents ?? [], [], []]
+    : order ? await Promise.all([input.store.listFulfilmentEvents(order.id), input.store.listPaymentAttempts(order.id), input.store.getOrderItems(order.id)])
+    : [[], [], []];
   const locale = negotiateLocale(input.locale);
   if (lightweight && order) {
     const view = orderPollView({ checkoutUrl: order.checkoutUrl, found: true, includeFrozen: false,

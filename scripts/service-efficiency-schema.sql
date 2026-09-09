@@ -55,9 +55,22 @@ create trigger project_funnel_formulation_read before insert or update of formul
 
 create or replace function public.project_funnel_assessment_read() returns trigger language plpgsql as $$
 begin
-  new.funnel_skip_healthscore := new.answers ? 'inStorePharmacy';
+  new.funnel_skip_healthscore := coalesce(new.answers ? 'inStorePharmacy',false);
   return new;
 end $$;
 drop trigger if exists project_funnel_assessment_read on public.assessments;
 create trigger project_funnel_assessment_read before insert or update of answers on public.assessments
   for each row execute function public.project_funnel_assessment_read();
+
+-- Freeze the immutable presentation/hash once, without copying baskets on polls.
+alter table public.agentic_orders add column if not exists read_projection jsonb;
+create or replace function public.project_agentic_order_read() returns trigger language plpgsql as $$
+begin
+  new.read_projection := jsonb_build_object('version',1,'frozenHash',md5(new.frozen_plan::text),
+    'presentation',jsonb_build_object('channel',new.frozen_plan->'channel','subtotalMinor',new.frozen_plan->'subtotalMinor',
+      'shippingMinor',new.frozen_plan->'shippingMinor','taxMinor',new.frozen_plan->'taxMinor'));
+  return new;
+end $$;
+drop trigger if exists project_agentic_order_read on public.agentic_orders;
+create trigger project_agentic_order_read before insert or update of frozen_plan on public.agentic_orders
+  for each row execute function public.project_agentic_order_read();

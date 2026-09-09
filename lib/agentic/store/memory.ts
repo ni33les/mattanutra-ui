@@ -1,3 +1,4 @@
+import { orderReadProjection, compactFulfilmentEvents } from "@/lib/agentic/presentation/order-read";
 import { operationCursor, withoutOperationCursor, withOperationCursor } from "@/lib/agentic/store/operation-checkpoint";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { planStatusProjection } from "@/lib/agentic/presentation/status-projection";
@@ -217,6 +218,11 @@ export function createMemoryStore(): AgenticStore {
       const record = idempotency.get(idempotencyKey(operation, ownerScope, key));
       return record ? clone(record) : null;
     },
+    async getOrderReadState(id) {
+      const order = orders.get(id); if (!order) return null;
+      const projection = order.readProjection ?? orderReadProjection(order.frozenPlan);
+      return clone({ order: { ...order, readProjection: projection, frozenPlan: projection.presentation }, fulfilmentEvents: compactFulfilmentEvents(fulfilment.get(id) ?? []) });
+    },
     async getOrder(id) {
       return orders.get(id) ? clone(orders.get(id)!) : null;
     },
@@ -362,7 +368,7 @@ export function createMemoryStore(): AgenticStore {
       idempotency.set(key, clone(record));
     },
     async insertOrder(record) {
-      orders.set(record.id, clone(record));
+      orders.set(record.id, clone({ ...record, readProjection: orderReadProjection(record.frozenPlan) }));
     },
     async insertOrderItems(items) {
       if (items.length < 1) {
@@ -448,7 +454,7 @@ export function createMemoryStore(): AgenticStore {
       idempotency.set(key, clone(record));
     },
     async updateOrder(record) {
-      orders.set(record.id, clone(record));
+      orders.set(record.id, clone({ ...record, readProjection: orderReadProjection(record.frozenPlan) }));
     },
     async updatePlan(record) {
       plans.set(record.id, clone(record));

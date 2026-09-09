@@ -329,6 +329,25 @@ export function createPostgresStore(inputSql: Sql, inTransaction = false): Agent
         responseJson: JSON.stringify(row.response_json)
       };
     },
+    async getOrderReadState(id) {
+      const [row] = await sql<DatabaseRow<OrderRecord> & { events: FulfilmentEventRecord[] }>`
+        select o.id,o.plan_id,o.plan_revision,o.environment,o.tenant_scope,o.principal_scope,o.reference,
+          o.currency,o.destination_country,o.total_price_minor,o.order_status,o.payment_status,o.fulfilment_status,
+          o.state_version,o.cancelled_at,o.expired_at,o.completed_at,o.checkout_access_hash,o.checkout_expires_at,
+          o.checkout_url,o.latest_payment_attempt,o.latest_payment_reason,o.provider_session_id,o.created_at,o.updated_at,
+          o.read_projection,case when o.read_projection is null then o.frozen_plan else o.read_projection->'presentation' end as frozen_plan,
+          coalesce((select jsonb_agg(jsonb_build_object('id',e.id,'orderId',e.order_id,'status',e.status,'createdAt',e.created_at,
+            'payload',jsonb_build_object('tracking',e.payload->'tracking','number',e.payload->'number','url',e.payload->'url','reasonCode',e.payload->'reasonCode')) order by e.created_at)
+            from (
+              (select id,order_id,status,created_at,payload from public.agentic_fulfilment_events where order_id=o.id
+                and (jsonb_typeof(payload->'tracking')='string' or jsonb_typeof(payload->'number')='string') order by created_at desc limit 1)
+              union
+              (select id,order_id,status,created_at,payload from public.agentic_fulfilment_events where order_id=o.id
+                and status='exception' order by created_at desc limit 1)
+            ) e),'[]'::jsonb) as events
+        from public.agentic_orders o where o.id=${id}::uuid`;
+      return row ? { order: mapOrder(row), fulfilmentEvents: row.events } : null;
+    },
     async getOrder(id) {
       const [row] = await sql<DatabaseRow<OrderRecord>>`select * from public.agentic_orders where id = ${id}::uuid`;
       return row ? mapOrder(row) : null;
@@ -851,6 +870,7 @@ function mapOrder(row: DatabaseRow<OrderRecord>): OrderRecord {
     environment: row.environment,
     expiredAt: toIsoOrNull(row.expired_at),
     frozenPlan: row.frozen_plan,
+    readProjection: row.read_projection ?? null,
     fulfilmentStatus: row.fulfilment_status,
     id: row.id,
     latestPaymentAttempt: row.latest_payment_attempt,

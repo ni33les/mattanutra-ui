@@ -78,6 +78,7 @@ export type PlanRevisionRecord = Readonly<{
 }>;
 
 export type OrderRecord = Readonly<{
+  readProjection?: import("@/lib/agentic/presentation/order-read").OrderReadProjection | null;
   cancelledAt: string | null;
   checkoutAccessHash: string | null;
   checkoutExpiresAt: string | null;
@@ -254,6 +255,7 @@ export type AgenticStore = {
     key: string
   ): Promise<IdempotencyRecord | null>;
   getOrder(id: string): Promise<OrderRecord | null>;
+  getOrderReadState(id: string): Promise<import("@/lib/agentic/presentation/order-read").OrderReadState | null>;
   getOrderForUpdate(id: string): Promise<OrderRecord | null>;
   getOrderByProviderSessionId(id: string): Promise<OrderRecord | null>;
   getOpenOrderForPlanRevision(
