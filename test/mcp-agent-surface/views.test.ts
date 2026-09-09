@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { afterEach, test } from "node:test";
-import { installRealCatalogue, uninstallRealCatalogue, runtime, rpc, profile } from "../ax-refinement/helpers.ts";
+import { installRealCatalogue, uninstallRealCatalogue, runtime, rpcWithTaskExecutor as rpc, profile } from "../ax-refinement/helpers.ts";
 import { resetPlanCreateInflightForTests } from "../../lib/agentic/plan/service.ts";
 import type { PlanConversationWire, PlanSuccessWire } from "../../lib/agentic/contract/outputs.ts";
 

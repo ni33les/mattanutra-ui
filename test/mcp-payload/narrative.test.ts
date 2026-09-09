@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { afterEach, test } from "node:test";
 import Ajv from "ajv";
-import { runtime, rpc, installRealCatalogue, uninstallRealCatalogue, profile } from "../ax-refinement/helpers.ts";
+import { runtime, rpcWithTaskExecutor as rpc, installRealCatalogue, uninstallRealCatalogue, profile } from "../ax-refinement/helpers.ts";
 import { CLIENT_GUIDE_URI, readContractResource } from "../../lib/agentic/contract/guide.ts";
 import { toolList } from "../../lib/agentic/mcp/rpc.ts";
 import { runAdmittedPlanOperation, resetPlanCreateInflightForTests } from "../../lib/agentic/plan/service.ts";

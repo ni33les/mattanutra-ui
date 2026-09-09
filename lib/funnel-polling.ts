@@ -166,7 +166,7 @@ export function pollFunnelStatus<T>(options: FunnelPollOptions<T>): Promise<Poll
           await subscriber.options.onValue?.(detached);
           if (!active.subscribers.has(subscriber)) return;
           const status = subscriber.options.ready(detached) ? "ready" : subscriber.options.failed?.(detached) ? "failed" : null;
-          if (status) { subscriber.resolve({ status, value: detached }); remove(subscriber); }
+          if (status) { subscriber.resolve(status === "ready" ? { status: "ready", value: detached } : { status: "failed", value: detached }); remove(subscriber); }
         } catch (error) { subscriber.reject(error); remove(subscriber); }
       }));
     }

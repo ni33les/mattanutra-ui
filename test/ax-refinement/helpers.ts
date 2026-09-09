@@ -47,3 +47,15 @@ export function barrier() {
   let release!: () => void; const promise = new Promise<void>(resolve => { release = resolve; });
   return { promise, release };
 }
+
+/** The external harness runs admitted tasks; polling itself remains read-only. */
+export async function rpcWithTaskExecutor(instance: ReturnType<typeof runtime>, tool: string, args: Record<string, unknown>) {
+  const response = await rpc(instance, tool, args);
+  if (tool !== "plan" || args.operation === "get" || typeof args.idempotencyKey !== "string" || response.status !== "processing") return response;
+  const scope = instance.scope;
+  const operation = await instance.store.getPlanOperationByKey(`${scope.environment}:${scope.tenantScope}:${scope.principalScope ?? "anon"}`, args.idempotencyKey);
+  assert.ok(operation, "Processing requires a durable admitted operation");
+  const { runAdmittedPlanOperation } = await import("../../lib/agentic/plan/service.ts");
+  await runAdmittedPlanOperation({ config: instance.config, store: instance.store, operationId: operation.id });
+  return rpc(instance, tool, args);
+}
