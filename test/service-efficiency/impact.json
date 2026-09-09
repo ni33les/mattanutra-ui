@@ -333,6 +333,19 @@
       "slice": "result-preparation",
       "expectedCases": 3,
       "reason": "Audits 1/10/11: prepare immutable product rows, localized presentation and HealthScore hashes outside task/assessment publication locks"
+    },
+    {
+      "file": "test/service-efficiency/decision-batch.integration.test.ts",
+      "slice": "decision-batch",
+      "database": true,
+      "expectedCases": 1,
+      "reason": "Audits 10/11: constant protected decision-write round trips with exact values and duplicate replay semantics"
+    },
+    {
+      "file": "test/recommendation-selection-projections.test.ts",
+      "slice": "decision-batch",
+      "expectedCases": 3,
+      "reason": "Affected supplement/product projections preserve coverage, quantities, decisions and rejected products"
     }
   ],
   "inputs": [
