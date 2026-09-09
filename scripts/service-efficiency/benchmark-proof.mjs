@@ -16,6 +16,13 @@ export function compareBenchmarkRuns(control, candidate, inventory) {
     assert.equal(before.inputSha256, after.inputSha256, `Different input: ${id}`);
     assert.deepEqual(semanticValue(before.semantic), semanticValue(after.semantic), `Changed semantic result: ${id}`);
     for (const row of [before, after]) for (const key of ["wallMs", "cpuMs", "maxRssBytes"]) assert.ok(Number.isFinite(row.measurements[key]) && row.measurements[key] >= 0, `Missing measurement: ${id}.${key}`);
+    if (!["reads", "funnel"].includes(id)) for (const row of [before, after]) {
+      for (const phase of ["queue", "execution"]) {
+        const metric = row.measurements[phase];
+        assert.ok(metric && Number.isSafeInteger(metric.count) && metric.count > 0 && metric.count === row.measurements.checkpointFrames, `Missing or incomplete dispatch ${phase} probes: ${id}`);
+        for (const key of ["totalMs", "p50Ms", "p95Ms", "maxMs"]) assert.ok(Number.isFinite(metric[key]) && metric[key] >= 0, `Invalid ${phase}.${key}: ${id}`);
+      }
+    }
     return { id, identical: true, semanticSha256: benchmarkHash(semanticValue(after.semantic)), control: before.measurements, candidate: after.measurements };
   });
   return { passed: true, normalization: "Object key order only; typed BigInt and Map encoding. Matching results, array order and work counts preserved exactly.", rows };

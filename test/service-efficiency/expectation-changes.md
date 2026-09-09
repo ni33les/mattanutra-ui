@@ -17,3 +17,4 @@ Historical evidence and prices are unchanged.
 - EFF-CACHE-07 initial attempts used an invalid short idempotency key and were prerequisite failures, not product RED evidence. The corrected real-worker test proves two owners coalesce and a third reuses completed matching facts without sharing capability access.
 
 - Final inventory includes the existing completed no-purchase reveal browser regression (ten affected browser cases in total). `acceptance-1` was deliberately interrupted to correct its omission before deployment; its partial execution is not an attestation.
+- `acceptance-2` passed 150 affected cases, paired semantic benchmarks and typecheck, then failed the release lint rule forbidding a local variable named `module`. The binding was renamed without changing assertions. Queue/execution diagnostics were added to the benchmark before the final retry; missing or incomplete dispatch probes now fail the comparison proof (EFF-PACK-05).

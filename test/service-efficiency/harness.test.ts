@@ -3,8 +3,9 @@ import { test } from "node:test";
 
 test("EFF-PACK-01 benchmark evidence rejects missing runs and semantic changes without hiding dose or work differences", async () => {
   const { compareBenchmarkRuns } = await import("../../scripts/service-efficiency/benchmark-proof.mjs");
+  const timing = { count: 2, totalMs: 2, p50Ms: 1, p95Ms: 1, maxMs: 1 };
   const row = { id: "d3", inputSha256: "a".repeat(64), semantic: { doses: [2], advice: ["review"], attempts: 8000 },
-    measurements: { wallMs: 100, cpuMs: 80, maxRssBytes: 1000, inputTransfers: 2, inputBytes: 100, checkpointBytes: 500 } };
+    measurements: { wallMs: 100, cpuMs: 80, maxRssBytes: 1000, inputTransfers: 2, inputBytes: 100, checkpointBytes: 500, checkpointFrames: 2, queue: timing, execution: timing } };
   assert.throws(() => compareBenchmarkRuns([row], [], ["d3"]), /missing|inventory/i);
   assert.throws(() => compareBenchmarkRuns([row], [{ ...row, semantic: { ...row.semantic, doses: [3] } }], ["d3"]), /semantic/i);
   assert.throws(() => compareBenchmarkRuns([row], [{ ...row, semantic: { ...row.semantic, attempts: 7999 } }], ["d3"]), /semantic/i);
@@ -54,4 +55,8 @@ test("EFF-PACK-05 matching comparisons require queue and execution timing with c
   const row = { id: "concurrent", inputSha256: "a".repeat(64), semantic: { attempts: 8000 },
     measurements: { wallMs: 100, cpuMs: 80, maxRssBytes: 1000, inputTransfers: 2, inputBytes: 100, checkpointBytes: 500, checkpointFrames: 2 } };
   assert.throws(() => compareBenchmarkRuns([row], [row], ["concurrent"]), /queue|dispatch/i);
+  const timing = { count: 2, totalMs: 2, p50Ms: 1, p95Ms: 1, maxMs: 1 };
+  const valid = { ...row, measurements: { ...row.measurements, queue: timing, execution: timing } };
+  assert.equal(compareBenchmarkRuns([valid], [valid], ["concurrent"]).passed, true);
+  assert.throws(() => compareBenchmarkRuns([valid], [{ ...valid, measurements: { ...valid.measurements, queue: { ...timing, count: 1 } } }], ["concurrent"]), /incomplete dispatch/i);
 });

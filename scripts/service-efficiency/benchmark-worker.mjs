@@ -18,8 +18,17 @@ const { normalizePlanRequest } = await load("lib/agentic/plan/normalize.ts");
 const frozen = await installCatalogue();
 const loop = monitorEventLoopDelay({ resolution: 10 }); loop.enable();
 const counters = { inputTransfers: 0, inputBytes: 0, checkpointBytes: 0, checkpointFrames: 0, continuations: 0, measurementMs: 0 };
+const { ThreadPool } = await load("lib/thread-pool.ts");
+const queued = new WeakMap(), dispatched = new WeakMap(), queueMs = [], executionMs = [];
+const originalRun = ThreadPool.prototype.run;
+ThreadPool.prototype.run = function(input, ...args) {
+  if (input && typeof input === "object") queued.set(input, performance.now());
+  return originalRun.call(this, input, ...args);
+};
 const originalPost = Worker.prototype.postMessage, originalEmit = Worker.prototype.emit;
 Worker.prototype.postMessage = function(message, ...args) {
+  const queuedAt = queued.get(message);
+  if (queuedAt !== undefined) { const now = performance.now(); queueMs.push(now - queuedAt); queued.delete(message); dispatched.set(this, now); }
   if (message?.snapshot || message?.kind === "session-continue") {
     const start = performance.now(); const bytes = serialize(message).byteLength;
     counters.inputBytes += bytes; counters.measurementMs += performance.now() - start;
@@ -28,6 +37,10 @@ Worker.prototype.postMessage = function(message, ...args) {
   return originalPost.call(this, message, ...args);
 };
 Worker.prototype.emit = function(event, reply, ...args) {
+  if (event === "message" && reply?.result) {
+    const startedAt = dispatched.get(this);
+    if (startedAt !== undefined) { executionMs.push(performance.now() - startedAt); dispatched.delete(this); }
+  }
   const cursor = event === "message" && reply?.result?.value?.checkpoint?.cursor;
   if (cursor) { counters.checkpointFrames++; counters.checkpointBytes += typeof cursor === "string" ? Buffer.byteLength(cursor) : cursor.byteLength; }
   return originalEmit.call(this, event, reply, ...args);
@@ -75,7 +88,12 @@ try {
     if (id === "expanded") assert.ok(performance.now() - started <= 180000, "Expanded functional deadline");
   }
   const usage = process.cpuUsage(cpu);
-  const measurements = { wallMs: performance.now() - started, cpuMs: (usage.user + usage.system) / 1000,
+  const summary = values => {
+    const ordered = [...values].sort((a, b) => a - b);
+    return { count: values.length, totalMs: values.reduce((sum, value) => sum + value, 0),
+      p50Ms: ordered[Math.floor((ordered.length - 1) * .5)] ?? 0, p95Ms: ordered[Math.ceil((ordered.length - 1) * .95)] ?? 0, maxMs: ordered.at(-1) ?? 0 };
+  };
+  const measurements = { queue: summary(queueMs), execution: summary(executionMs), wallMs: performance.now() - started, cpuMs: (usage.user + usage.system) / 1000,
     maxRssBytes: process.resourceUsage().maxRSS * 1024, memory: process.memoryUsage(), eventLoopP95Ms: loop.percentile(95) / 1e6,
     ...counters, ...extra };
   writeFileSync(output, JSON.stringify({ id, inputSha256, semantic: semanticValue(semantic), measurements }, null, 2), { flag: "wx", mode: 0o600 });
