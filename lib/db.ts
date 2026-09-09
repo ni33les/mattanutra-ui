@@ -59,15 +59,26 @@ export async function withDatabaseTransaction<T>(
   const timer = setTimeout(() => controller.abort(new Error("Database phase deadline exceeded")), timeoutMs);
   const signal = parent ? AbortSignal.any([parent.signal, controller.signal]) : controller.signal;
   const effects: Array<() => void> = [];
+  let stopWaiting: (() => void) | undefined;
   try {
-    const result = await withRequestLifetime({...parent, signal}, () => sql.begin(async tx => {
-      signal.throwIfAborted();
-      const result = await transactionScope.run(tx as unknown as postgres.Sql, () =>
-        commitEffects.run(effects, () => work(tx as unknown as postgres.Sql))
-      );
-      signal.throwIfAborted();
-      return result;
-    })) as T;
+    signal.throwIfAborted();
+    const result = await new Promise<T>((resolve, reject) => {
+      let acquired = false;
+      stopWaiting = () => { if (!acquired) reject(signal.reason); };
+      signal.addEventListener("abort", stopWaiting, { once: true });
+      // postgres.js does not expose cancellation of a queued BEGIN. Stop waiting
+      // now; a late acquisition throws before work and rolls back. Observe its
+      // rejection so cleanup cannot become an unhandled background failure.
+      void withRequestLifetime({...parent, signal}, () => sql.begin(async tx => {
+        acquired = true;
+        signal.throwIfAborted();
+        const value = await transactionScope.run(tx as unknown as postgres.Sql, () =>
+          commitEffects.run(effects, () => work(tx as unknown as postgres.Sql))
+        );
+        signal.throwIfAborted();
+        return value;
+      })).then(value => resolve(value as T), reject);
+    });
     for (const effect of effects) {
       try { effect(); } catch (error) {
         dbLog.warn("database_commit_effect_failed", {message: error instanceof Error ? error.message : "unknown"});
@@ -75,6 +86,7 @@ export async function withDatabaseTransaction<T>(
     }
     return result;
   } finally {
+    if (stopWaiting) signal.removeEventListener("abort", stopWaiting);
     clearTimeout(timer);
   }
 }
