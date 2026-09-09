@@ -399,6 +399,12 @@
       "database": true,
       "expectedCases": 1,
       "reason": "Audits 1/26/30: actual durable cancellation between committed reservation and worker dispatch preserves zero attempts and a recoverable receipt"
+    },
+    {
+      "file": "test/service-efficiency/rollout.test.ts",
+      "slice": "rollout",
+      "expectedCases": 3,
+      "reason": "Both approved deployment bases, source/register proof, executable coverage for all 39 locks, and environment-specific worker identity configuration"
     }
   ],
   "inputs": [
@@ -429,5 +435,9 @@
     "mixed",
     "reads",
     "funnel"
-  ]
+  ],
+  "deploymentBases": {
+    "dev": "41a9f1d7a938ff158a66bcc3dfea3b935f940341",
+    "uat": "84c39d9acff2fa380b0223be38650264ab1cc73d"
+  }
 }
