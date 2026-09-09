@@ -39,7 +39,10 @@ test("EFF-TXN-PG-02 checkpoint updates use one conditional write and preserve st
   assert.equal(await updateClaimedOperation(store, claim, { checkpoint: { search: { cursor, expansionAttempts: 4000 } } }, now), true);
   assert.equal(business().length, 1);
   const stored = await store.getPlanOperation(row.id);
-  assert.deepEqual(stored?.command, row.command); assert.deepEqual(stored?.checkpoint, { search: { cursor, expansionAttempts: 4000 } });
+  assert.deepEqual(stored?.command, row.command);
+  const { operationCursor, operationCursorBytes, withoutOperationCursor } = await import("../../lib/agentic/store/operation-checkpoint.ts");
+  assert.deepEqual(withoutOperationCursor(stored!).checkpoint, { search: { expansionAttempts: 4000 } });
+  assert.deepEqual(operationCursorBytes(operationCursor(stored!)!), Buffer.from(cursor, "base64"));
   await cancelPlanOperation(store, row.id, now);
   assert.equal(await updateClaimedOperation(store, claim, { status: "complete" }, now), false);
 });

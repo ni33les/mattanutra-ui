@@ -26,7 +26,7 @@ export function operationCommands(sql: postgres.Sql) {
           and (status<>'running' or (record_json->>'leaseExpiresAt')::timestamptz<=${now}::timestamptz)
           and coalesce((record_json->>'deadlineAt')::timestamptz,created_at+interval '175 seconds')>${now}::timestamptz
         returning record_json,checkpoint_cursor`;
-      return row ? withOperationCursor(row.record_json, row.checkpoint_cursor?.toString("base64")) : null;
+      return row ? withOperationCursor(row.record_json, row.checkpoint_cursor ?? undefined) : null;
     },
     async patchClaimedOperation(id: string, token: string, changes: OperationChanges, now: string, leaseExpiresAt: string | null) {
       const patch = { ...changes };

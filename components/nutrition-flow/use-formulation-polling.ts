@@ -54,7 +54,7 @@ export function useFormulationPolling(planId: string, locale: Locale, initialRes
     }
     void wait().catch(() => { if (!controller.signal.aborted) setFailed(true); });
     return () => controller.abort();
-  }, [attempt, locale, onPollingComplete, productPollingPreference, refresh, root]);
+  }, [attempt, locale, onPollingComplete, planId, productPollingPreference, refresh, root]);
 
   const retry = useCallback(() => { setFailed(false); setAttempt(value => value + 1); }, []);
   return { result, failed, retry, refresh: () => refresh(), loadState: result ? "ready" : failed ? "error" : "loading" };

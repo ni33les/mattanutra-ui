@@ -105,7 +105,7 @@ export function createPostgresStore(inputSql: Sql, inTransaction = false): Agent
         return row ? withoutOperationCursor(row.record_json) : null;
       }
       const [row] = await sql<{ record_json: PlanOperationRecord; checkpoint_cursor: Buffer | null }>`select record_json,checkpoint_cursor from public.agentic_plan_operations where id=${id}::uuid`;
-      return row ? withOperationCursor(row.record_json, row.checkpoint_cursor?.toString("base64")) : null;
+      return row ? withOperationCursor(row.record_json, row.checkpoint_cursor ?? undefined) : null;
     },
     async getPlanOperationByKey(ownerScope, key) {
       const [row] = await sql<{ record_json: PlanOperationRecord }>`select record_json from public.agentic_plan_operations where owner_scope=${ownerScope} and idempotency_key=${key}`;
