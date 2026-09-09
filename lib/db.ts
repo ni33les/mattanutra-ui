@@ -378,29 +378,37 @@ function instrumentSql(
       const signal = lifetime?.signal;
       const cancel = () => pending.cancel?.();
       const originalThen = pending.then.bind(pending);
+      let observed: Promise<unknown> | undefined;
       pending.then = ((onFulfilled, onRejected) => {
+        // The driver observes transaction-query errors itself. Its subscription
+        // and the caller's await are one SQL execution, not two statements.
+        if (observed) return observed.then(onFulfilled, onRejected);
         recordServiceMetric("db.statements");
         const measured = measureService("db.sql_ms");
+        // Client observations include server execution and network time. They
+        // must not be presented as PostgreSQL's exact lock-wait/hold duration.
+        const locked = /\bfor\s+(?:(?:no\s+key|key)\s+)?(?:update|share)\b|\bpg_(?:try_)?advisory_(?:xact_)?lock\b|\block\s+table\b/i.test((args[0] as TemplateStringsArray).join(" ? "))
+          ? measureService("db.lock_statement_client_ms") : undefined;
         signal?.addEventListener("abort", cancel, { once: true });
         if (signal?.aborted) cancel();
-        return originalThen(
+        observed = originalThen(
           (value) => {
             measured();
+            locked?.();
             signal?.removeEventListener("abort", cancel);
             noteQuery(kind, startedAt, args[0]);
-            return typeof onFulfilled === "function" ? onFulfilled(value) : value;
+            return value;
           },
           (error) => {
             measured();
+            locked?.();
             if ((error as { code?: string })?.code === "55P03") recordServiceMetric("db.lock_timeouts");
             signal?.removeEventListener("abort", cancel);
             noteQuery(kind, startedAt, args[0]);
-            if (typeof onRejected === "function") {
-              return onRejected(error);
-            }
             throw error;
           }
         );
+        return observed.then(onFulfilled, onRejected);
       }) as Promise<unknown>["then"];
     }
 
@@ -418,8 +426,10 @@ function instrumentSql(
       fn: (txn: postgres.TransactionSql) => unknown
     ) => {
       const acquired = measureService("db.acquire_begin_ms");
+      let protectedDuration: (() => void) | undefined;
       return originalBegin(async (txn) => {
         acquired();
+        protectedDuration = measureService("db.transaction_client_ms");
         requestLifetime()?.signal.throwIfAborted();
         const instrumented = instrumentSql(
           txn as unknown as postgres.Sql,
@@ -435,7 +445,7 @@ function instrumentSql(
         `;
         configured();
         return fn(instrumented);
-      });
+      }).finally(() => protectedDuration?.());
     }) as postgres.Sql["begin"];
   }
 
