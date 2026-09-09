@@ -63,3 +63,38 @@ test("EFF-READ-PG-02 warm status uses two SELECTs and the read state contains no
   assert.equal(state.result, null); assert.equal(state.operation, null);
   assert.ok(Buffer.byteLength(JSON.stringify(state)) < 2500);
 });
+
+test("EFF-ORDER-PG-01 expired order status stays read-only behind a held checkout write", async () => {
+  const { app, orderId } = await fixture();
+  const order = await store.getOrder(orderId); assert.ok(order);
+  await store.updateOrder({ ...order, checkoutExpiresAt: new Date(Date.parse(app.now!) - 1000).toISOString() });
+  const { handle } = await issueCapability({ config: app.config, store, scope: app.scope, now: app.now!, resourceId: orderId,
+    resourceType: "order", allowedActions: ["order.read"] });
+  let release!: () => void, ready!: () => void;
+  const held = new Promise<void>(resolve => { ready = resolve; }), released = new Promise<void>(resolve => { release = resolve; });
+  const writer = sql.begin(async tx => {
+    await tx`update public.agentic_orders set state_version=state_version+1 where id=${orderId}::uuid`; ready(); await released;
+  });
+  await held;
+  try {
+    const { orderTool } = await import("../../lib/agentic/commerce/order.ts");
+    const result = await orderTool({ ...app, now: app.now!, orderHandle: handle, responseView: "status" });
+    assert.ok(result.ok); assert.equal(result.orderStatus, "expired");
+    assert.equal((await store.getOrder(orderId))!.orderStatus, "open");
+  } finally { release(); await writer; }
+});
+
+test("EFF-ORDER-PG-02 warm order polls read small facts in two SELECTs and retain frozen full data", async () => {
+  const { app, orderId } = await fixture();
+  const { handle } = await issueCapability({ config: app.config, store, scope: app.scope, now: app.now!, resourceId: orderId,
+    resourceType: "order", allowedActions: ["order.read"] });
+  const { orderTool } = await import("../../lib/agentic/commerce/order.ts");
+  queries.length = 0;
+  const first = await orderTool({ ...app, now: app.now!, orderHandle: handle, responseView: "status" }); assert.ok(first.ok);
+  assert.equal(queries.length, 2); assert.ok(queries.every(query => /^\s*select/i.test(query)));
+  const state = await store.getOrderReadState(orderId); assert.ok(state);
+  assert.ok(Buffer.byteLength(JSON.stringify(state)) < 2500);
+  assert.deepEqual((await store.getOrder(orderId))!.frozenPlan, internalFixture());
+  const second = await orderTool({ ...app, now: app.now!, orderHandle: handle, responseView: "status", knownResultVersion: first.resultVersion });
+  assert.ok(second.ok && "unchanged" in second && second.unchanged);
+});
