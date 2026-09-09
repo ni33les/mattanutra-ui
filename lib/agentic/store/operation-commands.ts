@@ -38,12 +38,12 @@ export function operationCommands(sql: postgres.Sql) {
         returning record_json,checkpoint_cursor`;
       return row ? withOperationCursor(row.record_json, row.checkpoint_cursor ?? undefined) : null;
     },
-    async patchClaimedOperation(id: string, token: string, changes: OperationChanges, now: string, leaseExpiresAt: string | null) {
+    async patchClaimedOperation(id: string, token: string, changes: OperationChanges, now: string, leaseExpiresAt: string | null, preparedJson?: string) {
       const patch = { ...changes };
       const cursor = operationCursor({ checkpoint: changes.checkpoint } as PlanOperationRecord);
       if (Object.hasOwn(changes, "checkpoint")) patch.checkpoint = withoutOperationCursor({ checkpoint: changes.checkpoint } as PlanOperationRecord).checkpoint;
       const rows = await sql`update public.agentic_plan_operations set status=${changes.status ?? "running"},version=version+1,updated_at=${now}::timestamptz,
-        record_json=(record_json #- '{checkpoint,search,cursor}') || ${sql.json(json(patch))}::jsonb ||
+        record_json=(record_json #- '{checkpoint,search,cursor}') || ${preparedJson ?? JSON.stringify(patch)}::text::jsonb ||
           jsonb_build_object('status',${changes.status ?? "running"}::text,'version',version+1,'updatedAt',${now}::text,'leaseExpiresAt',${leaseExpiresAt}::text),
         checkpoint_cursor=case when ${cursor !== undefined} then ${cursor === undefined ? null : operationCursorBytes(cursor)}
           when ${changes.checkpoint === null} then null else coalesce(checkpoint_cursor,decode(record_json #>> '{checkpoint,search,cursor}','base64')) end

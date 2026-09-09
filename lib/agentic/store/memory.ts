@@ -460,7 +460,9 @@ export function createMemoryStore(): AgenticStore {
       idempotency.set(key, clone(record));
     },
     async updateOrder(record) {
-      orders.set(record.id, clone({ ...record, readProjection: orderReadProjection(record.frozenPlan) }));
+      const existing=orders.get(record.id);
+      if(!existing) return;
+      orders.set(record.id, clone({ ...record, frozenPlan:existing.frozenPlan, readProjection:existing.readProjection }));
     },
     async updatePlan(record) {
       plans.set(record.id, clone(record));

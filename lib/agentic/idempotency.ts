@@ -112,7 +112,7 @@ export async function beginIdempotency<T>(input: Readonly<{
   };
 }
 
-export async function commitIdempotency(input: Readonly<{
+export function prepareIdempotencyRecord(input: Readonly<{
   key: string;
   now: string;
   operation: string;
@@ -120,8 +120,7 @@ export async function commitIdempotency(input: Readonly<{
   payload: unknown;
   resourceIds: Readonly<Record<string, string>>;
   response: unknown;
-  store: AgenticStore;
-}>): Promise<IdempotencyRecord> {
+}>): IdempotencyRecord {
   const record: IdempotencyRecord = {
     createdAt: input.now,
     expiresAt: new Date(
@@ -135,8 +134,12 @@ export async function commitIdempotency(input: Readonly<{
     responseJson: JSON.stringify(input.response)
   };
 
-  await input.store.insertIdempotency(record);
   return record;
+}
+
+export async function commitIdempotency(input: Parameters<typeof prepareIdempotencyRecord>[0] & {store:AgenticStore}):Promise<IdempotencyRecord> {
+  const record=prepareIdempotencyRecord(input);
+  await input.store.insertIdempotency(record);return record;
 }
 
 export function isIdempotencyRace(error: unknown) {

@@ -1,4 +1,5 @@
 import { planStatusProjection } from "@/lib/agentic/presentation/status-projection";
+import {preparePlanRevisionRecord} from "@/lib/agentic/store/prepared-revision";
 import { readPlanPresentation } from "@/lib/agentic/presentation/plan-read";
 import { planContractCompatible } from "@/lib/agentic/presentation/compatibility";
 import { withoutOperationCursor } from "@/lib/agentic/store/operation-checkpoint";
@@ -26,6 +27,7 @@ import {
   beginIdempotency,
   canonicalRequestHash,
   commitIdempotency,
+  prepareIdempotencyRecord,
   isIdempotencyRace
 } from "@/lib/agentic/idempotency";
 import { resolveMarket } from "@/lib/agentic/catalogue/market";
@@ -894,6 +896,7 @@ async function commitTerminalIdempotency(input: Readonly<{
   payload: unknown;
   planId: string;
   response: unknown;
+  preparedRecord?: import("@/lib/agentic/store/types").IdempotencyRecord;
   store: AgenticStore;
 }>) {
   const existing = await input.store.getIdempotency(
@@ -908,11 +911,12 @@ async function commitTerminalIdempotency(input: Readonly<{
     await input.store.updateIdempotency({
       ...existing,
       resourceIds: { planId: input.planId },
-      responseJson: JSON.stringify(input.response)
+      responseJson: input.preparedRecord?.responseJson ?? JSON.stringify(input.response)
     });
     return;
   }
 
+  if(input.preparedRecord) {await input.store.insertIdempotency(input.preparedRecord);return;}
   await commitIdempotency({
     key: input.key,
     now: input.now,
@@ -1994,18 +1998,23 @@ async function persistTerminalPlan(input: Readonly<{
   const projectedSuccess = successFromResult({ locale: input.locale, planHandle: input.planHandle,
     result: terminalResult, revision: input.revision });
   const statusProjection = planStatusProjection(terminalResult);
+  const preparedRevision=preparePlanRevisionRecord({...revisionRecord(input.planId,input.revision,terminalResult,input.input.now),statusProjection});
+  const key=input.input.payload.idempotencyKey;
+  const preparedReceipt=key?prepareIdempotencyRecord({key,now:input.input.now,operation:"plan",ownerScope:input.ownerScope,
+    payload:input.input.payload,resourceIds:{planId:input.planId},response:projectedSuccess}):undefined;
+  const terminalChanges={status:"complete" as const,response:projectedSuccess,error:null};
+  const terminalChangesJson=JSON.stringify(terminalChanges);
   const response = await input.input.store.transaction(async (store) => {
     const plan = await store.getPlanForUpdate(input.planId);
     if (!plan) return businessError({ message: "Not found.", reasonCode: "not_found" });
     const operationClaim = planAttempts.getStore()?.operation;
     if (operationClaim) {
-      const active = await store.getPlanOperation(operationClaim.id, { includeCursor: false });
+      const active = store.getPlanOperationHeader?await store.getPlanOperationHeader(operationClaim.id):await store.getPlanOperation(operationClaim.id, { includeCursor: false });
       if (!active || active.status !== "running" || active.leaseToken !== operationClaim.leaseToken || Date.parse(active.leaseExpiresAt ?? "") <= Date.now()) {
         return businessError({ reasonCode: "stale_revision", message: "This matching operation no longer owns publication. Reload the plan." });
       }
     }
 
-    const key = input.input.payload.idempotencyKey;
     if (key) {
       const replay = await beginIdempotency<PlanToolSuccess>({
         key, now: input.input.now, operation: "plan", ownerScope: input.ownerScope,
@@ -2015,7 +2024,7 @@ async function persistTerminalPlan(input: Readonly<{
       if (replay.kind === "replay" && replay.response.status !== "processing") return replay.response;
     }
 
-    const current = await store.getPlanRevision(input.planId, input.revision);
+    const current = store.getPlanRevisionHeader?await store.getPlanRevisionHeader(input.planId,input.revision):await store.getPlanRevision(input.planId, input.revision);
     const baseRevision = input.input.payload.expectedRevision ?? input.revision;
     if (plan.currentRevision !== baseRevision || (current && current.status !== "processing")) {
       return businessError({
@@ -2044,17 +2053,17 @@ async function persistTerminalPlan(input: Readonly<{
         planId: input.planId, revision: input.revision, scope: input.input.scope, store });
     }
     const success = projectedSuccess;
-    const record = { ...revisionRecord(input.planId, input.revision, result, current?.createdAt ?? input.input.now), statusProjection };
+    const record = {...preparedRevision,createdAt:current?.createdAt ?? input.input.now};
     if (current) await store.updatePlanRevision(record);
     else await store.insertPlanRevision(record);
     await store.updatePlan({ ...plan, currentRevision: input.revision, updatedAt: input.input.now });
     if (key) {
       await commitTerminalIdempotency({
         key, now: input.input.now, ownerScope: input.ownerScope,
-        payload: input.input.payload, planId: input.planId, response: success, store
+        payload: input.input.payload, planId: input.planId, response: success, store, preparedRecord:preparedReceipt
       });
     }
-    if (operationClaim && !await updateClaimedOperation(store, operationClaim, { status: "complete", response: success, error: null }, new Date().toISOString())) {
+    if (operationClaim && !await updateClaimedOperation(store, operationClaim, terminalChanges, new Date().toISOString(),terminalChangesJson)) {
       throw new Error("Plan operation lost publication ownership");
     }
     planAttempts.getStore()?.signal?.throwIfAborted();

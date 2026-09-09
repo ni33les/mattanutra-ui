@@ -100,9 +100,9 @@ export async function claimPlanOperation(store: AgenticStore, id: string, leaseT
 }
 
 export async function updateClaimedOperation(store: AgenticStore, claim: PlanOperationRecord,
-  changes: Partial<Pick<PlanOperationRecord, "checkpoint" | "catalogueIdentity" | "referenceIdentity" | "status" | "response" | "error">>, now: string) {
+  changes: Partial<Pick<PlanOperationRecord, "checkpoint" | "catalogueIdentity" | "referenceIdentity" | "status" | "response" | "error">>, now: string, preparedJson?: string) {
   if (store.patchClaimedOperation) return store.patchClaimedOperation(claim.id, claim.leaseToken!, changes, now,
-    !changes.status || changes.status === "running" ? new Date(Date.parse(now) + PLAN_OPERATION_LEASE_MS).toISOString() : null);
+    !changes.status || changes.status === "running" ? new Date(Date.parse(now) + PLAN_OPERATION_LEASE_MS).toISOString() : null, preparedJson);
   return store.transaction(async tx => {
     const current = await tx.getPlanOperation(claim.id, { includeCursor: false });
     if (!current || current.status !== "running" || current.leaseToken !== claim.leaseToken ||

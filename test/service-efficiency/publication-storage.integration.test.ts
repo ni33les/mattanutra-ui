@@ -19,7 +19,7 @@ test("LOCK-STORAGE-01 prepared revision JSON is persisted without revisiting res
   const id=randomUUID(),app=runtime(`prepared-${id}`,store),result=internalFixture();
   await store.insertPlan({id,currentRevision:1,...app.scope,createdAt:app.now!,updatedAt:app.now!});
   const value:PlanRevisionRecord={planId:id,revision:1,status:result.status,requestSnapshot:result.requestSnapshot,result,
-    catalogueVersion:result.catalogueVersion,guidanceRulesVersion:result.guidanceRulesVersion,availabilityAsOf:app.now!,createdAt:app.now!};
+    catalogueVersion:"lock-fixture",guidanceRulesVersion:"unchanged",availabilityAsOf:app.now!,createdAt:app.now!};
   const expected=JSON.parse(JSON.stringify(result)),prepared=preparePlanRevisionRecord(value);
   Object.defineProperty(result,"toJSON",{value:()=>{throw new Error("Result serialized while publishing");}});
   try {

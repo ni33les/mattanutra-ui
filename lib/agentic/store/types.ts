@@ -65,6 +65,7 @@ export type PlanOperationRecord = Readonly<{
 }>;
 
 export type PlanRevisionRecord = Readonly<{
+  storageJson?: Readonly<{request:string;result:string;projection:string}>;
   statusProjection?: import("@/lib/agentic/presentation/status-projection").PlanStatusProjection | null;
   availabilityAsOf: string;
   catalogueVersion: string;
@@ -229,7 +230,8 @@ export type FeedbackRecord = Readonly<{
 export type AgenticStore = {
   expireOperation?(id: string, now: string, error: unknown): Promise<boolean>;
   claimOperation?(id: string, token: string, now: string, leaseExpiresAt: string): Promise<PlanOperationRecord | null>;
-  patchClaimedOperation?(id: string, token: string, changes: import("@/lib/agentic/store/operation-commands").OperationChanges, now: string, leaseExpiresAt: string | null): Promise<boolean>;
+  patchClaimedOperation?(id: string, token: string, changes: import("@/lib/agentic/store/operation-commands").OperationChanges, now: string, leaseExpiresAt: string | null, preparedJson?: string): Promise<boolean>;
+  getPlanOperationHeader?(id:string):Promise<Pick<PlanOperationRecord,"status"|"leaseToken"|"leaseExpiresAt">|null>;
   releaseUnstartedOperationAttempts?(id: string, token: string, attempts: number, reserved: number, restore: number, now: string): Promise<boolean>;
   /** Coherent MVCC presentation read; never locks rows or includes commands/cursors. */
   getPlanReadState(planId: string, revision?: number, includeResult?: boolean): Promise<import("@/lib/agentic/presentation/status-projection").PlanReadState | null>;
@@ -281,6 +283,7 @@ export type AgenticStore = {
     planId: string,
     revision: number
   ): Promise<PlanRevisionRecord | null>;
+  getPlanRevisionHeader?(planId:string,revision:number):Promise<Pick<PlanRevisionRecord,"revision"|"status"|"createdAt">|null>;
   getProviderEvent(
     provider: string,
     providerEventId: string

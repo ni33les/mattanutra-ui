@@ -1,6 +1,7 @@
 import { operationCursor, operationCursorBytes, withoutOperationCursor, withOperationCursor } from "@/lib/agentic/store/operation-checkpoint";
 import { operationCommands } from "@/lib/agentic/store/operation-commands";
 import { getSql, keepDatabaseWarm, withDatabaseTransaction } from "@/lib/db";
+import {preparePlanRevisionRecord} from "@/lib/agentic/store/prepared-revision";
 import type {
   AgenticStore,
   CapabilityRecord,
@@ -24,7 +25,7 @@ import type {
 import type { CatalogueSnapshot } from "@/lib/agentic/catalogue/types";
 import { createMemoryStore } from "@/lib/agentic/store/memory";
 import { asMinor } from "@/lib/agentic/money";
-import { planStatusProjection, type PlanReadState, type PlanStatusProjection, type PlanOperationRead } from "@/lib/agentic/presentation/status-projection";
+import type { PlanReadState, PlanStatusProjection, PlanOperationRead } from "@/lib/agentic/presentation/status-projection";
 
 type Sql = NonNullable<ReturnType<typeof getSql>>;
 type StoreSql = {
@@ -68,6 +69,17 @@ export function createPostgresStore(inputSql: Sql, inTransaction = false): Agent
   const sql = inputSql as unknown as StoreSql;
   const store: AgenticStore = {
     ...operationCommands(inputSql),
+    async getPlanRevisionHeader(planId,revision) {
+      const [row]=await sql<{revision:number;status:PlanRevisionRecord["status"];created_at:DatabaseTimestamp}>`
+        select revision,status,created_at from public.agentic_plan_revisions where plan_id=${planId}::uuid and revision=${revision}`;
+      return row?{revision:row.revision,status:row.status,createdAt:toIso(row.created_at)}:null;
+    },
+    async getPlanOperationHeader(id) {
+      const [row]=await sql<{status:PlanOperationRecord["status"];lease_token:string|null;lease_expires_at:string|null}>`
+        select status,record_json->>'leaseToken' as lease_token,record_json->>'leaseExpiresAt' as lease_expires_at
+        from public.agentic_plan_operations where id=${id}::uuid`;
+      return row?{status:row.status,leaseToken:row.lease_token,leaseExpiresAt:row.lease_expires_at}:null;
+    },
     async getPlanReadState(planId, requestedRevision, includeResult = false) {
       const [row] = await sql<DatabaseRow<PlanRecord> & { revision: number; projection: PlanStatusProjection | null;
         result: unknown; operation: PlanOperationRead | null; payment: PlanReadState["payment"]; frozen: boolean; catalogue_revision: number | null }>`
@@ -600,7 +612,7 @@ export function createPostgresStore(inputSql: Sql, inTransaction = false): Agent
           operation, owner_scope, idempotency_key, request_hash, resource_ids, response_json, created_at, expires_at
         ) values (
           ${record.operation}, ${record.ownerScope}, ${record.key}, ${record.requestHash},
-          ${asJson(record.resourceIds)}, ${asJson(JSON.parse(record.responseJson))},
+          ${asJson(record.resourceIds)}, ${record.responseJson}::text::jsonb,
           ${record.createdAt}::timestamptz, ${record.expiresAt}::timestamptz
         )
         on conflict (operation, owner_scope, idempotency_key) do nothing
@@ -679,17 +691,18 @@ export function createPostgresStore(inputSql: Sql, inTransaction = false): Agent
       `;
     },
     async insertPlanRevision(record) {
-      const projection = record.statusProjection ?? planStatusProjection(record.result);
+      const prepared=record.storageJson ? record : preparePlanRevisionRecord(record);
+      const projection=prepared.statusProjection ?? null,encoded=prepared.storageJson!;
       await sql`
         insert into public.agentic_plan_revisions (
           plan_id, revision, status, request_snapshot, result, catalogue_version,
           guidance_rules_version, availability_as_of, created_at, status_projection
         ) values (
           ${record.planId}::uuid, ${record.revision}, ${record.status},
-          ${asJson(record.requestSnapshot)}, ${asJson(record.result)},
+          ${encoded.request}::text::jsonb, ${encoded.result}::text::jsonb,
           ${record.catalogueVersion}, ${record.guidanceRulesVersion},
           ${record.availabilityAsOf}::timestamptz, ${record.createdAt}::timestamptz,
-          case when ${projection !== null} then jsonb_set(${asJson(projection)}::jsonb,'{catalogueRevision}',
+          case when ${projection !== null} then jsonb_set(${encoded.projection}::text::jsonb,'{catalogueRevision}',
             coalesce((select snapshot_json->'runtimeRevision' from public.agentic_catalogue_snapshots where snapshot_id=${projection?.snapshotId ?? ""}),${asJson(projection?.catalogueRevision ?? null)}::jsonb,'null'::jsonb)) else null end
         )
       `;
@@ -775,7 +788,7 @@ export function createPostgresStore(inputSql: Sql, inTransaction = false): Agent
         update public.agentic_idempotency_records set
           request_hash = ${record.requestHash},
           resource_ids = ${asJson(record.resourceIds)},
-          response_json = ${asJson(JSON.parse(record.responseJson))},
+          response_json = ${record.responseJson}::text::jsonb,
           expires_at = ${record.expiresAt}::timestamptz
         where operation = ${record.operation}
           and owner_scope = ${record.ownerScope}
@@ -794,7 +807,6 @@ export function createPostgresStore(inputSql: Sql, inTransaction = false): Agent
           state_version = ${record.stateVersion},
           latest_payment_attempt = ${record.latestPaymentAttempt},
           latest_payment_reason = ${record.latestPaymentReason},
-          frozen_plan = ${asJson(record.frozenPlan)},
           updated_at = ${record.updatedAt}::timestamptz,
           completed_at = ${record.completedAt}::timestamptz,
           cancelled_at = ${record.cancelledAt}::timestamptz,
@@ -811,13 +823,14 @@ export function createPostgresStore(inputSql: Sql, inTransaction = false): Agent
       `;
     },
     async updatePlanRevision(record) {
-      const projection = record.statusProjection ?? planStatusProjection(record.result);
+      const prepared=record.storageJson ? record : preparePlanRevisionRecord(record);
+      const projection=prepared.statusProjection ?? null,encoded=prepared.storageJson!;
       await sql`
         update public.agentic_plan_revisions set
           status = ${record.status},
-          request_snapshot = ${asJson(record.requestSnapshot)},
-          result = ${asJson(record.result)},
-          status_projection = case when ${projection !== null} then jsonb_set(${asJson(projection)}::jsonb,'{catalogueRevision}',
+          request_snapshot = ${encoded.request}::text::jsonb,
+          result = ${encoded.result}::text::jsonb,
+          status_projection = case when ${projection !== null} then jsonb_set(${encoded.projection}::text::jsonb,'{catalogueRevision}',
             coalesce((select snapshot_json->'runtimeRevision' from public.agentic_catalogue_snapshots where snapshot_id=${projection?.snapshotId ?? ""}),${asJson(projection?.catalogueRevision ?? null)}::jsonb,'null'::jsonb)) else null end,
           catalogue_version = ${record.catalogueVersion},
           guidance_rules_version = ${record.guidanceRulesVersion},
