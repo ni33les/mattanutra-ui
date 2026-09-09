@@ -320,7 +320,7 @@ async function callTool(
         else {
           // A terminal idempotency receipt remains immutable. Present its current
           // freshness without allowing an old ready response to authorize purchase.
-          const presented = state.refreshRequired && full.status !== "processing" ? { ...full, ...publicPlanFields(state.result) } : full;
+          const presented = (state.refreshRequired && full.status !== "processing" ? { ...full, ...publicPlanFields(state.result) } : full) as PlanSuccessWire;
           const projected = projectPlan({ ...presented, ...(request ? { originalRequest: request as PlanSuccessWire["originalRequest"] } : {}) }, params as PlanViewInput);
           value = isAgenticErrorResult(projected) || params.responseView === "full" ? projected : { ...projected, resultVersion: state.resultVersion };
         }
