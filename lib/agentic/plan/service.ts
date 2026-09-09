@@ -57,6 +57,8 @@ import {
 import { evaluateSafety, planStatus, safetyQuestions } from "@/lib/agentic/plan/safety";
 import { persistMatcherTelemetry } from "@/lib/agentic/plan/telemetry";
 import { publicPlanFields } from "@/lib/agentic/public-mapper";
+import { SharedMatchWork } from "@/lib/match-work-cache";
+import { matchingResultIdentity } from "@/lib/agentic/plan/matching";
 import { matchPlanInWorker, matchPlanResidentChunkInWorker, closePlanMatchSession, MatcherUnavailableError } from "@/lib/agentic/plan/match-worker-pool";
 import { evidenceHandleFor, issueEvidenceCapability } from "@/lib/agentic/evidence/tool";
 import { planCompactApplicable } from "@/lib/agentic/contract/plan-result";
@@ -503,31 +505,52 @@ type DurableSearchCheckpoint = {
   search?: import("@/lib/agentic/plan/matching").ResidentChunkOptions["checkpoint"];
   reservedAttempts?: number;
 };
+type MatchCheckpointEvent = { checkpoint: DurableSearchCheckpoint; reserve: boolean };
+const durableMatchingWork = new SharedMatchWork<ReturnType<typeof matchPlan>, MatchCheckpointEvent>(16 * 1024 * 1024);
 async function durableMatch(input: { snapshot: CatalogueSnapshot; state: CanonicalPlanState }) {
   const attempt = planAttempts.getStore();
   if (!attempt?.operation || !attempt.operationStore) return matchPlanInWorker(input);
   const store = attempt.operationStore, claim = attempt.operation;
   const current = await store.getPlanOperation(claim.id);
-  let checkpoint = current?.checkpoint as DurableSearchCheckpoint | null;
-  if (!checkpoint) throw new Error("Missing normalized operation checkpoint");
-  let lostAttempts = checkpoint.reservedAttempts ?? 0;
-  try { while (true) {
-    const remaining = (input.state.searchEffort === "expanded" ? 64_000 : checkpoint.search?.expansionBudget ?? 8_000)
-      - (checkpoint.search?.expansionAttempts ?? 0) - lostAttempts;
-    const chunkBudget = Math.min(4_000, Math.max(0, remaining));
-    const reserved = { ...checkpoint, stage: "search" as const, reservedAttempts: chunkBudget + lostAttempts };
-    const reply = await matchPlanResidentChunkInWorker(claim.id, input, { checkpoint: checkpoint.search, chunkBudget: Math.max(1, chunkBudget), lostAttempts }, async () => {
-      if (!await updateClaimedOperation(store, claim, { checkpoint: withoutOperationCursor({ ...claim, checkpoint: reserved }).checkpoint }, new Date().toISOString())) throw new Error("Matching operation lease lost");
-    });
-    checkpoint = { ...checkpoint, stage: "search", search: reply.checkpoint, reservedAttempts: 0 };
-    if (!await updateClaimedOperation(store, claim, { checkpoint }, new Date().toISOString())) throw new Error("Matching operation lease lost");
-    lostAttempts = 0;
-    console.info("[agentic-plan-checkpoint]", { operationId: claim.id, attempts: reply.expansionAttempts, budget: reply.checkpoint.expansionBudget, checkpointBytes: reply.checkpoint.cursor.length, complete: reply.done });
-    if (reply.done) {
-      if (!reply.result) throw new Error("Completed matcher chunk has no result");
-      return reply.result;
-    }
-  } } finally { closePlanMatchSession(claim.id); }
+  const initial = current?.checkpoint as DurableSearchCheckpoint | null;
+  if (!initial) throw new Error("Missing normalized operation checkpoint");
+  // Recovery with reserved/lost work has its own history and never joins a fresh
+  // computation. Fully completed facts can be reused only under identical inputs.
+  const scope = claim.command.scope;
+  const key = matchingResultIdentity(input, `${scope.environment}:${scope.tenantScope}`)
+    + (initial.search || initial.reservedAttempts ? `:recovery:${claim.id}:${claim.leaseToken}` : "");
+  return durableMatchingWork.run(key, { signal: requestLifetime()?.signal, checkpoint: async event => {
+    const checkpoint = { ...event.checkpoint, state: initial.state, catalogueId: initial.catalogueId };
+    // A subscriber joining between chunks first persists the shared acknowledged
+    // cursor. Later reservations need only the small metadata update.
+    const alreadyAcknowledged = initial.search?.expansionAttempts === checkpoint.search?.expansionAttempts;
+    const persisted = event.reserve && alreadyAcknowledged
+      ? withoutOperationCursor({ ...claim, checkpoint }).checkpoint : checkpoint;
+    if (!await updateClaimedOperation(store, claim, { checkpoint: persisted }, new Date().toISOString())) throw new Error("Matching operation lease lost");
+    initial.search = checkpoint.search;
+  } }, async context => {
+    let checkpoint = initial;
+    let lostAttempts = checkpoint.reservedAttempts ?? 0;
+    const sessionId = `shared:${claim.id}:${claim.leaseToken}`;
+    try { while (true) {
+      const remaining = (input.state.searchEffort === "expanded" ? 64_000 : checkpoint.search?.expansionBudget ?? 8_000)
+        - (checkpoint.search?.expansionAttempts ?? 0) - lostAttempts;
+      const chunkBudget = Math.min(4_000, Math.max(0, remaining));
+      const reserved = { ...checkpoint, stage: "search" as const, reservedAttempts: chunkBudget + lostAttempts };
+      const reply = await matchPlanResidentChunkInWorker(sessionId, input,
+        { checkpoint: checkpoint.search, chunkBudget: Math.max(1, chunkBudget), lostAttempts },
+        () => context.notify({ checkpoint: reserved, reserve: true }), context.signal);
+      checkpoint = { ...checkpoint, stage: "search", search: reply.checkpoint, reservedAttempts: 0 };
+      await context.notify({ checkpoint, reserve: false });
+      lostAttempts = 0;
+      console.info("[agentic-plan-checkpoint]", { operationId: claim.id, attempts: reply.expansionAttempts,
+        budget: reply.checkpoint.expansionBudget, checkpointBytes: reply.checkpoint.cursor.length, complete: reply.done });
+      if (reply.done) {
+        if (!reply.result) throw new Error("Completed matcher chunk has no result");
+        return reply.result;
+      }
+    } } finally { closePlanMatchSession(sessionId); }
+  });
 }
 
 async function buildResult(input: Readonly<{

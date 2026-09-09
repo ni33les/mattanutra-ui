@@ -86,7 +86,7 @@ export function matchPlanChunkInWorker(input: MatchInput, chunk: NonNullable<Mat
   return pool.runChunk(input, chunk, requestLifetime()?.signal, 15_000, beforeStart);
 }
 
-export function matchPlanResidentChunkInWorker(sessionId: string, input: MatchInput, chunk: ResidentChunkOptions, beforeStart?: () => Promise<unknown>) {
-  return pool.runResidentChunk(sessionId, input, chunk, requestLifetime()?.signal, beforeStart);
+export function matchPlanResidentChunkInWorker(sessionId: string, input: MatchInput, chunk: ResidentChunkOptions, beforeStart?: () => Promise<unknown>, signal = requestLifetime()?.signal) {
+  return pool.runResidentChunk(sessionId, input, chunk, signal, beforeStart);
 }
 export function closePlanMatchSession(sessionId: string) { pool.closeResidentSession(sessionId); }

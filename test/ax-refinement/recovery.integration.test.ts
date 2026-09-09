@@ -32,21 +32,18 @@ test("AXR-REL-03 expanded PostgreSQL refinement resumes a lost checkpoint at a r
   const first = await runAdmittedPlanOperation({ store, config: instance.config, operationId: created.id });
   assert.equal(first.ok, true, JSON.stringify(first)); assert.equal(first.revision, 1);
   const previous = await store.getPlanRevision(created.planId, 1);
-  const update = store.updatePlanOperation.bind(store), transaction = store.transaction.bind(store);
+  const patch = store.patchClaimedOperation!.bind(store);
   let interrupted = false;
-  // The transaction store owns the write, so inject at that actual boundary.
-  store.transaction = work => transaction(async tx => {
-    const write = tx.updatePlanOperation.bind(tx);
-    tx.updatePlanOperation = async (record, version) => {
-      const checkpoint = record.checkpoint as { search?: { cursor?: string; expansionAttempts: number } } | null;
-      if (!interrupted && checkpoint?.search?.cursor && checkpoint.search.expansionAttempts === 28000) {
-        interrupted = true; throw new Error("Injected checkpoint statement_timeout");
-      }
-      return write(record, version);
-    };
-    return work(tx);
-  });
-  const args = { operation: "revise", planHandle: first.planHandle, expectedRevision: 1,
+  // Checkpoints now use the atomic conditional write directly. Interrupt that
+  // same durable boundary; retain the historical 24k + 4k recovery assertion.
+  store.patchClaimedOperation = async (id, token, changes, now, expiry) => {
+    const checkpoint = changes.checkpoint as { search?: { cursor?: string | Uint8Array; expansionAttempts: number } } | null;
+    if (!interrupted && checkpoint?.search?.cursor && checkpoint.search.expansionAttempts === 28000) {
+      interrupted = true; throw new Error("Injected checkpoint statement_timeout");
+    }
+    return patch(id, token, changes, now, expiry);
+  };
+  const args = { operation: "revise", responseView: "full", planHandle: first.planHandle, expectedRevision: 1,
     idempotencyKey: "ax-pg-recovery-expanded", searchEffort: "expanded", request: profile("A2") };
   await rpc(instance, "plan", args);
   const admitted = await store.getPlanOperationByKey(ownerScope, args.idempotencyKey); assert.ok(admitted);
@@ -56,7 +53,7 @@ test("AXR-REL-03 expanded PostgreSQL refinement resumes a lost checkpoint at a r
   assert.deepEqual(await store.getPlanRevision(created.planId, 1), previous);
   const checkpoint = (await store.getPlanOperation(admitted.id))?.checkpoint as { reservedAttempts: number; search: { expansionAttempts: number } };
   assert.equal(checkpoint.reservedAttempts, 4000); assert.equal(checkpoint.search.expansionAttempts, 24000);
-  store.transaction = transaction; store.updatePlanOperation = update;
+  store.patchClaimedOperation = patch;
   replaceCatalogueSnapshot({ ...snapshot, availabilityAsOf: "2026-09-08T03:29:00Z" });
   await rpc(instance, "plan", args);
   const recovered = await runAdmittedPlanOperation({ store, config: instance.config, operationId: admitted.id });

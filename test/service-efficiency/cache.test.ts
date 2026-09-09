@@ -43,3 +43,11 @@ test("EFF-CACHE-03 failed work and lost ownership are isolated and never cached 
   assert.equal(await two, 9); await rejected;
   assert.equal(await work.run("different-scope", {}, async () => 6), 6);
 });
+
+test("EFF-CACHE-04 compiled facts are deeply immutable and reused within the byte budget", () => {
+  const facts = new cache.ByteBoundedCache<{ amounts: { amount: bigint }[] }>(1000, true);
+  const source = { amounts: [{ amount: 1n }] }; facts.set("catalogue-and-reference", source); source.amounts[0].amount = 100n;
+  const first = facts.get("catalogue-and-reference"); assert.ok(first);
+  assert.equal(first.amounts[0].amount, 1n); assert.equal(facts.get("catalogue-and-reference"), first);
+  assert.throws(() => { first.amounts[0].amount = 0n; }, TypeError); assert.ok(facts.bytes <= 1000);
+});

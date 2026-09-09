@@ -71,9 +71,10 @@ import { countQuery } from "@/lib/agentic/plan/query-budget";
 
 export { toMatcherProduct };
 
-const MATCH_PLAN_CACHE_LIMIT = 64;
-const matchPlanCache = new Map<string, ReturnType<typeof computeMatchPlan>>();
-const matcherProductCache = new Map<string, ReturnType<typeof toMatcherProduct>[]>();
+import { ByteBoundedCache } from "@/lib/match-work-cache";
+
+const matchPlanCache = new ByteBoundedCache<ReturnType<typeof computeMatchPlan>>(16 * 1024 * 1024);
+const matcherProductCache = new ByteBoundedCache<ReturnType<typeof toMatcherProduct>[]>(8 * 1024 * 1024, true);
 const snapshotIdCache = new WeakMap<CatalogueSnapshot, string>();
 
 export function resetMatchPlanCache() {
@@ -99,12 +100,6 @@ function matcherProductsFor(snapshot: CatalogueSnapshot) {
   }
   const products = snapshot.products.map(toMatcherProduct);
   matcherProductCache.set(id, products);
-  if (matcherProductCache.size > 8) {
-    const oldest = matcherProductCache.keys().next().value;
-    if (oldest) {
-      matcherProductCache.delete(oldest);
-    }
-  }
   return products;
 }
 
@@ -1141,26 +1136,18 @@ export function matchPlan(input: Readonly<{
   targetFrontiers?: NonNullable<MatcherTelemetry["targetFrontiers"]>;
   unmetRequirements: string[];
 } {
-  const cacheKey = matchPlanCacheKey(input.state, input.snapshot);
+  const cacheKey = matchingResultIdentity(input, process.env.MATTANUTRA_ENV ?? "unspecified");
   const cached = matchPlanCache.get(cacheKey);
   if (cached) {
     countQuery("plan.match");
     countQuery("plan.match.hit");
-    matchPlanCache.delete(cacheKey);
-    matchPlanCache.set(cacheKey, cached);
-    return structuredClone(cached);
+    return cached;
   }
 
   countQuery("plan.match");
   countQuery("plan.match.miss");
   const computed = computeMatchPlan(input);
   matchPlanCache.set(cacheKey, computed);
-  if (matchPlanCache.size > MATCH_PLAN_CACHE_LIMIT) {
-    const oldest = matchPlanCache.keys().next().value;
-    if (oldest) {
-      matchPlanCache.delete(oldest);
-    }
-  }
   return structuredClone(computed);
 }
 
@@ -1350,4 +1337,11 @@ export function advanceResidentPlanSession(session: ResidentSession, options: { 
 
 export function planCheckpointInputIdentity(input: Parameters<typeof matchPlan>[0]) {
   return matchPlanCacheKey({ ...input.state, searchEffort: "standard" }, input.snapshot);
+}
+
+/** Response-producing caches include observation time; resumable work identity
+ * deliberately excludes that diagnostic clock for legacy checkpoint recovery. */
+export function matchingResultIdentity(input: Parameters<typeof matchPlan>[0], scope: string) {
+  return createHash("sha256").update(JSON.stringify([scope, matchPlanCacheKey(input.state, input.snapshot),
+    input.snapshot.availabilityAsOf])).digest("hex");
 }

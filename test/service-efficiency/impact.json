@@ -62,8 +62,21 @@
     {
       "file": "test/service-efficiency/cache.test.ts",
       "slice": "cache",
-      "expectedCases": 3,
+      "expectedCases": 4,
       "reason": "Byte-bounded immutable reuse, concurrent owner cancellation, checkpoint fencing and failed-computation isolation"
+    },
+    {
+      "file": "test/ax-refinement/recovery.integration.test.ts",
+      "slice": "recovery",
+      "database": true,
+      "expectedCases": 1,
+      "reason": "Preserve AXR-REL-03 exact lost-checkpoint accounting across binary durable sessions and reference observation changes"
+    },
+    {
+      "file": "test/ax-refinement/checkpoints.test.ts",
+      "slice": "checkpoints",
+      "expectedCases": 3,
+      "reason": "Preserve legacy checkpoint readers, restart equivalence and all prior identity/cache-isolation assertions"
     }
   ],
   "inputs": [
