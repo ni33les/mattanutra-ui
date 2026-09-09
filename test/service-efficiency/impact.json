@@ -346,6 +346,12 @@
       "slice": "decision-batch",
       "expectedCases": 3,
       "reason": "Affected supplement/product projections preserve coverage, quantities, decisions and rejected products"
+    },
+    {
+      "file": "test/service-efficiency/checkout-preparation.test.ts",
+      "slice": "checkout-preparation",
+      "expectedCases": 2,
+      "reason": "Audits 2/3/6/15: external payment preparation before locks, current commercial publication fence, unchanged frozen checkout recovery"
     }
   ],
   "inputs": [
