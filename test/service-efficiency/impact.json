@@ -359,6 +359,13 @@
       "database": true,
       "expectedCases": 2,
       "reason": "Audit 36: pool acquisition obeys cancellation/deadlines without late writes, effects or leaked permits"
+    },
+    {
+      "file": "test/service-efficiency/preference-reads.integration.test.ts",
+      "slice": "preference-reads",
+      "database": true,
+      "expectedCases": 1,
+      "reason": "Audit 15: ordinary preference reads and existing initialization avoid redundant row locks/no-op writes; mutations remain assessment-fenced"
     }
   ],
   "inputs": [
