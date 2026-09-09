@@ -24,8 +24,11 @@ export { ThreadPoolUnavailableError as MatcherUnavailableError } from "@/lib/thr
 
 export class MatchWorkerPool {
   private readonly pool: ThreadPool<MatchCommand, ReferenceJobCompletion<MatchValue>>;
-  private readonly sessions = new Map<string, { input: MatchInput; referenceIdentity: ReferenceJobIdentity }>();
-  constructor(capacity = 2, queueLimit = 16) {
+  private readonly sessions = new Map<string, { input: MatchInput; referenceIdentity: ReferenceJobIdentity; idleTimer?: ReturnType<typeof setTimeout> }>();
+  private readonly idleSessionMs: number;
+  constructor(capacity = 2, queueLimit = 16, idleSessionMs = 60_000) {
+    if (!Number.isSafeInteger(idleSessionMs) || idleSessionMs <= 0) throw new Error("idleSessionMs must be a positive safe integer");
+    this.idleSessionMs = idleSessionMs;
     // Keep the path explicit so Next.js can trace the worker entry point.
     this.pool = new ThreadPool<MatchCommand, ReferenceJobCompletion<MatchValue>>(() => new Worker(resolve(process.cwd(), "workers/mcp-matcher.ts"), {
       execArgv: ["--experimental-strip-types", "--import", resolve(process.cwd(), "scripts/register-ts-path-loader.mjs")]
@@ -52,6 +55,7 @@ export class MatchWorkerPool {
   }
   async runResidentChunk(sessionId: string, input: MatchInput, chunk: ResidentChunkOptions, signal?: AbortSignal, beforeStart?: () => Promise<unknown>): Promise<ResidentPlanMatchChunk> {
     const existing = this.sessions.get(sessionId);
+    clearTimeout(existing?.idleTimer);
     const reuse = Boolean(existing && this.pool.hasAffinity(sessionId) && existing.input.state === input.state && existing.input.snapshot === input.snapshot);
     const referenceIdentity = reuse ? existing!.referenceIdentity : captureReferenceJobIdentity(input.snapshot.runtimeRevision,
       input.snapshot.products.length > 0 && input.snapshot.products.every(product => product.source === "fixture"));
@@ -68,13 +72,21 @@ export class MatchWorkerPool {
       const value = checkedReferenceCompletion(result, referenceIdentity);
       if (!("done" in value) || !(value.checkpoint.cursor instanceof Uint8Array)) throw new Error("Missing binary session checkpoint");
       if (value.done) this.closeResidentSession(sessionId);
+      else {
+        const session = this.sessions.get(sessionId);
+        if (session) {
+          session.idleTimer = setTimeout(() => this.closeResidentSession(sessionId), this.idleSessionMs);
+          session.idleTimer.unref();
+        }
+      }
       return { ...value, checkpoint: { ...value.checkpoint, cursor: value.checkpoint.cursor }, inputTransferred: !reuse };
     } catch (error) { this.closeResidentSession(sessionId); throw error; }
   }
   closeResidentSession(sessionId: string) {
+    clearTimeout(this.sessions.get(sessionId)?.idleTimer);
     this.sessions.delete(sessionId); this.pool.releaseAffinity(sessionId, { kind: "session-release", sessionId });
   }
-  close() { this.sessions.clear(); return this.pool.close(); }
+  close() { for (const sessionId of this.sessions.keys()) this.closeResidentSession(sessionId); return this.pool.close(); }
 }
 const pool = new MatchWorkerPool();
 

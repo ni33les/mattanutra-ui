@@ -380,7 +380,7 @@ describe("external worker boundaries", () => {
       "reserve is check-and-return; workers wait locally on LISTEN or 24s",
     );
     assert.match(source, /eventName: "task_reserved"/);
-    assert.match(completeRouteSource, /eventName: "task_completed"/);
+    assert.match(completeRouteSource, /eventName: task\.status === "completed" \? "task_completed" : "task_deferred"/);
     assert.match(failRouteSource, /eventName: "task_failed"/);
     assert.match(progressRouteSource, /requireWorkerAccess/);
     assert.match(progressRouteSource, /reportTaskProgress/);

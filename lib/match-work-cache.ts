@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from "node:async_hooks";
 import { serialize, deserialize } from "node:v8";
 import { recordServiceMetric } from "@/lib/service-metrics";
 
@@ -68,9 +69,10 @@ export class SharedMatchWork<T, C> {
         if (this.pending.get(key) === active) this.pending.delete(key);
       }
     };
+    const ownerContext = AsyncLocalStorage.snapshot();
     const result = new Promise<T>((resolve, reject) => {
       const cancelled = () => detach(subscriber, owner.signal?.reason);
-      const subscriber = { ...owner, resolve, reject, cleanup: () => owner.signal?.removeEventListener("abort", cancelled) };
+      const subscriber = { ...owner, checkpoint: owner.checkpoint ? (value: C) => ownerContext(owner.checkpoint!, value) : undefined, resolve, reject, cleanup: () => owner.signal?.removeEventListener("abort", cancelled) };
       active.owners.add(subscriber); owner.signal?.addEventListener("abort", cancelled, { once: true });
     });
     if (created) void (async () => {

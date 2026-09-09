@@ -2444,6 +2444,28 @@ async function finalizeTaskCompletion(
   return mapTask(row);
 }
 
+async function deferMatchingTaskCompletion(input: CompleteTaskInput, operationId: string) {
+  const sql = getRequiredSql(), taskId = uuidOrNull(input.taskId), reservationId = uuidOrNull(input.reservationId);
+  const workerSessionId = uuidOrNull(input.workerSessionId), agentId = scopeAgentId(input), membershipId = scopeMembershipId(input);
+  if (!taskId || !reservationId || !workerSessionId || !agentId || !uuidOrNull(operationId)) throw new Error("Deferring matching requires its owned reservation and operation");
+  return withTaskRowLock(sql, taskId, async tx => {
+    const [row] = await tx<(TaskRow & { reservation_status: string; deferred_operation_id: string | null })[]>`
+      select t.*,r.status as reservation_status,r.metadata->>'deferredOperationId' as deferred_operation_id
+      from public.tasks t join public.task_reservations r on r.task_id=t.id
+      where t.id=${taskId}::uuid and t.task_type='match_agentic_plan' and t.payload->>'operationId'=${operationId}
+        and r.id=${reservationId}::uuid and r.agent_id=${agentId}::uuid and r.worker_session_id=${workerSessionId}::uuid
+        and (${membershipId}::uuid is null or r.membership_id=${membershipId}::uuid)`;
+    if (!row) throw new Error("Matching reservation ownership changed");
+    if (row.reservation_status === "released" && row.deferred_operation_id === operationId) return mapTask(row);
+    if (row.reservation_status !== "active" || !["reserved", "running"].includes(row.status) || row.reserved_by_agent_id !== agentId) throw new Error("Matching reservation is no longer active");
+    await releaseReservedTaskToQueue({ taskId, reservationId, workerSessionId, deferredOperationId: operationId });
+    await tx`update public.worker_sessions set status='idle',current_task_id=null,last_seen_at=now(),updated_at=now()
+      where id=${workerSessionId}::uuid and current_task_id=${taskId}::uuid`;
+    const [updated] = await tx<TaskRow[]>`select * from public.tasks where id=${taskId}::uuid`;
+    return mapTask(updated);
+  });
+}
+
 export async function completeTask(input: CompleteTaskInput) {
   for (const [name, value] of Object.entries({reservationId: input.reservationId, agentId: input.agentId, workerSessionId: input.workerSessionId})) {
     if (value && !uuidOrNull(value)) throw new Error(`Task completion requires a valid ${name}`);
@@ -2452,6 +2474,8 @@ export async function completeTask(input: CompleteTaskInput) {
   const afterCommitEffects: TaskAfterCommitEffect[] = [];
   await ensureWorkerSessionSchema(sql);
 
+  const deferred = payloadRecord(input.resultPayload).deferredOperationId;
+  if (typeof deferred === "string") return deferMatchingTaskCompletion(input, deferred);
   let task: TaskRecord;
   try {
     task = await withTaskRowLock(sql, uuidOrNull(input.taskId), async tx => {
@@ -2992,7 +3016,8 @@ export async function releaseReservedTaskToQueue(input: Readonly<{
     with released as (
       update public.task_reservations set
         status = 'released',
-        released_at = now()
+        released_at = now(),
+        metadata = metadata || case when ${deferredOperationId}::uuid is null then '{}'::jsonb else jsonb_build_object('deferredOperationId',${deferredOperationId}::text) end
       where id = ${reservationId}::uuid
         and task_id = ${taskId}::uuid
         and status = 'active'

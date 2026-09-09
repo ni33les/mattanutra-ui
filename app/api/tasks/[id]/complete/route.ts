@@ -77,8 +77,8 @@ async function handlePOST(
           ? new Date(task.completedAt).getTime() -
             new Date(task.startedAt).getTime()
           : null,
-      eventName: "task_completed",
-      eventStatus: "completed",
+      eventName: task.status === "completed" ? "task_completed" : "task_deferred",
+      eventStatus: task.status === "completed" ? "completed" : "accepted",
       eventType: "system",
       planId: task.planId,
       properties: {
