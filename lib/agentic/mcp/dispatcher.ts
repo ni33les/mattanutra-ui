@@ -306,7 +306,8 @@ async function callTool(
         });
     }
 
-    if (canonical === "plan" && value && typeof value === "object" && "ok" in value && value.ok === true && params.responseView && params.responseView !== "full" && params.responseView !== "status" && !("responseView" in value)) {
+    if (canonical === "plan" && value && typeof value === "object" && "ok" in value && value.ok === true && params.responseView &&
+      (params.responseView !== "full" || params.operation !== "get") && params.responseView !== "status" && !("responseView" in value)) {
       const full = value as PlanSuccessWire;
       // Pending edits have an admitted operation, but intentionally no result
       // row yet. Read the committed revision and operation for their version.
@@ -317,8 +318,11 @@ async function callTool(
         const request = params.responseView === "details" && Array.isArray(params.sections) && params.sections.includes("request") ? state.originalRequest() : undefined;
         if (isAgenticErrorResult(request)) value = request;
         else {
-          const projected = projectPlan({ ...full, ...(request ? { originalRequest: request as PlanSuccessWire["originalRequest"] } : {}) }, params as PlanViewInput);
-          value = isAgenticErrorResult(projected) ? projected : { ...projected, resultVersion: state.resultVersion };
+          // A terminal idempotency receipt remains immutable. Present its current
+          // freshness without allowing an old ready response to authorize purchase.
+          const presented = state.refreshRequired && full.status !== "processing" ? { ...full, ...publicPlanFields(state.result) } : full;
+          const projected = projectPlan({ ...presented, ...(request ? { originalRequest: request as PlanSuccessWire["originalRequest"] } : {}) }, params as PlanViewInput);
+          value = isAgenticErrorResult(projected) || params.responseView === "full" ? projected : { ...projected, resultVersion: state.resultVersion };
         }
       }
     }
