@@ -1,3 +1,4 @@
+import { recoverMissingFunnelGeneration } from "@/lib/funnel-generation-recovery";
 import { getSql, withDatabaseTransaction } from "@/lib/db";
 import { getFunnelReadiness } from "@/lib/funnel-readiness";
 import { isUuid } from "@/lib/assessment-store";
@@ -32,5 +33,9 @@ export async function recoverFunnelWork(planId: string, locale: unknown, refresh
       if (assessment.selected_plan) await ensureFreshProductRecommendationsForReveal(planId);
     });
   });
-  return getFunnelReadiness(planId, locale);
+  const readiness = await getFunnelReadiness(planId, locale);
+  if (refreshOnly && readiness) await recoverMissingFunnelGeneration({ planId, locale,
+    healthScoreMissing: !readiness.copyReady && !readiness.copyFailed,
+    formulationMissing: readiness.hasPaidPlan && readiness.fulfillmentStatus === "complete" && readiness.formulationStatus === "pending" });
+  return readiness;
 }

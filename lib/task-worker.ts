@@ -316,7 +316,7 @@ export async function enqueueHealthScoreAnalysisTask({
   }
 
   const rows = await sql`
-    select answers, health_score
+    select answers
     from public.assessments
     where plan_id = ${planId}::uuid
     limit 1
@@ -333,10 +333,12 @@ export async function enqueueHealthScoreAnalysisTask({
   const generation = await loadGenerationInput(sql, planId, locale);
   if (!generation) return null;
   if (!force) {
-    const [ready] = await sql`select result from public.assessment_healthscore_results
+    const [ready] = await sql`select case when read_projection->>'version'='1' then null else result end as result,
+      case when read_projection->>'version'='1' then (read_projection->'ready'->>${generation.locale})::boolean else null end as ready
+      from public.assessment_healthscore_results
       where plan_id = ${planId}::uuid and revision = ${generation.revision}
         and locale = ${generation.locale} and generator_version = ${FUNNEL_GENERATOR_VERSION}`;
-    if (ready && hasHealthScoreAiCopy(ready.result, generation.locale)) return null;
+    if (ready && (ready.ready ?? hasHealthScoreAiCopy(ready.result, generation.locale))) return null;
   }
   const inputHash = generation.inputHash;
   return createWorkTask({

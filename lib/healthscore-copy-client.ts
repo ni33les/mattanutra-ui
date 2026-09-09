@@ -1,4 +1,4 @@
-import { fetchFunnelJson, pollFunnelStatus, FUNNEL_FOREGROUND_WAIT_MS } from "@/lib/funnel-polling";
+import { assessmentPollKey, fetchFunnelJson, pollFunnelStatus, FUNNEL_FOREGROUND_WAIT_MS } from "@/lib/funnel-polling";
 import type { Locale } from "@/lib/i18n";
 export const HEALTHSCORE_COPY_POLL_INTERVAL_MS = 1_500;
 export const HEALTHSCORE_COPY_WAIT_MS = FUNNEL_FOREGROUND_WAIT_MS;
@@ -11,8 +11,8 @@ export async function fetchHealthScoreCopyStatus(planId: string, fetchImpl: type
 }
 
 export function waitForHealthScoreCopy(planId: string, locale: Locale, signal: AbortSignal) {
-  return pollFunnelStatus({ signal, read: async signal => (await fetchFunnelJson<HealthScoreCopyStatus>(
-    `/api/assessment/${encodeURIComponent(planId)}/journey?view=copy&locale=${encodeURIComponent(locale)}`, { signal })).data,
+  return pollFunnelStatus({ subscriptionKey: assessmentPollKey(planId, locale), signal, read: async signal => (await fetchFunnelJson<HealthScoreCopyStatus>(
+    `/api/assessment/${encodeURIComponent(planId)}/journey?locale=${encodeURIComponent(locale)}`, { signal })).data,
     ready: status => status.copyReady, failed: status => status.copyFailed });
 }
 export async function retryHealthScoreCopy(planId: string, locale: Locale, signal?: AbortSignal) {

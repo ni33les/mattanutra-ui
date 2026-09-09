@@ -8,7 +8,7 @@ import "@/components/chat-questionnaire/chat-questionnaire.css";
 import type { Locale } from "@/lib/i18n";
 import { nutritionRevealPath } from "@/lib/nutrition-paths";
 import type { NutritionJourneySnapshot } from "@/lib/nutrition-journey-read";
-import { fetchFunnelJson, pollFunnelStatus } from "@/lib/funnel-polling";
+import { assessmentPollKey, fetchFunnelJson, pollFunnelStatus } from "@/lib/funnel-polling";
 
 type JourneyProgressProps = Readonly<{
   initial: NutritionJourneySnapshot;
@@ -35,6 +35,7 @@ export function JourneyProgress({ initial, locale, planId }: JourneyProgressProp
       await fetchFunnelJson(root + "/retry", { method: "POST", signal: controller.signal,
         headers: { "Content-Type": "application/json" }, body: JSON.stringify({ locale }) });
       const outcome = await pollFunnelStatus({
+        subscriptionKey: assessmentPollKey(planId, locale),
         read: async signal => (await fetchFunnelJson<NutritionJourneySnapshot>(`${root}?locale=${locale}`, { signal })).data,
         ready: value => value.readyForReveal, failed: value => value.failed, signal: controller.signal
       });

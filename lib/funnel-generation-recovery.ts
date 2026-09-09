@@ -2,7 +2,7 @@ import { getSql, withDatabaseTransaction } from "@/lib/db";
 import { loadGenerationInput, withGenerationInput } from "@/lib/assessment-revisions";
 import type { Locale } from "@/lib/i18n";
 
-/** Lazily replace stale generator outputs. Existing failed tasks still need an explicit retry. */
+/** Explicit refresh repairs missing generator outputs. Status reads never invoke this mutation. */
 export async function recoverMissingFunnelGeneration(input: Readonly<{
   planId: string; locale: Locale; healthScoreMissing: boolean; formulationMissing: boolean;
 }>) {

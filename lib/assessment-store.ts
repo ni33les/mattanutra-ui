@@ -1,3 +1,5 @@
+import { hasHealthScoreAiCopy } from "@/lib/healthscore-readiness";
+export { hasHealthScoreAiCopy } from "@/lib/healthscore-readiness";
 import type { ProductRecommendationSummary } from "@/lib/formulation-types";
 import { getFunnelReadiness } from "@/lib/funnel-readiness";
 import { assessmentInputHash, FUNNEL_GENERATOR_VERSION, getRevisionHealthScore } from "@/lib/assessment-revisions";
@@ -334,70 +336,6 @@ export function hasHealthScoreAdvice(value: unknown) {
   return hasHealthScoreAiCopy(value);
 }
 
-const HEALTHSCORE_AI_TEXT_KEYS = [
-  "bandLine",
-  "findingsHeadline",
-  "findingsSub",
-  "heroBody",
-  "heroTitle",
-  "highestLeverageBody",
-  "methodHeadline",
-  "pillarHeadline",
-  "relativityHeadline",
-  "relativitySub",
-  "strengthNote",
-  "subtractionBody"
-] as const;
-
-function localizedHealthScoreTextPresent(value: unknown, locale?: Locale) {
-  if (typeof value === "string") {
-    return value.trim().length > 0;
-  }
-
-  if (value && typeof value === "object" && !Array.isArray(value)) {
-    if (locale) return typeof (value as Record<string, unknown>)[locale] === "string" && String((value as Record<string, unknown>)[locale]).trim().length > 0;
-    return Object.values(value as Record<string, unknown>).some(
-      (item) => typeof item === "string" && item.trim().length > 0
-    );
-  }
-
-  return false;
-}
-
-function healthScoreAiCardPresent(value: unknown, locale?: Locale) {
-  const card = asRecord(value);
-
-  return (
-    localizedHealthScoreTextPresent(card.body, locale) &&
-    (localizedHealthScoreTextPresent(card.headline, locale) ||
-      localizedHealthScoreTextPresent(card.title, locale))
-  );
-}
-
-export function hasHealthScoreAiCopy(value: unknown, locale?: Locale) {
-  const aiCopy = asRecord(asRecord(asRecord(value).pageContent).aiCopy);
-
-  if (
-    !HEALTHSCORE_AI_TEXT_KEYS.every((key) =>
-      localizedHealthScoreTextPresent(aiCopy[key], locale)
-    )
-  ) {
-    return false;
-  }
-
-  const gaps = asArray(aiCopy.gapTrio);
-  const findings = asArray(aiCopy.findings);
-  const methodCards = asArray(aiCopy.methodCards);
-
-  return (
-    gaps.length > 0 &&
-    gaps.every(card => healthScoreAiCardPresent(card, locale)) &&
-    findings.length > 0 &&
-    findings.every(card => healthScoreAiCardPresent(card, locale)) &&
-    methodCards.length === 3 &&
-    methodCards.every(card => healthScoreAiCardPresent(card, locale))
-  );
-}
 
 function asArray<T>(value: unknown): T[] {
   return Array.isArray(value) ? (value as T[]) : [];

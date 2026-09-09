@@ -21,11 +21,13 @@ type DeliveryRow = { id: string; plan_id: string; revision: number; locale: Loca
 const receipt = (row: DeliveryRow) => ({ id: row.id, planId: row.plan_id, revision: Number(row.revision), locale: row.locale, status: row.status, error: row.error_message });
 
 async function adviceReady(sql: Db, planId: string, revision: number, locale: Locale) {
-  const [row] = await sql`select r.result from public.assessment_healthscore_results r
+  const [row] = await sql`select case when r.read_projection->>'version'='1' then null else r.result end as result,
+    case when r.read_projection->>'version'='1' then (r.read_projection->'ready'->>${locale})::boolean else null end as ready
+    from public.assessment_healthscore_results r
     join public.assessments a on a.plan_id = r.plan_id and a.input_revision = r.revision
     where r.plan_id = ${planId}::uuid and r.revision = ${revision} and r.locale = ${locale}
       and r.generator_version = ${FUNNEL_GENERATOR_VERSION}`;
-  return hasHealthScoreAiCopy(row?.result, locale);
+  return row?.ready ?? hasHealthScoreAiCopy(row?.result, locale);
 }
 
 /** Called inside capture/completion/request transactions; never sends email here. */

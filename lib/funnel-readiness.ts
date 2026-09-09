@@ -2,17 +2,17 @@ import { getSql } from "@/lib/db";
 import { isUuid, hasHealthScoreAiCopy } from "@/lib/assessment-store";
 import { isLocale, type Locale } from "@/lib/i18n";
 import { FUNNEL_GENERATOR_VERSION } from "@/lib/assessment-revisions";
-import { recoverMissingFunnelGeneration } from "@/lib/funnel-generation-recovery";
 import { nutritionJourneyStatusFromCounts, nutritionJourneyWorkTimeline } from "@/lib/nutrition-journey-status";
 
 /** One projection for copy gates, journey polling, formulation responses and reveal rendering. */
-export async function getFunnelReadiness(planId: string, localeOption?: string | null) {
-  const sql = getSql();
+export async function getFunnelReadiness(planId: string, localeOption?: string | null, sql = getSql()) {
   if (!sql || !isUuid(planId)) return null;
   const requestedLocale = isLocale(localeOption) ? localeOption : null;
   const [row] = await sql`select a.input_revision, a.input_hash, coalesce(${requestedLocale}, a.locale) as requested_locale,
-      a.selected_plan, a.status as assessment_status, a.answers ? 'inStorePharmacy' as skip_healthscore,
-      score.result as health_score, score.created_at as score_version,
+      a.selected_plan, a.status as assessment_status, coalesce(a.funnel_skip_healthscore, a.answers ? 'inStorePharmacy') as skip_healthscore,
+      case when score.read_projection->>'version' = '1' then null else score.result end as health_score,
+      case when score.read_projection->>'version' = '1' then (score.read_projection->'ready'->>coalesce(${requestedLocale}, a.locale))::boolean else null end as copy_ready,
+      score.created_at as score_version,
       formula.version as formula_version, formula.visible_count, formula.section_status,
       products.id as product_version, products.generated_at as product_generated_at, products.status as product_status,
       products.stack_coverage_percent, products.product_count,
@@ -23,9 +23,10 @@ export async function getFunnelReadiness(planId: string, localeOption?: string |
     left join public.assessment_healthscore_results score on score.plan_id = a.plan_id and score.revision = a.input_revision
       and score.locale = coalesce(${requestedLocale}, a.locale) and score.generator_version = ${FUNNEL_GENERATOR_VERSION}
     left join lateral (
-      select f.version, f.formulation #>> '{sectionStatuses,supplements}' as section_status,
+      select f.version, case when f.read_projection->>'version' = '1' then f.read_projection->>'sectionStatus' else f.formulation #>> '{sectionStatuses,supplements}' end as section_status,
+        case when f.read_projection->>'version' = '1' then (f.read_projection->>'visibleCount')::int else
         (select count(*)::int from jsonb_array_elements(coalesce(f.formulation->'supplementBreakdown', '[]'::jsonb)) item
-          where coalesce(item #>> '{safety,visibility}', 'visible') <> 'hidden') as visible_count
+          where coalesce(item #>> '{safety,visibility}', 'visible') <> 'hidden') end as visible_count
       from public.formulations f where f.plan_id = a.plan_id and f.assessment_revision = a.input_revision
         and f.generation_locale = coalesce(${requestedLocale}, a.locale) and f.generator_version = ${FUNNEL_GENERATOR_VERSION}
         and (case when a.selected_plan is null then f.model_version like '%:example'
@@ -62,14 +63,11 @@ export async function getFunnelReadiness(planId: string, localeOption?: string |
     where a.plan_id = ${planId}::uuid`;
   if (!row) return null;
   const locale = row.requested_locale as Locale;
-  const copyReady = row.skip_healthscore === true || hasHealthScoreAiCopy(row.health_score, locale);
+  const copyReady = row.skip_healthscore === true || (row.copy_ready ?? hasHealthScoreAiCopy(row.health_score, locale));
   const copyFailed = !copyReady && ["failed", "cancelled", "completed"].includes(row.copy_status ?? "");
   const hasPaidPlan = Boolean(row.selected_plan || row.payment_status);
   const fulfillmentStatus = row.fulfillment_status ?? (row.selected_plan ? "complete" : "not_started");
   const fulfillmentPending = Boolean(row.payment_status && fulfillmentStatus !== "complete");
-  await recoverMissingFunnelGeneration({ planId, locale,
-    healthScoreMissing: !copyReady && !row.copy_status,
-    formulationMissing: Boolean(row.selected_plan) && !fulfillmentPending && !row.formula_version && !row.formula_status });
   const taskStatuses = [row.formula_version ? null : row.formula_status, row.product_version ? null : row.product_task_status].filter((s): s is string => typeof s === "string");
   // A failed older projection does not override a current retry or an available current result.
   const status = fulfillmentPending ? (fulfillmentStatus === "failed" ? "failed" : "formulation_pending")
@@ -89,5 +87,6 @@ export async function getFunnelReadiness(planId: string, localeOption?: string |
     formulationStatus, refreshPending: ["queued", "reserved", "running", "needs_review", "waiting_approval"].includes(row.product_task_status ?? ""), generationStatus: timeline.readyForReveal ? "ready" : timeline.failed ? "failed" : "pending",
     resultVersion: [row.input_revision, locale, FUNNEL_GENERATOR_VERSION, row.score_version ? new Date(row.score_version).getTime() : 0,
       row.formula_version ?? 0, row.product_version ?? "", row.product_generated_at ? new Date(row.product_generated_at).getTime() : 0,
-      row.food_version ?? 0, row.report_version ?? 0, row.product_task_status ?? ""].join(":") };
+      row.food_version ?? 0, row.report_version ?? 0, row.product_task_status ?? "",
+      copyReady, row.copy_status ?? "", row.formula_status ?? "", row.payment_status ?? "", fulfillmentStatus].join(":") };
 }

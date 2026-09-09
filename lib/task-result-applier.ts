@@ -1,3 +1,4 @@
+import { healthScoreReadProjection } from "@/lib/healthscore-readiness";
 import { loadAdminSafetyReferenceSnapshot } from "@/lib/agentic/catalogue/load-safety-ceilings";
 import { matchesSafetyReferenceIdentity } from "@/lib/agentic/catalogue/reference-job";
 import { getAssessmentProductPreferences } from "@/lib/assessment-product-preferences";
@@ -394,9 +395,9 @@ async function applyHealthScoreResult(
     if (!hasHealthScoreAiCopy(healthScore, locale)) throw new Error("HealthScore AI advice is incomplete");
     const generation = generationInput(task.payload);
     if (!generation) return;
-    await sql`insert into public.assessment_healthscore_results (plan_id, revision, locale, generator_version, result, task_id)
-      values (${task.planId}::uuid, ${generation.revision}, ${generation.locale}, ${generation.generatorVersion}, ${sql.json(toJsonValue(healthScore))}, ${task.id}::uuid)
-      on conflict (plan_id, revision, locale, generator_version) do update set result = excluded.result, task_id = excluded.task_id, created_at = now()`;
+    await sql`insert into public.assessment_healthscore_results (plan_id, revision, locale, generator_version, result, read_projection, task_id)
+      values (${task.planId}::uuid, ${generation.revision}, ${generation.locale}, ${generation.generatorVersion}, ${sql.json(toJsonValue(healthScore))}, ${sql.json(healthScoreReadProjection(healthScore))}, ${task.id}::uuid)
+      on conflict (plan_id, revision, locale, generator_version) do update set result = excluded.result, read_projection = excluded.read_projection, task_id = excluded.task_id, created_at = now()`;
     await sql`update public.assessments set health_score = ${sql.json(toJsonValue(healthScore))}, updated_at = now()
       where plan_id = ${task.planId}::uuid and input_revision = ${generation.revision} and locale = ${generation.locale}`;
     await enqueueReadyHealthScoreDeliveries(sql, task.planId, generation.revision, generation.locale);

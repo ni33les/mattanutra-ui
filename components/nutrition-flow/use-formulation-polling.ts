@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { FormulationResult, ProductStackPreference } from "@/lib/formulation-types";
 import type { Locale } from "@/lib/i18n";
 import type { NutritionJourneySnapshot } from "@/lib/nutrition-journey-read";
-import { fetchFunnelJson, pollFunnelStatus } from "@/lib/funnel-polling";
+import { assessmentPollKey, fetchFunnelJson, pollFunnelStatus } from "@/lib/funnel-polling";
 
 export function useFormulationPolling(planId: string, locale: Locale, initialResult: FormulationResult | null,
   productPollingPreference: ProductStackPreference | null, onPollingComplete: () => void) {
@@ -41,10 +41,10 @@ export function useFormulationPolling(planId: string, locale: Locale, initialRes
       await fetchFunnelJson(`${root}/formulation/refresh`, { method: "POST", signal: controller.signal,
         headers: { "Content-Type": "application/json" }, body: JSON.stringify({ locale }) });
       const outcome = await pollFunnelStatus({
-        read: async signal => {
-          const snapshot = (await fetchFunnelJson<NutritionJourneySnapshot>(`${root}/journey?locale=${locale}`, { signal })).data;
-          if (snapshot.formulationStatus === "ready" && snapshot.resultVersion !== version.current) await refresh(signal);
-          return snapshot;
+        subscriptionKey: assessmentPollKey(planId, locale),
+        read: async signal => (await fetchFunnelJson<NutritionJourneySnapshot>(`${root}/journey?locale=${locale}`, { signal })).data,
+        onValue: async snapshot => {
+          if (snapshot.formulationStatus === "ready" && snapshot.resultVersion !== version.current) await refresh(controller.signal);
         },
         ready: value => value.readyForReveal && !value.refreshPending && hasResult.current,
         failed: value => value.failed || value.formulationStatus === "inconsistent", signal: controller.signal

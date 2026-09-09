@@ -23,3 +23,41 @@ end $$;
 drop trigger if exists invalidate_legacy_plan_projection on public.agentic_plan_revisions;
 create trigger invalidate_legacy_plan_projection before update of result on public.agentic_plan_revisions
   for each row execute function public.invalidate_legacy_plan_projection();
+
+-- Funnel readers use compact immutable result facts. Older writers invalidate
+-- advice projections; the read fallback preserves complete-advice semantics.
+alter table public.assessment_healthscore_results add column if not exists read_projection jsonb;
+alter table public.formulations add column if not exists read_projection jsonb;
+alter table public.assessments add column if not exists funnel_skip_healthscore boolean;
+
+create or replace function public.invalidate_legacy_healthscore_projection() returns trigger language plpgsql as $$
+begin
+  if new.result is distinct from old.result and new.read_projection is not distinct from old.read_projection then
+    new.read_projection := null;
+  end if;
+  return new;
+end $$;
+drop trigger if exists invalidate_legacy_healthscore_projection on public.assessment_healthscore_results;
+create trigger invalidate_legacy_healthscore_projection before update of result on public.assessment_healthscore_results
+  for each row execute function public.invalidate_legacy_healthscore_projection();
+
+create or replace function public.project_funnel_formulation_read() returns trigger language plpgsql as $$
+begin
+  new.read_projection := jsonb_build_object('version',1,
+    'sectionStatus',new.formulation #>> '{sectionStatuses,supplements}',
+    'visibleCount',(select count(*)::int from jsonb_array_elements(coalesce(new.formulation->'supplementBreakdown','[]'::jsonb)) item
+      where coalesce(item #>> '{safety,visibility}','visible')<>'hidden'));
+  return new;
+end $$;
+drop trigger if exists project_funnel_formulation_read on public.formulations;
+create trigger project_funnel_formulation_read before insert or update of formulation on public.formulations
+  for each row execute function public.project_funnel_formulation_read();
+
+create or replace function public.project_funnel_assessment_read() returns trigger language plpgsql as $$
+begin
+  new.funnel_skip_healthscore := new.answers ? 'inStorePharmacy';
+  return new;
+end $$;
+drop trigger if exists project_funnel_assessment_read on public.assessments;
+create trigger project_funnel_assessment_read before insert or update of answers on public.assessments
+  for each row execute function public.project_funnel_assessment_read();
