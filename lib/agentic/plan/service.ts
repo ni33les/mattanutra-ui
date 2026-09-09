@@ -123,54 +123,17 @@ export function setPlanClaimLatchForTests(
   }
 }
 
-export function snapshotPlanInflightForTests() {
-  return {
-    idempotency: inflightPlanIdempotency.size,
-    matches: inflightPlanMatches.size
-  };
-}
-
-export function resetPlanCreateInflightForTests() {
-  inflightPlanIdempotency.clear();
-  inflightPlanMatches.clear();
-}
+// Historical QA hooks: admission and revision ownership now live exclusively in the store.
+export function snapshotPlanInflightForTests() { return {idempotency:0,matches:0}; }
+export function resetPlanCreateInflightForTests() {}
 
 type PlanAttempt = Readonly<{
   operation?: PlanOperationRecord;
   operationStore?: AgenticStore;
   correlationId: string;
   signal?: AbortSignal;
-  releases: Set<() => void>;
-}>;
-type PlanWork = Readonly<{
-  attempt: PlanAttempt;
-  work: Promise<PlanToolSuccess | AgenticErrorResult>;
 }>;
 const planAttempts = new AsyncLocalStorage<PlanAttempt>();
-const inflightPlanMatches = new Map<string, PlanWork>();
-const inflightPlanIdempotency = new Map<string, PlanWork & { hash: string }>();
-
-function attemptStopped(attempt: PlanAttempt) {
-  return attempt.signal ? attempt.signal.aborted : Boolean(attempt.correlationId && deadlineExceeded(attempt.correlationId));
-}
-
-function releaseAttempt(attempt: PlanAttempt | undefined) {
-  for (const release of attempt?.releases ?? []) release();
-}
-
-function trackPlanWork<T extends PlanWork>(map: Map<string, T>, key: string, entry: T) {
-  const release = () => {
-    // A cancelled attempt may finish after its replacement has already started.
-    if (map.get(key) === entry) map.delete(key);
-  };
-  map.set(key, entry);
-  entry.attempt.releases.add(release);
-  if (attemptStopped(entry.attempt)) release();
-  void entry.work.finally(() => {
-    release();
-    entry.attempt.releases.delete(release);
-  }).catch(() => undefined);
-}
 
 function planCorrelationId(idempotencyKey?: string) {
   return requestLifetime()?.correlationId ?? (idempotencyKey ? `plan:${idempotencyKey}` : "");
@@ -191,13 +154,11 @@ async function stopIfPlanDeadline(
     planAttempts.getStore()?.signal?.throwIfAborted();
     throwIfAborted(correlation);
   } catch {
-    releaseAttempt(planAttempts.getStore());
     return serviceDeadlineError(correlation);
   }
   if (!deadlineExceeded(correlation)) {
     return null;
   }
-  releaseAttempt(planAttempts.getStore());
   return serviceDeadlineError(correlation);
 }
 
@@ -719,9 +680,7 @@ function selectFromAnswers(answers: readonly PlanAnswer[]) {
   return found ? found.choice.slice("select_option:".length) : undefined;
 }
 
-function matchInflightKey(planId: string, revision: number) {
-  return `${planId}:${revision}`;
-}
+
 
 function isTerminalPlanStatus(
   status: PlanResult["status"]
@@ -1014,7 +973,7 @@ export async function runAdmittedPlanOperation(input: Readonly<{
   const controller = new AbortController();
   const deadline = setTimeout(() => controller.abort(new Error("Matching operation deadline exceeded")), operationDeadlineRemaining(claim));
   const signal = input.signal ? AbortSignal.any([input.signal, controller.signal]) : controller.signal;
-  const attempt: PlanAttempt = { correlationId: `plan-operation:${claim.id}`, signal, releases: new Set(), operation: claim, operationStore: input.store };
+  const attempt: PlanAttempt = { correlationId: `plan-operation:${claim.id}`, signal, operation: claim, operationStore: input.store };
   const prepared = claim.command.prepared as PreparedPlanCommand;
   const work = withRequestLifetime({ signal, correlationId: attempt.correlationId }, () => planAttempts.run(attempt, async () => {
     try {
@@ -1042,7 +1001,7 @@ export async function runAdmittedPlanOperation(input: Readonly<{
       console.error("[agentic-plan-operation]", { operationId: claim.id, origin: error instanceof Error ? error.name : "unknown", message: error instanceof Error ? error.message : "operation_failed" });
       return result;
     }
-  })).finally(() => { clearTimeout(deadline); inflightDurableOperations.delete(claim.id); releaseAttempt(attempt); });
+  })).finally(() => { clearTimeout(deadline); inflightDurableOperations.delete(claim.id); });
   inflightDurableOperations.set(claim.id, work);
   return work;
 }
@@ -1079,29 +1038,10 @@ export async function planTool(input: PlanExecutionInput): Promise<PlanToolSucce
   if (input.scope.principalScope?.startsWith("qa-v3:")) {
     setQueryNamespace(input.scope.principalScope);
   }
-  const ownerScope = `${input.scope.environment}:${input.scope.tenantScope}:${input.scope.principalScope ?? "anon"}`;
-  const inflightKey =
-    input.payload.operation === "get" || !input.payload.idempotencyKey
-      ? null
-      : `${ownerScope}\0${input.payload.idempotencyKey}`;
-  if (inflightKey) {
-    const existing = inflightPlanIdempotency.get(inflightKey);
-    if (existing && existing.hash !== canonicalRequestHash(input.payload)) {
-      return businessError({ fieldPath: "idempotencyKey", message: "This key is in use with a different payload.", reasonCode: "idempotency_conflict" });
-    }
-    if (existing) {
-      if (!attemptStopped(existing.attempt)) return existing.work;
-      releaseAttempt(existing.attempt);
-    }
-  }
-
   const attempt: PlanAttempt = {
     correlationId: planCorrelationId(input.payload.idempotencyKey),
-    signal: requestLifetime()?.signal,
-    releases: new Set()
+    signal: requestLifetime()?.signal
   };
-  const release = () => releaseAttempt(attempt);
-  attempt.signal?.addEventListener("abort", release, { once: true });
   const work = planAttempts.run(attempt, () => executePlanTool(input).then(async (result) => {
     const stopped = await stopIfPlanDeadline(input.payload.idempotencyKey);
     if (stopped) {
@@ -1119,13 +1059,7 @@ export async function planTool(input: PlanExecutionInput): Promise<PlanToolSucce
       }
     }
     return result;
-  }).finally(() => {
-    release();
-    attempt.signal?.removeEventListener("abort", release);
   }));
-  if (inflightKey) {
-    trackPlanWork(inflightPlanIdempotency, inflightKey, { hash: canonicalRequestHash(input.payload), attempt, work });
-  }
   return work;
 }
 
@@ -1288,6 +1222,15 @@ async function executePlanTool(input: Readonly<{
 
   async function persistPreparedPlan() {
     return input.store.transaction(async (store) => {
+    // Recheck after admission to the transaction. A process queue used to hide
+    // this race and could otherwise leave a second, unreferenced plan behind.
+    if (!input.matchPort && payload.idempotencyKey) {
+      const existing = await store.getPlanOperationByKey(ownerScope, payload.idempotencyKey);
+      if (existing) {
+        if (existing.requestHash !== canonicalRequestHash(input.payload)) throw new Error("idempotency_conflict");
+        return { ...(existing.command.prepared as PreparedPlanCommand), operationId: existing.id };
+      }
+    }
     const answers = incomingAnswers(payload);
     const ack = null;
     const selectOptionId =
@@ -1638,22 +1581,7 @@ function runPlanMatch(
   loadLiveCatalogue: boolean,
   matchStartedAt: number
 ) {
-  const key = `${matchInflightKey(prepared.planId, prepared.revision)}:${canonicalRequestHash(input.payload)}`;
-  const existing = inflightPlanMatches.get(key);
-
-  if (existing) {
-    if (!attemptStopped(existing.attempt)) return existing.work;
-    releaseAttempt(existing.attempt);
-  }
-
-  const work = completePreparedPlan(
-    prepared,
-    input,
-    loadLiveCatalogue,
-    matchStartedAt
-  );
-  trackPlanWork(inflightPlanMatches, key, { attempt: planAttempts.getStore()!, work });
-  return work;
+  return completePreparedPlan(prepared, input, loadLiveCatalogue, matchStartedAt);
 }
 
 async function completePreparedPlan(

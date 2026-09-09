@@ -44,45 +44,15 @@ import {
 import {
   recordRequestStage,
   runObservedRequest,
-  throwIfAborted,
-  waitUntilCancelled
+  throwIfAborted
 } from "@/lib/agentic/qa/request-trace";
-import {
-  deadlineExceeded,
-  serviceDeadlineError,
-  waitUntilDeadline
-} from "@/lib/agentic/qa/service-clock";
 
-const executeLockChains = new Map<string, Promise<unknown>>();
-const executeCommitSignals = new Map<string, Promise<void>>();
-const executeCommitResolvers = new Map<string, () => void>();
-const executeWaiters = new Map<string, number>();
 let executeRequestSeq = 0;
-
-function signalExecuteCommitted(key: string) {
-  executeCommitResolvers.get(key)?.();
-}
-
-export function captureExecuteLockState() {
-  return new Map(executeLockChains);
-}
-
-export function restoreExecuteLockState(snapshot: Map<string, Promise<unknown>>) {
-  executeLockChains.clear();
-  for (const [key, value] of snapshot) {
-    executeLockChains.set(key, value);
-  }
-}
-
-export function emptyExecuteLockState() {
-  return new Map<string, Promise<unknown>>();
-}
-
+// Historical QA snapshots remain readable; no process queue owns checkout execution.
+export function captureExecuteLockState() { return new Map<string, Promise<unknown>>(); }
+export function restoreExecuteLockState(snapshot: Map<string, Promise<unknown>>) { void snapshot; }
+export function emptyExecuteLockState() { return new Map<string, Promise<unknown>>(); }
 export function resetExecuteLockState() {
-  executeLockChains.clear();
-  executeCommitSignals.clear();
-  executeCommitResolvers.clear();
-  executeWaiters.clear();
   executeFreshGate = null;
   executeFreshEntered = null;
   executeFollowerEntered = null;
@@ -123,21 +93,6 @@ export function setExecuteFailAtForTests(
   at: "before_commit" | "at_commit" | "after_commit" | null
 ) {
   executeFailAt = at;
-}
-
-function enqueueExecute<T>(
-  store: AgenticStore,
-  key: string,
-  work: () => Promise<T>
-): Promise<T> {
-  void store;
-  const previous = executeLockChains.get(key) ?? Promise.resolve();
-  const next = previous.catch(() => undefined).then(() => work());
-  executeLockChains.set(key, next);
-  void next.finally(() => {
-    if (executeLockChains.get(key) === next) executeLockChains.delete(key);
-  }).catch(() => undefined);
-  return next;
 }
 
 function executeError(
@@ -209,21 +164,7 @@ export async function executeTool(input: Readonly<{
   store: AgenticStore;
 }>): Promise<ExecuteSuccess | AgenticErrorResult> {
   const correlation = `execute:${input.idempotencyKey}:${++executeRequestSeq}`;
-  const owner = input.scope.environment + ":" + input.scope.tenantScope + ":" + (input.scope.principalScope ?? "anon");
-  const key = owner + ":" + input.idempotencyKey;
-  executeWaiters.set(key, (executeWaiters.get(key) ?? 0) + 1);
-  try {
-    const observed = await runObservedRequest(correlation, () => executeToolBody(input, correlation));
-    return observed as ExecuteSuccess | AgenticErrorResult;
-  } finally {
-    const remaining = (executeWaiters.get(key) ?? 1) - 1;
-    if (remaining === 0) {
-      signalExecuteCommitted(key);
-      executeWaiters.delete(key);
-      executeCommitSignals.delete(key);
-      executeCommitResolvers.delete(key);
-    } else executeWaiters.set(key, remaining);
-  }
+  return await runObservedRequest(correlation, () => executeToolBody(input, correlation)) as ExecuteSuccess | AgenticErrorResult;
 }
 
 async function executeToolBody(
@@ -246,54 +187,6 @@ async function executeToolBody(
     expectedRevision: input.expectedRevision,
     planHandle: input.planHandle
   };
-  const inflightKey = `${ownerScope}:${input.idempotencyKey}`;
-  let leader = false;
-  if (!executeCommitSignals.has(inflightKey)) {
-    leader = true;
-    executeCommitSignals.set(
-      inflightKey,
-      new Promise<void>((resolve) => {
-        executeCommitResolvers.set(inflightKey, resolve);
-      })
-    );
-  }
-  if (!leader) {
-    executeFollowerEntered?.();
-    const committedSignal = executeCommitSignals.get(inflightKey);
-    if (committedSignal) {
-      const deadline = waitUntilDeadline(correlation);
-      try {
-        await Promise.race([committedSignal, deadline, waitUntilCancelled(correlation)]);
-      } finally { deadline.cancel(); }
-    }
-    try {
-      throwIfAborted(correlation);
-    } catch {
-      return serviceDeadlineError(correlation);
-    }
-    if (deadlineExceeded(correlation)) {
-      return serviceDeadlineError(correlation);
-    }
-    const committed = await beginIdempotency<ExecuteSuccess>({
-      key: input.idempotencyKey,
-      now: input.now,
-      operation: "execute",
-      ownerScope,
-      payload,
-      store: input.store
-    });
-    if (committed.kind === "replay") {
-      await recordRequestStage(correlation, "durable_committed");
-      await recordRequestStage(correlation, "serialization_completed");
-      await recordRequestStage(correlation, "response_handed_to_transport");
-      await recordRequestStage(correlation, "request_released");
-      return committed.response;
-    }
-    if (committed.kind === "conflict") {
-      return committed.error;
-    }
-  }
-
   const replay = await beginIdempotency<ExecuteSuccess>({
     key: input.idempotencyKey,
     now: input.now,
@@ -308,7 +201,7 @@ async function executeToolBody(
   }
 
   if (replay.kind === "replay") {
-    signalExecuteCommitted(inflightKey);
+    executeFollowerEntered?.();
     await recordRequestStage(correlation, "durable_committed");
     await recordRequestStage(correlation, "serialization_completed");
     await recordRequestStage(correlation, "response_handed_to_transport");
@@ -318,14 +211,8 @@ async function executeToolBody(
 
   await recordRequestStage(correlation, "durable_started");
   try {
-    const value = await enqueueExecute(
-      input.store,
-      `${ownerScope}:${input.planHandle}:${input.expectedRevision}`,
-      () => executeFresh(input, ownerScope, payload, inflightKey, correlation)
-    );
-    if (isAgenticErrorResult(value)) {
-      signalExecuteCommitted(inflightKey);
-    } else {
+    const value = await executeFresh(input, ownerScope, payload, correlation);
+    if (!isAgenticErrorResult(value)) {
       await recordRequestStage(correlation, "durable_committed");
       await recordRequestStage(correlation, "serialization_completed");
       await recordRequestStage(correlation, "response_handed_to_transport");
@@ -333,7 +220,6 @@ async function executeToolBody(
     }
     return value;
   } catch (error) {
-    signalExecuteCommitted(inflightKey);
     if (error instanceof Error && error.message.startsWith("execute_fail_")) {
       return businessError({
         correlationId: correlation,
@@ -359,7 +245,6 @@ async function executeFresh(
   }>,
   ownerScope: string,
   payload: Readonly<{ expectedRevision: number; planHandle: string }>,
-  inflightKey?: string,
   correlation = `execute:${input.idempotencyKey}`
 ) {
   executeFreshEntered?.();
@@ -698,9 +583,6 @@ async function executeFresh(
       response,
       store
     });
-    if (inflightKey) {
-      signalExecuteCommitted(inflightKey);
-    }
     if (executeFailAt === "at_commit") {
       throw new Error("execute_fail_at_commit");
     }
