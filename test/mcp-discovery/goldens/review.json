@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "source": "User-approved discoverability brief dated 2026-09-09",
+  "reviewer": "Codex",
+  "reviewMethod": "Bilingual semantic review against the English brief; independent goldens committed before runtime copy. No external human translation approval claimed.",
+  "checks": [
+    "invocation triggers",
+    "Thailand market",
+    "real purchasable and refinable basket",
+    "coverage and overlap",
+    "current stock, pill burden and cost",
+    "wellness, diagnostic and medical-approval boundaries",
+    "test-environment identity",
+    "stable native identifiers"
+  ],
+  "locales": [
+    "en",
+    "th",
+    "zh-CN"
+  ],
+  "intentionalClarification": "Long description adds current stock to satisfy DISC-PRE-03."
+}
