@@ -69,11 +69,14 @@ export function createMemoryStore(): AgenticStore {
       const op = active ?? candidates.filter(row => row.expectedRevision === plan.currentRevision && ["failed", "cancelled"].includes(row.status))
         .sort((a, b) => b.createdAt.localeCompare(a.createdAt) || b.id.localeCompare(a.id))[0];
       const projection = revision.statusProjection ?? null;
+      const order = [...orders.values()].filter(row => row.planId === planId && row.planRevision === revision.revision &&
+        !["expired", "cancelled"].includes(row.orderStatus) && !row.cancelledAt && !row.expiredAt)
+        .sort((a,b) => b.createdAt.localeCompare(a.createdAt) || b.id.localeCompare(a.id))[0];
       return clone({ plan, revision: revision.revision, projection,
         result: includeResult || !projection ? revision.result : null,
         operation: op ? { id: op.id, revision: op.revision, status: op.status, error: op.error, createdAt: op.createdAt, deadlineAt: op.deadlineAt } : null,
-        frozen: [...orders.values()].some(row => row.planId === planId && row.planRevision === revision.revision &&
-          !["expired", "cancelled"].includes(row.orderStatus) && !row.cancelledAt && !row.expiredAt),
+        frozen: Boolean(order), payment: order ? { orderId: order.id, paymentStatus: order.paymentStatus,
+          fulfilmentStatus: order.fulfilmentStatus, orderStatus: order.orderStatus, stateVersion: order.stateVersion } : null,
         catalogueRevision: projection?.catalogueRevision ?? null });
     },
     async getPlanOperation(id, options) {

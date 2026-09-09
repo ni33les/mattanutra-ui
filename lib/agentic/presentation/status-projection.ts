@@ -13,6 +13,7 @@ export type PlanStatusProjection = {
 export type PlanOperationRead = Pick<PlanOperationRecord, "id" | "revision" | "status" | "error" | "createdAt" | "deadlineAt">;
 export type PlanReadState = {
   plan: PlanRecord; revision: number; projection: PlanStatusProjection | null; result: unknown;
+  payment: { orderId: string; paymentStatus: string; fulfilmentStatus: string; orderStatus: string; stateVersion: number } | null;
   operation: PlanOperationRead | null; frozen: boolean; catalogueRevision: number | null;
 };
 
@@ -38,5 +39,5 @@ export function projectedResultVersion(state: PlanReadState, projection: PlanSta
   const operation = state.operation ? { id: state.operation.id, status: state.operation.status,
     revision: state.operation.revision, error: state.operation.error } : null;
   return canonicalHash({ presentation: PLAN_PRESENTATION_VERSION, revision: state.revision,
-    currentRevision: state.plan.currentRevision, resultHash: projection.resultHash, operation, refreshRequired });
+    currentRevision: state.plan.currentRevision, resultHash: projection.resultHash, operation, payment: state.payment, refreshRequired });
 }

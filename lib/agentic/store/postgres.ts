@@ -70,16 +70,19 @@ export function createPostgresStore(inputSql: Sql, inTransaction = false): Agent
     ...operationCommands(inputSql),
     async getPlanReadState(planId, requestedRevision, includeResult = false) {
       const [row] = await sql<DatabaseRow<PlanRecord> & { revision: number; projection: PlanStatusProjection | null;
-        result: unknown; operation: PlanOperationRead | null; frozen: boolean; catalogue_revision: number | null }>`
+        result: unknown; operation: PlanOperationRead | null; payment: PlanReadState["payment"]; frozen: boolean; catalogue_revision: number | null }>`
         select p.*,r.revision,r.status_projection as projection,
           case when ${includeResult} or r.status_projection is null then r.result else null end as result,
           op.read_projection as operation,
-          exists(select 1 from public.agentic_orders o where o.plan_id=p.id and o.plan_revision=r.revision
-            and o.order_status not in ('expired','cancelled') and o.checkout_reuse_eligible
-            and o.cancelled_at is null and o.expired_at is null) as frozen,
+          payment.state as payment,(payment.state is not null) as frozen,
           epoch.revision as catalogue_revision
         from public.agentic_plans p
         join public.agentic_plan_revisions r on r.plan_id=p.id and r.revision=coalesce(${requestedRevision ?? null}::integer,p.current_revision)
+        left join lateral (select jsonb_build_object('orderId',o.id,'paymentStatus',o.payment_status,
+          'fulfilmentStatus',o.fulfilment_status,'orderStatus',o.order_status,'stateVersion',o.state_version) as state
+          from public.agentic_orders o where o.plan_id=p.id and o.plan_revision=r.revision
+            and o.order_status not in ('expired','cancelled') and o.checkout_reuse_eligible
+            and o.cancelled_at is null and o.expired_at is null order by o.created_at desc,o.id desc limit 1) payment on true
         left join public.catalogue_runtime_revision epoch on epoch.singleton=true
         left join lateral (
           select x.read_projection from public.agentic_plan_operations x where x.plan_id=p.id
@@ -94,7 +97,7 @@ export function createPostgresStore(inputSql: Sql, inTransaction = false): Agent
       return { plan: { id: row.id, currentRevision: row.current_revision, environment: row.environment,
         principalScope: row.principal_scope, tenantScope: row.tenant_scope, createdAt: toIso(row.created_at), updatedAt: toIso(row.updated_at) },
         revision: row.revision, projection: row.projection, result: row.result, operation: row.operation,
-        frozen: row.frozen, catalogueRevision: row.catalogue_revision == null ? null : Number(row.catalogue_revision) } satisfies PlanReadState;
+        frozen: row.frozen, payment: row.payment, catalogueRevision: row.catalogue_revision == null ? null : Number(row.catalogue_revision) } satisfies PlanReadState;
     },
     async getPlanOperation(id, options) {
       if (options?.includeCursor === false) {
