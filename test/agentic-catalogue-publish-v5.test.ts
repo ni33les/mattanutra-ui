@@ -1,3 +1,5 @@
+import { matcherSafetyCeilings, setMatcherSafetyCeilings } from "../lib/matcher/safety-ceilings.ts";
+import { catalogueRecordFingerprint } from "../lib/catalogue-corrections.ts";
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { it } from 'node:test';
@@ -28,6 +30,7 @@ it('V5-PUBLISH-01: a catalogue-only change preserves the completed snapshot and 
   setMatcherEnteredForTests(entered);
   try {
     replaceCatalogueSnapshot({ ...fixtureSnapshot(), runtimeRevision: epoch });
+    setMatcherSafetyCeilings(matcherSafetyCeilings(), { runtimeRevision: epoch, fingerprint: catalogueRecordFingerprint(matcherSafetyCeilings()) });
     const admitted = await planTool({ config, now: '2026-09-07T00:00:00Z', payload, scope, store });
     assert.equal(admitted.ok, true);
     const operation = await store.getPlanOperationByKey(`dev:mattanutra:${principalScope}`, payload.idempotencyKey); assert.ok(operation);

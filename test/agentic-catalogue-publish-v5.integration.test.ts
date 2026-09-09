@@ -1,3 +1,5 @@
+import { matcherSafetyCeilings, setMatcherSafetyCeilings } from "../lib/matcher/safety-ceilings.ts";
+import { catalogueRecordFingerprint } from "../lib/catalogue-corrections.ts";
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { after, it } from 'node:test';
@@ -29,6 +31,7 @@ it('V5-PUBLISH-PG-01: matching publishes without waiting for catalogue writers a
     const scope = { environment: 'dev' as const, tenantScope: 'mattanutra', principalScope };
     const payload = { operation: 'create' as const, idempotencyKey: `publish-pg-${randomUUID()}`, request: { destinationCountry: 'TH', locale: 'en', optimization: 'balanced', profile: { ageYears: 38, lifeStage: 'adult' }, requirements: {}, targets: [{ name: 'Vitamin D3', amount: 1000, unit: 'IU' }] } };
     replaceCatalogueSnapshot({ ...fixtureSnapshot(), catalogueVersion: principalScope, runtimeRevision: Number(epoch.revision) });
+    setMatcherSafetyCeilings(matcherSafetyCeilings(), { runtimeRevision: Number(epoch.revision), fingerprint: catalogueRecordFingerprint(matcherSafetyCeilings()) });
     const admitted=await planTool({config,now:new Date().toISOString(),payload,scope,store}); assert.ok(admitted.ok);
     const operation=await store.getPlanOperationByKey(`dev:mattanutra:${principalScope}`,payload.idempotencyKey); assert.ok(operation);
     let release!:()=>void, entered!:()=>void;

@@ -1,3 +1,5 @@
+import { matcherSafetyCeilings, setMatcherSafetyCeilings } from "../../lib/matcher/safety-ceilings.ts";
+import { catalogueRecordFingerprint } from "../../lib/catalogue-corrections.ts";
 import assert from "node:assert/strict";
 import { afterEach, test } from "node:test";
 import { installGoldCatalogue, uninstallGoldCatalogue } from "../helpers/gold-catalogue.ts";
@@ -10,6 +12,7 @@ const request={destinationCountry:"TH",locale:"en",optimization:"balanced",profi
 afterEach(uninstallGoldCatalogue);
 async function fixture(name: string) {
   installGoldCatalogue(); replaceCatalogueSnapshot({...fixtureSnapshot(),runtimeRevision:11});
+    setMatcherSafetyCeilings(matcherSafetyCeilings(), { runtimeRevision: 11, fingerprint: catalogueRecordFingerprint(matcherSafetyCeilings()) });
   const app=runtime(name), plan=await rpcWithTaskExecutor(app,"plan",{operation:"create",idempotencyKey:name,request,responseView:"full"});
   assert.equal(plan.status,"ready");
   return {app,call:{...app,now:app.now!,expectedRevision:Number(plan.revision),planHandle:String(plan.planHandle),idempotencyKey:name+"-execute"}};
