@@ -41,3 +41,12 @@ test("EFF-MET-03 production measurement flushing is bounded and excludes request
   const text = JSON.stringify(rows[0]); assert.match(text, /cache.hit/); assert.ok(!/answers|email|token|credentials/.test(text));
   duplicate(); stop(); t.mock.timers.tick(60_000); assert.equal(rows.length, 1);
 });
+
+test("EFF-MET-04 concise transport does not serialize an unused JSON clone", async () => {
+  const { toolResult } = await import("../../lib/agentic/mcp/rpc.ts");
+  let serializations = 0;
+  const payload = { responseView: "conversation", summary: "Ready", nextActions: ["confirm_with_user"],
+    toJSON() { serializations++; return { responseView: this.responseView, summary: this.summary }; } };
+  const reply = toolResult(payload); assert.equal(reply.structuredContent, payload);
+  assert.equal(serializations, 0); assert.match(reply.content[0].text, /confirm_with_user/);
+});

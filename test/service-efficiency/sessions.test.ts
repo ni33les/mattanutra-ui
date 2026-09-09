@@ -57,3 +57,17 @@ test("EFF-SESSION-03 idle sessions release affinity and recover through the dura
     assert.equal(resumed.inputTransferred, true); assert.equal(resumed.expansionAttempts, first.expansionAttempts + 1);
   } finally { await pool.close(); }
 });
+
+test("EFF-SESSION-04 worker session protocol rejects incompatible continuations before searching", async () => {
+  const { Worker } = await import("node:worker_threads"), { resolve } = await import("node:path");
+  const { captureReferenceJobIdentity } = await import("../../lib/agentic/catalogue/reference-job.ts");
+  const { matcherSafetyCeilings } = await import("../../lib/matcher/safety-ceilings.ts");
+  const request = await input();
+  const worker = new Worker(resolve("workers/mcp-matcher.ts"), { execArgv: ["--experimental-strip-types", "--import", resolve("scripts/register-ts-path-loader.mjs")] });
+  try {
+    const reply = new Promise<Record<string, unknown>>((resolve, reject) => { worker.once("message", resolve); worker.once("error", reject); });
+    worker.postMessage({ ...request, protocol: 0, kind: "session-start", sessionId: "incompatible", chunk: { chunkBudget: 1 },
+      referenceIdentity: captureReferenceJobIdentity(undefined, true), ceilings: matcherSafetyCeilings(), safetyUnavailable: false });
+    assert.deepEqual(await reply, { error: "worker_protocol_mismatch" });
+  } finally { await worker.terminate(); }
+});

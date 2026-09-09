@@ -64,3 +64,19 @@ test("EFF-CACHE-05 shared checkpoint writes retain each owner's request lifetime
   } }, compute));
   a.abort(); release.release(); assert.equal(await two, 3); await rejected;
 });
+
+test("EFF-CACHE-06 durable result identities fence locale, effort, scope, facts and reference availability", async () => {
+  const { input } = await import("./support.ts");
+  const { matchingResultIdentity } = await import("../../lib/agentic/plan/matching.ts");
+  const { setMatcherSafetyCeilingsUnavailable, resetMatcherSafetyCeilings } = await import("../../lib/matcher/safety-ceilings.ts");
+  const job = await input(), key = matchingResultIdentity(job, "dev:tenant-a");
+  try {
+    assert.notEqual(matchingResultIdentity(job, "uat:tenant-a"), key);
+    assert.notEqual(matchingResultIdentity(job, "dev:tenant-b"), key);
+    assert.notEqual(matchingResultIdentity({ ...job, state: { ...job.state, locale: "th" } }, "dev:tenant-a"), key);
+    assert.notEqual(matchingResultIdentity({ ...job, state: { ...job.state, searchEffort: "expanded" } }, "dev:tenant-a"), key);
+    assert.notEqual(matchingResultIdentity({ ...job, snapshot: { ...job.snapshot, availabilityAsOf: "2026-09-09T00:00:00Z" } }, "dev:tenant-a"), key);
+    setMatcherSafetyCeilingsUnavailable();
+    assert.notEqual(matchingResultIdentity(job, "dev:tenant-a"), key);
+  } finally { resetMatcherSafetyCeilings(); }
+});

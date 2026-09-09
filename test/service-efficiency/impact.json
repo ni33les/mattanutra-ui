@@ -6,7 +6,7 @@
     {
       "file": "test/service-efficiency/measurements.test.ts",
       "slice": "measurements",
-      "expectedCases": 3,
+      "expectedCases": 4,
       "reason": "Concurrent query measurement isolation and retained diagnostic namespace compatibility"
     },
     {
@@ -56,13 +56,13 @@
     {
       "file": "test/service-efficiency/sessions.test.ts",
       "slice": "sessions",
-      "expectedCases": 3,
+      "expectedCases": 4,
       "reason": "Resident worker continuation, binary checkpoint restart and exact synchronous result/attempt parity"
     },
     {
       "file": "test/service-efficiency/cache.test.ts",
       "slice": "cache",
-      "expectedCases": 5,
+      "expectedCases": 6,
       "reason": "Byte-bounded immutable reuse, concurrent owner cancellation, checkpoint fencing and failed-computation isolation"
     },
     {
