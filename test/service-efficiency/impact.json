@@ -309,6 +309,12 @@
       "database": true,
       "expectedCases": 8,
       "reason": "Web catalogue snapshot publication, preserved immutable reference identities, preferences/revision concurrency and explicit recovery without read maintenance"
+    },
+    {
+      "file": "test/service-efficiency/duplicate-admission.test.ts",
+      "slice": "duplicate-admission",
+      "expectedCases": 2,
+      "reason": "Audits 31/35: concurrent preparation without process Promise chains, one database-owned plan/checkout receipt"
     }
   ],
   "inputs": [
