@@ -1,6 +1,6 @@
 import { isUuid } from "@/lib/assessment-store";
 import { getSql, withDatabaseTransaction } from "@/lib/db";
-import { getAssessmentProductPreferences, normalizedProductExclusions } from "@/lib/assessment-product-preferences";
+import { ensureAssessmentProductPreferences, normalizedProductExclusions } from "@/lib/assessment-product-preferences";
 import { FunnelError } from "@/lib/funnel-errors";
 import { loadGenerationInput, withGenerationInput } from "@/lib/assessment-revisions";
 import { isLocale } from "@/lib/i18n";
@@ -77,7 +77,7 @@ export async function POST(
       if (body.assessmentRevision != null && Number(body.assessmentRevision) !== Number(assessment.input_revision)) {
         throw new FunnelError("Assessment changed. Reload before replanning.", 409, "assessment_changed");
       }
-      const previous = await getAssessmentProductPreferences(tx, planId, true);
+      const previous = await ensureAssessmentProductPreferences(tx, planId);
       let selectionRevision = previous.revision;
       if (body.excludeProductIds !== undefined || body.searchEffort !== undefined) {
         const excluded = body.excludeProductIds === undefined ? previous.excludedProductIds : normalizedProductExclusions(body.excludeProductIds);

@@ -11,12 +11,18 @@ export function normalizedProductExclusions(value: unknown): string[] {
   return [...new Set(value.map(id => id.toLowerCase()))].sort();
 }
 
-export async function getAssessmentProductPreferences(sql: Db, planId: string, lock = false): Promise<AssessmentProductPreferences> {
-  if (lock) await sql`insert into public.assessment_product_preferences (plan_id) values (${planId}::uuid) on conflict do nothing`;
-  const [row] = lock
-    ? await sql`select revision, excluded_product_ids, search_effort from public.assessment_product_preferences where plan_id = ${planId}::uuid for update`
-    : await sql`select revision, excluded_product_ids, search_effort from public.assessment_product_preferences where plan_id = ${planId}::uuid`;
+export async function getAssessmentProductPreferences(sql: Db, planId: string, initialize = false): Promise<AssessmentProductPreferences> {
+  const [row] = await sql`select revision, excluded_product_ids, search_effort from public.assessment_product_preferences where plan_id = ${planId}::uuid`;
+  if (!row && initialize) {
+    await sql`insert into public.assessment_product_preferences (plan_id) values (${planId}::uuid) on conflict do nothing`;
+    return getAssessmentProductPreferences(sql, planId);
+  }
   return { revision: Number(row?.revision ?? 0), excludedProductIds: row?.excluded_product_ids ?? [], searchEffort: row?.search_effort === "expanded" ? "expanded" : "standard" };
+}
+
+/** Mutation callers already own the assessment fence; no second row lock is needed. */
+export function ensureAssessmentProductPreferences(sql: Db, planId: string) {
+  return getAssessmentProductPreferences(sql, planId, true);
 }
 
 export function requireCurrentProductSelection(input: Readonly<{ expectedAssessmentRevision?: number | null; assessmentRevision: number; expectedSelectionRevision?: number | null; selectionRevision: number; runSelectionRevision: number; expectedRunId?: string | null; runId: string; optionId?: string | null; availableOptionIds: readonly string[]; selectedIds: readonly string[]; allowedIds: readonly string[]; excludedIds: readonly string[] }>) {
