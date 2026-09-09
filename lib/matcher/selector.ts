@@ -263,7 +263,8 @@ export function compareBaskets(left: ScoredBasket, right: ScoredBasket, request:
   // For a single requested nutrient, prefer an equally accurate dedicated
   // product to a stack assembled from incidental ingredients. Unknown pills
   // remain unknown; this is product focus, never a fabricated pill comparison.
-  const focusedSingle = (basket: ScoredBasket) => request.targets.length === 1 && basket.productCount === 1 && basket.incidentalCount === 0;
+  const focusedSingle = (basket: ScoredBasket) => request.targets.length === 1 && basket.productCount === 1 && basket.incidentalCount === 0 &&
+    basket.requestedLabelCount > 0 && basket.aggregateCoverage > 0;
   const focus = Number(focusedSingle(right)) - Number(focusedSingle(left));
   if (focus) return focus;
   // Dose accuracy remains first. Price-led alternatives are selected below;

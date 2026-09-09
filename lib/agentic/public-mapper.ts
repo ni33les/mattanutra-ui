@@ -78,7 +78,9 @@ function compactPublic(
 
 function publicCanonicalStamp(stamp: ReturnType<typeof buildCanonicalPlanStamp>) {
   const snapshotId = stamp.snapshotId;
-  const published = { ...stamp } as Record<string, unknown>;
+  // Keep the documented public identity enumerable across durable receipts.
+  // snapshotId remains a local compatibility alias only.
+  const published = { ...stamp, catalogId: snapshotId } as Record<string, unknown>;
   delete published.snapshotId;
   Object.defineProperty(published, "snapshotId", {
     configurable: true,

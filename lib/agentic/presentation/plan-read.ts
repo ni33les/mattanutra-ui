@@ -35,7 +35,7 @@ export async function readPlanPresentation(runtime: ReadRuntime, planHandle: str
   if (isAgenticErrorResult(state)) return state;
   const saved = state.result as PlanResult;
   const result: PlanResult = state.refreshRequired ? { ...saved, refreshRequired: true,
-    sourceContractVersion: saved.contractVersion, status: "needs_input", questions: [] } : saved;
+    sourceContractVersion: saved.contractVersion ?? "3.0.0", status: "needs_input", questions: [] } : saved;
   return { ...state, revision: { revision: state.revision, result }, result, originalRequest: () => originalRequestFor(result) };
 }
 

@@ -1,3 +1,4 @@
+import { withServiceMeasurements } from "@/lib/service-metrics";
 import { planStatusProjection } from "@/lib/agentic/presentation/status-projection";
 import {preparePlanRevisionRecord} from "@/lib/agentic/store/prepared-revision";
 import { readPlanPresentation } from "@/lib/agentic/presentation/plan-read";
@@ -991,7 +992,8 @@ export async function runAdmittedPlanOperation(input: Readonly<{
   const signal = input.signal ? AbortSignal.any([input.signal, controller.signal]) : controller.signal;
   const attempt: PlanAttempt = { correlationId: `plan-operation:${claim.id}`, signal, operation: claim, operationStore: input.store };
   const prepared = claim.command.prepared as PreparedPlanCommand;
-  const work = withRequestLifetime({ signal, correlationId: attempt.correlationId }, () => planAttempts.run(attempt, async () => {
+  const work = withRequestLifetime({ signal, correlationId: attempt.correlationId }, () => withServiceMeasurements(() => planAttempts.run(attempt, async () => {
+    if (claim.command.scope.principalScope?.startsWith("qa-v3:")) setQueryNamespace(claim.command.scope.principalScope);
     try {
       const result = await completePreparedPlan(prepared, {
         config: input.config, now: claim.createdAt, payload: claim.command.payload as PlanToolInput,
@@ -1017,7 +1019,7 @@ export async function runAdmittedPlanOperation(input: Readonly<{
       console.error("[agentic-plan-operation]", { operationId: claim.id, origin: error instanceof Error ? error.name : "unknown", message: error instanceof Error ? error.message : "operation_failed" });
       return result;
     }
-  })).finally(() => { clearTimeout(deadline); inflightDurableOperations.delete(claim.id); });
+  }))).finally(() => { clearTimeout(deadline); inflightDurableOperations.delete(claim.id); });
   inflightDurableOperations.set(claim.id, work);
   return work;
 }
@@ -1124,13 +1126,15 @@ async function executePlanTool(input: Readonly<{
     if (!capability) return businessError({ reasonCode: "not_found", message: "Not found." });
     const active = await input.store.getActivePlanOperation(capability.resourceId);
     if (active) return admittedResponse(input, active);
-    const plan = await input.store.getPlan(capability.resourceId);
-    if (plan) {
-      const failed = await input.store.getFailedPlanOperation(plan.id, plan.currentRevision);
-      if (failed) return operationFailureResponse(failed);
-    }
     const state = await readPlanPresentation(input, input.payload.planHandle);
     if (isAgenticErrorResult(state)) return state;
+    // Failed edits do not hide the last committed result. Status carries the
+    // operation failure; an initial failure without a result remains an error.
+    if (state.result.status === "processing" && state.operation && ["failed", "cancelled"].includes(state.operation.status)) {
+      if (isAgenticErrorResult(state.operation.error)) return state.operation.error;
+      return businessError({ reasonCode: "temporarily_unavailable", retryable: true,
+        message: "This plan has no completed result. Revise with a new idempotency key to recover." });
+    }
     return successFromResult({ locale: negotiateLocale(state.result.requestSnapshot.locale),
       planHandle: input.payload.planHandle, revision: state.revision.revision, result: state.result });
   }
@@ -1417,7 +1421,7 @@ async function executePlanTool(input: Readonly<{
       : previous?.pendingInput;
     const processing = processingResult({ locale, previous, state, pendingInput });
 
-    const persistProcessing = !resume && !(
+    const persistProcessing = (!resume || (!input.matchPort && payload.operation !== "get" && Boolean(payload.idempotencyKey))) && !(
       !hasFullRequest(payload) &&
       !selectOptionId &&
       answers.length === 0 &&
@@ -2044,7 +2048,9 @@ async function persistTerminalPlan(input: Readonly<{
     throwIfAborted(planCorrelationId(key));
     // Calculation publishes its immutable snapshot even if the catalogue moved.
     // Only selection must fence current commercial facts; reads project stale results.
-    if (input.input.payload.operation === "select" && input.expectedCatalogueRevision != null &&
+    const selectsOption = input.input.payload.operation === "select" || input.input.payload.selectOptionId ||
+      input.input.payload.optionId || selectFromAnswers(asAnswers(input.input.payload.answers));
+    if (selectsOption && input.expectedCatalogueRevision != null &&
       (!store.isCatalogueRevisionCurrent || !await store.isCatalogueRevisionCurrent(input.expectedCatalogueRevision))) {
       // Keep the saved processing request and its idempotency receipt. A retry
       // or handle poll loads a fresh snapshot and resumes this same revision.
