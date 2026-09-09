@@ -71,5 +71,12 @@ test("LOCK-SNAPSHOT-03 interrupted durable matching restores its catalogue and r
     app.store.getPlanReadState = async (...args) => { const row = await read(...args); return row ? { ...row, catalogueRevision: frozen.snapshot.runtimeRevision! + 1 } : row; };
     const status = await rpc(app, "plan", { operation: "get", planHandle: created.planHandle, responseView: "status" });
     assert.equal(status.refreshRequired, true); assert.equal(status.status, "needs_input");
+    for (const responseView of ["conversation", "full"] as const) {
+      const replay = await rpc(app, "plan", { operation: "create", idempotencyKey: "immutable-restart-create", request: goldens.d3, responseView });
+      assert.equal(replay.status, "needs_input", `same-key ${responseView} must not claim the stale receipt is checkout-ready`);
+      assert.equal(replay.refreshRequired, true);
+      assert.equal((replay.nextActions as string[])[0], "change_request");
+    }
+    assert.equal(((await app.store.getPlanOperation(op.id))?.response as {status?:string})?.status, "ready", "presentation must preserve the immutable receipt");
   } finally { if (previous === undefined) delete process.env.AX_REFINEMENT_REAL_WORKERS; else process.env.AX_REFINEMENT_REAL_WORKERS = previous; }
 });
