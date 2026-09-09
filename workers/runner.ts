@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import { hostname } from "node:os";
 import nextEnv from "@next/env";
 import { executeTaskWorkItem } from "../lib/task-execution.ts";
+import { startServiceMeasurementReporting } from "../lib/service-metrics.ts";
 import { SYSTEM_AGENTS, type SystemAgentKey } from "../lib/system-agents.ts";
 import {
   RUNTIME_WORKER_PROFILE_MODES,
@@ -796,6 +797,7 @@ async function shutdown() {
 }
 
 async function runWorker(mode: WorkerMode) {
+  startServiceMeasurementReporting(value => console.info("[service-efficiency:worker]", JSON.stringify(value)));
   try {
     const wake = await startWorkerWakeServer();
     workerWakeUrl = wake.url;
