@@ -3,7 +3,18 @@
   "releaseBase": "a28f3b27d6bde5a21803fa5e33622e89ce2a708d",
   "testPolicy": "Scoped RED/GREEN and affected consumers only. No skipped, focused, todo, cancelled, retried or empty cases. Full application/MCP acceptance excluded.",
   "files": [
-    { "file": "test/service-efficiency/measurements.test.ts", "slice": "measurements", "expectedCases": 2, "reason": "Concurrent query measurement isolation and retained diagnostic namespace compatibility" }
+    {
+      "file": "test/service-efficiency/measurements.test.ts",
+      "slice": "measurements",
+      "expectedCases": 2,
+      "reason": "Concurrent query measurement isolation and retained diagnostic namespace compatibility"
+    },
+    {
+      "file": "test/service-efficiency/reads.test.ts",
+      "slice": "reads",
+      "expectedCases": 3,
+      "reason": "Lockless projection reads, unchanged versions, preserved expiry state and full conversation compatibility"
+    }
   ],
   "inputs": [
     "test/mcp-conversation-pack/d3-fixture.json",
