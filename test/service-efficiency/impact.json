@@ -83,6 +83,13 @@
       "slice": "funnel",
       "expectedCases": 3,
       "reason": "Single-consumption JSON bodies, shared page polling with independent cancellation, zero hidden-tab interval wakeups"
+    },
+    {
+      "file": "test/service-efficiency/funnel-reads.integration.test.ts",
+      "slice": "funnel-reads",
+      "database": true,
+      "expectedCases": 2,
+      "reason": "Read-only funnel status under held assessment writes, compact locale-specific advice gates and invalidated legacy projections"
     }
   ],
   "inputs": [
