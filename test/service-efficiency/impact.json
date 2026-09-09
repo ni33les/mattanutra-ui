@@ -31,14 +31,14 @@
     {
       "file": "test/service-efficiency/wakeup.test.ts",
       "slice": "wakeup",
-      "expectedCases": 4,
+      "expectedCases": 6,
       "reason": "Lost task notification reproduction, bounded coalescing and single-consumer wakeups"
     },
     {
       "file": "test/service-efficiency/operations.integration.test.ts",
       "slice": "operations-pg",
       "database": true,
-      "expectedCases": 2,
+      "expectedCases": 3,
       "reason": "Bounded atomic lease and checkpoint statements with preserved commands, cursor and stale-owner rejection"
     },
     {
@@ -233,6 +233,12 @@
       "slice": "harness",
       "expectedCases": 1,
       "reason": "Shared attestation reader must preserve historical presentation-only release validation and rejection rules"
+    },
+    {
+      "file": "test/service-efficiency/durable-cache.test.ts",
+      "slice": "durable-cache",
+      "expectedCases": 1,
+      "reason": "Exercise real durable worker coalescing, independent capability ownership and warm completed-result reuse end to end"
     }
   ],
   "inputs": [

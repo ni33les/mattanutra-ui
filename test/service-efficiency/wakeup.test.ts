@@ -42,3 +42,25 @@ test("EFF-WAKE-04 transport bursts coalesce without dropping work arriving durin
   await Promise.all([...first, later]);
   assert.equal(calls.length, 2); assert.equal(calls[0].taskId, "one"); assert.equal(calls[1].taskId, "two");
 });
+
+
+test("EFF-WAKE-05 an in-flight duplicate does not create another HTTP wake burst", async () => {
+  const { coalescedWorkerWake } = await import("../../lib/worker-wake.ts");
+  let release!: () => void, entered!: () => void;
+  const held = new Promise<void>(resolve => { release = resolve; }), started = new Promise<void>(resolve => { entered = resolve; });
+  let calls = 0;
+  const wake = coalescedWorkerWake(async () => { calls++; entered(); await held; });
+  const first = wake({ taskType: "match", taskId: "one" }); await started;
+  const duplicate = wake({ taskType: "match", taskId: "one" }); release(); await Promise.all([first, duplicate]);
+  assert.equal(calls, 1);
+});
+
+test("EFF-WAKE-06 one task wakes one registered worker; distinct tasks distribute fairly", async () => {
+  const module = await import("../../lib/worker-wake.ts");
+  const choose = (module as unknown as { chooseWorkerWakeUrls?: (urls: string[], signal: TaskQueueSignal) => string[] }).chooseWorkerWakeUrls;
+  assert.equal(typeof choose, "function"); assert.ok(choose);
+  const urls = ["https://one.invalid", "https://two.invalid"];
+  const first = choose(urls, { taskType: "match", taskId: "one" }), second = choose(urls, { taskType: "match", taskId: "two" });
+  assert.equal(first.length, 1); assert.equal(second.length, 1); assert.notDeepEqual(first, second);
+  assert.deepEqual(choose(urls, { taskType: "match" }), urls);
+});

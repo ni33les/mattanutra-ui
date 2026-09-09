@@ -43,3 +43,15 @@ test("EFF-TXN-PG-02 checkpoint updates use one conditional write and preserve st
   await cancelPlanOperation(store, row.id, now);
   assert.equal(await updateClaimedOperation(store, claim, { status: "complete" }, now), false);
 });
+
+
+test("EFF-TXN-PG-03 durable BYTEA checkpoints remain binary when read and reclaimed", async () => {
+  const row = await operation(), claim = await claimPlanOperation(store, row.id, "owner", now); assert.ok(claim);
+  const cursor = randomBytes(512);
+  assert.equal(await updateClaimedOperation(store, claim, { checkpoint: { search: { cursor, expansionAttempts: 4000 } } }, now), true);
+  const { operationCursor } = await import("../../lib/agentic/store/operation-checkpoint.ts");
+  const read = operationCursor((await store.getPlanOperation(row.id))!);
+  assert.ok(read instanceof Uint8Array); assert.deepEqual(Buffer.from(read), cursor);
+  const reclaimed = await claimPlanOperation(store, row.id, "next", "2026-09-09T00:01:00Z"); assert.ok(reclaimed);
+  const resumed = operationCursor(reclaimed); assert.ok(resumed instanceof Uint8Array); assert.deepEqual(Buffer.from(resumed), cursor);
+});
