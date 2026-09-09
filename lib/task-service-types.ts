@@ -410,6 +410,8 @@ export type CompleteTaskInput = Readonly<{
   accessScope?: TaskAgentAccessScope | null;
   agentId?: string | null;
   applyResult?: (context: TaskCompletionContext) => Promise<unknown>;
+  /** Pure result preparation runs before mutation locks; publication revalidates task inputs. */
+  prepareResult?: (context: Pick<TaskCompletionContext, "task" | "resultPayload">) => Promise<unknown>;
   reservationId?: string | null;
   resultPayload?: Record<string, unknown>;
   taskId: string;
@@ -444,6 +446,7 @@ export type TaskCompletionContext = Readonly<{
   agentId?: string | null;
   reservationId?: string | null;
   resultPayload: Record<string, unknown>;
+  preparedResult?: unknown;
   sql: TaskServiceDb;
   task: TaskRecord;
 }>;

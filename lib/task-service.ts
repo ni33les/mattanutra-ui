@@ -1,5 +1,7 @@
 import { ASSESSMENT_GENERATION_TASKS, generationInput, generationTaskId, loadGenerationInput } from "@/lib/assessment-revisions";
 import { randomUUID } from "node:crypto";
+import { AsyncLocalStorage } from "node:async_hooks";
+import { canonicalHash } from "@/lib/agentic/value/canonical";
 import type postgres from "postgres";
 import { toJsonValue } from "@/lib/assessment-store";
 import { getSql, getWorkerSql, withDatabaseTransaction } from "@/lib/db";
@@ -2164,12 +2166,20 @@ export async function reserveNextTask(
   };
 }
 
+const ownedTaskLocks = new AsyncLocalStorage<ReadonlySet<string>>();
 async function withTaskRowLock<T>(sql: postgres.Sql, taskId: string | null, work: (tx: postgres.Sql) => Promise<T>) {
   if (!taskId) throw new Error("Task operation requires a valid taskId");
   return withDatabaseTransaction(sql, async tx => {
+    const owned = ownedTaskLocks.getStore();
+    if (owned?.has(taskId)) return work(tx);
     await tx`select id from public.tasks where id = ${taskId}::uuid for update`;
-    return work(tx);
+    return ownedTaskLocks.run(new Set([...(owned ?? []), taskId]), () => work(tx));
   });
+}
+
+function taskPublicationInputIdentity(task: TaskRecord) {
+  return canonicalHash({ taskType: task.taskType, planId: task.planId, taskGroupId: task.taskGroupId,
+    payload: task.payload, context: task.context });
 }
 
 async function claimTaskCompletionApplication(
@@ -2476,6 +2486,22 @@ export async function completeTask(input: CompleteTaskInput) {
 
   const deferred = payloadRecord(input.resultPayload).deferredOperationId;
   if (typeof deferred === "string") return deferMatchingTaskCompletion(input, deferred);
+  let prepared: { identity: string; value: unknown } | undefined;
+  if (input.prepareResult) {
+    const [row] = await sql<TaskRow[]>`select t.* from public.tasks t where t.id=${input.taskId}::uuid and (
+      ${!(input.reservationId || scopeAgentId(input) || input.workerSessionId)} or exists (
+        select 1 from public.task_reservations r where r.task_id=t.id and r.status in ('active','completed')
+          and (${uuidOrNull(input.reservationId)}::uuid is null or r.id=${uuidOrNull(input.reservationId)}::uuid)
+          and (${scopeAgentId(input)}::uuid is null or r.agent_id=${scopeAgentId(input)}::uuid)
+          and (${scopeMembershipId(input)}::uuid is null or r.membership_id=${scopeMembershipId(input)}::uuid)
+          and (${uuidOrNull(input.workerSessionId)}::uuid is null or r.worker_session_id=${uuidOrNull(input.workerSessionId)}::uuid)))`;
+    if (!row) throw new Error("Task completion ownership changed before preparation");
+    const current = mapTask(row);
+    if (current.status === "completed") return current;
+    const identity = taskPublicationInputIdentity(current);
+    const value = await input.prepareResult({ task: current, resultPayload: input.resultPayload ?? {} });
+    prepared = { identity, value };
+  }
   let task: TaskRecord;
   try {
     task = await withTaskRowLock(sql, uuidOrNull(input.taskId), async tx => {
@@ -2497,12 +2523,16 @@ export async function completeTask(input: CompleteTaskInput) {
       `;
       if (completed[0]) return mapTask(completed[0]);
       const claim = await claimTaskCompletionApplication(tx, input);
+      if (prepared && prepared.identity !== taskPublicationInputIdentity(claim.task)) {
+        throw new Error("Task input changed after result preparation");
+      }
       // Appliers persist results/queue work here; external effects are deferred.
       const resultPayload = payloadRecord(input.applyResult
         ? await input.applyResult({
             afterCommit: effect => afterCommitEffects.push(effect),
             agentId: input.accessScope?.agentId ?? input.agentId ?? claim.activeReservation?.agent_id,
             reservationId: claim.activeReservation?.id ?? input.reservationId,
+            preparedResult: prepared?.value,
             resultPayload: input.resultPayload ?? {}, sql: tx, task: claim.task
           })
         : (input.resultPayload ?? {}));
