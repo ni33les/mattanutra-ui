@@ -2641,7 +2641,7 @@ async function enqueueReassessmentEmailTask({
   return taskId;
 }
 
-async function claimDueCronActions(sql: postgres.Sql) {
+export async function claimDueCronActions(sql: postgres.Sql) {
   return sql<
     Array<{
       action_type: string;
