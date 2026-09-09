@@ -236,16 +236,11 @@ export async function executeTaskWorkItem(
     const { createRuntimeStore } = await import("@/lib/agentic/store/postgres");
     const { loadAgenticConfig } = await import("@/lib/agentic/config");
     const store = createRuntimeStore(), config = loadAgenticConfig();
-    const { setTimeout: wait } = await import("node:timers/promises");
-    for (;;) {
-      throwIfTaskExecutionAborted(runtime);
-      const result = await runAdmittedPlanOperation({ store, config, operationId: workItem.operationId, signal: runtime.signal });
-      if (!result.ok) throw new Error(result.error.reasonCode);
-      if (result.status !== "processing") return { operationId: workItem.operationId, revision: result.revision, status: result.status };
-      // Observe the admitted operation while its short lease belongs to the
-      // HTTP-started worker. This never consumes another search expansion.
-      await wait(1000, undefined, { signal: runtime.signal });
-    }
+    throwIfTaskExecutionAborted(runtime);
+    const result = await runAdmittedPlanOperation({ store, config, operationId: workItem.operationId, signal: runtime.signal });
+    if (!result.ok) throw new Error(result.error.reasonCode);
+    return { operationId: workItem.operationId, revision: result.revision, status: result.status,
+      ...(result.status === "processing" ? { deferredOperationId: workItem.operationId } : {}) };
   }
   if (workItem.taskType === "send_healthscore_email") {
     const { deliverHealthScore } = await import("@/lib/healthscore-delivery");

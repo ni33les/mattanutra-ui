@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import { hostname } from "node:os";
 import nextEnv from "@next/env";
 import { executeTaskWorkItem } from "../lib/task-execution.ts";
+import { releaseReservedTaskToQueue } from "../lib/task-service.ts";
 import { SYSTEM_AGENTS, type SystemAgentKey } from "../lib/system-agents.ts";
 import {
   RUNTIME_WORKER_PROFILE_MODES,
@@ -619,7 +620,10 @@ async function runAgentLoop(
         if (taskAbortReason) {
           throw taskAbortReason;
         }
-        await retryApiCall(`${agent.name} task completion`, () =>
+        const deferred = taskType === "match_agentic_plan" && resultPayload && typeof resultPayload === "object" &&
+          "deferredOperationId" in resultPayload && typeof resultPayload.deferredOperationId === "string" ? resultPayload.deferredOperationId : null;
+        if (deferred) await releaseReservedTaskToQueue({ taskId, reservationId, workerSessionId, deferredOperationId: deferred });
+        else await retryApiCall(`${agent.name} task completion`, () =>
           client.complete({
             agentId: agent.id,
             reservationId,

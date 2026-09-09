@@ -2972,6 +2972,7 @@ export async function failTask(input: FailTaskInput) {
 }
 
 export async function releaseReservedTaskToQueue(input: Readonly<{
+  deferredOperationId?: string;
   reservationId: string;
   taskId: string;
   workerSessionId?: string | null;
@@ -2980,6 +2981,8 @@ export async function releaseReservedTaskToQueue(input: Readonly<{
   const reservationId = uuidOrNull(input.reservationId);
   const taskId = uuidOrNull(input.taskId);
   const workerSessionId = uuidOrNull(input.workerSessionId);
+  const deferredOperationId = uuidOrNull(input.deferredOperationId);
+  if (input.deferredOperationId && !deferredOperationId) throw new Error("Invalid deferred operation identity");
 
   if (!reservationId || !taskId) {
     throw new Error("Releasing a reserved task requires reservationId and taskId");
@@ -2993,6 +2996,8 @@ export async function releaseReservedTaskToQueue(input: Readonly<{
       where id = ${reservationId}::uuid
         and task_id = ${taskId}::uuid
         and status = 'active'
+        and (${deferredOperationId}::uuid is null or exists (select 1 from public.tasks t
+          where t.id=${taskId}::uuid and t.task_type='match_agentic_plan' and t.payload->>'operationId'=${deferredOperationId}))
         and (
           ${workerSessionId}::uuid is null
           or worker_session_id = ${workerSessionId}::uuid
@@ -3001,6 +3006,11 @@ export async function releaseReservedTaskToQueue(input: Readonly<{
     )
     update public.tasks set
       status = 'queued',
+      attempts = case when ${deferredOperationId}::uuid is null then attempts else greatest(attempts-1,0) end,
+      scheduled_for = case when ${deferredOperationId}::uuid is null then scheduled_for else
+        greatest(now()+interval '1 second',coalesce((select least((op.record_json->>'leaseExpiresAt')::timestamptz,
+          coalesce((op.record_json->>'deadlineAt')::timestamptz,op.created_at+interval '175 seconds'))
+          from public.agentic_plan_operations op where op.id=${deferredOperationId}::uuid and op.status='running'),now())) end,
       reserved_by_agent_id = null,
       lease_until = null,
       started_at = null,

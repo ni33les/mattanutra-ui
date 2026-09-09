@@ -27,12 +27,12 @@ export class MatchWorkerPool {
     }), capacity, queueLimit);
   }
 
-  private dispatch(input: MatchInput, signal?: AbortSignal, timeoutMs = 15_000, chunk?: MatchJob["chunk"]) {
+  private dispatch(input: MatchInput, signal?: AbortSignal, timeoutMs = 15_000, chunk?: MatchJob["chunk"], beforeStart?: () => Promise<unknown>) {
     let referenceIdentity: ReferenceJobIdentity;
     try { referenceIdentity = captureReferenceJobIdentity(input.snapshot.runtimeRevision,
       input.snapshot.products.length > 0 && input.snapshot.products.every(product => product.source === "fixture")); }
     catch (error) { return Promise.reject(error); }
-    return this.pool.run({...input, ...(chunk ? { chunk } : {}), referenceIdentity, ceilings: matcherSafetyCeilings(), safetyUnavailable: matcherSafetyCeilingsUnavailable()}, signal, timeoutMs)
+    return this.pool.run({...input, ...(chunk ? { chunk } : {}), referenceIdentity, ceilings: matcherSafetyCeilings(), safetyUnavailable: matcherSafetyCeilingsUnavailable()}, signal, timeoutMs, { beforeStart })
       .then(reply => checkedReferenceCompletion(reply, referenceIdentity));
   }
   async run(input: MatchInput, signal?: AbortSignal, timeoutMs = 15_000): Promise<MatchResult> {
@@ -40,8 +40,8 @@ export class MatchWorkerPool {
     if ("done" in value) throw new Error("Unexpected chunk response");
     return value;
   }
-  async runChunk(input: MatchInput, chunk: NonNullable<MatchJob["chunk"]>, signal?: AbortSignal, timeoutMs = 15_000): Promise<PlanMatchChunk> {
-    const value = await this.dispatch(input, signal, timeoutMs, chunk);
+  async runChunk(input: MatchInput, chunk: NonNullable<MatchJob["chunk"]>, signal?: AbortSignal, timeoutMs = 15_000, beforeStart?: () => Promise<unknown>): Promise<PlanMatchChunk> {
+    const value = await this.dispatch(input, signal, timeoutMs, chunk, beforeStart);
     if (!("done" in value)) throw new Error("Missing chunk response");
     return value;
   }
@@ -53,6 +53,6 @@ export function matchPlanInWorker(input: MatchInput) {
   return pool.run(input, requestLifetime()?.signal);
 }
 
-export function matchPlanChunkInWorker(input: MatchInput, chunk: NonNullable<MatchJob["chunk"]>) {
-  return pool.runChunk(input, chunk, requestLifetime()?.signal);
+export function matchPlanChunkInWorker(input: MatchInput, chunk: NonNullable<MatchJob["chunk"]>, beforeStart?: () => Promise<unknown>) {
+  return pool.runChunk(input, chunk, requestLifetime()?.signal, 15_000, beforeStart);
 }

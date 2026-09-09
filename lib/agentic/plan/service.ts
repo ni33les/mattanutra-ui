@@ -516,8 +516,9 @@ async function durableMatch(input: { snapshot: CatalogueSnapshot; state: Canonic
       - (checkpoint.search?.expansionAttempts ?? 0) - lostAttempts;
     const chunkBudget = Math.min(4_000, Math.max(0, remaining));
     const reserved = { ...checkpoint, stage: "search" as const, reservedAttempts: chunkBudget + lostAttempts };
-    if (!await updateClaimedOperation(store, claim, { checkpoint: withoutOperationCursor({ ...claim, checkpoint: reserved }).checkpoint }, new Date().toISOString())) throw new Error("Matching operation lease lost");
-    const reply = await matchPlanChunkInWorker(input, { checkpoint: checkpoint.search, chunkBudget: Math.max(1, chunkBudget), lostAttempts });
+    const reply = await matchPlanChunkInWorker(input, { checkpoint: checkpoint.search, chunkBudget: Math.max(1, chunkBudget), lostAttempts }, async () => {
+      if (!await updateClaimedOperation(store, claim, { checkpoint: withoutOperationCursor({ ...claim, checkpoint: reserved }).checkpoint }, new Date().toISOString())) throw new Error("Matching operation lease lost");
+    });
     checkpoint = { ...checkpoint, stage: "search", search: reply.checkpoint, reservedAttempts: 0 };
     if (!await updateClaimedOperation(store, claim, { checkpoint }, new Date().toISOString())) throw new Error("Matching operation lease lost");
     lostAttempts = 0;
@@ -1037,7 +1038,10 @@ async function admittedResponse(input: PlanExecutionInput, operation: PlanOperat
     const current = await input.store.getPlan(operation.planId);
     return operationFailureResponse(operation, current?.currentRevision);
   }
-  const work = runAdmittedPlanOperation({ config: input.config, store: input.store, operationId: operation.id });
+  // Only the durable task executor starts work. A colocated executor may already
+  // be completing it; otherwise admission returns its existing processing view.
+  const work = inflightDurableOperations.get(operation.id);
+  if (!work) return operationProcessingResponse(operation);
   if (input.payload.operation === "get") {
     void work.catch(() => undefined);
     return operationProcessingResponse(operation);
