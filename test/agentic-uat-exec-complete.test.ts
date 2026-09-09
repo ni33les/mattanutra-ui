@@ -134,8 +134,8 @@ describe("UAT execute/order request-completion", () => {
     const entered = deferred();
     const followerEntered = deferred();
     setExecuteFreshGateForTests(latch.promise);
-    setExecuteFreshEnteredForTests(entered.resolve);
-    setExecuteFollowerEnteredForTests(followerEntered.resolve);
+    let arrivals = 0;
+    setExecuteFreshEnteredForTests(() => { entered.resolve(); if (++arrivals === 2) followerEntered.resolve(); });
     const leader = executeOn(cluster, "A", { ...ready, suffix: "exec02" });
     await entered.promise;
     const follower = executeOn(cluster, "B", { ...ready, suffix: "exec02" });
@@ -154,10 +154,10 @@ describe("UAT execute/order request-completion", () => {
       "same-key execute replays must not share a request clock"
     );
     assert.equal(UAT_EXEC_SUCCESS_DEADLINE_MS < UAT_EXEC_CLIENT_DEADLINE_MS, true);
-    // Capacity must remain occupied while the deliberately uncancellable dependency
-    // is held. Releasing a Promise does not synchronously finish its continuations.
+    // Request-stage permit gates were removed. Cancellation still prevents
+    // either independently prepared request from creating an order.
     assert.deepEqual(snapshotResourcePermits(), {
-      admission: 1, connection: 1, database: 0, lock: 0, worker: 1
+      admission: 0, connection: 0, database: 0, lock: 0, worker: 0
     });
     latch.resolve();
     await withHangBudget((async () => {
@@ -235,8 +235,8 @@ describe("UAT execute/order request-completion", () => {
     const entered = deferred();
     const followerEntered = deferred();
     setExecuteFreshGateForTests(latch.promise);
-    setExecuteFreshEnteredForTests(entered.resolve);
-    setExecuteFollowerEnteredForTests(followerEntered.resolve);
+    let arrivals = 0;
+    setExecuteFreshEnteredForTests(() => { entered.resolve(); if (++arrivals === 2) followerEntered.resolve(); });
     const leader = executeOn(cluster, "A", { ...ready, suffix: "exec04" });
     await entered.promise;
     const follower = executeOn(cluster, "B", { ...ready, suffix: "exec04" });
@@ -259,8 +259,8 @@ describe("UAT execute/order request-completion", () => {
       const entered = deferred();
       const followerEntered = deferred();
       setExecuteFreshGateForTests(latch.promise);
-      setExecuteFreshEnteredForTests(entered.resolve);
-      setExecuteFollowerEnteredForTests(followerEntered.resolve);
+      let arrivals = 0;
+      setExecuteFreshEnteredForTests(() => { entered.resolve(); if (++arrivals === 2) followerEntered.resolve(); });
       const leader = executeOn(cluster, "A", { ...ready, suffix: `exec05${pass}` });
       await entered.promise;
       const follower = executeOn(cluster, "B", { ...ready, suffix: `exec05${pass}` });

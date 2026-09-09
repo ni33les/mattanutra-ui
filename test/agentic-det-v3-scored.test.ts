@@ -1,3 +1,4 @@
+import { withMemoryTaskExecutor } from "./helpers/completed-mcp-client.ts";
 import { AGENT_CARD } from "../lib/agentic/contract/agent-card.ts";
 import { observeLatency } from "./helpers/latency-observation.ts";
 import assert from "node:assert/strict";
@@ -7,9 +8,9 @@ import { checkoutResponsibilityCopy } from "../lib/agentic/responsibility/matrix
 import { RESEARCH_VERSION, RESPONSIBILITY_VERSION } from "../lib/agentic/discovery/versions.ts";
 import { FUNNEL_EVENT_TYPES } from "../lib/agentic/funnel/events.ts";
 import { recordFunnelEvent, resetFunnelLedger, listFunnelEvents } from "../lib/agentic/funnel/ledger.ts";
-import { handleJsonRpc } from "../lib/agentic/mcp/dispatcher.ts";
+import { handleCompletedFullJsonRpc as handleJsonRpc } from "./helpers/completed-mcp-client.ts";
 import { handleQaJsonRpc } from "../lib/agentic/mcp/qa-dispatcher.ts";
-import { planTool } from "../lib/agentic/plan/service.ts";
+import { completedPlanTool as planTool } from "./helpers/completed-mcp-client.ts";
 import { executeTool } from "../lib/agentic/commerce/execute.ts";
 import { supportTool } from "../lib/agentic/support.ts";
 import { queryBudgetSnapshot, resetQueryBudget } from "../lib/agentic/plan/query-budget.ts";
@@ -458,7 +459,7 @@ describe("Slice S5 isolation without fixture SKUs", () => {
 
   it("S5-02 checkoutContinuityProof decline then success is exactly-once", async () => {
     const runtime = createDetRuntime();
-    const proof = await checkoutContinuityProof(runtime);
+    const proof = await withMemoryTaskExecutor(runtime, () => checkoutContinuityProof(runtime));
     assert.equal(proof.passed, true, canonicalJson(proof.checks));
   });
 });

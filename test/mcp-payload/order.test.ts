@@ -30,7 +30,7 @@ test("PAY-POLL-02 order status avoids frozen projection and histories while deta
   assert.ok(bytes(toolResult(same)) <= 4096); assert.ok(bytes(toolResult(same)) < bytes(toolResult(full)) * .1);
   const detail = await rpc(app, "order", { orderHandle: handle, responseView: "details", sections: ["frozen_order", "events"] });
   assert.equal(detail.ok, true); assert.deepEqual(detail.frozenOrder, full.frozenOrder); assert.deepEqual(detail.events, full.events);
-  await app.store.insertFulfilmentEvent({ id: "event-1", orderId: order.id, createdAt: app.now!, status: "shipped", reasonCode: null, payload: { trackingNumber: "TRACK-1", trackingUrl: "https://example.test/track/1" } });
+  await app.store.insertFulfilmentEvent({ id: "event-1", orderId: order.id, createdAt: app.now!, status: "shipped", reasonCode: null, payload: { number: "TRACK-1", url: "https://example.test/track/1" } });
   const changed = await rpc(app, "order", { orderHandle: handle, responseView: "status", knownResultVersion: first.resultVersion });
   assert.equal(changed.unchanged, false, "New fulfilment data changes the version even when stateVersion has not changed");
   assert.deepEqual((await app.store.getOrder(order.id))?.frozenPlan, frozenPlan);

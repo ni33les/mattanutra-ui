@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { afterEach, test } from "node:test";
-import { installRealCatalogue, uninstallRealCatalogue, runtime, rpc, profile } from "../ax-refinement/helpers.ts";
+import { installRealCatalogue, uninstallRealCatalogue, runtime, rpc, rpcWithTaskExecutor, profile } from "../ax-refinement/helpers.ts";
 import { resetPlanCreateInflightForTests } from "../../lib/agentic/plan/service.ts";
 import { admitPlanOperation, claimPlanOperation, cancelPlanOperation } from "../../lib/agentic/plan/operations.ts";
 
@@ -8,16 +8,17 @@ afterEach(() => { resetPlanCreateInflightForTests(); uninstallRealCatalogue(); }
 test("PAY-HANDOFF-01 concise refinement replay and get preserve a held pending revision without a false not-found error", async () => {
   await installRealCatalogue("dev");
   const app = runtime("held-refinement"), ownerScope = "dev:mattanutra:ax-refinement:held-refinement";
-  const initial = await rpc(app, "plan", { operation: "create", idempotencyKey: "held-refinement-create", request: profile("A6"), responseView: "full" });
+  const initial = await rpcWithTaskExecutor(app, "plan", { operation: "create", idempotencyKey: "held-refinement-create", request: profile("A6"), responseView: "full" });
   assert.equal(initial.status, "ready");
   const created = await app.store.getPlanOperationByKey(ownerScope, "held-refinement-create"); assert.ok(created);
   const before = await app.store.getPlanRevision(created.planId, 1); assert.ok(before);
   const payload = { operation: "revise", planHandle: initial.planHandle, expectedRevision: 1, idempotencyKey: "held-refinement-revise", requestPatch: {} };
+  const executionNow = new Date().toISOString();
   const operation = await admitPlanOperation(app.store, { planId: created.planId, ownerScope, key: payload.idempotencyKey,
-    payload, expectedRevision: 1, revision: 2, prepared: { ...created.command.prepared, revision: 2, existingPlan: await app.store.getPlan(created.planId), previous: before.result }, scope: app.scope, now: app.now! });
+    payload, expectedRevision: 1, revision: 2, prepared: { ...created.command.prepared, revision: 2, existingPlan: await app.store.getPlan(created.planId), previous: before.result }, scope: app.scope, now: app.now!, admittedAt: executionNow });
   // An independently held worker lease reproduces the real handoff, without
   // relying on catalogue size or CPU speed to make a request take three seconds.
-  const claim = await claimPlanOperation(app.store, operation.id, "held-worker", "2099-01-01T00:00:00Z"); assert.ok(claim);
+  const claim = await claimPlanOperation(app.store, operation.id, "held-worker", executionNow); assert.ok(claim);
   for (const args of [payload, { operation: "get", planHandle: initial.planHandle }]) {
     const pending = await rpc(app, "plan", { ...args, responseView: "conversation" });
     assert.equal(pending.ok, true, JSON.stringify(pending));

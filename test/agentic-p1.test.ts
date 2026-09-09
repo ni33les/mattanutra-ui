@@ -5,9 +5,10 @@ import { FIXTURE_SUPPLEMENTS } from "../lib/agentic/catalogue/fixtures.ts";
 import { installGoldCatalogue, uninstallGoldCatalogue } from "./helpers/gold-catalogue.ts";
 import { parseCheckoutAddress } from "../lib/agentic/checkout-address.ts";
 import { AGENTIC_CONTRACT_VERSION, loadAgenticConfig } from "../lib/agentic/config.ts";
-import { handleJsonRpc } from "../lib/agentic/mcp/dispatcher.ts";
-import { planTool } from "../lib/agentic/plan/service.ts";
+import { handleCompletedFullJsonRpc as handleJsonRpc } from "./helpers/completed-mcp-client.ts";
+import { completedPlanTool as planTool } from "./helpers/completed-mcp-client.ts";
 import { executeTool } from "../lib/agentic/commerce/execute.ts";
+import { withMemoryTaskExecutor } from "./helpers/completed-mcp-client.ts";
 import { handleQaJsonRpc } from "../lib/agentic/mcp/qa-dispatcher.ts";
 import {
   createAgenticRuntime,
@@ -128,7 +129,7 @@ describe("agentic P1 pack fixes", () => {
     assert.equal(row.coveragePercent, Math.min(100, Math.round(100 * Number(row.deliveredAmount) / 50)));
     assert.equal(row.remainingGap, Math.max(0, 50 - Number(row.deliveredAmount)));
     assert.equal(result.acknowledgementStatus, "not_required");
-    if (Number(row.deliveredAmount) < 50) assert.notEqual(result.status, "ready");
+    assert.equal(result.status, "ready", "Incomplete target coverage is advisory for a purchasable basket");
     if (Number(row.deliveredAmount) > 40) assert.ok((result.safetyGuidance as Array<{ code: string }>).some(item => item.code === "dose_review_required"));
   });
 
@@ -344,11 +345,11 @@ describe("agentic P1 pack fixes", () => {
     });
     assert.equal(prefixedQa?.error?.code, -32601);
 
-    const continuity = await handleQaJsonRpc(runtime, {
+    const continuity = await withMemoryTaskExecutor(runtime, () => handleQaJsonRpc(runtime, {
       id: 3,
       method: "tools/call",
       params: { arguments: {}, name: "checkoutContinuityProof" }
-    });
+    }));
     const cont = continuity?.result?.structuredContent as {
       passed: boolean;
       evidence: { paymentConfirmedCount: number; omsSubmitCount: number };
@@ -828,8 +829,8 @@ describe("agentic P1 pack fixes", () => {
       /\$\{input\.config\.siteUrl\}\/en\/order\/track`/
     );
     assert.match(
-      executeSource,
-      /order\/track\/\$\{encodeURIComponent\(orderNumber\)\}/
+      readFileSync(new URL("../lib/agentic/commerce/basket-checkout.ts", import.meta.url), "utf8"),
+      /order\/track\/\$\{encodeURIComponent\(retail\.orderNumber\)\}/
     );
     const returnPage = readFileSync(
       new URL("../app/[locale]/mcp/checkout/[checkoutAccess]/return/page.tsx", import.meta.url),
@@ -987,11 +988,11 @@ describe("agentic P1 pack fixes", () => {
 
   it("returns every untested pack ID from packProof", async () => {
     const runtime = runtimeFor();
-    const proof = await handleQaJsonRpc(runtime, {
+    const proof = await withMemoryTaskExecutor(runtime, () => handleQaJsonRpc(runtime, {
       id: 9,
       method: "tools/call",
       params: { arguments: {}, name: "packProof" }
-    });
+    }));
     const body = proof?.result?.structuredContent as {
       checks: Array<{ id: string; passed: boolean }>;
       passed: boolean;

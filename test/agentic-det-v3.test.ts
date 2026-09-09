@@ -40,13 +40,13 @@ import {
   supportRespectsContract
 } from "../lib/agentic/contract/support-result.ts";
 import { publicCoverage, publicPlanFields } from "../lib/agentic/public-mapper.ts";
-import { handleJsonRpc } from "../lib/agentic/mcp/dispatcher.ts";
+import { handleCompletedFullJsonRpc as handleJsonRpc } from "./helpers/completed-mcp-client.ts";
 import { validateToolIssues } from "../lib/agentic/contract/validate.ts";
 import { EVIDENCE_INPUT_SCHEMA } from "../lib/agentic/contract/schemas.ts";
 import { queryCount, resetQueryBudget } from "../lib/agentic/plan/query-budget.ts";
 import { mergeBySemanticKey } from "../lib/agentic/plan/merge.ts";
 import { resetMatchPlanCache } from "../lib/agentic/plan/matching.ts";
-import { planTool } from "../lib/agentic/plan/service.ts";
+import { completedPlanTool as planTool } from "./helpers/completed-mcp-client.ts";
 import { executeTool } from "../lib/agentic/commerce/execute.ts";
 import { orderTool } from "../lib/agentic/commerce/order.ts";
 import { applyVerifiedPaymentEvent } from "../lib/agentic/commerce/state.ts";
@@ -273,8 +273,9 @@ describe("Slice A discovery", () => {
     });
     const instructions = String(init?.result?.instructions ?? "");
     assert.doesNotMatch(instructions, /welness/i);
-    assert.match(instructions, /info, plan, execute, order, support, feedback/);
-    assert.doesNotMatch(instructions, /info, plan, execute, order, support, feedback, evidence/);
+    assert.match(instructions, /Thailand/);
+    assert.match(instructions, /conversation is the default/);
+    assert.match(instructions, /poll.*status|Poll with status/);
   });
 });
 
@@ -338,7 +339,7 @@ describe("Slice B compact decision and evidence", () => {
     }
   });
 
-  it("B-INTEGRATION-01 evidence handles remain plan data and are not callable public tools", async () => {
+  it("B-INTEGRATION-01 returned evidence handles retrieve scoped claims without changing the plan", async () => {
     const runtime = createDetRuntime();
     const plan = await planTool({
       config: runtime.config,
@@ -359,7 +360,8 @@ describe("Slice B compact decision and evidence", () => {
       method: "tools/call",
       params: { name: "evidence", arguments: { evidenceHandle: handle, mode: "summary" } }
     });
-    assert.equal(response?.error?.code, -32601);
+    const evidence = response?.result?.structuredContent as { ok: boolean; claims: unknown[]; planRevision: number };
+    assert.equal(evidence.ok, true); assert.ok(evidence.claims.length > 0); assert.equal(evidence.planRevision, revision);
     const again = await planTool({
       config: runtime.config,
       now: DET_V3_CLOCK,
@@ -493,7 +495,7 @@ describe("Slice B compact decision and evidence", () => {
     assert.ok(issues.some((item) => item.reasonCode === "unexpected_property"));
   });
 
-  it("B-SECURITY-01 evidence is not exposed through a callable public tool", async () => {
+  it("B-SECURITY-01 the public evidence tool rejects another principal", async () => {
     const alice = createDetRuntime({ principal: "alice" });
     const plan = await planTool({
       config: alice.config,
@@ -524,7 +526,7 @@ describe("Slice B compact decision and evidence", () => {
       method: "tools/call",
       params: { name: "evidence", arguments: { evidenceHandle: handle, mode: "summary" } }
     });
-    assert.equal(stolen?.error?.code, -32601);
+    assert.equal((stolen?.result?.structuredContent as { error: { reasonCode: string } }).error.reasonCode, "not_found");
     assert.equal(/Magnesium contributes|NIH ODS/i.test(canonicalJson(stolen)), false);
   });
 });
@@ -1622,7 +1624,7 @@ describe("Slice G responsibility and trust", () => {
       id: 1,
       jsonrpc: "2.0",
       method: "tools/call",
-      params: { name: "evidence", arguments: { evidenceHandle: "cap_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" } }
+      params: { name: "not_a_tool", arguments: { evidenceHandle: "cap_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" } }
     });
     const feedback = await detCall(runtime, "feedback", {
       consentConfirmed: false,
@@ -1759,7 +1761,7 @@ describe("Slice G responsibility and trust", () => {
     assert.equal(canonicalJson(accepted), canonicalJson(replay));
   });
 
-  it("G-ISOLATION-01 plan handles are not accepted by hidden evidence routes", async () => {
+  it("G-ISOLATION-01 plan handles are not accepted by the public evidence tool", async () => {
     const runtime = createDetRuntime();
     const plan = await planTool({
       config: runtime.config,
@@ -1777,6 +1779,6 @@ describe("Slice G responsibility and trust", () => {
       method: "tools/call",
       params: { name: "evidence", arguments: { evidenceHandle: (plan as { planHandle: string }).planHandle } }
     });
-    assert.equal(response?.error?.code, -32601);
+    assert.equal((response?.result?.structuredContent as { error: { reasonCode: string } }).error.reasonCode, "wrong_purpose");
   });
 });

@@ -10,14 +10,17 @@ const products = [product('00-a', { a: 10 }), product('01-b', { b: 10 }),
   ...Array.from({ length: 30 }, (_, index) => product(`d${String(index).padStart(3, '0')}`, { a: 51 + index, b: 1 })),
   product('zz-complement', { a: 90, b: 90 })];
 
-it('V5-REPAIR-01: supported quantities preserve the exact two-product fit above pill preferences', () => {
+it('V5-REPAIR-01: equal-fit default uses three pills and permits the cheaper twenty-pill proposal', () => {
   const result = match(requirements, catalog(products));
-  // Advisory pill preferences cannot discard the cheaper exact fit at ten units each.
-  assert.deepEqual(result.selected?.variantIds, ['seller:00-a:x10', 'seller:01-b:x10']);
+  // The default now breaks equal dose fit by routine burden; the cheaper
+  // twenty-pill proposal remains selectable despite the advisory preference.
+  assert.deepEqual(result.selected?.variantIds, ['seller:00-a:x1', 'seller:zz-complement:x1', 'seller:01-b:x1']);
+  const cheaper = match({ ...requirements, productDoses: [{ productId: '00-a', servingsPerDay: 10 }, { productId: '01-b', servingsPerDay: 10 }] }, catalog(products)).selected;
+  assert.ok(cheaper); assert.equal(cheaper.doseFit?.total, 0); assert.equal(cheaper.purchaseEligible, true);
   assert.equal(result.selected?.doseFit?.total, 0);
-  assert.equal(result.selected?.priceMinor, 200);
-  assert.equal(result.selected?.dailyPills, 20);
-  assert.equal(result.selected?.productCount, 2);
+  assert.equal(result.selected?.priceMinor, 300);
+  assert.equal(result.selected?.dailyPills, 3);
+  assert.equal(result.selected?.productCount, 3);
   assert.equal(result.selected?.coveredCount, 2);
   assert.ok(result.searchSummary!.expansionAttempts <= 8000);
 });
@@ -39,7 +42,7 @@ it('V5-REPAIR-02: reserved repair remains deterministic, keeps the expanded incu
 // proposals, which are still firm, rather than a retired numeric veto.
 it('ADV6-REPAIR-01: large-catalogue complementary repair completes two proposed one-unit products', () => {
   const result = match({ ...requirements, productDoses: [{ productId: '00-a', servingsPerDay: 1 }, { productId: '01-b', servingsPerDay: 1 }] }, catalog(products));
-  assert.deepEqual(result.selected?.variantIds, ['seller:00-a:x1', 'seller:01-b:x1', 'seller:zz-complement:x1']);
+  assert.deepEqual(result.selected?.variantIds, ['seller:00-a:x1', 'seller:zz-complement:x1', 'seller:01-b:x1']);
   assert.equal(result.selected?.doseFit?.total, 0);
   assert.equal(result.selected?.priceMinor, 300);
   assert.equal(result.selected?.dailyPills, 3);

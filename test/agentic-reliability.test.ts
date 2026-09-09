@@ -11,7 +11,7 @@ import { loadAgenticConfig } from "../lib/agentic/config.ts";
 import { normalizePlanRequest, planRematchFingerprint } from "../lib/agentic/plan/normalize.ts";
 import { createAgenticRuntime, type AgenticRuntime } from "../lib/agentic/runtime.ts";
 import { handleCompletedFullJsonRpc as handleJsonRpc } from "./helpers/completed-mcp-client.ts";
-import { resetPlanCreateInflightForTests, setPlanClaimLatchForTests, setMatcherGateForTests, setMatcherEnteredForTests } from "../lib/agentic/plan/service.ts";
+import { resetPlanCreateInflightForTests, setMatcherGateForTests, setMatcherEnteredForTests } from "../lib/agentic/plan/service.ts";
 import { resetExecuteLockState } from "../lib/agentic/commerce/execute.ts";
 import { runObservedRequest, recordRequestStage, listRequestTraces, resetRequestTraces, REQUEST_TRACE_LIMIT } from "../lib/agentic/qa/request-trace.ts";
 import { resetServiceClock, advanceServiceClock } from "../lib/agentic/qa/service-clock.ts";
@@ -116,16 +116,13 @@ describe("MCP reliability: atomic plan and checkout commands", () => {
 
   it("rejects different concurrent payloads with the same idempotency key", async () => {
     const runtime = createAgenticRuntime();
-    const gate = deferred(), entered = deferred();
-    const key = "review-payload-conflict";
-    setPlanClaimLatchForTests(key, gate.promise, entered.resolve);
-    const first = call(runtime, { operation: "create", idempotencyKey: key, request });
-    await entered.promise;
-    const second = await call(runtime, { operation: "create", idempotencyKey: key, request: { ...request, targets: [{ name: "Magnesium", amount: 100, unit: "mg" }] } });
-    gate.resolve();
-    setPlanClaimLatchForTests(key, null);
-    assert.equal((await first).ok, true);
-    assert.equal(second.error.reasonCode, "idempotency_conflict");
+    const results = await Promise.all([
+      call(runtime, { operation: "create", idempotencyKey: "review-payload-conflict", request }),
+      call(runtime, { operation: "create", idempotencyKey: "review-payload-conflict", request: { ...request, targets: [{ name: "Magnesium", amount: 100, unit: "mg" }] } })
+    ]);
+    assert.equal(results.filter(result => result.ok).length, 1);
+    assert.equal(results.find(result => !result.ok)?.error.reasonCode, "idempotency_conflict");
+    assert.equal((await runtime.store.listPlanIdsByPrincipal(runtime.scope.principalScope!)).length, 1);
   });
 
   it("publishes only one of two concurrent edits to the same revision", async () => {
@@ -139,8 +136,9 @@ describe("MCP reliability: atomic plan and checkout commands", () => {
       planHandle: created.planHandle, expectedRevision: 1, request: { ...request, targets: [{ name: "Vitamin D3", amount, unit: "IU" }] } });
     const pending = [edit(1500), edit(2000)];
     await entered.promise;
-    const reading = await call(runtime, { operation: "get", planHandle: created.planHandle });
+    const reading = await call(runtime, { operation: "get", planHandle: created.planHandle, responseView: "status" });
     assert.equal(reading.revision, 1);
+    assert.equal(reading.pendingRevision, 2);
     gate.resolve();
     const results = await Promise.all(pending);
     assert.equal(count, 1, "Only the admitted owner may enter matching");

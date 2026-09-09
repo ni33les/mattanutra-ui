@@ -44,5 +44,12 @@ it("an unchanged catalogue observation keeps matching identity while retaining i
   const refreshed = { ...snapshot, availabilityAsOf: "2026-09-08T12:00:00.000Z" };
   assert.notEqual(refreshed.availabilityAsOf, snapshot.availabilityAsOf);
   assert.equal(catalogueSnapshotId(refreshed), catalogueSnapshotId(snapshot));
-  assert.deepEqual(matchPlan({ state, snapshot: refreshed }), matchPlan({ state, snapshot }));
+  const fresh = matchPlan({ state, snapshot: refreshed }), previous = matchPlan({ state, snapshot });
+  assert.equal(fresh.selected?.basket[0]?.availabilityAsOf, refreshed.availabilityAsOf);
+  assert.equal(previous.selected?.basket[0]?.availabilityAsOf, snapshot.availabilityAsOf);
+  // Observation timestamps are intentionally current; all matching facts and
+  // commercial values must remain identical for unchanged catalogue content.
+  const withoutObservationClock = (value: unknown): unknown => Array.isArray(value) ? value.map(withoutObservationClock)
+    : value && typeof value === "object" ? Object.fromEntries(Object.entries(value).filter(([key]) => key !== "availabilityAsOf").map(([key, item]) => [key, withoutObservationClock(item)])) : value;
+  assert.deepEqual(withoutObservationClock(fresh), withoutObservationClock(previous));
 });

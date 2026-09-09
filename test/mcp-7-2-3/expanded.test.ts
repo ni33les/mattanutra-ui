@@ -1,3 +1,4 @@
+import { startMemoryTaskExecutor } from "../helpers/completed-mcp-client.ts";
 import assert from "node:assert/strict";
 import { register } from "node:module";
 import { before, after, test } from "node:test";
@@ -13,8 +14,11 @@ const app = runtime("m723-independent-expanded");
 const globalLive = globalThis as typeof globalThis & { mattanutraLiveAgenticRuntime?: AgenticRuntime };
 const records: { first: Record<string, unknown>; last: Record<string, unknown>; elapsedMs: number }[] = [];
 let fault: { status: number; body: Record<string, unknown> }, originalGet: typeof app.store.getCapabilityByHash;
-before(async () => { process.env.AX_REFINEMENT_REAL_WORKERS = "1"; await installCatalogue(); useLiveServiceClock(); });
-after(() => {
+let stopWorker: (() => Promise<void>) | undefined;
+before(async () => {
+  stopWorker = startMemoryTaskExecutor(app); process.env.AX_REFINEMENT_REAL_WORKERS = "1"; await installCatalogue(); useLiveServiceClock(); });
+after(async () => {
+  await stopWorker?.();
   if (originalGet) app.store.getCapabilityByHash = originalGet;
   delete globalLive.mattanutraLiveAgenticRuntime;
   if (process.env.MCP_723_EVIDENCE_DIR) writeFileSync(`${process.env.MCP_723_EVIDENCE_DIR}/expanded-pair.json`, JSON.stringify({ records, fault }, null, 2), { flag: "wx" });

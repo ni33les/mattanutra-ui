@@ -242,15 +242,17 @@ describe("QA-GOLD-v1 catalogue", () => {
     assert.equal(resolveQaSubject("Menaquinone-7")?.id, "sup_k2");
   });
 
-  it("M-20 lowest cost uses two servings of the cheaper measured C pack", () => {
+  it("M-20 equal-fit default uses one C unit and permits the cheaper two-unit proposal", () => {
     const result = match(
       qaRequest({ optimization: "lowest_cost", targets: [qaTarget("c", 500)] }),
       QA_GOLD_CATALOG
     );
-    assert.deepEqual(ids(result), ["G-INCIDENTAL-C"]);
-    assert.equal(result.selected?.priceMinor, 7000);
-    assert.equal(result.selected?.dailyPills, 2);
+    assert.deepEqual(ids(result), ["G-C-500"]);
+    assert.equal(result.selected?.priceMinor, 10000);
+    assert.equal(result.selected?.dailyPills, 1);
     assert.equal(result.selected?.doseFit?.total, 0);
     assert.equal(publicCoveragePercent(result.selected), 100);
+    const cheaper = match(qaRequest({ optimization: "lowest_cost", targets: [qaTarget("c", 500)], productDoses: [{ productId: "G-INCIDENTAL-C", servingsPerDay: 2 }] }), QA_GOLD_CATALOG).selected;
+    assert.ok(cheaper); assert.equal(cheaper.priceMinor, 7000); assert.equal(cheaper.dailyPills, 2); assert.equal(cheaper.doseFit?.total, 0);
   });
 });

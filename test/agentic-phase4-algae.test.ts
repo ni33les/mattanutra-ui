@@ -44,10 +44,10 @@ describe("Phase 4 source preservation under contract 7", () => {
     const planCopy = resource.contents[0].text;
     assert.match(planCopy, /Algae Omega-3.*explicit algae_only/i);
     assert.match(planCopy, /source.*preserv/i);
-    assert.ok(AGENTIC_SERVER_INSTRUCTIONS.includes(CLIENT_GUIDE_URI));
+    assert.match(AGENTIC_SERVER_INSTRUCTIONS, /info.*service card, templates and operation schemas/);
     assert.match(
       AGENTIC_TOOL_DESCRIPTIONS.plan,
-      /Preserve constraints/
+      /diet, exclusions and physical quantities bind/
     );
   });
 

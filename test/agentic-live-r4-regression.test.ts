@@ -4,7 +4,7 @@ import {
   LIVE_ORIGIN,
   LIVE_PUBLIC,
   LIVE_QA,
-  liveCall,
+  liveCompletedFullCall as liveCall,
   magCurrentRequest,
   stamp
 } from "./helpers/live-mcp.ts";

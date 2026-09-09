@@ -1,3 +1,4 @@
+import { baseline } from "../mcp-payload/fixtures.ts";
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { loadFrozenAnnaInput, reconstructAnnaSnapshot } from "../../lib/matcher/experiments/frozen-corpus.ts";
@@ -44,7 +45,19 @@ for (const [id, loss, price] of [["A4", 4/300, 91900], ["A5", 5/100, 70300]] as 
     const canonical = toCanonicalRequest(normalized.state); assert.ok(!("error" in canonical));
     const result = match(canonical, { ...snapshot, products: snapshot.products.map(toMatcherProduct) }); assert.ok(result.selected);
     assert.ok(result.selected.doseFit!.total <= loss, `Dose loss ${result.selected.doseFit!.total} exceeds control ${loss}`);
-    assert.ok(result.selected.doseFit!.total < loss || result.selected.priceMinor <= price, `Equal fit costs ${result.selected.priceMinor}, control ${price}`);
+    const control = baseline.cases.find(row => row.caseId === `${id}-en`)!.plan;
+    assert.equal(control.stackSummary!.totalPriceMinor, price, "Historical prices are unchanged");
+    const controlPills = control.stackSummary!.totalDailyPills;
+    if (result.selected.doseFit!.total === loss) {
+      const selected = result.selected, pills = selected.pillCountKnown === false ? null : selected.dailyPills;
+      // Since 7.2.1 equal fit prefers known pills, then products, then cost.
+      // Price is still enforced whenever the higher-priority routine ties.
+      const routineOrder = Number(pills === null) - Number(controlPills === null) ||
+        (pills !== null && controlPills !== null ? pills - controlPills : 0) ||
+        selected.productCount - control.stackSummary!.productCount;
+      assert.ok(routineOrder < 0 || (routineOrder === 0 && selected.priceMinor <= price),
+        `Equal-fit routine regressed: ${JSON.stringify({ pills, products: selected.productCount, price: selected.priceMinor, control: control.stackSummary })}`);
+    }
     assert.ok(result.searchSummary!.expansionAttempts <= 8000);
   } finally { resetMatcherSafetyCeilings(); }
 });

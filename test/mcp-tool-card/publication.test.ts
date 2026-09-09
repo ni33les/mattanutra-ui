@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { readFileSync, writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdtempSync, cpSync, symlinkSync, mkdirSync, rmSync } from "node:fs";
 import { register } from "node:module";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 register("./config-loader.mjs", import.meta.url);
 const { default: nextConfig } = await import("../../next.config.ts");
 import { toolList } from "../../lib/agentic/mcp/rpc.ts";
@@ -9,8 +11,18 @@ import { AGENTIC_CONTRACT_VERSION } from "../../lib/agentic/config.ts";
 import Ajv from "ajv";
 
 test("production build regenerates a stale publication while server startup does not write it", () => {
-  const file = "public/.well-known/mcp.json", original = readFileSync(file, "utf8");
+  const checkout = process.cwd(), isolated = mkdtempSync(join(tmpdir(), "mcp-publication-"));
+  const file = "public/.well-known/mcp.json";
+  // Run the actual build hook against its own files. This negative test must
+  // never overwrite the checkout or interfere with other contract checks.
+  for (const directory of ["lib", "contract"]) cpSync(join(checkout, directory), join(isolated, directory), { recursive: true });
+  for (const file of ["package.json", "tsconfig.json"]) cpSync(join(checkout, file), join(isolated, file));
+  mkdirSync(join(isolated, "scripts"));
+  for (const file of ["write-agentic-contract-snapshot.mjs", "register-ts-path-loader.mjs", "ts-path-loader.mjs"]) cpSync(join(checkout, "scripts", file), join(isolated, "scripts", file));
+  symlinkSync(join(checkout, "node_modules"), join(isolated, "node_modules"), "dir");
+  mkdirSync(join(isolated, "public/.well-known"), { recursive: true });
   try {
+    process.chdir(isolated);
     writeFileSync(file, '{"tools":"stale"}');
     assert.equal(typeof nextConfig, "function", "The production build must publish the shared contract");
     const configure = nextConfig as unknown as (phase: string) => unknown;
@@ -19,7 +31,7 @@ test("production build regenerates a stale publication while server startup does
     const published = JSON.parse(readFileSync(file, "utf8"));
     assert.deepEqual(published.tools, toolList()); assert.equal(published.contractVersion, AGENTIC_CONTRACT_VERSION);
     assert.deepEqual(JSON.parse(readFileSync(`contract/mcp/${AGENTIC_CONTRACT_VERSION}/tools.json`, "utf8")).tools, published.tools);
-  } finally { writeFileSync(file, original); }
+  } finally { process.chdir(checkout); rmSync(isolated, { recursive: true, force: true }); }
 });
 
 test("visible operation fields preserve prior view and refinement validation", () => {

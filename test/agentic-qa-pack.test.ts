@@ -4,7 +4,7 @@ import { installGoldCatalogue, uninstallGoldCatalogue } from "./helpers/gold-cat
 import { readFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { handleJsonRpc } from "../lib/agentic/mcp/dispatcher.ts";
+import { handleCompletedFullJsonRpc as handleJsonRpc } from "./helpers/completed-mcp-client.ts";
 import {
   createAgenticRuntime,
   setAgenticRuntimeForTests,
@@ -14,6 +14,7 @@ import { createMemoryStore } from "../lib/agentic/store/memory.ts";
 import { loadAgenticConfig } from "../lib/agentic/config.ts";
 import { engineeringInfo } from "../lib/agentic/info.ts";
 import type { PlanResult } from "../lib/agentic/plan/types.ts";
+import { agenticToolDescriptions } from "../lib/agentic/contract/index.ts";
 import { AGENTIC_SERVER_INSTRUCTIONS } from "../lib/agentic/contract/instructions.ts";
 import { mcpTestBatches, mcpTestFiles } from "../scripts/agentic-qa-pack.mjs";
 import {
@@ -483,9 +484,9 @@ describe("Repository MattaNutra Agentic QA coverage", () => {
     assert.match(uat.stderr, /MATTANUTRA_ENV=dev/);
   });
 
-  it("T3 initialize instructions invite consented feedback", () => {
-    assert.match(AGENTIC_SERVER_INSTRUCTIONS, /Feedback remains optional/);
-    assert.match(AGENTIC_SERVER_INSTRUCTIONS, /requires explicit consent/);
+  it("T3 published tool instructions invite only optional consented feedback", () => {
+    assert.match(agenticToolDescriptions("dev", "en").feedback, /optional/i);
+    assert.match(agenticToolDescriptions("dev", "en").feedback, /consentConfirmed=true/);
     assert.equal(/A1–A13 = 13\/13/.test(AGENTIC_SERVER_INSTRUCTIONS), false);
     const schema = readFileSync(
       new URL("../scripts/apply-agentic-commerce-schema.ts", import.meta.url),

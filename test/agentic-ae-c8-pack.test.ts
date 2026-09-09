@@ -5,7 +5,7 @@ import {
   endDeterministicIdsForTests
 } from "../lib/agentic/capabilities.ts";
 import { loadAgenticConfig } from "../lib/agentic/config.ts";
-import { handleJsonRpc } from "./helpers/recording-mcp-dispatcher.ts";
+import { handleCompletedFullJsonRpc as handleJsonRpc } from "./helpers/completed-mcp-client.ts";
 import { assertRecordedMcpEvidence, withRecordedMcpEvidence } from "./helpers/mcp-evidence.ts";
 import { createCountingMatchPort } from "../lib/agentic/plan/match-port.ts";
 import type {

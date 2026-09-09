@@ -5,7 +5,7 @@ import {
 } from "../../../lib/agentic/capabilities.ts";
 import { loadAgenticConfig } from "../../../lib/agentic/config.ts";
 import { handleQaJsonRpc } from "../../../lib/agentic/mcp/qa-dispatcher.ts";
-import { handleJsonRpc } from "../../../lib/agentic/mcp/dispatcher.ts";
+import { handleCompletedFullJsonRpc as handleJsonRpc } from "../../helpers/completed-mcp-client.ts";
 import {
   createAgenticRuntime,
   setAgenticRuntimeForTests,
@@ -15,7 +15,7 @@ import { createMemoryStore } from "../../../lib/agentic/store/memory.ts";
 import type { AgenticStore } from "../../../lib/agentic/store/types.ts";
 import { createMockPaymentAdapter } from "../../../lib/agentic/commerce/payment.ts";
 import { installGoldCatalogue, uninstallGoldCatalogue } from "../../helpers/gold-catalogue.ts";
-import { planTool } from "../../../lib/agentic/plan/service.ts";
+import { completedPlanTool as planTool } from "../../helpers/completed-mcp-client.ts";
 import { executeTool } from "../../../lib/agentic/commerce/execute.ts";
 import { orderTool } from "../../../lib/agentic/commerce/order.ts";
 import { goldenPlanRequest } from "../../../lib/agentic/qa/proofs.ts";

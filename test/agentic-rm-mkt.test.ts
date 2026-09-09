@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { afterEach, beforeEach, describe, it } from "node:test";
 import { contributionMinor } from "../lib/agentic/funnel/events.ts";
 import { handleQaJsonRpc } from "../lib/agentic/mcp/qa-dispatcher.ts";
-import { planTool } from "../lib/agentic/plan/service.ts";
+import { completedPlanTool as planTool } from "./helpers/completed-mcp-client.ts";
 import { executeTool } from "../lib/agentic/commerce/execute.ts";
 import { orderTool } from "../lib/agentic/commerce/order.ts";
 import { goldenPlanRequest } from "../lib/agentic/qa/proofs.ts";

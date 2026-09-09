@@ -1,3 +1,4 @@
+import { startMemoryTaskExecutor } from "../helpers/completed-mcp-client.ts";
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import { setTimeout as delay } from "node:timers/promises";
@@ -7,8 +8,11 @@ import { useLiveServiceClock } from "../../lib/agentic/qa/service-clock.ts";
 
 const app = runtime("m722-expanded");
 let initial: Record<string, unknown>, concurrent: Record<string, unknown>, completed: Record<string, unknown>, elapsedMs: number, initialRevision: number;
-before(async () => { process.env.AX_REFINEMENT_REAL_WORKERS = "1"; await installRealCatalogue("dev"); useLiveServiceClock(); });
-after(() => { resetPlanCreateInflightForTests(); uninstallRealCatalogue(); });
+let stopWorker: (() => Promise<void>) | undefined;
+before(async () => {
+  stopWorker = startMemoryTaskExecutor(app); process.env.AX_REFINEMENT_REAL_WORKERS = "1"; await installRealCatalogue("dev"); useLiveServiceClock(); });
+after(async () => {
+  await stopWorker?.(); resetPlanCreateInflightForTests(); uninstallRealCatalogue(); });
 const request = profile("A2");
 request.targets = request.targets.map(row => row.name === "Algae Omega-3" ? { ...row, name: "Omega-3" } : row);
 request.requirements = { ...request.requirements, excludeProductIds: ["prd_50265f478be551c496f907a01d746dab"] };

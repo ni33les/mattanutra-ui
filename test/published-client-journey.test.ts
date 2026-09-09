@@ -61,7 +61,7 @@ it("V5-CLIENT-09 customer answer selection uses documented returned semantics in
 
 it("V5-CLIENT-10 stale recovery reloads through the published get example and reapplies intent with fresh returned identity", async () => {
   const { recoverPublishedPatch } = await import("../scripts/published-client-journey.mjs");
-  const contract = { examples: [{ name: "get-current-or-processing", tool: "plan", arguments: { operation: "get", planHandle: "example-placeholder" } }] };
+  const contract = { examples: [{ name: "get-current-decision", tool: "plan", arguments: { operation: "get", planHandle: "example-placeholder" } }] };
   const intended = { operation: "revise", planHandle: "stale-local-handle", expectedRevision: 2,
     idempotencyKey: "original-stale-key", requestPatch: { requirements: { excludeProductIds: ["prd_rejected"] } } };
   const original = structuredClone(intended);
@@ -82,7 +82,7 @@ it("V5-CLIENT-10 stale recovery reloads through the published get example and re
 
 it("V5-CLIENT-11 failed reloads never reapply a stale patch or use a guessed revision", async () => {
   const { recoverPublishedPatch } = await import("../scripts/published-client-journey.mjs");
-  const contract = { examples: [{ name: "get-current-or-processing", tool: "plan", arguments: { operation: "get" } }] };
+  const contract = { examples: [{ name: "get-current-decision", tool: "plan", arguments: { operation: "get" } }] };
   const intended = { operation: "revise", planHandle: "saved-handle", expectedRevision: 2, requestPatch: {} };
   for (const response of [{ ok: false, error: { reasonCode: "not_found" } }, { ok: true, planHandle: "returned", revision: 0 }]) {
     let calls = 0;

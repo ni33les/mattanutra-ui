@@ -1,3 +1,4 @@
+import { hasContextAssessment } from "./helpers/context-assessment.ts";
 import { withRecordedMcpEvidence } from "./helpers/mcp-evidence.ts";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
@@ -40,10 +41,10 @@ import {
   IMPL_SAFETY_LEDGER_VERSION,
   asksAcceptOrRemove,
   basketOf,
-  callPlan,
+  callCompletedPlan as callPlan,
   closeSession,
   coverageOf,
-  createPlan,
+  createCompletedPlan as createPlan,
   d3OnlyRequest,
   freezeImplCatalogue,
   withFinancialSession,
@@ -196,8 +197,6 @@ async function runRegCv01(session: PlanSession, runIndex: number): Promise<CvImp
   const questions = questionsOf(plan);
   const gaps = gapTargets(plan);
   const identity = identityOf(plan);
-  const assessedMeds = stringList(plan.assessedMedicationCodes);
-  const assessedConditions = stringList(plan.assessedConditionCodes);
   const requestedNames = new Set(
     coverage.map((row) => String(row.name).toLowerCase())
   );
@@ -250,8 +249,8 @@ async function runRegCv01(session: PlanSession, runIndex: number): Promise<CvImp
         (item) => item.recommended !== true && item.optionId !== plan.optionId && item.selected === true
       )
     ),
-    assertTrue("FIX-01.A10", assessedMeds.includes("apixaban")),
-    assertTrue("FIX-01.A10b", assessedConditions.includes("atrial_fibrillation")),
+    assertTrue("FIX-01.A10", hasContextAssessment(plan, "medication", "apixaban")),
+    assertTrue("FIX-01.A10b", hasContextAssessment(plan, "condition", "atrial_fibrillation")),
     assertTrue("FIX-01.A10c", incidentalCredit === false),
     assertTrue("REG-CV-01.identity", identity.ok)
   ];
@@ -314,8 +313,8 @@ async function runRegCv02(session: PlanSession, runIndex: number): Promise<CvImp
     assertEq("REG-CV-02.profileSex", "male", asRecord(unknownRequest.profile).sex),
     assertTrue(
       "REG-CV-02.medsUnchanged",
-      stringList(unknown.assessedMedicationCodes).includes("apixaban") ||
-        stringList(unsatisfied.assessedMedicationCodes).includes("apixaban")
+      hasContextAssessment(unknown, "medication", "apixaban") ||
+        hasContextAssessment(unsatisfied, "medication", "apixaban")
     )
   ];
   return conclude(
@@ -518,7 +517,7 @@ async function runDevState01(session: PlanSession, runIndex: number): Promise<Cv
       "STATE-01.A5",
       answered.status !== "needs_input" || gapOnly
     ),
-    assertTrue("STATE-01.A6", stringList(answered.assessedMedicationCodes).includes("apixaban") || created.status === "needs_input"),
+    assertTrue("STATE-01.A6", hasContextAssessment(answered, "medication", "apixaban") || created.status === "needs_input"),
     assertEq("STATE-01.A7", answered.revision, got.revision),
     assertEq("STATE-01.A7b", identityOf(got).snapshotId, answeredId.snapshotId),
     assertEq("STATE-01.A8", Number(answered.revision), Number(replay.revision)),
@@ -1608,7 +1607,7 @@ describe("Customer value implementation pack v1.1", () => {
     );
     assert.equal(first.snapshotId, second.snapshotId);
     assert.equal(canonicalCvImplReport(first), canonicalCvImplReport(second), "CV implementation non-latency results diverged");
-    assert.equal(MATCHER_VERSION, "flexible-dose-fit-4");
+    assert.equal(MATCHER_VERSION, "flexible-dose-fit-9");
     assert.equal(CUSTOMER_VALUE_PACK_VERSION, "dev-customer-value-v4.0");
   });
 });

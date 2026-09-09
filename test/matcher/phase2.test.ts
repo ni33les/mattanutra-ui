@@ -291,7 +291,7 @@ describe("matcher phase 2 oversupply, source, and ontology", () => {
     assert.equal(publicCoveragePercent(result.selected) >= 90, true);
   });
 
-  it("M-20 lowest cost uses two servings of the cheaper measured C pack", () => {
+  it("M-20 equal-fit default uses one C unit and preserves the cheaper two-unit choice", () => {
     const result = match(
       request({
         optimization: "lowest_cost",
@@ -300,12 +300,13 @@ describe("matcher phase 2 oversupply, source, and ontology", () => {
       catalog([G_C_500, G_INCIDENTAL_C])
     );
     assert.ok(result.selected);
-    assert.deepEqual(result.selected?.productIds, ["G-INCIDENTAL-C"]);
-    assert.equal(result.selected?.productIds.includes("G-C-500"), false);
-    assert.equal(result.selected?.priceMinor, 7000);
-    assert.equal(result.selected?.dailyPills, 2);
+    assert.deepEqual(result.selected?.productIds, ["G-C-500"]);
+    assert.equal(result.selected?.priceMinor, 10000);
+    assert.equal(result.selected?.dailyPills, 1);
     assert.equal(result.selected?.doseFit?.total, 0);
     assert.equal(publicCoveragePercent(result.selected), 100);
+    const cheaper = result.alternatives.find(option => option.productIds.length === 1 && option.productIds[0] === "G-INCIDENTAL-C");
+    assert.ok(cheaper); assert.equal(cheaper.priceMinor, 7000); assert.equal(cheaper.dailyPills, 2); assert.equal(cheaper.doseFit?.total, 0);
   });
 
   it("fewest_pills ranks 4-pill combo ahead of an 8-SKU pile at the same coverage", () => {

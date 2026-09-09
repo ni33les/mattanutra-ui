@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, it } from "node:test";
 import { QA_FIXTURE_RECIPES } from "../lib/agentic/qa/preflight.ts";
 import { fixtureSnapshot } from "../lib/agentic/catalogue/fixtures.ts";
 import { replaceCatalogueSnapshot } from "../lib/agentic/catalogue/snapshot.ts";
-import { planTool } from "../lib/agentic/plan/service.ts";
+import { completedPlanTool as planTool } from "./helpers/completed-mcp-client.ts";
 import { executeTool } from "../lib/agentic/commerce/execute.ts";
 import { supportTool } from "../lib/agentic/support.ts";
 import { isAgenticErrorResult } from "../lib/agentic/contract/errors.ts";
@@ -404,7 +404,7 @@ describe("Slice 6 missing-days completion", () => {
       scope: runtime.scope,
       store: runtime.store
     });
-    assert.equal((answered as { status?: string }).status, "ready", canonicalJson(answered));
+    assert.equal((answered as { status?: string }).status, "no_purchase", canonicalJson(answered));
     assert.equal((answered as { purchaseRequiredNow?: boolean }).purchaseRequiredNow, false);
     assert.equal((answered as { scheduleComplete?: boolean }).scheduleComplete, true);
     assert.equal((answered as { nextReplenishmentDay?: number }).nextReplenishmentDay, 7);

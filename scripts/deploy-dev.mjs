@@ -171,7 +171,7 @@ async function main() {
     await run(process.execPath, ["--experimental-strip-types", "--import", "./scripts/register-ts-path-loader.mjs", "scripts/apply-service-efficiency-schema.ts"]);
     await npmRun("dev-runtime-schema:verify");
   } else if (discoveryIndex >= 0 || payloadIndex >= 0 || patchIndex >= 0 || latestPatchIndex >= 0 || toolCardIndex >= 0 || conversationIndex >= 0) {
-    // This presentation-only package has no migrations or catalogue changes.
+    // These packages, including maintained MCP recovery fixes, require no migrations or catalogue changes.
     await npmRun("dev-runtime-schema:verify");
   } else await applyOrVerifyRuntimeSchema();
   const sha = (await runCapture("git", ["rev-parse", "HEAD"])).trim();

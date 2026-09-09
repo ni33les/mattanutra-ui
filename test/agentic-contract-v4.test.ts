@@ -8,14 +8,15 @@ import { CLIENT_EXAMPLES, CLIENT_GUIDE_URI, CONTRACT_SCHEMA_URI } from "../lib/a
 import { validateToolIssues } from "../lib/agentic/contract/validate.ts";
 import { createAgenticRuntime } from "../lib/agentic/runtime.ts";
 import { createMemoryStore } from "../lib/agentic/store/memory.ts";
-import { handleJsonRpc } from "../lib/agentic/mcp/dispatcher.ts";
+import { handleJsonRpc as admitJsonRpc } from "../lib/agentic/mcp/dispatcher.ts";
+import { handleCompletedFullJsonRpc as handleJsonRpc } from "./helpers/completed-mcp-client.ts";
 import { installGoldCatalogue, uninstallGoldCatalogue } from "./helpers/gold-catalogue.ts";
 import type { PlanResult } from "../lib/agentic/plan/types.ts";
 
 const request = { locale: "en", destinationCountry: "TH", optimization: "lowest_cost", profile: {}, requirements: {}, medicationCodes: ["apixaban"], conditionCodes: ["atrial_fibrillation"], targets: [{ name: "Vitamin D3", amount: 2000, unit: "IU" }] };
 const makeRuntime = () => createAgenticRuntime({ store: createMemoryStore(), scope: { environment: "dev", tenantScope: "mattanutra", principalScope: "contract-v4" } });
-async function call(runtime: ReturnType<typeof makeRuntime>, tool: keyof typeof AGENTIC_INPUT_SCHEMAS, args: unknown) {
-  const response = await handleJsonRpc(runtime, { id: 1, method: "tools/call", params: { name: tool, arguments: args } });
+async function call(runtime: ReturnType<typeof makeRuntime>, tool: keyof typeof AGENTIC_INPUT_SCHEMAS, args: unknown, complete = true) {
+  const response = await (complete ? handleJsonRpc : admitJsonRpc)(runtime, { id: 1, method: "tools/call", params: { name: tool, arguments: args } });
   const value = response?.result?.structuredContent as Record<string, unknown>;
   assert.ok(value, JSON.stringify(response));
   const issues = validateToolIssues(AGENTIC_OUTPUT_SCHEMAS[tool], value);
@@ -97,8 +98,9 @@ describe("MCP v4 published contract and replanning", () => {
     const resources = await handleJsonRpc(runtime, { id: 1, method: "resources/list" });
     // v6 adds current resources and preserves both guide/schema pairs for v4 and v5.
     const publishedResources = resources?.result?.resources as Array<{ uri: string }>;
-    assert.equal(publishedResources.length, 6);
-    for (const version of ["4.0.0", "5.0.0", "6.0.0"]) for (const suffix of ["client-guide", "schema"])
+    assert.equal(publishedResources.length, 20);
+    assert.equal(new Set(publishedResources.map(resource => resource.uri)).size, 20);
+    for (const version of ["4.0.0", "5.0.0", "6.0.0", "7.0.0", "7.1.0", "7.2.0", "7.2.1", "7.2.2", "7.2.3", "7.2.4"]) for (const suffix of ["client-guide", "schema"])
       assert.ok(publishedResources.some(resource => resource.uri === `mattanutra://contract/${version}/${suffix}`));
     for (const uri of [CLIENT_GUIDE_URI, CONTRACT_SCHEMA_URI]) {
       const read = await handleJsonRpc(runtime, { id: 1, method: "resources/read", params: { uri } });
@@ -163,7 +165,7 @@ describe("MCP v4 published contract and replanning", () => {
       assert.equal(fields.nextActions.includes("confirm_with_user"), false);
     }
     const processingRuntime = createAgenticRuntime({ ...runtime, store: createMemoryStore(), deferProcessing: true });
-    const pending = await call(processingRuntime, "plan", { operation: "create", idempotencyKey: "v4-processing-ack-001", request });
+    const pending = await call(processingRuntime, "plan", { operation: "create", idempotencyKey: "v4-processing-ack-001", responseView: "full", request }, false);
     assert.equal(pending.status, "processing"); assert.equal(pending.operationalDecision.nextAction, "poll_plan");
   });
   it("keeps the current checkout quote when retained intake makes future schedules incomplete", async () => {
@@ -217,7 +219,7 @@ describe("MCP v4 published contract and replanning", () => {
     const [id] = await runtime.store.listPlanIdsByPrincipal("contract-v4");
     const row = await runtime.store.getPlanRevision(id, created.revision); assert.ok(row);
     const legacy = { ...(row.result as PlanResult) }; delete legacy.contractVersion;
-    await runtime.store.updatePlanRevision({ ...row, result: legacy });
+    await runtime.store.updatePlanRevision({ ...row, result: legacy, statusProjection: null, storageJson: undefined });
     const read = await call(runtime, "plan", { operation: "get", planHandle: created.planHandle });
     assert.equal(read.refreshRequired, true); assert.equal(read.sourceContractVersion, "3.0.0"); assert.equal(read.status, "needs_input");
     const refresh = { operation: "revise", planHandle: created.planHandle, expectedRevision: read.revision, idempotencyKey: "v4-legacy-refresh-01", requestPatch: {} };

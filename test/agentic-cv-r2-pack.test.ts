@@ -1,3 +1,4 @@
+import { hasContextAssessment } from "./helpers/context-assessment.ts";
 import { withRecordedMcpEvidence } from "./helpers/mcp-evidence.ts";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
@@ -42,10 +43,10 @@ import {
   IMPL_CONTRACT_VERSION,
   IMPL_SAFETY_LEDGER_VERSION,
   basketOf,
-  callPlan,
+  callCompletedPlan as callPlan,
   closeSession,
   coverageOf,
-  createPlan,
+  createCompletedPlan as createPlan,
   d3OnlyRequest,
   freezeImplCatalogue,
   identityOf,
@@ -334,8 +335,8 @@ async function runReg01(session: PlanSession, runIndex: number): Promise<R2CaseR
     assertEq("REG-01.d3", "conditional_deferred", d3?.status),
     assertTrue("REG-01.role", recommended.role === "minimum_core" || Boolean(plan.optionId)),
     assertEq("REG-01.ready", "ready", plan.status),
-    assertTrue("REG-01.af", stringList(plan.assessedConditionCodes).includes("atrial_fibrillation")),
-    assertTrue("REG-01.apixaban", stringList(plan.assessedMedicationCodes).includes("apixaban"))
+    assertTrue("REG-01.af", hasContextAssessment(plan, "condition", "atrial_fibrillation")),
+    assertTrue("REG-01.apixaban", hasContextAssessment(plan, "medication", "apixaban"))
   ];
   return conclude("R2-REG-01", assertions, envelopeFor(session, request, plan, assertions, runIndex));
 }
@@ -1410,7 +1411,7 @@ describe("Customer value implementation pack v1.2", () => {
     );
     assert.equal(first.snapshotId, second.snapshotId);
     assert.equal(canonicalR2Report(first), canonicalR2Report(second), "All non-latency request and response evidence must match across runs");
-    assert.equal(MATCHER_VERSION, "flexible-dose-fit-4");
+    assert.equal(MATCHER_VERSION, "flexible-dose-fit-9");
     assert.equal(CUSTOMER_VALUE_PACK_VERSION, "dev-customer-value-v4.0");
   });
 });

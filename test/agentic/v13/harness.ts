@@ -3,7 +3,7 @@ import {
   setAgenticRuntimeForTests,
   type AgenticRuntime
 } from "../../../lib/agentic/runtime.ts";
-import { planTool } from "../../../lib/agentic/plan/service.ts";
+import { completedPlanTool as planTool } from "../../helpers/completed-mcp-client.ts";
 import { goldenPlanRequest } from "../../../lib/agentic/qa/proofs.ts";
 import {
   captureDurableFunnelState,

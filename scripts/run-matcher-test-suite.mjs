@@ -61,7 +61,9 @@ async function main() {
   const sourceCommit = execFileSync("git", ["rev-parse", "HEAD"], { cwd: ROOT, encoding: "utf8" }).trim();
   const common = { ...isolatedValidationEnvironment(process.env), AGENTIC_BUILD_ID: sourceCommit, DB_URL: process.env.TEST_DB_URL, DB_WORKER_URL: process.env.TEST_DB_URL,
     MATTANUTRA_ENV: "dev", STRIPE_PAYMENT_MODE: "mock", NODE_ENV: "test", DB_POOL_IDLE_TIMEOUT_SECONDS: "1" };
-  const args = ["--test", "--test-timeout=300000", "--test-concurrency=1", "--experimental-strip-types", "--import", "./test/helpers/offline-network.mjs", "--import", "./scripts/register-ts-path-loader.mjs"];
+  // This is the file/container ceiling. Named journey, operation and D3
+  // deadlines remain stricter; 18 serialized locale journeys exceed five minutes.
+  const args = ["--test", "--test-timeout=600000", "--test-concurrency=1", "--experimental-strip-types", "--import", "./test/helpers/offline-network.mjs", "--import", "./scripts/register-ts-path-loader.mjs"];
   const prerequisites = await runBatch("catalogue-prerequisites", ["scripts/matcher-fixture-prerequisites.mjs", join(evidence, "catalogue-prerequisites.json")], common, evidence);
   if (!prerequisites.passed) throw new Error("Maintained MCP catalogue/reference prerequisites are incomplete; inspect catalogue-prerequisites.log");
   const fixture = await runBatch("public-catalogue-fixtures", ["scripts/seed-matcher-public-fixtures.mjs", join(evidence, "public-catalogue-fixtures.json")], common, evidence);

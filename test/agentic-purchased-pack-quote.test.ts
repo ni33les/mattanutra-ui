@@ -4,7 +4,7 @@ import { replaceCatalogueSnapshot, resetCatalogueSnapshotCache } from "../lib/ag
 import { loadAgenticConfig } from "../lib/agentic/config.ts";
 import { resolveCapability } from "../lib/agentic/capabilities.ts";
 import { createMockPaymentAdapter } from "../lib/agentic/commerce/payment.ts";
-import { handleJsonRpc } from "../lib/agentic/mcp/dispatcher.ts";
+import { handleCompletedFullJsonRpc as handleJsonRpc } from "./helpers/completed-mcp-client.ts";
 import { publicPlanFields } from "../lib/agentic/public-mapper.ts";
 import type { PlanResult } from "../lib/agentic/plan/types.ts";
 import { simulatePayment } from "../lib/agentic/qa/simulate.ts";

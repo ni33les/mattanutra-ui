@@ -1,3 +1,7 @@
+import { handleJsonRpc as admitJsonRpc } from "../lib/agentic/mcp/dispatcher.ts";
+import { runAdmittedPlanOperation } from "../lib/agentic/plan/service.ts";
+import { PLAN_OPERATION_TERMINAL_MS } from "../lib/agentic/plan/operations.ts";
+import { F_READY_MAG } from "./agentic/v16/manifest.ts";
 import { CURRENT_CONTRACT_SCHEMA_CHECKSUM } from "./helpers/current-contract-lock.ts";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
@@ -15,7 +19,6 @@ import { listRequestTraces, requestTrace } from "../lib/agentic/qa/request-trace
 import {
   advanceServiceClock,
   CLIENT_READ_DEADLINE_MS,
-  deadlineExceeded,
   SERVICE_INTERNAL_DEADLINE_MS,
   useInjectedServiceClock
 } from "../lib/agentic/qa/service-clock.ts";
@@ -251,7 +254,9 @@ describe("v1.6 TECH-02 plan(create) completion", () => {
     await entered.promise;
     const info = await publicInfo(runtime);
     assert.equal(info.ok, true);
-    assert.equal(snapshotPlanInflightForTests().matches >= 1, true);
+    assert.equal(snapshotPlanInflightForTests().matches, 0, "Removed request-local watcher maps remain empty");
+    const active = await runtime.store.getPlanOperationByKey(`dev:mattanutra:${runtime.scope.principalScope}`, v16FreshKey(1, 0));
+    assert.ok(active); assert.equal(active.status, "running");
     hold.resolve();
     const result = await pending;
     assert.equal(result.ok === true || result.ok === false, true);
@@ -272,66 +277,39 @@ describe("v1.6 TECH-02 plan(create) completion", () => {
     assert.equal(snapshotPlanInflightForTests().matches, 0);
   });
 
-  it("L2-PLAN-RED-07 controlled dependency deadline", async () => {
-    const { runtime } = createV16Runtime();
-    const hold = deferred();
-    const entered = deferred();
-    setMatcherGateForTests(hold.promise);
-    setMatcherEnteredForTests(() => entered.resolve());
-    const pending = publicPlanCreate(runtime, v16FreshKey(1, 0));
-    await entered.promise;
-    await Promise.resolve();
-    await Promise.resolve();
-    advanceServiceClock(V16_SUCCESS_DEADLINE_MS);
-    assert.equal(
-      deadlineExceeded(`plan:${v16FreshKey(1, 0)}`),
-      true,
-      "injected clock did not reach the 60s plan deadline"
-    );
-    const result = await pending;
+  it("L2-PLAN-RED-07 controlled durable-operation deadline", async () => {
+    const { runtime, store } = createV16Runtime(), key = v16FreshKey(1, 0);
+    const reply = await admitJsonRpc(runtime, { id: 1, method: "tools/call", params: { name: "plan", arguments: { operation: "create", idempotencyKey: key, request: F_READY_MAG } } });
+    assert.equal((reply?.result?.structuredContent as { status: string }).status, "processing");
+    const operation = await store.getPlanOperationByKey(`dev:mattanutra:${runtime.scope.principalScope}`, key); assert.ok(operation);
+    assert.equal(PLAN_OPERATION_TERMINAL_MS, 175000);
+    const expired = { ...operation, deadlineAt: new Date(Date.now() - 1).toISOString() };
+    assert.equal(await store.updatePlanOperation(expired, operation.version), true);
+    const result = await runAdmittedPlanOperation({ store, config: runtime.config, operationId: operation.id });
     assert.equal(result.ok, false);
-    const error = asError(result);
-    assert.equal(error.retryable, true);
-    assert.equal(
-      error.reasonCode === "PLAN_CREATE_DEADLINE_EXCEEDED" ||
-        error.reasonCode === "SERVICE_DEADLINE_EXCEEDED",
-      true,
-      JSON.stringify(error)
-    );
-    assert.equal(result.planHandle, undefined);
+    assert.equal(asError(result).reasonCode, "temporarily_unavailable");
+    assert.equal(asError(result).retryable, false);
+    assert.deepEqual(asError(result).nextActions, ["refresh_plan"]);
+    assert.equal((await store.getPlanOperation(operation.id))?.status, "failed");
+    assert.equal((await store.getPlanRevision(operation.planId, 1))?.status, "processing");
     assert.equal(result.basket, undefined);
-    hold.resolve();
-    for (let index = 0; index < 50; index += 1) {
-      await Promise.resolve();
-    }
     assert.equal(CLIENT_READ_DEADLINE_MS, V16_CLIENT_DEADLINE_MS);
-    void snapshotPlanInflightForTests;
   });
 
-  it("L2-PLAN-RED-08 cancellation and clean replay", async () => {
-    const { runtime, store } = createV16Runtime();
-    const hold = deferred();
-    const entered = deferred();
-    const key = v16FreshKey(1, 0);
-    setMatcherGateForTests(hold.promise);
-    setMatcherEnteredForTests(() => entered.resolve());
-    const firstPromise = publicPlanCreate(runtime, key);
-    await entered.promise;
-    await Promise.resolve();
-    await Promise.resolve();
-    advanceServiceClock(V16_SUCCESS_DEADLINE_MS);
-    assert.equal(deadlineExceeded(`plan:${key}`), true);
-    const first = await firstPromise;
-    hold.resolve();
-    setMatcherGateForTests(null);
-    setMatcherEnteredForTests(null);
-    useInjectedServiceClock();
-    assert.equal(first.ok, false);
-    assert.equal(first.planHandle, undefined);
+  it("L2-PLAN-RED-08 worker cancellation and clean same-key replay", async () => {
+    const { runtime, store } = createV16Runtime(), key = v16FreshKey(1, 0);
+    await admitJsonRpc(runtime, { id: 1, method: "tools/call", params: { name: "plan", arguments: { operation: "create", idempotencyKey: key, request: F_READY_MAG } } });
+    const operation = await store.getPlanOperationByKey(`dev:mattanutra:${runtime.scope.principalScope}`, key); assert.ok(operation);
+    const hold = deferred(), entered = deferred(), controller = new AbortController();
+    setMatcherGateForTests(hold.promise); setMatcherEnteredForTests(entered.resolve);
+    const pending = runAdmittedPlanOperation({ store, config: runtime.config, operationId: operation.id, signal: controller.signal });
+    await entered.promise; controller.abort(); hold.resolve();
+    assert.equal((await pending).ok, false);
+    setMatcherGateForTests(null); setMatcherEnteredForTests(null);
     const replay = await publicPlanCreate(runtime, key);
-    assert.equal(replay.ok, true, JSON.stringify(replay));
-    assert.equal(replay.status, "ready");
-    void store;
+    assert.equal(replay.ok, true, JSON.stringify(replay)); assert.equal(replay.status, "ready");
+    assert.equal((await store.getPlanOperationByKey(`dev:mattanutra:${runtime.scope.principalScope}`, key))?.id, operation.id);
+    assert.equal((await store.getPlan(operation.planId))?.currentRevision, 1);
   });
 
   it("L2-PLAN-RED-09 failed shared work cannot poison later calls", async () => {

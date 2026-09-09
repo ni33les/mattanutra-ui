@@ -1,3 +1,4 @@
+import { setImmediate as yieldToIO } from "node:timers/promises";
 import assert from "node:assert/strict";
 import { afterEach, beforeEach, describe, it } from "node:test";
 import {
@@ -77,9 +78,11 @@ describe("v1.2 OBS contractual evidence is final before success", () => {
       settled = true;
       return result;
     });
-    while (!entered && !settled) {
-      await Promise.resolve();
+    const barrierDeadline = Date.now() + 5000;
+    while (!entered && !settled && Date.now() < barrierDeadline) {
+      await yieldToIO();
     }
+    assert.equal(entered, true, "Counter commit barrier must actually be reached");
     for (let index = 0; index < 10000 && !settled; index += 1) {
       await Promise.resolve();
     }

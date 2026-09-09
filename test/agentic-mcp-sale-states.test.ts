@@ -4,7 +4,7 @@ import { fixtureSnapshot } from "../lib/agentic/catalogue/fixtures.ts";
 import { replaceCatalogueSnapshot } from "../lib/agentic/catalogue/snapshot.ts";
 import type { CatalogueProduct } from "../lib/agentic/catalogue/types.ts";
 import { loadAgenticConfig } from "../lib/agentic/config.ts";
-import { handleJsonRpc } from "../lib/agentic/mcp/dispatcher.ts";
+import { handleCompletedFullJsonRpc as handleJsonRpc } from "./helpers/completed-mcp-client.ts";
 import {
   createAgenticRuntime,
   setAgenticRuntimeForTests,
@@ -144,7 +144,7 @@ describe("MCP sale states", () => {
     assert.match(encoded, /"excludeSupplementIds"/);
     assert.match(encoded, /"female"/);
     assert.match(encoded, /"male"/);
-    assert.match(String(plan.description ?? ""), /unknown profile\/intake is allowed/i);
+    assert.match(String(plan.description ?? ""), /Unknown intake is never zero/i);
     const branches = schema.anyOf as Array<{ properties?: Record<string, Record<string, unknown>> }>;
     const create = branches.find(branch => branch.properties?.operation?.const === "create");
     assert.ok(create, "create has a separately published operation schema");

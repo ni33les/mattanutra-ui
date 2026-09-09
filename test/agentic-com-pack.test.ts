@@ -728,8 +728,10 @@ async function com21() {
       first.retryable === false &&
       second.orderStatus === "expired" &&
       second.stateVersion === first.stateVersion &&
-      afterPay.orderStatus === "expired" &&
-      afterPay.paymentStatus !== "paid";
+      afterPay.orderStatus === "completed" &&
+      afterPay.paymentStatus === "paid" &&
+      typeof afterPay.orderReference === "string" && afterPay.orderReference === first.orderReference &&
+      JSON.stringify(afterPay.frozenOrder) === JSON.stringify(first.frozenOrder);
     return verdict("COM-21", ok, {
       afterPayStatus: afterPay.orderStatus ?? null,
       afterPayPayment: afterPay.paymentStatus ?? null,
@@ -986,7 +988,8 @@ async function com28() {
     );
     const shallowAdvertised = commercial.every((tool) => {
       const schema = frozenOf(tool.inputSchema);
-      return schema.additionalProperties === false && !("oneOf" in schema) && !("$defs" in schema);
+      const branches = Array.isArray(schema.anyOf) ? schema.anyOf.map(frozenOf) : [schema];
+      return branches.length > 0 && branches.every(branch => branch.additionalProperties === false && !("oneOf" in branch) && !("$defs" in branch));
     });
     const qaListed = tools.some((tool) =>
       ["simulate", "simulateFulfilment", "observe", "packProof", "isolationProof"].includes(String(tool.name))

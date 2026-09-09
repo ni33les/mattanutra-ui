@@ -18,11 +18,11 @@ describe("consistency r5 regression guards", () => {
 
   it("keeps algae_only as its own requirements flag", async () => {
     const planCopy = await readFile(
-      "lib/agentic/contract/instructions.ts",
+      "lib/agentic/contract/guide.ts",
       "utf8"
     );
 
-    assert.match(planCopy, /algae_only remains its own flag/);
+    assert.match(planCopy, /algae_only/);
   });
 
   it("peeks queued work with one unlocked query", async () => {

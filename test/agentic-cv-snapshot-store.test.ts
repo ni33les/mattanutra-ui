@@ -1,12 +1,17 @@
 import assert from 'node:assert/strict';
 import { it } from 'node:test';
 import { createSnapshotMemoryStore } from './agentic/value/snapshot-store.ts';
-import { createMemoryStore } from '../lib/agentic/store/memory.ts';
 import { fixtureSnapshot } from '../lib/agentic/catalogue/fixtures.ts';
 import { runWithCatalogueSnapshot } from '../lib/agentic/catalogue/snapshot.ts';
 import { installGoldCatalogue, uninstallGoldCatalogue } from './helpers/gold-catalogue.ts';
 import { loadAgenticConfig } from '../lib/agentic/config.ts';
-import { planTool } from '../lib/agentic/plan/service.ts';
+import { planTool, runAdmittedPlanOperation } from '../lib/agentic/plan/service.ts';
+import { completedPlanTool } from './helpers/completed-mcp-client.ts';
+import { captureMatcherSafetySnapshot } from '../lib/matcher/safety-ceilings.ts';
+import { runWithMatcherSafetySnapshot } from '../lib/matcher/safety-ceilings-server.ts';
+import { canonicalHash } from '../lib/agentic/value/canonical.ts';
+import { readPlanStatus } from '../lib/agentic/presentation/plan-read.ts';
+import { createAgenticRuntime } from '../lib/agentic/runtime.ts';
 
 it('V5-CV-STORE-01: frozen memory fixtures validate their exact epoch only inside a transaction', async () => {
   const snapshot = { runtimeRevision: 12 };
@@ -23,26 +28,35 @@ it('V5-CV-STORE-01: frozen memory fixtures validate their exact epoch only insid
   await missing.transaction(async tx => assert.equal(await tx.isCatalogueRevisionCurrent!(0), false));
 });
 
-it('V5-CV-STORE-02: the fixture adapter supports current publication without bypassing the application fence', async () => {
+it('V5-CV-STORE-02: snapshot publication is nonlocking while stale selection retains the commercial fence', async () => {
   installGoldCatalogue();
   const snapshot = { ...fixtureSnapshot(), runtimeRevision: 41 };
   const config = loadAgenticConfig();
   const payload = { operation: 'create' as const, idempotencyKey: 'cv-snapshot-fence-0001', request: {
     destinationCountry: 'TH', locale: 'en', optimization: 'balanced', profile: { ageYears: 38, lifeStage: 'adult' },
     requirements: {}, medicationCodes: [], currentSupplements: [], targets: [{ name: 'Vitamin D3', amount: 1000, unit: 'IU' }] } };
-  const run = (store: ReturnType<typeof createMemoryStore>, principalScope: string) => runWithCatalogueSnapshot(snapshot, () => planTool({
-    config, store, now: '2026-09-01T00:00:00Z', payload, scope: { environment: 'dev', tenantScope: 'mattanutra', principalScope }
-  }));
+  const captured = captureMatcherSafetySnapshot();
+  const references = { ...captured, identity: { runtimeRevision: 41, fingerprint: canonicalHash(captured.ceilings) } };
+  const within = <T>(work: () => T) => runWithMatcherSafetySnapshot(references, () => runWithCatalogueSnapshot(snapshot, work));
   try {
-    const missing = await run(createMemoryStore(), 'cv-fence-missing');
-    assert.equal(missing.ok, false);
-    assert.equal('error' in missing && missing.error.reasonCode, 'availability_changed');
-    const stale = await run(createSnapshotMemoryStore({ runtimeRevision: 40 }), 'cv-fence-stale');
-    assert.equal(stale.ok, false);
-    assert.equal('error' in stale && stale.error.reasonCode, 'availability_changed');
-    const current = await run(createSnapshotMemoryStore(snapshot), 'cv-fence-current');
-    assert.equal(current.ok, true);
-    assert.equal('status' in current && current.status, 'ready');
-    assert.equal('revision' in current && current.revision, 1);
+    for (const epoch of [undefined, 40, 41]) {
+      const store = createSnapshotMemoryStore({ runtimeRevision: epoch });
+      const runtime = createAgenticRuntime({ config, store, now: '2026-09-01T00:00:00Z',
+        scope: { environment: 'dev', tenantScope: 'mattanutra', principalScope: `cv-fence-${epoch}` } });
+      const current = await within(() => completedPlanTool({ ...runtime, now: runtime.now!, payload }));
+      assert.equal(current.ok, true); if (!current.ok) throw new Error('Missing completed fixture');
+      assert.equal(current.status, 'ready'); assert.equal(current.revision, 1);
+      const status = await readPlanStatus(runtime, current.planHandle);
+      assert.equal(status.ok, true); if (!status.ok) throw new Error('Missing status');
+      assert.equal(status.refreshRequired, epoch !== 41);
+      assert.equal(status.status, epoch === 41 ? 'ready' : 'needs_input');
+      const selection = { operation: 'select' as const, idempotencyKey: `cv-select-${epoch}-0001`, planHandle: current.planHandle, expectedRevision: 1, optionId: current.optionId! };
+      const admission = await planTool({ ...runtime, now: runtime.now!, payload: selection }); assert.equal(admission.ok, true);
+      const op = await store.getPlanOperationByKey(`dev:mattanutra:${runtime.scope.principalScope}`, selection.idempotencyKey); assert.ok(op);
+      const selected = await within(() => runAdmittedPlanOperation({ store, config, operationId: op.id }));
+      assert.equal(selected.ok, epoch === 41);
+      if (!selected.ok) assert.equal(selected.error.reasonCode, 'availability_changed');
+      const saved = await store.getPlanRevision(op.planId, 1); assert.equal(saved?.status, 'ready', 'A stale selection cannot change the saved result');
+    }
   } finally { uninstallGoldCatalogue(); }
 });

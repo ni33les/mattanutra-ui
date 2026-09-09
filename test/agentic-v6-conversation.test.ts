@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 import { assessPreferences } from "../lib/matcher/preferences.ts";
-import { clientDiscovery, readContractResource } from "../lib/agentic/contract/guide.ts";
+import { clientDiscovery, readContractResource, clientGuideMarkdown, CLIENT_EXAMPLES } from "../lib/agentic/contract/guide.ts";
 import { AGENTIC_INPUT_SCHEMAS, REQUIREMENTS_SCHEMA } from "../lib/agentic/contract/schemas.ts";
 import { validateToolIssues } from "../lib/agentic/contract/validate.ts";
 import { AGENTIC_OUTPUT_SCHEMAS } from "../lib/agentic/contract/outputs.ts";
@@ -11,14 +11,16 @@ import { infoTool } from "../lib/agentic/info.ts";
 import { loadAgenticConfig } from "../lib/agentic/config.ts";
 
 describe("v6 conversational discovery and advisory preferences", () => {
-  it("ANNA-AX-01: existing locale-only discovery explains basis and provides five executable operation templates", () => {
+  it("ANNA-AX-01: existing locale-only discovery explains basis and links to five executable operation templates", () => {
     const value = clientDiscovery("en");
     assert.match(value.clientInstructions, /total_daily/);
     assert.match(value.clientInstructions, /supplemental/);
     assert.match(value.clientInstructions, /advisory/i);
-    assert.match(value.clientInstructions, /20%/);
-    assert.ok(value.clientExamples.some(example => example.arguments.request?.targets?.some(target => target.basis === "supplemental")));
-    for (const operation of ["create", "get", "revise", "answer", "select"]) assert.ok(value.clientExamples.some(example => example.arguments.operation === operation));
+    assert.match(clientGuideMarkdown("en"), /20%/);
+    assert.ok(CLIENT_EXAMPLES.some(example => example.arguments.request?.targets?.some(target => target.basis === "supplemental")));
+    assert.equal(value.clientExamples.length, 1);
+    assert.ok(clientGuideMarkdown("en").includes("select"));
+    for (const operation of ["create", "get", "revise", "answer", "select"]) assert.ok(CLIENT_EXAMPLES.some(example => example.arguments.operation === operation));
     for (const example of value.clientExamples) assert.deepEqual(validateToolIssues(AGENTIC_INPUT_SCHEMAS[example.tool], example.arguments), [], example.name);
   });
   it("ANNA-AX-02: historical v5 guide and schema remain byte-identical to the released artefacts", () => {
@@ -31,7 +33,8 @@ describe("v6 conversational discovery and advisory preferences", () => {
   });
   it("ANNA-AX-03: all retained numeric preference names publish advisory semantics and zero/null remain valid", () => {
     for (const name of ["maxProductCount", "maxDailyPills", "maxPriceMinor"]) {
-      assert.match(JSON.stringify(REQUIREMENTS_SCHEMA.properties[name as keyof typeof REQUIREMENTS_SCHEMA.properties]), /advisory/i);
+      assert.match(REQUIREMENTS_SCHEMA.description!, /advisory, never purchase limits/i);
+      assert.match(JSON.stringify(REQUIREMENTS_SCHEMA.properties[name as keyof typeof REQUIREMENTS_SCHEMA.properties]), /Preferred/i);
       for (const value of [0, null, 1]) assert.deepEqual(validateToolIssues(REQUIREMENTS_SCHEMA, { [name]: value }), []);
     }
   });
@@ -60,7 +63,8 @@ describe("v6 conversational discovery and advisory preferences", () => {
     for (const locale of ["en", "th", "zh-CN"]) {
       const overview = await infoTool({ config, locale, isolatedInfo });
       assert.deepEqual(validateToolIssues(AGENTIC_OUTPUT_SCHEMAS.info, overview), []);
-      assert.ok(overview.clientExamples.some(example => example.name === "create-supplemental-target"));
+      assert.equal(overview.clientExamples.length, 1);
+      assert.equal(overview.clientExamples[0].arguments.operation, "create");
       assert.equal(overview.planSchemaJson, undefined);
       assert.equal(overview.clientGuideText, undefined);
       assert.equal(infoConversationBudget(overview).passed, true, JSON.stringify(infoConversationBudget(overview)));

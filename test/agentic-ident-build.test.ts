@@ -31,10 +31,14 @@ describe("BUILD identity contract", () => {
       process.env.AGENTIC_BUILD_ID = `  ${"B".repeat(40)}  `;
       process.env.COMMIT_SHA = "c".repeat(40);
       process.env.COMMIT_HASH = "d".repeat(40);
+      assert.throws(() => pipelineBuildId(), /identity mismatch/);
+      process.env.COMMIT_SHA = "b".repeat(40); process.env.COMMIT_HASH = "b".repeat(40);
       assert.equal(pipelineBuildId(), "b".repeat(40));
       delete process.env.AGENTIC_BUILD_ID;
+      process.env.COMMIT_SHA = "c".repeat(40); process.env.COMMIT_HASH = "c".repeat(40);
       assert.equal(pipelineBuildId(), "c".repeat(40));
       delete process.env.COMMIT_SHA;
+      process.env.COMMIT_HASH = "d".repeat(40);
       assert.equal(pipelineBuildId(), "d".repeat(40));
       delete process.env.COMMIT_HASH;
       assert.equal(pipelineBuildId(), TEST_RELEASE_BUILD_ID);

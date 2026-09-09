@@ -1,3 +1,4 @@
+import { hasContextAssessment } from "./helpers/context-assessment.ts";
 import assert from "node:assert/strict";
 import { createHash, randomUUID } from "node:crypto";
 import { describe, it } from "node:test";
@@ -9,10 +10,10 @@ import {
 } from "../lib/agentic/contract/index.ts";
 import { AGENTIC_SCHEMA_CHECKSUM } from "../lib/agentic/info.ts";
 import { computeSchemaChecksum } from "../lib/agentic/release-manifest.ts";
-import { handleJsonRpc } from "./helpers/recording-mcp-dispatcher.ts";
+import { handleCompletedFullJsonRpc as handleJsonRpc } from "./helpers/completed-mcp-client.ts";
 import { withRecordedMcpEvidence } from "./helpers/mcp-evidence.ts";
 import { toolList } from "../lib/agentic/mcp/rpc.ts";
-import { planTool } from "./helpers/recording-mcp-dispatcher.ts";
+import { completedPlanTool as planTool } from "./helpers/completed-mcp-client.ts";
 import { normalizePublishedClientResult } from "../scripts/published-client-semantics.mjs";
 import { createSnapshotMemoryStore } from "./agentic/value/snapshot-store.ts";
 import {
@@ -229,7 +230,7 @@ function asksAcceptOrRemove(rows: readonly Record<string, unknown>[], names: rea
 
 function identityPresent(plan: Record<string, unknown>) {
   const canonical = asRecord(plan.canonical);
-  const snapshotId = String(canonical.snapshotId ?? plan.snapshotId ?? "");
+  const snapshotId = String(canonical.catalogId ?? "");
   const matcherVersion = String(canonical.matcherVersion ?? "");
   const packVersion = String(canonical.packVersion ?? "");
   const contractVersion = String(canonical.contractVersion ?? plan.contractVersion ?? "");
@@ -336,16 +337,14 @@ export async function runCvFixPack(frozenInput?: ValueCatalogueFreeze): Promise<
         if (extra.some((item) => item.selected === true)) {
           failed.push("FIX-01.A9");
         }
-        const assessedMeds = stringList(plan.assessedMedicationCodes);
-        const assessedConditions = stringList(plan.assessedConditionCodes);
-        if (!assessedMeds.includes("apixaban") || !assessedConditions.includes("atrial_fibrillation")) {
+                    if (!hasContextAssessment(plan, "medication", "apixaban") || !hasContextAssessment(plan, "condition", "atrial_fibrillation")) {
           failed.push("FIX-01.A10");
         }
         for (const option of options) {
           const safety = asRecord(option.safety);
           if (
             safety.assessedMedicationCodes &&
-            !stringList(safety.assessedMedicationCodes).includes("apixaban")
+            stringList(safety.assessedMedicationCodes).includes("apixaban") && !((Array.isArray(safety.guidance) ? safety.guidance : []) as Record<string, unknown>[]).some(row => row.code === "medication_interaction")
           ) {
             failed.push("FIX-01.A10");
             break;

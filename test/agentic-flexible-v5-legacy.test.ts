@@ -6,7 +6,7 @@ import { createAgenticRuntime } from "../lib/agentic/runtime.ts";
 import { createMemoryStore } from "../lib/agentic/store/memory.ts";
 import { loadAgenticConfig } from "../lib/agentic/config.ts";
 import type { AgenticStore } from "../lib/agentic/store/types.ts";
-import { handleJsonRpc } from "../lib/agentic/mcp/dispatcher.ts";
+import { handleCompletedFullJsonRpc as handleJsonRpc } from "./helpers/completed-mcp-client.ts";
 import { replaceCatalogueSnapshot } from "../lib/agentic/catalogue/snapshot.ts";
 import { publicSupplementId } from "../lib/agentic/contract/ids.ts";
 import { simulatePayment } from "../lib/agentic/qa/simulate.ts";
@@ -70,7 +70,8 @@ async function legacyPlan(explicit: boolean, retainOriginal = true) {
   const result = { ...current, contractVersion: "4.0.0", originalRequest: retainOriginal ? original : undefined, pendingInput: undefined, requestSnapshot: state };
   const historical = { ...saved, result, requestSnapshot: state };
   await runtime.store.updatePlanRevision(historical);
-  return { runtime, created, planId, historical, original };
+  const persistedHistorical = await runtime.store.getPlanRevision(planId, created.revision); assert.ok(persistedHistorical);
+  return { runtime, created, planId, historical: persistedHistorical, original };
 }
 
 test("LEGACY5-01 omitted v4 count refreshes to eight while preserving original medications and intake", async () => {

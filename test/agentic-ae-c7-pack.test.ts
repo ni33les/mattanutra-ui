@@ -8,7 +8,7 @@ import {
 } from "../lib/agentic/capabilities.ts";
 import { loadAgenticConfig } from "../lib/agentic/config.ts";
 import { AGENTIC_TOOL_SCHEMAS } from "../lib/agentic/contract/index.ts";
-import { handleJsonRpc } from "./helpers/recording-mcp-dispatcher.ts";
+import { handleCompletedFullJsonRpc as handleJsonRpc } from "./helpers/completed-mcp-client.ts";
 import { assertRecordedMcpEvidence, withRecordedMcpEvidence } from "./helpers/mcp-evidence.ts";
 import { publicCoverage } from "../lib/agentic/public-mapper.ts";
 import { canonicalizeTargets } from "../lib/matcher/canonicalizer.ts";
@@ -610,7 +610,12 @@ export async function runAeC7Pack(): Promise<AeC7PackReport> {
           compactErrorOk(first, ["idempotencyKey", "request"]) &&
           JSON.stringify(first) === JSON.stringify(second) &&
           schemaDumpHits(raw).length === 0 &&
-          schemaDumpHits(listed).length === 0;
+          // Published output schemas intentionally use $defs. Error bodies and
+          // tool descriptions must stay free of validator dumps.
+          schemaDumpHits(asRecord(asRecord(listed).result).tools.map((tool: Record<string, unknown>) => {
+            const { inputSchema, outputSchema, ...metadata } = tool;
+            assert.ok(inputSchema && outputSchema); return metadata;
+          })).length === 0;
         return ok
           ? pass("AX7-01", { bytes: jsonSize(first) })
           : fail("AX7-01", {

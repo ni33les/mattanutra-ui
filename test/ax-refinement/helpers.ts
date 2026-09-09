@@ -2,10 +2,10 @@ import { correctedAxSnapshot } from "../../lib/agentic/catalogue/ax-corrections.
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { createAgenticRuntime } from "../../lib/agentic/runtime.ts";
-import { createMemoryStore } from "../../lib/agentic/store/memory.ts";
+import { createSnapshotMemoryStore } from "../agentic/value/snapshot-store.ts";
 import { handleJsonRpc } from "../../lib/agentic/mcp/dispatcher.ts";
 import { loadFrozenAnnaInput, reconstructAnnaSnapshot } from "../../lib/matcher/experiments/frozen-corpus.ts";
-import { replaceCatalogueSnapshot, resetCatalogueSnapshotCache } from "../../lib/agentic/catalogue/snapshot.ts";
+import { replaceCatalogueSnapshot, resetCatalogueSnapshotCache, installedCatalogueSnapshot } from "../../lib/agentic/catalogue/snapshot.ts";
 import { resetMatchPlanCache } from "../../lib/agentic/plan/matching.ts";
 import { resetCataloguePins } from "../../lib/agentic/catalogue/pin.ts";
 import { resetInfoCache } from "../../lib/agentic/info.ts";
@@ -32,7 +32,7 @@ export async function installRealCatalogue(environment: "dev" | "uat" = "uat") {
 export function uninstallRealCatalogue() {
   replaceCatalogueSnapshot(null); resetCatalogueSnapshotCache(); resetMatcherSafetyCeilings(); resetCataloguePins(); resetInfoCache(); resetQaPersistForTests();
 }
-export function runtime(principal: string, store: AgenticStore = createMemoryStore()) {
+export function runtime(principal: string, store: AgenticStore = createSnapshotMemoryStore({ runtimeRevision: installedCatalogueSnapshot()?.runtimeRevision ?? 99 })) {
   // The real reconstructed fixture's epoch is immutable in this in-memory
   // harness. PostgreSQL publication fencing is exercised separately.
   store.isCatalogueRevisionCurrent ??= async expected => expected === 99;

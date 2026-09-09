@@ -8,7 +8,7 @@ import {validateUatResources} from "./service-efficiency/runtime-resources.mjs";
 
 export const MCP721_BASE = "22f3ce60f17158c68a251abe4070f582dd39253a";
 export const MCP_PACKAGES = {
-  "discovery": { version: "7.2.4", directory: "test/mcp-discovery", base: "41ed9fd07e8b9c8814d361eab33d72b27ac7c157", scope: "mcp_connector_discoverability" },
+  "discovery": { version: "7.2.4", directory: "test/mcp-discovery", base: "41ed9fd07e8b9c8814d361eab33d72b27ac7c157", scope: "mcp_discoverability_and_maintained_regression" },
   "efficiency": { version: "7.2.4", directory: "test/service-efficiency", base: "a28f3b27d6bde5a21803fa5e33622e89ce2a708d", scope: "core_service_efficiency_and_funnel" },
   "conversation": { version: "7.2.4", directory: "test/mcp-conversation-pack", base: "1c169407ba0f3fed3a19871afa87ce0bdeecf949", scope: "mcp_conversation_payload" },
   "721": { version: "7.2.1", directory: "test/mcp-7-2-1", base: MCP721_BASE, scope: "mcp_721_alignment_and_routines" },
@@ -58,6 +58,8 @@ export function checkMcp721Proof(file, expected, packageId = "721") {
     assert.equal(full.passed, true); assert.equal(full.unchangedSource, true); assert.equal(full.sourceSha256, expected.sourceSha256); assert.equal(full.sourceCommit, expected.sourceCommit);
     assert.ok(selected.files.length > inventory.files.length);
     for (const file of inventory.regressionFiles) assert.ok(selected.files.includes(file), `Unexecuted discovery consumer: ${file}`);
+    const inputs = json("mcp-regression/catalogue-inputs.json");
+    assert.ok(inputs.schemaSha256 && inputs.catalogueSha256 && inputs.tables.length > 0);
     assert.ok(full.results.every(row => row.passed));
     for (const row of full.results.filter(row => row.label.startsWith("node-"))) {
       assert.ok(row.execution?.passed && row.execution.cases > 0); assert.equal(row.skipped, 0); assert.equal(row.todo, 0); assert.equal(row.cancelled, 0);

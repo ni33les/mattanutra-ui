@@ -6,11 +6,11 @@ export async function rejectObsoleteHealthAnswer(
   harness: { call: (name: string, args: unknown) => Promise<Record<string, unknown>> },
   args: Record<string, unknown>
 ) {
-  const before = await harness.call("plan", { operation: "get", planHandle: args.planHandle });
+  const before = await harness.call("plan", { operation: "get", responseView: "full", planHandle: args.planHandle });
   const rejected = await harness.call("plan", args);
   assert.equal(rejected.ok, false);
   assert.equal((rejected.error as Record<string, unknown>)?.reasonCode, "invalid_request");
-  const after = await harness.call("plan", { operation: "get", planHandle: args.planHandle });
+  const after = await harness.call("plan", { operation: "get", responseView: "full", planHandle: args.planHandle });
   for (const key of ["revision", "status", "optionId", "planHandle", "safetyGuidance", "medicationCodes", "conditionCodes"]) {
     assert.deepEqual(after[key], before[key], `Rejected health answer mutated ${key}`);
   }

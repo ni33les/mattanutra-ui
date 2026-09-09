@@ -20,7 +20,6 @@ describe("live connector and Terms consistency", () => {
     assert.match(AGENT_CARD, /stock/i);
     assert.match(description, /overlap/i);
     assert.match(description, /wellness guidance/i);
-    assert.match(description, /wellness guidance/i);
     assert.match(AGENT_CARD, /pharmacy/i);
     assert.equal(info.structured.responsibilityVersion, RESPONSIBILITY_VERSION);
     assert.equal(description, CONNECTOR_COPY.en);
@@ -54,7 +53,7 @@ describe("live connector and Terms consistency", () => {
 
 describe("live connector discovery contract identity", () => {
   it("GET discovery, RPC info and the published contract agree on version and schemas", async () => {
-    const response = await fetch(LIVE_PUBLIC, { headers: { accept: "application/json" }, signal: AbortSignal.timeout(30_000) });
+    const response = await fetch(LIVE_PUBLIC, { headers: { accept: "application/json, text/event-stream" }, signal: AbortSignal.timeout(30_000) });
     assert.equal(response.status, 405);
     const listing = await livePost(LIVE_PUBLIC, { jsonrpc: "2.0", id: 3, method: "tools/list" });
     const discovery = listing.structured;

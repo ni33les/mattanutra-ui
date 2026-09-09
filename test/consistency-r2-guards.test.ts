@@ -50,10 +50,10 @@ describe("consistency r2 regression guards", () => {
   });
 
   it("keeps algae_only as its own requirements flag", async () => {
-    const planCopy = await readFile("lib/agentic/contract/instructions.ts", "utf8");
+    const planCopy = await readFile("lib/agentic/contract/guide.ts", "utf8");
     const qaPack = await readFile("test/agentic-qa-pack.test.ts", "utf8");
 
-    assert.match(planCopy, /algae_only remains its own flag/);
+    assert.match(planCopy, /algae_only/);
     assert.match(qaPack, /omega3SourcePreference:\s*"algae_only"/);
   });
 

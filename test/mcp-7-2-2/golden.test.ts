@@ -1,3 +1,4 @@
+import { startMemoryTaskExecutor } from "../helpers/completed-mcp-client.ts";
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import { setTimeout as delay } from "node:timers/promises";
@@ -20,7 +21,9 @@ async function call(args: Record<string, unknown>) {
   const value = reply.result.structuredContent as Record<string, unknown>;
   assert.equal(value.ok, true, JSON.stringify(value)); calls.push({ args, reply }); return { reply, value };
 }
+let stopWorker: (() => Promise<void>) | undefined;
 before(async () => {
+  stopWorker = startMemoryTaskExecutor(app);
   await installRealCatalogue("dev"); useLiveServiceClock();
   const start = performance.now();
   let result = await call({ operation: "create", idempotencyKey: "m722-d3-golden-create", request });
@@ -33,7 +36,8 @@ before(async () => {
   assert.equal(conversation.responseView, "conversation"); assert.equal(conversation.status, "ready");
   full = (await call({ operation: "get", planHandle: conversation.planHandle, responseView: "full" })).value as unknown as PlanSuccessWire;
 });
-after(() => {
+after(async () => {
+  await stopWorker?.();
   if (process.env.MCP_722_EVIDENCE_DIR) writeFileSync(`${process.env.MCP_722_EVIDENCE_DIR}/golden-d3.json`, JSON.stringify({ request, elapsedMs, calls }, null, 2), { flag: "wx" });
   resetPlanCreateInflightForTests(); uninstallRealCatalogue();
 });

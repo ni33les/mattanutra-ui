@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { afterEach, beforeEach, describe, it } from "node:test";
-import { planTool } from "../lib/agentic/plan/service.ts";
+import { completedPlanTool as planTool } from "./helpers/completed-mcp-client.ts";
 import { executeTool } from "../lib/agentic/commerce/execute.ts";
 import { goldenPlanRequest } from "../lib/agentic/qa/proofs.ts";
 import { loadPersistedFunnelEvents } from "../lib/agentic/funnel/ledger.ts";
@@ -383,10 +383,12 @@ describe("RB-OBS pure read", () => {
     const secondBudget = asRecord(second.dependencyBudget);
     const firstQueries = asRecord(first.queries);
     const secondQueries = asRecord(second.queries);
-    assert.equal(firstBudget.catalogueSnapshots, 1);
-    assert.equal(secondBudget.catalogueSnapshots, 1);
-    assert.equal(firstQueries["catalogue.snapshot.TH"], 1);
-    assert.equal(secondQueries["catalogue.snapshot.TH"], 1);
+    // Two distinct admitted creates each acquire their immutable snapshot.
+    // Repeated observation must add no acquisition or matching work.
+    assert.equal(firstBudget.catalogueSnapshots, 2);
+    assert.equal(secondBudget.catalogueSnapshots, 2);
+    assert.equal(firstQueries["catalogue.snapshot.TH"], 2);
+    assert.equal(secondQueries["catalogue.snapshot.TH"], 2);
     assert.equal(firstQueries["plan.match.hit"] ?? firstQueries["plan.match.miss"], 1);
     assert.equal(canonicalJson(firstQueries), canonicalJson(secondQueries));
   });

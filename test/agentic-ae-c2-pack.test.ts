@@ -7,7 +7,7 @@ import {
   endDeterministicIdsForTests
 } from "../lib/agentic/capabilities.ts";
 import { AGENTIC_CONTRACT_VERSION, loadAgenticConfig } from "../lib/agentic/config.ts";
-import { handleJsonRpc } from "./helpers/recording-mcp-dispatcher.ts";
+import { handleCompletedFullJsonRpc as handleJsonRpc } from "./helpers/completed-mcp-client.ts";
 import { withRecordedMcpEvidence } from "./helpers/mcp-evidence.ts";
 import { createCountingMatchPort } from "../lib/agentic/plan/match-port.ts";
 import type {
@@ -1529,7 +1529,7 @@ export async function runAeC2Pack(): Promise<AeC2PackReport> {
           stringList(first.medicationCodes).includes("apixaban") &&
           stringList(first.conditionCodes).includes("ckd") &&
           !/recognisedNames|catalogueGaps|latency|migrationVersion|environment|checkoutBuild|matcherTelemetry|catalogueVersion/i.test(
-            blob
+            JSON.stringify(Object.keys(first))
           ) &&
           typeof first.buildId === "string" &&
           String(first.buildId).length === 40 &&

@@ -26,9 +26,10 @@ describe("QA-GOLD dietary, source and demographic stacks", () => {
     assert.equal(ids(result).includes("G-O3-FISH-1000"), false);
   });
 
-  it("E-02 algae-named target does not select fish oil", () => {
+  it("E-02 explicitly agreed algae-only target does not select fish oil", () => {
     const result = match(
       qaRequest({
+        omega3SourcePreference: "algae_only",
         targets: [qaTarget("omega", 500, "mg", "Algae omega-3")]
       }),
       QA_GOLD_CATALOG

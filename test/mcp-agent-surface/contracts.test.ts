@@ -45,7 +45,7 @@ test("AG72-CARD-01 seven short descriptors and an honest overview support resour
       assert.match(text, /medical approval/i); assert.match(text, /accepted inputs/i);
       assert.match(text, /do not guarantee.*interaction/i);
       assert.match(text, /host.*lists/i); assert.match(text, /templates/i);
-      assert.match(text, /last response/i); assert.match(text, /evidence/);
+      assert.match(text, /returned pollAfterSeconds/i); assert.match(text, /evidence/);
       assert.ok(text.length < 2200, "Overview must remain one screen");
       assert.ok(!/six short|never prefix|8000|64000/i.test(text));
       assert.equal(overview.contractVersion, "7.2.4");

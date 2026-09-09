@@ -3,7 +3,7 @@ import { describe, it } from "node:test";
 import { AGENTIC_INPUT_SCHEMAS, PLAN_REQUEST } from "../lib/agentic/contract/schemas.ts";
 import { validateToolIssues } from "../lib/agentic/contract/validate.ts";
 import { mergeRequestPatch } from "../lib/agentic/plan/request-patch.ts";
-import { CLIENT_EXAMPLES, CLIENT_GUIDE_URI, GUIDE_ESSENTIALS, readContractResource } from "../lib/agentic/contract/guide.ts";
+import { CLIENT_EXAMPLES, CLIENT_GUIDE_URI, readContractResource } from "../lib/agentic/contract/guide.ts";
 import { AGENTIC_CONTRACT_VERSION } from "../lib/agentic/config.ts";
 import type { PlanRequest } from "../lib/agentic/plan/types.ts";
 const request: PlanRequest = { locale: "en", destinationCountry: "TH", optimization: "balanced", profile: {}, medicationCodes: ["apixaban"], requirements: {}, targets: [{ name: "Vitamin D3", amount: 1000, unit: "IU" }] };
@@ -30,14 +30,14 @@ describe("v5 conversational contract", () => {
     assert.ok(validateToolIssues(PLAN_REQUEST, { ...request, requirements: { productDoses: [{ productId: "prd_returned", servingsPerDay: 0 }] } }).length);
   });
   it("publishes v7 while preserving complete historical v4–v6 resources", () => {
-    assert.equal(AGENTIC_CONTRACT_VERSION, "7.0.0"); assert.match(CLIENT_GUIDE_URI, /\/7\.0\.0\//);
+    assert.equal(AGENTIC_CONTRACT_VERSION, "7.2.4"); assert.equal(CLIENT_GUIDE_URI, `mattanutra://contract/${AGENTIC_CONTRACT_VERSION}/client-guide`);
     const old = readContractResource("mattanutra://contract/4.0.0/schema"); assert.ok(old);
     assert.equal(JSON.parse(old.contents[0].text).contractVersion, "4.0.0");
     const v5 = readContractResource("mattanutra://contract/5.0.0/schema"); assert.ok(v5);
     assert.equal(JSON.parse(v5.contents[0].text).contractVersion, "5.0.0");
     const current = readContractResource(CLIENT_GUIDE_URI); assert.ok(current);
     for (const phrase of ["closest_dose", "review_options", "productDoses", "searchEffort", "stale_revision"]) assert.ok(current.contents[0].text.includes(phrase), phrase);
-    assert.match(GUIDE_ESSENTIALS, /question.*decision/i);
+    assert.match(current.contents[0].text, /question.*decision/i);
     for (const example of CLIENT_EXAMPLES) assert.deepEqual(validateToolIssues(AGENTIC_INPUT_SCHEMAS[example.tool], example.arguments), [], example.name);
   });
 });

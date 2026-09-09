@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { LIVE_PUBLIC, liveCall, livePost, stamp } from "./helpers/live-mcp.ts";
+import { LIVE_PUBLIC, liveCompletedFullCall as liveCall, livePost, stamp } from "./helpers/live-mcp.ts";
 
 function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value)

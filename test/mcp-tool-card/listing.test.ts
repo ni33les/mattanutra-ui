@@ -34,6 +34,7 @@ test("hosted_create_defaults_to_conversation", () => {
 test("hosted_plan_blurb_mentions_thailand_gaps_and_conversation", () => {
   assert.match(plan.description, /TH|Thailand/); assert.match(plan.description, /finite catalogue/);
   assert.match(plan.description, /conversation/); assert.match(plan.description, /gaps/);
-  assert.equal(plan.description, GUIDE_ESSENTIALS, "Publish the same eight-line overview on the plan tool card");
+  assert.ok(plan.description.endsWith(GUIDE_ESSENTIALS), "Publish the same eight-line overview after the service positioning sentence");
+  assert.match(plan.description, /^Match agreed nutrient targets and customer context to real Thailand products;/);
   assert.equal(plan.description.split("\n").length, 8);
 });

@@ -1,3 +1,5 @@
+import { runAdmittedPlanOperation } from "../lib/agentic/plan/service.ts";
+import { completedPlanTool } from "./helpers/completed-mcp-client.ts";
 import assert from "node:assert/strict";
 import { afterEach, beforeEach, describe, it } from "node:test";
 import { FIXTURE_SUPPLEMENTS } from "../lib/agentic/catalogue/fixtures.ts";
@@ -89,7 +91,7 @@ describe("consistency r2 planTool boundaries", () => {
     const elapsed = Date.now() - started;
 
     assert.equal(isAgenticErrorResult(created), false);
-    assert.ok(durations.length >= 2, "prepare and persist must be separate transactions");
+    assert.ok(durations.length >= 1, "Admission and task creation must commit atomically");
     assert.ok(
       durations.every((ms) => ms < 200),
       `plan transactions must stay short, got ${durations.join(",")}`
@@ -106,12 +108,15 @@ describe("consistency r2 planTool boundaries", () => {
 
     if (created.status === "processing") {
       assert.ok(elapsed < 2000);
+      const operation = await store.getPlanOperationByKey("dev:mattanutra:r2-plan", "r2-eight-target-01");
+      assert.ok(operation);
+      assert.equal((await runAdmittedPlanOperation({ store, config: runtime.config, operationId: operation.id })).ok, true);
+      const transactionsBeforeGet = durations.length;
       const polled = await planTool({
         config: runtime.config,
         now: new Date().toISOString(),
         payload: {
-          expectedRevision: created.revision,
-          idempotencyKey: "r2-eight-target-poll",
+          operation: "get",
           planHandle: created.planHandle
         },
         scope: runtime.scope,
@@ -121,6 +126,7 @@ describe("consistency r2 planTool boundaries", () => {
       if (isAgenticErrorResult(polled)) {
         throw new Error("plan poll failed");
       }
+      assert.equal(durations.length, transactionsBeforeGet, "GET must not acquire mutation transactions");
       assert.notEqual(polled.status, "processing");
       assert.equal(polled.revision, created.revision);
     }
@@ -155,7 +161,7 @@ describe("consistency r2 planTool boundaries", () => {
       },
       store
     });
-    const created = await planTool({
+    const created = await completedPlanTool({
       config: runtime.config,
       now: new Date().toISOString(),
       payload: {

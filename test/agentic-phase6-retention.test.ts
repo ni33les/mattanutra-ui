@@ -122,7 +122,7 @@ describe("Phase 6 B12 retention, K2 copy, and latency split", () => {
     assert.equal(names.includes("Vitamin K2"), true);
     assert.equal(names.includes("MK-7"), true);
     assert.equal(names.includes("Menaquinone-7"), true);
-    assert.ok(AGENTIC_SERVER_INSTRUCTIONS.includes(CLIENT_GUIDE_URI));
+    assert.match(AGENTIC_SERVER_INSTRUCTIONS, /info.*service card, templates and operation schemas/);
     const guide = readContractResource(CLIENT_GUIDE_URI)?.contents[0]?.text ?? "";
     assert.match(guide, /Vitamin K2 aliases resolve while nutrient forms and units remain distinct/);
     assert.doesNotMatch(guide, /K2 becomes leftover not_in_catalogue/i);

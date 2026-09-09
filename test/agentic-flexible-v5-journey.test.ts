@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { afterEach, beforeEach, describe, it } from "node:test";
 import { createAgenticRuntime } from "../lib/agentic/runtime.ts";
 import { createMemoryStore } from "../lib/agentic/store/memory.ts";
-import { handleJsonRpc } from "../lib/agentic/mcp/dispatcher.ts";
+import { handleCompletedFullJsonRpc as handleJsonRpc } from "./helpers/completed-mcp-client.ts";
 import { installGoldCatalogue, uninstallGoldCatalogue } from "./helpers/gold-catalogue.ts";
 import { replaceCatalogueSnapshot } from "../lib/agentic/catalogue/snapshot.ts";
 import { sampleRetailProduct, sampleValueSnapshot } from "./agentic/value/sample-catalogue.ts";
@@ -70,7 +70,8 @@ describe("v5 complete conversational plan mutations and immutable purchase", () 
     assert.deepEqual(await call(runtime, "plan", proposal), revised);
     const bad = await call(runtime, "plan", { ...proposal, expectedRevision: revised.revision, idempotencyKey: "v5-journey-badqty-01", requestPatch: { requirements: { productDoses: [{ productId: chosen.productId, servingsPerDay: 0.125 }] } } });
     assert.equal(bad.ok, false); assert.equal(bad.error.fieldPath, "request.requirements.productDoses[0].servingsPerDay");
-    const current = await call(runtime, "plan", { operation: "get", planHandle: created.planHandle });
+    const current = await call(runtime, "plan", { operation: "get", responseView: "status", planHandle: created.planHandle });
+    assert.equal(current.ok, true); assert.equal(current.revision, revised.revision); assert.equal(current.operationStatus, "failed");
     const clear = await call(runtime, "plan", { ...proposal, expectedRevision: current.revision, idempotencyKey: "v5-journey-clear-01", requestPatch: { requirements: { productDoses: [], maxProductCount: null } } });
     assert.equal(clear.ok, true, JSON.stringify(clear)); assert.deepEqual(clear.medicationCodes, request.medicationCodes);
   });

@@ -310,8 +310,8 @@ describe("life-stage stack UL on every live matching flow", () => {
     assert.match(search, /labelledSafetyExposure/);
     // V5 centralises all attempted additions in the budgeted search pass;
     // the old index-level untracked fallback is deliberately removed.
-    assert.match(search, /return tryAddVariant\(state, variant, group, request\)/);
-    assert.match(index, /searchGroups\(/);
+    assert.match(search, /const next = tryAddVariant\(state, variant, group, request\)/);
+    assert.match(index, /advanceMatchCursor\(/);
     assert.doesNotMatch(index, /tryAddVariant\(/);
     assert.match(selector, /tryAddVariant/);
     assert.match(web, /const result = match\(/);

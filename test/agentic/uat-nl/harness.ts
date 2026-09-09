@@ -10,7 +10,8 @@ import type { CatalogueSnapshot } from "../../../lib/agentic/catalogue/types.ts"
 import { AGENTIC_CONTRACT_VERSION, loadAgenticConfig } from "../../../lib/agentic/config.ts";
 import { RESEARCH_VERSION } from "../../../lib/agentic/discovery/versions.ts";
 import { AGENTIC_SCHEMA_CHECKSUM, resetInfoCache } from "../../../lib/agentic/info.ts";
-import { handleJsonRpc } from "../../../lib/agentic/mcp/dispatcher.ts";
+import { handleCompletedFullJsonRpc as handleJsonRpc } from "../../helpers/completed-mcp-client.ts";
+import { refreshAdminSafetyCeilings } from "../../../lib/agentic/catalogue/load-safety-ceilings.ts";
 import { MATCHER_VERSION } from "../../../lib/matcher/config.ts";
 import { resetMatchPlanCache } from "../../../lib/agentic/plan/matching.ts";
 import {
@@ -94,6 +95,7 @@ export async function freezeRealThailandCatalogue() {
     try {
       resetCatalogueSnapshotCache();
       frozenReal = freezeCatalogueSnapshot(await cachedLiveRetailSnapshot("TH"));
+      await refreshAdminSafetyCeilings({ runtimeRevision: frozenReal.runtimeRevision });
     } finally {
       if (previous === undefined) {
         delete process.env.NODE_TEST_CONTEXT;

@@ -376,7 +376,7 @@ export async function pinWithoutRematch(snapshot: CatalogueSnapshot, store = cre
     store
   });
 
-  if (!("ok" in pinned) || pinned.ok !== true) {
+  if (!("ok" in pinned) || pinned.ok !== true || pinned.status === "processing" || !pinned.optionId) {
     return { pinKeptOption: false, pinWithoutRematch: false };
   }
 

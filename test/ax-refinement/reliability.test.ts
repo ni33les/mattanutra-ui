@@ -1,9 +1,10 @@
 import assert from "node:assert/strict";
 import { test, afterEach } from "node:test";
-import { setImmediate as nextTurn, setTimeout as delay } from "node:timers/promises";
-import { profile, runtime, rpc, installRealCatalogue, uninstallRealCatalogue, barrier } from "./helpers.ts";
+import { setImmediate as nextTurn } from "node:timers/promises";
+import { profile, runtime, rpc, rpcWithTaskExecutor, installRealCatalogue, uninstallRealCatalogue, barrier } from "./helpers.ts";
 import { setMatcherGateForTests, setMatcherEnteredForTests, resetPlanCreateInflightForTests, runAdmittedPlanOperation } from "../../lib/agentic/plan/service.ts";
 import { advanceServiceClock, useLiveServiceClock } from "../../lib/agentic/qa/service-clock.ts";
+import { requestAbortSignal } from "../../lib/agentic/qa/request-trace.ts";
 import type { PlanResult } from "../../lib/agentic/plan/types.ts";
 
 afterEach(context => { if (context.name.startsWith("AXR-")) { setMatcherGateForTests(null); setMatcherEnteredForTests(null); resetPlanCreateInflightForTests(); uninstallRealCatalogue(); } });
@@ -12,23 +13,28 @@ test("AXR-REL-02 a held real matcher hands off at its existing return budget wit
   await installRealCatalogue();
   const instance = runtime("handoff"), held = barrier(), entered = barrier();
   setMatcherGateForTests(held.promise); setMatcherEnteredForTests(entered.release);
-  let response: Awaited<ReturnType<typeof rpc>> | undefined;
-  const pending = rpc(instance, "plan", { operation: "create", idempotencyKey: "ax-refinement-held-a2", request: profile("A2") }).then(value => { response = value; return value; });
+  const pending = rpc(instance, "plan", { operation: "create", idempotencyKey: "ax-refinement-held-a2", request: profile("A2") });
+  const response = await pending;
+  assert.equal(response.status, "processing");
+  const admitted = await instance.store.getPlanOperationByKey("dev:mattanutra:ax-refinement:handoff", "ax-refinement-held-a2");
+  assert.ok(admitted); assert.equal(admitted.status, "queued");
+  // The controlled latch belongs to the durable operation, not the finished HTTP attempt.
+  requestAbortSignal(`plan-operation:${admitted.id}`);
+  const executing = runAdmittedPlanOperation({ store: instance.store, config: instance.config, operationId: admitted.id });
   try {
-    await Promise.race([entered.promise, pending.then(result => { throw new Error(`Returned before barrier: ${JSON.stringify(result)}`); })]);
+    await entered.promise;
     advanceServiceClock(3000);
     await nextTurn(); await nextTurn();
-    assert.ok(response, "The 3-second handoff must return while matching remains held");
-    assert.equal(response.status, "processing");
     assert.equal(response.ok, true);
     assert.equal(response.operationalDecision.nextAction, "poll_plan");
     assert.ok(response.planHandle && response.pollAfterSeconds > 0);
     assert.equal(response.basket, undefined);
+    const observed = await rpc(instance, "plan", { operation: "get", planHandle: response.planHandle, responseView: "status" });
+    assert.equal(observed.status, "processing");
+    assert.equal((await instance.store.getPlanOperation(admitted.id))?.status, "running");
   } finally {
-    held.release(); await pending;
-    const admitted = await instance.store.getPlanOperationByKey("dev:mattanutra:ax-refinement:handoff", "ax-refinement-held-a2");
-    assert.ok(admitted);
-    const finished = await runAdmittedPlanOperation({ store: instance.store, config: instance.config, operationId: admitted.id });
+    held.release();
+    const finished = await executing;
     assert.equal(finished.ok, true, JSON.stringify(finished));
     assert.notEqual(finished.status, "processing");
     assert.equal((await instance.store.getPlanOperation(admitted.id))?.status, "complete");
@@ -40,14 +46,7 @@ test("AXR-REL-01 reconstructed A2 expanded exclusions preserve effort, context a
   await installRealCatalogue();
   useLiveServiceClock();
   const instance = runtime("a2-expanded");
-  async function completed(args: Record<string, unknown>) {
-    let value = await rpc(instance, "plan", args);
-    while (value.status === "processing") {
-      await delay(Number(value.pollAfterSeconds) * 1000);
-      value = await rpc(instance, "plan", { operation: "get", planHandle: value.planHandle });
-    }
-    return value;
-  }
+  const completed = (args: Record<string, unknown>) => rpcWithTaskExecutor(instance, "plan", { responseView: "full", ...args });
   const original = profile("A2");
   let result!: Awaited<ReturnType<typeof rpc>>;
   await t.test("create within the existing client deadline", { timeout: 90000 }, async () => {
@@ -67,7 +66,7 @@ test("AXR-REL-01 reconstructed A2 expanded exclusions preserve effort, context a
     });
     assert.equal(result.ok, true, JSON.stringify(result)); assert.equal(result.revision, index + 2);
     assert.notEqual(result.status, "processing");
-    assert.deepEqual(await rpc(instance, "plan", args), result);
+    assert.deepEqual(await rpc(instance, "plan", { responseView: "full", ...args }), result);
   }
   assert.equal(result.searchSummary.effort, "expanded");
   assert.equal(result.searchSummary.expansionBudget, 64000);

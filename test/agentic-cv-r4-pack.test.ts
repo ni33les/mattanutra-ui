@@ -23,10 +23,10 @@ import {
 } from "./agentic/value/impl-evidence.ts";
 import {
   basketOf,
-  callPlan,
+  callCompletedPlan as callPlan,
   closeSession,
   coverageOf,
-  createPlan,
+  createCompletedPlan as createPlan,
   d3OnlyRequest,
   freezeFinancialCatalogue,
   IMPL_SAFETY_LEDGER_VERSION,
@@ -1264,7 +1264,7 @@ describe("Customer value implementation pack v1.4", () => {
       t.diagnostic(JSON.stringify({ first, second }));
     }
     assert.equal(canonicalR4Report(first), canonicalR4Report(second), "v1.4 runs diverged");
-    assert.equal(MATCHER_VERSION, "flexible-dose-fit-4");
+    assert.equal(MATCHER_VERSION, "flexible-dose-fit-9");
     assert.equal(CUSTOMER_VALUE_PACK_VERSION, "dev-customer-value-v4.0");
     const failed = [...first.cases, ...second.cases].filter((item) => item.result !== "PASS");
     assert.equal(

@@ -1,3 +1,4 @@
+import { startMemoryTaskExecutor } from "../helpers/completed-mcp-client.ts";
 import assert from "node:assert/strict";
 import { before, after, test } from "node:test";
 import { writeFileSync } from "node:fs";
@@ -11,7 +12,9 @@ import { projectPlan } from "../../lib/agentic/presentation/plan.ts";
 import { toolResult } from "../../lib/agentic/mcp/rpc.ts";
 const app = runtime("m723-goldens");
 const results: Record<string, { create: Record<string, unknown>; conversation: PlanConversationWire; full: PlanSuccessWire; elapsedMs: number }> = {};
+let stopWorker: (() => Promise<void>) | undefined;
 before(async () => {
+  stopWorker = startMemoryTaskExecutor(app);
   await installCatalogue(); useLiveServiceClock();
   for (const [name, request] of Object.entries(goldens)) {
     const start = performance.now();
@@ -27,7 +30,8 @@ before(async () => {
     results[name] = { create, conversation: conversation as unknown as PlanConversationWire, full: full as unknown as PlanSuccessWire, elapsedMs };
   }
 });
-after(() => {
+after(async () => {
+  await stopWorker?.();
   if (process.env.MCP_723_EVIDENCE_DIR) writeFileSync(`${process.env.MCP_723_EVIDENCE_DIR}/exact-goldens.json`, JSON.stringify({ requests: goldens, results }, null, 2), { flag: "wx" });
   resetPlanCreateInflightForTests(); uninstallRealCatalogue();
 });
@@ -37,10 +41,11 @@ test("d3_2000_selected_is_one_product_and_at_most_two_pills", () => {
   assert.equal(selected.basket![0].servingsPerDay, 2); assert.equal(selected.stackSummary.totalDailyPills, 2); assert.equal(selected.doseFit!.total, 0);
 });
 test("highlighted_alternative_is_a_different_option", () => {
-  for (const { conversation: value } of Object.values(results)) {
+  for (const { conversation: value, full } of Object.values(results)) {
     assert.ok(value.options.length > 1, "An alternative must actually exist");
     assert.ok(value.highlightedAlternativeOptionId && value.highlightedAlternativeOptionId !== value.selectedOptionId);
-    assert.ok(value.options.some(row => row.optionId === value.highlightedAlternativeOptionId && row.purchaseEligible));
+    assert.ok(value.options.some(row => row.optionId === value.highlightedAlternativeOptionId));
+    assert.ok(full.options!.some(row => row.optionId === value.highlightedAlternativeOptionId && row.purchaseEligible));
   }
 });
 test("k2_plus_d3_does_not_require_a_calcium_stack_when_a_simpler_option_exists", () => {
@@ -66,6 +71,9 @@ test("locks_omit_views_status_speed_and_unassessed_context", async () => {
     assert.equal(projected.advice.filter(row => row.kind === "incomplete_information").length, 1);
     assert.deepEqual(projected.options.map(row => row.optionId), results.d3.full.options!.map(row => row.optionId));
   }
-  const text = results.k2_d3.conversation.advice.map(row => row.message).join(" ");
+  const detail = await rpc(app, "plan", { operation: "get", planHandle: results.k2_d3.conversation.planHandle, responseView: "details", expectedRevision: results.k2_d3.conversation.revision, sections: ["advice"] });
+  assert.ok(detail.safetyGuidance.length, "Detailed advice must remain accessible through the public tool");
+  assert.ok(results.k2_d3.conversation.advice.every(row => !("message" in row)));
+  const text = detail.safetyGuidance.map(row => row.message).join(" ");
   assert.match(text, /apixaban/); assert.match(text, /atrial_fibrillation/); assert.match(text, /not (?:been )?assessed/);
 });

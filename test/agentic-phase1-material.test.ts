@@ -40,7 +40,7 @@ describe("Phase 1 material contribution", () => {
     assert.deepEqual(result.selected?.productIds, ["G-C-500"]);
   });
 
-  it("accepts an equally fitting lower-price labelled D3 carrier", () => {
+  it("retains the lower-price labelled carrier alongside the dedicated D3 recommendation", () => {
     const result = match(
       qaRequest({
         optimization: "balanced",
@@ -64,7 +64,8 @@ describe("Phase 1 material contribution", () => {
         })
       ])
     );
-    assert.deepEqual(result.selected?.productIds, ["G-BETA-GLUCAN"]);
+    assert.deepEqual(result.selected?.productIds, ["G-D3-2000"]);
+    assert.ok(result.alternatives.some(option => option.productIds.join() === "G-BETA-GLUCAN" && option.priceMinor === 8000));
     assert.equal(result.selected?.doseFit?.total, 0);
   });
 

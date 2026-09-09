@@ -1,3 +1,4 @@
+import { withMemoryTaskExecutor } from "../helpers/completed-mcp-client.ts";
 import assert from "node:assert/strict";
 import { afterEach, test } from "node:test";
 import { writeFileSync } from "node:fs";
@@ -23,6 +24,7 @@ test("M721-GOLD-01 frozen DEV D3 admits and reads conversation below 30 KB withi
     assert.deepEqual(validateToolIssues(AGENTIC_OUTPUT_SCHEMAS.plan, value), []);
     calls.push({ args, result: response.result }); return { value, result: response.result };
   }
+  await withMemoryTaskExecutor(app, async () => {
   const started = performance.now();
   const creation = { operation: "create", idempotencyKey: "m721-frozen-d3-create", request };
   let { value } = await call(creation); assert.equal(value.responseView, "conversation");
@@ -56,4 +58,5 @@ test("M721-GOLD-01 frozen DEV D3 admits and reads conversation below 30 KB withi
     selected: { basket: selected.basket, doseFit: selected.doseFit, stackSummary: selected.stackSummary },
     options: full.options!.map(row => ({ roles: row.roles, basket: row.basket, stackSummary: row.stackSummary, doseFit: row.doseFit }))
   }, null, 2), { flag: "wx" });
+  });
 });

@@ -38,9 +38,9 @@ test("AXR-DEPLOY-01 DEV work-package proofs reject stale source, wrong environme
 test("AXR-DEPLOY-02 scoped verification is explicit and DEV-only while ordinary deployment retains full verification", () => {
   const dev = readFileSync(new URL("../../scripts/deploy-dev.mjs", import.meta.url), "utf8");
   const published = JSON.parse(readFileSync(new URL("../../public/.well-known/mcp.json", import.meta.url), "utf8"));
-  assert.equal(published.contractVersion, "7.0.0");
+  assert.equal(published.contractVersion, "7.2.4");
   const fullGate = readFileSync(new URL("../../scripts/run-dev-advisory-validation.mjs", import.meta.url), "utf8");
-  assert.ok(fullGate.includes('contractVersion !== "7.0.0"'));
+  assert.ok(fullGate.includes('contractVersion !== "7.0.0"'), "The historical full-advisory gate remains separately versioned");
   assert.match(dev, /--ax-refinement-attestation/); assert.match(dev, /verify:dev/); assert.match(dev, /readAxValidationProof/);
   const uat = readFileSync(new URL("../../scripts/deploy-uat.mjs", import.meta.url), "utf8");
   assert.doesNotMatch(uat, /readAxValidationProof|ax-refinement-attestation/);

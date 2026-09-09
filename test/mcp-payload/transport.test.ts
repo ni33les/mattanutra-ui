@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { afterEach, test } from "node:test";
-import { installRealCatalogue, uninstallRealCatalogue, runtime, rpc, profile } from "../ax-refinement/helpers.ts";
+import { installRealCatalogue, uninstallRealCatalogue, runtime, rpcWithTaskExecutor as rpc, profile } from "../ax-refinement/helpers.ts";
 import { resetPlanCreateInflightForTests } from "../../lib/agentic/plan/service.ts";
 import { AGENTIC_INPUT_SCHEMAS, validateToolIssues } from "../../lib/agentic/contract/index.ts";
 
@@ -61,8 +61,11 @@ test("PAY-TRANSPORT-04 covered targets finish naturally and above-limit findings
   const noPurchase = await rpc(app, "plan", { operation: "create", idempotencyKey: "payload-no-purchase-01", responseView: "conversation", request: { ...base, currentSupplements: [{ name: "Vitamin C", dailyAmount: 500, unit: "mg", daysRemaining: 40 }] } });
   assert.equal(noPurchase.ok, true); assert.equal(noPurchase.status, "no_purchase"); assert.equal(noPurchase.purchaseRequiredNow, false); assert.equal(noPurchase.highlightedAlternativeOptionId, null);
   const above = await rpc(app, "plan", { operation: "create", idempotencyKey: "payload-above-limit-01", responseView: "conversation", request: { ...base, targets: [{ name: "Vitamin D3", amount: 150, unit: "mcg", basis: "supplemental" }], currentSupplements: [{ name: "Vitamin D3", dailyAmount: 120, unit: "mcg" }] } });
-  assert.equal(above.ok, true); assert.ok(above.advice.some(row => row.exposure > row.threshold && row.threshold > 0));
-  const option = above.options.find(row => row.purchaseEligible); assert.ok(option);
+  assert.equal(above.ok, true);
+  const fullAdvice = await rpc(app, "plan", { operation: "get", planHandle: above.planHandle, responseView: "details", expectedRevision: above.revision, sections: ["advice"] });
+  assert.ok(fullAdvice.safetyGuidance.some(row => row.exposure > row.threshold && row.threshold > 0));
+  assert.ok(above.advice.some(row => row.kind === "dose_review"));
+  const option = above.options.find(row => row.stackSummary.productCount > 0); assert.ok(option);
   const selected = await rpc(app, "plan", { operation: "select", planHandle: above.planHandle, expectedRevision: above.revision, optionId: option.optionId, idempotencyKey: "payload-above-select-01", responseView: "conversation" });
-  assert.equal(selected.ok, true); assert.equal(selected.operationalDecision.purchaseEligible, true); assert.ok(selected.advice.some(row => row.exposure > row.threshold && row.threshold > 0));
+  assert.equal(selected.ok, true); assert.equal(selected.operationalDecision.purchaseEligible, true); assert.ok(selected.advice.some(row => row.kind === "dose_review"));
 });

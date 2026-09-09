@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, it } from "node:test";
 import { applyVerifiedPaymentEvent } from "../lib/agentic/commerce/state.ts";
 import { mockEventForScenario } from "../lib/agentic/commerce/payment.ts";
 import { processOmsOutbox, applyFulfilmentEvent } from "../lib/agentic/retail/mock-thailand.ts";
-import { planTool } from "../lib/agentic/plan/service.ts";
+import { completedPlanTool as planTool } from "./helpers/completed-mcp-client.ts";
 import { executeTool } from "../lib/agentic/commerce/execute.ts";
 import { orderTool } from "../lib/agentic/commerce/order.ts";
 import { handleQaJsonRpc } from "../lib/agentic/mcp/qa-dispatcher.ts";
