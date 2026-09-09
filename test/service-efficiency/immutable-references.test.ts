@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { afterEach, test } from "node:test";
 import * as references from "../../lib/matcher/safety-ceilings.ts";
+import { runWithMatcherSafetySnapshot } from "../../lib/matcher/safety-ceilings-server.ts";
 import { installCatalogue, goldens } from "../mcp-7-2-3/helpers.ts";
 import { runtime, rpc, uninstallRealCatalogue } from "../ax-refinement/helpers.ts";
 import { runAdmittedPlanOperation } from "../../lib/agentic/plan/service.ts";
@@ -13,12 +14,12 @@ import type { AgenticStore } from "../../lib/agentic/store/types.ts";
 afterEach(uninstallRealCatalogue);
 
 test("LOCK-SNAPSHOT-02 concurrent reference scopes keep their immutable facts after a refresh", async () => {
-  assert.equal(typeof references.runWithMatcherSafetySnapshot, "function");
+  assert.equal(typeof runWithMatcherSafetySnapshot, "function");
   references.setMatcherSafetyCeilings([{ subjectId: "d3", name: "Vitamin D3", maxAmount: 100, maxUnit: "mcg" }], { runtimeRevision: 1, fingerprint: "a".repeat(64) });
   const old = references.captureMatcherSafetySnapshot(1);
   let release!: () => void;
   const gate = new Promise<void>(resolve => { release = resolve; });
-  const pending = references.runWithMatcherSafetySnapshot(old, async () => {
+  const pending = runWithMatcherSafetySnapshot(old, async () => {
     await gate;
     assert.equal(references.matcherSafetyCeilings()[0]?.maxAmount, 100);
     assert.equal(references.matcherSafetyReferenceIdentity()?.runtimeRevision, 1);

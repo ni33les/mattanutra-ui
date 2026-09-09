@@ -32,7 +32,8 @@ import {
 } from "@/lib/agentic/idempotency";
 import { resolveMarket } from "@/lib/agentic/catalogue/market";
 import { refreshAdminSafetyCeilings } from "@/lib/agentic/catalogue/load-safety-ceilings";
-import { matcherSafetyCeilings, captureMatcherSafetySnapshot, runWithMatcherSafetySnapshot, type MatcherSafetySnapshot } from "@/lib/matcher/safety-ceilings";
+import { matcherSafetyCeilings, captureMatcherSafetySnapshot, type MatcherSafetySnapshot } from "@/lib/matcher/safety-ceilings";
+import { runWithMatcherSafetySnapshot } from "@/lib/matcher/safety-ceilings-server";
 import { AGENTIC_CONTRACT_VERSION, GUIDANCE_RULES_VERSION } from "@/lib/agentic/config";
 import { ensureCatalogueSnapshot } from "@/lib/agentic/catalogue/snapshot";
 import {

@@ -1,4 +1,3 @@
-import { AsyncLocalStorage } from "node:async_hooks";
 import type {
   LifeStage,
   MatcherUnit,
@@ -71,28 +70,29 @@ export type SafetyReferenceIdentity = Readonly<{ runtimeRevision: number; finger
 export type MatcherSafetySnapshot = Readonly<{
   version: 1; ceilings: readonly SafetyCeiling[]; identity: SafetyReferenceIdentity | null; unavailable: boolean;
 }>;
-const referenceScope = new AsyncLocalStorage<MatcherSafetySnapshot>();
+// The browser matcher uses the same pure fact readers. Server callers install
+// their request-local accessor without importing Node runtime APIs here.
+let readReferenceScope: (() => MatcherSafetySnapshot | undefined) | undefined;
+export function installMatcherSafetyScope(reader: () => MatcherSafetySnapshot | undefined) {
+  readReferenceScope = reader;
+}
 const referenceSnapshots = new Map<number, MatcherSafetySnapshot>();
 let cached: { at: number; ceilings: SafetyCeiling[]; referenceIdentity: SafetyReferenceIdentity | null } | null = null;
 let unavailable = false;
 
-function immutableReferences(value: MatcherSafetySnapshot): MatcherSafetySnapshot {
+export function immutableReferences(value: MatcherSafetySnapshot): MatcherSafetySnapshot {
   if (value.version !== 1) throw new Error("Unsupported immutable safety reference snapshot");
   return Object.freeze({ ...value, identity: value.identity ? Object.freeze({ ...value.identity }) : null,
     ceilings: Object.freeze(value.ceilings.map(item => Object.freeze({ ...item }))) });
 }
 
 export function captureMatcherSafetySnapshot(runtimeRevision?: number): MatcherSafetySnapshot {
-  const scoped = referenceScope.getStore();
+  const scoped = readReferenceScope?.();
   if (scoped && (runtimeRevision === undefined || scoped.identity?.runtimeRevision === runtimeRevision)) return scoped;
   const snapshot = runtimeRevision === undefined ? immutableReferences({ version: 1, ceilings: cached?.ceilings ?? [],
     identity: cached?.referenceIdentity ?? null, unavailable: matcherSafetyCeilingsUnavailable() }) : referenceSnapshots.get(runtimeRevision);
   if (!snapshot) throw new Error("Immutable safety reference snapshot is unavailable for the catalogue revision");
   return snapshot;
-}
-
-export function runWithMatcherSafetySnapshot<T>(snapshot: MatcherSafetySnapshot, work: () => T): T {
-  return referenceScope.run(immutableReferences(snapshot), work);
 }
 
 export function setMatcherSafetyCeilings(ceilings: readonly SafetyCeiling[], referenceIdentity: SafetyReferenceIdentity | null = null) {
@@ -110,11 +110,11 @@ export function setMatcherSafetyCeilingsUnavailable() {
 }
 
 export function matcherSafetyCeilingsUnavailable() {
-  return referenceScope.getStore()?.unavailable ?? (unavailable && (cached?.ceilings.length ?? 0) < 1);
+  return readReferenceScope?.()?.unavailable ?? (unavailable && (cached?.ceilings.length ?? 0) < 1);
 }
 
 export function matcherSafetyCeilings() {
-  return referenceScope.getStore()?.ceilings as SafetyCeiling[] | undefined ?? cached?.ceilings ?? [];
+  return readReferenceScope?.()?.ceilings as SafetyCeiling[] | undefined ?? cached?.ceilings ?? [];
 }
 
 export function matcherSafetyCeilingsCachedAt() {
@@ -122,7 +122,7 @@ export function matcherSafetyCeilingsCachedAt() {
 }
 
 export function matcherSafetyReferenceIdentity() {
-  const scoped = referenceScope.getStore();
+  const scoped = readReferenceScope?.();
   return scoped ? scoped.identity : cached?.referenceIdentity ?? null;
 }
 

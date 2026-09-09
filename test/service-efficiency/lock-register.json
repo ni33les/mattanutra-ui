@@ -246,12 +246,14 @@
         "lib/retail-product-checkout.ts",
         "lib/task-result-applier.ts",
         "lib/agentic/store/postgres.ts:isCatalogueRevisionCurrent",
-        "lib/retail-product-checkout.ts:currentWebCheckoutRecommendations"
+        "lib/retail-product-checkout.ts:currentWebCheckoutRecommendations",
+        "lib/matcher/safety-ceilings-server.ts"
       ],
       "tests": [
         "test/agentic-catalogue-publish-v5.integration.test.ts",
         "test/web-advisory.integration.test.ts",
-        "test/service-efficiency/checkout-preparation.test.ts"
+        "test/service-efficiency/checkout-preparation.test.ts",
+        "test/service-efficiency/reference-browser.test.ts"
       ],
       "verification": "Required named cases reconciled with successful execution by lock-register-verification.json in the unchanged-source scoped gate; historical RED evidence remains separate.",
       "cases": [
@@ -298,6 +300,10 @@
         {
           "file": "test/service-efficiency/checkout-preparation.test.ts",
           "name": "LOCK-CHECKOUT-02 catalogue changes after preparation prevent new checkout but preserve frozen recovery"
+        },
+        {
+          "file": "test/service-efficiency/reference-browser.test.ts",
+          "name": "LOCK-SNAPSHOT-04 shared browser matching bundles without server async-context imports"
         }
       ],
       "historicalCallers": [
@@ -1456,11 +1462,13 @@
       "permittedWork": "Only the bounded productive work or immutable coalescing described by this mechanism; never serialize unrelated ordinary reads.",
       "release": "Until SELECT/parse/fingerprint succeeds or fails. The 10-minute cache TTL is not a held lock.",
       "callers": [
-        "lib/agentic/catalogue/load-safety-ceilings.ts"
+        "lib/agentic/catalogue/load-safety-ceilings.ts",
+        "lib/matcher/safety-ceilings-server.ts"
       ],
       "tests": [
         "test/service-efficiency/read-coalescing.integration.test.ts",
-        "test/service-efficiency/immutable-references.test.ts"
+        "test/service-efficiency/immutable-references.test.ts",
+        "test/service-efficiency/reference-browser.test.ts"
       ],
       "verification": "Required named cases reconciled with successful execution by lock-register-verification.json in the unchanged-source scoped gate; historical RED evidence remains separate.",
       "cases": [
@@ -1475,6 +1483,10 @@
         {
           "file": "test/service-efficiency/immutable-references.test.ts",
           "name": "LOCK-SNAPSHOT-03 interrupted durable matching restores its catalogue and references after both change"
+        },
+        {
+          "file": "test/service-efficiency/reference-browser.test.ts",
+          "name": "LOCK-SNAPSHOT-04 shared browser matching bundles without server async-context imports"
         }
       ],
       "historicalCallers": [
