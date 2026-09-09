@@ -1,5 +1,4 @@
 import { healthScoreReadProjection } from "@/lib/healthscore-readiness";
-import { loadAdminSafetyReferenceSnapshot } from "@/lib/agentic/catalogue/load-safety-ceilings";
 import { matchesSafetyReferenceIdentity } from "@/lib/agentic/catalogue/reference-job";
 import { getAssessmentProductPreferences } from "@/lib/assessment-product-preferences";
 import { enqueueReadyHealthScoreDeliveries } from "@/lib/healthscore-delivery";
@@ -2227,20 +2226,20 @@ async function applyProductRecommendationsResult(
   if (!sql || !task.planId) {
     throw new Error("Product recommendation result is missing plan");
   }
-  const preferences = await getAssessmentProductPreferences(sql, task.planId, true);
+  // The assessment fence is already held and every preference writer takes it.
+  const preferences = await getAssessmentProductPreferences(sql, task.planId);
   const expectedPreferences = objectValue(objectValue(task.payload).productPreferences);
   if (Number(expectedPreferences.revision ?? 0) !== preferences.revision) {
     return { superseded: true, message: "Product preferences changed; old result was not applied" };
   }
-  // Publication holds the shared epoch row until the completion transaction commits.
-  // Reference/catalogue edits update this row in their own transaction and must wait.
-  await sql`select revision from public.catalogue_runtime_revision where singleton=true for share`;
-  const reference = await loadAdminSafetyReferenceSnapshot(sql);
+  // Validate provenance against the task's immutable input, not today's catalogue.
+  // Current readers/selection fence freshness; completed older snapshots remain stored.
+  const reference = objectValue(objectValue(task.payload).safetyReferenceIdentity);
   const expectedCatalogueRevision = objectValue(task.payload).catalogueRevision;
-  if (expectedCatalogueRevision != null && (Number(expectedCatalogueRevision) !== reference.runtimeRevision || Number(objectValue(resultPayload).catalogueRevision) !== Number(expectedCatalogueRevision))) return { superseded: true, message: "Catalogue changed; old product result was not applied" };
   if (!Number.isSafeInteger(expectedCatalogueRevision) || !Number.isSafeInteger(objectValue(resultPayload).catalogueRevision) ||
-      !matchesSafetyReferenceIdentity(objectValue(task.payload).safetyReferenceIdentity, reference) ||
-      !matchesSafetyReferenceIdentity(objectValue(resultPayload).safetyReferenceIdentity, reference)) {
+      reference.runtimeRevision !== expectedCatalogueRevision || objectValue(resultPayload).catalogueRevision !== expectedCatalogueRevision ||
+      typeof reference.fingerprint !== "string" || !/^[a-f0-9]{64}$/.test(reference.fingerprint) ||
+      !matchesSafetyReferenceIdentity(objectValue(resultPayload).safetyReferenceIdentity, {runtimeRevision:Number(reference.runtimeRevision),fingerprint:reference.fingerprint})) {
     return { superseded: true, message: "Safety references changed or are missing; old product result was not applied" };
   }
   const [localeRow] = await sql<{ locale: string | null }[]>`
@@ -2484,7 +2483,7 @@ export async function applyTaskCompletionResult({
       return { superseded: true, message: "Assessment inputs changed; old result was not applied" };
     }
     if (task.taskType === "generate_food_gap_guidance") {
-      const preferences = await getAssessmentProductPreferences(db, task.planId, true);
+      const preferences = await getAssessmentProductPreferences(db, task.planId);
       if (Number(objectValue(objectValue(task.payload).productPreferences).revision ?? 0) !== preferences.revision) {
         return { superseded: true, message: "Product preferences changed; old result was not applied" };
       }
