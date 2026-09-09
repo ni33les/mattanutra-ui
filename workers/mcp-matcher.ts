@@ -1,4 +1,5 @@
 import { MATCH_WORKER_PROTOCOL } from "../lib/agentic/plan/match-worker-protocol.ts";
+import { takeWorkerMeasurements } from "../lib/service-metrics.ts";
 import { parentPort } from "node:worker_threads";
 import { matchPlan, matchPlanChunk, createResidentPlanSession, advanceResidentPlanSession } from "../lib/agentic/plan/matching.ts";
 import { matchCursorAttempts } from "../lib/matcher/match-cursor.ts";
@@ -45,5 +46,5 @@ parentPort.on("message", (job: MatchCommand) => {
   }
   const value = reply.result?.value;
   const buffer = value && "done" in value && value.checkpoint.cursor instanceof Uint8Array ? value.checkpoint.cursor.buffer as ArrayBuffer : null;
-  parentPort!.postMessage(reply, buffer ? [buffer] : []);
+  parentPort!.postMessage({ ...reply, metrics: takeWorkerMeasurements() }, buffer ? [buffer] : []);
 });

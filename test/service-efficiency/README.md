@@ -26,3 +26,26 @@ acceptance proofs. Final acceptance covers this package, never the whole app.
 
 Normalizations for comparisons are explicitly allowlisted generated identifiers
 and diagnostic timings; money, doses, advice, option order and work counts remain.
+
+## Operational limits and rollout
+
+Normal status/version reads do not take application row locks. Atomic admission,
+revision publication, order/payment transitions and catalogue publication fences
+retain their existing locks. Task creation joins the caller's transaction; wake
+notifications run after commit and periodic discovery remains the recovery path.
+The operation path takes the plan before its operation; checkout takes the plan
+before orders. Provider, matcher and email work execute outside those transactions.
+
+Production emits one bounded numeric measurement aggregate per minute. Worker
+checkpoint metrics are relayed to the owning request; input byte sizes are sampled
+once per 64 dispatches and include their measurement cost. SQL timing includes
+server execution and waiting; acquisition plus BEGIN is one combined metric because
+the managed transaction-pool driver does not expose independent acquisition time.
+These metrics do not claim a separately measured PostgreSQL lock-wait duration.
+
+Projection backfill is additive and resumable. Legacy rows use ordinary compatible
+reads until backfilled. Opaque result-version tokens can change once during rollout;
+a changed token requests a fresh payload, without changing basket or payment data.
+The internal worker protocol is version 2; legacy persisted checkpoint readers stay
+available. Restart the DEV application supervisor and its worker child together.
+No catalogue corrections, clinical reference changes or pool resizing are included.

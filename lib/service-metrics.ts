@@ -1,10 +1,12 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import { performance, monitorEventLoopDelay } from "node:perf_hooks";
 
-export type ServiceMetric = "db.acquire_begin_ms" | "db.setup_ms" | "db.sql_ms" | "db.statements" | "db.lock_timeouts"
-  | "worker.queue_ms" | "worker.execute_ms" | "worker.input_bytes" | "checkpoint.encode_ms" | "checkpoint.decode_ms"
-  | "checkpoint.bytes" | "serialization.ms" | "cache.hit" | "cache.miss" | "cache.eviction" | "cache.bytes";
+const METRIC_NAMES = ["db.acquire_begin_ms", "db.setup_ms", "db.sql_ms", "db.statements", "db.lock_timeouts",
+  "worker.queue_ms", "worker.execute_ms", "worker.input_bytes", "worker.sampled_input_bytes", "checkpoint.encode_ms", "checkpoint.decode_ms",
+  "checkpoint.bytes", "serialization.ms", "cache.hit", "cache.miss", "cache.eviction", "cache.bytes"] as const;
+export type ServiceMetric = typeof METRIC_NAMES[number];
 type Aggregate = { count: number; total: number; max: number };
+export type ServiceMetricBatch = Partial<Record<ServiceMetric, Aggregate>>;
 type Context = { metrics: Map<ServiceMetric, Aggregate>; queryNamespace: string; queries: Map<string, Map<string, number>> };
 const scopes = new AsyncLocalStorage<Context>();
 const totals = new Map<ServiceMetric, Aggregate>();
@@ -44,4 +46,21 @@ export function startServiceMeasurementReporting(write: (value: ReturnType<typeo
   reportTimer = setInterval(() => { write(serviceProcessMeasurements()); }, 60_000);
   reportTimer.unref?.();
   return () => { clearInterval(reportTimer); reportTimer = undefined; eventLoop?.disable(); eventLoop = undefined; };
+}
+
+
+/** Fixed numeric fields only; worker batches never include customer inputs. */
+export function takeWorkerMeasurements(): ServiceMetricBatch {
+  const result = Object.fromEntries(totals); totals.clear(); return result;
+}
+export function mergeWorkerMeasurements(batch: ServiceMetricBatch | undefined) {
+  if (!batch) return;
+  for (const name of METRIC_NAMES) {
+    const value = batch[name];
+    if (!value || !Number.isSafeInteger(value.count) || value.count < 1 || !Number.isFinite(value.total) || value.total < 0 || !Number.isFinite(value.max) || value.max < 0) continue;
+    for (const map of [totals, scopes.getStore()?.metrics]) if (map) {
+      const previous = map.get(name) ?? { count: 0, total: 0, max: 0 };
+      map.set(name, { count: previous.count + value.count, total: previous.total + value.total, max: Math.max(previous.max, value.max) });
+    }
+  }
 }

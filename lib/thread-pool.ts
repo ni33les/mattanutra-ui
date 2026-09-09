@@ -1,9 +1,12 @@
+import { AsyncLocalStorage } from "node:async_hooks";
+import { serialize } from "node:v8";
 import type { Worker, TransferListItem } from "node:worker_threads";
 import { performance } from "node:perf_hooks";
 import { matcherCpuAdmission } from "@/lib/matcher-cpu-admission";
-import { recordServiceMetric } from "@/lib/service-metrics";
+import { recordServiceMetric, mergeWorkerMeasurements, type ServiceMetricBatch } from "@/lib/service-metrics";
 
-export type ThreadReply<Result> = {result: Result; error?: never} | {error: string; result?: never};
+export type ThreadReply<Result> = ({result: Result; error?: never} | {error: string; result?: never}) & { metrics?: ServiceMetricBatch };
+let inputSamples = 0;
 export type ThreadRunOptions = {
   affinity?: string;
   beforeStart?: () => Promise<unknown>;
@@ -11,7 +14,7 @@ export type ThreadRunOptions = {
   inputBytes?: number;
 };
 type Job<Input, Result> = {
-  input: Input; options: ThreadRunOptions; queuedAt: number; startedAt?: number;
+  input: Input; options: ThreadRunOptions; runInContext: ReturnType<typeof AsyncLocalStorage.snapshot>; queuedAt: number; startedAt?: number;
   resolve: (result: Result) => void; reject: (error: unknown) => void;
   cleanup: () => void; controller: AbortController; settled: boolean; posted: boolean;
   startTimer: () => void;
@@ -47,7 +50,7 @@ export class ThreadPool<Input, Result> {
     return new Promise((resolve, reject) => {
       let timer: ReturnType<typeof setTimeout>;
       const controller = new AbortController();
-      const job: Job<Input, Result> = { input, options, resolve, reject, controller, settled: false, posted: false, queuedAt: performance.now(),
+      const job: Job<Input, Result> = { input, options, runInContext: AsyncLocalStorage.snapshot(), resolve, reject, controller, settled: false, posted: false, queuedAt: performance.now(),
         cleanup: () => { clearTimeout(timer); signal?.removeEventListener("abort", onAbort); },
         startTimer: () => { clearTimeout(timer); timer = setTimeout(() => this.cancel(job, new ThreadPoolUnavailableError("Matcher deadline exceeded")), timeoutMs); } };
       const onAbort = () => this.cancel(job, signal?.reason ?? new Error("Matcher cancelled"));
@@ -114,6 +117,11 @@ export class ThreadPool<Input, Result> {
       if (job.settled || slot.job !== job) return;
       job.startTimer(); job.startedAt = performance.now(); job.posted = true;
       if (job.options.inputBytes !== undefined) recordServiceMetric("worker.input_bytes", job.options.inputBytes);
+      if ((++inputSamples % 64) === 0) {
+        const measured = performance.now();
+        recordServiceMetric("worker.sampled_input_bytes", serialize(job.input).byteLength);
+        recordServiceMetric("serialization.ms", performance.now() - measured);
+      }
       slot.worker.postMessage(job.input, job.options.transferList);
     } catch (error) { this.cancel(job, error); }
   }
@@ -123,8 +131,11 @@ export class ThreadPool<Input, Result> {
     worker.on("message", (reply: ThreadReply<Result>) => {
       const job = slot.job; if (!job?.posted) return;
       slot.job = undefined; slot.releaseCpu?.(); slot.releaseCpu = undefined; worker.unref();
-      if (job.startedAt !== undefined) recordServiceMetric("worker.execute_ms", performance.now() - job.startedAt);
-      this.settle(job, reply); this.drain();
+      job.runInContext(() => {
+        if (job.startedAt !== undefined) recordServiceMetric("worker.execute_ms", performance.now() - job.startedAt);
+        mergeWorkerMeasurements(reply.metrics);
+        this.settle(job, reply);
+      }); this.drain();
     });
     worker.on("error", () => { const job = slot.job; if (job) this.cancel(job, new ThreadPoolUnavailableError("Matcher worker failed")); this.retire(slot); });
     worker.on("exit", () => {
