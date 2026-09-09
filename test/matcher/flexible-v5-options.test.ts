@@ -47,3 +47,9 @@ it('V5-OPTION-04: declared nutrients with unknown quantities remain exploration 
   assert.equal(option.purchaseEligible, true);
   assert.ok(option.safety.findings.some(row => row.uncertainty?.length));
 });
+it('MCP-MAINT-FOCUS-01: an unrelated one-product basket cannot win the dedicated-target tie-break', () => {
+  const result = match(request(), catalog([product('unrelated', {})]));
+  assert.equal(result.selected?.productCount, 0);
+  assert.equal(result.selected?.coveredCount, 0);
+  assert.equal(result.selected?.doseFit?.total, 1);
+});
