@@ -65,7 +65,6 @@ import { planCompactApplicable } from "@/lib/agentic/contract/plan-result";
 import { planClaimIds, planResearchVersion } from "@/lib/agentic/value/compact-decision";
 import { commitFunnelEvent } from "@/lib/agentic/funnel/ledger";
 import { setQueryNamespace, queryBudgetSnapshot } from "@/lib/agentic/plan/query-budget";
-import { acquirePermit, releasePermit } from "@/lib/agentic/qa/resource-permits";
 import { persistQueryBudget } from "@/lib/agentic/qa/persist";
 import { QA_NAMESPACE_PREFIX } from "@/lib/agentic/qa/session";
 import { throwIfAborted, waitUntilCancelled } from "@/lib/agentic/qa/request-trace";
@@ -1691,16 +1690,10 @@ async function completePreparedPlan(
     }
     snapshot = pinned;
   } else {
-    const permitId = `plan:${prepared.planId}:${prepared.revision}`;
-    acquirePermit(permitId, "database");
-    try {
-      snapshot = await persistCataloguePin(
-        await ensureCatalogueSnapshot(input.config.environment, country),
-        GUIDANCE_RULES_VERSION, input.store
-      );
-    } finally {
-      releasePermit(permitId, "database");
-    }
+    snapshot = await persistCataloguePin(
+      await ensureCatalogueSnapshot(input.config.environment, country),
+      GUIDANCE_RULES_VERSION, input.store
+    );
   }
   matcherEntered?.();
   const planCorrelation = planCorrelationId(input.payload.idempotencyKey);

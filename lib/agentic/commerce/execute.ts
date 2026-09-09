@@ -41,7 +41,6 @@ import {
   QA_NAMESPACE_PREFIX,
   resolveQaSession
 } from "@/lib/agentic/qa/session";
-import { acquirePermit, releasePermit } from "@/lib/agentic/qa/resource-permits";
 import {
   recordRequestStage,
   runObservedRequest,
@@ -613,9 +612,7 @@ async function executeFresh(
     if (executeFailAt === "before_commit") {
       throw new Error("execute_fail_before_commit");
     }
-    acquirePermit(correlation, "database");
     let response: ExecuteSuccess | undefined;
-    try {
     await store.insertOrder(draftOrder);
     await store.insertOrderItems(
       selected.basket.map((item) => ({
@@ -706,9 +703,6 @@ async function executeFresh(
     }
     if (executeFailAt === "at_commit") {
       throw new Error("execute_fail_at_commit");
-    }
-    } finally {
-      releasePermit(correlation, "database");
     }
     if (!response) {
       throw new Error("execute_fail_at_commit");

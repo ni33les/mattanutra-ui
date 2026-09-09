@@ -1,10 +1,6 @@
 import { actualRequestId, requestLifetime, withRequestLifetime } from "@/lib/request-lifetime";
 import { businessError, type AgenticErrorResult } from "@/lib/agentic/contract/errors";
 import {
-  acquirePermitWhenAvailable,
-  releaseAllPermits
-} from "@/lib/agentic/qa/resource-permits";
-import {
   deadlineExceeded,
   forgetRequestClock,
   markRequestStart,
@@ -245,17 +241,12 @@ export async function runObservedRequest<T>(
     return { kind: "deadline" as const };
   });
   const running = withRequestLifetime({ signal, correlationId, logicalId }, async () => {
-    for (const kind of ["admission", "worker", "connection"] as const) {
-      await acquirePermitWhenAvailable(correlationId, kind, signal);
-    }
     signal.throwIfAborted();
     if (deadlineExceeded(correlationId)) throw new DOMException("Deadline exceeded", "AbortError");
     return work();
   }).then(value => {
-    releaseAllPermits(correlationId);
     return { kind: "ok" as const, value };
   }, error => {
-    releaseAllPermits(correlationId);
     return { kind: "err" as const, error };
   });
 
@@ -283,16 +274,13 @@ export async function runObservedRequest<T>(
       await recordRequestStage(correlationId, "request_released", { skipLatch: true });
       return businessError({ correlationId, message: "The request was cancelled.", reasonCode: "temporarily_unavailable", retryable: true });
     }
-    if (error instanceof Error && error.message === "admission_queue_full") {
-      return businessError({ correlationId, message: "The service is busy. Retry shortly with the same idempotency key.", reasonCode: "temporarily_unavailable", retryable: true });
-    }
     throw error;
   } finally {
     finished = true;
     deadline.cancel();
     parentSignal?.removeEventListener("abort", abort);
-    // Keep admission capacity and the abort signal until underlying work stops.
-    // Returning a deadline must not admit an unbounded stream of orphaned work.
+    // Retain cancellation and trace state until the underlying work stops.
+    // Productive CPU admission and database pools own their respective capacity.
     void running.then(() => finishRequest(correlationId));
   }
 }
