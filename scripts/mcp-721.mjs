@@ -75,6 +75,16 @@ async function command(label, args, env = safe) {
 }
 if (mode === "validate") {
   const identity = mcp721Identity(source.sha256, commit, packageId);
+  if (packageId === "efficiency") {
+    const { verifyLockExecution } = await import("./service-efficiency/rollout-proof.mjs");
+    const raw = readFileSync("test/service-efficiency/lock-register.json");
+    writeFileSync(resolve(output, "lock-register.json"), raw, {flag:"wx", mode:0o600});
+    save("executed-cases.json", events);
+    save("lock-register-verification.json", verifyLockExecution(JSON.parse(raw), events));
+    save("rollout.json", {version:1, environments:["dev", "uat"], sourceCommit:commit,
+      deploymentBases:identity.deploymentBases, lockRegisterSha256:identity.lockRegisterSha256});
+    stages.push({label:"lock-register-verification", passed:true});
+  }
   await command("typecheck", ["node_modules/typescript/bin/tsc", "--noEmit"]);
   const lint = git("diff", "--name-only", "--diff-filter=ACMR", MCP721_BASE, "HEAD").split("\n").filter(file => /\.(?:[cm]?js|tsx?)$/.test(file));
   save("lint-files.json", { releaseBase: MCP721_BASE, files: lint }); assert.ok(lint.length);

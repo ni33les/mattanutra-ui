@@ -1,5 +1,6 @@
 import { npmCommand, run, runCapture } from "./dev-cycle-utils.mjs";
 import { spawn } from "node:child_process";
+import { deployEfficiencyUat } from "./service-efficiency/deploy-uat.mjs";
 
 const smokeAttempts = Number(process.env.UAT_DEPLOY_SMOKE_ATTEMPTS || 30);
 const smokeDelayMs = Number(process.env.UAT_DEPLOY_SMOKE_DELAY_MS || 20_000);
@@ -242,6 +243,8 @@ async function runImageStorageProbeIfConfigured() {
 }
 
 async function main() {
+  const efficiencyIndex = process.argv.indexOf("--service-efficiency-attestation");
+  if (efficiencyIndex >= 0) return deployEfficiencyUat(process.argv[efficiencyIndex + 1], uatSchemaDatabaseEnv());
   const branch = await runCapture("git", ["branch", "--show-current"]);
   const dirty = await runCapture("git", ["status", "--porcelain"]);
 

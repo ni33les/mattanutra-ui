@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync, realpathSync } from "node:fs";
 import { dirname, resolve, relative, isAbsolute } from "node:path";
 import { payloadHash } from "./mcp-payload/proof.mjs";
+import { validateRolloutBinding, verifyLockExecution } from "./service-efficiency/rollout-proof.mjs";
 
 export const MCP721_BASE = "22f3ce60f17158c68a251abe4070f582dd39253a";
 export const MCP_PACKAGES = {
@@ -15,13 +16,15 @@ export const MCP_PACKAGES = {
 };
 export const MCP721_STAGES = ["affected-tests", "typecheck", "release-diff-lint", "production-build", "unchanged-source-and-inputs"];
 export function packageStages(packageId) {
-  return packageId === "efficiency" ? ["isolated-schema", "affected-tests", "typecheck", "release-diff-lint", "production-build", "affected-browser-tests", "repeated-baseline-comparison", "unchanged-source-and-inputs"] : MCP721_STAGES;
+  return packageId === "efficiency" ? ["isolated-schema", "affected-tests", "lock-register-verification", "typecheck", "release-diff-lint", "production-build", "affected-browser-tests", "repeated-baseline-comparison", "unchanged-source-and-inputs"] : MCP721_STAGES;
 }
 export function mcp721Identity(sourceSha256, sourceCommit, packageId = "721") {
   const definition = MCP_PACKAGES[packageId]; assert.ok(definition, "Unknown work package");
   const inventory = readFileSync(`${definition.directory}/impact.json`);
   const inputs = JSON.parse(inventory).inputs.map(file => ({ file, sha256: payloadHash(readFileSync(file)) }));
-  return { ...(packageId === "efficiency" ? { schemaSha256: payloadHash(readFileSync("scripts/service-efficiency-schema.sql")), workerProtocolSha256: payloadHash(readFileSync("lib/agentic/plan/match-worker-protocol.ts")) } : {}), sourceSha256, sourceCommit, releaseBase: definition.base,
+  return { ...(packageId === "efficiency" ? { deploymentBases: JSON.parse(inventory).deploymentBases,
+    lockRegisterSha256: payloadHash(readFileSync("test/service-efficiency/lock-register.json")),
+    schemaSha256: payloadHash(readFileSync("scripts/service-efficiency-schema.sql")), workerProtocolSha256: payloadHash(readFileSync("lib/agentic/plan/match-worker-protocol.ts")) } : {}), sourceSha256, sourceCommit, releaseBase: definition.base,
     contractSha256: payloadHash(readFileSync(`contract/mcp/${definition.version}/schema.json`)), inventorySha256: payloadHash(inventory), inputSha256: payloadHash(JSON.stringify(inputs)) };
 }
 export function checkMcp721Proof(file, expected, packageId = "721") {
@@ -29,7 +32,7 @@ export function checkMcp721Proof(file, expected, packageId = "721") {
   const proof = JSON.parse(readFileSync(file, "utf8"));
   assert.equal(proof.version, `dev-mcp-${packageId}-1`); assert.equal(proof.environment, "dev");
   assert.equal(proof.scope, definition.scope); assert.equal(proof.contractVersion, definition.version); assert.equal(proof.passed, true);
-  for (const [key, value] of Object.entries(expected)) { assert.ok(value); assert.equal(proof[key], value, `Changed ${key}`); }
+  for (const [key, value] of Object.entries(expected)) { assert.ok(value); assert.deepEqual(proof[key], value, `Changed ${key}`); }
   assert.deepEqual(proof.stages, packageStages(packageId).map(label => ({ label, passed: true })));
   const root = realpathSync(dirname(resolve(file)));
   assert.ok(Array.isArray(proof.artifacts) && proof.artifacts.length > 0);
@@ -47,6 +50,11 @@ export function checkMcp721Proof(file, expected, packageId = "721") {
   assert.ok(tests.execution.cases > 0 && build.buildSha256 && build.nextBuildId);
   assert.equal(json("source-after.json").sha256, expected.sourceSha256);
   if (packageId === "efficiency") {
+    const register = json("lock-register.json"), events = json("executed-cases.json");
+    assert.equal(payloadHash(readFileSync(resolve(root, "lock-register.json"))), expected.lockRegisterSha256);
+    assert.deepEqual(json("lock-register-verification.json"), verifyLockExecution(register, events));
+    validateRolloutBinding(json("rollout.json"), expected, "dev", expected.deploymentBases.dev);
+    validateRolloutBinding(json("rollout.json"), expected, "uat", expected.deploymentBases.uat);
     const browser = json("browser-results.json"), benchmark = json("benchmark-comparison.json"), schema = json("schema.json");
     assert.equal(browser.passed, true); assert.equal(browser.execution.passed, true); assert.deepEqual(browser.execution.failures, []);
     assert.equal(browser.execution.cases, inventory.browser.reduce((sum, row) => sum + row.expectedCases, 0));
