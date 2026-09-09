@@ -18,6 +18,7 @@ import {
 import { startWorkerWakeServer } from "./wake-server.ts";
 import { loadAgenticConfig } from "../lib/agentic/config.ts";
 import { verifyWorkerBuildIdentity } from "../lib/runtime-build-identity.ts";
+import { workerProfileConcurrency } from "../lib/worker-profile-concurrency.ts";
 import {
   isWorkerAuthConfigurationError,
   WorkerApiClient,
@@ -50,7 +51,6 @@ const DEFAULT_HEARTBEAT_INTERVAL_MS = 15_000;
 const INITIAL_AGENT_RESTART_BACKOFF_MS = 1_000;
 const MAX_AGENT_RESTART_BACKOFF_MS = 30_000;
 const MAX_POLLING_BACKOFF_MS = 30_000;
-const MAX_WORKER_PROFILE_CONCURRENCY = 8;
 const WORKER_AUTH_CONFIGURATION_EXIT_CODE = 78;
 const WORKER_PROFILE_STARTUP_STAGGER_MS = 350;
 const TASK_LEASE_ABORT_SAFETY_MS = 120_000;
@@ -91,13 +91,6 @@ function positiveInteger(value: string | undefined, fallback: number) {
   return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
 }
 
-function boundedPositiveInteger(
-  value: string | undefined,
-  fallback: number,
-  max: number,
-) {
-  return Math.min(positiveInteger(value, fallback), max);
-}
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -215,21 +208,6 @@ function profileForMode(mode: WorkerProfileMode) {
   }
 
   return agentProfile(runtimeProfile.agentKey, runtimeProfile.taskTypes);
-}
-
-function workerConcurrency(mode: WorkerProfileMode) {
-  const profileEnvName = `WORKER_${mode.toUpperCase()}_CONCURRENCY`;
-  const defaultConcurrency = boundedPositiveInteger(
-    process.env.WORKER_CONCURRENCY,
-    1,
-    MAX_WORKER_PROFILE_CONCURRENCY,
-  );
-
-  return boundedPositiveInteger(
-    process.env[profileEnvName],
-    defaultConcurrency,
-    MAX_WORKER_PROFILE_CONCURRENCY,
-  );
 }
 
 function uniqueTexts(values: readonly string[]) {
@@ -830,7 +808,7 @@ async function runWorker(mode: WorkerMode) {
   }
   const loops = modes.flatMap((profileMode, profileIndex) => {
     const configs = requireConfigs(profileMode);
-    const concurrency = workerConcurrency(profileMode);
+    const concurrency = workerProfileConcurrency(profileMode);
     const slotCount = configs.length * concurrency;
 
     return configs.flatMap((config, configIndex) =>

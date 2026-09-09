@@ -25,4 +25,9 @@ export class MatcherCpuAdmission {
   }
   private drain() { while (this.active < this.limit && this.waiting.length) this.waiting.shift()!.start(); }
 }
-export const matcherCpuAdmission = new MatcherCpuAdmission(Number(process.env.MATCHER_CPU_SLOTS ?? 2));
+export function matcherCpuSlotCount(env: Readonly<Record<string, string | undefined>> = process.env) {
+  const value = Number(env.MATCHER_CPU_SLOTS ?? 2);
+  if (!Number.isSafeInteger(value) || value < 1 || value > 64) throw new Error("MATCHER_CPU_SLOTS must be an integer from 1 to 64");
+  return value;
+}
+export const matcherCpuAdmission = new MatcherCpuAdmission(matcherCpuSlotCount());
