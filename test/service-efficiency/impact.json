@@ -19,7 +19,7 @@
       "file": "test/service-efficiency/reads.integration.test.ts",
       "slice": "reads-pg",
       "database": true,
-      "expectedCases": 4,
+      "expectedCases": 5,
       "reason": "Actual PostgreSQL locks retained for mutations, nonblocking status and two small SELECTs"
     },
     {
@@ -225,8 +225,14 @@
     {
       "file": "test/service-efficiency/harness.test.ts",
       "slice": "harness",
-      "expectedCases": 3,
+      "expectedCases": 4,
       "reason": "Reject incomplete benchmark comparisons, changed semantics, missing browser evidence and unchanged-source proof gaps"
+    },
+    {
+      "file": "test/mcp-conversation-pack/deployment.test.ts",
+      "slice": "harness",
+      "expectedCases": 1,
+      "reason": "Shared attestation reader must preserve historical presentation-only release validation and rejection rules"
     }
   ],
   "inputs": [

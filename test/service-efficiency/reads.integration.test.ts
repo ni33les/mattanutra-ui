@@ -98,3 +98,14 @@ test("EFF-ORDER-PG-02 warm order polls read small facts in two SELECTs and retai
   const second = await orderTool({ ...app, now: app.now!, orderHandle: handle, responseView: "status", knownResultVersion: first.resultVersion });
   assert.ok(second.ok && "unchanged" in second && second.unchanged);
 });
+
+test("EFF-READ-PG-03 payment transitions invalidate the small plan version without loading frozen contents", async () => {
+  const { app, handle, id, orderId } = await fixture();
+  const first = await readPlanStatus(app, handle); assert.ok(first.ok && "resultVersion" in first);
+  const order = await store.getOrder(orderId); assert.ok(order);
+  await store.updateOrder({ ...order, paymentStatus: "paid", stateVersion: 2 });
+  const second = await readPlanStatus(app, handle, first.resultVersion);
+  assert.ok(second.ok && "unchanged" in second && !second.unchanged);
+  const state = await store.getPlanReadState(id); assert.equal(state?.payment?.paymentStatus, "paid");
+  assert.equal(state?.result, null); assert.ok(Buffer.byteLength(JSON.stringify(state)) < 2500);
+});
