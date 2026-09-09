@@ -40,6 +40,12 @@
       "database": true,
       "expectedCases": 2,
       "reason": "Bounded atomic lease and checkpoint statements with preserved commands, cursor and stale-owner rejection"
+    },
+    {
+      "file": "test/service-efficiency/dispatch.test.ts",
+      "slice": "dispatch",
+      "expectedCases": 4,
+      "reason": "Pre-dispatch accounting, durable start acknowledgement, affine continuations and shared CPU capacity"
     }
   ],
   "inputs": [
