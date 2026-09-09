@@ -225,7 +225,7 @@
     {
       "file": "test/service-efficiency/harness.test.ts",
       "slice": "harness",
-      "expectedCases": 4,
+      "expectedCases": 5,
       "reason": "Reject incomplete benchmark comparisons, changed semantics, missing browser evidence and unchanged-source proof gaps"
     },
     {

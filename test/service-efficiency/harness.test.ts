@@ -47,3 +47,11 @@ test("EFF-PACK-04 release proof rejects a false repeated-semantic claim", async 
     assert.throws(() => checkMcp721Proof(join(root, "attestation.json"), identity, "efficiency"));
   } finally { rmSync(root, { recursive: true }); }
 });
+
+
+test("EFF-PACK-05 matching comparisons require queue and execution timing with complete probe counts", async () => {
+  const { compareBenchmarkRuns } = await import("../../scripts/service-efficiency/benchmark-proof.mjs");
+  const row = { id: "concurrent", inputSha256: "a".repeat(64), semantic: { attempts: 8000 },
+    measurements: { wallMs: 100, cpuMs: 80, maxRssBytes: 1000, inputTransfers: 2, inputBytes: 100, checkpointBytes: 500, checkpointFrames: 2 } };
+  assert.throws(() => compareBenchmarkRuns([row], [row], ["concurrent"]), /queue|dispatch/i);
+});

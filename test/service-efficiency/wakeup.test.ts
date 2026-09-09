@@ -56,8 +56,8 @@ test("EFF-WAKE-05 an in-flight duplicate does not create another HTTP wake burst
 });
 
 test("EFF-WAKE-06 one task wakes one registered worker; distinct tasks distribute fairly", async () => {
-  const module = await import("../../lib/worker-wake.ts");
-  const choose = (module as unknown as { chooseWorkerWakeUrls?: (urls: string[], signal: TaskQueueSignal) => string[] }).chooseWorkerWakeUrls;
+  const wakeModule = await import("../../lib/worker-wake.ts");
+  const choose = (wakeModule as unknown as { chooseWorkerWakeUrls?: (urls: string[], signal: TaskQueueSignal) => string[] }).chooseWorkerWakeUrls;
   assert.equal(typeof choose, "function"); assert.ok(choose);
   const urls = ["https://one.invalid", "https://two.invalid"];
   const first = choose(urls, { taskType: "match", taskId: "one" }), second = choose(urls, { taskType: "match", taskId: "two" });
