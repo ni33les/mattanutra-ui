@@ -1,4 +1,4 @@
-import { operationCursor, withoutOperationCursor, withOperationCursor } from "@/lib/agentic/store/operation-checkpoint";
+import { operationCursor, operationCursorBytes, withoutOperationCursor, withOperationCursor } from "@/lib/agentic/store/operation-checkpoint";
 import { operationCommands } from "@/lib/agentic/store/operation-commands";
 import { getSql, keepDatabaseWarm, withDatabaseTransaction } from "@/lib/db";
 import type {
@@ -137,7 +137,7 @@ export function createPostgresStore(inputSql: Sql, inTransaction = false): Agent
       const cursor = operationCursor(record), metadata = asJson(withoutOperationCursor(record));
       const rows = cursor !== undefined
         ? await sql<{ id: string }>`update public.agentic_plan_operations set status=${record.status},version=${record.version},
-          record_json=${metadata},checkpoint_cursor=${Buffer.from(cursor, "base64")},updated_at=${record.updatedAt}::timestamptz
+          record_json=${metadata},checkpoint_cursor=${operationCursorBytes(cursor)},updated_at=${record.updatedAt}::timestamptz
           where id=${record.id}::uuid and version=${expectedVersion} returning id`
         : await sql<{ id: string }>`update public.agentic_plan_operations set status=${record.status},version=${record.version},
           record_json=${metadata},checkpoint_cursor=case when ${record.checkpoint === null} then null else

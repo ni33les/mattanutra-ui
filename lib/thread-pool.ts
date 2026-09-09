@@ -56,8 +56,11 @@ export class ThreadPool<Input, Result> {
   }
 
   hasAffinity(key: string) { return [...this.slots].some(slot => slot.affinity === key && !this.terminating.has(slot)); }
-  releaseAffinity(key: string) {
-    for (const slot of this.slots) if (slot.affinity === key && !slot.job) slot.affinity = undefined;
+  releaseAffinity(key: string, releaseMessage?: Input) {
+    for (const slot of this.slots) if (slot.affinity === key && !slot.job) {
+      if (releaseMessage !== undefined && !this.terminating.has(slot)) slot.worker.postMessage(releaseMessage);
+      slot.affinity = undefined;
+    }
     this.drain();
   }
   private settle(job: Job<Input, Result>, reply: ThreadReply<Result>) {

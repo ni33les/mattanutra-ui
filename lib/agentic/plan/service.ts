@@ -57,7 +57,7 @@ import {
 import { evaluateSafety, planStatus, safetyQuestions } from "@/lib/agentic/plan/safety";
 import { persistMatcherTelemetry } from "@/lib/agentic/plan/telemetry";
 import { publicPlanFields } from "@/lib/agentic/public-mapper";
-import { matchPlanInWorker, matchPlanChunkInWorker, MatcherUnavailableError } from "@/lib/agentic/plan/match-worker-pool";
+import { matchPlanInWorker, matchPlanResidentChunkInWorker, closePlanMatchSession, MatcherUnavailableError } from "@/lib/agentic/plan/match-worker-pool";
 import { evidenceHandleFor, issueEvidenceCapability } from "@/lib/agentic/evidence/tool";
 import { planCompactApplicable } from "@/lib/agentic/contract/plan-result";
 import { planClaimIds, planResearchVersion } from "@/lib/agentic/value/compact-decision";
@@ -500,7 +500,7 @@ function targetNameGroups(
 
 type DurableSearchCheckpoint = {
   stage: "normalized" | "search"; state: CanonicalPlanState; catalogueId: string;
-  search?: import("@/lib/agentic/plan/matching").PlanSearchCheckpoint;
+  search?: import("@/lib/agentic/plan/matching").ResidentChunkOptions["checkpoint"];
   reservedAttempts?: number;
 };
 async function durableMatch(input: { snapshot: CatalogueSnapshot; state: CanonicalPlanState }) {
@@ -511,12 +511,12 @@ async function durableMatch(input: { snapshot: CatalogueSnapshot; state: Canonic
   let checkpoint = current?.checkpoint as DurableSearchCheckpoint | null;
   if (!checkpoint) throw new Error("Missing normalized operation checkpoint");
   let lostAttempts = checkpoint.reservedAttempts ?? 0;
-  while (true) {
+  try { while (true) {
     const remaining = (input.state.searchEffort === "expanded" ? 64_000 : checkpoint.search?.expansionBudget ?? 8_000)
       - (checkpoint.search?.expansionAttempts ?? 0) - lostAttempts;
     const chunkBudget = Math.min(4_000, Math.max(0, remaining));
     const reserved = { ...checkpoint, stage: "search" as const, reservedAttempts: chunkBudget + lostAttempts };
-    const reply = await matchPlanChunkInWorker(input, { checkpoint: checkpoint.search, chunkBudget: Math.max(1, chunkBudget), lostAttempts }, async () => {
+    const reply = await matchPlanResidentChunkInWorker(claim.id, input, { checkpoint: checkpoint.search, chunkBudget: Math.max(1, chunkBudget), lostAttempts }, async () => {
       if (!await updateClaimedOperation(store, claim, { checkpoint: withoutOperationCursor({ ...claim, checkpoint: reserved }).checkpoint }, new Date().toISOString())) throw new Error("Matching operation lease lost");
     });
     checkpoint = { ...checkpoint, stage: "search", search: reply.checkpoint, reservedAttempts: 0 };
@@ -527,7 +527,7 @@ async function durableMatch(input: { snapshot: CatalogueSnapshot; state: Canonic
       if (!reply.result) throw new Error("Completed matcher chunk has no result");
       return reply.result;
     }
-  }
+  } } finally { closePlanMatchSession(claim.id); }
 }
 
 async function buildResult(input: Readonly<{

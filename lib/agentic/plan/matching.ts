@@ -1,4 +1,4 @@
-import { decodeMatchCursor, encodeMatchCursor } from "@/lib/matcher/cursor-codec-server";
+import { decodeMatchCursor, encodeMatchCursor, encodeMatchCursorBytes } from "@/lib/matcher/cursor-codec-server";
 import { createHash } from "node:crypto";
 import type { CatalogueProduct, CatalogueSnapshot } from "@/lib/agentic/catalogue/types";
 import { catalogueSnapshotId, freezeCatalogueSnapshot } from "@/lib/agentic/catalogue/freeze";
@@ -1295,20 +1295,39 @@ export type PlanMatchChunk = Readonly<{
   done: boolean; checkpoint: PlanSearchCheckpoint; expansionAttempts: number;
   result?: ReturnType<typeof matchPlan>;
 }>;
+export type BinaryPlanSearchCheckpoint = Omit<PlanSearchCheckpoint, "cursor"> & { cursor: Uint8Array };
+export type ResidentChunkOptions = { checkpoint?: PlanSearchCheckpoint | BinaryPlanSearchCheckpoint; chunkBudget: number; lostAttempts?: number };
+export type ResidentPlanMatchChunk = Omit<PlanMatchChunk, "checkpoint"> & { checkpoint: BinaryPlanSearchCheckpoint; inputTransferred?: boolean };
 /** Worker-sized increments use the identical search and projection as synchronous
  * consumers. The checkpoint is an internal operation fact, never a public job. */
 export function matchPlanChunk(input: Parameters<typeof matchPlan>[0], options: {
   checkpoint?: PlanSearchCheckpoint; chunkBudget: number; lostAttempts?: number;
 }): PlanMatchChunk {
+  const session = createResidentPlanSession(input, options.checkpoint);
+  const step = advanceResidentSearch(session, options);
+  const checkpoint = { ...sessionCheckpoint(session), cursor: encodeMatchCursor(session.cursor) };
+  return { ...step, checkpoint, ...(step.done ? { result: computeMatchPlan({ ...input, completedCursor: session.cursor }) } : {}) };
+}
+
+export function createResidentPlanSession(input: Parameters<typeof matchPlan>[0], checkpoint?: PlanSearchCheckpoint | BinaryPlanSearchCheckpoint) {
   const request = toCanonicalRequest(input.state);
   if ("error" in request) throw new Error(request.error);
   const catalog = { availabilityAsOf: input.snapshot.availabilityAsOf, catalogueVersion: input.snapshot.catalogueVersion, products: matcherProductsFor(input.snapshot) };
   const inputIdentity = planCheckpointInputIdentity(input);
-  if (options.checkpoint && options.checkpoint.inputIdentity !== inputIdentity) throw new Error("Plan checkpoint input identity changed");
-  const cursor = options.checkpoint
-    ? decodeMatchCursor(options.checkpoint.cursor, matchCursorIdentity(request, catalog, DEFAULT_MATCHER_CONFIG))
+  if (checkpoint && checkpoint.inputIdentity !== inputIdentity) throw new Error("Plan checkpoint input identity changed");
+  const cursor = checkpoint
+    ? decodeMatchCursor(checkpoint.cursor, matchCursorIdentity(request, catalog, DEFAULT_MATCHER_CONFIG))
     : createMatchCursor(request, catalog, DEFAULT_MATCHER_CONFIG);
   if (input.state.searchEffort === "expanded" && cursor.effort !== "expanded") expandMatchCursor(cursor);
+  return { input, request, cursor, inputIdentity };
+}
+type ResidentSession = ReturnType<typeof createResidentPlanSession>;
+function sessionCheckpoint(session: ResidentSession) {
+  return { version: "plan-search-1" as const, inputIdentity: session.inputIdentity,
+    expansionAttempts: matchCursorAttempts(session.cursor), expansionBudget: session.cursor.expansionBudget };
+}
+function advanceResidentSearch(session: ResidentSession, options: { chunkBudget: number; lostAttempts?: number }) {
+  const { cursor, request } = session;
   // A crashed chunk may have consumed every reserved attempt. Charge that work
   // conservatively before any replay; completed archive entries remain intact.
   let lost = options.lostAttempts ?? 0;
@@ -1320,9 +1339,13 @@ export function matchPlanChunk(input: Parameters<typeof matchPlan>[0], options: 
   if (lost > 0) throw new Error("Lost work exceeds the operation search budget");
   advanceMatchCursor(cursor, request, options.chunkBudget);
   const expansionAttempts = matchCursorAttempts(cursor);
-  const checkpoint: PlanSearchCheckpoint = { version: "plan-search-1", inputIdentity, cursor: encodeMatchCursor(cursor), expansionAttempts, expansionBudget: cursor.expansionBudget };
-  return { done: cursor.done, checkpoint, expansionAttempts,
-    ...(cursor.done ? { result: computeMatchPlan({ ...input, completedCursor: cursor }) } : {}) };
+  return { done: cursor.done, expansionAttempts };
+}
+
+export function advanceResidentPlanSession(session: ResidentSession, options: { chunkBudget: number; lostAttempts?: number }): ResidentPlanMatchChunk {
+  const step = advanceResidentSearch(session, options);
+  const checkpoint = { ...sessionCheckpoint(session), cursor: Uint8Array.from(encodeMatchCursorBytes(session.cursor)) };
+  return { ...step, checkpoint, ...(step.done ? { result: computeMatchPlan({ ...session.input, completedCursor: session.cursor }) } : {}) };
 }
 
 export function planCheckpointInputIdentity(input: Parameters<typeof matchPlan>[0]) {

@@ -1,6 +1,6 @@
 import type postgres from "postgres";
 import type { PlanOperationRecord } from "@/lib/agentic/store/types";
-import { operationCursor, withoutOperationCursor, withOperationCursor } from "@/lib/agentic/store/operation-checkpoint";
+import { operationCursor, operationCursorBytes, withoutOperationCursor, withOperationCursor } from "@/lib/agentic/store/operation-checkpoint";
 
 export type OperationChanges = Partial<Pick<PlanOperationRecord, "checkpoint" | "catalogueIdentity" | "referenceIdentity" | "status" | "response" | "error">>;
 const json = (value: unknown) => JSON.parse(JSON.stringify(value)) as postgres.JSONValue;
@@ -35,7 +35,7 @@ export function operationCommands(sql: postgres.Sql) {
       const rows = await sql`update public.agentic_plan_operations set status=${changes.status ?? "running"},version=version+1,updated_at=${now}::timestamptz,
         record_json=(record_json #- '{checkpoint,search,cursor}') || ${sql.json(json(patch))}::jsonb ||
           jsonb_build_object('status',${changes.status ?? "running"}::text,'version',version+1,'updatedAt',${now}::text,'leaseExpiresAt',${leaseExpiresAt}::text),
-        checkpoint_cursor=case when ${cursor !== undefined} then ${cursor === undefined ? null : Buffer.from(cursor, "base64")}
+        checkpoint_cursor=case when ${cursor !== undefined} then ${cursor === undefined ? null : operationCursorBytes(cursor)}
           when ${changes.checkpoint === null} then null else coalesce(checkpoint_cursor,decode(record_json #>> '{checkpoint,search,cursor}','base64')) end
         where id=${id}::uuid and status='running' and record_json->>'leaseToken'=${token}
           and (record_json->>'leaseExpiresAt')::timestamptz>${now}::timestamptz returning id`;
