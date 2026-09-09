@@ -51,3 +51,16 @@ test("EFF-CACHE-04 compiled facts are deeply immutable and reused within the byt
   assert.equal(first.amounts[0].amount, 1n); assert.equal(facts.get("catalogue-and-reference"), first);
   assert.throws(() => { first.amounts[0].amount = 0n; }, TypeError); assert.ok(facts.bytes <= 1000);
 });
+
+test("EFF-CACHE-05 shared checkpoint writes retain each owner's request lifetime", async () => {
+  const { withRequestLifetime, requestLifetime } = await import("../../lib/request-lifetime.ts");
+  const work = new cache.SharedMatchWork<number, number>(1000), entered = barrier(), release = barrier();
+  const a = new AbortController(), b = new AbortController();
+  const compute = async (context: cache.SharedWorkContext<number>) => { entered.release(); await release.promise; await context.notify(1); return 3; };
+  const one = withRequestLifetime({ signal: a.signal, logicalId: "a" }, () => work.run("owners", { signal: a.signal }, compute));
+  const rejected = assert.rejects(one, { name: "AbortError" }); await entered.promise;
+  const two = withRequestLifetime({ signal: b.signal, logicalId: "b" }, () => work.run("owners", { signal: b.signal, checkpoint: async () => {
+    assert.equal(requestLifetime()?.logicalId, "b"); assert.equal(requestLifetime()?.signal, b.signal);
+  } }, compute));
+  a.abort(); release.release(); assert.equal(await two, 3); await rejected;
+});

@@ -150,4 +150,30 @@ describe("task lifecycle transactions on PostgreSQL", {skip: !databaseUrl}, () =
     assert.equal(row.status, "completed");
   });
 
+  it("EFF-DISPATCH-PG-01 deferred matching releases its slot through completion without applying a result or double-refunding", async () => {
+    const input = await reserved(), operationId = randomUUID(), planId = randomUUID(), sql = getSql()!;
+    await sql`insert into public.agentic_plans(id,environment,tenant_scope,current_revision) values(${planId},'dev','fixture',1)`;
+    const record = { leaseExpiresAt: new Date(Date.now()+60000).toISOString(), deadlineAt: new Date(Date.now()+175000).toISOString() };
+    await sql`insert into public.agentic_plan_operations(id,plan_id,owner_scope,idempotency_key,status,version,record_json,created_at,updated_at)
+      values(${operationId},${planId},${operationId},${operationId},'running',1,${sql.json(record)},now(),now())`;
+    await sql`update public.tasks set task_type='match_agentic_plan',payload=jsonb_build_object('operationId',${operationId}::text) where id=${input.taskId}`;
+    let applied = 0;
+    const completion = { ...input, resultPayload: { deferredOperationId: operationId }, applyResult: async () => { applied++; return {}; } };
+    try {
+      await assert.rejects(completeTask({ ...completion, workerSessionId: randomUUID() }));
+      const results = await Promise.all([completeTask(completion), completeTask(completion)]);
+      assert.ok(results.every(task => task.status === "queued")); assert.equal(applied, 0);
+      const [row] = await sql`select attempts,status,scheduled_for>now()+interval '40 seconds' as deferred from public.tasks where id=${input.taskId}`;
+      assert.deepEqual(row, { attempts: 0, status: "queued", deferred: true });
+      await sql`update public.tasks set scheduled_for=now() where id=${input.taskId}`;
+      const next = await reserveNextTask({ accessScope: scope, agent: { id: agentId, name: scope.agentName }, workerSessionId: sessionId, taskId: input.taskId }); assert.ok(next);
+      assert.notEqual(next.reservationId, input.reservationId);
+      assert.equal((await completeTask(completion)).status, "reserved");
+      assert.equal((await sql`select attempts from public.tasks where id=${input.taskId}`)[0].attempts, 1);
+    } finally {
+      await sql`delete from public.agentic_plan_operations where id=${operationId}`;
+      await sql`delete from public.agentic_plans where id=${planId}`;
+    }
+  });
+
 });

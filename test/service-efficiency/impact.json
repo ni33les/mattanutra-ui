@@ -62,7 +62,7 @@
     {
       "file": "test/service-efficiency/cache.test.ts",
       "slice": "cache",
-      "expectedCases": 4,
+      "expectedCases": 5,
       "reason": "Byte-bounded immutable reuse, concurrent owner cancellation, checkpoint fencing and failed-computation isolation"
     },
     {
@@ -90,6 +90,19 @@
       "database": true,
       "expectedCases": 2,
       "reason": "Read-only funnel status under held assessment writes, compact locale-specific advice gates and invalidated legacy projections"
+    },
+    {
+      "file": "test/task-transactions.integration.test.ts",
+      "slice": "task-lifecycle",
+      "database": true,
+      "expectedCases": 9,
+      "reason": "Task admission/rollback, reservation fencing, deferred matching ownership and exact replay through the existing worker completion boundary"
+    },
+    {
+      "file": "test/worker-boundary.test.ts",
+      "slice": "worker-boundary",
+      "expectedCases": 12,
+      "reason": "Preserve the external worker API boundary, real profile registrations and direct platform import restrictions"
     }
   ],
   "inputs": [
