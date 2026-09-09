@@ -352,6 +352,13 @@
       "slice": "checkout-preparation",
       "expectedCases": 2,
       "reason": "Audits 2/3/6/15: external payment preparation before locks, current commercial publication fence, unchanged frozen checkout recovery"
+    },
+    {
+      "file": "test/service-efficiency/pool-wait.integration.test.ts",
+      "slice": "pool-wait",
+      "database": true,
+      "expectedCases": 2,
+      "reason": "Audit 36: pool acquisition obeys cancellation/deadlines without late writes, effects or leaked permits"
     }
   ],
   "inputs": [
