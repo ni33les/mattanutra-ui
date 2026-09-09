@@ -7,9 +7,9 @@ import { replaceCatalogueSnapshot } from '../lib/agentic/catalogue/snapshot.ts';
 import { createMemoryStore } from '../lib/agentic/store/memory.ts';
 import type { AgenticStore } from '../lib/agentic/store/types.ts';
 import { loadAgenticConfig } from '../lib/agentic/config.ts';
-import { planTool, setMatcherEnteredForTests, setMatcherGateForTests } from '../lib/agentic/plan/service.ts';
+import { planTool, runAdmittedPlanOperation, setMatcherEnteredForTests, setMatcherGateForTests } from '../lib/agentic/plan/service.ts';
 
-it('V5-PUBLISH-01: a catalogue change during matching cannot publish ready; retry resumes the same assessment revision', async () => {
+it('V5-PUBLISH-01: a catalogue-only change preserves the completed snapshot and marks its read as stale', async () => {
   installGoldCatalogue();
   let epoch = 11;
   const base = createMemoryStore();
@@ -28,23 +28,26 @@ it('V5-PUBLISH-01: a catalogue change during matching cannot publish ready; retr
   setMatcherEnteredForTests(entered);
   try {
     replaceCatalogueSnapshot({ ...fixtureSnapshot(), runtimeRevision: epoch });
-    const work = planTool({ config, now: '2026-09-07T00:00:00Z', payload, scope, store });
+    const admitted = await planTool({ config, now: '2026-09-07T00:00:00Z', payload, scope, store });
+    assert.equal(admitted.ok, true);
+    const operation = await store.getPlanOperationByKey(`dev:mattanutra:${principalScope}`, payload.idempotencyKey); assert.ok(operation);
+    const work = runAdmittedPlanOperation({ config, store, operationId: operation.id });
     await Promise.race([ready, work.then(() => { throw Error('Matching ended before the catalogue-change gate'); })]);
     epoch += 1; release();
     const stale = await work;
-    assert.equal(stale.ok, false);
-    assert.equal('error' in stale && stale.error.reasonCode, 'availability_changed');
-    assert.equal('error' in stale && stale.error.retryable, true);
+    assert.equal(stale.ok, true, JSON.stringify(stale));
     const ids = await store.listPlanIdsByPrincipal(principalScope);
     assert.equal(ids.length, 1);
-    assert.equal((await store.getPlanRevision(ids[0]!, 1))?.status, 'processing');
-    setMatcherGateForTests(null); setMatcherEnteredForTests(null);
-    replaceCatalogueSnapshot({ ...fixtureSnapshot(), runtimeRevision: epoch });
-    const recovered = await planTool({ config, now: '2026-09-07T00:00:01Z', payload, scope, store });
-    assert.equal(recovered.ok, true);
-    assert.equal('status' in recovered && recovered.status, 'ready');
-    assert.equal('revision' in recovered && recovered.revision, 1);
-    assert.deepEqual(await store.listPlanIdsByPrincipal(principalScope), ids);
+    const revision = await store.getPlanRevision(ids[0]!, 1); assert.equal(revision?.status, 'ready');
+    assert.equal((await store.getPlanOperation(operation.id))?.status, 'complete');
+    const {readPlanStatus}=await import('../lib/agentic/presentation/plan-read.ts');
+    const {createAgenticRuntime}=await import('../lib/agentic/runtime.ts');
+    const read = store.getPlanReadState.bind(store);
+    store.getPlanReadState = async (...args) => { const state=await read(...args); return state ? {...state,catalogueRevision:epoch}:state; };
+    const status=await readPlanStatus(createAgenticRuntime({config,store,scope,now:'2026-09-07T00:00:01Z'}), admitted.ok ? admitted.planHandle : '');
+    assert.ok(status.ok && status.refreshRequired); assert.equal(status.status,'needs_input');
+    assert.equal(status.nextActions[0],'change_request');
+    assert.equal((await store.getPlanRevision(ids[0]!,1))?.status,'ready','Reading stale data must not overwrite the saved result');
   } finally {
     release?.(); setMatcherGateForTests(null); setMatcherEnteredForTests(null); uninstallGoldCatalogue();
   }

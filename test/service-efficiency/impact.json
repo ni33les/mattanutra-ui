@@ -251,6 +251,19 @@
       "slice": "permits",
       "expectedCases": 3,
       "reason": "Audits 22\u201325: remove artificial admission/worker/connection/database gates while preserving cancellation and deadlines"
+    },
+    {
+      "file": "test/agentic-catalogue-publish-v5.test.ts",
+      "slice": "snapshots",
+      "expectedCases": 1,
+      "reason": "V5-PUBLISH-01 revised catalogue-only policy: retain immutable completed result, stale presentation and terminal receipt"
+    },
+    {
+      "file": "test/agentic-catalogue-publish-v5.integration.test.ts",
+      "slice": "snapshots-pg",
+      "database": true,
+      "expectedCases": 1,
+      "reason": "V5-PUBLISH-PG-01: publication completes behind epoch writer while immutable result remains stale after writer commits"
     }
   ],
   "inputs": [

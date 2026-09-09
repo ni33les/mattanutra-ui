@@ -1,20 +1,22 @@
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
-import { it } from 'node:test';
+import { after, it } from 'node:test';
+import { closeSqlPool } from '../lib/db.ts';
 import postgres from 'postgres';
 import { installGoldCatalogue, uninstallGoldCatalogue } from './helpers/gold-catalogue.ts';
 import { fixtureSnapshot } from '../lib/agentic/catalogue/fixtures.ts';
 import { replaceCatalogueSnapshot } from '../lib/agentic/catalogue/snapshot.ts';
 import { createPostgresStore } from '../lib/agentic/store/postgres.ts';
 import { loadAgenticConfig } from '../lib/agentic/config.ts';
-import { planTool } from '../lib/agentic/plan/service.ts';
+import { planTool, runAdmittedPlanOperation } from '../lib/agentic/plan/service.ts';
 import { fixtureDatabaseUrl } from './helpers/fixture-teardown.ts';
+after(closeSqlPool);
 
-it('V5-PUBLISH-PG-01: PostgreSQL rejects a stale completed match and the same request recovers one saved revision', async () => {
+it('V5-PUBLISH-PG-01: matching publishes without waiting for catalogue writers and later reads mark it stale', async () => {
   const databaseUrl = process.env.TEST_DB_URL;
   assert.ok(databaseUrl, 'The PostgreSQL gate must supply TEST_DB_URL');
   fixtureDatabaseUrl();
-  const sql = postgres(databaseUrl, { max: 3 });
+  const sql = postgres(databaseUrl, { max: 3, prepare: false, connection: { lock_timeout: "250ms", statement_timeout: "2000ms" } });
   const store = createPostgresStore(sql);
   const principalScope = `publish-fence-pg:${randomUUID()}`;
   installGoldCatalogue();
@@ -26,24 +28,26 @@ it('V5-PUBLISH-PG-01: PostgreSQL rejects a stale completed match and the same re
     const config = { ...loadAgenticConfig(), capabilitySecret: 'publish-pg-fixture-secret-0001', paymentProvider: 'mock' as const, thailandRetailerAdapter: 'mock_thailand' as const };
     const scope = { environment: 'dev' as const, tenantScope: 'mattanutra', principalScope };
     const payload = { operation: 'create' as const, idempotencyKey: `publish-pg-${randomUUID()}`, request: { destinationCountry: 'TH', locale: 'en', optimization: 'balanced', profile: { ageYears: 38, lifeStage: 'adult' }, requirements: {}, targets: [{ name: 'Vitamin D3', amount: 1000, unit: 'IU' }] } };
-    replaceCatalogueSnapshot({ ...fixtureSnapshot(), catalogueVersion: principalScope, runtimeRevision: Number(epoch.revision) - 1 });
-    const stale = await planTool({ config, now: '2026-09-07T00:00:00Z', payload, scope, store });
-    assert.equal(stale.ok, false);
-    assert.equal('error' in stale && stale.error.reasonCode, 'availability_changed');
-    const ids = await store.listPlanIdsByPrincipal(principalScope);
-    assert.equal(ids.length, 1);
-    assert.equal((await store.getPlanRevision(ids[0]!, 1))?.status, 'processing');
-    const receipt = await store.getIdempotency('plan', `dev:mattanutra:${principalScope}`, payload.idempotencyKey);
-    assert.ok(receipt); assert.equal(JSON.parse(receipt.responseJson).status, 'processing');
     replaceCatalogueSnapshot({ ...fixtureSnapshot(), catalogueVersion: principalScope, runtimeRevision: Number(epoch.revision) });
-    const recovered = await planTool({ config, now: '2026-09-07T00:00:01Z', payload, scope, store });
-    assert.equal(recovered.ok, true);
-    assert.equal('status' in recovered && recovered.status, 'ready');
-    assert.equal('revision' in recovered && recovered.revision, 1);
-    assert.deepEqual(await store.listPlanIdsByPrincipal(principalScope), ids);
-    const [counts] = await sql`select (select count(*)::integer from public.agentic_plan_revisions where plan_id=${ids[0]}::uuid) as revisions,
-      (select count(*)::integer from public.agentic_orders where plan_id=${ids[0]}::uuid) as orders`;
-    assert.equal(counts!.revisions, 1); assert.equal(counts!.orders, 0);
+    const admitted=await planTool({config,now:new Date().toISOString(),payload,scope,store}); assert.ok(admitted.ok);
+    const operation=await store.getPlanOperationByKey(`dev:mattanutra:${principalScope}`,payload.idempotencyKey); assert.ok(operation);
+    let release!:()=>void, entered!:()=>void;
+    const held=new Promise<void>(resolve=>{entered=resolve;}); const barrier=new Promise<void>(resolve=>{release=resolve;});
+    const writer=sql.begin(async tx=>{await tx`update public.catalogue_runtime_revision set revision=revision+1 where singleton=true`; entered();await barrier;});
+    await held;
+    try {
+      const completed=await runAdmittedPlanOperation({config,store,operationId:operation.id});
+      assert.equal(completed.ok,true,JSON.stringify(completed));
+      assert.equal((await store.getPlanOperation(operation.id))?.status,'complete');
+    } finally {release();await writer;}
+    const {readPlanStatus}=await import('../lib/agentic/presentation/plan-read.ts');
+    const {createAgenticRuntime}=await import('../lib/agentic/runtime.ts');
+    const status=await readPlanStatus(createAgenticRuntime({config,store,scope}),admitted.planHandle);
+    assert.ok(status.ok && status.refreshRequired);assert.equal(status.status,'needs_input');
+    const saved=await store.getPlanRevision(operation.planId,1);assert.equal(saved?.status,'ready');
+    assert.equal(saved?.statusProjection?.catalogueRevision,Number(epoch.revision));
+    const [counts]=await sql`select count(*)::integer as revisions from agentic_plan_revisions where plan_id=${operation.planId}::uuid`;
+    assert.equal(counts!.revisions,1);
   } finally {
     uninstallGoldCatalogue();
     await store.deletePrincipalScope(principalScope);
