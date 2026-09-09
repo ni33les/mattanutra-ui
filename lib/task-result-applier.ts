@@ -76,6 +76,7 @@ import {
 } from "@/lib/product-recommendations";
 import {
   productDecisionRowsFromRecommendationResult,
+  prepareProductDecisionRows,
   writeProductRecommendationDecisionRows,
   projectSupplementRecommendationSelections
 } from "@/lib/recommendation-selection-projections";
@@ -2073,12 +2074,12 @@ async function queueUnknownProductReviewTasks(
 
 type PreparedProductVariant = ProductRecommendationVariantPayload & Readonly<{
   runId: string; itemsJson: string; clientNeedsJson: string; exclusionsJson: string; diagnosticsJson: string;
-  decisions: ReturnType<typeof productDecisionRowsFromRecommendationResult>;
+  decisions: ReturnType<typeof productDecisionRowsFromRecommendationResult>; decisionsJson: string;
 }>;
 export type PreparedTaskCompletionResult = Readonly<{
   healthScore?: { json: string; projection: ReturnType<typeof healthScoreReadProjection>; locale: Locale };
   products?: { variants: PreparedProductVariant[]; selected: PreparedProductVariant | undefined; discovery: ReturnType<typeof productDiscoveryPayload>;
-    discoveryNotes: string; countryCode: string; locale: Locale; legacyJson: string };
+    discoveryNotes: string; configuredAdapters: number; countryCode: string; locale: Locale; legacyJson: string };
 }>;
 
 /** Pure projection/serialization happens before the task service opens its publication transaction. */
@@ -2107,9 +2108,10 @@ export async function prepareTaskCompletionResult({ task, resultPayload }: Reado
     const { result, maxProducts, stackPreference } = variant;
     const diagnostics = { ...result.diagnostics, maxProducts, stackPreference,
       trace: { ...result.diagnostics.trace, ...(maxProducts != null ? { maxProducts } : {}), stackPreference } };
+    const decisions = productDecisionRowsFromRecommendationResult(result);
     return { ...variant, runId: randomUUID(), clientNeedsJson: JSON.stringify(toJsonValue(result.clientNeeds)),
       exclusionsJson: JSON.stringify(toJsonValue(result.exclusions)), diagnosticsJson: JSON.stringify(toJsonValue(diagnostics)),
-      decisions: productDecisionRowsFromRecommendationResult(result),
+      decisions, decisionsJson: prepareProductDecisionRows(decisions),
       itemsJson: JSON.stringify(result.recommendations.map(item => ({ product_id: item.product.id, rank: item.rank, score: item.score,
         product_coverage_percent: item.productCoveragePercent, stack_contribution_percent: item.stackContributionPercent,
         serving_multiplier: Math.max(1, Math.round(item.servingMultiplier || 1)), covered_needs: toJsonValue(item.coveredNeeds),
@@ -2119,7 +2121,7 @@ export async function prepareTaskCompletionResult({ task, resultPayload }: Reado
   const selected = variants.find(item => item.stackPreference === stackPreference) ?? variants.find(item => item.stackPreference === "balanced") ?? variants[0];
   const configured = discovery.diagnostics.filter(item => item.configured).length;
   const found = discovery.diagnostics.reduce((total, item) => total + item.resultCount, 0);
-  return { products: { variants, selected, discovery, locale, countryCode: normalizeProductCountryCode(country) ?? defaultProductCountryCode,
+  return { products: { variants, selected, discovery, locale, configuredAdapters: configured, countryCode: normalizeProductCountryCode(country) ?? defaultProductCountryCode,
     discoveryNotes: !discovery.diagnostics.length ? "Matched against the approved curated product catalogue." : !configured ? "Product discovery adapters are not configured." : `Product discovery returned ${found} products.`,
     legacyJson: JSON.stringify(toJsonValue(selected?.result.recommendations.map(item => toRecommendedProduct(item, selected.result.stackCoveragePercent, selected.runId, locale)) ?? [])) } };
 }
@@ -2200,7 +2202,7 @@ async function insertProductRecommendationResult({
       serving_multiplier integer, covered_needs jsonb, why text, url_used text, price_amount numeric, currency text,
       image_url text, unknown_at_recommendation boolean)
     on conflict (run_id, product_id) do nothing`;
-  await writeProductRecommendationDecisionRows(sql, { rows: prepared.decisions, runId, planId: task.planId, taskId: task.id });
+  await writeProductRecommendationDecisionRows(sql, { rows: prepared.decisions, preparedRowsJson: prepared.decisionsJson, runId, planId: task.planId, taskId: task.id });
 
   return runId;
 }
@@ -2235,7 +2237,7 @@ async function applyProductRecommendationsResult(
   }
   const prepared = preparedResult?.products ?? (await prepareTaskCompletionResult({ task, resultPayload })).products;
   if (!prepared?.selected) throw new Error("Product recommendation result is missing variants");
-  const { variants, selected: selectedVariant, discovery, discoveryNotes, countryCode, legacyJson } = prepared;
+  const { variants, selected: selectedVariant, discovery, discoveryNotes, configuredAdapters, countryCode, legacyJson } = prepared;
   const result = selectedVariant.result;
 
   const runIds = new Map<ProductStackPreference, string>();

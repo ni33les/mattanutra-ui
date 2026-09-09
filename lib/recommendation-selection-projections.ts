@@ -542,12 +542,17 @@ function objectValue(value: unknown): Record<string, unknown> {
     : {};
 }
 
+export function prepareProductDecisionRows(rows: ProductDecisionProjection[]) {
+  return JSON.stringify(toJsonValue([...new Map(rows.map(row => [row.dedupeKey, row])).values()]));
+}
+
 export async function writeProductRecommendationDecisionRows(
   sql: Db,
   input: Readonly<{
     generatedAt?: Date | string | null;
     planId?: string | null;
     rows: ProductDecisionProjection[];
+    preparedRowsJson?: string;
     runId: string;
     taskId?: string | null;
   }>
@@ -564,54 +569,22 @@ export async function writeProductRecommendationDecisionRows(
     `;
   }
 
-  for (const row of input.rows) {
-    await sql`
-      insert into public.product_recommendation_decisions (
-        run_id,
-        plan_id,
-        task_id,
-        product_id,
-        product_title,
-        outcome,
-        dedupe_key,
-        rank,
-        score,
-        product_coverage_percent,
-        stack_contribution_percent,
-        serving_multiplier,
-        covered_needs,
-        reason,
-        url_used,
-        price_amount,
-        currency,
-        unknown_at_recommendation,
-        is_current,
-        generated_at,
-        created_at
-      )
-      values (
-        ${input.runId}::uuid,
-        ${input.planId ?? null}::uuid,
-        ${input.taskId ?? null}::uuid,
-        ${row.productId}::uuid,
-        ${row.productTitle},
-        ${row.outcome},
-        ${row.dedupeKey},
-        ${row.rank},
-        ${row.score},
-        ${row.productCoveragePercent},
-        ${row.stackContributionPercent},
-        ${row.servingMultiplier},
-        ${sql.json(toJsonValue(row.coveredNeeds))}::jsonb,
-        ${row.reason},
-        ${row.urlUsed},
-        ${row.priceAmount},
-        ${row.currency},
-        ${row.unknownAtRecommendation},
-        ${Boolean(input.planId)},
-        ${input.generatedAt ?? new Date()},
-        now()
-      )
+  // Preserve sequential upsert semantics for repeated keys while issuing one write.
+  const rowsJson = input.preparedRowsJson ?? prepareProductDecisionRows(input.rows);
+  if (input.rows.length) await sql`
+    insert into public.product_recommendation_decisions (
+      run_id, plan_id, task_id, product_id, product_title, outcome, dedupe_key, rank, score,
+      product_coverage_percent, stack_contribution_percent, serving_multiplier, covered_needs,
+      reason, url_used, price_amount, currency, unknown_at_recommendation, is_current, generated_at, created_at)
+    select ${input.runId}::uuid, ${input.planId ?? null}::uuid, ${input.taskId ?? null}::uuid,
+      r."productId", r."productTitle", r.outcome, r."dedupeKey", r.rank, r.score,
+      r."productCoveragePercent", r."stackContributionPercent", r."servingMultiplier", r."coveredNeeds",
+      r.reason, r."urlUsed", r."priceAmount", r.currency, r."unknownAtRecommendation",
+      ${Boolean(input.planId)}, ${input.generatedAt ?? new Date()}, now()
+    from jsonb_to_recordset(${rowsJson}::text::jsonb) as r(
+      "productId" uuid, "productTitle" text, outcome text, "dedupeKey" text, rank integer, score numeric,
+      "productCoveragePercent" numeric, "stackContributionPercent" numeric, "servingMultiplier" integer,
+      "coveredNeeds" jsonb, reason text, "urlUsed" text, "priceAmount" numeric, currency text, "unknownAtRecommendation" boolean)
       on conflict (run_id, dedupe_key) do update set
         plan_id = excluded.plan_id,
         task_id = excluded.task_id,
@@ -632,7 +605,6 @@ export async function writeProductRecommendationDecisionRows(
         is_current = excluded.is_current,
         generated_at = excluded.generated_at
     `;
-  }
 
   return input.rows.length;
 }
