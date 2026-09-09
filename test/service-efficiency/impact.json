@@ -93,9 +93,9 @@
     },
     {
       "file": "test/task-transactions.integration.test.ts",
-      "slice": "task-lifecycle",
+      "slice": "task-transactions",
       "database": true,
-      "expectedCases": 9,
+      "expectedCases": 11,
       "reason": "Task admission/rollback, reservation fencing, deferred matching ownership and exact replay through the existing worker completion boundary"
     },
     {

@@ -5,9 +5,11 @@ import { after, before, describe, it } from "node:test";
 import { closeSqlPool, getSql, getWorkerSql, withDatabaseTransaction } from "../lib/db.ts";
 import { completeTask, reserveNextTask, releaseExpiredReservations, renewTaskLease, failTask } from "../lib/task-service.ts";
 import type { TaskAgentAccessScope } from "../lib/task-service-types.ts";
+import postgres from "postgres";
 
 const databaseUrl = process.env.TEST_DB_URL;
-describe("task lifecycle transactions on PostgreSQL", {skip: !databaseUrl}, () => {
+assert.ok(databaseUrl, "Task transaction tests require isolated PostgreSQL");
+describe("task lifecycle transactions on PostgreSQL", () => {
   const organisationId = randomUUID(), agentId = randomUUID(), membershipId = randomUUID(), sessionId = randomUUID();
   const scope: TaskAgentAccessScope = {organisationId, agentId, membershipId, agentName: "Lock review", capabilities: [], role: "platform_agent"};
   const taskIds: string[] = [];
@@ -53,6 +55,41 @@ describe("task lifecycle transactions on PostgreSQL", {skip: !databaseUrl}, () =
     assert.ok(result);
     return {taskId, reservationId: result.reservationId, workerSessionId: sessionId, accessScope: scope};
   }
+
+  it("LOCK-TASK-01 result preparation occurs before the task lock and the prepared payload is used once", async () => {
+    const input = await reserved();
+    let release!: () => void, entered!: () => void;
+    const ready = new Promise<void>(resolve => { entered=resolve; });
+    const barrier = new Promise<void>(resolve => { release=resolve; });
+    const independent = postgres(databaseUrl!, {max:1,prepare:false});
+    const work = completeTask({...input,
+      prepareResult: async () => { entered(); await barrier; return {value:"prepared"}; },
+      applyResult: async context => {
+        assert.deepEqual(context.preparedResult,{value:"prepared"});
+        await context.sql`insert into public.lock_review_task_results values (${input.taskId}, 'prepared')`;
+        return {done:true};
+      }
+    });
+    try {
+      await Promise.race([ready,work.then(()=>{throw Error("Completion skipped the preparation phase");})]);
+      await independent.begin(async tx=>{await tx`select id from tasks where id=${input.taskId}::uuid for update nowait`;});
+      release(); assert.equal((await work).status,"completed");
+      assert.equal((await independent`select * from lock_review_task_results where task_id=${input.taskId}`).length,1);
+    } finally { release(); await work.catch(()=>undefined); await independent.end(); }
+  });
+
+  it("LOCK-TASK-02 a changed task input cannot publish a previously prepared result", async () => {
+    const input = await reserved(); let applied=false;
+    await assert.rejects(completeTask({...input,
+      prepareResult: async () => {
+        await getSql()!`update public.tasks set payload='{"changed":true}'::jsonb where id=${input.taskId}::uuid`;
+        return {value:"stale"};
+      },
+      applyResult: async () => {applied=true;return {done:true};}
+    }), /task.*input.*changed/i);
+    assert.equal(applied,false);
+    assert.equal((await getSql()!`select status from tasks where id=${input.taskId}`)[0].status,"reserved");
+  });
 
   it("claims independent queued tasks concurrently without duplicate reservations", async () => {
     await Promise.all(Array.from({length: 6}, () => queued()));
