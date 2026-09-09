@@ -44,7 +44,7 @@
     {
       "file": "test/service-efficiency/dispatch.test.ts",
       "slice": "dispatch",
-      "expectedCases": 4,
+      "expectedCases": 5,
       "reason": "Pre-dispatch accounting, durable start acknowledgement, affine continuations and shared CPU capacity"
     },
     {

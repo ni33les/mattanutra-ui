@@ -62,3 +62,19 @@ test("EFF-DISP-04 independent matcher pools share the process CPU admission limi
     for (const worker of workers) worker.reply("done"); await Promise.all(jobs);
   } finally { await Promise.all([left.close(), right.close()]); await settled; }
 });
+
+
+test("EFF-DISP-05 reused threads attribute completion and checkpoint metrics to the active request", async () => {
+  const { withServiceMeasurements, serviceMeasurements } = await import("../../lib/service-metrics.ts");
+  const worker = new FakeWorker(), pool = new ThreadPool(() => worker as unknown as Worker, 1, 2);
+  try {
+    for (const bytes of [123, 456]) await withServiceMeasurements(async () => {
+      const job = pool.run("work", undefined, 1000); await tick();
+      worker.emit("message", { result: "done", metrics: { "checkpoint.bytes": { count: 1, total: bytes, max: bytes } } });
+      await job;
+      const measured = serviceMeasurements();
+      assert.equal(measured["worker.execute_ms"]?.count, 1);
+      assert.equal(measured["checkpoint.bytes"]?.total, bytes);
+    });
+  } finally { await pool.close(); }
+});
