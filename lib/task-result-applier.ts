@@ -1,9 +1,10 @@
+import { randomUUID } from "node:crypto";
 import { healthScoreReadProjection } from "@/lib/healthscore-readiness";
 import { matchesSafetyReferenceIdentity } from "@/lib/agentic/catalogue/reference-job";
 import { getAssessmentProductPreferences } from "@/lib/assessment-product-preferences";
 import { enqueueReadyHealthScoreDeliveries } from "@/lib/healthscore-delivery";
 import { ASSESSMENT_GENERATION_TASKS, generationInput, withGenerationInput, generationLocale, FUNNEL_GENERATOR_VERSION } from "@/lib/assessment-revisions";
-import { hasHealthScoreAiCopy, isUuid, toJsonValue } from "@/lib/assessment-store";
+import { isUuid, toJsonValue } from "@/lib/assessment-store";
 import { updateBlogPost, updateTestimonial } from "@/lib/blog";
 import { writeBpmEvent } from "@/lib/bpm";
 import {
@@ -74,7 +75,8 @@ import {
   type ProductStackPreference
 } from "@/lib/product-recommendations";
 import {
-  projectProductRecommendationDecisions,
+  productDecisionRowsFromRecommendationResult,
+  writeProductRecommendationDecisionRows,
   projectSupplementRecommendationSelections
 } from "@/lib/recommendation-selection-projections";
 import { AGENT_CAPABILITIES } from "@/lib/system-agents";
@@ -350,7 +352,8 @@ async function applyHealthScoreResult(
   task: TaskRecord,
   resultPayload: unknown,
   sqlOverride?: TaskServiceDb,
-  afterCommit?: AfterCommitScheduler
+  afterCommit?: AfterCommitScheduler,
+  preparedResult?: PreparedTaskCompletionResult
 ) {
   const sql = sqlOverride ?? getSql();
   const payload = objectValue(resultPayload);
@@ -363,13 +366,9 @@ async function applyHealthScoreResult(
     throw new Error("HealthScore completion result is incomplete");
   }
 
-  const rows = await sql`
-    select locale
-    from public.assessments
-    where plan_id = ${task.planId}::uuid
-    limit 1
-  `;
-  const locale: Locale = generationInput(task.payload)?.locale ?? (isLocale(rows[0]?.locale) ? rows[0].locale : "en");
+  const prepared = preparedResult?.healthScore ?? (await prepareTaskCompletionResult({ task, resultPayload })).healthScore;
+  if (!prepared) throw new Error("HealthScore completion result is incomplete");
+  const { locale } = prepared;
 
   await appendAssessmentVersion(sql, {
     actor: task.reservedByAgentId,
@@ -391,13 +390,13 @@ async function applyHealthScoreResult(
   });
 
   if (!fallbackUsed) {
-    if (!hasHealthScoreAiCopy(healthScore, locale)) throw new Error("HealthScore AI advice is incomplete");
+    if (!prepared.projection.ready[locale]) throw new Error("HealthScore AI advice is incomplete");
     const generation = generationInput(task.payload);
     if (!generation) return;
     await sql`insert into public.assessment_healthscore_results (plan_id, revision, locale, generator_version, result, read_projection, task_id)
-      values (${task.planId}::uuid, ${generation.revision}, ${generation.locale}, ${generation.generatorVersion}, ${sql.json(toJsonValue(healthScore))}, ${sql.json(healthScoreReadProjection(healthScore))}, ${task.id}::uuid)
+      values (${task.planId}::uuid, ${generation.revision}, ${generation.locale}, ${generation.generatorVersion}, ${prepared.json}::text::jsonb, ${sql.json(prepared.projection)}, ${task.id}::uuid)
       on conflict (plan_id, revision, locale, generator_version) do update set result = excluded.result, read_projection = excluded.read_projection, task_id = excluded.task_id, created_at = now()`;
-    await sql`update public.assessments set health_score = ${sql.json(toJsonValue(healthScore))}, updated_at = now()
+    await sql`update public.assessments set health_score = ${prepared.json}::text::jsonb, updated_at = now()
       where plan_id = ${task.planId}::uuid and input_revision = ${generation.revision} and locale = ${generation.locale}`;
     await enqueueReadyHealthScoreDeliveries(sql, task.planId, generation.revision, generation.locale);
   }
@@ -2072,50 +2071,77 @@ async function queueUnknownProductReviewTasks(
 
 
 
-async function loadProductRecommendationCountryCode(
-  sql: TaskServiceDb,
-  planId: string
-) {
-  const rows = await sql<Array<{ country: string | null }>>`
-    select answers ->> 'country' as country
-    from public.assessments
-    where plan_id = ${planId}::uuid
-    order by updated_at desc
-    limit 1
-  `;
+type PreparedProductVariant = ProductRecommendationVariantPayload & Readonly<{
+  runId: string; itemsJson: string; clientNeedsJson: string; exclusionsJson: string; diagnosticsJson: string;
+  decisions: ReturnType<typeof productDecisionRowsFromRecommendationResult>;
+}>;
+export type PreparedTaskCompletionResult = Readonly<{
+  healthScore?: { json: string; projection: ReturnType<typeof healthScoreReadProjection>; locale: Locale };
+  products?: { variants: PreparedProductVariant[]; selected: PreparedProductVariant | undefined; discovery: ReturnType<typeof productDiscoveryPayload>;
+    discoveryNotes: string; countryCode: string; locale: Locale; legacyJson: string };
+}>;
 
-  return normalizeProductCountryCode(rows[0]?.country) ?? defaultProductCountryCode;
+/** Pure projection/serialization happens before the task service opens its publication transaction. */
+export async function prepareTaskCompletionResult({ task, resultPayload }: Readonly<{ task: TaskRecord; resultPayload: unknown }>): Promise<PreparedTaskCompletionResult> {
+  if (!["analyze_healthscore", "generate_product_recommendations"].includes(task.taskType)) return {};
+  const generation = generationInput(task.payload);
+  let locale: Locale = generation?.locale ?? "en";
+  let country = generation?.answers.country;
+  if (!generation && task.planId) {
+    const sql = getSql();
+    if (!sql) throw new Error("Database is not configured");
+    const [row] = await sql`select locale, answers ->> 'country' as country from public.assessments where plan_id = ${task.planId}::uuid`;
+    locale = isLocale(row?.locale) ? row.locale : "en"; country = row?.country;
+  }
+  if (task.taskType === "analyze_healthscore") {
+    const score = objectValue(resultPayload).healthScore;
+    return score ? { healthScore: { json: JSON.stringify(toJsonValue(score)), projection: healthScoreReadProjection(score), locale } } : {};
+  }
+  const initial = productRecommendationPayload(resultPayload), discovery = productDiscoveryPayload(resultPayload);
+  const stackPreference = normalizeProductStackPreference(initial.diagnostics?.stackPreference ?? payloadText(task.payload, "stackPreference"));
+  let rawVariants = productRecommendationVariantPayloads(resultPayload);
+  if (!rawVariants.length && (initial.recommendations.length > 0 || ["no_purchase", "review_options"].includes(initial.diagnostics.matching?.operationalStatus ?? ""))) {
+    rawVariants = [{ maxProducts: initial.diagnostics?.trace?.maxProducts ?? null, result: initial, stackPreference }];
+  }
+  const variants = rawVariants.map(variant => {
+    const { result, maxProducts, stackPreference } = variant;
+    const diagnostics = { ...result.diagnostics, maxProducts, stackPreference,
+      trace: { ...result.diagnostics.trace, ...(maxProducts != null ? { maxProducts } : {}), stackPreference } };
+    return { ...variant, runId: randomUUID(), clientNeedsJson: JSON.stringify(toJsonValue(result.clientNeeds)),
+      exclusionsJson: JSON.stringify(toJsonValue(result.exclusions)), diagnosticsJson: JSON.stringify(toJsonValue(diagnostics)),
+      decisions: productDecisionRowsFromRecommendationResult(result),
+      itemsJson: JSON.stringify(result.recommendations.map(item => ({ product_id: item.product.id, rank: item.rank, score: item.score,
+        product_coverage_percent: item.productCoveragePercent, stack_contribution_percent: item.stackContributionPercent,
+        serving_multiplier: Math.max(1, Math.round(item.servingMultiplier || 1)), covered_needs: toJsonValue(item.coveredNeeds),
+        why: item.why, url_used: item.url, price_amount: item.product.priceAmount ?? null, currency: item.product.currency || "THB",
+        image_url: item.product.imageUrl ?? null, unknown_at_recommendation: item.unknownAtRecommendation }))) };
+  });
+  const selected = variants.find(item => item.stackPreference === stackPreference) ?? variants.find(item => item.stackPreference === "balanced") ?? variants[0];
+  const configured = discovery.diagnostics.filter(item => item.configured).length;
+  const found = discovery.diagnostics.reduce((total, item) => total + item.resultCount, 0);
+  return { products: { variants, selected, discovery, locale, countryCode: normalizeProductCountryCode(country) ?? defaultProductCountryCode,
+    discoveryNotes: !discovery.diagnostics.length ? "Matched against the approved curated product catalogue." : !configured ? "Product discovery adapters are not configured." : `Product discovery returned ${found} products.`,
+    legacyJson: JSON.stringify(toJsonValue(selected?.result.recommendations.map(item => toRecommendedProduct(item, selected.result.stackCoveragePercent, selected.runId, locale)) ?? [])) } };
 }
 
 async function insertProductRecommendationResult({
+  prepared,
   countryCode,
   discoveryNotes,
-  maxProducts,
   result,
   sql,
-  stackPreference,
   task
 }: Readonly<{
+  prepared: PreparedProductVariant;
   countryCode: string;
   discoveryNotes: string;
-  maxProducts: number | null;
   result: ProductRecommendationResult;
   sql: TaskServiceDb;
-  stackPreference: ProductStackPreference;
   task: TaskRecord;
 }>) {
-  const diagnostics = {
-    ...result.diagnostics,
-    maxProducts,
-    stackPreference,
-    trace: {
-      ...result.diagnostics.trace,
-      ...(maxProducts != null ? { maxProducts } : {}),
-      stackPreference
-    }
-  };
   const runRows = await sql<Array<{ id: string }>>`
     insert into public.product_recommendation_runs (
+      id,
       catalogue_revision, catalogue_fingerprint, search_effort,
       selection_revision, generation_locale, generator_version, assessment_revision,
       plan_id,
@@ -2135,6 +2161,7 @@ async function insertProductRecommendationResult({
       created_at
     )
     values (
+      ${prepared.runId}::uuid,
       ${Number(objectValue(task.payload).catalogueRevision ?? 0)}, ${result.diagnostics.catalogueFingerprint ?? (String(objectValue(result.diagnostics.trace).catalogueFingerprint ?? "") || null)},
       ${objectValue(objectValue(task.payload).productPreferences).searchEffort === "expanded" ? "expanded" : "standard"},
       ${Number(objectValue(objectValue(task.payload).productPreferences).revision ?? 0)},
@@ -2149,9 +2176,9 @@ async function insertProductRecommendationResult({
       ${result.supplementProductCoveragePercent},
       ${result.foodCoveragePercent},
       ${result.totalPlanCoveragePercent},
-      ${sql.json(toJsonValue(result.clientNeeds))}::jsonb,
-      ${sql.json(toJsonValue(result.exclusions))}::jsonb,
-      ${sql.json(toJsonValue(diagnostics))}::jsonb,
+      ${prepared.clientNeedsJson}::text::jsonb,
+      ${prepared.exclusionsJson}::text::jsonb,
+      ${prepared.diagnosticsJson}::text::jsonb,
       ${discoveryNotes},
       now(),
       now()
@@ -2164,51 +2191,16 @@ async function insertProductRecommendationResult({
     throw new Error("Product recommendation run was not created");
   }
 
-  for (const item of result.recommendations) {
-    await sql`
-      insert into public.product_recommendation_items (
-        run_id,
-        product_id,
-        rank,
-        score,
-        product_coverage_percent,
-        stack_contribution_percent,
-        serving_multiplier,
-        covered_needs,
-        why,
-        url_used,
-        price_amount,
-        currency,
-        image_url,
-        unknown_at_recommendation,
-        created_at
-      )
-      values (
-        ${runId}::uuid,
-        ${item.product.id}::uuid,
-        ${item.rank},
-        ${item.score},
-        ${item.productCoveragePercent},
-        ${item.stackContributionPercent},
-        ${Math.max(1, Math.round(item.servingMultiplier || 1))},
-        ${sql.json(toJsonValue(item.coveredNeeds))}::jsonb,
-        ${item.why},
-        ${item.url},
-        ${item.product.priceAmount ?? null},
-        ${item.product.currency || "THB"},
-        ${item.product.imageUrl ?? null},
-        ${item.unknownAtRecommendation},
-        now()
-      )
-      on conflict (run_id, product_id) do nothing
-    `;
-  }
-
-  await projectProductRecommendationDecisions(sql, {
-    result,
-    runId,
-    task
-  });
+  await sql`
+    insert into public.product_recommendation_items (
+      run_id, product_id, rank, score, product_coverage_percent, stack_contribution_percent,
+      serving_multiplier, covered_needs, why, url_used, price_amount, currency, image_url, unknown_at_recommendation, created_at)
+    select ${runId}::uuid, item.*, now() from jsonb_to_recordset(${prepared.itemsJson}::text::jsonb) as item(
+      product_id uuid, rank integer, score numeric, product_coverage_percent numeric, stack_contribution_percent numeric,
+      serving_multiplier integer, covered_needs jsonb, why text, url_used text, price_amount numeric, currency text,
+      image_url text, unknown_at_recommendation boolean)
+    on conflict (run_id, product_id) do nothing`;
+  await writeProductRecommendationDecisionRows(sql, { rows: prepared.decisions, runId, planId: task.planId, taskId: task.id });
 
   return runId;
 }
@@ -2217,11 +2209,10 @@ async function applyProductRecommendationsResult(
   task: TaskRecord,
   resultPayload: unknown,
   sqlOverride?: TaskServiceDb,
-  afterCommit?: AfterCommitScheduler
+  afterCommit?: AfterCommitScheduler,
+  preparedResult?: PreparedTaskCompletionResult
 ) {
   const sql = sqlOverride ?? getSql();
-  const initialResult = productRecommendationPayload(resultPayload);
-  const discovery = productDiscoveryPayload(resultPayload);
 
   if (!sql || !task.planId) {
     throw new Error("Product recommendation result is missing plan");
@@ -2242,50 +2233,10 @@ async function applyProductRecommendationsResult(
       !matchesSafetyReferenceIdentity(objectValue(resultPayload).safetyReferenceIdentity, {runtimeRevision:Number(reference.runtimeRevision),fingerprint:reference.fingerprint})) {
     return { superseded: true, message: "Safety references changed or are missing; old product result was not applied" };
   }
-  const [localeRow] = await sql<{ locale: string | null }[]>`
-    select locale
-    from public.assessments
-    where plan_id = ${task.planId}::uuid
-    limit 1
-  `;
-  const locale: Locale = generationInput(task.payload)?.locale ?? (isLocale(localeRow?.locale) ? localeRow.locale : "en");
-  const countryCode = await loadProductRecommendationCountryCode(sql, task.planId);
-  const stackPreference = normalizeProductStackPreference(
-    initialResult.diagnostics?.stackPreference ??
-      payloadText(task.payload, "stackPreference")
-  );
-  let variants = productRecommendationVariantPayloads(resultPayload);
-
-  if (variants.length < 1 && (initialResult.recommendations.length > 0 || ["no_purchase", "review_options"].includes(initialResult.diagnostics.matching?.operationalStatus ?? ""))) {
-    variants = [{
-      maxProducts: initialResult.diagnostics?.trace?.maxProducts ?? null,
-      result: initialResult,
-      stackPreference
-    }];
-  }
-
-  if (variants.length < 1) {
-    throw new Error("Product recommendation result is missing variants");
-  }
-
-  const selectedVariant =
-    variants.find((variant) => variant.stackPreference === stackPreference) ??
-    variants.find((variant) => variant.stackPreference === "balanced") ??
-    variants[0];
+  const prepared = preparedResult?.products ?? (await prepareTaskCompletionResult({ task, resultPayload })).products;
+  if (!prepared?.selected) throw new Error("Product recommendation result is missing variants");
+  const { variants, selected: selectedVariant, discovery, discoveryNotes, countryCode, legacyJson } = prepared;
   const result = selectedVariant.result;
-  const configuredAdapters = discovery.diagnostics.filter(
-    (item) => item.configured
-  ).length;
-  const discoveryResults = discovery.diagnostics.reduce(
-    (total, item) => total + item.resultCount,
-    0
-  );
-  const discoveryNotes =
-    discovery.diagnostics.length < 1
-      ? "Matched against the approved curated product catalogue."
-      : configuredAdapters < 1
-        ? "Product discovery adapters are not configured."
-        : `Product discovery returned ${discoveryResults} products.`;
 
   const runIds = new Map<ProductStackPreference, string>();
 
@@ -2300,12 +2251,11 @@ async function applyProductRecommendationsResult(
     runIds.set(
       variant.stackPreference,
       await insertProductRecommendationResult({
+        prepared: variant,
         countryCode,
         discoveryNotes,
-        maxProducts: variant.maxProducts,
         result: variant.result,
         sql,
-        stackPreference: variant.stackPreference,
         task
       })
     );
@@ -2316,10 +2266,6 @@ async function applyProductRecommendationsResult(
   if (!runId) {
     throw new Error("Product recommendation run was not created");
   }
-
-  const legacyRecommendations = result.recommendations.map((item) =>
-    toRecommendedProduct(item, result.stackCoveragePercent, runId, locale)
-  );
 
   await sql`
     insert into public.recommendations (
@@ -2335,7 +2281,7 @@ async function applyProductRecommendationsResult(
       ${generationInput(task.payload)?.revision ?? null},
       ${task.planId}::uuid,
       coalesce(max(version), 0) + 1,
-      ${sql.json(toJsonValue(legacyRecommendations))}::jsonb,
+      ${legacyJson}::text::jsonb,
       now(),
       now()
     from public.recommendations
@@ -2411,12 +2357,13 @@ type TaskCompletionResultApplier = (
   task: TaskRecord,
   resultPayload: unknown,
   sql: TaskServiceDb | undefined,
-  afterCommit: AfterCommitScheduler | undefined
+  afterCommit: AfterCommitScheduler | undefined,
+  preparedResult?: PreparedTaskCompletionResult
 ) => Promise<unknown>;
 
 const taskCompletionResultHandlers: Readonly<Record<string, TaskCompletionResultApplier>> = {
-  analyze_healthscore: async (task, resultPayload, sql, afterCommit) => {
-    await applyHealthScoreResult(task, resultPayload, sql, afterCommit);
+  analyze_healthscore: async (task, resultPayload, sql, afterCommit, preparedResult) => {
+    await applyHealthScoreResult(task, resultPayload, sql, afterCommit, preparedResult);
     return resultPayload;
   },
   client_safety_followup: applyCommunicationFollowupResult,
@@ -2460,6 +2407,7 @@ const taskCompletionResultHandlers: Readonly<Record<string, TaskCompletionResult
 };
 
 export async function applyTaskCompletionResult({
+  preparedResult,
   afterCommit,
   resultPayload,
   sql,
@@ -2467,6 +2415,7 @@ export async function applyTaskCompletionResult({
   taskId
 }: Readonly<{
   afterCommit?: AfterCommitScheduler;
+  preparedResult?: unknown;
   resultPayload: unknown;
   sql?: TaskServiceDb;
   task?: TaskRecord;
@@ -2496,9 +2445,9 @@ export async function applyTaskCompletionResult({
     if (task.planId && generation) {
       const planId = task.planId;
       const schedule = afterCommit ? (effect: () => Promise<void>) => afterCommit(() => withGenerationInput(planId, generation, effect)) : undefined;
-      return withGenerationInput(planId, generation, () => handler(task, resultPayload, sql, schedule));
+      return withGenerationInput(planId, generation, () => handler(task, resultPayload, sql, schedule, preparedResult as PreparedTaskCompletionResult | undefined));
     }
-    return handler(task, resultPayload, sql, afterCommit);
+    return handler(task, resultPayload, sql, afterCommit, preparedResult as PreparedTaskCompletionResult | undefined);
   }
 
   return resultPayload;

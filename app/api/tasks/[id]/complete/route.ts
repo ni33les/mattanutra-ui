@@ -6,7 +6,7 @@ import {
   taskApiError,
   textValue
 } from "@/lib/openclaw-api";
-import { applyTaskCompletionResult } from "@/lib/task-result-applier";
+import { applyTaskCompletionResult, prepareTaskCompletionResult } from "@/lib/task-result-applier";
 import { writeBpmEvent } from "@/lib/bpm";
 import { getWorkerSql } from "@/lib/db";
 import { completeTask } from "@/lib/task-service";
@@ -56,8 +56,10 @@ async function handlePOST(
     const task = await completeTask({
       accessScope: access.scope,
       agentId,
+      prepareResult: prepareTaskCompletionResult,
       applyResult: (context) =>
         applyTaskCompletionResult({
+          preparedResult: context.preparedResult,
           afterCommit: context.afterCommit,
           resultPayload: context.resultPayload,
           sql: context.sql,
