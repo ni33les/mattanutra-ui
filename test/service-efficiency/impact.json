@@ -12,7 +12,7 @@
     {
       "file": "test/service-efficiency/reads.test.ts",
       "slice": "reads",
-      "expectedCases": 3,
+      "expectedCases": 6,
       "reason": "Lockless projection reads, unchanged versions, preserved expiry state and full conversation compatibility"
     },
     {
