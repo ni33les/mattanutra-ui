@@ -1,4 +1,6 @@
 /** The maintained pack runs on DEV, or on an explicitly isolated local candidate. */
+export function isolatedMcpClientHeaders(_target, _clientId) { return {}; }
+
 export function mcpTestTarget(env = process.env) {
   const dev = "https://dev.mattanutra.com/api/mcp";
   if ((env.MATTANUTRA_ENV ?? "dev") !== "dev") throw new Error("MCP tests require MATTANUTRA_ENV=dev.");

@@ -4,6 +4,8 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { runMatcherBatches } from "../scripts/run-matcher-test-suite.mjs";
+import { isolatedMcpClientHeaders } from "../scripts/mcp-test-target.mjs";
+import { consumeRateLimit, rateLimitClientKey, resetRateLimitStoreForTests } from "../lib/rate-limit.ts";
 
 test("MCP-INFRA-01 database concurrency fixtures have exclusive control of their execution owners", async () => {
   const evidence = mkdtempSync(join(tmpdir(), "mcp-worker-isolation-"));
@@ -48,4 +50,24 @@ test("MCP-INFRA-02 failed client execution releases its worker before propagatin
     }), /controlled client failure/);
     assert.equal(stopped, 1);
   } finally { rmSync(evidence, { recursive: true, force: true }); }
+});
+
+test("MCP-INFRA-03 independent isolated clients do not consume one another's request allowance", () => {
+  const previous = process.env.TRUST_PROXY;
+  process.env.TRUST_PROXY = "1";
+  resetRateLimitStoreForTests();
+  try {
+    const key = (client: number) => rateLimitClientKey(new Request("http://127.0.0.1:12345/api/mcp", {
+      headers: isolatedMcpClientHeaders({ isolatedCandidate: true }, client)
+    }), "mcp-fixture");
+    const config = { name: "mcp-fixture", limit: 2, windowMs: 60_000 };
+    assert.equal(consumeRateLimit(key(101), config).allowed, true);
+    assert.equal(consumeRateLimit(key(101), config).allowed, true);
+    assert.equal(consumeRateLimit(key(101), config).allowed, false, "A single client retains the real request limit");
+    assert.equal(consumeRateLimit(key(202), config).allowed, true, "Another test file represents a different client");
+    assert.deepEqual(isolatedMcpClientHeaders({ isolatedCandidate: false }, 101), {}, "Never inject proxy identity when calling a deployed endpoint");
+  } finally {
+    resetRateLimitStoreForTests();
+    if (previous === undefined) delete process.env.TRUST_PROXY; else process.env.TRUST_PROXY = previous;
+  }
 });
