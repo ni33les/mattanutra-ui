@@ -703,7 +703,7 @@ export function createPostgresStore(inputSql: Sql, inTransaction = false): Agent
           ${record.catalogueVersion}, ${record.guidanceRulesVersion},
           ${record.availabilityAsOf}::timestamptz, ${record.createdAt}::timestamptz,
           case when ${projection !== null} then jsonb_set(${encoded.projection}::text::jsonb,'{catalogueRevision}',
-            coalesce((select snapshot_json->'runtimeRevision' from public.agentic_catalogue_snapshots where snapshot_id=${projection?.snapshotId ?? ""}),${asJson(projection?.catalogueRevision ?? null)}::jsonb,'null'::jsonb)) else null end
+            coalesce(to_jsonb(${projection?.catalogueRevision ?? null}::bigint),(select snapshot_json->'runtimeRevision' from public.agentic_catalogue_snapshots where snapshot_id=${projection?.snapshotId ?? ""}),'null'::jsonb)) else null end
         )
       `;
     },
@@ -831,7 +831,7 @@ export function createPostgresStore(inputSql: Sql, inTransaction = false): Agent
           request_snapshot = ${encoded.request}::text::jsonb,
           result = ${encoded.result}::text::jsonb,
           status_projection = case when ${projection !== null} then jsonb_set(${encoded.projection}::text::jsonb,'{catalogueRevision}',
-            coalesce((select snapshot_json->'runtimeRevision' from public.agentic_catalogue_snapshots where snapshot_id=${projection?.snapshotId ?? ""}),${asJson(projection?.catalogueRevision ?? null)}::jsonb,'null'::jsonb)) else null end,
+            coalesce(to_jsonb(${projection?.catalogueRevision ?? null}::bigint),(select snapshot_json->'runtimeRevision' from public.agentic_catalogue_snapshots where snapshot_id=${projection?.snapshotId ?? ""}),'null'::jsonb)) else null end,
           catalogue_version = ${record.catalogueVersion},
           guidance_rules_version = ${record.guidanceRulesVersion},
           availability_as_of = ${record.availabilityAsOf}::timestamptz

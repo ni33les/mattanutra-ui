@@ -35,17 +35,21 @@ test("EFF-PACK-04 release proof rejects a false repeated-semantic claim", async 
   const { checkMcp721Proof, packageStages } = await import("../../scripts/mcp-721-proof.mjs");
   const { payloadHash } = await import("../../scripts/mcp-payload/proof.mjs");
   const root = mkdtempSync(join(tmpdir(), "eff-proof-"));
-  const identity = { sourceSha256: "source", sourceCommit: "commit", releaseBase: "base", contractSha256: "contract", inventorySha256: "inventory", inputSha256: "inputs", schemaSha256: "schema", workerProtocolSha256: "worker" };
-  const execution = { passed: true, files: 1, cases: 1, failures: [] };
-  const reports = { "tests.json": { passed: true, execution, missing: [] }, "build.json": { buildSha256: "build", nextBuildId: "id", sourceCommit: "commit" },
-    "source-after.json": { sha256: "source" }, "inventory.json": { files: [{ file: "fixture.test.ts", expectedCases: 1 }], browser: [{ expectedCases: 1 }], benchmarks: ["d3"] },
+  const register={mechanisms:Array.from({length:39},(_,index)=>({number:index+1,disposition:"retain",cases:[{file:"fixture.test.ts",name:`case-${index+1}`}]}))};
+  const events=register.mechanisms.map(row=>({file:"fixture.test.ts",name:`case-${row.number}`,type:"test",passed:true}));
+  const {verifyLockExecution}=await import("../../scripts/service-efficiency/rollout-proof.mjs");
+  const identity = { deploymentBases:{dev:"d".repeat(40),uat:"e".repeat(40)},lockRegisterSha256:payloadHash(JSON.stringify(register)),sourceSha256: "source", sourceCommit: "c".repeat(40), releaseBase: "base", contractSha256: "contract", inventorySha256: "inventory", inputSha256: "inputs", schemaSha256: "schema", workerProtocolSha256: "worker" };
+  const execution = { passed: true, files: 1, cases: 39, failures: [] };
+  const reports = { "lock-register.json":register,"executed-cases.json":events,"lock-register-verification.json":verifyLockExecution(register,events),
+    "rollout.json":{version:1,environments:["dev","uat"],deploymentBases:identity.deploymentBases,sourceCommit:identity.sourceCommit,lockRegisterSha256:identity.lockRegisterSha256}, "tests.json": { passed: true, execution, missing: [] }, "build.json": { buildSha256: "build", nextBuildId: "id", sourceCommit: identity.sourceCommit },
+    "source-after.json": { sha256: "source" }, "inventory.json": { files: [{ file: "fixture.test.ts", expectedCases: 39 }], browser: [{ expectedCases: 39 }], benchmarks: ["d3"] },
     "schema.json": { passed: true, schemaSha256: "schema" }, "browser-results.json": { passed: true, execution },
-    "benchmark-comparison.json": { passed: true, reproducible: true, controlCommit: "base", candidateCommit: "commit", runs: ["a", "b"].map(run => ({ run, comparison: { passed: true, rows: [{ id: "d3", identical: true, semanticSha256: run }] } })) } };
+    "benchmark-comparison.json": { passed: true, reproducible: true, controlCommit: "base", candidateCommit: identity.sourceCommit, runs: ["a", "b"].map(run => ({ run, comparison: { passed: true, rows: [{ id: "d3", identical: true, semanticSha256: run }] } })) } };
   try {
     for (const [file, value] of Object.entries(reports)) writeFileSync(join(root, file), JSON.stringify(value));
     writeFileSync(join(root, "attestation.json"), JSON.stringify({ version: "dev-mcp-efficiency-1", environment: "dev", scope: "core_service_efficiency_and_funnel", contractVersion: "7.2.4", ...identity,
       passed: true, stages: packageStages("efficiency").map(label => ({ label, passed: true })), artifacts: Object.entries(reports).map(([file, value]) => ({ file, sha256: payloadHash(JSON.stringify(value)) })) }));
-    assert.throws(() => checkMcp721Proof(join(root, "attestation.json"), identity, "efficiency"));
+    assert.throws(() => checkMcp721Proof(join(root, "attestation.json"), identity, "efficiency"), /deep-equal/, "The failure must be the contradictory semantic hashes, not a missing prerequisite");
   } finally { rmSync(root, { recursive: true }); }
 });
 

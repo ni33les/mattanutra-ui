@@ -6,6 +6,7 @@ import { dirname, resolve } from "node:path";
 import { sourceManifest } from "./run-full-test-suite.mjs";
 import { axExpectedIdentity, readAxValidationProof } from "./ax-validation-proof.mjs";
 import { npmCommand, npmRun, run, runCapture } from "./dev-cycle-utils.mjs";
+import {validateRolloutBinding} from "./service-efficiency/rollout-proof.mjs";
 
 const serviceName = "mattanutra-ui-dev.service";
 const schemaScripts = [
@@ -131,7 +132,12 @@ async function main() {
     const file = process.argv[(efficiencyIndex >= 0 ? efficiencyIndex : conversationIndex >= 0 ? conversationIndex : toolCardIndex >= 0 ? toolCardIndex : latestPatchIndex >= 0 ? latestPatchIndex : currentPatchIndex >= 0 ? currentPatchIndex : patchIndex) + 1];
     if (!file?.startsWith("/")) throw new Error("Pass the absolute MCP work-package attestation path");
     if (await runCapture("git", ["status", "--porcelain"])) throw new Error("Validated source must remain clean");
-    checkMcp721Proof(file, mcp721Identity(sourceManifest().sha256, await runCapture("git", ["rev-parse", "HEAD"]), packageId), packageId);
+    const identity=mcp721Identity(sourceManifest().sha256, await runCapture("git", ["rev-parse", "HEAD"]), packageId);
+    checkMcp721Proof(file, identity, packageId);
+    if(packageId === "efficiency") {
+      const active=await fetch("http://127.0.0.1:3000/api/mcp",{method:"HEAD",signal:AbortSignal.timeout(5000)});
+      validateRolloutBinding(JSON.parse(await readFile(resolve(dirname(file),"rollout.json"),"utf8")),identity,"dev",active.headers.get("x-agentic-build-id"));
+    }
     const build = JSON.parse(await readFile(resolve(dirname(file), "build.json"), "utf8"));
     if (build.nextBuildId !== (await readFile(".next/BUILD_ID", "utf8")).trim() || build.buildSha256 !== compiledBuildIdentity()) throw new Error("Validated compiled build changed");
     console.log(`[deploy:dev] Verified scoped MCP ${packageId} evidence: ${file}`);
