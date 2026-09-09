@@ -18,3 +18,5 @@ Historical evidence and prices are unchanged.
 
 - Final inventory includes the existing completed no-purchase reveal browser regression (ten affected browser cases in total). `acceptance-1` was deliberately interrupted to correct its omission before deployment; its partial execution is not an attestation.
 - `acceptance-2` passed 150 affected cases, paired semantic benchmarks and typecheck, then failed the release lint rule forbidding a local variable named `module`. The binding was renamed without changing assertions. Queue/execution diagnostics were added to the benchmark before the final retry; missing or incomplete dispatch probes now fail the comparison proof (EFF-PACK-05).
+
+- `acceptance-3` passed all 151 affected tests, both benchmark runs, typecheck and release lint. The 6 GiB webpack heap exceeded the resized 8 GiB host's available memory and was killed by the OS. Efficiency builds now use a 4 GiB heap and one build CPU; runtime matching CPU/search budgets and database pools are unchanged. The failed build is retained as environment/resource evidence.
