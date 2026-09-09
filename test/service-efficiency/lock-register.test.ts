@@ -10,8 +10,23 @@ test("LOCK-REG-01 all 39 audited mechanisms name their disposition, invariant, b
     assert.ok(["remove", "narrow", "retain"].includes(row.disposition), String(row.number));
     for (const field of ["resource", "invariant", "acquisition", "permittedWork", "release"]) assert.ok(row[field]?.length > 10, `${row.number}: ${field}`);
     assert.ok(row.callers.length && row.tests.length, String(row.number));
+    assert.ok(row.cases?.length, `${row.number}: named executable evidence is required`);
     for (const file of row.tests) assert.ok(inventory.files.some((entry: {file: string})=>entry.file===file), `${row.number}: ${file} missing from scoped inventory`);
   }
+});
+
+test("LOCK-REG-04 operational TypeScript migrations and repair tools cannot bypass discovery", async () => {
+  const {mkdtempSync,mkdirSync,writeFileSync,rmSync}=await import("node:fs");
+  const {tmpdir}=await import("node:os"),{join}=await import("node:path");
+  const {scanLockSites}=await import("../../scripts/service-efficiency/lock-register.mjs");
+  const root=mkdtempSync(join(tmpdir(),"lock-register-maintenance-"));
+  try {
+    for(const directory of ["lib","app","workers","scripts"])mkdirSync(join(root,directory));
+    writeFileSync(join(root,"scripts/repair.ts"),'async function repair(sql) { return sql`select id from tasks for update skip locked`; }');
+    const sites=scanLockSites(root);
+    assert.equal(sites.length,1,"Operational script row locks need a registered invariant too");
+    assert.equal(sites[0].owner,"repair");
+  } finally {rmSync(root,{recursive:true,force:true});}
 });
 
 test("LOCK-REG-02 production SQL locking sites require explicit registered justification", async () => {
