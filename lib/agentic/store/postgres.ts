@@ -1,5 +1,5 @@
 import { operationCursor, withoutOperationCursor, withOperationCursor } from "@/lib/agentic/store/operation-checkpoint";
-import { getSql, keepDatabaseWarm } from "@/lib/db";
+import { getSql, keepDatabaseWarm, withDatabaseTransaction } from "@/lib/db";
 import type {
   AgenticStore,
   CapabilityRecord,
@@ -729,7 +729,7 @@ export function createPostgresStore(inputSql: Sql, inTransaction = false): Agent
     },
     async transaction<T>(work: (store: AgenticStore) => Promise<T>) {
       if (inTransaction) return work(store);
-      return sql.begin((tx) => work(createPostgresStore(tx as unknown as Sql, true)));
+      return withDatabaseTransaction(inputSql, tx => work(createPostgresStore(tx, true)));
     },
     async updateCheckout(record) {
       await sql`

@@ -5,7 +5,7 @@ export type TaskQueueSignal = Readonly<{
 
 const globalTaskWakeup = globalThis as typeof globalThis & {
   mattanutraTaskQueuePending?: TaskQueueSignal[];
-  mattanutraTaskWakeupWaiters?: Set<(signal: TaskQueueSignal) => void>;
+  mattanutraTaskWakeupWaiters?: Set<(signal: TaskQueueSignal) => boolean>;
 };
 
 function taskWakeupWaiters() {
@@ -22,17 +22,17 @@ function pendingTaskQueueSignals() {
 
 export function signalTaskQueue(signal: TaskQueueSignal) {
   const waiters = taskWakeupWaiters();
-
-  if (waiters.size === 0) {
-    if (signal.taskType) {
-      pendingTaskQueueSignals().push(signal);
-    }
-
-    return;
-  }
-
   for (const waiter of waiters) {
-    waiter(signal);
+    if (waiter(signal)) return;
+  }
+  if (signal.taskType) {
+    const pending = pendingTaskQueueSignals();
+    const index = pending.findIndex(item => item.taskType === signal.taskType);
+    if (index < 0) pending.push(signal);
+    else if (pending[index].taskId !== signal.taskId) pending[index] = { taskType: signal.taskType };
+    // Signals are hints; durable rows remain authoritative. Coalescing multiple
+    // IDs requests a normal queue drain. Overflow recovers through periodic reads.
+    if (pending.length > 256) pending.shift();
   }
 }
 
@@ -48,6 +48,10 @@ export function waitForTaskQueueChange(
     (taskTypes ?? []).filter((taskType) => taskType.trim().length > 0)
   );
 
+  const pending = pendingTaskQueueSignals();
+  const index = pending.findIndex(signal => accepted.size === 0 || accepted.has(signal.taskType));
+  if (index >= 0) { pending.splice(index, 1); return Promise.resolve(true); }
+
   return new Promise<boolean>((resolve) => {
     const waiters = taskWakeupWaiters();
     const complete = (changed: boolean) => {
@@ -62,7 +66,9 @@ export function waitForTaskQueueChange(
         accepted.has(signal.taskType)
       ) {
         complete(true);
+        return true;
       }
+      return false;
     };
     const timeout = setTimeout(() => complete(false), timeoutMs);
 
@@ -98,7 +104,9 @@ export function waitForTaskQueueWork(
     const onWakeup = (signal: TaskQueueSignal) => {
       if (signal.taskType && accepted.has(signal.taskType)) {
         complete(signal);
+        return true;
       }
+      return false;
     };
     const timeout = setTimeout(() => complete(null), timeoutMs);
 
