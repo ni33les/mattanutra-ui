@@ -82,3 +82,12 @@ test("EFF-CACHE-06 durable result identities fence locale, effort, scope, facts 
     assert.notEqual(matchingResultIdentity(job, "dev:tenant-a"), noReferences);
   } finally { resetMatcherSafetyCeilings(); }
 });
+
+test("LOCK-CACHE-08 cancelled shared admission compensates committed reservations before declining dispatch",async()=>{
+  const work=new cache.SharedMatchWork<number,number>(1000),controller=new AbortController(),entered=barrier(),release=barrier(),finished=barrier();let reserved=0,executions=0;
+  const pending=work.run("cancelled-admission",{signal:controller.signal,checkpoint:async()=>{reserved=4000;entered.release();await release.promise;return async()=>{reserved=0;};}},async context=>{
+    try{await context.notify(4000);executions++;return 1;}finally{finished.release();}
+  });
+  const rejected=assert.rejects(pending,/cancelled/);await entered.promise;controller.abort(new Error("cancelled admission"));release.release();await rejected;await finished.promise;
+  assert.equal(executions,0);assert.equal(reserved,0);
+});

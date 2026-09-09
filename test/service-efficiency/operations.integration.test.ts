@@ -58,3 +58,17 @@ test("EFF-TXN-PG-03 durable BYTEA checkpoints remain binary when read and reclai
   const reclaimed = await claimPlanOperation(store, row.id, "next", "2026-09-09T00:01:00Z"); assert.ok(reclaimed);
   const resumed = operationCursor(reclaimed); assert.ok(resumed instanceof Uint8Array); assert.deepEqual(Buffer.from(resumed), cursor);
 });
+
+test("LOCK-ATTEMPTS-04 unstarted reservation compensation preserves prior lost attempts and refuses a newer owner",async()=>{
+  const row=await operation(),claim=await claimPlanOperation(store,row.id,"owner",now);assert.ok(claim);
+  const cursor=randomBytes(256);
+  await updateClaimedOperation(store,claim,{checkpoint:{reservedAttempts:5000,search:{cursor,expansionAttempts:4000}}},now);
+  assert.equal(typeof store.releaseUnstartedOperationAttempts,"function");queries.length=0;
+  assert.equal(await store.releaseUnstartedOperationAttempts!(row.id,"owner",4000,5000,1000,now),true);
+  assert.equal(business().length,1);
+  const saved=await store.getPlanOperation(row.id);assert.deepEqual(saved?.command,row.command);
+  assert.equal((saved?.checkpoint as {reservedAttempts:number}).reservedAttempts,1000);
+  assert.deepEqual(Buffer.from((saved?.checkpoint as {search:{cursor:Uint8Array}}).search.cursor),cursor);
+  const next=await claimPlanOperation(store,row.id,"new-owner","2026-09-09T00:01:00Z");assert.ok(next);
+  assert.equal(await store.releaseUnstartedOperationAttempts!(row.id,"owner",4000,1000,0,"2026-09-09T00:01:00Z"),false);
+});

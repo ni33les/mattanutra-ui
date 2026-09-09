@@ -78,3 +78,14 @@ test("EFF-DISP-05 reused threads attribute completion and checkpoint metrics to 
     });
   } finally { await pool.close(); }
 });
+
+test("LOCK-DISPATCH-06 cancellation during reservation releases known unstarted work without posting a calculation",async()=>{
+  const worker=new FakeWorker(),pool=new ThreadPool(()=>worker as unknown as Worker,1,2),controller=new AbortController();
+  let release!:()=>void,reserved=0,returned=0;
+  const gate=new Promise<void>(resolve=>{release=resolve;});
+  const job=pool.run("unstarted",controller.signal,1000,{beforeStart:async()=>{reserved=4000;await gate;return async()=>{reserved=0;returned++;};}});
+  const rejected=assert.rejects(job,/cancelled/);
+  try {await tick();assert.equal(reserved,4000);controller.abort(new Error("cancelled before dispatch"));release();await rejected;await tick();
+    assert.deepEqual(worker.posts,[]);assert.equal(reserved,0);assert.equal(returned,1);
+  }finally{release();await pool.close();await rejected;}
+});

@@ -38,13 +38,13 @@
       "file": "test/service-efficiency/operations.integration.test.ts",
       "slice": "operations-pg",
       "database": true,
-      "expectedCases": 3,
+      "expectedCases": 4,
       "reason": "Bounded atomic lease and checkpoint statements with preserved commands, cursor and stale-owner rejection"
     },
     {
       "file": "test/service-efficiency/dispatch.test.ts",
       "slice": "dispatch",
-      "expectedCases": 5,
+      "expectedCases": 6,
       "reason": "Pre-dispatch accounting, durable start acknowledgement, affine continuations and shared CPU capacity"
     },
     {
@@ -62,7 +62,7 @@
     {
       "file": "test/service-efficiency/cache.test.ts",
       "slice": "cache",
-      "expectedCases": 6,
+      "expectedCases": 7,
       "reason": "Byte-bounded immutable reuse, concurrent owner cancellation, checkpoint fencing and failed-computation isolation"
     },
     {
@@ -386,6 +386,19 @@
       "slice": "immutable-references",
       "expectedCases": 2,
       "reason": "Audits 6/30/33: concurrent immutable reference scopes and real checkpoint restart after catalogue/reference changes, with explicit stale presentation"
+    },
+    {
+      "file": "test/transaction-boundary.test.ts",
+      "slice": "transaction-architecture",
+      "expectedCases": 16,
+      "reason": "Affected shared transaction and catalogue/plan store boundaries; replace superseded duplicate lock allowlists with the complete justified-site register"
+    },
+    {
+      "file": "test/service-efficiency/cancel-admission.integration.test.ts",
+      "slice": "cancel-admission",
+      "database": true,
+      "expectedCases": 1,
+      "reason": "Audits 1/26/30: actual durable cancellation between committed reservation and worker dispatch preserves zero attempts and a recoverable receipt"
     }
   ],
   "inputs": [
