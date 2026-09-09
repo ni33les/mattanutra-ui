@@ -17,6 +17,7 @@ export function operationDeadlineRemaining(operation: PlanOperationRecord, now =
   return Math.max(0, (operation.deadlineAt ? Date.parse(operation.deadlineAt) : Date.parse(operation.createdAt) + PLAN_OPERATION_TERMINAL_MS) - now);
 }
 export async function expirePlanOperation(store: AgenticStore, id: string, now: string) {
+  if (store.expireOperation) return store.expireOperation(id, now, planOperationDeadlineError());
   return store.transaction(async tx => {
     const current = await tx.getPlanOperation(id, { includeCursor: false });
     if (!current || !["queued", "running", "retryable"].includes(current.status) || operationDeadlineRemaining(current, Date.parse(now)) > 0) return false;
@@ -63,6 +64,7 @@ export async function admitPlanOperation(store: AgenticStore, input: Readonly<{
 
 export async function claimPlanOperation(store: AgenticStore, id: string, leaseToken: string, now: string) {
   if (await expirePlanOperation(store, id, now)) return null;
+  if (store.claimOperation) return store.claimOperation(id, leaseToken, now, new Date(Date.parse(now) + PLAN_OPERATION_LEASE_MS).toISOString());
   const claimed = await store.transaction(async tx => {
     const current = await tx.getPlanOperation(id, { includeCursor: false });
     if (!current || ["complete", "cancelled", "failed"].includes(current.status)) return null;
@@ -78,6 +80,8 @@ export async function claimPlanOperation(store: AgenticStore, id: string, leaseT
 
 export async function updateClaimedOperation(store: AgenticStore, claim: PlanOperationRecord,
   changes: Partial<Pick<PlanOperationRecord, "checkpoint" | "catalogueIdentity" | "referenceIdentity" | "status" | "response" | "error">>, now: string) {
+  if (store.patchClaimedOperation) return store.patchClaimedOperation(claim.id, claim.leaseToken!, changes, now,
+    !changes.status || changes.status === "running" ? new Date(Date.parse(now) + PLAN_OPERATION_LEASE_MS).toISOString() : null);
   return store.transaction(async tx => {
     const current = await tx.getPlanOperation(claim.id, { includeCursor: false });
     if (!current || current.status !== "running" || current.leaseToken !== claim.leaseToken ||

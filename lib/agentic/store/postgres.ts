@@ -1,4 +1,5 @@
 import { operationCursor, withoutOperationCursor, withOperationCursor } from "@/lib/agentic/store/operation-checkpoint";
+import { operationCommands } from "@/lib/agentic/store/operation-commands";
 import { getSql, keepDatabaseWarm, withDatabaseTransaction } from "@/lib/db";
 import type {
   AgenticStore,
@@ -66,6 +67,7 @@ export function createPostgresStore(inputSql: Sql, inTransaction = false): Agent
   // shape rather than leaking untyped columns into the store interface.
   const sql = inputSql as unknown as StoreSql;
   const store: AgenticStore = {
+    ...operationCommands(inputSql),
     async getPlanReadState(planId, requestedRevision, includeResult = false) {
       const [row] = await sql<DatabaseRow<PlanRecord> & { revision: number; projection: PlanStatusProjection | null;
         result: unknown; operation: PlanOperationRead | null; frozen: boolean; catalogue_revision: number | null }>`
@@ -421,21 +423,12 @@ export function createPostgresStore(inputSql: Sql, inTransaction = false): Agent
     },
     async getPlanForUpdate(id) {
       if (!inTransaction) throw new Error("Plan locks require a transaction");
-      await sql`select id from public.agentic_plans where id = ${id}::uuid for update`;
-      return store.getPlan(id);
+      const [row] = await sql<DatabaseRow<PlanRecord>>`select * from public.agentic_plans where id = ${id}::uuid for update`;
+      return row ? mapPlan(row) : null;
     },
     async getPlan(id) {
       const [row] = await sql<DatabaseRow<PlanRecord>>`select * from public.agentic_plans where id = ${id}::uuid`;
-      if (!row) return null;
-      return {
-        createdAt: toIso(row.created_at),
-        currentRevision: row.current_revision,
-        environment: row.environment,
-        id: row.id,
-        principalScope: row.principal_scope,
-        tenantScope: row.tenant_scope,
-        updatedAt: toIso(row.updated_at)
-      };
+      return row ? mapPlan(row) : null;
     },
     async getPlanRevision(planId, revision) {
       const [row] = await sql<DatabaseRow<PlanRevisionRecord>>`
@@ -838,6 +831,11 @@ function mapCheckout(row: DatabaseRow<CheckoutSessionRecord>): CheckoutSessionRe
     shippingMinor: row.shipping_minor == null ? null : asMinor(row.shipping_minor),
     taxMinor: row.tax_minor == null ? null : asMinor(row.tax_minor)
   };
+}
+
+function mapPlan(row: DatabaseRow<PlanRecord>): PlanRecord {
+  return { createdAt: toIso(row.created_at), currentRevision: row.current_revision, environment: row.environment,
+    id: row.id, principalScope: row.principal_scope, tenantScope: row.tenant_scope, updatedAt: toIso(row.updated_at) };
 }
 
 function mapOrder(row: DatabaseRow<OrderRecord>): OrderRecord {
