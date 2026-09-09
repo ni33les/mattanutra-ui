@@ -327,6 +327,12 @@
       "slice": "affinity",
       "expectedCases": 3,
       "reason": "Audits 26/30: acknowledged resident cursor eviction prevents idle affinity stranding productive work; exact attempt/result recovery"
+    },
+    {
+      "file": "test/service-efficiency/result-preparation.test.ts",
+      "slice": "result-preparation",
+      "expectedCases": 3,
+      "reason": "Audits 1/10/11: prepare immutable product rows, localized presentation and HealthScore hashes outside task/assessment publication locks"
     }
   ],
   "inputs": [
