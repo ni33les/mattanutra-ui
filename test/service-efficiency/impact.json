@@ -437,6 +437,13 @@
       "slice": "runtime-resources",
       "expectedCases": 1,
       "reason": "Bound repeated matching comparisons to verified UAT-equivalent CPU/memory with no swap, OOM or silently unbounded runtime evidence"
+    },
+    {
+      "file": "test/service-efficiency/publication-storage.integration.test.ts",
+      "slice": "publication-storage",
+      "database": true,
+      "expectedCases": 2,
+      "reason": "Audits 1/3/5: serialized revision publication and small validation headers; order status changes never reserialize or rewrite immutable frozen baskets"
     }
   ],
   "inputs": [
