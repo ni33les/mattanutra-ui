@@ -444,6 +444,12 @@
       "database": true,
       "expectedCases": 2,
       "reason": "Audits 1/3/5: serialized revision publication and small validation headers; order status changes never reserialize or rewrite immutable frozen baskets"
+    },
+    {
+      "file": "test/service-efficiency/reference-browser.test.ts",
+      "slice": "browser-reference",
+      "expectedCases": 1,
+      "reason": "The shared web/admin matcher must compile and execute in a browser without importing Node async context; server reference isolation remains independently covered"
     }
   ],
   "inputs": [
