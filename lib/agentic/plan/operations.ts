@@ -3,6 +3,27 @@ import { canonicalRequestHash } from "@/lib/agentic/idempotency";
 import type { CapabilityScope } from "@/lib/agentic/capabilities";
 import type { AgenticStore, PlanOperationRecord } from "@/lib/agentic/store/types";
 import { businessError } from "@/lib/agentic/contract/errors";
+import { requestLifetime, withRequestLifetime } from "@/lib/request-lifetime";
+
+/** Cleanup owns a separate bounded lifetime after execution/request cancellation. */
+export function withOperationCleanup<T>(work: () => Promise<T>) {
+  return withRequestLifetime({ signal: AbortSignal.timeout(2_000), correlationId: requestLifetime()?.correlationId }, work);
+}
+
+export async function releaseUnstartedAttempts(store: AgenticStore, claim: PlanOperationRecord, attempts: number, reserved: number, restore: number) {
+  const now = new Date().toISOString();
+  return withOperationCleanup(() => {
+    if (store.releaseUnstartedOperationAttempts) return store.releaseUnstartedOperationAttempts(claim.id, claim.leaseToken!, attempts, reserved, restore, now);
+    return store.transaction(async tx => {
+      const current = await tx.getPlanOperation(claim.id, { includeCursor: false });
+      const checkpoint = current?.checkpoint as { reservedAttempts?: number; search?: { expansionAttempts?: number } } | null;
+      if (!current || !["running","retryable","failed","cancelled"].includes(current.status) ||
+        (current.leaseToken !== claim.leaseToken && !(current.leaseToken === null && ["failed","cancelled"].includes(current.status))) ||
+        (checkpoint?.search?.expansionAttempts ?? 0) !== attempts || checkpoint?.reservedAttempts !== reserved) return false;
+      return tx.updatePlanOperation({ ...current, checkpoint: { ...checkpoint, reservedAttempts: restore }, version: current.version + 1, updatedAt: now }, current.version);
+    });
+  });
+}
 
 export const PLAN_OPERATION_LEASE_MS = 60_000;
 export const PLAN_OPERATION_TASK = "match_agentic_plan";

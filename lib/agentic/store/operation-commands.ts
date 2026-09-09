@@ -9,6 +9,16 @@ const json = (value: unknown) => JSON.parse(JSON.stringify(value)) as postgres.J
  * commands stay in the database during heartbeat/checkpoint metadata updates. */
 export function operationCommands(sql: postgres.Sql) {
   return {
+    async releaseUnstartedOperationAttempts(id: string, token: string, attempts: number, reserved: number, restore: number, now: string) {
+      if (![attempts, reserved, restore].every(value => Number.isSafeInteger(value) && value >= 0) || restore > reserved) throw new Error("Invalid unstarted attempt compensation");
+      const rows = await sql`update public.agentic_plan_operations set version=version+1,updated_at=${now}::timestamptz,
+        record_json=jsonb_set(record_json,'{checkpoint,reservedAttempts}',to_jsonb(${restore}::integer)) || jsonb_build_object('version',version+1,'updatedAt',${now}::text)
+        where id=${id}::uuid and status in ('running','retryable','failed','cancelled')
+          and (record_json->>'leaseToken'=${token} or (status in ('failed','cancelled') and record_json->>'leaseToken' is null))
+          and coalesce((record_json #>> '{checkpoint,search,expansionAttempts}')::integer,0)=${attempts}
+          and (record_json #>> '{checkpoint,reservedAttempts}')::integer=${reserved} returning id`;
+      return rows.length === 1;
+    },
     async expireOperation(id: string, now: string, error: unknown) {
       const rows = await sql`update public.agentic_plan_operations set status='failed',version=version+1,updated_at=${now}::timestamptz,
         record_json=record_json || jsonb_build_object('status','failed','version',version+1,'leaseToken',null,'leaseExpiresAt',null,'updatedAt',${now}::text,'error',${sql.json(json(error))}::jsonb)

@@ -9,7 +9,7 @@ import { validateProductDoseProposals } from "@/lib/matcher/serving-grid";
 import { toMatcherProduct } from "@/lib/agentic/plan/to-matcher-product";
 import { mergeRequestPatch, originalRequestFor } from "@/lib/agentic/plan/request-patch";
 import { requestLifetime, withRequestLifetime } from "@/lib/request-lifetime";
-import { admitPlanOperation, claimPlanOperation, failPlanOperation, updateClaimedOperation } from "@/lib/agentic/plan/operations";
+import { admitPlanOperation, claimPlanOperation, failPlanOperation, updateClaimedOperation, releaseUnstartedAttempts, withOperationCleanup } from "@/lib/agentic/plan/operations";
 import type { PlanOperationRecord } from "@/lib/agentic/store/types";
 import { AsyncLocalStorage } from "node:async_hooks";
 import type { Locale } from "@/lib/i18n";
@@ -467,7 +467,7 @@ type DurableSearchCheckpoint = {
   search?: import("@/lib/agentic/plan/matching").ResidentChunkOptions["checkpoint"];
   reservedAttempts?: number;
 };
-type MatchCheckpointEvent = { checkpoint: DurableSearchCheckpoint; reserve: boolean };
+type MatchCheckpointEvent = { checkpoint: DurableSearchCheckpoint; reserve: boolean; restoreReservedAttempts?: number };
 const durableMatchingWork = new SharedMatchWork<ReturnType<typeof matchPlan>, MatchCheckpointEvent>(16 * 1024 * 1024);
 async function durableMatch(input: { snapshot: CatalogueSnapshot; state: CanonicalPlanState }) {
   const attempt = planAttempts.getStore();
@@ -488,8 +488,13 @@ async function durableMatch(input: { snapshot: CatalogueSnapshot; state: Canonic
     const alreadyAcknowledged = initial.search?.expansionAttempts === checkpoint.search?.expansionAttempts;
     const persisted = event.reserve && alreadyAcknowledged
       ? withoutOperationCursor({ ...claim, checkpoint }).checkpoint : checkpoint;
-    if (!await updateClaimedOperation(store, claim, { checkpoint: persisted }, new Date().toISOString())) throw new Error("Matching operation lease lost");
+    const releaseUnstarted = event.reserve ? async () => { await releaseUnstartedAttempts(store, claim,
+      checkpoint.search?.expansionAttempts ?? 0, checkpoint.reservedAttempts ?? 0, event.restoreReservedAttempts ?? 0); } : undefined;
+    try {
+      if (!await updateClaimedOperation(store, claim, { checkpoint: persisted }, new Date().toISOString())) throw new Error("Matching operation lease lost");
+    } catch (error) { await releaseUnstarted?.(); throw error; }
     initial.search = checkpoint.search;
+    return releaseUnstarted;
   } }, async context => {
     let checkpoint = initial;
     let lostAttempts = checkpoint.reservedAttempts ?? 0;
@@ -501,7 +506,7 @@ async function durableMatch(input: { snapshot: CatalogueSnapshot; state: Canonic
       const reserved = { ...checkpoint, stage: "search" as const, reservedAttempts: chunkBudget + lostAttempts };
       const reply = await matchPlanResidentChunkInWorker(sessionId, input,
         { checkpoint: checkpoint.search, chunkBudget: Math.max(1, chunkBudget), lostAttempts },
-        () => context.notify({ checkpoint: reserved, reserve: true }), context.signal);
+        () => context.notify({ checkpoint: reserved, reserve: true, restoreReservedAttempts: lostAttempts }), context.signal);
       checkpoint = { ...checkpoint, stage: "search", search: reply.checkpoint, reservedAttempts: 0 };
       await context.notify({ checkpoint, reserve: false });
       acknowledgePlanMatchSession(sessionId);
@@ -985,21 +990,21 @@ export async function runAdmittedPlanOperation(input: Readonly<{
       }, !(claim.command.payload as PlanToolInput).planHandle, Date.now());
       if (isAgenticErrorResult(result)) {
         if (operationDeadlineRemaining(claim) === 0) {
-          await expirePlanOperation(input.store, claim.id, new Date().toISOString());
+          await withOperationCleanup(() => expirePlanOperation(input.store, claim.id, new Date().toISOString()));
           return planOperationDeadlineError();
         }
         const status = result.error.retryable ? "retryable" : "failed";
-        await updateClaimedOperation(input.store, claim, { status, error: result }, new Date().toISOString());
+        await withOperationCleanup(() => updateClaimedOperation(input.store, claim, { status, error: result }, new Date().toISOString()));
       }
       return result;
     } catch (error) {
       if (operationDeadlineRemaining(claim) === 0) {
-        await expirePlanOperation(input.store, claim.id, new Date().toISOString());
+        await withOperationCleanup(() => expirePlanOperation(input.store, claim.id, new Date().toISOString()));
         return planOperationDeadlineError();
       }
       const result = businessError({ reasonCode: "temporarily_unavailable", retryable: true,
         message: "Matching could not finish. Retry this operation with the same key and unchanged request." });
-      await failPlanOperation(input.store, claim, result, new Date().toISOString());
+      await withOperationCleanup(() => failPlanOperation(input.store, claim, result, new Date().toISOString()));
       console.error("[agentic-plan-operation]", { operationId: claim.id, origin: error instanceof Error ? error.name : "unknown", message: error instanceof Error ? error.message : "operation_failed" });
       return result;
     }

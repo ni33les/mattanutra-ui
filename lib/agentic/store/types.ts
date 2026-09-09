@@ -230,6 +230,7 @@ export type AgenticStore = {
   expireOperation?(id: string, now: string, error: unknown): Promise<boolean>;
   claimOperation?(id: string, token: string, now: string, leaseExpiresAt: string): Promise<PlanOperationRecord | null>;
   patchClaimedOperation?(id: string, token: string, changes: import("@/lib/agentic/store/operation-commands").OperationChanges, now: string, leaseExpiresAt: string | null): Promise<boolean>;
+  releaseUnstartedOperationAttempts?(id: string, token: string, attempts: number, reserved: number, restore: number, now: string): Promise<boolean>;
   /** Coherent MVCC presentation read; never locks rows or includes commands/cursors. */
   getPlanReadState(planId: string, revision?: number, includeResult?: boolean): Promise<import("@/lib/agentic/presentation/status-projection").PlanReadState | null>;
   getPlanOperation(id: string, options?: { includeCursor: boolean }): Promise<PlanOperationRecord | null>;

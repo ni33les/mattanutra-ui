@@ -41,8 +41,9 @@ function freezeFacts<T>(value: T): T {
   return value;
 }
 
-export type SharedWorkContext<C> = { signal: AbortSignal; notify: (checkpoint: C) => Promise<void> };
-type Owner<C> = { signal?: AbortSignal; checkpoint?: (value: C) => Promise<void> };
+type ReleaseUnstarted = () => Promise<void>;
+export type SharedWorkContext<C> = { signal: AbortSignal; notify: (checkpoint: C) => Promise<ReleaseUnstarted | void> };
+type Owner<C> = { signal?: AbortSignal; checkpoint?: (value: C) => Promise<ReleaseUnstarted | void> };
 type Subscriber<T, C> = Owner<C> & { resolve: (value: T) => void; reject: (error: unknown) => void; cleanup: () => void };
 type Flight<T, C> = { controller: AbortController; owners: Set<Subscriber<T, C>> };
 
@@ -79,11 +80,15 @@ export class SharedMatchWork<T, C> {
       try {
         const value = await compute({ signal: active.controller.signal, notify: async checkpoint => {
           active.controller.signal.throwIfAborted();
+          const releases: ReleaseUnstarted[] = [];
           await Promise.all([...active.owners].map(async subscriber => {
-            try { await subscriber.checkpoint?.(checkpoint); }
+            try { const release = await subscriber.checkpoint?.(checkpoint); if (release) releases.push(release); }
             catch (error) { detach(subscriber, error); }
           }));
+          const releaseUnstarted = releases.length ? async () => { await Promise.all(releases.map(release => release())); } : undefined;
+          if (active.controller.signal.aborted) await releaseUnstarted?.();
           active.controller.signal.throwIfAborted();
+          return releaseUnstarted;
         } });
         active.controller.signal.throwIfAborted();
         this.completed.set(key, value);

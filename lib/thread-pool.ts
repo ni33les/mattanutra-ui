@@ -85,7 +85,7 @@ export class ThreadPool<Input, Result> {
     if (slot) {
       slot.job = undefined;
       if (job.posted) this.retire(slot);
-      else { slot.releaseCpu?.(); slot.releaseCpu = undefined; }
+      else { slot.releaseCpu?.(); slot.releaseCpu = undefined; slot.worker.unref(); }
     }
     job.reject(error); this.drain();
   }
@@ -124,8 +124,11 @@ export class ThreadPool<Input, Result> {
       if (job.settled) { release(); return; }
       slot.releaseCpu = release;
       recordServiceMetric("worker.queue_ms", performance.now() - job.queuedAt);
-      await job.options.beforeStart?.();
-      if (job.settled || slot.job !== job) return;
+      const releaseUnstarted = await job.options.beforeStart?.();
+      if (job.settled || slot.job !== job) {
+        if (typeof releaseUnstarted === "function") await releaseUnstarted();
+        return;
+      }
       job.startTimer(); job.startedAt = performance.now(); job.posted = true;
       if (job.options.inputBytes !== undefined) recordServiceMetric("worker.input_bytes", job.options.inputBytes);
       if ((++inputSamples % 64) === 0) {
