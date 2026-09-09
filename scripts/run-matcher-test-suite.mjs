@@ -10,7 +10,7 @@ import { unclassifiedMatcherConsumers } from "./matcher-test-inventory.mjs";
 
 const ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)));
 
-async function startHttpCandidate(env, evidence) {
+export async function startHttpCandidate(env, evidence) {
   const log = createWriteStream(join(evidence, "mcp-http.log"), { flags: "wx", mode: 0o600 });
   const child = spawn(process.execPath, ["--experimental-strip-types", "--import", "./scripts/register-ts-path-loader.mjs", "--import", "./scripts/register-matcher-http-loader.mjs", "scripts/serve-matcher-test-http.ts"],
     { cwd: ROOT, env, detached: process.platform !== "win32", stdio: ["ignore", "pipe", "pipe", "ipc"] });
