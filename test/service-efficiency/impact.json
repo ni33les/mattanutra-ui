@@ -221,6 +221,12 @@
       "slice": "mcp-consumers",
       "expectedCases": 4,
       "reason": "Affected MCP read and durable executor compatibility: exact compact fields, ownership, localized guides and unchanged public contract"
+    },
+    {
+      "file": "test/service-efficiency/harness.test.ts",
+      "slice": "harness",
+      "expectedCases": 3,
+      "reason": "Reject incomplete benchmark comparisons, changed semantics, missing browser evidence and unchanged-source proof gaps"
     }
   ],
   "inputs": [
@@ -228,6 +234,28 @@
     "test/fixtures/mcp-payload/baseline.json.gz",
     "test/fixtures/mcp-payload/manifest.json",
     "test/fixtures/ax-refinement/six-profiles.json",
-    "test/fixtures/ax-refinement/dev-corrections.json"
+    "test/fixtures/ax-refinement/dev-corrections.json",
+    "test/fixtures/mcp-7-2-3/goldens.json",
+    "data/catalogue-corrections/mcp-7.2.2-dev.json",
+    "test/fixtures/matcher-experiments/manifest.json",
+    "test/fixtures/matcher-experiments/anna-dev.json"
+  ],
+  "browser": [
+    {
+      "file": "test/e2e/web-funnel-recovery.spec.ts",
+      "grep": "fresh browser|capture failure|ordinary checkout|prepaid reservation|progress and reveal",
+      "expectedCases": 9,
+      "reason": "Capture/resume/reload, shared status and reveal/payment/email recovery in en/th/zh-CN without repeating matching",
+      "excluded": "Three ANNA-BROWSER-06 numeric preference/exclusion matching scenarios remain maintained and outside this polling/infrastructure browser scope"
+    }
+  ],
+  "benchmarks": [
+    "d3",
+    "anna",
+    "expanded",
+    "concurrent",
+    "mixed",
+    "reads",
+    "funnel"
   ]
 }
