@@ -2,6 +2,7 @@ import { AsyncLocalStorage } from "node:async_hooks";
 import { requestLifetime, withRequestLifetime } from "@/lib/request-lifetime";
 import postgres from "postgres";
 import { createLogger } from "@/lib/logger";
+import { measureService, recordServiceMetric } from "@/lib/service-metrics";
 
 const globalDb = globalThis as typeof globalThis & {
   mattanutraDbUnavailableLogged?: boolean;
@@ -366,15 +367,20 @@ function instrumentSql(
       const cancel = () => pending.cancel?.();
       const originalThen = pending.then.bind(pending);
       pending.then = ((onFulfilled, onRejected) => {
+        recordServiceMetric("db.statements");
+        const measured = measureService("db.sql_ms");
         signal?.addEventListener("abort", cancel, { once: true });
         if (signal?.aborted) cancel();
         return originalThen(
           (value) => {
+            measured();
             signal?.removeEventListener("abort", cancel);
             noteQuery(kind, startedAt, args[0]);
             return typeof onFulfilled === "function" ? onFulfilled(value) : value;
           },
           (error) => {
+            measured();
+            if ((error as { code?: string })?.code === "55P03") recordServiceMetric("db.lock_timeouts");
             signal?.removeEventListener("abort", cancel);
             noteQuery(kind, startedAt, args[0]);
             if (typeof onRejected === "function") {
@@ -398,22 +404,27 @@ function instrumentSql(
 
     (tagged as postgres.Sql).begin = ((
       fn: (txn: postgres.TransactionSql) => unknown
-    ) =>
-      originalBegin(async (txn) => {
+    ) => {
+      const acquired = measureService("db.acquire_begin_ms");
+      return originalBegin(async (txn) => {
+        acquired();
         requestLifetime()?.signal.throwIfAborted();
         const instrumented = instrumentSql(
           txn as unknown as postgres.Sql,
           kind,
           true
         ) as unknown as postgres.TransactionSql;
+        const configured = measureService("db.setup_ms");
         await instrumented`
           select
             set_config('statement_timeout', ${String(dbStatementTimeoutMs())}, true),
             set_config('lock_timeout', ${String(dbLockTimeoutMs())}, true),
             set_config('idle_in_transaction_session_timeout', ${String(dbIdleInTxnTimeoutMs())}, true)
         `;
+        configured();
         return fn(instrumented);
-      })) as postgres.Sql["begin"];
+      });
+    }) as postgres.Sql["begin"];
   }
 
   return tagged as unknown as postgres.Sql;

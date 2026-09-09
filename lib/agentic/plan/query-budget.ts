@@ -1,25 +1,29 @@
+import { serviceMeasurementContext } from "@/lib/service-metrics";
 const GLOBAL = "global";
 const byNamespace = new Map<string, Map<string, number>>();
 let activeNamespace = GLOBAL;
 
-function bucket(namespace = activeNamespace) {
+function bucket(namespace = getQueryNamespace(), map = serviceMeasurementContext()?.queries ?? byNamespace) {
   const key = namespace || GLOBAL;
-  const existing = byNamespace.get(key);
+  const existing = map.get(key);
   if (existing) {
     return existing;
   }
   const created = new Map<string, number>();
-  byNamespace.set(key, created);
+  map.set(key, created);
+  while (map.size > 128) map.delete(map.keys().next().value!);
   return created;
 }
 
 export function setQueryNamespace(namespace?: string) {
-  activeNamespace = namespace?.trim() || GLOBAL;
+  const scope = serviceMeasurementContext();
+  if (scope) scope.queryNamespace = namespace?.trim() || GLOBAL;
+  else activeNamespace = namespace?.trim() || GLOBAL;
   bucket(activeNamespace);
 }
 
 export function getQueryNamespace() {
-  return activeNamespace;
+  return serviceMeasurementContext()?.queryNamespace ?? activeNamespace;
 }
 
 export function captureQueryBudgetState() {
@@ -40,6 +44,11 @@ export function restoreQueryBudgetState(snapshot: ReturnType<typeof captureQuery
 }
 
 export function resetQueryBudget(namespace?: string) {
+  const scope = serviceMeasurementContext();
+  if (scope) {
+    if (namespace) scope.queries.delete(namespace); else scope.queries.clear();
+    if (!namespace || scope.queryNamespace === namespace) scope.queryNamespace = GLOBAL;
+  }
   if (namespace) {
     byNamespace.delete(namespace);
     if (activeNamespace === namespace) {
@@ -54,10 +63,14 @@ export function resetQueryBudget(namespace?: string) {
 export function countQuery(name: string) {
   const counts = bucket();
   counts.set(name, (counts.get(name) ?? 0) + 1);
+  if (serviceMeasurementContext()) {
+    const diagnostic = bucket(getQueryNamespace(), byNamespace);
+    diagnostic.set(name, (diagnostic.get(name) ?? 0) + 1);
+  }
 }
 
 export function queryBudgetSnapshot(namespace?: string) {
-  const counts = bucket(namespace ?? activeNamespace);
+  const counts = namespace ? bucket(namespace, byNamespace) : bucket();
   return Object.fromEntries(
     [...counts.entries()].sort(([left], [right]) => left.localeCompare(right))
   );

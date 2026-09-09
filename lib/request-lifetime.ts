@@ -1,4 +1,5 @@
 import { AsyncLocalStorage } from "node:async_hooks";
+import { serviceMeasurementContext, withServiceMeasurements } from "@/lib/service-metrics";
 
 type RequestLifetime = Readonly<{
   signal: AbortSignal;
@@ -9,7 +10,8 @@ type RequestLifetime = Readonly<{
 const requests = new AsyncLocalStorage<RequestLifetime>();
 
 export function withRequestLifetime<T>(lifetime: RequestLifetime, work: () => T): T {
-  return requests.run(lifetime, work);
+  return serviceMeasurementContext() ? requests.run(lifetime, work)
+    : withServiceMeasurements(() => requests.run(lifetime, work));
 }
 
 export function requestLifetime() {

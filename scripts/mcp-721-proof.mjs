@@ -5,6 +5,7 @@ import { payloadHash } from "./mcp-payload/proof.mjs";
 
 export const MCP721_BASE = "22f3ce60f17158c68a251abe4070f582dd39253a";
 export const MCP_PACKAGES = {
+  "efficiency": { version: "7.2.4", directory: "test/service-efficiency", base: "a28f3b27d6bde5a21803fa5e33622e89ce2a708d", scope: "core_service_efficiency_and_funnel" },
   "conversation": { version: "7.2.4", directory: "test/mcp-conversation-pack", base: "1c169407ba0f3fed3a19871afa87ce0bdeecf949", scope: "mcp_conversation_payload" },
   "721": { version: "7.2.1", directory: "test/mcp-7-2-1", base: MCP721_BASE, scope: "mcp_721_alignment_and_routines" },
   "724": { version: "7.2.4", directory: "test/mcp-tool-card", base: "fab0e5a0c0d3b6d593404c4fe13e3849b7da752b", scope: "mcp_tool_card_publication" },

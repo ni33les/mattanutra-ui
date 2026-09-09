@@ -10,10 +10,14 @@ import { MCP_PACKAGES, mcp721Identity, checkMcp721Proof } from "./mcp-721-proof.
 const [mode, ...rawArgs] = process.argv.slice(2);
 const packageId = rawArgs[0]?.startsWith("--package=") ? rawArgs[0].slice("--package=".length) : "721";
 assert.ok(MCP_PACKAGES[packageId], "Unknown work package");
-const args = rawArgs[0]?.startsWith("--package=") ? rawArgs.slice(1) : rawArgs;
+const args = rawArgs[0]?.startsWith("--package=") ? rawArgs.slice(1) : [...rawArgs];
+const sliceIndex = args.indexOf("--slice");
+const slice = sliceIndex < 0 ? null : args.splice(sliceIndex, 2)[1];
+assert.ok(!slice || (mode === "test" && packageId === "efficiency"), "Slices are limited to efficiency development tests");
 const definition = MCP_PACKAGES[packageId], MCP721_BASE = definition.base;
 assert.ok(["test", "validate"].includes(mode));
 const inventory = JSON.parse(readFileSync(`${definition.directory}/impact.json`, "utf8"));
+if (slice) inventory.files = inventory.files.filter(row => row.slice === slice);
 assert.equal(inventory.releaseBase, MCP721_BASE);
 if (args.length === 1 && args[0] === "--list") { console.log(JSON.stringify(inventory, null, 2)); process.exit(0); }
 assert.ok(args.length === 2 && args[0] === "--output" && args[1].startsWith("/"));
@@ -22,8 +26,8 @@ const git = (...args) => execFileSync("git", args, { encoding: "utf8" }).trim();
 const commit = git("rev-parse", "HEAD"), files = inventory.files.map(row => row.file);
 assert.equal(new Set(files).size, files.length); assert.ok(files.length > 0);
 const discovered = readdirSync(definition.directory, { recursive: true }).filter(file => file.endsWith(".test.ts")).map(file => `${definition.directory}/${file}`);
-for (const file of discovered) assert.ok(files.includes(file), `Undeclared package test ${file}`);
-for (const file of git("diff", "--name-only", "--diff-filter=ACMR", MCP721_BASE, "--", "test").split("\n").filter(file => file.endsWith(".test.ts"))) assert.ok(files.includes(file), `Changed test omitted ${file}`);
+for (const file of discovered.filter(file => !slice || files.includes(file))) assert.ok(files.includes(file), `Undeclared package test ${file}`);
+for (const file of (slice ? [] : git("diff", "--name-only", "--diff-filter=ACMR", MCP721_BASE, "--", "test").split("\n").filter(file => file.endsWith(".test.ts")))) assert.ok(files.includes(file), `Changed test omitted ${file}`);
 for (const row of inventory.files) {
   assert.ok(row.reason.length > 20 && row.expectedCases > 0 && existsSync(row.file));
   assert.deepEqual(testSourceHygiene(readFileSync(row.file, "utf8"), row.file), []);
