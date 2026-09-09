@@ -6,6 +6,7 @@ import { resolve } from "node:path";
 import { createHash } from "node:crypto";
 import { runBatch } from "../run-full-test-suite.mjs";
 import { browserExecutionProof } from "../test-execution-proof.mjs";
+import { prepareLockFixtures } from "./prepare-lock-fixtures.mjs";
 
 export async function prepareEfficiencyDatabase(templateUrl, output, env) {
   const url = new URL(templateUrl); assert.equal(url.hostname, "127.0.0.1"); assert.notEqual(url.port, "5432");
@@ -20,6 +21,8 @@ export async function prepareEfficiencyDatabase(templateUrl, output, env) {
   assert.ok(result.passed, "Isolated efficiency migration failed");
   const sql = postgres(url.href, { max: 1, prepare: false });
   try {
+    const lockFixtures = await prepareLockFixtures(sql, url.href);
+    writeFileSync(resolve(output, "lock-fixtures.json"), JSON.stringify(lockFixtures, null, 2), { flag: "wx", mode: 0o600 });
     const columns = await sql`select table_name,column_name,data_type from information_schema.columns where table_schema='public' and
       ((table_name='agentic_plan_revisions' and column_name='status_projection') or
        (table_name in ('agentic_orders','agentic_plan_operations','assessment_healthscore_results','formulations') and column_name='read_projection') or

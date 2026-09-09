@@ -123,3 +123,20 @@ test("CAT-CACHE-PG-03 a contending ordinary product writer finishes while cache 
     await sql.end();
   }
 });
+
+test("LOCK-CATALOGUE-01 validation is prepared before writer fences and publication does not reconstruct product facts", async () => {
+  const { prepareApprovedAdvisoryCaches } = await import("../lib/product-advisory-cache-refresh.ts");
+  const sql=postgres(databaseUrl,{max:1});const rollback=new Error("Rollback prepared catalogue fixture");
+  try { await assert.rejects(sql.begin("isolation level serializable",async tx=>{
+    const seeded=await seedPublicMatcherFixtures(tx),fixture=seeded.products.find(row=>row.key==="d3-high")!;assert.ok(fixture);
+    await tx`update public.products set validation_status='failed',validation_reasons=ARRAY['unsafe_dose'] where id=${fixture.productId}`;
+    const manifest=await inspectApprovedAdvisoryCacheRefresh(tx,fixture.productId);assert.equal(manifest.entries.length,1);
+    const statements:string[]=[];const observed=new Proxy(tx,{apply(target,receiver,args){statements.push(args[0].join("?"));return Reflect.apply(target,receiver,args);}});
+    const prepared=await prepareApprovedAdvisoryCaches(observed,manifest);
+    assert.ok(statements.length>0);assert.ok(statements.every(q=>/^\s*select/i.test(q)&&!/for (?:update|share)/i.test(q)));
+    statements.length=0;
+    assert.equal((await refreshApprovedAdvisoryCaches(observed,manifest,true,prepared))[0]?.status,"applied");
+    assert.ok(statements.some(q=>/for update/.test(q)));assert.ok(statements.every(q=>!/jsonb_agg|from public.product_facts/i.test(q)),"no fact reconstruction inside writer fences");
+    throw rollback;
+  }),error=>error===rollback); } finally {await sql.end();}
+});

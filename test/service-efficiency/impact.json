@@ -273,8 +273,8 @@
     },
     {
       "file": "test/product-advisory-cache-refresh.integration.test.ts",
-      "slice": "retained-locks",
-      "expectedCases": 3,
+      "slice": "catalogue-writer",
+      "expectedCases": 4,
       "reason": "Direct verification of retained audited writer, pool, rate-limit and maintenance invariants",
       "database": true
     },
