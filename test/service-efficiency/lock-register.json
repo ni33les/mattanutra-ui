@@ -1,0 +1,1120 @@
+{
+  "version": 1,
+  "baseline": "41a9f1d7a938ff158a66bcc3dfea3b935f940341",
+  "uatBaseline": "84c39d9acff2fa380b0223be38650264ab1cc73d",
+  "contract": "7.2.4",
+  "scope": "39 audited mechanisms and shared consumers; no PRD deployment",
+  "lockOrder": "Plan then operation/order; task then assessment then preferences/payment/delivery; multiple rows in stable ID order. Catalogue writers prepare outside transactions; maintenance product acquisition uses NOWAIT to break the epoch/product writer cycle.",
+  "timingPolicy": "Report acquisition latency and client-observed transaction duration separately. A lease lifetime is not a PostgreSQL row-lock hold time.",
+  "mechanisms": [
+    {
+      "number": 1,
+      "resource": "Plan row \u2014 FOR UPDATE",
+      "disposition": "narrow",
+      "invariant": "Serializes operation admission, revision publication and checkout against a single plan.",
+      "acquisition": "Explicit mutation transaction or conditional write; ordinary reads never acquire this lock.",
+      "permittedWork": "Revalidate ownership, revision and affected row identities; apply necessary writes only. Prepare, calculate, serialize, render and perform external effects outside the protected phase.",
+      "release": "Acquisition to outer transaction commit/rollback; matching runs outside this transaction. No dedicated lock-hold TTL.",
+      "callers": [
+        "lib/agentic/store/postgres.ts:393",
+        "lib/agentic/plan/operations.ts:38",
+        "lib/agentic/plan/service.ts:2009",
+        "lib/agentic/commerce/execute.ts:453"
+      ],
+      "tests": [
+        "test/service-efficiency/operations.integration.test.ts",
+        "test/ax-refinement/recovery.integration.test.ts"
+      ],
+      "verification": "pending-final-scoped-run"
+    },
+    {
+      "number": 2,
+      "resource": "Operation row \u2014 conditional UPDATE",
+      "disposition": "narrow",
+      "invariant": "Claims/renews operation ownership, reserves attempts, saves checkpoints, expires/cancels work and records terminal publication.",
+      "acquisition": "Explicit mutation transaction or conditional write; ordinary reads never acquire this lock.",
+      "permittedWork": "Revalidate ownership, revision and affected row identities; apply necessary writes only. Prepare, calculate, serialize, render and perform external effects outside the protected phase.",
+      "release": "Each UPDATE locks its row until its transaction ends; the 60-second ownership lease is separate.",
+      "callers": [
+        "lib/agentic/store/postgres.ts:698",
+        "lib/agentic/plan/operations.ts:19",
+        "lib/agentic/plan/operations.ts:69",
+        "lib/agentic/plan/operations.ts:86",
+        "scripts/apply-agentic-commerce-schema.ts:58"
+      ],
+      "tests": [
+        "test/service-efficiency/operations.integration.test.ts"
+      ],
+      "verification": "pending-final-scoped-run"
+    },
+    {
+      "number": 3,
+      "resource": "Revision, receipt and uniqueness conflicts",
+      "disposition": "narrow",
+      "invariant": "Protects one result per revision, one response per idempotency key, one active task reservation and one active checkout per plan/revision.",
+      "acquisition": "Explicit mutation transaction or conditional write; ordinary reads never acquire this lock.",
+      "permittedWork": "Revalidate ownership, revision and affected row identities; apply necessary writes only. Prepare, calculate, serialize, render and perform external effects outside the protected phase.",
+      "release": "Writes and concurrent unique-key conflicts resolve at transaction commit/rollback; permanent records are not permanently held locks.",
+      "callers": [
+        "lib/agentic/store/postgres.ts:705",
+        "lib/agentic/plan/service.ts:2059",
+        "lib/funnel-idempotency.ts:1"
+      ],
+      "tests": [
+        "test/task-transactions.integration.test.ts"
+      ],
+      "verification": "pending-final-scoped-run"
+    },
+    {
+      "number": 4,
+      "resource": "Active-order lookup \u2014 FOR UPDATE on presentation reads",
+      "disposition": "remove",
+      "invariant": "Finds an existing frozen order while producing plan status/details and checking compatibility.",
+      "acquisition": "Explicit mutation transaction or conditional write; ordinary reads never acquire this lock.",
+      "permittedWork": "No production acquisition. Remove redundant serialization; retain request cancellation, deadlines and database integrity.",
+      "release": "From finding the order until the surrounding presentation transaction ends, including subsequent snapshot loading and catalogue checking.",
+      "callers": [
+        "lib/agentic/store/postgres.ts:327",
+        "lib/agentic/presentation/plan-read.ts:21"
+      ],
+      "tests": [
+        "test/service-efficiency/reads.integration.test.ts"
+      ],
+      "verification": "pending-final-scoped-run"
+    },
+    {
+      "number": 5,
+      "resource": "Order mutation / checkout reuse \u2014 FOR UPDATE",
+      "disposition": "narrow",
+      "invariant": "Serializes payment transitions, fulfilment events and reuse of an open checkout.",
+      "acquisition": "Explicit mutation transaction or conditional write; ordinary reads never acquire this lock.",
+      "permittedWork": "Revalidate ownership, revision and affected row identities; apply necessary writes only. Prepare, calculate, serialize, render and perform external effects outside the protected phase.",
+      "release": "Mutation transaction; order reads inside outbox handling hold it through that event transaction.",
+      "callers": [
+        "lib/agentic/store/postgres.ts:310",
+        "lib/agentic/store/postgres.ts:388",
+        "lib/agentic/commerce/state.ts:88",
+        "lib/agentic/commerce/stripe-adapter.ts:23",
+        "lib/agentic/retail/mock-thailand.ts:48"
+      ],
+      "tests": [
+        "test/web-payment-fulfillment.integration.test.ts",
+        "test/service-efficiency/reads.integration.test.ts"
+      ],
+      "verification": "pending-final-scoped-run"
+    },
+    {
+      "number": 6,
+      "resource": "Catalogue epoch \u2014 FOR SHARE",
+      "disposition": "narrow",
+      "invariant": "Selection and creation of new checkout validate current commercial facts atomically. Matching publication retains its immutable snapshot and ordinary reads take no epoch lock.",
+      "acquisition": "Explicit mutation transaction or conditional write; ordinary reads never acquire this lock.",
+      "permittedWork": "Revalidate ownership, revision and affected row identities; apply necessary writes only. Prepare, calculate, serialize, render and perform external effects outside the protected phase.",
+      "release": "Acquisition to transaction end. In result completion this includes subsequent result-item writes.",
+      "callers": [
+        "lib/agentic/store/postgres.ts:120",
+        "lib/agentic/plan/service.ts:2041",
+        "lib/agentic/presentation/plan-read.ts:29",
+        "lib/task-result-applier.ts:2236",
+        "lib/retail-product-checkout.ts:370"
+      ],
+      "tests": [
+        "test/agentic-catalogue-publish-v5.integration.test.ts",
+        "test/service-efficiency/reads.integration.test.ts"
+      ],
+      "verification": "pending-final-scoped-run"
+    },
+    {
+      "number": 7,
+      "resource": "Global catalogue epoch writer \u2014 UPDATE / FOR UPDATE",
+      "disposition": "narrow",
+      "invariant": "Advances one global content revision after catalogue/reference changes. Reviewed advisory-cache refresh explicitly takes the same row first.",
+      "acquisition": "Explicit mutation transaction or conditional write; ordinary reads never acquire this lock.",
+      "permittedWork": "Revalidate ownership, revision and affected row identities; apply necessary writes only. Prepare, calculate, serialize, render and perform external effects outside the protected phase.",
+      "release": "From first epoch update/lock to end of the writer transaction; a whole correction batch can retain it.",
+      "callers": [
+        "lib/product-advisory-cache-refresh.ts:51",
+        "lib/catalogue-runtime-revision.ts:4"
+      ],
+      "tests": [
+        "test/product-advisory-cache-refresh.integration.test.ts"
+      ],
+      "verification": "pending-final-scoped-run"
+    },
+    {
+      "number": 8,
+      "resource": "Reviewed product corrections \u2014 FOR UPDATE NOWAIT",
+      "disposition": "narrow",
+      "invariant": "Protects each product against an unexpected concurrent correction.",
+      "acquisition": "Explicit mutation transaction or conditional write; ordinary reads never acquire this lock.",
+      "permittedWork": "Revalidate ownership, revision and affected row identities; apply necessary writes only. Prepare, calculate, serialize, render and perform external effects outside the protected phase.",
+      "release": "Until the correction transaction ends, potentially across the whole manifest; acquisition fails immediately if its row is locked.",
+      "callers": [
+        "lib/product-advisory-cache-refresh.ts:43"
+      ],
+      "tests": [
+        "test/product-advisory-cache-refresh.integration.test.ts"
+      ],
+      "verification": "pending-final-scoped-run"
+    },
+    {
+      "number": 9,
+      "resource": "Safety-reference advisory transaction lock",
+      "disposition": "retain",
+      "invariant": "One pg_try_advisory_xact_lock per nutrient serializes version/scope edits.",
+      "acquisition": "Explicit mutation transaction or conditional write; ordinary reads never acquire this lock.",
+      "permittedWork": "Revalidate ownership, revision and affected row identities; apply necessary writes only. Prepare, calculate, serialize, render and perform external effects outside the protected phase.",
+      "release": "Until caller transaction ends; acquisition is immediate success or reference_review_in_progress, with no lock-wait queue.",
+      "callers": [
+        "lib/supplement-safety-limit-versions.ts:24"
+      ],
+      "tests": [
+        "test/catalogue-admin-reference-concurrency.integration.test.ts"
+      ],
+      "verification": "pending-final-scoped-run"
+    },
+    {
+      "number": 10,
+      "resource": "Queued task claim \u2014 FOR UPDATE SKIP LOCKED",
+      "disposition": "narrow",
+      "invariant": "Ensures one worker reserves each eligible task.",
+      "acquisition": "Explicit mutation transaction or conditional write; ordinary reads never acquire this lock.",
+      "permittedWork": "Revalidate ownership, revision and affected row identities; apply necessary writes only. Prepare, calculate, serialize, render and perform external effects outside the protected phase.",
+      "release": "Short claim/reservation transaction; selected tasks, reservation and events commit together.",
+      "callers": [
+        "lib/task-service.ts:1664",
+        "lib/task-service.ts:1730",
+        "lib/task-service.ts:2113"
+      ],
+      "tests": [
+        "test/task-transactions.integration.test.ts"
+      ],
+      "verification": "pending-final-scoped-run"
+    },
+    {
+      "number": 11,
+      "resource": "Expired/offline/orphan task recovery \u2014 SKIP LOCKED",
+      "disposition": "narrow",
+      "invariant": "Reclaims expired claims, failed leases and work owned by offline sessions.",
+      "acquisition": "Explicit mutation transaction or conditional write; ordinary reads never acquire this lock.",
+      "permittedWork": "Revalidate ownership, revision and affected row identities; apply necessary writes only. Prepare, calculate, serialize, render and perform external effects outside the protected phase.",
+      "release": "Each bounded recovery transaction or CTE statement; not the duration of matching.",
+      "callers": [
+        "lib/task-service.ts:1143",
+        "lib/task-service.ts:1223",
+        "lib/task-service-agents.ts:501",
+        "lib/task-sweep-loop.ts:3"
+      ],
+      "tests": [
+        "test/task-transactions.integration.test.ts"
+      ],
+      "verification": "pending-final-scoped-run"
+    },
+    {
+      "number": 12,
+      "resource": "Task lifecycle \u2014 FOR UPDATE",
+      "disposition": "narrow",
+      "invariant": "Serializes completion claim/application/finalization, failure claim/application/finalization, progress, lease renewal and return to queue.",
+      "acquisition": "Explicit mutation transaction or conditional write; ordinary reads never acquire this lock.",
+      "permittedWork": "Revalidate ownership, revision and affected row identities; apply necessary writes only. Prepare, calculate, serialize, render and perform external effects outside the protected phase.",
+      "release": "Outer withDatabaseTransaction ends only after the callback/applier finishes. Configured database-phase deadline is 15 seconds; actual holds were not measured.",
+      "callers": [
+        "lib/task-service.ts:2167",
+        "lib/task-service.ts:2175",
+        "lib/task-service.ts:2313",
+        "lib/task-service.ts:2447",
+        "lib/task-service.ts:2500",
+        "lib/task-service.ts:2578",
+        "lib/task-service.ts:2659",
+        "lib/task-service.ts:2797",
+        "lib/task-service.ts:2934",
+        "lib/task-service.ts:2974"
+      ],
+      "tests": [
+        "test/task-transactions.integration.test.ts"
+      ],
+      "verification": "pending-final-scoped-run"
+    },
+    {
+      "number": 13,
+      "resource": "Reservation and worker-session row updates",
+      "disposition": "narrow",
+      "invariant": "Records task ownership, heartbeat/progress, release/finalization and worker registration/status.",
+      "acquisition": "Explicit mutation transaction or conditional write; ordinary reads never acquire this lock.",
+      "permittedWork": "Revalidate ownership, revision and affected row identities; apply necessary writes only. Prepare, calculate, serialize, render and perform external effects outside the protected phase.",
+      "release": "Individual transaction lifetime. The lease_until timestamp persists afterwards without holding a row lock.",
+      "callers": [
+        "lib/task-service.ts:1901",
+        "lib/task-service.ts:2513",
+        "lib/task-service.ts:2592",
+        "lib/task-service-agents.ts:335",
+        "lib/task-service-agents.ts:448"
+      ],
+      "tests": [
+        "test/task-transactions.integration.test.ts"
+      ],
+      "verification": "pending-final-scoped-run"
+    },
+    {
+      "number": 14,
+      "resource": "Assessment row \u2014 FOR NO KEY UPDATE",
+      "disposition": "narrow",
+      "invariant": "Fences answer/contact edits, replan, recovery, checkout and generation completion by assessment revision.",
+      "acquisition": "Explicit mutation transaction or conditional write; ordinary reads never acquire this lock.",
+      "permittedWork": "Revalidate ownership, revision and affected row identities; apply necessary writes only. Prepare, calculate, serialize, render and perform external effects outside the protected phase.",
+      "release": "Capture/recovery/checkout or completion transaction. Uses shared database-phase deadline where withDatabaseTransaction owns the transaction.",
+      "callers": [
+        "lib/assessment-capture.ts:91",
+        "lib/assessment-capture.ts:150",
+        "lib/funnel-generation-recovery.ts:14",
+        "lib/funnel-recovery.ts:19",
+        "lib/task-result-applier.ts:2480",
+        "lib/task-result-applier.ts:2542",
+        "lib/retail-product-checkout.ts:947",
+        "app/api/assessment/[planId]/product-recommendations/route.ts:75"
+      ],
+      "tests": [
+        "test/assessment-capture.integration.test.ts"
+      ],
+      "verification": "pending-final-scoped-run"
+    },
+    {
+      "number": 15,
+      "resource": "Assessment product-preference row \u2014 FOR UPDATE",
+      "disposition": "narrow",
+      "invariant": "Preserves exclusion/search-effort revision when replanning or applying generation output.",
+      "acquisition": "Explicit mutation transaction or conditional write; ordinary reads never acquire this lock.",
+      "permittedWork": "Revalidate ownership, revision and affected row identities; apply necessary writes only. Prepare, calculate, serialize, render and perform external effects outside the protected phase.",
+      "release": "Until owning assessment/completion transaction ends.",
+      "callers": [
+        "lib/assessment-product-preferences.ts:12",
+        "lib/task-result-applier.ts:2487"
+      ],
+      "tests": [
+        "test/funnel-readiness.integration.test.ts"
+      ],
+      "verification": "pending-final-scoped-run"
+    },
+    {
+      "number": 16,
+      "resource": "Funnel request receipt \u2014 FOR UPDATE",
+      "disposition": "narrow",
+      "invariant": "Serializes retries with the same capture/checkout idempotency key.",
+      "acquisition": "Explicit mutation transaction or conditional write; ordinary reads never acquire this lock.",
+      "permittedWork": "Revalidate ownership, revision and affected row identities; apply necessary writes only. Prepare, calculate, serialize, render and perform external effects outside the protected phase.",
+      "release": "Admission/capture/checkout transaction; duplicate insert can first wait on the unique key.",
+      "callers": [
+        "lib/funnel-idempotency.ts:21"
+      ],
+      "tests": [
+        "test/assessment-capture.integration.test.ts"
+      ],
+      "verification": "pending-final-scoped-run"
+    },
+    {
+      "number": 17,
+      "resource": "Web payment row \u2014 FOR UPDATE",
+      "disposition": "narrow",
+      "invariant": "Protects reservation binding, cancellation/confirmation, checkout recovery and generation/accounting fulfilment.",
+      "acquisition": "Explicit mutation transaction or conditional write; ordinary reads never acquire this lock.",
+      "permittedWork": "Revalidate ownership, revision and affected row identities; apply necessary writes only. Prepare, calculate, serialize, render and perform external effects outside the protected phase.",
+      "release": "Short database mutation transaction, including required generation-task creation where applicable.",
+      "callers": [
+        "lib/stripe-payments.ts:292",
+        "lib/stripe-payments.ts:373",
+        "lib/stripe-payments.ts:1432",
+        "lib/stripe-payments.ts:1882",
+        "lib/web-payment-fulfillment.ts:51",
+        "lib/funnel-recovery.ts:25"
+      ],
+      "tests": [
+        "test/web-payment-transitions.integration.test.ts"
+      ],
+      "verification": "pending-final-scoped-run"
+    },
+    {
+      "number": 18,
+      "resource": "HealthScore delivery request \u2014 FOR UPDATE",
+      "disposition": "narrow",
+      "invariant": "Prevents duplicate queueing and fences sending state against assessment revision.",
+      "acquisition": "Explicit mutation transaction or conditional write; ordinary reads never acquire this lock.",
+      "permittedWork": "Revalidate ownership, revision and affected row identities; apply necessary writes only. Prepare, calculate, serialize, render and perform external effects outside the protected phase.",
+      "release": "Queue/admission/pre-send transaction; released before SMTP/provider send.",
+      "callers": [
+        "lib/healthscore-delivery.ts:35",
+        "lib/healthscore-delivery.ts:82"
+      ],
+      "tests": [
+        "test/healthscore-delivery.integration.test.ts"
+      ],
+      "verification": "pending-final-scoped-run"
+    },
+    {
+      "number": 19,
+      "resource": "OMS outbox row \u2014 FOR UPDATE SKIP LOCKED",
+      "disposition": "narrow",
+      "invariant": "Claims a fulfilment event before applying it to its order.",
+      "acquisition": "Explicit mutation transaction or conditional write; ordinary reads never acquire this lock.",
+      "permittedWork": "Revalidate ownership, revision and affected row identities; apply necessary writes only. Prepare, calculate, serialize, render and perform external effects outside the protected phase.",
+      "release": "One event transaction, which can then take its order lock; at most 25 such transactions per mock-OMS pass.",
+      "callers": [
+        "lib/agentic/store/postgres.ts:378",
+        "lib/agentic/retail/mock-thailand.ts:48"
+      ],
+      "tests": [
+        "test/task-transactions.integration.test.ts"
+      ],
+      "verification": "pending-final-scoped-run"
+    },
+    {
+      "number": 20,
+      "resource": "Scheduled-task cron row \u2014 SKIP LOCKED",
+      "disposition": "narrow",
+      "invariant": "Prevents two schedulers dispatching the same due cron entry.",
+      "acquisition": "Explicit mutation transaction or conditional write; ordinary reads never acquire this lock.",
+      "permittedWork": "Revalidate ownership, revision and affected row identities; apply necessary writes only. Prepare, calculate, serialize, render and perform external effects outside the protected phase.",
+      "release": "Claim/update statement transaction.",
+      "callers": [
+        "lib/task-worker.ts:2668"
+      ],
+      "tests": [
+        "test/worker-boundary.test.ts"
+      ],
+      "verification": "pending-final-scoped-run"
+    },
+    {
+      "number": 21,
+      "resource": "PostgreSQL implicit relation / transaction / foreign-key locks",
+      "disposition": "retain",
+      "invariant": "Ordinary SELECTs use relation AccessShare; row-locking reads and writes also take relation locks. FK checks can lock referenced keys; transaction-ID waits represent conflicting uncommitted writes.",
+      "acquisition": "Explicit mutation transaction or conditional write; ordinary reads never acquire this lock.",
+      "permittedWork": "PostgreSQL unique, foreign-key and relation integrity. Application code must not attempt to bypass engine integrity locking.",
+      "release": "Typically transaction lifetime. Internal buffer/WAL/latch waits are shorter engine critical sections, not app-owned leases; no per-site duration evidence was captured.",
+      "callers": [
+        "lib/db.ts:334"
+      ],
+      "tests": [
+        "test/task-transactions.integration.test.ts"
+      ],
+      "verification": "pending-final-scoped-run"
+    },
+    {
+      "number": 22,
+      "resource": "Request admission permits \u2014 32",
+      "disposition": "remove",
+      "invariant": "Limits simultaneously admitted observed MCP requests per process.",
+      "acquisition": "Limits simultaneously admitted observed MCP requests per process.",
+      "permittedWork": "No production acquisition. Remove redundant serialization; retain request cancellation, deadlines and database integrity.",
+      "release": "Acquire before handler; release on completion, error or cancellation, within the 60-second request deadline target. Up to 128 queued waiters for this permit type.",
+      "callers": [
+        "lib/agentic/qa/request-trace.ts:229",
+        "lib/agentic/qa/resource-permits.ts:23",
+        "lib/agentic/mcp/dispatcher.ts:169"
+      ],
+      "tests": [
+        "test/service-efficiency/permit-removal.test.ts"
+      ],
+      "verification": "pending-final-scoped-run"
+    },
+    {
+      "number": 23,
+      "resource": "Request worker permits \u2014 32",
+      "disposition": "remove",
+      "invariant": "Second request-level admission counter, acquired after admission permit.",
+      "acquisition": "Second request-level admission counter, acquired after admission permit.",
+      "permittedWork": "No production acquisition. Remove redundant serialization; retain request cancellation, deadlines and database integrity.",
+      "release": "Same request lifetime; while waiting, the earlier admission permit remains occupied.",
+      "callers": [
+        "lib/agentic/qa/request-trace.ts:248",
+        "lib/agentic/qa/resource-permits.ts:23"
+      ],
+      "tests": [
+        "test/service-efficiency/permit-removal.test.ts"
+      ],
+      "verification": "pending-final-scoped-run"
+    },
+    {
+      "number": 24,
+      "resource": "Request connection permits \u2014 32",
+      "disposition": "remove",
+      "invariant": "Third request-level counter, acquired after admission and worker permits.",
+      "acquisition": "Third request-level counter, acquired after admission and worker permits.",
+      "permittedWork": "No production acquisition. Remove redundant serialization; retain request cancellation, deadlines and database integrity.",
+      "release": "Same request lifetime; earlier permits stay occupied while waiting.",
+      "callers": [
+        "lib/agentic/qa/request-trace.ts:248",
+        "lib/agentic/qa/resource-permits.ts:23"
+      ],
+      "tests": [
+        "test/service-efficiency/permit-removal.test.ts"
+      ],
+      "verification": "pending-final-scoped-run"
+    },
+    {
+      "number": 25,
+      "resource": "Database-stage permits \u2014 32",
+      "disposition": "remove",
+      "invariant": "Limits catalogue-load/pin sections and execute database sections.",
+      "acquisition": "Limits catalogue-load/pin sections and execute database sections.",
+      "permittedWork": "No production acquisition. Remove redundant serialization; retain request cancellation, deadlines and database integrity.",
+      "release": "Held around the entire load/pin or execute write section; released in finally. Exhaustion throws immediately rather than waiting.",
+      "callers": [
+        "lib/agentic/plan/service.ts:1666",
+        "lib/agentic/commerce/execute.ts:616"
+      ],
+      "tests": [
+        "test/service-efficiency/permit-removal.test.ts"
+      ],
+      "verification": "pending-final-scoped-run"
+    },
+    {
+      "number": 26,
+      "resource": "MCP CPU pool \u2014 2 slots / 16 queued jobs",
+      "disposition": "narrow",
+      "invariant": "Bounds worker-thread search concurrency per process.",
+      "acquisition": "Bounds worker-thread search concurrency per process.",
+      "permittedWork": "Only the bounded productive work or immutable coalescing described by this mechanism; never serialize unrelated ordinary reads.",
+      "release": "Each chunk has a 15-second deadline starting at enqueue, including queue wait. A cancelled running slot remains occupied until thread exit.",
+      "callers": [
+        "lib/thread-pool.ts:30",
+        "lib/thread-pool.ts:37",
+        "lib/thread-pool.ts:59",
+        "lib/agentic/plan/match-worker-pool.ts:30",
+        "lib/agentic/plan/service.ts:513"
+      ],
+      "tests": [
+        "test/service-efficiency/dispatch.test.ts",
+        "test/service-efficiency/sessions.test.ts"
+      ],
+      "verification": "pending-final-scoped-run"
+    },
+    {
+      "number": 27,
+      "resource": "Web product CPU pool \u2014 2 slots / 8 queued jobs",
+      "disposition": "narrow",
+      "invariant": "Runs questionnaire product matching off the external worker event loop.",
+      "acquisition": "Runs questionnaire product matching off the external worker event loop.",
+      "permittedWork": "Only the bounded productive work or immutable coalescing described by this mechanism; never serialize unrelated ordinary reads.",
+      "release": "Default 60-second job timeout including queueing. Slot released on result or worker exit.",
+      "callers": [
+        "workers/product-matcher-pool.ts:25",
+        "workers/runner.ts:299"
+      ],
+      "tests": [
+        "test/service-efficiency/dispatch.test.ts",
+        "test/product-matcher-worker.test.ts"
+      ],
+      "verification": "pending-final-scoped-run"
+    },
+    {
+      "number": 28,
+      "resource": "External product-worker slot and task lease",
+      "disposition": "narrow",
+      "invariant": "Only the durable executor owns matching tasks; productive dispatch follows the shared two-slot CPU budget, with no watching task occupying another slot.",
+      "acquisition": "One product-profile slot per UAT replica claims generate_product_recommendations / match_agentic_plan and related product tasks.",
+      "permittedWork": "Only the bounded productive work or immutable coalescing described by this mechanism; never serialize unrelated ordinary reads.",
+      "release": "Effective task lease 180 seconds from registration, normally renewed every 36 seconds. Slot lasts until execute plus complete/fail handling finishes. Finalization temporarily extends lease by 300 seconds.",
+      "callers": [
+        "workers/runner.ts:217",
+        "workers/runner.ts:349",
+        "workers/runner.ts:564",
+        "lib/task-service-agents.ts:431",
+        "lib/task-service.ts:125",
+        "lib/task-execution.ts:230"
+      ],
+      "tests": [
+        "test/worker-boundary.test.ts",
+        "test/service-efficiency/dispatch.test.ts"
+      ],
+      "verification": "pending-final-scoped-run"
+    },
+    {
+      "number": 29,
+      "resource": "Durable operation ownership lease",
+      "disposition": "narrow",
+      "invariant": "Stops two processes publishing the same matching operation.",
+      "acquisition": "Stops two processes publishing the same matching operation.",
+      "permittedWork": "Only the bounded productive work or immutable coalescing described by this mechanism; never serialize unrelated ordinary reads.",
+      "release": "60-second operation ownership lease; each renewal/reservation/checkpoint SQL write releases its row lock at commit. Overall operation deadline stays 175 seconds.",
+      "callers": [
+        "lib/agentic/plan/operations.ts:7",
+        "lib/agentic/plan/operations.ts:69",
+        "lib/agentic/plan/operations.ts:86"
+      ],
+      "tests": [
+        "test/service-efficiency/operations.integration.test.ts",
+        "test/ax-refinement/recovery.integration.test.ts"
+      ],
+      "verification": "pending-final-scoped-run"
+    },
+    {
+      "number": 30,
+      "resource": "One pending refinement per plan",
+      "disposition": "narrow",
+      "invariant": "Prevents a different revision being admitted while a plan operation is queued/running/retryable.",
+      "acquisition": "Prevents a different revision being admitted while a plan operation is queued/running/retryable.",
+      "permittedWork": "Only the bounded productive work or immutable coalescing described by this mechanism; never serialize unrelated ordinary reads.",
+      "release": "Until terminal state, cancellation, or expiry persistence. The intended overall deadline is 175 seconds; expiry is enforced when work/polls run.",
+      "callers": [
+        "lib/agentic/plan/operations.ts:38",
+        "lib/agentic/plan/service.ts:1317"
+      ],
+      "tests": [
+        "test/ax-refinement/recovery.integration.test.ts"
+      ],
+      "verification": "pending-final-scoped-run"
+    },
+    {
+      "number": 31,
+      "resource": "In-flight plan Promise maps",
+      "disposition": "remove",
+      "invariant": "Coalesces same-key requests, same plan/revision/request matching and same operation execution in one process.",
+      "acquisition": "Coalesces same-key requests, same plan/revision/request matching and same operation execution in one process.",
+      "permittedWork": "No production acquisition. Remove redundant serialization; retain request cancellation, deadlines and database integrity.",
+      "release": "Until corresponding Promise settles or cleanup occurs; HTTP handoff at up to 3 seconds does not release admitted matching ownership.",
+      "callers": [
+        "lib/agentic/plan/service.ts:147",
+        "lib/agentic/plan/service.ts:1608",
+        "lib/agentic/plan/service.ts:968",
+        "lib/agentic/plan/service.ts:1054"
+      ],
+      "tests": [
+        "test/service-efficiency/ownership.test.ts",
+        "test/service-efficiency/cache.test.ts"
+      ],
+      "verification": "pending-final-scoped-run"
+    },
+    {
+      "number": 32,
+      "resource": "Catalogue load Promise maps",
+      "disposition": "retain",
+      "invariant": "Joins concurrent country snapshot loads and pin preparation instead of loading the catalogue separately each time.",
+      "acquisition": "Joins concurrent country snapshot loads and pin preparation instead of loading the catalogue separately each time.",
+      "permittedWork": "Only the bounded productive work or immutable coalescing described by this mechanism; never serialize unrelated ordinary reads.",
+      "release": "Until the shared load settles. No dedicated mutex TTL; database/request deadlines constrain its work. Cache freshness TTL is not lock lifetime.",
+      "callers": [
+        "lib/agentic/catalogue/snapshot.ts:150",
+        "lib/agentic/catalogue/live.ts:599"
+      ],
+      "tests": [
+        "test/service-efficiency/cache.test.ts"
+      ],
+      "verification": "pending-final-scoped-run"
+    },
+    {
+      "number": 33,
+      "resource": "Safety-reference refresh Promise map",
+      "disposition": "retain",
+      "invariant": "Coalesces a reference load for one catalogue epoch.",
+      "acquisition": "Coalesces a reference load for one catalogue epoch.",
+      "permittedWork": "Only the bounded productive work or immutable coalescing described by this mechanism; never serialize unrelated ordinary reads.",
+      "release": "Until SELECT/parse/fingerprint succeeds or fails. The 10-minute cache TTL is not a held lock.",
+      "callers": [
+        "lib/agentic/catalogue/load-safety-ceilings.ts:55"
+      ],
+      "tests": [
+        "test/service-efficiency/cache.test.ts"
+      ],
+      "verification": "pending-final-scoped-run"
+    },
+    {
+      "number": 34,
+      "resource": "Market discovery Promise",
+      "disposition": "retain",
+      "invariant": "Coalesces loading of served markets.",
+      "acquisition": "Coalesces loading of served markets.",
+      "permittedWork": "Only the bounded productive work or immutable coalescing described by this mechanism; never serialize unrelated ordinary reads.",
+      "release": "Until one database load completes; 60-second cache TTL is not a lock duration.",
+      "callers": [
+        "lib/agentic/catalogue/market.ts:88"
+      ],
+      "tests": [
+        "test/service-efficiency/cache.test.ts"
+      ],
+      "verification": "pending-final-scoped-run"
+    },
+    {
+      "number": 35,
+      "resource": "Checkout execute chain and commit followers",
+      "disposition": "remove",
+      "invariant": "Serializes same owner/plan/revision executes and makes same-key followers await the leader receipt.",
+      "acquisition": "Serializes same owner/plan/revision executes and makes same-key followers await the leader receipt.",
+      "permittedWork": "No production acquisition. Remove redundant serialization; retain request cancellation, deadlines and database integrity.",
+      "release": "Chain entry exists until execute settles; same-key followers race commit against 60-second request deadline/cancellation.",
+      "callers": [
+        "lib/agentic/commerce/execute.ts:129",
+        "lib/agentic/commerce/execute.ts:250"
+      ],
+      "tests": [
+        "test/web-payment-fulfillment.integration.test.ts"
+      ],
+      "verification": "pending-final-scoped-run"
+    },
+    {
+      "number": 36,
+      "resource": "Client and managed pool slots",
+      "disposition": "retain",
+      "invariant": "Limits database concurrency: each configured application/worker client pool max 30; the managed UAT transaction pool has 30 server slots in total.",
+      "acquisition": "Limits database concurrency: each configured application/worker client pool max 30; the managed UAT transaction pool has 30 server slots in total.",
+      "permittedWork": "Only the bounded productive work or immutable coalescing described by this mechanism; never serialize unrelated ordinary reads.",
+      "release": "Client checkout lasts for its query/transaction; PgBouncer server slot lasts for transaction. Connect timeout is 5 seconds, not a dedicated existing-pool queue timeout.",
+      "callers": [
+        "lib/db.ts:17",
+        "lib/db.ts:438"
+      ],
+      "tests": [
+        "test/db-pool-sizing.test.ts",
+        "test/db-transactions.integration.test.ts"
+      ],
+      "verification": "pending-final-scoped-run"
+    },
+    {
+      "number": 37,
+      "resource": "Worker wake / long-poll wait",
+      "disposition": "retain",
+      "invariant": "Waits for queued work through local signals, PostgreSQL notification and HTTP worker wake.",
+      "acquisition": "Waits for queued work through local signals, PostgreSQL notification and HTTP worker wake.",
+      "permittedWork": "Only the bounded productive work or immutable coalescing described by this mechanism; never serialize unrelated ordinary reads.",
+      "release": "Configured default poll wait 24 seconds; HTTP wake timeout 1.5 seconds. No database row lock is held while sleeping.",
+      "callers": [
+        "lib/task-queue-signal.ts:31",
+        "lib/task-wakeup.ts:28",
+        "lib/worker-wake.ts:6",
+        "workers/runner.ts:354",
+        "lib/agentic/store/postgres.ts:698"
+      ],
+      "tests": [
+        "test/service-efficiency/wakeup.test.ts"
+      ],
+      "verification": "pending-final-scoped-run"
+    },
+    {
+      "number": 38,
+      "resource": "Maintenance / schema-check / warmup exclusion flags",
+      "disposition": "retain",
+      "invariant": "Coalesces worker-schema inspection, skips overlapping maintenance ticks and suppresses competing background warmups.",
+      "acquisition": "Coalesces worker-schema inspection, skips overlapping maintenance ticks and suppresses competing background warmups.",
+      "permittedWork": "Only the bounded productive work or immutable coalescing described by this mechanism; never serialize unrelated ordinary reads.",
+      "release": "Until each Promise/job settles. Maintenance first tick after 60 seconds, then every 15 seconds; schema success cached for process lifetime.",
+      "callers": [
+        "lib/task-service-agents.ts:49",
+        "lib/task-sweep-loop.ts:12",
+        "lib/agentic/plan/warm-dev.ts:81"
+      ],
+      "tests": [
+        "test/plan-keep-warm-static.test.ts"
+      ],
+      "verification": "pending-final-scoped-run"
+    },
+    {
+      "number": 39,
+      "resource": "Rate-limit window",
+      "disposition": "retain",
+      "invariant": "Protects public MCP capacity, including plan polling.",
+      "acquisition": "Protects public MCP capacity, including plan polling.",
+      "permittedWork": "Only the bounded productive work or immutable coalescing described by this mechanism; never serialize unrelated ordinary reads.",
+      "release": "Per-process/client window: regular MCP 60 calls per 60 seconds; order reads 300/minute; identified QA pack 2,000/10 minutes.",
+      "callers": [
+        "lib/agentic/qa/rate-limit.ts:44",
+        "lib/rate-limit.ts:328"
+      ],
+      "tests": [
+        "test/rate-limit.test.ts"
+      ],
+      "verification": "pending-final-scoped-run"
+    }
+  ],
+  "sites": [
+    {
+      "file": "app/api/assessment/[planId]/product-recommendations/route.ts",
+      "owner": "POST",
+      "key": "a39d0a69144950ac41484e5711d8ae9eaa7df98df38e31adbdd3ed46202dc93a",
+      "statement": "`select input_revision from public.assessments where plan_id = ${planId}::uuid for no key update`",
+      "mechanisms": [
+        14
+      ],
+      "justification": "Fences answer/contact edits, replan, recovery, checkout and generation completion by assessment revision."
+    },
+    {
+      "file": "lib/agentic/store/postgres.ts",
+      "owner": "claimOutboxBatch",
+      "key": "195c690f2a06cec5f6d7bf35080d362f3608797a8162a741b4486c2bc43dcace",
+      "statement": "` select * from public.agentic_outbox_events where processed_at is null and type = 'OMS_SUBMIT' order by created_at, id limit ${Math.max(1, Math.min(50, limit))} for update skip locked `",
+      "mechanisms": [
+        19
+      ],
+      "justification": "Claims a fulfilment event before applying it to its order."
+    },
+    {
+      "file": "lib/agentic/store/postgres.ts",
+      "owner": "getActiveOrderForPlanRevisionForUpdate",
+      "key": "81f2549b3c197433ecdf37c2b012dd370e6227d17f61ac6cebb187171c45a446",
+      "statement": "` select * from public.agentic_orders where plan_id = ${planId}::uuid and plan_revision = ${planRevision} and order_status not in ('expired', 'cancelled') and checkout_reuse_eligible and cancelled_at is null and expired_at is null order by created_at asc limit 1 for update `",
+      "mechanisms": [
+        5
+      ],
+      "justification": "Serializes payment transitions, fulfilment events and reuse of an open checkout."
+    },
+    {
+      "file": "lib/agentic/store/postgres.ts",
+      "owner": "getOrderForUpdate",
+      "key": "f618782642d92edcde3a926263e1338023be54369a8a620bf165d8a0ab2df534",
+      "statement": "`select * from public.agentic_orders where id = ${id}::uuid for update`",
+      "mechanisms": [
+        5
+      ],
+      "justification": "Serializes payment transitions, fulfilment events and reuse of an open checkout."
+    },
+    {
+      "file": "lib/agentic/store/postgres.ts",
+      "owner": "getPlanForUpdate",
+      "key": "33c01bb240179d014ac601f51d54c64b0c77fdc0a2ff5b9350a25d78b6f971de",
+      "statement": "`select * from public.agentic_plans where id = ${id}::uuid for update`",
+      "mechanisms": [
+        1
+      ],
+      "justification": "Serializes operation admission, revision publication and checkout against a single plan."
+    },
+    {
+      "file": "lib/agentic/store/postgres.ts",
+      "owner": "isCatalogueRevisionCurrent",
+      "key": "516e872eada0ba98ba7e2ded050e7cb24ecd23b2100ab5c9557467a6d9d34eea",
+      "statement": "` select revision from public.catalogue_runtime_revision where singleton = true for share`",
+      "mechanisms": [
+        6
+      ],
+      "justification": "Selection and creation of new checkout validate current commercial facts atomically. Matching publication retains its immutable snapshot and ordinary reads take no epoch lock."
+    },
+    {
+      "file": "lib/assessment-capture.ts",
+      "owner": "captureAssessment",
+      "key": "f611d5fbf208473ce100fe05613d4b7804e2a482e2221c94122ae8c982fb3146",
+      "statement": "`select selected_plan, input_revision from public.assessments where plan_id = ${planId}::uuid for no key update`",
+      "mechanisms": [
+        14
+      ],
+      "justification": "Fences answer/contact edits, replan, recovery, checkout and generation completion by assessment revision."
+    },
+    {
+      "file": "lib/assessment-capture.ts",
+      "owner": "retryAssessmentHealthScore",
+      "key": "500a8eb8556f6a6ef9aa89cab32e2a16e887055c2f0e878568a2d2e10f56f131",
+      "statement": "`select input_revision from public.assessments where plan_id = ${planId}::uuid for no key update`",
+      "mechanisms": [
+        14
+      ],
+      "justification": "Fences answer/contact edits, replan, recovery, checkout and generation completion by assessment revision."
+    },
+    {
+      "file": "lib/assessment-product-preferences.ts",
+      "owner": "getAssessmentProductPreferences",
+      "key": "7e9da4e30db436ef5fb41ec87aa3d23a7272b2bffd6e1d629a5f5c9bd0a662ee",
+      "statement": "`select revision, excluded_product_ids, search_effort from public.assessment_product_preferences where plan_id = ${planId}::uuid for update`",
+      "mechanisms": [
+        15
+      ],
+      "justification": "Preserves exclusion/search-effort revision when replanning or applying generation output."
+    },
+    {
+      "file": "lib/funnel-generation-recovery.ts",
+      "owner": "recoverMissingFunnelGeneration",
+      "key": "71a9701170806cd1072b65b2e1756e580646f94248771b801c60e79acba577f4",
+      "statement": "`select selected_plan from public.assessments where plan_id = ${input.planId}::uuid for no key update`",
+      "mechanisms": [
+        14
+      ],
+      "justification": "Fences answer/contact edits, replan, recovery, checkout and generation completion by assessment revision."
+    },
+    {
+      "file": "lib/funnel-idempotency.ts",
+      "owner": "claimFunnelRequest",
+      "key": "e0c75ee29fb38a7e9ec09da400a69d20c2dcf0659a6f3b1120edfe9f45faccd7",
+      "statement": "`select * from public.funnel_requests where scope = ${scope} and request_key = ${key} for update`",
+      "mechanisms": [
+        16
+      ],
+      "justification": "Serializes retries with the same capture/checkout idempotency key."
+    },
+    {
+      "file": "lib/funnel-recovery.ts",
+      "owner": "recoverFunnelWork",
+      "key": "0137144ac5d893b3b89fbb2fbe65564c3053d4cc2c498763824818e43e410616",
+      "statement": "`select * from public.payments where plan_id = ${planId}::uuid and status in ('paid', 'bound') order by created_at desc limit 1 for update`",
+      "mechanisms": [
+        17
+      ],
+      "justification": "Protects reservation binding, cancellation/confirmation, checkout recovery and generation/accounting fulfilment."
+    },
+    {
+      "file": "lib/funnel-recovery.ts",
+      "owner": "recoverFunnelWork",
+      "key": "652fed46a5a35abaeedf9891811d3348461f4b6f9a6eac7f2a9b5cef7747e7c5",
+      "statement": "`select selected_plan, answers from public.assessments where plan_id = ${planId}::uuid for no key update`",
+      "mechanisms": [
+        14
+      ],
+      "justification": "Fences answer/contact edits, replan, recovery, checkout and generation completion by assessment revision."
+    },
+    {
+      "file": "lib/healthscore-delivery.ts",
+      "owner": "deliverHealthScore",
+      "key": "4d55869337c47ab949295f8f8da1d71361874b42038db91eda9bdcf039d66ad2",
+      "statement": "`select * from public.healthscore_delivery_requests where id = ${requestId}::uuid for update`",
+      "mechanisms": [
+        18
+      ],
+      "justification": "Prevents duplicate queueing and fences sending state against assessment revision."
+    },
+    {
+      "file": "lib/healthscore-delivery.ts",
+      "owner": "deliverHealthScore",
+      "key": "b6a92e56ebf1cec29832fe5b25ce031755d2dc2016ec45cddad4f4ee590968b1",
+      "statement": "`select input_revision from public.assessments where plan_id = ${initial.plan_id}::uuid for no key update`",
+      "mechanisms": [
+        14
+      ],
+      "justification": "Fences answer/contact edits, replan, recovery, checkout and generation completion by assessment revision."
+    },
+    {
+      "file": "lib/healthscore-delivery.ts",
+      "owner": "enqueueReadyHealthScoreDeliveries",
+      "key": "51affe33bf6824ae1b8dce0ea68cf8607acdc963f6f7f61ccdd92eeafacef2a7",
+      "statement": "`select * from public.healthscore_delivery_requests where plan_id = ${planId}::uuid and revision = ${revision} and locale = ${locale} and status = 'waiting' for update`",
+      "mechanisms": [
+        18
+      ],
+      "justification": "Prevents duplicate queueing and fences sending state against assessment revision."
+    },
+    {
+      "file": "lib/healthscore-delivery.ts",
+      "owner": "requestHealthScoreDelivery",
+      "key": "6400031911bff7d385ed71b3a2c4810f81f2453dc1fb83c6f7e5604172525f6e",
+      "statement": "`select input_revision from public.assessments where plan_id = ${planId}::uuid for no key update`",
+      "mechanisms": [
+        14
+      ],
+      "justification": "Fences answer/contact edits, replan, recovery, checkout and generation completion by assessment revision."
+    },
+    {
+      "file": "lib/prd-live-catalogue-sync.ts",
+      "owner": "acquireSyncLock",
+      "key": "4c0f66a3ed179456f523e902b2eca3374c52bd2ef8417018a09cb270c0cae9df",
+      "statement": "` select pg_try_advisory_xact_lock(hashtext('mattanutra-prd-live-catalogue-sync')) as locked `",
+      "mechanisms": [
+        9
+      ],
+      "justification": "One pg_try_advisory_xact_lock per nutrient serializes version/scope edits."
+    },
+    {
+      "file": "lib/product-advisory-cache-refresh.ts",
+      "owner": "refreshApprovedAdvisoryCaches",
+      "key": "c256b10fa3b29602cb39bee51721df15190d16be7228aded9894ef0bdfdd1c8d",
+      "statement": "`select id from public.products where id=${entry.productId}::uuid for update nowait`",
+      "mechanisms": [
+        8
+      ],
+      "justification": "Protects each product against an unexpected concurrent correction."
+    },
+    {
+      "file": "lib/product-advisory-cache-refresh.ts",
+      "owner": "refreshApprovedAdvisoryCaches",
+      "key": "f63c488f8d50285630bbb881304ecc0eafc900da0e9c4af1b49adee7d7522625",
+      "statement": "`select revision from public.catalogue_runtime_revision where singleton=true for update`",
+      "mechanisms": [
+        7,
+        8
+      ],
+      "justification": "Advances one global content revision after catalogue/reference changes. Reviewed advisory-cache refresh explicitly takes the same row first.; Protects each product against an unexpected concurrent correction."
+    },
+    {
+      "file": "lib/retail-product-checkout.ts",
+      "owner": "createRetailCheckoutSession",
+      "key": "59cbfb4153900f07e40feb9e174a94f310f8daf295fc549e609840cb19fef647",
+      "statement": "`select plan_id from public.assessments where plan_id = ${input.planId}::uuid for no key update`",
+      "mechanisms": [
+        14
+      ],
+      "justification": "Fences answer/contact edits, replan, recovery, checkout and generation completion by assessment revision."
+    },
+    {
+      "file": "lib/retail-product-checkout.ts",
+      "owner": "currentWebCheckoutRecommendations",
+      "key": "3e6be7ae7d631e8d9d0631a9b5fff3bcb3b3adedff576b6dd19fde33ad5f73fc",
+      "statement": "` select revision from public.catalogue_runtime_revision where singleton = true for share`",
+      "mechanisms": [
+        6
+      ],
+      "justification": "Selection and creation of new checkout validate current commercial facts atomically. Matching publication retains its immutable snapshot and ordinary reads take no epoch lock."
+    },
+    {
+      "file": "lib/stripe-payments.ts",
+      "owner": "claimPaidReservation",
+      "key": "9dc0e8467dac59c662ca125aaccaf3661d6b8b812aa9290995fabb259b860426",
+      "statement": "` select * from public.payments where id = ${paymentId}::uuid for update `",
+      "mechanisms": [
+        17
+      ],
+      "justification": "Protects reservation binding, cancellation/confirmation, checkout recovery and generation/accounting fulfilment."
+    },
+    {
+      "file": "lib/stripe-payments.ts",
+      "owner": "completeMockPayment",
+      "key": "b26771c263652bd0f0e0332bb3102022809fa1dbb7622bb2bef45ff85493096d",
+      "statement": "`select * from public.payments where id = ${input.paymentId}::uuid for update`",
+      "mechanisms": [
+        17
+      ],
+      "justification": "Protects reservation binding, cancellation/confirmation, checkout recovery and generation/accounting fulfilment."
+    },
+    {
+      "file": "lib/stripe-payments.ts",
+      "owner": "createStripeCheckoutSession",
+      "key": "9f90244e9a2cc556a04802258fa54d50baeb1dabe49baef5cb9b4f378759a50f",
+      "statement": "`select plan_id from public.assessments where plan_id = ${input.planId}::uuid for no key update`",
+      "mechanisms": [
+        14
+      ],
+      "justification": "Fences answer/contact edits, replan, recovery, checkout and generation completion by assessment revision."
+    },
+    {
+      "file": "lib/stripe-payments.ts",
+      "owner": "fulfillCheckoutSession",
+      "key": "6c95920ee9dd45364694df284d1bc6efcc732ee8996a02c67dfd57c257ccd707",
+      "statement": "`select * from public.payments where id = ${payment.id}::uuid for update`",
+      "mechanisms": [
+        17
+      ],
+      "justification": "Protects reservation binding, cancellation/confirmation, checkout recovery and generation/accounting fulfilment."
+    },
+    {
+      "file": "lib/stripe-payments.ts",
+      "owner": "updatePaymentState",
+      "key": "c63b82d4405ad13941f1ec4730048686a42bb4add30708d22e0c6936740304a5",
+      "statement": "` select * from public.payments where id = ${input.paymentId}::uuid for update `",
+      "mechanisms": [
+        17
+      ],
+      "justification": "Protects reservation binding, cancellation/confirmation, checkout recovery and generation/accounting fulfilment."
+    },
+    {
+      "file": "lib/supplement-safety-limit-versions.ts",
+      "owner": "lockSupplementSafetyReference",
+      "key": "46980435240436a10696020ef1e3af6c0b976d96498a4d00b4aca4254916f012",
+      "statement": "`select pg_try_advisory_xact_lock(hashtextextended(${`supplement-safety-reference:${supplementId}`}, 0)) as acquired`",
+      "mechanisms": [
+        9
+      ],
+      "justification": "One pg_try_advisory_xact_lock per nutrient serializes version/scope edits."
+    },
+    {
+      "file": "lib/task-result-applier.ts",
+      "owner": "applyProductRecommendationsResult",
+      "key": "f346ad7e16ce4b95744ef68e46215aaa9e47c424c5727d70be8cc725a0e7f7e2",
+      "statement": "`select revision from public.catalogue_runtime_revision where singleton=true for share`",
+      "mechanisms": [
+        6
+      ],
+      "justification": "Selection and creation of new checkout validate current commercial facts atomically. Matching publication retains its immutable snapshot and ordinary reads take no epoch lock."
+    },
+    {
+      "file": "lib/task-result-applier.ts",
+      "owner": "applyTaskCompletionResult",
+      "key": "71c21a8664497b4fd07c4d41aab34e68204a56e6bdcaec23a5a39d8ea2b0a470",
+      "statement": "`select input_revision, input_hash from public.assessments where plan_id = ${task.planId}::uuid for no key update`",
+      "mechanisms": [
+        14
+      ],
+      "justification": "Fences answer/contact edits, replan, recovery, checkout and generation completion by assessment revision."
+    },
+    {
+      "file": "lib/task-result-applier.ts",
+      "owner": "applyTaskFailureResult",
+      "key": "c77d216dff0d0317a60af45f5b9ad96e72449992bd82c9111adcee56fe60cad7",
+      "statement": "`select input_revision from public.assessments where plan_id = ${task.planId}::uuid for no key update`",
+      "mechanisms": [
+        14
+      ],
+      "justification": "Fences answer/contact edits, replan, recovery, checkout and generation completion by assessment revision."
+    },
+    {
+      "file": "lib/task-service-agents.ts",
+      "owner": "releaseOfflineWorkerReservations",
+      "key": "71011a622e951ac3a632e43582bfd7ef3ef7c4c853c3dc9b2c10f727d5a9c45c",
+      "statement": "` with active_reservations as ( select task_reservations.id as reservation_id, task_reservations.task_id, task_reservations.agent_id, task_reservations.worker_session_id, (tasks.attempts >= tasks.max_attempts) as exhausted from public.task_reservations join public.tasks on tasks.id = task_reservations.task_id where task_reservations.worker_session_id = ${input.workerSessionId}::uuid and task_reservations.status = 'active' and (${input.agentId}::uuid is null or task_reservations.agent_id = ${input.agentId}::uuid) and (${input.membershipId}::uuid is null or task_reservations.membership_id = ${input.membershipId}::uuid) and tasks.status in ('reserved', 'running') order by tasks.id limit 100 for update of tasks skip locked ), released_reservations as ( update public.task_reservations set status = 'released', released_at = now(), metadata = metadata || jsonb_build_object( 'releaseReason', 'worker_session_offline', 'releasedAt', now() ) from active_reservations where task_reservations.id = active_reservations.reservation_id returning active_reservations.reservation_id, active_reservations.task_id, active_reservations.agent_id, active_reservations.worker_session_id, active_reservations.exhausted ), updated_tasks as ( update public.tasks set status = case when released_reservations.exhausted then 'failed' else 'queued' end, reserved_by_agent_id = null, lease_until = null, error_message = case when released_reservations.exhausted then 'Task worker session went offline after maximum attempts.' else null end, result_payload = case when released_reservations.exhausted then '{}'::jsonb else public.tasks.result_payload end, updated_at = now() from released_reservations where public.tasks.id = released_reservations.task_id and public.tasks.status in ('reserved', 'running') returning public.tasks.id, released_reservations.reservation_id, released_reservations.agent_id, released_reservations.worker_session_id, released_reservations.exhausted ), task_events as ( insert into public.task_events ( id, task_id, agent_id, event_type, event_status, severity, event_payload, occurred_at, created_at ) select gen_random_uuid(), updated_tasks.id, updated_tasks.agent_id, case when updated_tasks.exhausted then 'task_failed_after_worker_offline' else 'reservation_released' end, case when updated_tasks.exhausted then 'failed' else 'observed' end, case when updated_tasks.exhausted then 'high' else 'medium' end, jsonb_build_object( 'reservationId', updated_tasks.reservation_id, 'workerSessionId', updated_tasks.worker_session_id, 'releaseReason', 'worker_session_offline', 'exhausted', updated_tasks.exhausted ), now(), now() from updated_tasks returning id ) select count(*)::int as released_count from updated_tasks `",
+      "mechanisms": [
+        11
+      ],
+      "justification": "Reclaims expired claims, failed leases and work owned by offline sessions."
+    },
+    {
+      "file": "lib/task-service.ts",
+      "owner": "claimExpiredReservationsBatch",
+      "key": "4e50d859daa4e49e3dc8e68df680308418766757af49d71904b236e4e516f703",
+      "statement": "` with expired as ( select task_reservations.id as reservation_id, task_reservations.agent_id as reservation_agent_id, task_reservations.membership_id as reservation_membership_id, task_reservations.worker_session_id as reservation_worker_session_id, tasks.id as task_id, case when tasks.status not in ('reserved', 'running') then 'invalid_active_reservation' when tasks.lease_until is null then 'missing_task_lease' when tasks.lease_until < now() then 'task_lease_expired' else 'reservation_lease_expired' end as release_reason, ( tasks.status in ('reserved', 'running') and tasks.attempts >= tasks.max_attempts ) as exhausted, ( tasks.idempotency_key is not null and tasks.retry_attempt < tasks.max_retries ) as retry_will_be_scheduled from public.task_reservations join public.tasks on tasks.id = task_reservations.task_id where task_reservations.status = 'active' and tasks.status not in ('completed', 'cancelled', 'skipped') and ( task_reservations.lease_until < now() or tasks.status not in ('reserved', 'running') or tasks.lease_until is null or tasks.lease_until < now() ) order by task_reservations.lease_until asc limit ${batchLimit} for update of tasks skip locked ), released as ( update public.task_reservations set status = 'expired', released_at = now() from expired where task_reservations.id = expired.reservation_id returning expired.reservation_id, expired.reservation_agent_id, expired.reservation_membership_id, expired.reservation_worker_session_id, expired.task_id, expired.exhausted, expired.release_reason, expired.retry_will_be_scheduled ), updated_tasks as ( update public.tasks set status = case when released.exhausted then 'failed' when public.tasks.status in ('reserved', 'running') then 'queued' else public.tasks.status end, reserved_by_agent_id = null, lease_until = null, error_message = case when released.exhausted then 'Task lease expired after maximum attempts.' else null end, result_payload = case when released.exhausted then '{}'::jsonb else public.tasks.result_payload end, updated_at = now() from released where public.tasks.id = released.task_id and public.tasks.status in ('reserved', 'running') returning public.tasks.*, released.reservation_id::text as reservation_id, released.reservation_agent_id::text as reservation_agent_id, released.reservation_membership_id::text as reservation_membership_id, released.reservation_worker_session_id::text as reservation_worker_session_id, released.exhausted, released.release_reason, released.retry_will_be_scheduled ), task_events as ( insert into public.task_events ( id, task_id, agent_id, event_type, event_status, severity, event_payload, occurred_at, created_at ) select gen_random_uuid(), updated_tasks.id, updated_tasks.reservation_agent_id::uuid, case when updated_tasks.exhausted then 'task_failed_after_lease_expiry' else 'lease_expired' end, case when updated_tasks.exhausted then 'failed' else 'observed' end, case when updated_tasks.exhausted then 'high' else 'medium' end, jsonb_build_object( 'exhausted', updated_tasks.exhausted, 'releaseReason', updated_tasks.release_reason, 'reservationId', updated_tasks.reservation_id, 'retryWillBeScheduled', updated_tasks.retry_will_be_scheduled ), now(), now() from updated_tasks returning id ) select * from updated_tasks `",
+      "mechanisms": [
+        11
+      ],
+      "justification": "Reclaims expired claims, failed leases and work owned by offline sessions."
+    },
+    {
+      "file": "lib/task-service.ts",
+      "owner": "claimQueuedTaskRow",
+      "key": "035f7bc94f335d9b98ad1ef5adfab63d1cbcaf8b1d9101b70656689ff9793ad5",
+      "statement": "` with candidate as ( select tasks.id from public.tasks join public.organisations task_organisations on task_organisations.id = tasks.organisation_id where tasks.status = 'queued' and coalesce(tasks.actor_type, 'system') <> 'human' and tasks.scheduled_for <= now() and tasks.attempts < tasks.max_attempts and not (tasks.id = any(${uuidArray(sql, input.skipTaskIds)}::uuid[])) and ( coalesce(cardinality(tasks.required_capabilities), 0) = 0 or tasks.required_capabilities <@ ${textArray(sql, input.reserveCapabilities)}::text[] ) and ( ${input.mustRequireCapability}::text is null or ${input.mustRequireCapability} = any(tasks.required_capabilities) ) and ( ${input.taskTypes.length < 1} or tasks.task_type = any(${textArray(sql, input.taskTypes)}::text[]) ) and ( ( ${input.accessScope.role}::text = 'platform_agent' and task_organisations.organisation_type = 'platform' ) or ( ${input.accessScope.role}::text = 'retail_agent' and task_organisations.organisation_type = 'tenant' and tasks.organisation_id = ${input.accessScope.organisationId}::uuid ) ) order by coalesce(tasks.priority_score, tasks.business_value) desc, tasks.scheduled_for asc, tasks.created_at asc limit 1 for update of tasks skip locked ) update public.tasks set status = 'reserved', reserved_by_agent_id = ${input.accessScope.agentId}::uuid, lease_until = now() + make_interval(secs => ${input.leaseSeconds}), updated_at = now() from candidate where public.tasks.id = candidate.id and public.tasks.status = 'queued' returning public.tasks.* `",
+      "mechanisms": [
+        10
+      ],
+      "justification": "Ensures one worker reserves each eligible task."
+    },
+    {
+      "file": "lib/task-service.ts",
+      "owner": "recoverOrphanedTaskClaims",
+      "key": "ea7ec19545ea05c6209e7f1a31ac8179f3df52af66d51bca375865acc9495d44",
+      "statement": "` with orphaned as ( select tasks.id from public.tasks where tasks.status in ('reserved', 'running') and (tasks.lease_until is null or tasks.lease_until < now()) and not exists (select 1 from public.task_reservations r where r.task_id = tasks.id and r.status = 'active') order by tasks.id limit ${batchLimit} for update of tasks skip locked ) update public.tasks set status = case when attempts < max_attempts then 'queued' else 'needs_review' end, reserved_by_agent_id = null, lease_until = null, updated_at = now(), error_message = 'Recovered an expired task claim without an active reservation.' from orphaned where tasks.id = orphaned.id returning tasks.id `",
+      "mechanisms": [
+        11
+      ],
+      "justification": "Reclaims expired claims, failed leases and work owned by offline sessions."
+    },
+    {
+      "file": "lib/task-service.ts",
+      "owner": "withTaskRowLock",
+      "key": "d9b605ff99fa87a1ad85bb3697cd742f3cfbccc84049422f77f7733b76121f91",
+      "statement": "`select id from public.tasks where id = ${taskId}::uuid for update`",
+      "mechanisms": [
+        12
+      ],
+      "justification": "Serializes completion claim/application/finalization, failure claim/application/finalization, progress, lease renewal and return to queue."
+    },
+    {
+      "file": "lib/task-worker.ts",
+      "owner": "claimDueCronActions",
+      "key": "ea349644f73715c1ed75c9096e2be78f3589299d5b6b96ce36ec03803a2c6789",
+      "statement": "` update public.cron set status = 'queued', attempts = attempts + 1, updated_at = now() where id in ( select id from public.cron where scheduled_for <= now() and ( status = 'scheduled' or ( status = 'queued' and updated_at < now() - interval '10 minutes' ) ) order by scheduled_for asc for update of cron skip locked limit 25 ) returning id::text, action_type, plan_id::text, recipient, payload `",
+      "mechanisms": [
+        20
+      ],
+      "justification": "Prevents two schedulers dispatching the same due cron entry."
+    },
+    {
+      "file": "lib/web-payment-fulfillment.ts",
+      "owner": "fulfillWebPayment",
+      "key": "6fa39856603e7c43533ce83da25349a6bb9626925714a97d355baed7434dbba5",
+      "statement": "`select * from public.payments where id = ${paymentId}::uuid for update`",
+      "mechanisms": [
+        17
+      ],
+      "justification": "Protects reservation binding, cancellation/confirmation, checkout recovery and generation/accounting fulfilment."
+    },
+    {
+      "file": "lib/web-payment-fulfillment.ts",
+      "owner": "fulfillWebPayment",
+      "key": "a89b1641dcceb52f3ee85ce16d6f0e03a68a6f01951ac4e90fca28d5d7448204",
+      "statement": "`select locale from public.assessments where plan_id = ${payment.plan_id}::uuid for no key update`",
+      "mechanisms": [
+        14
+      ],
+      "justification": "Fences answer/contact edits, replan, recovery, checkout and generation completion by assessment revision."
+    }
+  ]
+}

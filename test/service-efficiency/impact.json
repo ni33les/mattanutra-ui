@@ -270,6 +270,38 @@
       "slice": "lock-register",
       "expectedCases": 2,
       "reason": "All 39 mechanisms have reviewed boundaries and tests; discover SQL locks and reject unregistered additions"
+    },
+    {
+      "file": "test/product-advisory-cache-refresh.integration.test.ts",
+      "slice": "retained-locks",
+      "expectedCases": 3,
+      "reason": "Direct verification of retained audited writer, pool, rate-limit and maintenance invariants",
+      "database": true
+    },
+    {
+      "file": "test/catalogue-admin-reference-concurrency.integration.test.ts",
+      "slice": "retained-locks",
+      "expectedCases": 2,
+      "reason": "Direct verification of retained audited writer, pool, rate-limit and maintenance invariants",
+      "database": true
+    },
+    {
+      "file": "test/db-pool-sizing.test.ts",
+      "slice": "retained-locks",
+      "expectedCases": 6,
+      "reason": "Direct verification of retained audited writer, pool, rate-limit and maintenance invariants"
+    },
+    {
+      "file": "test/rate-limit.test.ts",
+      "slice": "retained-locks",
+      "expectedCases": 7,
+      "reason": "Direct verification of retained audited writer, pool, rate-limit and maintenance invariants"
+    },
+    {
+      "file": "test/plan-keep-warm-static.test.ts",
+      "slice": "retained-locks",
+      "expectedCases": 1,
+      "reason": "Direct verification of retained audited writer, pool, rate-limit and maintenance invariants"
     }
   ],
   "inputs": [
