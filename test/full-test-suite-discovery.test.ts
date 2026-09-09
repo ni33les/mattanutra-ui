@@ -98,3 +98,10 @@ it("V5-INFRA-06 pre-matcher health advice and cache refresh regressions remain i
     if (file.includes(".integration.")) assert.ok(inventory.integration.includes(file), file);
   }
 });
+
+it("DISC-INFRA-01 complete MCP qualification includes refinement and matching execution consumers", async () => {
+  const { unclassifiedMatcherConsumers } = await import("../scripts/matcher-test-inventory.mjs");
+  const inventory=fullTestInventory();
+  for (const file of ["test/ax-refinement/contract.test.ts", "test/ax-refinement/recovery.integration.test.ts", "test/service-efficiency/reads.test.ts", "test/service-efficiency/operations.integration.test.ts"]) assert.ok(inventory.mcp.includes(file),file);
+  assert.deepEqual(unclassifiedMatcherConsumers(process.cwd(),inventory.node,inventory.mcp),[]);
+});
