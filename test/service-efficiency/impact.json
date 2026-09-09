@@ -405,6 +405,26 @@
       "slice": "rollout",
       "expectedCases": 3,
       "reason": "Both approved deployment bases, source/register proof, executable coverage for all 39 locks, and environment-specific worker identity configuration"
+    },
+    {
+      "file": "test/service-efficiency/read-coalescing.integration.test.ts",
+      "slice": "read-coalescing",
+      "expectedCases": 4,
+      "database": true,
+      "reason": "Audits 32-34/38: actual immutable catalogue/reference/market single-flight and maintenance exclusion cannot block ordinary readers"
+    },
+    {
+      "file": "test/periodic-task.test.ts",
+      "slice": "maintenance",
+      "expectedCases": 2,
+      "reason": "Audit 38: bounded periodic work coalesces and releases after failures without overlapping maintenance"
+    },
+    {
+      "file": "test/service-efficiency/atomic-checkout.integration.test.ts",
+      "slice": "atomic-checkout",
+      "expectedCases": 2,
+      "database": true,
+      "reason": "Actual concurrent PostgreSQL admission and checkout preserve one durable resource and immutable frozen recovery without process queues"
     }
   ],
   "inputs": [
