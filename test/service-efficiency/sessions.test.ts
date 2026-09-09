@@ -47,3 +47,13 @@ test("EFF-SESSION-02 binary durable checkpoint survives a worker restart with id
     assert.deepEqual(reply.result, expected);
   } finally { await pool.close(); }
 });
+
+test("EFF-SESSION-03 idle sessions release affinity and recover through the durable checkpoint", async () => {
+  const request = await input(), pool = new MatchWorkerPool(1, 16, 20);
+  try {
+    const first = await pool.runResidentChunk("idle", request, { chunkBudget: 1 }); assert.equal(first.done, false);
+    await new Promise(resolve => setTimeout(resolve, 60));
+    const resumed = await pool.runResidentChunk("idle", request, { checkpoint: first.checkpoint, chunkBudget: 1 });
+    assert.equal(resumed.inputTransferred, true); assert.equal(resumed.expansionAttempts, first.expansionAttempts + 1);
+  } finally { await pool.close(); }
+});

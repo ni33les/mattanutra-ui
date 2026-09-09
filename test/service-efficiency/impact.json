@@ -56,7 +56,7 @@
     {
       "file": "test/service-efficiency/sessions.test.ts",
       "slice": "sessions",
-      "expectedCases": 2,
+      "expectedCases": 3,
       "reason": "Resident worker continuation, binary checkpoint restart and exact synchronous result/attempt parity"
     },
     {
@@ -103,6 +103,76 @@
       "slice": "worker-boundary",
       "expectedCases": 12,
       "reason": "Preserve the external worker API boundary, real profile registrations and direct platform import restrictions"
+    },
+    {
+      "file": "test/funnel-polling.test.ts",
+      "slice": "funnel",
+      "database": false,
+      "expectedCases": 4,
+      "reason": "Existing header/body deadlines, transient retry, cancellation, hidden-tab and foreground recovery behaviour"
+    },
+    {
+      "file": "test/db-transactions.integration.test.ts",
+      "slice": "db-consumers",
+      "database": true,
+      "expectedCases": 6,
+      "reason": "Managed-pool transaction-local timeouts, shared transaction ownership and cancellation recovery"
+    },
+    {
+      "file": "test/assessment-capture.integration.test.ts",
+      "slice": "capture",
+      "database": true,
+      "expectedCases": 5,
+      "reason": "Capture idempotency, revision fencing, contact-only preservation and transactional generation scheduling"
+    },
+    {
+      "file": "test/web-payment-transitions.integration.test.ts",
+      "slice": "payments",
+      "database": true,
+      "expectedCases": 4,
+      "reason": "Atomic binding and conditional payment transitions preserve revenue, ownership and paid state"
+    },
+    {
+      "file": "test/web-payment-fulfillment.integration.test.ts",
+      "slice": "fulfillment",
+      "database": true,
+      "expectedCases": 4,
+      "reason": "Idempotent accounting and plan task publication remain atomic and recover after interruption"
+    },
+    {
+      "file": "test/healthscore-delivery.integration.test.ts",
+      "slice": "email",
+      "database": true,
+      "expectedCases": 4,
+      "reason": "Persisted advice readiness must preserve durable delivery, rejection, ambiguous acceptance and provider acknowledgement"
+    },
+    {
+      "file": "test/funnel-readiness.integration.test.ts",
+      "slice": "readiness",
+      "database": true,
+      "expectedCases": 6,
+      "reason": "Shared localized advice gates, pending formulation status, payment fulfillment and stale-generation rejection"
+    },
+    {
+      "file": "test/agentic-match-worker.test.ts",
+      "slice": "worker-consumers",
+      "database": false,
+      "expectedCases": 6,
+      "reason": "Shared ThreadPool retains reference validation, deterministic matching, cancellation and queue bounds"
+    },
+    {
+      "file": "test/product-matcher-worker.test.ts",
+      "slice": "worker-consumers",
+      "database": false,
+      "expectedCases": 3,
+      "reason": "Web matching uses shared CPU admission without changing outputs or cancellation and capacity behaviour"
+    },
+    {
+      "file": "test/consistency-r2-formulation-read.test.ts",
+      "slice": "funnel",
+      "database": false,
+      "expectedCases": 5,
+      "reason": "Preserve bounded formulation reads, revision polling and one full result fetch per changed version"
     }
   ],
   "inputs": [
