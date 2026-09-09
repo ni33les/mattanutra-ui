@@ -1,3 +1,4 @@
+import { compareBenchmarkRuns } from "./service-efficiency/benchmark-proof.mjs";
 import assert from "node:assert/strict";
 import { readFileSync, realpathSync } from "node:fs";
 import { dirname, resolve, relative, isAbsolute } from "node:path";
@@ -13,11 +14,14 @@ export const MCP_PACKAGES = {
   "722": { version: "7.2.2", directory: "test/mcp-7-2-2", base: "391ba2beafc01a49d119a85b5f632a8a6f737944", scope: "mcp_722_open_points" }
 };
 export const MCP721_STAGES = ["affected-tests", "typecheck", "release-diff-lint", "production-build", "unchanged-source-and-inputs"];
+export function packageStages(packageId) {
+  return packageId === "efficiency" ? ["isolated-schema", "affected-tests", "repeated-baseline-comparison", "typecheck", "release-diff-lint", "production-build", "affected-browser-tests", "unchanged-source-and-inputs"] : MCP721_STAGES;
+}
 export function mcp721Identity(sourceSha256, sourceCommit, packageId = "721") {
   const definition = MCP_PACKAGES[packageId]; assert.ok(definition, "Unknown work package");
   const inventory = readFileSync(`${definition.directory}/impact.json`);
   const inputs = JSON.parse(inventory).inputs.map(file => ({ file, sha256: payloadHash(readFileSync(file)) }));
-  return { sourceSha256, sourceCommit, releaseBase: definition.base,
+  return { ...(packageId === "efficiency" ? { schemaSha256: payloadHash(readFileSync("scripts/service-efficiency-schema.sql")), workerProtocolSha256: payloadHash(readFileSync("lib/agentic/plan/match-worker-protocol.ts")) } : {}), sourceSha256, sourceCommit, releaseBase: definition.base,
     contractSha256: payloadHash(readFileSync(`contract/mcp/${definition.version}/schema.json`)), inventorySha256: payloadHash(inventory), inputSha256: payloadHash(JSON.stringify(inputs)) };
 }
 export function checkMcp721Proof(file, expected, packageId = "721") {
@@ -26,7 +30,7 @@ export function checkMcp721Proof(file, expected, packageId = "721") {
   assert.equal(proof.version, `dev-mcp-${packageId}-1`); assert.equal(proof.environment, "dev");
   assert.equal(proof.scope, definition.scope); assert.equal(proof.contractVersion, definition.version); assert.equal(proof.passed, true);
   for (const [key, value] of Object.entries(expected)) { assert.ok(value); assert.equal(proof[key], value, `Changed ${key}`); }
-  assert.deepEqual(proof.stages, MCP721_STAGES.map(label => ({ label, passed: true })));
+  assert.deepEqual(proof.stages, packageStages(packageId).map(label => ({ label, passed: true })));
   const root = realpathSync(dirname(resolve(file)));
   assert.ok(Array.isArray(proof.artifacts) && proof.artifacts.length > 0);
   assert.equal(new Set(proof.artifacts.map(row => row.file)).size, proof.artifacts.length);
@@ -42,5 +46,25 @@ export function checkMcp721Proof(file, expected, packageId = "721") {
   assert.equal(tests.execution.cases, inventory.files.reduce((sum, row) => sum + row.expectedCases, 0));
   assert.ok(tests.execution.cases > 0 && build.buildSha256 && build.nextBuildId);
   assert.equal(json("source-after.json").sha256, expected.sourceSha256);
+  if (packageId === "efficiency") {
+    const browser = json("browser-results.json"), benchmark = json("benchmark-comparison.json"), schema = json("schema.json");
+    assert.equal(browser.passed, true); assert.equal(browser.execution.passed, true); assert.deepEqual(browser.execution.failures, []);
+    assert.equal(browser.execution.cases, inventory.browser.reduce((sum, row) => sum + row.expectedCases, 0));
+    assert.equal(benchmark.passed, true); assert.equal(benchmark.reproducible, true);
+    assert.equal(benchmark.controlCommit, expected.releaseBase); assert.equal(benchmark.candidateCommit, expected.sourceCommit);
+    assert.deepEqual(benchmark.runs.map(row => row.run), ["a", "b"]);
+    for (const run of benchmark.runs) {
+      assert.equal(run.comparison.passed, true);
+      assert.deepEqual(run.comparison.rows.map(row => row.id).sort(), [...inventory.benchmarks].sort());
+      assert.ok(run.comparison.rows.every(row => row.identical === true && row.semanticSha256));
+    }
+    assert.deepEqual(benchmark.runs[0].comparison.rows.map(row => [row.id, row.semanticSha256]), benchmark.runs[1].comparison.rows.map(row => [row.id, row.semanticSha256]));
+    for (const run of benchmark.runs) {
+      const rows = label => inventory.benchmarks.map(id => json(`benchmarks/${run.run}-${id}-${label}.json`));
+      assert.deepEqual(compareBenchmarkRuns(rows("control"), rows("candidate"), inventory.benchmarks), run.comparison);
+    }
+    assert.equal(schema.passed, true); assert.equal(schema.schemaSha256, expected.schemaSha256);
+    assert.equal(build.sourceCommit, expected.sourceCommit);
+  }
   return proof;
 }

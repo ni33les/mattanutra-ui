@@ -83,7 +83,7 @@ test("capture failure, persistence failure, reload and analysis retry remain sep
   await expect.poll(() => page.evaluate(() => Object.keys(localStorage).some(k => k.startsWith("mn-questionnaire:v1:") && JSON.parse(localStorage.getItem(k)!).captured))).toBe(true);
   await page.reload();
   await expect(page.getByTestId("questionnaire-calculating")).toBeVisible();
-  await page.route("**/journey?view=copy*", route => route.fulfill({ json: { copyReady: false, copyFailed: true } }));
+  await page.route("**/journey?locale=*", route => route.fulfill({ json: { copyReady: false, copyFailed: true } }));
   await expect(page.getByTestId("retry-analysis")).toBeVisible();
   await expect(page.getByTestId("retry-capture")).toHaveCount(0);
   expect(captures).toBe(2);
@@ -95,7 +95,7 @@ test("capture failure, persistence failure, reload and analysis retry remain sep
   await page.locator('[data-testid="calc-emailbox"] button').click();
   await expect(page.getByTestId("calc-emailbox")).toHaveCount(0);
   await fixture({ action: "copy", planId: captured.planId });
-  await page.unroute("**/journey?view=copy*");
+  await page.unroute("**/journey?locale=*");
   await page.getByTestId("retry-analysis").click();
   expect(captures).toBe(2);
   await expect(page).toHaveURL(new RegExp(`healthscore\\?plan=${captured.planId}`));
