@@ -924,7 +924,7 @@ export function publicPlanFields(result: Pick<
     >
   >) {
   const legacy = result as PlanResult;
-  if (legacy.refreshRequired) result = { ...result, status: "needs_input", summary: "This saved plan needs a contract refresh. Revise with requestPatch={} and the current revision; existing health information is preserved.", questions: [] };
+  if (legacy.refreshRequired) result = { ...result, status: "needs_input", summary: agenticMessage(negotiateLocale(result.requestSnapshot.locale), "plan.summary.refresh_required"), questions: [] };
   const selected = result.selected;
   const guidanceIds = result.safetyGuidance.map((item) => item.guidanceId);
   const snapshot =

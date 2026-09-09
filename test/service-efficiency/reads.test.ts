@@ -50,8 +50,11 @@ test("LOCK-READ-07 stale catalogue projections consistently require refresh acro
       ...(view === "details" ? { expectedRevision: 1, sections: ["advice"] } : {}) });
     assert.equal(result.ok, true, JSON.stringify(result));
     assert.equal(result.status, "needs_input", view);
-    assert.equal(result.refreshRequired, true, view);
-    assert.equal((result.nextActions as string[])[0], "change_request", view);
+    // 7.2.4 details exposes status, but has no action/refresh fields. Preserve its schema.
+    if (view !== "details") {
+      assert.equal(result.refreshRequired, true, view);
+      assert.equal((result.nextActions as string[])[0], "change_request", view);
+    }
     if (result.operationalDecision) assert.equal((result.operationalDecision as {purchaseEligible: boolean}).purchaseEligible, false);
   }
 });

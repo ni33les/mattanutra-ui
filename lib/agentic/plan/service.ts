@@ -1,4 +1,5 @@
 import { planStatusProjection } from "@/lib/agentic/presentation/status-projection";
+import { readPlanPresentation } from "@/lib/agentic/presentation/plan-read";
 import { planContractCompatible } from "@/lib/agentic/presentation/compatibility";
 import { withoutOperationCursor } from "@/lib/agentic/store/operation-checkpoint";
 import { expirePlanOperation, operationDeadlineRemaining, planOperationDeadlineError } from "@/lib/agentic/plan/operations";
@@ -1054,7 +1055,8 @@ function operationFailureResponse(operation: PlanOperationRecord, currentRevisio
 }
 
 async function admittedResponse(input: PlanExecutionInput, operation: PlanOperationRecord) {
-  if (await expirePlanOperation(input.store, operation.id, new Date().toISOString())) return planOperationDeadlineError();
+  // HTTP only observes expiry. The durable executor owns terminal transitions.
+  if (["queued", "running", "retryable"].includes(operation.status) && operationDeadlineRemaining(operation) === 0) return planOperationDeadlineError();
   if (operation.status === "complete") return operation.response as PlanToolSuccess;
   if (operation.status === "failed" || operation.status === "cancelled") {
     const current = await input.store.getPlan(operation.planId);
@@ -1166,7 +1168,7 @@ async function executePlanTool(input: Readonly<{
       return admittedResponse(input, admitted);
     }
   }
-  if (!input.matchPort && input.payload.operation === "get" && input.payload.planHandle) {
+  if (input.payload.operation === "get" && input.payload.planHandle) {
     const capability = await resolveCapability({ action: "plan.read", config: input.config, handle: input.payload.planHandle,
       now: input.now, resourceType: "plan", scope: input.scope, store: input.store });
     if (!capability) return businessError({ reasonCode: "not_found", message: "Not found." });
@@ -1177,6 +1179,10 @@ async function executePlanTool(input: Readonly<{
       const failed = await input.store.getFailedPlanOperation(plan.id, plan.currentRevision);
       if (failed) return operationFailureResponse(failed);
     }
+    const state = await readPlanPresentation(input, input.payload.planHandle);
+    if (isAgenticErrorResult(state)) return state;
+    return successFromResult({ locale: negotiateLocale(state.result.requestSnapshot.locale),
+      planHandle: input.payload.planHandle, revision: state.revision.revision, result: state.result });
   }
   const skipIdempotency =
     input.payload.operation === "get" || !input.payload.idempotencyKey;

@@ -8,8 +8,9 @@ import type { PlanStatusWire } from "@/lib/agentic/contract/outputs";
 import { planContractCompatible } from "@/lib/agentic/presentation/compatibility";
 import { operationForRead, planStatusProjection, projectedResultVersion } from "@/lib/agentic/presentation/status-projection";
 import { getPinnedCatalogueSnapshot } from "@/lib/agentic/catalogue/pin";
+type ReadRuntime = Pick<AgenticRuntime, "config" | "scope" | "store" | "now">;
 
-async function readState(runtime: AgenticRuntime, planHandle: string, requestedRevision?: number, includeResult = false) {
+async function readState(runtime: ReadRuntime, planHandle: string, requestedRevision?: number, includeResult = false) {
   const capability = await resolveCapability({ action: "plan.read", config: runtime.config, handle: planHandle,
     now: runtime.now ?? new Date().toISOString(), resourceType: "plan", scope: runtime.scope, store: runtime.store });
   if (!capability) return businessError({ reasonCode: "not_found", message: "Not found." });
@@ -29,10 +30,12 @@ async function readState(runtime: AgenticRuntime, planHandle: string, requestedR
 }
 
 /** One coherent, ordinary database read after capability validation. */
-export async function readPlanPresentation(runtime: AgenticRuntime, planHandle: string, requestedRevision?: number) {
+export async function readPlanPresentation(runtime: ReadRuntime, planHandle: string, requestedRevision?: number) {
   const state = await readState(runtime, planHandle, requestedRevision, true);
   if (isAgenticErrorResult(state)) return state;
-  const result = state.result as PlanResult;
+  const saved = state.result as PlanResult;
+  const result: PlanResult = state.refreshRequired ? { ...saved, refreshRequired: true,
+    sourceContractVersion: saved.contractVersion, status: "needs_input", questions: [] } : saved;
   return { ...state, revision: { revision: state.revision, result }, result, originalRequest: () => originalRequestFor(result) };
 }
 
@@ -44,8 +47,8 @@ export async function readPlanStatus(runtime: AgenticRuntime, planHandle: string
   const error = operation && isAgenticErrorResult(operation.error) ? operation.error.error : undefined;
   return { ok: true, responseView: "status", planHandle, revision, resultVersion,
     contractVersion: AGENTIC_CONTRACT_VERSION, locale: projection.locale,
-    status: active ? "processing" : projection.decision.status, unchanged: knownResultVersion === resultVersion,
+    status: active ? "processing" : refreshRequired ? "needs_input" : projection.decision.status, unchanged: knownResultVersion === resultVersion,
     pendingRevision: operation?.revision ?? null, operationStatus: operation?.status ?? null,
-    nextActions: error || operation?.status === "cancelled" || refreshRequired ? ["refresh_plan"] : active ? ["poll_plan"] : [projection.decision.nextAction],
+    nextActions: error || operation?.status === "cancelled" ? ["refresh_plan"] : active ? ["poll_plan"] : refreshRequired ? ["change_request"] : [projection.decision.nextAction],
     pollAfterSeconds: active ? 2 : 0, refreshRequired, ...(error ? { error: JSON.parse(JSON.stringify(error)) as PlanStatusWire["error"] } : {}) };
 }
