@@ -357,7 +357,7 @@
       "file": "test/service-efficiency/pool-wait.integration.test.ts",
       "slice": "pool-wait",
       "database": true,
-      "expectedCases": 2,
+      "expectedCases": 3,
       "reason": "Audit 36: pool acquisition obeys cancellation/deadlines without late writes, effects or leaked permits"
     },
     {
