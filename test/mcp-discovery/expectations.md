@@ -9,3 +9,5 @@ Baseline: 41ed9fd07e8b9c8814d361eab33d72b27ac7c157, contract 7.2.4.
 - LIVE-TRUST discovery checks the valid POST-only transport (GET 405), then checks tools/list against the served contract with seven tools. Six-tool and GET-discovery historical results remain untouched.
 - Full regression uses the existing complete MCP/matcher inventory once for the DEV release cycle and once after UAT promotion, in isolated databases. No full application or unrelated browser suite is claimed.
 - Local adapter parity and native endpoint probes are not installed-host proof. A missing owner refresh/export remains an open integration requirement.
+
+- Complete-suite preflight exposed unclassified AX refinement/service-efficiency suites and the HTTP test adapter reporting a content-hash prefix instead of the compiled git identity. The inventory now includes those consumers; qualification builds once before running the adapter and passes the actual commit. Production identity checks remain unchanged.

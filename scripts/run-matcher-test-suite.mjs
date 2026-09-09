@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { spawn } from "node:child_process";
+import { spawn, execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { createWriteStream, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
@@ -54,7 +54,8 @@ async function main() {
   const before = sourceManifest();
   const inventorySha256 = createHash("sha256").update(JSON.stringify(inventory)).digest("hex");
   for (const [name, data] of [["inventory", { ...inventory, sha256: inventorySha256 }], ["source-before", before]]) writeFileSync(join(evidence, `${name}.json`), JSON.stringify(data, null, 2), { flag: "wx" });
-  const common = { ...isolatedValidationEnvironment(process.env), AGENTIC_BUILD_ID: before.sha256.slice(0, 40), DB_URL: process.env.TEST_DB_URL, DB_WORKER_URL: process.env.TEST_DB_URL,
+  const sourceCommit = execFileSync("git", ["rev-parse", "HEAD"], { cwd: ROOT, encoding: "utf8" }).trim();
+  const common = { ...isolatedValidationEnvironment(process.env), AGENTIC_BUILD_ID: sourceCommit, DB_URL: process.env.TEST_DB_URL, DB_WORKER_URL: process.env.TEST_DB_URL,
     MATTANUTRA_ENV: "dev", STRIPE_PAYMENT_MODE: "mock", NODE_ENV: "test", DB_POOL_IDLE_TIMEOUT_SECONDS: "1" };
   const args = ["--test", "--test-concurrency=1", "--experimental-strip-types", "--import", "./test/helpers/offline-network.mjs", "--import", "./scripts/register-ts-path-loader.mjs"];
   const fixture = await runBatch("public-catalogue-fixtures", ["scripts/seed-matcher-public-fixtures.mjs", join(evidence, "public-catalogue-fixtures.json")], common, evidence);
@@ -82,7 +83,7 @@ async function main() {
   }
   const after = sourceManifest(), unchangedSource = before.sha256 === after.sha256;
   writeFileSync(join(evidence, "source-after.json"), JSON.stringify(after, null, 2), { flag: "wx" });
-  const result = { results, sourceSha256: before.sha256, inventorySha256, unchangedSource, identicalNonLatency,
+  const result = { results, sourceCommit, sourceSha256: before.sha256, inventorySha256, unchangedSource, identicalNonLatency,
     passed: unchangedSource && identicalNonLatency !== false && results.every(row => row.passed) };
   writeFileSync(join(evidence, "results.json"), JSON.stringify(result, null, 2), { flag: "wx" });
   console.log(JSON.stringify({ evidence, passed: result.passed, unchangedSource, identicalNonLatency }));

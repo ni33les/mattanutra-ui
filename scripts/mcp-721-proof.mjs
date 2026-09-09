@@ -18,7 +18,7 @@ export const MCP_PACKAGES = {
 };
 export const MCP721_STAGES = ["affected-tests", "typecheck", "release-diff-lint", "production-build", "unchanged-source-and-inputs"];
 export function packageStages(packageId) {
-  if (packageId === "discovery") return [...MCP721_STAGES.slice(0, 3), "complete-mcp-regression", ...MCP721_STAGES.slice(3)];
+  if (packageId === "discovery") return [...MCP721_STAGES.slice(0, 4), "complete-mcp-regression", ...MCP721_STAGES.slice(4)];
   return packageId === "efficiency" ? ["isolated-schema", "affected-tests", "lock-register-verification", "typecheck", "release-diff-lint", "production-build", "affected-browser-tests", "repeated-baseline-comparison", "unchanged-source-and-inputs"] : MCP721_STAGES;
 }
 export function mcp721Identity(sourceSha256, sourceCommit, packageId = "721") {
@@ -55,7 +55,7 @@ export function checkMcp721Proof(file, expected, packageId = "721") {
   assert.equal(json("source-after.json").sha256, expected.sourceSha256);
   if (packageId === "discovery") {
     const full = json("mcp-regression/results.json"), selected = json("mcp-regression/inventory.json");
-    assert.equal(full.passed, true); assert.equal(full.unchangedSource, true); assert.equal(full.sourceSha256, expected.sourceSha256);
+    assert.equal(full.passed, true); assert.equal(full.unchangedSource, true); assert.equal(full.sourceSha256, expected.sourceSha256); assert.equal(full.sourceCommit, expected.sourceCommit);
     assert.ok(selected.files.length > inventory.files.length);
     for (const file of inventory.regressionFiles) assert.ok(selected.files.includes(file), `Unexecuted discovery consumer: ${file}`);
     assert.ok(full.results.every(row => row.passed));
