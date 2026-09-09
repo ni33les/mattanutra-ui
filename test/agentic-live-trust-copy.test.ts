@@ -5,7 +5,7 @@ import { getLegalContent } from "../lib/legal-content.ts";
 import { CONNECTOR_COPY } from "../lib/agentic/discovery/content.ts";
 import { RESPONSIBILITY_MATRIX } from "../lib/agentic/responsibility/matrix.ts";
 import { RESPONSIBILITY_VERSION } from "../lib/agentic/discovery/versions.ts";
-import { LIVE_PUBLIC, liveCall, livePost } from "./helpers/live-mcp.ts";
+import { LIVE_PUBLIC, LIVE_CLIENT_HEADERS, liveCall, livePost } from "./helpers/live-mcp.ts";
 import { AGENTIC_CONTRACT_VERSION } from "../lib/agentic/config.ts";
 import { CONTRACT_SCHEMA_URI } from "../lib/agentic/contract/guide.ts";
 
@@ -53,7 +53,7 @@ describe("live connector and Terms consistency", () => {
 
 describe("live connector discovery contract identity", () => {
   it("GET discovery, RPC info and the published contract agree on version and schemas", async () => {
-    const response = await fetch(LIVE_PUBLIC, { headers: { accept: "application/json, text/event-stream" }, signal: AbortSignal.timeout(30_000) });
+    const response = await fetch(LIVE_PUBLIC, { headers: { ...LIVE_CLIENT_HEADERS, accept: "application/json, text/event-stream" }, signal: AbortSignal.timeout(30_000) });
     assert.equal(response.status, 405);
     const listing = await livePost(LIVE_PUBLIC, { jsonrpc: "2.0", id: 3, method: "tools/list" });
     const discovery = listing.structured;

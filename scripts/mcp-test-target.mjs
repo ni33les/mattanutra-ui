@@ -1,5 +1,10 @@
 /** The maintained pack runs on DEV, or on an explicitly isolated local candidate. */
-export function isolatedMcpClientHeaders(_target, _clientId) { return {}; }
+export function isolatedMcpClientHeaders(target, clientId) {
+  if (!target.isolatedCandidate) return {};
+  if (!Number.isSafeInteger(clientId) || clientId < 0 || clientId > 0xffffffff) throw new Error("Invalid isolated client identity");
+  // Documentation-only IPv6 range; stable for a client's complete journey.
+  return { "x-forwarded-for": `2001:db8:${Math.floor(clientId / 65536).toString(16)}:${(clientId % 65536).toString(16)}::1` };
+}
 
 export function mcpTestTarget(env = process.env) {
   const dev = "https://dev.mattanutra.com/api/mcp";

@@ -15,6 +15,9 @@ export async function startHttpCandidate(env, evidence) {
   // would activate in-process catalogue stubs instead of the isolated DB reader.
   const applicationEnv = { ...env };
   delete applicationEnv.NODE_TEST_CONTEXT;
+  // This loopback adapter models the production reverse proxy. Individual
+  // test processes have stable client IPs; public rate limits remain unchanged.
+  applicationEnv.TRUST_PROXY = "1";
   const log = createWriteStream(join(evidence, "mcp-http.log"), { flags: "wx", mode: 0o600 });
   const child = spawn(process.execPath, ["--experimental-strip-types", "--import", "./scripts/register-ts-path-loader.mjs", "--import", "./scripts/register-matcher-http-loader.mjs", "scripts/serve-matcher-test-http.ts"],
     { cwd: ROOT, env: applicationEnv, detached: process.platform !== "win32", stdio: ["ignore", "pipe", "pipe", "ipc"] });

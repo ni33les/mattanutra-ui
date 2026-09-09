@@ -1,7 +1,7 @@
 import http from "node:http";
 import https from "node:https";
 import { URL } from "node:url";
-import { mcpTestTarget } from "../../scripts/mcp-test-target.mjs";
+import { mcpTestTarget, isolatedMcpClientHeaders } from "../../scripts/mcp-test-target.mjs";
 import { decodeMcpPayload } from "../../lib/agentic/mcp/transport.ts";
 import { setTimeout as delay } from "node:timers/promises";
 import assert from "node:assert/strict";
@@ -10,6 +10,7 @@ const target = mcpTestTarget();
 export const LIVE_PUBLIC = target.publicUrl;
 export const LIVE_ORIGIN = target.originUrl;
 export const LIVE_QA = target.qaUrl;
+export const LIVE_CLIENT_HEADERS = isolatedMcpClientHeaders(target, process.pid);
 
 export type LiveMcpCall = Readonly<{
   headers: Record<string, string>;
@@ -51,6 +52,7 @@ export function livePost(
           accept: "application/json, text/event-stream",
           "content-length": Buffer.byteLength(payload),
           "content-type": "application/json",
+          ...LIVE_CLIENT_HEADERS,
           ...extraHeaders
         },
         hostname: target.hostname,

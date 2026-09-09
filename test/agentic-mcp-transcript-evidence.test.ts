@@ -112,16 +112,17 @@ it('MCP-TRANSCRIPT-07: all maintained selective-evidence packs attach actual har
   for (const name of packs) {
     const source = readFileSync(new URL(name, import.meta.url), 'utf8');
     assert.match(source, /withRecordedMcpEvidence\(/, `${name} must retain per-case transcripts`);
-    if (name !== 'agentic-com-pack.test.ts') assert.match(source, /import \{ handleJsonRpc \} from "\.\/helpers\/recording-mcp-dispatcher\.ts"/);
+    if (name !== 'agentic-com-pack.test.ts') assert.match(source, /import \{ (?:handleJsonRpc|handleCompletedFullJsonRpc as handleJsonRpc) \} from "\.\/helpers\/(?:recording-mcp-dispatcher|completed-mcp-client)\.ts"/);
   }
   const commercial = readFileSync(new URL('./helpers/com-fixtures.ts', import.meta.url), 'utf8');
-  assert.match(commercial, /import \{ handleJsonRpc \} from "\.\/recording-mcp-dispatcher\.ts"/);
+  assert.match(commercial, /import \{ (?:handleJsonRpc|handleCompletedFullJsonRpc as handleJsonRpc) \} from "\.\/(?:recording-mcp-dispatcher|completed-mcp-client)\.ts"/);
   const fix = readFileSync(new URL('./agentic-cv-fix-pack.test.ts', import.meta.url), 'utf8');
-  assert.match(fix, /import \{ planTool \} from "\.\/helpers\/recording-mcp-dispatcher\.ts"/,
+  assert.match(fix, /import \{ completedPlanTool as planTool \} from "\.\/helpers\/completed-mcp-client\.ts"/,
     'Direct plan-service cases must capture their matching results too');
   const det = readFileSync(new URL('./agentic-det-pack.test.ts', import.meta.url), 'utf8');
   assert.match(det, /captureMcpTranscript\(/);
-  assert.match(det, /import \{ matchPlan, evaluateSafety, planTool \} from "\.\/helpers\/recording-mcp-dispatcher\.ts"/);
+  assert.match(det, /import \{ completedPlanTool as planTool \} from "\.\/helpers\/completed-mcp-client\.ts"/);
+  assert.match(det, /import \{ matchPlan, evaluateSafety \} from "\.\/helpers\/recording-mcp-dispatcher\.ts"/);
   assert.match(readFileSync(new URL('../scripts/mcp-matcher-pack-report.mjs', import.meta.url), 'utf8'), /matcher: JSON\.parse\(canonicalDetReport\(run\.matcher\)\)/);
 });
 

@@ -96,6 +96,7 @@
     "test/agentic-live-trust-copy.test.ts",
     "test/agentic-matching-bridge-v4.test.ts",
     "test/agentic-mcp-sale-states.test.ts",
+    "test/agentic-mcp-transcript-evidence.test.ts",
     "test/agentic-p1.test.ts",
     "test/agentic-phase1-material.test.ts",
     "test/agentic-phase2-compact-rank.test.ts",

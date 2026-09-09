@@ -97,3 +97,6 @@ or historical result files were changed to obtain these passes.
 
 - MCP-INFRA-01–02: stop the pack-wide HTTP worker before database concurrency fixtures take ownership of task execution; each HTTP integration owns its own worker lifecycle. Paired batches start independent HTTP workers and preserve failures.
 - AX2–AX6 diagnostic-key checks: allow only the documented `canonical.catalogId` provenance field restored by the durable-serialization regression. Other catalogue diagnostic keys and paths remain forbidden. The acceptance-5 failures are retained, and that source-changing run cannot qualify deployment.
+
+- MCP-TRANSCRIPT-07: completed clients now use the recording completion adapter. The guard follows that adapter while preserving actual request/response recording and the independent raw-dispatcher regressions.
+- MCP-INFRA-03 / LIVE-DUR-01 / LIVE-CON-01 / LIVE-CAN-01: independent HTTP test processes model different clients in the isolated reverse-proxy adapter. One client's request allowance remains enforced; another file cannot consume it. No request limits or deployed proxy configuration change. The duration, price, cash, quantity and coverage assertions remain intact.
