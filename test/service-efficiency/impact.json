@@ -380,6 +380,12 @@
       "database": true,
       "expectedCases": 6,
       "reason": "Audits 9/33: exact reference-head invariants, per-nutrient contention/retry and ordinary warm-cache invalidation"
+    },
+    {
+      "file": "test/service-efficiency/immutable-references.test.ts",
+      "slice": "immutable-references",
+      "expectedCases": 2,
+      "reason": "Audits 6/30/33: concurrent immutable reference scopes and real checkpoint restart after catalogue/reference changes, with explicit stale presentation"
     }
   ],
   "inputs": [
