@@ -60,3 +60,24 @@ test("EFF-PACK-05 matching comparisons require queue and execution timing with c
   assert.equal(compareBenchmarkRuns([valid], [valid], ["concurrent"]).passed, true);
   assert.throws(() => compareBenchmarkRuns([valid], [{ ...valid, measurements: { ...valid.measurements, queue: { ...timing, count: 1 } } }], ["concurrent"]), /incomplete dispatch/i);
 });
+
+
+test("EFF-PACK-06 database benchmarks exclude background setup queries and retain lazy SQL fragments", async () => {
+  const moduleUrl = new URL("../../scripts/service-efficiency/database-traffic.mjs", import.meta.url);
+  const { existsSync } = await import("node:fs"); assert.ok(existsSync(moduleUrl), "Request-scoped benchmark measurement is required");
+  const { measureDatabaseTraffic } = await import(moduleUrl.href);
+  const raw = (parts: TemplateStringsArray) => Promise.resolve([{ text: parts.join("") }]);
+  const measured = measureDatabaseTraffic(raw);
+  let release!: () => void; const signal = new Promise<void>(resolve => { release = resolve; });
+  const background = signal.then(() => measured.sql`select background_setup`);
+  await measured.observe(async () => {
+    release(); await background;
+    await measured.sql`select current_poll`;
+  });
+  assert.equal(measured.measurements().applicationSelects, 1);
+  assert.equal(measured.measurements().sqlStatements, 1);
+  assert.equal(measured.measurements().rowBytes, Buffer.byteLength(JSON.stringify([{ text: "select current_poll" }])));
+  measured.reset();
+  await measured.observe(async () => { measured.sql`current_timestamp`; });
+  assert.equal(measured.measurements().sqlStatements, 0);
+});
