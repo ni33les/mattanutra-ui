@@ -21,6 +21,18 @@
       "database": true,
       "expectedCases": 2,
       "reason": "Actual PostgreSQL locks retained for mutations, nonblocking status and two small SELECTs"
+    },
+    {
+      "file": "test/service-efficiency/transactions.test.ts",
+      "slice": "transactions",
+      "expectedCases": 2,
+      "reason": "Shared transaction session, commit-only effects and rollback silence for task admission"
+    },
+    {
+      "file": "test/service-efficiency/wakeup.test.ts",
+      "slice": "wakeup",
+      "expectedCases": 3,
+      "reason": "Lost task notification reproduction, bounded coalescing and single-consumer wakeups"
     }
   ],
   "inputs": [
