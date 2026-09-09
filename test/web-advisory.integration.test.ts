@@ -23,7 +23,8 @@ import { enqueueProductRecommendationsTask } from "../lib/task-worker.ts";
 import { ACTIVE_PRODUCT_RECOMMENDATION_ALGORITHM_VERSION, ACTIVE_PRODUCT_RECOMMENDATION_IMPLEMENTATION_VERSION } from "../lib/product-recommendations.ts";
 
 const databaseUrl = process.env.TEST_DB_URL;
-describe("web advisory revisions on PostgreSQL", { skip: !databaseUrl }, () => {
+assert.ok(databaseUrl, "Web matching tests require isolated PostgreSQL");
+describe("web advisory revisions on PostgreSQL", () => {
   const plans: string[] = [];
   const answers = { firstName: "Advisory fixture", sex: "female", age: "36-45", goals: ["energy"] };
   before(async () => {
@@ -181,7 +182,7 @@ describe("web advisory revisions on PostgreSQL", { skip: !databaseUrl }, () => {
     }
   });
 
-  it("persists an actual current product run and rejects a catalogue edit before completion", async () => {
+  it("LOCK-WEB-01 persists current and older-snapshot results without a catalogue publication lock", async () => {
     const planId = await seed();
     const sql = getSql()!;
     const catalogueRevision = await getCatalogueRuntimeRevision(sql);
@@ -201,8 +202,17 @@ describe("web advisory revisions on PostgreSQL", { skip: !databaseUrl }, () => {
     assert.equal(Number(runs[0].assessment_revision), 1);
     assert.equal(Number(runs[0].catalogue_revision), catalogueRevision);
     await sql`update public.catalogue_runtime_revision set revision=revision+1 where singleton=true`;
-    assert.deepEqual(await withDatabaseTransaction(sql, tx => applyTaskCompletionResult({ task, taskId: task.id, sql: tx, afterCommit: () => {}, resultPayload })), { superseded: true, message: "Catalogue changed; old product result was not applied" });
-    assert.equal((await sql`select count(*)::int as n from public.product_recommendation_runs where plan_id=${planId}::uuid`)[0].n, 1);
+    const { task: older } = await createTask({ planId, title: "Older snapshot completing", taskType: "generate_product_recommendations", payload: task.payload });
+    let release!: () => void, entered!: () => void;
+    const held=new Promise<void>(resolve=>{entered=resolve;}); const barrier=new Promise<void>(resolve=>{release=resolve;});
+    const writer=sql.begin(async tx=>{await tx`update public.catalogue_runtime_revision set revision=revision+1 where singleton=true`;entered();await barrier;});
+    await held;
+    try {
+      const completed = await withDatabaseTransaction(sql, tx => applyTaskCompletionResult({ task: older, taskId: older.id, sql: tx, afterCommit: () => {}, resultPayload }));
+      assert.notEqual((completed as {superseded?: boolean}).superseded, true);
+    } finally { release();await writer; }
+    assert.equal((await sql`select count(*)::int as n from public.product_recommendation_runs where plan_id=${planId}::uuid`)[0].n, 2);
+    assert.equal((await getFunnelReadiness(planId))?.readyForReveal, false, "Older snapshot results do not unlock current reveal");
   });
 
   it("ANNA-REF-WEB-01 rejects legacy queued work and missing or changed result reference identity without writes", async () => {
@@ -232,13 +242,16 @@ describe("web advisory revisions on PostgreSQL", { skip: !databaseUrl }, () => {
     assert.equal((await sql`select count(*)::int as n from public.product_recommendation_runs where plan_id=${planId}::uuid`)[0].n, 0);
   });
 
-  it("keeps completed no-purchase results terminal and starts one current copy task for a legacy HealthScore", async () => {
+  it("keeps no-purchase results terminal and only explicit recovery creates missing copy work", async () => {
     const planId = await seed(); const generation = (await loadGenerationInput(getSql()!, planId))!;
     await insertFormulationVersion(getSql()!, { planId, generation, modelVersion: "advisory-fixture", formulation: { supplementBreakdown: [], sectionStatuses: { supplements: "ready" } } });
     await getSql()!`insert into public.assessment_healthscore_results (plan_id, revision, locale, generator_version, result)
       values (${planId}::uuid, 1, 'en', 'web-funnel-v1', ${getSql()!.json(completeHealthScoreFixture("en"))})`;
     assert.equal((await getFunnelReadiness(planId))?.copyReady, false);
     await getFunnelReadiness(planId);
+    assert.equal((await getSql()!`select count(*)::int as n from public.tasks where plan_id = ${planId}::uuid and task_type = 'analyze_healthscore'`)[0].n, 0);
+    const { recoverMissingFunnelGeneration } = await import("../lib/funnel-generation-recovery.ts");
+    await recoverMissingFunnelGeneration({planId,locale:"en",healthScoreMissing:true,formulationMissing:false});
     assert.equal((await getSql()!`select count(*)::int as n from public.tasks where plan_id = ${planId}::uuid and task_type = 'analyze_healthscore'`)[0].n, 1);
     await getSql()!`insert into public.assessment_healthscore_results (plan_id, revision, locale, generator_version, result)
       values (${planId}::uuid, 1, 'en', ${FUNNEL_GENERATOR_VERSION}, ${getSql()!.json(completeHealthScoreFixture("en"))})`;

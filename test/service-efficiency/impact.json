@@ -302,6 +302,13 @@
       "slice": "retained-locks",
       "expectedCases": 1,
       "reason": "Direct verification of retained audited writer, pool, rate-limit and maintenance invariants"
+    },
+    {
+      "file": "test/web-advisory.integration.test.ts",
+      "slice": "web-publication",
+      "database": true,
+      "expectedCases": 8,
+      "reason": "Web catalogue snapshot publication, preserved immutable reference identities, preferences/revision concurrency and explicit recovery without read maintenance"
     }
   ],
   "inputs": [
