@@ -366,6 +366,20 @@
       "database": true,
       "expectedCases": 1,
       "reason": "Audit 15: ordinary preference reads and existing initialization avoid redundant row locks/no-op writes; mutations remain assessment-fenced"
+    },
+    {
+      "file": "test/service-efficiency/retained-claims.integration.test.ts",
+      "slice": "retained-claims",
+      "database": true,
+      "expectedCases": 3,
+      "reason": "Audits 19/20/21: actual outbox and scheduled-action disjoint claims, dependency cycle serialization, FK protection and nonblocking reads"
+    },
+    {
+      "file": "test/catalogue-safety-reference-integrity.integration.test.ts",
+      "slice": "reference-locks",
+      "database": true,
+      "expectedCases": 6,
+      "reason": "Audits 9/33: exact reference-head invariants, per-nutrient contention/retry and ordinary warm-cache invalidation"
     }
   ],
   "inputs": [
