@@ -425,6 +425,18 @@
       "expectedCases": 2,
       "database": true,
       "reason": "Actual concurrent PostgreSQL admission and checkout preserve one durable resource and immutable frozen recovery without process queues"
+    },
+    {
+      "file": "test/agentic-cv-speed-pack.test.ts",
+      "slice": "speed-consumer",
+      "expectedCases": 4,
+      "reason": "Existing directly affected admission and immutable-match cache assertions must use the durable worker owner and nonempty result evidence"
+    },
+    {
+      "file": "test/service-efficiency/resources.test.ts",
+      "slice": "runtime-resources",
+      "expectedCases": 1,
+      "reason": "Bound repeated matching comparisons to verified UAT-equivalent CPU/memory with no swap, OOM or silently unbounded runtime evidence"
     }
   ],
   "inputs": [
