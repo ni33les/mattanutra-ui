@@ -321,6 +321,12 @@
       "slice": "worker-capacity",
       "expectedCases": 3,
       "reason": "Audit 28: productive external matching concurrency follows shared CPU budget; unrelated worker concurrency retained"
+    },
+    {
+      "file": "test/service-efficiency/affinity.test.ts",
+      "slice": "affinity",
+      "expectedCases": 3,
+      "reason": "Audits 26/30: acknowledged resident cursor eviction prevents idle affinity stranding productive work; exact attempt/result recovery"
     }
   ],
   "inputs": [
