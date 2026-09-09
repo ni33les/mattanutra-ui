@@ -58,7 +58,7 @@ export async function processOmsOutbox(input: Readonly<{
           await store.insertRetailLink({adapter: "mock_thailand", createdAt: input.now, orderId: event.orderId, retailerReference: `th-mock-${event.orderId.slice(0, 8)}`});
         }
         if (order?.fulfilmentStatus === "not_started" && order.paymentStatus === "paid") {
-          await applyFulfilmentInTransaction({now: input.now, orderId: order.id, status: "processing", store});
+          await applyFulfilmentInTransaction({now: input.now, orderId: order.id, status: "processing", store}, order);
         }
       }
       await store.markOutboxProcessed(event.id, input.now);
@@ -107,8 +107,8 @@ async function applyFulfilmentInTransaction(input: Readonly<{
   reasonCode?: string;
   status: FulfilmentAdvanceStatus;
   store: AgenticStore;
-}>): Promise<OrderRecord | null> {
-  const order = await input.store.getOrderForUpdate(input.orderId);
+}>, lockedOrder?: OrderRecord): Promise<OrderRecord | null> {
+  const order = lockedOrder ?? await input.store.getOrderForUpdate(input.orderId);
 
   if (!order) {
     return null;
