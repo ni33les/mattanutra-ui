@@ -30,7 +30,7 @@ import {
 } from "@/lib/agentic/idempotency";
 import { resolveMarket } from "@/lib/agentic/catalogue/market";
 import { refreshAdminSafetyCeilings } from "@/lib/agentic/catalogue/load-safety-ceilings";
-import { matcherSafetyCeilings } from "@/lib/matcher/safety-ceilings";
+import { matcherSafetyCeilings, captureMatcherSafetySnapshot, runWithMatcherSafetySnapshot, type MatcherSafetySnapshot } from "@/lib/matcher/safety-ceilings";
 import { AGENTIC_CONTRACT_VERSION, GUIDANCE_RULES_VERSION } from "@/lib/agentic/config";
 import { ensureCatalogueSnapshot } from "@/lib/agentic/catalogue/snapshot";
 import {
@@ -463,6 +463,7 @@ function targetNameGroups(
 
 type DurableSearchCheckpoint = {
   stage: "normalized" | "search"; state: CanonicalPlanState; catalogueId: string;
+  references?: MatcherSafetySnapshot;
   search?: import("@/lib/agentic/plan/matching").ResidentChunkOptions["checkpoint"];
   reservedAttempts?: number;
 };
@@ -481,7 +482,7 @@ async function durableMatch(input: { snapshot: CatalogueSnapshot; state: Canonic
   const key = matchingResultIdentity(input, `${scope.environment}:${scope.tenantScope}`)
     + (initial.search || initial.reservedAttempts ? `:recovery:${claim.id}:${claim.leaseToken}` : "");
   return durableMatchingWork.run(key, { signal: requestLifetime()?.signal, checkpoint: async event => {
-    const checkpoint = { ...event.checkpoint, state: initial.state, catalogueId: initial.catalogueId };
+    const checkpoint = { ...event.checkpoint, state: initial.state, catalogueId: initial.catalogueId, references: initial.references };
     // A subscriber joining between chunks first persists the shared acknowledged
     // cursor. Later reservations need only the small metadata update.
     const alreadyAcknowledged = initial.search?.expansionAttempts === checkpoint.search?.expansionAttempts;
@@ -1603,6 +1604,8 @@ async function completePreparedPlan(
     prepared.previous?.requestSnapshot.destinationCountry;
   const catalogueStartedAt = Date.now();
   const isolated = Boolean(input.matchPort);
+  const admittedOperation = planAttempts.getStore()?.operation;
+  const savedCheckpoint = admittedOperation?.checkpoint as DurableSearchCheckpoint | null;
   let snapshot: CatalogueSnapshot;
   if (isolated) {
     snapshot = {
@@ -1611,6 +1614,10 @@ async function completePreparedPlan(
       products: [],
       supplements: []
     };
+  } else if (savedCheckpoint?.catalogueId) {
+    const pinned = await restoreCataloguePin(savedCheckpoint.catalogueId, GUIDANCE_RULES_VERSION, input.store);
+    if (!pinned) return businessError({ reasonCode: "temporarily_unavailable", retryable: true, message: "The operation's immutable catalogue snapshot is unavailable. Retry with the same key." });
+    snapshot = pinned;
   } else if (input.payload.operation === "get" && prepared.previous && prepared.previous.status !== "processing" && !loadLiveCatalogue &&
     prepared.previous.requestSnapshot.destinationCountry === country) {
     const pinned = await restoreCataloguePin(
@@ -1630,6 +1637,15 @@ async function completePreparedPlan(
       GUIDANCE_RULES_VERSION, input.store
     );
   }
+  if (!isolated && !savedCheckpoint?.references && matcherSafetyCeilings().length < 1) await refreshAdminSafetyCeilings();
+  // Capture before any asynchronous matching work. A concurrent refresh changes
+  // the process cache, never this operation's advice, score or continuation input.
+  const references = savedCheckpoint?.references ?? captureMatcherSafetySnapshot(isolated ? undefined : snapshot.runtimeRevision);
+  if (savedCheckpoint?.references && (references.identity?.runtimeRevision !== snapshot.runtimeRevision ||
+    admittedOperation?.referenceIdentity !== (references.identity?.fingerprint ?? null))) {
+    return businessError({ reasonCode: "stale_revision", message: "The stored operation reference identity is inconsistent. Refresh the plan." });
+  }
+  return runWithMatcherSafetySnapshot(references, async () => {
   matcherEntered?.();
   const planCorrelation = planCorrelationId(input.payload.idempotencyKey);
   if (matcherGate) {
@@ -1645,9 +1661,6 @@ async function completePreparedPlan(
     return gatedDeadline;
   }
   const catalogueMs = Math.max(0, Date.now() - catalogueStartedAt);
-  if (!isolated && matcherSafetyCeilings().length < 1) {
-    await refreshAdminSafetyCeilings();
-  }
 
   const pendingInput = prepared.resume ? prepared.processing.pendingInput : undefined;
   const replacingPendingRequest = prepared.resume && Boolean(input.payload.planHandle) && hasFullRequest(input.payload);
@@ -1869,7 +1882,7 @@ async function completePreparedPlan(
     }
     const saved = await updateClaimedOperation(input.store, activeOperation, {
       catalogueIdentity: catalogueSnapshotId(snapshot), referenceIdentity: matcherSafetyReferenceIdentity()?.fingerprint ?? null,
-      checkpoint: activeOperation.checkpoint ? withoutOperationCursor(activeOperation).checkpoint : checkpoint ?? { stage: "normalized", state, catalogueId: catalogueSnapshotId(snapshot) }
+      checkpoint: { ...(activeOperation.checkpoint ? withoutOperationCursor(activeOperation).checkpoint as DurableSearchCheckpoint : checkpoint ?? { stage: "normalized", state, catalogueId: catalogueSnapshotId(snapshot) }), references }
     }, new Date().toISOString());
     if (!saved) return businessError({ reasonCode: "stale_revision", message: "This matching operation was cancelled or superseded. Reload the plan." });
   }
@@ -1933,6 +1946,7 @@ async function completePreparedPlan(
     revision,
     expectedCatalogueRevision: isolated ? undefined : snapshot.runtimeRevision,
     skipSideEffects: isolated
+  });
   });
 }
 

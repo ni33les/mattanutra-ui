@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from "node:async_hooks";
 import type {
   LifeStage,
   MatcherUnit,
@@ -67,11 +68,40 @@ export function parseAdminLimitDose(amount: number, value: string): { amount: nu
 }
 
 export type SafetyReferenceIdentity = Readonly<{ runtimeRevision: number; fingerprint: string }>;
+export type MatcherSafetySnapshot = Readonly<{
+  version: 1; ceilings: readonly SafetyCeiling[]; identity: SafetyReferenceIdentity | null; unavailable: boolean;
+}>;
+const referenceScope = new AsyncLocalStorage<MatcherSafetySnapshot>();
+const referenceSnapshots = new Map<number, MatcherSafetySnapshot>();
 let cached: { at: number; ceilings: SafetyCeiling[]; referenceIdentity: SafetyReferenceIdentity | null } | null = null;
 let unavailable = false;
 
+function immutableReferences(value: MatcherSafetySnapshot): MatcherSafetySnapshot {
+  if (value.version !== 1) throw new Error("Unsupported immutable safety reference snapshot");
+  return Object.freeze({ ...value, identity: value.identity ? Object.freeze({ ...value.identity }) : null,
+    ceilings: Object.freeze(value.ceilings.map(item => Object.freeze({ ...item }))) });
+}
+
+export function captureMatcherSafetySnapshot(runtimeRevision?: number): MatcherSafetySnapshot {
+  const scoped = referenceScope.getStore();
+  if (scoped && (runtimeRevision === undefined || scoped.identity?.runtimeRevision === runtimeRevision)) return scoped;
+  const snapshot = runtimeRevision === undefined ? immutableReferences({ version: 1, ceilings: cached?.ceilings ?? [],
+    identity: cached?.referenceIdentity ?? null, unavailable: matcherSafetyCeilingsUnavailable() }) : referenceSnapshots.get(runtimeRevision);
+  if (!snapshot) throw new Error("Immutable safety reference snapshot is unavailable for the catalogue revision");
+  return snapshot;
+}
+
+export function runWithMatcherSafetySnapshot<T>(snapshot: MatcherSafetySnapshot, work: () => T): T {
+  return referenceScope.run(immutableReferences(snapshot), work);
+}
+
 export function setMatcherSafetyCeilings(ceilings: readonly SafetyCeiling[], referenceIdentity: SafetyReferenceIdentity | null = null) {
-  cached = { at: Date.now(), ceilings: [...ceilings], referenceIdentity };
+  const snapshot = immutableReferences({ version: 1, ceilings, identity: referenceIdentity, unavailable: false });
+  cached = { at: Date.now(), ceilings: snapshot.ceilings as SafetyCeiling[], referenceIdentity: snapshot.identity };
+  if (referenceIdentity) {
+    referenceSnapshots.set(referenceIdentity.runtimeRevision, snapshot);
+    while (referenceSnapshots.size > 32) referenceSnapshots.delete(referenceSnapshots.keys().next().value!);
+  }
   unavailable = false;
 }
 
@@ -80,11 +110,11 @@ export function setMatcherSafetyCeilingsUnavailable() {
 }
 
 export function matcherSafetyCeilingsUnavailable() {
-  return unavailable && (cached?.ceilings.length ?? 0) < 1;
+  return referenceScope.getStore()?.unavailable ?? (unavailable && (cached?.ceilings.length ?? 0) < 1);
 }
 
 export function matcherSafetyCeilings() {
-  return cached?.ceilings ?? [];
+  return referenceScope.getStore()?.ceilings as SafetyCeiling[] | undefined ?? cached?.ceilings ?? [];
 }
 
 export function matcherSafetyCeilingsCachedAt() {
@@ -92,11 +122,13 @@ export function matcherSafetyCeilingsCachedAt() {
 }
 
 export function matcherSafetyReferenceIdentity() {
-  return cached?.referenceIdentity ?? null;
+  const scoped = referenceScope.getStore();
+  return scoped ? scoped.identity : cached?.referenceIdentity ?? null;
 }
 
 export function resetMatcherSafetyCeilings() {
   cached = null;
+  referenceSnapshots.clear();
   unavailable = false;
 }
 
