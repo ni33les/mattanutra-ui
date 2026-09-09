@@ -8,7 +8,9 @@ import { serialize } from "node:v8";
 import { Worker } from "node:worker_threads";
 import { performance, monitorEventLoopDelay } from "node:perf_hooks";
 import { semanticValue } from "./benchmark-proof.mjs";
+import {runtimeResourceSnapshot} from "./runtime-resources.mjs";
 const [id, output] = process.argv.slice(2);
+if(process.env.EFFICIENCY_RESOURCE_BOUND === "uat") runtimeResourceSnapshot();
 const load = file => import(pathToFileURL(resolve(file)));
 const hash = value => createHash("sha256").update(JSON.stringify(semanticValue(value))).digest("hex");
 const { loadAgenticConfig } = await load("lib/agentic/config.ts");
@@ -94,6 +96,7 @@ try {
       p50Ms: ordered[Math.floor((ordered.length - 1) * .5)] ?? 0, p95Ms: ordered[Math.ceil((ordered.length - 1) * .95)] ?? 0, maxMs: ordered.at(-1) ?? 0 };
   };
   const measurements = { queue: summary(queueMs), execution: summary(executionMs), wallMs: performance.now() - started, cpuMs: (usage.user + usage.system) / 1000,
+    ...(process.env.EFFICIENCY_RESOURCE_BOUND === "uat" ? {resources:runtimeResourceSnapshot()} : {}),
     maxRssBytes: process.resourceUsage().maxRSS * 1024, memory: process.memoryUsage(), eventLoopP95Ms: loop.percentile(95) / 1e6,
     ...counters, ...extra };
   writeFileSync(output, JSON.stringify({ id, inputSha256, semantic: semanticValue(semantic), measurements }, null, 2), { flag: "wx", mode: 0o600 });

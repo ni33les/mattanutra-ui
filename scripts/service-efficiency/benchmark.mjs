@@ -5,6 +5,7 @@ import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { cpus, totalmem } from "node:os";
 import { compareBenchmarkRuns } from "./benchmark-proof.mjs";
+import { scopedBenchmarkCommand } from "./runtime-resources.mjs";
 
 export async function benchmarkServices(output, env, inventory) {
   const control = process.env.EFFICIENCY_CONTROL_WORKTREE ?? "/tmp/mattanutra-efficiency-control-a28f3b27";
@@ -18,9 +19,10 @@ export async function benchmarkServices(output, env, inventory) {
     for (const id of inventory) for (const [label, cwd] of [["control", control], ["candidate", process.cwd()]]) {
       const name = `${run}-${id}-${label}`, file = resolve(output, `${name}.json`), fd = openSync(resolve(output, `${name}.log`), "wx", 0o600);
       const code = await new Promise((done, reject) => {
-        const child = spawn(process.execPath, ["--experimental-strip-types", "--import", resolve(cwd, "scripts/register-ts-path-loader.mjs"),
-          "--import", resolve(cwd, "test/helpers/offline-network.mjs"), resolve("scripts/service-efficiency/benchmark-worker.mjs"), id, file], {
-          cwd, env: { ...env, NODE_OPTIONS: "--max-old-space-size=2500" }, detached: true, stdio: ["ignore", fd, fd] });
+        const launch = scopedBenchmarkCommand(name, [process.execPath,"--experimental-strip-types", "--import", resolve(cwd, "scripts/register-ts-path-loader.mjs"),
+          "--import", resolve(cwd, "test/helpers/offline-network.mjs"), resolve("scripts/service-efficiency/benchmark-worker.mjs"), id, file]);
+        const child = spawn(launch.command, launch.args, {
+          cwd, env: { ...env, NODE_OPTIONS: "", EFFICIENCY_RESOURCE_BOUND:"uat" }, detached: true, stdio: ["ignore", fd, fd] });
         const cancel = () => { try { process.kill(-child.pid, "SIGKILL"); } catch { /* exited */ } };
         const timer = setTimeout(cancel, 200_000);
         process.once("SIGTERM", cancel); process.once("SIGINT", cancel);
@@ -40,7 +42,8 @@ export async function benchmarkServices(output, env, inventory) {
   }
   assert.deepEqual(runs[0].comparison.rows.map(row => [row.id, row.semanticSha256]), runs[1].comparison.rows.map(row => [row.id, row.semanticSha256]), "Non-latency results differ across repeated benchmarks");
   const report = { version: 1, passed: true, reproducible: true, controlCommit: releaseBase, candidateCommit: git(process.cwd(), "rev-parse", "HEAD"),
-    hardware: { cpus: cpus().map(row => row.model), totalMemoryBytes: totalmem(), node: process.version },
+    hardware: { cpus: cpus().map(row => row.model), totalMemoryBytes: totalmem(), node: process.version,
+      runtimeBudget:{cpu:1,memoryBytes:1073741824,swapBytes:0},scope:"Worker and harness process including matcher threads; platform HTTP process is verified separately during deployment" },
     measurements: "Process CPU/RSS includes worker threads. IPC bytes are V8-equivalent measurement bytes; checkpoint bytes are actual encoded payload bytes. Instrumentation serialization time is reported separately. SQL counts and returned JSON bytes are attributed to awaited poll requests; background fixture setup is excluded. Queue timing runs from ThreadPool admission to postMessage; execution includes reply/checkpoint transfer. No clinical input or fixture changes.",
     normalization: "Only generated plan handles, assessment IDs and opaque result versions are removed from read comparisons. Matching results and search work counts are exact. Timing/memory diagnostics are separate.", runs };
   writeFileSync(resolve(output, "comparison.json"), JSON.stringify(report, null, 2), { flag: "wx", mode: 0o600 });

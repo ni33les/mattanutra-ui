@@ -14,7 +14,8 @@ function files(root, directory, extension = /\.tsx?$/) {
 /** Inspect SQL templates, excluding prose, comments and historical generated JSON. */
 export function scanLockSites(root) {
   const sites = [];
-  for (const file of [...files(root,"lib"),...files(root,"app"),...files(root,"workers")]) {
+  for (const file of [...files(root,"lib"),...files(root,"app"),...files(root,"workers"),
+    ...(existsSync(resolve(root,"scripts")) ? files(root,"scripts",/\.(?:ts|mjs)$/) : [])]) {
     const text = readFileSync(resolve(root,file),"utf8");
     if (!locking.test(text)) continue;
     const source = ts.createSourceFile(file,text,ts.ScriptTarget.Latest,true);

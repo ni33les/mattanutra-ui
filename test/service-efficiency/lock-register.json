@@ -13,19 +13,52 @@
       "disposition": "narrow",
       "invariant": "Serializes operation admission, revision publication and checkout against a single plan.",
       "acquisition": "Explicit mutation transaction or conditional write; ordinary reads never acquire this lock.",
-      "permittedWork": "Revalidate ownership, revision and affected row identities; apply necessary writes only. Prepare, calculate, serialize, render and perform external effects outside the protected phase.",
+      "permittedWork": "Admission and publication use durable row/uniqueness protection. Concurrent unique-key losers return the committed operation; HTTP never calculates. Worker ownership and revision are revalidated before required writes.",
       "release": "Acquisition to outer transaction commit/rollback; matching runs outside this transaction. No dedicated lock-hold TTL.",
       "callers": [
+        "lib/agentic/commerce/execute.ts",
+        "lib/agentic/plan/operations.ts",
+        "lib/agentic/plan/service.ts",
+        "lib/agentic/store/postgres.ts",
+        "lib/agentic/store/postgres.ts:getPlanForUpdate"
+      ],
+      "tests": [
+        "test/service-efficiency/atomic-checkout.integration.test.ts",
+        "test/service-efficiency/operations.integration.test.ts"
+      ],
+      "verification": "Required named cases reconciled with successful execution by lock-register-verification.json in the unchanged-source scoped gate; historical RED evidence remains separate.",
+      "cases": [
+        {
+          "file": "test/service-efficiency/atomic-checkout.integration.test.ts",
+          "name": "LOCK-ATOMIC-01 simultaneous real database admission returns one durable plan, operation and task"
+        },
+        {
+          "file": "test/service-efficiency/atomic-checkout.integration.test.ts",
+          "name": "LOCK-ATOMIC-02 simultaneous checkout owns one frozen order and stale catalogue cannot replace it"
+        },
+        {
+          "file": "test/service-efficiency/operations.integration.test.ts",
+          "name": "EFF-TXN-PG-01 claiming work returns its input in at most two database statements"
+        },
+        {
+          "file": "test/service-efficiency/operations.integration.test.ts",
+          "name": "EFF-TXN-PG-02 checkpoint updates use one conditional write and preserve stale-owner fencing"
+        },
+        {
+          "file": "test/service-efficiency/operations.integration.test.ts",
+          "name": "EFF-TXN-PG-03 durable BYTEA checkpoints remain binary when read and reclaimed"
+        },
+        {
+          "file": "test/service-efficiency/operations.integration.test.ts",
+          "name": "LOCK-ATTEMPTS-04 unstarted reservation compensation preserves prior lost attempts and refuses a newer owner"
+        }
+      ],
+      "historicalCallers": [
         "lib/agentic/store/postgres.ts:393",
         "lib/agentic/plan/operations.ts:38",
         "lib/agentic/plan/service.ts:2009",
         "lib/agentic/commerce/execute.ts:453"
-      ],
-      "tests": [
-        "test/service-efficiency/operations.integration.test.ts",
-        "test/ax-refinement/recovery.integration.test.ts"
-      ],
-      "verification": "pending-final-scoped-run"
+      ]
     },
     {
       "number": 2,
@@ -36,16 +69,40 @@
       "permittedWork": "Revalidate ownership, revision and affected row identities; apply necessary writes only. Prepare, calculate, serialize, render and perform external effects outside the protected phase.",
       "release": "Each UPDATE locks its row until its transaction ends; the 60-second ownership lease is separate.",
       "callers": [
+        "lib/agentic/plan/operations.ts",
+        "lib/agentic/store/postgres.ts",
+        "scripts/apply-agentic-commerce-schema.ts",
+        "scripts/apply-service-efficiency-schema.ts:module"
+      ],
+      "tests": [
+        "test/service-efficiency/operations.integration.test.ts"
+      ],
+      "verification": "Required named cases reconciled with successful execution by lock-register-verification.json in the unchanged-source scoped gate; historical RED evidence remains separate.",
+      "cases": [
+        {
+          "file": "test/service-efficiency/operations.integration.test.ts",
+          "name": "EFF-TXN-PG-01 claiming work returns its input in at most two database statements"
+        },
+        {
+          "file": "test/service-efficiency/operations.integration.test.ts",
+          "name": "EFF-TXN-PG-02 checkpoint updates use one conditional write and preserve stale-owner fencing"
+        },
+        {
+          "file": "test/service-efficiency/operations.integration.test.ts",
+          "name": "EFF-TXN-PG-03 durable BYTEA checkpoints remain binary when read and reclaimed"
+        },
+        {
+          "file": "test/service-efficiency/operations.integration.test.ts",
+          "name": "LOCK-ATTEMPTS-04 unstarted reservation compensation preserves prior lost attempts and refuses a newer owner"
+        }
+      ],
+      "historicalCallers": [
         "lib/agentic/store/postgres.ts:698",
         "lib/agentic/plan/operations.ts:19",
         "lib/agentic/plan/operations.ts:69",
         "lib/agentic/plan/operations.ts:86",
         "scripts/apply-agentic-commerce-schema.ts:58"
-      ],
-      "tests": [
-        "test/service-efficiency/operations.integration.test.ts"
-      ],
-      "verification": "pending-final-scoped-run"
+      ]
     },
     {
       "number": 3,
@@ -53,34 +110,71 @@
       "disposition": "narrow",
       "invariant": "Protects one result per revision, one response per idempotency key, one active task reservation and one active checkout per plan/revision.",
       "acquisition": "Explicit mutation transaction or conditional write; ordinary reads never acquire this lock.",
-      "permittedWork": "Revalidate ownership, revision and affected row identities; apply necessary writes only. Prepare, calculate, serialize, render and perform external effects outside the protected phase.",
+      "permittedWork": "Admission and publication use durable row/uniqueness protection. Concurrent unique-key losers return the committed operation; HTTP never calculates. Worker ownership and revision are revalidated before required writes.",
       "release": "Writes and concurrent unique-key conflicts resolve at transaction commit/rollback; permanent records are not permanently held locks.",
       "callers": [
+        "lib/agentic/plan/service.ts",
+        "lib/agentic/store/postgres.ts",
+        "lib/funnel-idempotency.ts"
+      ],
+      "tests": [
+        "test/service-efficiency/atomic-checkout.integration.test.ts"
+      ],
+      "verification": "Required named cases reconciled with successful execution by lock-register-verification.json in the unchanged-source scoped gate; historical RED evidence remains separate.",
+      "cases": [
+        {
+          "file": "test/service-efficiency/atomic-checkout.integration.test.ts",
+          "name": "LOCK-ATOMIC-01 simultaneous real database admission returns one durable plan, operation and task"
+        },
+        {
+          "file": "test/service-efficiency/atomic-checkout.integration.test.ts",
+          "name": "LOCK-ATOMIC-02 simultaneous checkout owns one frozen order and stale catalogue cannot replace it"
+        }
+      ],
+      "historicalCallers": [
         "lib/agentic/store/postgres.ts:705",
         "lib/agentic/plan/service.ts:2059",
         "lib/funnel-idempotency.ts:1"
-      ],
-      "tests": [
-        "test/task-transactions.integration.test.ts"
-      ],
-      "verification": "pending-final-scoped-run"
+      ]
     },
     {
       "number": 4,
       "resource": "Active-order lookup — FOR UPDATE on presentation reads",
       "disposition": "remove",
       "invariant": "Finds an existing frozen order while producing plan status/details and checking compatibility.",
-      "acquisition": "Explicit mutation transaction or conditional write; ordinary reads never acquire this lock.",
+      "acquisition": "None in production. Reads use ordinary MVCC SELECT; removed process counters and chains cannot admit or serialize requests.",
       "permittedWork": "No production acquisition. Remove redundant serialization; retain request cancellation, deadlines and database integrity.",
-      "release": "From finding the order until the surrounding presentation transaction ends, including subsequent snapshot loading and catalogue checking.",
+      "release": "No retained acquisition or hold interval. Historical boundaries remain in the frozen audit.",
       "callers": [
-        "lib/agentic/store/postgres.ts:327",
-        "lib/agentic/presentation/plan-read.ts:21"
+        "lib/agentic/presentation/plan-read.ts",
+        "lib/agentic/store/postgres.ts"
       ],
       "tests": [
         "test/service-efficiency/reads.integration.test.ts"
       ],
-      "verification": "pending-final-scoped-run"
+      "verification": "Required named cases reconciled with successful execution by lock-register-verification.json in the unchanged-source scoped gate; historical RED evidence remains separate.",
+      "cases": [
+        {
+          "file": "test/service-efficiency/reads.integration.test.ts",
+          "name": "EFF-READ-PG-01 ordinary status reads complete behind held updates while mutation locks remain effective"
+        },
+        {
+          "file": "test/service-efficiency/reads.integration.test.ts",
+          "name": "LOCK-READ-04 ordinary active/open order lookups never wait behind checkout writers"
+        },
+        {
+          "file": "test/service-efficiency/reads.integration.test.ts",
+          "name": "EFF-ORDER-PG-01 expired order status stays read-only behind a held checkout write"
+        },
+        {
+          "file": "test/service-efficiency/reads.integration.test.ts",
+          "name": "EFF-ORDER-PG-02 warm order polls read small facts in two SELECTs and retain frozen full data"
+        }
+      ],
+      "historicalCallers": [
+        "lib/agentic/store/postgres.ts:327",
+        "lib/agentic/presentation/plan-read.ts:21"
+      ]
     },
     {
       "number": 5,
@@ -88,41 +182,116 @@
       "disposition": "narrow",
       "invariant": "Serializes payment transitions, fulfilment events and reuse of an open checkout.",
       "acquisition": "Explicit mutation transaction or conditional write; ordinary reads never acquire this lock.",
-      "permittedWork": "Revalidate ownership, revision and affected row identities; apply necessary writes only. Prepare, calculate, serialize, render and perform external effects outside the protected phase.",
+      "permittedWork": "Prepare checkout rows and provider result before plan/order fences; under the fence validate current state, reuse frozen receipt or write one order. OMS consumes the already-owned order without re-locking.",
       "release": "Mutation transaction; order reads inside outbox handling hold it through that event transaction.",
       "callers": [
+        "lib/agentic/commerce/state.ts",
+        "lib/agentic/commerce/stripe-adapter.ts",
+        "lib/agentic/retail/mock-thailand.ts",
+        "lib/agentic/store/postgres.ts",
+        "lib/agentic/store/postgres.ts:getActiveOrderForPlanRevisionForUpdate",
+        "lib/agentic/store/postgres.ts:getOrderForUpdate",
+        "scripts/apply-service-efficiency-schema.ts:module"
+      ],
+      "tests": [
+        "test/service-efficiency/atomic-checkout.integration.test.ts",
+        "test/service-efficiency/retained-claims.integration.test.ts"
+      ],
+      "verification": "Required named cases reconciled with successful execution by lock-register-verification.json in the unchanged-source scoped gate; historical RED evidence remains separate.",
+      "cases": [
+        {
+          "file": "test/service-efficiency/atomic-checkout.integration.test.ts",
+          "name": "LOCK-ATOMIC-02 simultaneous checkout owns one frozen order and stale catalogue cannot replace it"
+        },
+        {
+          "file": "test/service-efficiency/retained-claims.integration.test.ts",
+          "name": "LOCK-RETAIN-19B fulfilment uses its already locked order once and replay does not duplicate its event"
+        }
+      ],
+      "historicalCallers": [
         "lib/agentic/store/postgres.ts:310",
         "lib/agentic/store/postgres.ts:388",
         "lib/agentic/commerce/state.ts:88",
         "lib/agentic/commerce/stripe-adapter.ts:23",
         "lib/agentic/retail/mock-thailand.ts:48"
-      ],
-      "tests": [
-        "test/web-payment-fulfillment.integration.test.ts",
-        "test/service-efficiency/reads.integration.test.ts"
-      ],
-      "verification": "pending-final-scoped-run"
+      ]
     },
     {
       "number": 6,
       "resource": "Catalogue epoch — FOR SHARE",
       "disposition": "narrow",
       "invariant": "Selection and creation of new checkout validate current commercial facts atomically. Matching publication retains its immutable snapshot and ordinary reads take no epoch lock.",
-      "acquisition": "Explicit mutation transaction or conditional write; ordinary reads never acquire this lock.",
+      "acquisition": "Only explicit selection and new-checkout commercial validation take FOR SHARE. Reads and MCP/web result publication perform no catalogue row locking.",
       "permittedWork": "Revalidate ownership, revision and affected row identities; apply necessary writes only. Prepare, calculate, serialize, render and perform external effects outside the protected phase.",
       "release": "Acquisition to transaction end. In result completion this includes subsequent result-item writes.",
       "callers": [
+        "lib/agentic/plan/service.ts",
+        "lib/agentic/presentation/plan-read.ts",
+        "lib/agentic/store/postgres.ts",
+        "lib/retail-product-checkout.ts",
+        "lib/task-result-applier.ts",
+        "lib/agentic/store/postgres.ts:isCatalogueRevisionCurrent",
+        "lib/retail-product-checkout.ts:currentWebCheckoutRecommendations"
+      ],
+      "tests": [
+        "test/agentic-catalogue-publish-v5.integration.test.ts",
+        "test/web-advisory.integration.test.ts",
+        "test/service-efficiency/checkout-preparation.test.ts"
+      ],
+      "verification": "Required named cases reconciled with successful execution by lock-register-verification.json in the unchanged-source scoped gate; historical RED evidence remains separate.",
+      "cases": [
+        {
+          "file": "test/agentic-catalogue-publish-v5.integration.test.ts",
+          "name": "V5-PUBLISH-PG-01: matching publishes without waiting for catalogue writers and later reads mark it stale"
+        },
+        {
+          "file": "test/web-advisory.integration.test.ts",
+          "name": "creates current-version work beside a completed historical deterministic task and reuses the current task"
+        },
+        {
+          "file": "test/web-advisory.integration.test.ts",
+          "name": "reuses an active current product refresh when the request is retried"
+        },
+        {
+          "file": "test/web-advisory.integration.test.ts",
+          "name": "supersedes old product and food-gap work after exclusions without changing answers or HealthScore revision"
+        },
+        {
+          "file": "test/web-advisory.integration.test.ts",
+          "name": "replans in the viewed locale while fencing old options across locales and preserving HealthScore"
+        },
+        {
+          "file": "test/web-advisory.integration.test.ts",
+          "name": "serializes exclusion changes with simultaneous product and food-gap completion"
+        },
+        {
+          "file": "test/web-advisory.integration.test.ts",
+          "name": "LOCK-WEB-01 persists current and older-snapshot results without a catalogue publication lock"
+        },
+        {
+          "file": "test/web-advisory.integration.test.ts",
+          "name": "ANNA-REF-WEB-01 rejects legacy queued work and missing or changed result reference identity without writes"
+        },
+        {
+          "file": "test/web-advisory.integration.test.ts",
+          "name": "keeps no-purchase results terminal and only explicit recovery creates missing copy work"
+        },
+        {
+          "file": "test/service-efficiency/checkout-preparation.test.ts",
+          "name": "LOCK-CHECKOUT-01 checkout preparation invokes no payment port under a transaction lock"
+        },
+        {
+          "file": "test/service-efficiency/checkout-preparation.test.ts",
+          "name": "LOCK-CHECKOUT-02 catalogue changes after preparation prevent new checkout but preserve frozen recovery"
+        }
+      ],
+      "historicalCallers": [
         "lib/agentic/store/postgres.ts:120",
         "lib/agentic/plan/service.ts:2041",
         "lib/agentic/presentation/plan-read.ts:29",
         "lib/task-result-applier.ts:2236",
         "lib/retail-product-checkout.ts:370"
-      ],
-      "tests": [
-        "test/agentic-catalogue-publish-v5.integration.test.ts",
-        "test/service-efficiency/reads.integration.test.ts"
-      ],
-      "verification": "pending-final-scoped-run"
+      ]
     },
     {
       "number": 7,
@@ -130,16 +299,39 @@
       "disposition": "narrow",
       "invariant": "Advances one global content revision after catalogue/reference changes. Reviewed advisory-cache refresh explicitly takes the same row first.",
       "acquisition": "Explicit mutation transaction or conditional write; ordinary reads never acquire this lock.",
-      "permittedWork": "Revalidate ownership, revision and affected row identities; apply necessary writes only. Prepare, calculate, serialize, render and perform external effects outside the protected phase.",
+      "permittedWork": "Prepare manifest, prior fingerprints, verification and audit JSON before locks; epoch fence then sorted product NOWAIT guards validate exact prior rows and write bounded cache/audit changes. Ordinary competing product writers can finish.",
       "release": "From first epoch update/lock to end of the writer transaction; a whole correction batch can retain it.",
       "callers": [
-        "lib/product-advisory-cache-refresh.ts:51",
-        "lib/catalogue-runtime-revision.ts:4"
+        "lib/catalogue-runtime-revision.ts",
+        "lib/product-advisory-cache-refresh.ts",
+        "lib/product-advisory-cache-refresh.ts:refreshApprovedAdvisoryCaches"
       ],
       "tests": [
         "test/product-advisory-cache-refresh.integration.test.ts"
       ],
-      "verification": "pending-final-scoped-run"
+      "verification": "Required named cases reconciled with successful execution by lock-register-verification.json in the unchanged-source scoped gate; historical RED evidence remains separate.",
+      "cases": [
+        {
+          "file": "test/product-advisory-cache-refresh.integration.test.ts",
+          "name": "CAT-CACHE-PG-01 reviewed approved caches refresh once with immutable before/after evidence and stale input rejection"
+        },
+        {
+          "file": "test/product-advisory-cache-refresh.integration.test.ts",
+          "name": "CAT-CACHE-PG-02 pending approval, missing evidence and changed prior facts cannot be refreshed"
+        },
+        {
+          "file": "test/product-advisory-cache-refresh.integration.test.ts",
+          "name": "CAT-CACHE-PG-03 a contending ordinary product writer finishes while cache refresh rejects and releases its epoch"
+        },
+        {
+          "file": "test/product-advisory-cache-refresh.integration.test.ts",
+          "name": "LOCK-CATALOGUE-01 validation is prepared before writer fences and publication does not reconstruct product facts"
+        }
+      ],
+      "historicalCallers": [
+        "lib/product-advisory-cache-refresh.ts:51",
+        "lib/catalogue-runtime-revision.ts:4"
+      ]
     },
     {
       "number": 8,
@@ -147,15 +339,37 @@
       "disposition": "narrow",
       "invariant": "Protects each product against an unexpected concurrent correction.",
       "acquisition": "Explicit mutation transaction or conditional write; ordinary reads never acquire this lock.",
-      "permittedWork": "Revalidate ownership, revision and affected row identities; apply necessary writes only. Prepare, calculate, serialize, render and perform external effects outside the protected phase.",
+      "permittedWork": "Prepare manifest, prior fingerprints, verification and audit JSON before locks; epoch fence then sorted product NOWAIT guards validate exact prior rows and write bounded cache/audit changes. Ordinary competing product writers can finish.",
       "release": "Until the correction transaction ends, potentially across the whole manifest; acquisition fails immediately if its row is locked.",
       "callers": [
-        "lib/product-advisory-cache-refresh.ts:43"
+        "lib/product-advisory-cache-refresh.ts",
+        "lib/product-advisory-cache-refresh.ts:refreshApprovedAdvisoryCaches"
       ],
       "tests": [
         "test/product-advisory-cache-refresh.integration.test.ts"
       ],
-      "verification": "pending-final-scoped-run"
+      "verification": "Required named cases reconciled with successful execution by lock-register-verification.json in the unchanged-source scoped gate; historical RED evidence remains separate.",
+      "cases": [
+        {
+          "file": "test/product-advisory-cache-refresh.integration.test.ts",
+          "name": "CAT-CACHE-PG-01 reviewed approved caches refresh once with immutable before/after evidence and stale input rejection"
+        },
+        {
+          "file": "test/product-advisory-cache-refresh.integration.test.ts",
+          "name": "CAT-CACHE-PG-02 pending approval, missing evidence and changed prior facts cannot be refreshed"
+        },
+        {
+          "file": "test/product-advisory-cache-refresh.integration.test.ts",
+          "name": "CAT-CACHE-PG-03 a contending ordinary product writer finishes while cache refresh rejects and releases its epoch"
+        },
+        {
+          "file": "test/product-advisory-cache-refresh.integration.test.ts",
+          "name": "LOCK-CATALOGUE-01 validation is prepared before writer fences and publication does not reconstruct product facts"
+        }
+      ],
+      "historicalCallers": [
+        "lib/product-advisory-cache-refresh.ts:43"
+      ]
     },
     {
       "number": 9,
@@ -166,12 +380,35 @@
       "permittedWork": "Revalidate ownership, revision and affected row identities; apply necessary writes only. Prepare, calculate, serialize, render and perform external effects outside the protected phase.",
       "release": "Until caller transaction ends; acquisition is immediate success or reference_review_in_progress, with no lock-wait queue.",
       "callers": [
-        "lib/supplement-safety-limit-versions.ts:24"
+        "lib/supplement-safety-limit-versions.ts",
+        "lib/prd-live-catalogue-sync.ts:acquireSyncLock",
+        "lib/supplement-safety-limit-versions.ts:lockSupplementSafetyReference"
       ],
       "tests": [
-        "test/catalogue-admin-reference-concurrency.integration.test.ts"
+        "test/catalogue-safety-reference-integrity.integration.test.ts"
       ],
-      "verification": "pending-final-scoped-run"
+      "verification": "Required named cases reconciled with successful execution by lock-register-verification.json in the unchanged-source scoped gate; historical RED evidence remains separate.",
+      "cases": [
+        {
+          "file": "test/catalogue-safety-reference-integrity.integration.test.ts",
+          "name": "ANNA-REF-PG-01 provenance-only corrections append a complete new version"
+        },
+        {
+          "file": "test/catalogue-safety-reference-integrity.integration.test.ts",
+          "name": "ANNA-REF-PG-06 bootstrap never resurrects an explicitly retired reference"
+        },
+        {
+          "file": "test/catalogue-safety-reference-integrity.integration.test.ts",
+          "name": "ANNA-REF-PG-07 a changed catalogue epoch refreshes references before the ten-minute TTL"
+        },
+        {
+          "file": "test/catalogue-safety-reference-integrity.integration.test.ts",
+          "name": "ANNA-REF-PG-08 concurrent writers fail fast without writes and can retry after the nutrient lock releases"
+        }
+      ],
+      "historicalCallers": [
+        "lib/supplement-safety-limit-versions.ts:24"
+      ]
     },
     {
       "number": 10,
@@ -182,14 +419,28 @@
       "permittedWork": "Revalidate ownership, revision and affected row identities; apply necessary writes only. Prepare, calculate, serialize, render and perform external effects outside the protected phase.",
       "release": "Short claim/reservation transaction; selected tasks, reservation and events commit together.",
       "callers": [
-        "lib/task-service.ts:1664",
-        "lib/task-service.ts:1730",
-        "lib/task-service.ts:2113"
+        "lib/task-service.ts",
+        "lib/task-service.ts:claimQueuedTaskRow"
       ],
       "tests": [
         "test/task-transactions.integration.test.ts"
       ],
-      "verification": "pending-final-scoped-run"
+      "verification": "Required named cases reconciled with successful execution by lock-register-verification.json in the unchanged-source scoped gate; historical RED evidence remains separate.",
+      "cases": [
+        {
+          "file": "test/task-transactions.integration.test.ts",
+          "name": "claims independent queued tasks concurrently without duplicate reservations"
+        },
+        {
+          "file": "test/task-transactions.integration.test.ts",
+          "name": "rolls back a failed reservation insert with its claimed task and attempt"
+        }
+      ],
+      "historicalCallers": [
+        "lib/task-service.ts:1664",
+        "lib/task-service.ts:1730",
+        "lib/task-service.ts:2113"
+      ]
     },
     {
       "number": 11,
@@ -200,15 +451,29 @@
       "permittedWork": "Revalidate ownership, revision and affected row identities; apply necessary writes only. Prepare, calculate, serialize, render and perform external effects outside the protected phase.",
       "release": "Each bounded recovery transaction or CTE statement; not the duration of matching.",
       "callers": [
-        "lib/task-service.ts:1143",
-        "lib/task-service.ts:1223",
-        "lib/task-service-agents.ts:501",
-        "lib/task-sweep-loop.ts:3"
+        "lib/task-service-agents.ts",
+        "lib/task-service.ts",
+        "lib/task-sweep-loop.ts",
+        "lib/task-service-agents.ts:releaseOfflineWorkerReservations",
+        "lib/task-service.ts:claimExpiredReservationsBatch",
+        "lib/task-service.ts:recoverOrphanedTaskClaims"
       ],
       "tests": [
         "test/task-transactions.integration.test.ts"
       ],
-      "verification": "pending-final-scoped-run"
+      "verification": "Required named cases reconciled with successful execution by lock-register-verification.json in the unchanged-source scoped gate; historical RED evidence remains separate.",
+      "cases": [
+        {
+          "file": "test/task-transactions.integration.test.ts",
+          "name": "recovers expired claims with no reservation"
+        }
+      ],
+      "historicalCallers": [
+        "lib/task-service.ts:1143",
+        "lib/task-service.ts:1223",
+        "lib/task-service-agents.ts:501",
+        "lib/task-sweep-loop.ts:3"
+      ]
     },
     {
       "number": 12,
@@ -219,6 +484,55 @@
       "permittedWork": "Revalidate ownership, revision and affected row identities; apply necessary writes only. Prepare, calculate, serialize, render and perform external effects outside the protected phase.",
       "release": "Outer withDatabaseTransaction ends only after the callback/applier finishes. Configured database-phase deadline is 15 seconds; actual holds were not measured.",
       "callers": [
+        "lib/task-service.ts",
+        "db-rollout/db-rollout.sql:public.prevent_task_dependency_cycle",
+        "db-schema.sql:public.prevent_task_dependency_cycle",
+        "lib/task-service.ts:withTaskRowLock"
+      ],
+      "tests": [
+        "test/task-transactions.integration.test.ts",
+        "test/service-efficiency/result-preparation.test.ts"
+      ],
+      "verification": "Required named cases reconciled with successful execution by lock-register-verification.json in the unchanged-source scoped gate; historical RED evidence remains separate.",
+      "cases": [
+        {
+          "file": "test/task-transactions.integration.test.ts",
+          "name": "LOCK-TASK-01 result preparation occurs before the task lock and the prepared payload is used once"
+        },
+        {
+          "file": "test/task-transactions.integration.test.ts",
+          "name": "LOCK-TASK-02 a changed task input cannot publish a previously prepared result"
+        },
+        {
+          "file": "test/task-transactions.integration.test.ts",
+          "name": "applies concurrent completion once and replays a lost response"
+        },
+        {
+          "file": "test/task-transactions.integration.test.ts",
+          "name": "rolls back partial result persistence and permits a complete retry"
+        },
+        {
+          "file": "test/task-transactions.integration.test.ts",
+          "name": "serializes renew, failure, and completion without deadlock or double application"
+        },
+        {
+          "file": "test/service-efficiency/result-preparation.test.ts",
+          "name": "LOCK-PREP-01 product rows, legacy presentation and decision facts are frozen before publication"
+        },
+        {
+          "file": "test/service-efficiency/result-preparation.test.ts",
+          "name": "LOCK-PREP-02 HealthScore hash and localized gates are prepared from the exact saved copy"
+        },
+        {
+          "file": "test/service-efficiency/result-preparation.test.ts",
+          "name": "LOCK-PREP-03 external worker completion invokes preparation before the transaction callback"
+        },
+        {
+          "file": "test/service-efficiency/result-preparation.test.ts",
+          "name": "LOCK-PREP-04 formulation and food advice are prepared before publication and audit effects remain deferred"
+        }
+      ],
+      "historicalCallers": [
         "lib/task-service.ts:2167",
         "lib/task-service.ts:2175",
         "lib/task-service.ts:2313",
@@ -229,11 +543,7 @@
         "lib/task-service.ts:2797",
         "lib/task-service.ts:2934",
         "lib/task-service.ts:2974"
-      ],
-      "tests": [
-        "test/task-transactions.integration.test.ts"
-      ],
-      "verification": "pending-final-scoped-run"
+      ]
     },
     {
       "number": 13,
@@ -244,16 +554,42 @@
       "permittedWork": "Revalidate ownership, revision and affected row identities; apply necessary writes only. Prepare, calculate, serialize, render and perform external effects outside the protected phase.",
       "release": "Individual transaction lifetime. The lease_until timestamp persists afterwards without holding a row lock.",
       "callers": [
+        "lib/task-service-agents.ts",
+        "lib/task-service.ts"
+      ],
+      "tests": [
+        "test/task-transactions.integration.test.ts"
+      ],
+      "verification": "Required named cases reconciled with successful execution by lock-register-verification.json in the unchanged-source scoped gate; historical RED evidence remains separate.",
+      "cases": [
+        {
+          "file": "test/task-transactions.integration.test.ts",
+          "name": "claims independent queued tasks concurrently without duplicate reservations"
+        },
+        {
+          "file": "test/task-transactions.integration.test.ts",
+          "name": "rolls back a failed reservation insert with its claimed task and attempt"
+        },
+        {
+          "file": "test/task-transactions.integration.test.ts",
+          "name": "recovers expired claims with no reservation"
+        },
+        {
+          "file": "test/task-transactions.integration.test.ts",
+          "name": "serializes renew, failure, and completion without deadlock or double application"
+        },
+        {
+          "file": "test/task-transactions.integration.test.ts",
+          "name": "administrative completion closes the current reservation"
+        }
+      ],
+      "historicalCallers": [
         "lib/task-service.ts:1901",
         "lib/task-service.ts:2513",
         "lib/task-service.ts:2592",
         "lib/task-service-agents.ts:335",
         "lib/task-service-agents.ts:448"
-      ],
-      "tests": [
-        "test/task-transactions.integration.test.ts"
-      ],
-      "verification": "pending-final-scoped-run"
+      ]
     },
     {
       "number": 14,
@@ -264,6 +600,58 @@
       "permittedWork": "Revalidate ownership, revision and affected row identities; apply necessary writes only. Prepare, calculate, serialize, render and perform external effects outside the protected phase.",
       "release": "Capture/recovery/checkout or completion transaction. Uses shared database-phase deadline where withDatabaseTransaction owns the transaction.",
       "callers": [
+        "app/api/assessment/[planId]/product-recommendations/route.ts",
+        "lib/assessment-capture.ts",
+        "lib/funnel-generation-recovery.ts",
+        "lib/funnel-recovery.ts",
+        "lib/retail-product-checkout.ts",
+        "lib/task-result-applier.ts",
+        "app/api/assessment/[planId]/product-recommendations/route.ts:POST",
+        "lib/assessment-capture.ts:captureAssessment",
+        "lib/assessment-capture.ts:retryAssessmentHealthScore",
+        "lib/funnel-generation-recovery.ts:recoverMissingFunnelGeneration",
+        "lib/funnel-recovery.ts:recoverFunnelWork",
+        "lib/healthscore-delivery.ts:deliverHealthScore",
+        "lib/healthscore-delivery.ts:requestHealthScoreDelivery",
+        "lib/retail-product-checkout.ts:createRetailCheckoutSession",
+        "lib/stripe-payments.ts:createStripeCheckoutSession",
+        "lib/task-result-applier.ts:applyTaskCompletionResult",
+        "lib/task-result-applier.ts:applyTaskFailureResult",
+        "lib/web-payment-fulfillment.ts:fulfillWebPayment",
+        "scripts/apply-service-efficiency-schema.ts:module"
+      ],
+      "tests": [
+        "test/assessment-capture.integration.test.ts",
+        "test/service-efficiency/result-preparation.test.ts"
+      ],
+      "verification": "Required named cases reconciled with successful execution by lock-register-verification.json in the unchanged-source scoped gate; historical RED evidence remains separate.",
+      "cases": [
+        {
+          "file": "test/assessment-capture.integration.test.ts",
+          "name": "returns the original capture on replay and contact updates preserve advice, status and tasks"
+        },
+        {
+          "file": "test/assessment-capture.integration.test.ts",
+          "name": "rejects malformed answers, unknown updates and stale edits"
+        },
+        {
+          "file": "test/service-efficiency/result-preparation.test.ts",
+          "name": "LOCK-PREP-01 product rows, legacy presentation and decision facts are frozen before publication"
+        },
+        {
+          "file": "test/service-efficiency/result-preparation.test.ts",
+          "name": "LOCK-PREP-02 HealthScore hash and localized gates are prepared from the exact saved copy"
+        },
+        {
+          "file": "test/service-efficiency/result-preparation.test.ts",
+          "name": "LOCK-PREP-03 external worker completion invokes preparation before the transaction callback"
+        },
+        {
+          "file": "test/service-efficiency/result-preparation.test.ts",
+          "name": "LOCK-PREP-04 formulation and food advice are prepared before publication and audit effects remain deferred"
+        }
+      ],
+      "historicalCallers": [
         "lib/assessment-capture.ts:91",
         "lib/assessment-capture.ts:150",
         "lib/funnel-generation-recovery.ts:14",
@@ -272,11 +660,7 @@
         "lib/task-result-applier.ts:2542",
         "lib/retail-product-checkout.ts:947",
         "app/api/assessment/[planId]/product-recommendations/route.ts:75"
-      ],
-      "tests": [
-        "test/assessment-capture.integration.test.ts"
-      ],
-      "verification": "pending-final-scoped-run"
+      ]
     },
     {
       "number": 15,
@@ -287,13 +671,36 @@
       "permittedWork": "Revalidate ownership, revision and affected row identities; apply necessary writes only. Prepare, calculate, serialize, render and perform external effects outside the protected phase.",
       "release": "Until owning assessment/completion transaction ends.",
       "callers": [
-        "lib/assessment-product-preferences.ts:12",
-        "lib/task-result-applier.ts:2487"
+        "lib/assessment-product-preferences.ts",
+        "lib/task-result-applier.ts"
       ],
       "tests": [
-        "test/funnel-readiness.integration.test.ts"
+        "test/service-efficiency/preference-reads.integration.test.ts",
+        "test/web-advisory.integration.test.ts"
       ],
-      "verification": "pending-final-scoped-run"
+      "verification": "Required named cases reconciled with successful execution by lock-register-verification.json in the unchanged-source scoped gate; historical RED evidence remains separate.",
+      "cases": [
+        {
+          "file": "test/service-efficiency/preference-reads.integration.test.ts",
+          "name": "LOCK-PREF-01 existing preference reads do not reacquire the writer fence or issue no-op inserts"
+        },
+        {
+          "file": "test/web-advisory.integration.test.ts",
+          "name": "supersedes old product and food-gap work after exclusions without changing answers or HealthScore revision"
+        },
+        {
+          "file": "test/web-advisory.integration.test.ts",
+          "name": "replans in the viewed locale while fencing old options across locales and preserving HealthScore"
+        },
+        {
+          "file": "test/web-advisory.integration.test.ts",
+          "name": "serializes exclusion changes with simultaneous product and food-gap completion"
+        }
+      ],
+      "historicalCallers": [
+        "lib/assessment-product-preferences.ts:12",
+        "lib/task-result-applier.ts:2487"
+      ]
     },
     {
       "number": 16,
@@ -304,12 +711,26 @@
       "permittedWork": "Revalidate ownership, revision and affected row identities; apply necessary writes only. Prepare, calculate, serialize, render and perform external effects outside the protected phase.",
       "release": "Admission/capture/checkout transaction; duplicate insert can first wait on the unique key.",
       "callers": [
-        "lib/funnel-idempotency.ts:21"
+        "lib/funnel-idempotency.ts",
+        "lib/funnel-idempotency.ts:claimFunnelRequest"
       ],
       "tests": [
         "test/assessment-capture.integration.test.ts"
       ],
-      "verification": "pending-final-scoped-run"
+      "verification": "Required named cases reconciled with successful execution by lock-register-verification.json in the unchanged-source scoped gate; historical RED evidence remains separate.",
+      "cases": [
+        {
+          "file": "test/assessment-capture.integration.test.ts",
+          "name": "returns the original capture on replay and contact updates preserve advice, status and tasks"
+        },
+        {
+          "file": "test/assessment-capture.integration.test.ts",
+          "name": "keeps a single assessment if language changes before the capture receipt arrives"
+        }
+      ],
+      "historicalCallers": [
+        "lib/funnel-idempotency.ts:21"
+      ]
     },
     {
       "number": 17,
@@ -320,17 +741,47 @@
       "permittedWork": "Revalidate ownership, revision and affected row identities; apply necessary writes only. Prepare, calculate, serialize, render and perform external effects outside the protected phase.",
       "release": "Short database mutation transaction, including required generation-task creation where applicable.",
       "callers": [
+        "lib/funnel-recovery.ts",
+        "lib/stripe-payments.ts",
+        "lib/web-payment-fulfillment.ts",
+        "lib/funnel-recovery.ts:recoverFunnelWork",
+        "lib/stripe-payments.ts:claimPaidReservation",
+        "lib/stripe-payments.ts:completeMockPayment",
+        "lib/stripe-payments.ts:fulfillCheckoutSession",
+        "lib/stripe-payments.ts:updatePaymentState",
+        "lib/web-payment-fulfillment.ts:fulfillWebPayment",
+        "scripts/audit-web-funnel.ts:module"
+      ],
+      "tests": [
+        "test/web-payment-transitions.integration.test.ts"
+      ],
+      "verification": "Required named cases reconciled with successful execution by lock-register-verification.json in the unchanged-source scoped gate; historical RED evidence remains separate.",
+      "cases": [
+        {
+          "file": "test/web-payment-transitions.integration.test.ts",
+          "name": "does not cancel paid or bound payments or remove their revenue"
+        },
+        {
+          "file": "test/web-payment-transitions.integration.test.ts",
+          "name": "serializes cancellation against confirmation without downgrading paid"
+        },
+        {
+          "file": "test/web-payment-transitions.integration.test.ts",
+          "name": "allows exactly one reservation claim and makes the same claim replayable"
+        },
+        {
+          "file": "test/web-payment-transitions.integration.test.ts",
+          "name": "rolls binding and its audit version back with the caller transaction"
+        }
+      ],
+      "historicalCallers": [
         "lib/stripe-payments.ts:292",
         "lib/stripe-payments.ts:373",
         "lib/stripe-payments.ts:1432",
         "lib/stripe-payments.ts:1882",
         "lib/web-payment-fulfillment.ts:51",
         "lib/funnel-recovery.ts:25"
-      ],
-      "tests": [
-        "test/web-payment-transitions.integration.test.ts"
-      ],
-      "verification": "pending-final-scoped-run"
+      ]
     },
     {
       "number": 18,
@@ -341,13 +792,36 @@
       "permittedWork": "Revalidate ownership, revision and affected row identities; apply necessary writes only. Prepare, calculate, serialize, render and perform external effects outside the protected phase.",
       "release": "Queue/admission/pre-send transaction; released before SMTP/provider send.",
       "callers": [
-        "lib/healthscore-delivery.ts:35",
-        "lib/healthscore-delivery.ts:82"
+        "lib/healthscore-delivery.ts",
+        "lib/healthscore-delivery.ts:deliverHealthScore",
+        "lib/healthscore-delivery.ts:enqueueReadyHealthScoreDeliveries"
       ],
       "tests": [
         "test/healthscore-delivery.integration.test.ts"
       ],
-      "verification": "pending-final-scoped-run"
+      "verification": "Required named cases reconciled with successful execution by lock-register-verification.json in the unchanged-source scoped gate; historical RED evidence remains separate.",
+      "cases": [
+        {
+          "file": "test/healthscore-delivery.integration.test.ts",
+          "name": "creates no historical promise, persists explicit requests once and queues after matching advice completes"
+        },
+        {
+          "file": "test/healthscore-delivery.integration.test.ts",
+          "name": "does not claim success after missing plans, invalid recipients or persistence failure"
+        },
+        {
+          "file": "test/healthscore-delivery.integration.test.ts",
+          "name": "bounds definite rejection retries and never automatically resends ambiguous acceptance"
+        },
+        {
+          "file": "test/healthscore-delivery.integration.test.ts",
+          "name": "provides localized links and notification text without questionnaire answers"
+        }
+      ],
+      "historicalCallers": [
+        "lib/healthscore-delivery.ts:35",
+        "lib/healthscore-delivery.ts:82"
+      ]
     },
     {
       "number": 19,
@@ -358,13 +832,28 @@
       "permittedWork": "Revalidate ownership, revision and affected row identities; apply necessary writes only. Prepare, calculate, serialize, render and perform external effects outside the protected phase.",
       "release": "One event transaction, which can then take its order lock; at most 25 such transactions per mock-OMS pass.",
       "callers": [
-        "lib/agentic/store/postgres.ts:378",
-        "lib/agentic/retail/mock-thailand.ts:48"
+        "lib/agentic/retail/mock-thailand.ts",
+        "lib/agentic/store/postgres.ts",
+        "lib/agentic/store/postgres.ts:claimOutboxBatch"
       ],
       "tests": [
-        "test/task-transactions.integration.test.ts"
+        "test/service-efficiency/retained-claims.integration.test.ts"
       ],
-      "verification": "pending-final-scoped-run"
+      "verification": "Required named cases reconciled with successful execution by lock-register-verification.json in the unchanged-source scoped gate; historical RED evidence remains separate.",
+      "cases": [
+        {
+          "file": "test/service-efficiency/retained-claims.integration.test.ts",
+          "name": "LOCK-RETAIN-19 outbox owners claim distinct rows while ordinary reads remain nonblocking"
+        },
+        {
+          "file": "test/service-efficiency/retained-claims.integration.test.ts",
+          "name": "LOCK-RETAIN-19B fulfilment uses its already locked order once and replay does not duplicate its event"
+        }
+      ],
+      "historicalCallers": [
+        "lib/agentic/store/postgres.ts:378",
+        "lib/agentic/retail/mock-thailand.ts:48"
+      ]
     },
     {
       "number": 20,
@@ -375,12 +864,22 @@
       "permittedWork": "Revalidate ownership, revision and affected row identities; apply necessary writes only. Prepare, calculate, serialize, render and perform external effects outside the protected phase.",
       "release": "Claim/update statement transaction.",
       "callers": [
-        "lib/task-worker.ts:2668"
+        "lib/task-worker.ts",
+        "lib/task-worker.ts:claimDueCronActions"
       ],
       "tests": [
-        "test/worker-boundary.test.ts"
+        "test/service-efficiency/retained-claims.integration.test.ts"
       ],
-      "verification": "pending-final-scoped-run"
+      "verification": "Required named cases reconciled with successful execution by lock-register-verification.json in the unchanged-source scoped gate; historical RED evidence remains separate.",
+      "cases": [
+        {
+          "file": "test/service-efficiency/retained-claims.integration.test.ts",
+          "name": "LOCK-RETAIN-20 cron claims skip another owner and publish each due action once"
+        }
+      ],
+      "historicalCallers": [
+        "lib/task-worker.ts:2668"
+      ]
     },
     {
       "number": 21,
@@ -391,81 +890,165 @@
       "permittedWork": "PostgreSQL unique, foreign-key and relation integrity. Application code must not attempt to bypass engine integrity locking.",
       "release": "Typically transaction lifetime. Internal buffer/WAL/latch waits are shorter engine critical sections, not app-owned leases; no per-site duration evidence was captured.",
       "callers": [
-        "lib/db.ts:334"
+        "lib/db.ts",
+        "db-rollout/db-rollout.sql:public.prevent_task_dependency_cycle",
+        "db-schema.sql:public.prevent_task_dependency_cycle"
       ],
       "tests": [
-        "test/task-transactions.integration.test.ts"
+        "test/service-efficiency/retained-claims.integration.test.ts"
       ],
-      "verification": "pending-final-scoped-run"
+      "verification": "Required named cases reconciled with successful execution by lock-register-verification.json in the unchanged-source scoped gate; historical RED evidence remains separate.",
+      "cases": [
+        {
+          "file": "test/service-efficiency/retained-claims.integration.test.ts",
+          "name": "LOCK-RETAIN-21 dependency writes preserve acyclicity and foreign keys without blocking reads"
+        }
+      ],
+      "historicalCallers": [
+        "lib/db.ts:334"
+      ]
     },
     {
       "number": 22,
       "resource": "Request admission permits — 32",
       "disposition": "remove",
       "invariant": "Limits simultaneously admitted observed MCP requests per process.",
-      "acquisition": "Limits simultaneously admitted observed MCP requests per process.",
+      "acquisition": "None in production. Reads use ordinary MVCC SELECT; removed process counters and chains cannot admit or serialize requests.",
       "permittedWork": "No production acquisition. Remove redundant serialization; retain request cancellation, deadlines and database integrity.",
-      "release": "Acquire before handler; release on completion, error or cancellation, within the 60-second request deadline target. Up to 128 queued waiters for this permit type.",
+      "release": "No retained acquisition or hold interval. Historical boundaries remain in the frozen audit.",
       "callers": [
-        "lib/agentic/qa/request-trace.ts:229",
-        "lib/agentic/qa/resource-permits.ts:23",
-        "lib/agentic/mcp/dispatcher.ts:169"
+        "lib/agentic/mcp/dispatcher.ts",
+        "lib/agentic/qa/request-trace.ts",
+        "lib/agentic/qa/resource-permits.ts"
       ],
       "tests": [
         "test/service-efficiency/permit-removal.test.ts"
       ],
-      "verification": "pending-final-scoped-run"
+      "verification": "Required named cases reconciled with successful execution by lock-register-verification.json in the unchanged-source scoped gate; historical RED evidence remains separate.",
+      "cases": [
+        {
+          "file": "test/service-efficiency/permit-removal.test.ts",
+          "name": "LOCK-PERMIT-01 production request execution never waits for synthetic admission, worker or connection permits"
+        },
+        {
+          "file": "test/service-efficiency/permit-removal.test.ts",
+          "name": "LOCK-PERMIT-02 removing permit gates preserves cancellation and the request deadline"
+        },
+        {
+          "file": "test/service-efficiency/permit-removal.test.ts",
+          "name": "LOCK-PERMIT-03 matching preparation and checkout do not use synthetic database permits"
+        }
+      ],
+      "historicalCallers": [
+        "lib/agentic/qa/request-trace.ts:229",
+        "lib/agentic/qa/resource-permits.ts:23",
+        "lib/agentic/mcp/dispatcher.ts:169"
+      ]
     },
     {
       "number": 23,
       "resource": "Request worker permits — 32",
       "disposition": "remove",
       "invariant": "Second request-level admission counter, acquired after admission permit.",
-      "acquisition": "Second request-level admission counter, acquired after admission permit.",
+      "acquisition": "None in production. Reads use ordinary MVCC SELECT; removed process counters and chains cannot admit or serialize requests.",
       "permittedWork": "No production acquisition. Remove redundant serialization; retain request cancellation, deadlines and database integrity.",
-      "release": "Same request lifetime; while waiting, the earlier admission permit remains occupied.",
+      "release": "No retained acquisition or hold interval. Historical boundaries remain in the frozen audit.",
       "callers": [
-        "lib/agentic/qa/request-trace.ts:248",
-        "lib/agentic/qa/resource-permits.ts:23"
+        "lib/agentic/qa/request-trace.ts",
+        "lib/agentic/qa/resource-permits.ts"
       ],
       "tests": [
         "test/service-efficiency/permit-removal.test.ts"
       ],
-      "verification": "pending-final-scoped-run"
+      "verification": "Required named cases reconciled with successful execution by lock-register-verification.json in the unchanged-source scoped gate; historical RED evidence remains separate.",
+      "cases": [
+        {
+          "file": "test/service-efficiency/permit-removal.test.ts",
+          "name": "LOCK-PERMIT-01 production request execution never waits for synthetic admission, worker or connection permits"
+        },
+        {
+          "file": "test/service-efficiency/permit-removal.test.ts",
+          "name": "LOCK-PERMIT-02 removing permit gates preserves cancellation and the request deadline"
+        },
+        {
+          "file": "test/service-efficiency/permit-removal.test.ts",
+          "name": "LOCK-PERMIT-03 matching preparation and checkout do not use synthetic database permits"
+        }
+      ],
+      "historicalCallers": [
+        "lib/agentic/qa/request-trace.ts:248",
+        "lib/agentic/qa/resource-permits.ts:23"
+      ]
     },
     {
       "number": 24,
       "resource": "Request connection permits — 32",
       "disposition": "remove",
       "invariant": "Third request-level counter, acquired after admission and worker permits.",
-      "acquisition": "Third request-level counter, acquired after admission and worker permits.",
+      "acquisition": "None in production. Reads use ordinary MVCC SELECT; removed process counters and chains cannot admit or serialize requests.",
       "permittedWork": "No production acquisition. Remove redundant serialization; retain request cancellation, deadlines and database integrity.",
-      "release": "Same request lifetime; earlier permits stay occupied while waiting.",
+      "release": "No retained acquisition or hold interval. Historical boundaries remain in the frozen audit.",
       "callers": [
-        "lib/agentic/qa/request-trace.ts:248",
-        "lib/agentic/qa/resource-permits.ts:23"
+        "lib/agentic/qa/request-trace.ts",
+        "lib/agentic/qa/resource-permits.ts"
       ],
       "tests": [
         "test/service-efficiency/permit-removal.test.ts"
       ],
-      "verification": "pending-final-scoped-run"
+      "verification": "Required named cases reconciled with successful execution by lock-register-verification.json in the unchanged-source scoped gate; historical RED evidence remains separate.",
+      "cases": [
+        {
+          "file": "test/service-efficiency/permit-removal.test.ts",
+          "name": "LOCK-PERMIT-01 production request execution never waits for synthetic admission, worker or connection permits"
+        },
+        {
+          "file": "test/service-efficiency/permit-removal.test.ts",
+          "name": "LOCK-PERMIT-02 removing permit gates preserves cancellation and the request deadline"
+        },
+        {
+          "file": "test/service-efficiency/permit-removal.test.ts",
+          "name": "LOCK-PERMIT-03 matching preparation and checkout do not use synthetic database permits"
+        }
+      ],
+      "historicalCallers": [
+        "lib/agentic/qa/request-trace.ts:248",
+        "lib/agentic/qa/resource-permits.ts:23"
+      ]
     },
     {
       "number": 25,
       "resource": "Database-stage permits — 32",
       "disposition": "remove",
       "invariant": "Limits catalogue-load/pin sections and execute database sections.",
-      "acquisition": "Limits catalogue-load/pin sections and execute database sections.",
+      "acquisition": "None in production. Reads use ordinary MVCC SELECT; removed process counters and chains cannot admit or serialize requests.",
       "permittedWork": "No production acquisition. Remove redundant serialization; retain request cancellation, deadlines and database integrity.",
-      "release": "Held around the entire load/pin or execute write section; released in finally. Exhaustion throws immediately rather than waiting.",
+      "release": "No retained acquisition or hold interval. Historical boundaries remain in the frozen audit.",
       "callers": [
-        "lib/agentic/plan/service.ts:1666",
-        "lib/agentic/commerce/execute.ts:616"
+        "lib/agentic/commerce/execute.ts",
+        "lib/agentic/plan/service.ts"
       ],
       "tests": [
         "test/service-efficiency/permit-removal.test.ts"
       ],
-      "verification": "pending-final-scoped-run"
+      "verification": "Required named cases reconciled with successful execution by lock-register-verification.json in the unchanged-source scoped gate; historical RED evidence remains separate.",
+      "cases": [
+        {
+          "file": "test/service-efficiency/permit-removal.test.ts",
+          "name": "LOCK-PERMIT-01 production request execution never waits for synthetic admission, worker or connection permits"
+        },
+        {
+          "file": "test/service-efficiency/permit-removal.test.ts",
+          "name": "LOCK-PERMIT-02 removing permit gates preserves cancellation and the request deadline"
+        },
+        {
+          "file": "test/service-efficiency/permit-removal.test.ts",
+          "name": "LOCK-PERMIT-03 matching preparation and checkout do not use synthetic database permits"
+        }
+      ],
+      "historicalCallers": [
+        "lib/agentic/plan/service.ts:1666",
+        "lib/agentic/commerce/execute.ts:616"
+      ]
     },
     {
       "number": 26,
@@ -474,19 +1057,71 @@
       "invariant": "Bounds worker-thread search concurrency per process.",
       "acquisition": "Bounds worker-thread search concurrency per process.",
       "permittedWork": "Only the bounded productive work or immutable coalescing described by this mechanism; never serialize unrelated ordinary reads.",
-      "release": "Each chunk has a 15-second deadline starting at enqueue, including queue wait. A cancelled running slot remains occupied until thread exit.",
+      "release": "Capacity released after computation ends; on cancellation after actual thread termination. Predispatch cancelled reservations are compensated. Acknowledged idle affinity may be evicted for queued work.",
       "callers": [
+        "lib/agentic/plan/match-worker-pool.ts",
+        "lib/agentic/plan/service.ts",
+        "lib/thread-pool.ts"
+      ],
+      "tests": [
+        "test/service-efficiency/dispatch.test.ts",
+        "test/service-efficiency/affinity.test.ts",
+        "test/service-efficiency/cancel-admission.integration.test.ts"
+      ],
+      "verification": "Required named cases reconciled with successful execution by lock-register-verification.json in the unchanged-source scoped gate; historical RED evidence remains separate.",
+      "cases": [
+        {
+          "file": "test/service-efficiency/dispatch.test.ts",
+          "name": "EFF-DISP-01 queued timeout never reserves search work"
+        },
+        {
+          "file": "test/service-efficiency/dispatch.test.ts",
+          "name": "EFF-DISP-02 search starts only after its durable reservation commits"
+        },
+        {
+          "file": "test/service-efficiency/dispatch.test.ts",
+          "name": "EFF-DISP-03 continuation stays on its affine worker while other work runs"
+        },
+        {
+          "file": "test/service-efficiency/dispatch.test.ts",
+          "name": "EFF-DISP-04 independent matcher pools share the process CPU admission limit"
+        },
+        {
+          "file": "test/service-efficiency/dispatch.test.ts",
+          "name": "EFF-DISP-05 reused threads attribute completion and checkpoint metrics to the active request"
+        },
+        {
+          "file": "test/service-efficiency/dispatch.test.ts",
+          "name": "LOCK-DISPATCH-06 cancellation during reservation releases known unstarted work without posting a calculation"
+        },
+        {
+          "file": "test/service-efficiency/affinity.test.ts",
+          "name": "LOCK-AFF-01 waiting work can replace only a durably acknowledged idle session"
+        },
+        {
+          "file": "test/service-efficiency/affinity.test.ts",
+          "name": "LOCK-AFF-02 eviction resumes the acknowledged cursor without losing or repeating attempts"
+        },
+        {
+          "file": "test/service-efficiency/affinity.test.ts",
+          "name": "LOCK-AFF-03 idle expiry cannot discard an unacknowledged checkpoint"
+        },
+        {
+          "file": "test/service-efficiency/affinity.test.ts",
+          "name": "LOCK-AFF-04 the real child cannot expire a session before its parent acknowledges durable state"
+        },
+        {
+          "file": "test/service-efficiency/cancel-admission.integration.test.ts",
+          "name": "LOCK-ATTEMPTS-05 real durable cancellation after reservation commit spends zero attempts and persists recovery"
+        }
+      ],
+      "historicalCallers": [
         "lib/thread-pool.ts:30",
         "lib/thread-pool.ts:37",
         "lib/thread-pool.ts:59",
         "lib/agentic/plan/match-worker-pool.ts:30",
         "lib/agentic/plan/service.ts:513"
-      ],
-      "tests": [
-        "test/service-efficiency/dispatch.test.ts",
-        "test/service-efficiency/sessions.test.ts"
-      ],
-      "verification": "pending-final-scoped-run"
+      ]
     },
     {
       "number": 27,
@@ -495,16 +1130,58 @@
       "invariant": "Runs questionnaire product matching off the external worker event loop.",
       "acquisition": "Runs questionnaire product matching off the external worker event loop.",
       "permittedWork": "Only the bounded productive work or immutable coalescing described by this mechanism; never serialize unrelated ordinary reads.",
-      "release": "Default 60-second job timeout including queueing. Slot released on result or worker exit.",
+      "release": "Capacity released after computation ends; on cancellation after actual thread termination. Predispatch cancelled reservations are compensated. Acknowledged idle affinity may be evicted for queued work.",
       "callers": [
-        "workers/product-matcher-pool.ts:25",
-        "workers/runner.ts:299"
+        "workers/product-matcher-pool.ts",
+        "workers/runner.ts"
       ],
       "tests": [
         "test/service-efficiency/dispatch.test.ts",
         "test/product-matcher-worker.test.ts"
       ],
-      "verification": "pending-final-scoped-run"
+      "verification": "Required named cases reconciled with successful execution by lock-register-verification.json in the unchanged-source scoped gate; historical RED evidence remains separate.",
+      "cases": [
+        {
+          "file": "test/service-efficiency/dispatch.test.ts",
+          "name": "EFF-DISP-01 queued timeout never reserves search work"
+        },
+        {
+          "file": "test/service-efficiency/dispatch.test.ts",
+          "name": "EFF-DISP-02 search starts only after its durable reservation commits"
+        },
+        {
+          "file": "test/service-efficiency/dispatch.test.ts",
+          "name": "EFF-DISP-03 continuation stays on its affine worker while other work runs"
+        },
+        {
+          "file": "test/service-efficiency/dispatch.test.ts",
+          "name": "EFF-DISP-04 independent matcher pools share the process CPU admission limit"
+        },
+        {
+          "file": "test/service-efficiency/dispatch.test.ts",
+          "name": "EFF-DISP-05 reused threads attribute completion and checkpoint metrics to the active request"
+        },
+        {
+          "file": "test/service-efficiency/dispatch.test.ts",
+          "name": "LOCK-DISPATCH-06 cancellation during reservation releases known unstarted work without posting a calculation"
+        },
+        {
+          "file": "test/product-matcher-worker.test.ts",
+          "name": "ANNA-REF-WORKER-03 product jobs reject live catalogue work without reviewed reference identity"
+        },
+        {
+          "file": "test/product-matcher-worker.test.ts",
+          "name": "preserves product matching while keeping timers responsive"
+        },
+        {
+          "file": "test/product-matcher-worker.test.ts",
+          "name": "bounds product jobs, cancels active work, and recovers capacity"
+        }
+      ],
+      "historicalCallers": [
+        "workers/product-matcher-pool.ts:25",
+        "workers/runner.ts:299"
+      ]
     },
     {
       "number": 28,
@@ -513,20 +1190,56 @@
       "invariant": "Only the durable executor owns matching tasks; productive dispatch follows the shared two-slot CPU budget, with no watching task occupying another slot.",
       "acquisition": "One product-profile slot per UAT replica claims generate_product_recommendations / match_agentic_plan and related product tasks.",
       "permittedWork": "Only the bounded productive work or immutable coalescing described by this mechanism; never serialize unrelated ordinary reads.",
-      "release": "Effective task lease 180 seconds from registration, normally renewed every 36 seconds. Slot lasts until execute plus complete/fail handling finishes. Finalization temporarily extends lease by 300 seconds.",
+      "release": "One productive product task per granted CPU slot (default two); effective task lease 180 seconds, operation lease 60 seconds, operation deadline 175 seconds. Idle observers reserve no task slot.",
       "callers": [
+        "lib/task-execution.ts",
+        "lib/task-service-agents.ts",
+        "lib/task-service.ts",
+        "workers/runner.ts"
+      ],
+      "tests": [
+        "test/service-efficiency/worker-capacity.test.ts",
+        "test/service-efficiency/worker-identity.test.ts"
+      ],
+      "verification": "Required named cases reconciled with successful execution by lock-register-verification.json in the unchanged-source scoped gate; historical RED evidence remains separate.",
+      "cases": [
+        {
+          "file": "test/service-efficiency/worker-capacity.test.ts",
+          "name": "LOCK-CPU-01 productive product workers use the same two-slot capacity as MCP and web computation"
+        },
+        {
+          "file": "test/service-efficiency/worker-capacity.test.ts",
+          "name": "LOCK-CPU-02 other worker profiles retain their independent configured concurrency"
+        },
+        {
+          "file": "test/service-efficiency/worker-capacity.test.ts",
+          "name": "LOCK-CPU-03 the actual external runner uses the productive dispatch configuration"
+        },
+        {
+          "file": "test/service-efficiency/worker-identity.test.ts",
+          "name": "LOCK-ID-01 standalone UAT configuration uses the compiled application SHA without runtime injection"
+        },
+        {
+          "file": "test/service-efficiency/worker-identity.test.ts",
+          "name": "LOCK-ID-02 a runtime SHA conflicting with the compiled application is rejected"
+        },
+        {
+          "file": "test/service-efficiency/worker-identity.test.ts",
+          "name": "LOCK-ID-03 missing and malformed compiled identity never fall back to Next BUILD_ID or package version"
+        },
+        {
+          "file": "test/service-efficiency/worker-identity.test.ts",
+          "name": "LOCK-ID-04 the actual worker entrypoint verifies configuration and reports the compiled identity before admission"
+        }
+      ],
+      "historicalCallers": [
         "workers/runner.ts:217",
         "workers/runner.ts:349",
         "workers/runner.ts:564",
         "lib/task-service-agents.ts:431",
         "lib/task-service.ts:125",
         "lib/task-execution.ts:230"
-      ],
-      "tests": [
-        "test/worker-boundary.test.ts",
-        "test/service-efficiency/dispatch.test.ts"
-      ],
-      "verification": "pending-final-scoped-run"
+      ]
     },
     {
       "number": 29,
@@ -537,15 +1250,40 @@
       "permittedWork": "Only the bounded productive work or immutable coalescing described by this mechanism; never serialize unrelated ordinary reads.",
       "release": "60-second operation ownership lease; each renewal/reservation/checkpoint SQL write releases its row lock at commit. Overall operation deadline stays 175 seconds.",
       "callers": [
-        "lib/agentic/plan/operations.ts:7",
-        "lib/agentic/plan/operations.ts:69",
-        "lib/agentic/plan/operations.ts:86"
+        "lib/agentic/plan/operations.ts"
       ],
       "tests": [
         "test/service-efficiency/operations.integration.test.ts",
         "test/ax-refinement/recovery.integration.test.ts"
       ],
-      "verification": "pending-final-scoped-run"
+      "verification": "Required named cases reconciled with successful execution by lock-register-verification.json in the unchanged-source scoped gate; historical RED evidence remains separate.",
+      "cases": [
+        {
+          "file": "test/service-efficiency/operations.integration.test.ts",
+          "name": "EFF-TXN-PG-01 claiming work returns its input in at most two database statements"
+        },
+        {
+          "file": "test/service-efficiency/operations.integration.test.ts",
+          "name": "EFF-TXN-PG-02 checkpoint updates use one conditional write and preserve stale-owner fencing"
+        },
+        {
+          "file": "test/service-efficiency/operations.integration.test.ts",
+          "name": "EFF-TXN-PG-03 durable BYTEA checkpoints remain binary when read and reclaimed"
+        },
+        {
+          "file": "test/service-efficiency/operations.integration.test.ts",
+          "name": "LOCK-ATTEMPTS-04 unstarted reservation compensation preserves prior lost attempts and refuses a newer owner"
+        },
+        {
+          "file": "test/ax-refinement/recovery.integration.test.ts",
+          "name": "AXR-REL-03 expanded PostgreSQL refinement resumes a lost checkpoint at a refreshed observation clock"
+        }
+      ],
+      "historicalCallers": [
+        "lib/agentic/plan/operations.ts:7",
+        "lib/agentic/plan/operations.ts:69",
+        "lib/agentic/plan/operations.ts:86"
+      ]
     },
     {
       "number": 30,
@@ -553,36 +1291,119 @@
       "disposition": "narrow",
       "invariant": "Prevents a different revision being admitted while a plan operation is queued/running/retryable.",
       "acquisition": "Prevents a different revision being admitted while a plan operation is queued/running/retryable.",
-      "permittedWork": "Only the bounded productive work or immutable coalescing described by this mechanism; never serialize unrelated ordinary reads.",
+      "permittedWork": "Admission and publication use durable row/uniqueness protection. Concurrent unique-key losers return the committed operation; HTTP never calculates. Worker ownership and revision are revalidated before required writes.",
       "release": "Until terminal state, cancellation, or expiry persistence. The intended overall deadline is 175 seconds; expiry is enforced when work/polls run.",
       "callers": [
-        "lib/agentic/plan/operations.ts:38",
-        "lib/agentic/plan/service.ts:1317"
+        "lib/agentic/plan/operations.ts",
+        "lib/agentic/plan/service.ts"
       ],
       "tests": [
-        "test/ax-refinement/recovery.integration.test.ts"
+        "test/ax-refinement/recovery.integration.test.ts",
+        "test/service-efficiency/atomic-checkout.integration.test.ts",
+        "test/service-efficiency/immutable-references.test.ts"
       ],
-      "verification": "pending-final-scoped-run"
+      "verification": "Required named cases reconciled with successful execution by lock-register-verification.json in the unchanged-source scoped gate; historical RED evidence remains separate.",
+      "cases": [
+        {
+          "file": "test/ax-refinement/recovery.integration.test.ts",
+          "name": "AXR-REL-03 expanded PostgreSQL refinement resumes a lost checkpoint at a refreshed observation clock"
+        },
+        {
+          "file": "test/service-efficiency/atomic-checkout.integration.test.ts",
+          "name": "LOCK-ATOMIC-01 simultaneous real database admission returns one durable plan, operation and task"
+        },
+        {
+          "file": "test/service-efficiency/atomic-checkout.integration.test.ts",
+          "name": "LOCK-ATOMIC-02 simultaneous checkout owns one frozen order and stale catalogue cannot replace it"
+        },
+        {
+          "file": "test/service-efficiency/immutable-references.test.ts",
+          "name": "LOCK-SNAPSHOT-02 concurrent reference scopes keep their immutable facts after a refresh"
+        },
+        {
+          "file": "test/service-efficiency/immutable-references.test.ts",
+          "name": "LOCK-SNAPSHOT-03 interrupted durable matching restores its catalogue and references after both change"
+        }
+      ],
+      "historicalCallers": [
+        "lib/agentic/plan/operations.ts:38",
+        "lib/agentic/plan/service.ts:1317"
+      ]
     },
     {
       "number": 31,
       "resource": "In-flight plan Promise maps",
       "disposition": "remove",
       "invariant": "Coalesces same-key requests, same plan/revision/request matching and same operation execution in one process.",
-      "acquisition": "Coalesces same-key requests, same plan/revision/request matching and same operation execution in one process.",
-      "permittedWork": "No production acquisition. Remove redundant serialization; retain request cancellation, deadlines and database integrity.",
-      "release": "Until corresponding Promise settles or cleanup occurs; HTTP handoff at up to 3 seconds does not release admitted matching ownership.",
+      "acquisition": "None in production. Reads use ordinary MVCC SELECT; removed process counters and chains cannot admit or serialize requests.",
+      "permittedWork": "Admission and publication use durable row/uniqueness protection. Concurrent unique-key losers return the committed operation; HTTP never calculates. Worker ownership and revision are revalidated before required writes.",
+      "release": "No retained acquisition or hold interval. Historical boundaries remain in the frozen audit.",
       "callers": [
+        "lib/agentic/plan/service.ts"
+      ],
+      "tests": [
+        "test/service-efficiency/duplicate-admission.test.ts",
+        "test/service-efficiency/atomic-checkout.integration.test.ts",
+        "test/service-efficiency/ownership.test.ts",
+        "test/service-efficiency/cache.test.ts"
+      ],
+      "verification": "Required named cases reconciled with successful execution by lock-register-verification.json in the unchanged-source scoped gate; historical RED evidence remains separate.",
+      "cases": [
+        {
+          "file": "test/service-efficiency/duplicate-admission.test.ts",
+          "name": "LOCK-DUP-01 duplicate plan admission reaches its database boundary without a process Promise queue"
+        },
+        {
+          "file": "test/service-efficiency/duplicate-admission.test.ts",
+          "name": "LOCK-DUP-02 concurrent checkout preparation is independent and atomic writes return one frozen order"
+        },
+        {
+          "file": "test/service-efficiency/atomic-checkout.integration.test.ts",
+          "name": "LOCK-ATOMIC-01 simultaneous real database admission returns one durable plan, operation and task"
+        },
+        {
+          "file": "test/service-efficiency/atomic-checkout.integration.test.ts",
+          "name": "LOCK-ATOMIC-02 simultaneous checkout owns one frozen order and stale catalogue cannot replace it"
+        },
+        {
+          "file": "test/service-efficiency/ownership.test.ts",
+          "name": "EFF-OWNER-01 HTTP admission leaves matching ownership to the durable task executor"
+        },
+        {
+          "file": "test/service-efficiency/cache.test.ts",
+          "name": "EFF-CACHE-01 byte eviction preserves detached exact values and never retains oversized entries"
+        },
+        {
+          "file": "test/service-efficiency/cache.test.ts",
+          "name": "EFF-CACHE-02 cancelling one owner does not cancel shared computation or another owner"
+        },
+        {
+          "file": "test/service-efficiency/cache.test.ts",
+          "name": "EFF-CACHE-03 failed work and lost ownership are isolated and never cached as success"
+        },
+        {
+          "file": "test/service-efficiency/cache.test.ts",
+          "name": "EFF-CACHE-04 compiled facts are deeply immutable and reused within the byte budget"
+        },
+        {
+          "file": "test/service-efficiency/cache.test.ts",
+          "name": "EFF-CACHE-05 shared checkpoint writes retain each owner"
+        },
+        {
+          "file": "test/service-efficiency/cache.test.ts",
+          "name": "EFF-CACHE-06 durable result identities fence locale, effort, scope, facts and reference availability"
+        },
+        {
+          "file": "test/service-efficiency/cache.test.ts",
+          "name": "LOCK-CACHE-08 cancelled shared admission compensates committed reservations before declining dispatch"
+        }
+      ],
+      "historicalCallers": [
         "lib/agentic/plan/service.ts:147",
         "lib/agentic/plan/service.ts:1608",
         "lib/agentic/plan/service.ts:968",
         "lib/agentic/plan/service.ts:1054"
-      ],
-      "tests": [
-        "test/service-efficiency/ownership.test.ts",
-        "test/service-efficiency/cache.test.ts"
-      ],
-      "verification": "pending-final-scoped-run"
+      ]
     },
     {
       "number": 32,
@@ -593,13 +1414,23 @@
       "permittedWork": "Only the bounded productive work or immutable coalescing described by this mechanism; never serialize unrelated ordinary reads.",
       "release": "Until the shared load settles. No dedicated mutex TTL; database/request deadlines constrain its work. Cache freshness TTL is not lock lifetime.",
       "callers": [
-        "lib/agentic/catalogue/snapshot.ts:150",
-        "lib/agentic/catalogue/live.ts:599"
+        "lib/agentic/catalogue/live.ts",
+        "lib/agentic/catalogue/snapshot.ts"
       ],
       "tests": [
-        "test/service-efficiency/cache.test.ts"
+        "test/service-efficiency/read-coalescing.integration.test.ts"
       ],
-      "verification": "pending-final-scoped-run"
+      "verification": "Required named cases reconciled with successful execution by lock-register-verification.json in the unchanged-source scoped gate; historical RED evidence remains separate.",
+      "cases": [
+        {
+          "file": "test/service-efficiency/read-coalescing.integration.test.ts",
+          "name": "LOCK-COALESCE-32 catalogue single-flight waits only its own immutable load and cannot block status"
+        }
+      ],
+      "historicalCallers": [
+        "lib/agentic/catalogue/snapshot.ts:150",
+        "lib/agentic/catalogue/live.ts:599"
+      ]
     },
     {
       "number": 33,
@@ -610,12 +1441,30 @@
       "permittedWork": "Only the bounded productive work or immutable coalescing described by this mechanism; never serialize unrelated ordinary reads.",
       "release": "Until SELECT/parse/fingerprint succeeds or fails. The 10-minute cache TTL is not a held lock.",
       "callers": [
-        "lib/agentic/catalogue/load-safety-ceilings.ts:55"
+        "lib/agentic/catalogue/load-safety-ceilings.ts"
       ],
       "tests": [
-        "test/service-efficiency/cache.test.ts"
+        "test/service-efficiency/read-coalescing.integration.test.ts",
+        "test/service-efficiency/immutable-references.test.ts"
       ],
-      "verification": "pending-final-scoped-run"
+      "verification": "Required named cases reconciled with successful execution by lock-register-verification.json in the unchanged-source scoped gate; historical RED evidence remains separate.",
+      "cases": [
+        {
+          "file": "test/service-efficiency/read-coalescing.integration.test.ts",
+          "name": "LOCK-COALESCE-33 reference refresh coalesces one MVCC read behind a held reference writer"
+        },
+        {
+          "file": "test/service-efficiency/immutable-references.test.ts",
+          "name": "LOCK-SNAPSHOT-02 concurrent reference scopes keep their immutable facts after a refresh"
+        },
+        {
+          "file": "test/service-efficiency/immutable-references.test.ts",
+          "name": "LOCK-SNAPSHOT-03 interrupted durable matching restores its catalogue and references after both change"
+        }
+      ],
+      "historicalCallers": [
+        "lib/agentic/catalogue/load-safety-ceilings.ts:55"
+      ]
     },
     {
       "number": 34,
@@ -626,29 +1475,60 @@
       "permittedWork": "Only the bounded productive work or immutable coalescing described by this mechanism; never serialize unrelated ordinary reads.",
       "release": "Until one database load completes; 60-second cache TTL is not a lock duration.",
       "callers": [
-        "lib/agentic/catalogue/market.ts:88"
+        "lib/agentic/catalogue/market.ts"
       ],
       "tests": [
-        "test/service-efficiency/cache.test.ts"
+        "test/service-efficiency/read-coalescing.integration.test.ts"
       ],
-      "verification": "pending-final-scoped-run"
+      "verification": "Required named cases reconciled with successful execution by lock-register-verification.json in the unchanged-source scoped gate; historical RED evidence remains separate.",
+      "cases": [
+        {
+          "file": "test/service-efficiency/read-coalescing.integration.test.ts",
+          "name": "LOCK-COALESCE-34 market discovery coalesces ordinary reads without holding tenant locks"
+        }
+      ],
+      "historicalCallers": [
+        "lib/agentic/catalogue/market.ts:88"
+      ]
     },
     {
       "number": 35,
       "resource": "Checkout execute chain and commit followers",
       "disposition": "remove",
       "invariant": "Serializes same owner/plan/revision executes and makes same-key followers await the leader receipt.",
-      "acquisition": "Serializes same owner/plan/revision executes and makes same-key followers await the leader receipt.",
+      "acquisition": "None in production. Reads use ordinary MVCC SELECT; removed process counters and chains cannot admit or serialize requests.",
       "permittedWork": "No production acquisition. Remove redundant serialization; retain request cancellation, deadlines and database integrity.",
-      "release": "Chain entry exists until execute settles; same-key followers race commit against 60-second request deadline/cancellation.",
+      "release": "No retained acquisition or hold interval. Historical boundaries remain in the frozen audit.",
       "callers": [
-        "lib/agentic/commerce/execute.ts:129",
-        "lib/agentic/commerce/execute.ts:250"
+        "lib/agentic/commerce/execute.ts"
       ],
       "tests": [
-        "test/web-payment-fulfillment.integration.test.ts"
+        "test/service-efficiency/atomic-checkout.integration.test.ts",
+        "test/service-efficiency/duplicate-admission.test.ts"
       ],
-      "verification": "pending-final-scoped-run"
+      "verification": "Required named cases reconciled with successful execution by lock-register-verification.json in the unchanged-source scoped gate; historical RED evidence remains separate.",
+      "cases": [
+        {
+          "file": "test/service-efficiency/atomic-checkout.integration.test.ts",
+          "name": "LOCK-ATOMIC-01 simultaneous real database admission returns one durable plan, operation and task"
+        },
+        {
+          "file": "test/service-efficiency/atomic-checkout.integration.test.ts",
+          "name": "LOCK-ATOMIC-02 simultaneous checkout owns one frozen order and stale catalogue cannot replace it"
+        },
+        {
+          "file": "test/service-efficiency/duplicate-admission.test.ts",
+          "name": "LOCK-DUP-01 duplicate plan admission reaches its database boundary without a process Promise queue"
+        },
+        {
+          "file": "test/service-efficiency/duplicate-admission.test.ts",
+          "name": "LOCK-DUP-02 concurrent checkout preparation is independent and atomic writes return one frozen order"
+        }
+      ],
+      "historicalCallers": [
+        "lib/agentic/commerce/execute.ts:129",
+        "lib/agentic/commerce/execute.ts:250"
+      ]
     },
     {
       "number": 36,
@@ -656,17 +1536,71 @@
       "disposition": "retain",
       "invariant": "Limits database concurrency: each configured application/worker client pool max 30; the managed UAT transaction pool has 30 server slots in total.",
       "acquisition": "Limits database concurrency: each configured application/worker client pool max 30; the managed UAT transaction pool has 30 server slots in total.",
-      "permittedWork": "Only the bounded productive work or immutable coalescing described by this mechanism; never serialize unrelated ordinary reads.",
+      "permittedWork": "Await actual pool acquisition with cancellation/deadline; no synthetic permits. Late acquisition of a cancelled request rolls back before work. Existing pool sizes remain unchanged.",
       "release": "Client checkout lasts for its query/transaction; PgBouncer server slot lasts for transaction. Connect timeout is 5 seconds, not a dedicated existing-pool queue timeout.",
       "callers": [
-        "lib/db.ts:17",
-        "lib/db.ts:438"
+        "lib/db.ts"
       ],
       "tests": [
+        "test/service-efficiency/pool-wait.integration.test.ts",
         "test/db-pool-sizing.test.ts",
         "test/db-transactions.integration.test.ts"
       ],
-      "verification": "pending-final-scoped-run"
+      "verification": "Required named cases reconciled with successful execution by lock-register-verification.json in the unchanged-source scoped gate; historical RED evidence remains separate.",
+      "cases": [
+        {
+          "file": "test/service-efficiency/pool-wait.integration.test.ts",
+          "name": "LOCK-POOL-01 request cancellation covers pool acquisition without waiting for the holder"
+        },
+        {
+          "file": "test/service-efficiency/pool-wait.integration.test.ts",
+          "name": "LOCK-POOL-02 database phase deadline covers pool acquisition and suppresses late writes/effects"
+        },
+        {
+          "file": "test/service-efficiency/pool-wait.integration.test.ts",
+          "name": "LOCK-METRIC-01 acquisition, locking statement and protected transaction have separate client-observed durations"
+        },
+        {
+          "file": "test/db-pool-sizing.test.ts",
+          "name": "explicit smaller test and maintenance pools remain independent"
+        },
+        {
+          "file": "test/db-pool-sizing.test.ts",
+          "name": "omitted and invalid configuration retains conservative six-connection fallbacks"
+        },
+        {
+          "file": "test/db-pool-sizing.test.ts",
+          "name": "pool configuration remains bounded from one to 37 connections"
+        },
+        {
+          "file": "test/db-transactions.integration.test.ts",
+          "name": "sets timeouts on plain queries from both pools"
+        },
+        {
+          "file": "test/db-transactions.integration.test.ts",
+          "name": "reuses the transaction across helper pool lookups and rolls back all writes"
+        },
+        {
+          "file": "test/db-transactions.integration.test.ts",
+          "name": "keeps a usable phase deadline when the statement timeout is explicitly disabled"
+        },
+        {
+          "file": "test/db-transactions.integration.test.ts",
+          "name": "cancels active SQL and leaves the pool usable"
+        },
+        {
+          "file": "test/db-transactions.integration.test.ts",
+          "name": "bounds a plain query waiting on another transaction"
+        },
+        {
+          "file": "test/db-transactions.integration.test.ts",
+          "name": "rolls back the whole phase when its deadline expires"
+        }
+      ],
+      "historicalCallers": [
+        "lib/db.ts:17",
+        "lib/db.ts:438"
+      ]
     },
     {
       "number": 37,
@@ -677,16 +1611,49 @@
       "permittedWork": "Only the bounded productive work or immutable coalescing described by this mechanism; never serialize unrelated ordinary reads.",
       "release": "Configured default poll wait 24 seconds; HTTP wake timeout 1.5 seconds. No database row lock is held while sleeping.",
       "callers": [
+        "lib/agentic/store/postgres.ts",
+        "lib/task-queue-signal.ts",
+        "lib/task-wakeup.ts",
+        "lib/worker-wake.ts",
+        "workers/runner.ts"
+      ],
+      "tests": [
+        "test/service-efficiency/wakeup.test.ts"
+      ],
+      "verification": "Required named cases reconciled with successful execution by lock-register-verification.json in the unchanged-source scoped gate; historical RED evidence remains separate.",
+      "cases": [
+        {
+          "file": "test/service-efficiency/wakeup.test.ts",
+          "name": "EFF-WAKE-01 matching signal survives an unrelated waiting worker"
+        },
+        {
+          "file": "test/service-efficiency/wakeup.test.ts",
+          "name": "EFF-WAKE-02 duplicate signals coalesce and pending storage is bounded"
+        },
+        {
+          "file": "test/service-efficiency/wakeup.test.ts",
+          "name": "EFF-WAKE-03 one task wakes one matching waiter"
+        },
+        {
+          "file": "test/service-efficiency/wakeup.test.ts",
+          "name": "EFF-WAKE-04 transport bursts coalesce without dropping work arriving during delivery"
+        },
+        {
+          "file": "test/service-efficiency/wakeup.test.ts",
+          "name": "EFF-WAKE-05 an in-flight duplicate does not create another HTTP wake burst"
+        },
+        {
+          "file": "test/service-efficiency/wakeup.test.ts",
+          "name": "EFF-WAKE-06 one task wakes one registered worker; distinct tasks distribute fairly"
+        }
+      ],
+      "historicalCallers": [
         "lib/task-queue-signal.ts:31",
         "lib/task-wakeup.ts:28",
         "lib/worker-wake.ts:6",
         "workers/runner.ts:354",
         "lib/agentic/store/postgres.ts:698"
-      ],
-      "tests": [
-        "test/service-efficiency/wakeup.test.ts"
-      ],
-      "verification": "pending-final-scoped-run"
+      ]
     },
     {
       "number": 38,
@@ -697,14 +1664,40 @@
       "permittedWork": "Only the bounded productive work or immutable coalescing described by this mechanism; never serialize unrelated ordinary reads.",
       "release": "Until each Promise/job settles. Maintenance first tick after 60 seconds, then every 15 seconds; schema success cached for process lifetime.",
       "callers": [
+        "lib/agentic/plan/warm-dev.ts",
+        "lib/task-service-agents.ts",
+        "lib/task-sweep-loop.ts",
+        "scripts/apply-service-efficiency-schema.ts:module"
+      ],
+      "tests": [
+        "test/service-efficiency/read-coalescing.integration.test.ts",
+        "test/periodic-task.test.ts",
+        "test/plan-keep-warm-static.test.ts"
+      ],
+      "verification": "Required named cases reconciled with successful execution by lock-register-verification.json in the unchanged-source scoped gate; historical RED evidence remains separate.",
+      "cases": [
+        {
+          "file": "test/service-efficiency/read-coalescing.integration.test.ts",
+          "name": "LOCK-MAINT-38 live-work tracking suppresses maintenance without serializing customer requests"
+        },
+        {
+          "file": "test/periodic-task.test.ts",
+          "name": "coalesces concurrent runs and does not start intervals while a slow call is pending"
+        },
+        {
+          "file": "test/periodic-task.test.ts",
+          "name": "recovers after a rejected call and stops future work"
+        },
+        {
+          "file": "test/plan-keep-warm-static.test.ts",
+          "name": "does not rebuild the MCP catalogue on a timer"
+        }
+      ],
+      "historicalCallers": [
         "lib/task-service-agents.ts:49",
         "lib/task-sweep-loop.ts:12",
         "lib/agentic/plan/warm-dev.ts:81"
-      ],
-      "tests": [
-        "test/plan-keep-warm-static.test.ts"
-      ],
-      "verification": "pending-final-scoped-run"
+      ]
     },
     {
       "number": 39,
@@ -715,13 +1708,47 @@
       "permittedWork": "Only the bounded productive work or immutable coalescing described by this mechanism; never serialize unrelated ordinary reads.",
       "release": "Per-process/client window: regular MCP 60 calls per 60 seconds; order reads 300/minute; identified QA pack 2,000/10 minutes.",
       "callers": [
-        "lib/agentic/qa/rate-limit.ts:44",
-        "lib/rate-limit.ts:328"
+        "lib/agentic/qa/rate-limit.ts",
+        "lib/rate-limit.ts"
       ],
       "tests": [
         "test/rate-limit.test.ts"
       ],
-      "verification": "pending-final-scoped-run"
+      "verification": "Required named cases reconciled with successful execution by lock-register-verification.json in the unchanged-source scoped gate; historical RED evidence remains separate.",
+      "cases": [
+        {
+          "file": "test/rate-limit.test.ts",
+          "name": "allows traffic under the fixed window budget and then returns 429"
+        },
+        {
+          "file": "test/rate-limit.test.ts",
+          "name": "resets the window after windowMs elapses"
+        },
+        {
+          "file": "test/rate-limit.test.ts",
+          "name": "purges expired keys so the store cannot grow without bound"
+        },
+        {
+          "file": "test/rate-limit.test.ts",
+          "name": "prunes the least-recent keys when the max store size is exceeded"
+        },
+        {
+          "file": "test/rate-limit.test.ts",
+          "name": "keys clients by trusted forwarded IP and config name"
+        },
+        {
+          "file": "test/rate-limit.test.ts",
+          "name": "collapses untrusted forwarded IPs onto a shared unknown bucket"
+        },
+        {
+          "file": "test/rate-limit.test.ts",
+          "name": "wires enforceRateLimit into highest-risk public mutation routes"
+        }
+      ],
+      "historicalCallers": [
+        "lib/agentic/qa/rate-limit.ts:44",
+        "lib/rate-limit.ts:328"
+      ]
     }
   ],
   "sites": [
@@ -734,6 +1761,28 @@
         14
       ],
       "justification": "Fences answer/contact edits, replan, recovery, checkout and generation completion by assessment revision."
+    },
+    {
+      "file": "db-rollout/db-rollout.sql",
+      "owner": "public.prevent_task_dependency_cycle",
+      "key": "31796ebfe0fea5c0408f69aa33ef7f1c58dd00f35b5de3a048a1a733ae284da4",
+      "statement": "begin perform pg_advisory_xact_lock(1413563211, 1145393235)",
+      "mechanisms": [
+        12,
+        21
+      ],
+      "justification": "Serialize dependency edge writes to prevent cycles formed by concurrent transactions; no read or matcher acquires this trigger lock."
+    },
+    {
+      "file": "db-schema.sql",
+      "owner": "public.prevent_task_dependency_cycle",
+      "key": "6e3b67b5e1e382835f531f2c19749b42a3bc9a332bd2d02135a61ab50ee21bb9",
+      "statement": "begin perform pg_advisory_xact_lock(1413563211, 1145393235)",
+      "mechanisms": [
+        12,
+        21
+      ],
+      "justification": "Serialize dependency edge writes to prevent cycles formed by concurrent transactions; no read or matcher acquires this trigger lock."
     },
     {
       "file": "lib/agentic/store/postgres.ts",
@@ -804,16 +1853,6 @@
         14
       ],
       "justification": "Fences answer/contact edits, replan, recovery, checkout and generation completion by assessment revision."
-    },
-    {
-      "file": "lib/assessment-product-preferences.ts",
-      "owner": "getAssessmentProductPreferences",
-      "key": "7e9da4e30db436ef5fb41ec87aa3d23a7272b2bffd6e1d629a5f5c9bd0a662ee",
-      "statement": "`select revision, excluded_product_ids, search_effort from public.assessment_product_preferences where plan_id = ${planId}::uuid for update`",
-      "mechanisms": [
-        15
-      ],
-      "justification": "Preserves exclusion/search-effort revision when replanning or applying generation output."
     },
     {
       "file": "lib/funnel-generation-recovery.ts",
@@ -1008,16 +2047,6 @@
     },
     {
       "file": "lib/task-result-applier.ts",
-      "owner": "applyProductRecommendationsResult",
-      "key": "f346ad7e16ce4b95744ef68e46215aaa9e47c424c5727d70be8cc725a0e7f7e2",
-      "statement": "`select revision from public.catalogue_runtime_revision where singleton=true for share`",
-      "mechanisms": [
-        6
-      ],
-      "justification": "Selection and creation of new checkout validate current commercial facts atomically. Matching publication retains its immutable snapshot and ordinary reads take no epoch lock."
-    },
-    {
-      "file": "lib/task-result-applier.ts",
       "owner": "applyTaskCompletionResult",
       "key": "71c21a8664497b4fd07c4d41aab34e68204a56e6bdcaec23a5a39d8ea2b0a470",
       "statement": "`select input_revision, input_hash from public.assessments where plan_id = ${task.planId}::uuid for no key update`",
@@ -1117,26 +2146,58 @@
       "justification": "Fences answer/contact edits, replan, recovery, checkout and generation completion by assessment revision."
     },
     {
-      "file": "db-rollout/db-rollout.sql",
-      "owner": "public.prevent_task_dependency_cycle",
-      "key": "31796ebfe0fea5c0408f69aa33ef7f1c58dd00f35b5de3a048a1a733ae284da4",
-      "statement": "begin perform pg_advisory_xact_lock(1413563211, 1145393235)",
+      "file": "scripts/apply-service-efficiency-schema.ts",
+      "owner": "module",
+      "key": "0168298c38ed27cde3ba7e65e590ffbb9ae728156a4cb7a5c5c9adc1d2638778",
+      "statement": "`with batch as (select id from public.agentic_orders where read_projection is null limit 25 for update skip locked) update public.agentic_orders x set frozen_plan=x.frozen_plan from batch where x.id=batch.id returning x.id`",
       "mechanisms": [
-        12,
-        21
+        5,
+        38
       ],
-      "justification": "Serialize dependency edge writes to prevent cycles formed by concurrent transactions; no read or matcher acquires this trigger lock."
+      "justification": "Bounded additive projection backfill claims 25/50 rows using SKIP LOCKED; existing readers retain their nonlocking fallback. One bounded statement per transaction."
     },
     {
-      "file": "db-schema.sql",
-      "owner": "public.prevent_task_dependency_cycle",
-      "key": "6e3b67b5e1e382835f531f2c19749b42a3bc9a332bd2d02135a61ab50ee21bb9",
-      "statement": "begin perform pg_advisory_xact_lock(1413563211, 1145393235)",
+      "file": "scripts/apply-service-efficiency-schema.ts",
+      "owner": "module",
+      "key": "1103c81871d23c2ceea212a1545e5155adecc48fd219a217cfc9480889f873fd",
+      "statement": "`with batch as (select plan_id,version from public.formulations where read_projection is null limit 25 for update skip locked) update public.formulations x set formulation=x.formulation from batch where x.plan_id=batch.plan_id and x.version=batch.version returning x.plan_id`",
       "mechanisms": [
-        12,
-        21
+        14,
+        38
       ],
-      "justification": "Serialize dependency edge writes to prevent cycles formed by concurrent transactions; no read or matcher acquires this trigger lock."
+      "justification": "Bounded additive projection backfill claims 25/50 rows using SKIP LOCKED; existing readers retain their nonlocking fallback. One bounded statement per transaction."
+    },
+    {
+      "file": "scripts/apply-service-efficiency-schema.ts",
+      "owner": "module",
+      "key": "9e9c8f2adcead842b5d118378b6eb9c233abbb42fdf3f18c2e855cc4c04b5319",
+      "statement": "`with batch as (select plan_id from public.assessments where funnel_skip_healthscore is null limit 50 for update skip locked) update public.assessments x set answers=x.answers from batch where x.plan_id=batch.plan_id returning x.plan_id`",
+      "mechanisms": [
+        14,
+        38
+      ],
+      "justification": "Bounded additive projection backfill claims 25/50 rows using SKIP LOCKED; existing readers retain their nonlocking fallback. One bounded statement per transaction."
+    },
+    {
+      "file": "scripts/apply-service-efficiency-schema.ts",
+      "owner": "module",
+      "key": "b8b7b373d5017ce253de69e5ff37a30a7923b370db539a0878aefce9cb297b8c",
+      "statement": "`with batch as (select id from public.agentic_plan_operations where read_projection is null limit 50 for update skip locked) update public.agentic_plan_operations x set record_json=x.record_json from batch where x.id=batch.id returning x.id`",
+      "mechanisms": [
+        2,
+        38
+      ],
+      "justification": "Bounded additive projection backfill claims 25/50 rows using SKIP LOCKED; existing readers retain their nonlocking fallback. One bounded statement per transaction."
+    },
+    {
+      "file": "scripts/audit-web-funnel.ts",
+      "owner": "module",
+      "key": "6946df03bec0c49a8758552bd963ce430de70bb8d5be61a34713537b60cfb493",
+      "statement": "`select * from public.payments where id = ${payment.id}::uuid for update`",
+      "mechanisms": [
+        17
+      ],
+      "justification": "Payment-evidence repair revalidates the paid state before task creation; provider verification is outside the lock."
     }
   ]
 }

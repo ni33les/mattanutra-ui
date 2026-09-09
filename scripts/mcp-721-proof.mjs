@@ -4,6 +4,7 @@ import { readFileSync, realpathSync } from "node:fs";
 import { dirname, resolve, relative, isAbsolute } from "node:path";
 import { payloadHash } from "./mcp-payload/proof.mjs";
 import { validateRolloutBinding, verifyLockExecution } from "./service-efficiency/rollout-proof.mjs";
+import {validateUatResources} from "./service-efficiency/runtime-resources.mjs";
 
 export const MCP721_BASE = "22f3ce60f17158c68a251abe4070f582dd39253a";
 export const MCP_PACKAGES = {
@@ -69,6 +70,7 @@ export function checkMcp721Proof(file, expected, packageId = "721") {
     assert.deepEqual(benchmark.runs[0].comparison.rows.map(row => [row.id, row.semanticSha256]), benchmark.runs[1].comparison.rows.map(row => [row.id, row.semanticSha256]));
     for (const run of benchmark.runs) {
       const rows = label => inventory.benchmarks.map(id => json(`benchmarks/${run.run}-${id}-${label}.json`));
+      for(const value of [...rows("control"),...rows("candidate")]) validateUatResources(value.measurements.resources);
       assert.deepEqual(compareBenchmarkRuns(rows("control"), rows("candidate"), inventory.benchmarks), run.comparison);
     }
     assert.equal(schema.passed, true); assert.equal(schema.schemaSha256, expected.schemaSha256);
