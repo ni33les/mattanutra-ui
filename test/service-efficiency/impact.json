@@ -245,6 +245,12 @@
       "slice": "identity",
       "expectedCases": 4,
       "reason": "Standalone UAT runtime identity must match its compiled application before worker admission"
+    },
+    {
+      "file": "test/service-efficiency/permit-removal.test.ts",
+      "slice": "permits",
+      "expectedCases": 3,
+      "reason": "Audits 22\u201325: remove artificial admission/worker/connection/database gates while preserving cancellation and deadlines"
     }
   ],
   "inputs": [
