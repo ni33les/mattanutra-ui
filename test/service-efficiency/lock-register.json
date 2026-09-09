@@ -1390,7 +1390,7 @@
         },
         {
           "file": "test/service-efficiency/cache.test.ts",
-          "name": "EFF-CACHE-02 cancelling one owner does not cancel shared computation or another owner"
+          "name": "EFF-CACHE-02 cancelling one owner does not cancel shared computation or another owner's checkpoint"
         },
         {
           "file": "test/service-efficiency/cache.test.ts",
@@ -1402,7 +1402,7 @@
         },
         {
           "file": "test/service-efficiency/cache.test.ts",
-          "name": "EFF-CACHE-05 shared checkpoint writes retain each owner"
+          "name": "EFF-CACHE-05 shared checkpoint writes retain each owner's request lifetime"
         },
         {
           "file": "test/service-efficiency/cache.test.ts",
@@ -1605,7 +1605,7 @@
         },
         {
           "file": "test/db-transactions.integration.test.ts",
-          "name": "bounds a plain query waiting on another transaction"
+          "name": "bounds a plain query waiting on another transaction's row lock"
         },
         {
           "file": "test/db-transactions.integration.test.ts",
