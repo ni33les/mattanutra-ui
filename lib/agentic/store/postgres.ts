@@ -373,11 +373,25 @@ export function createPostgresStore(inputSql: Sql, inTransaction = false): Agent
           and expired_at is null
         order by created_at asc
         limit 1
-        for update
       `;
       return row ? mapOrder(row) : null;
     },
     async getActiveOrderForPlanRevision(planId, planRevision) {
+      const [row] = await sql<DatabaseRow<OrderRecord>>`
+        select * from public.agentic_orders
+        where plan_id = ${planId}::uuid
+          and plan_revision = ${planRevision}
+          and order_status not in ('expired', 'cancelled')
+          and checkout_reuse_eligible
+          and cancelled_at is null
+          and expired_at is null
+        order by created_at asc
+        limit 1
+      `;
+      return row ? mapOrder(row) : null;
+    },
+    async getActiveOrderForPlanRevisionForUpdate(planId, planRevision) {
+      if (!inTransaction) throw new Error("Order mutation lookup requires a transaction");
       const [row] = await sql<DatabaseRow<OrderRecord>>`
         select * from public.agentic_orders
         where plan_id = ${planId}::uuid

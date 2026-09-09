@@ -266,6 +266,8 @@ export type AgenticStore = {
     planId: string,
     planRevision: number
   ): Promise<OrderRecord | null>;
+  /** Mutation-only lookup; protects checkout reuse and payment transitions until commit. */
+  getActiveOrderForPlanRevisionForUpdate(planId: string, planRevision: number): Promise<OrderRecord | null>;
   getExecuteResponseForOrder(orderId: string): Promise<unknown | null>;
   getOrderItems(orderId: string): Promise<readonly OrderItemRecord[]>;
   getOutboxPending(): Promise<readonly OutboxEventRecord[]>;

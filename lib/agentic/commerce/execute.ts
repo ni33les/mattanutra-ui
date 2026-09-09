@@ -473,7 +473,7 @@ async function executeFresh(
     if (raced.kind === "replay") return raced.response;
     if (raced.kind === "conflict") return raced.error;
 
-    const existingOrder = await store.getActiveOrderForPlanRevision(
+    const existingOrder = await store.getActiveOrderForPlanRevisionForUpdate(
       plan.id,
       plan.currentRevision
     );
