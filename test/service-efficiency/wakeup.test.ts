@@ -29,3 +29,16 @@ test("EFF-WAKE-03 one task wakes one matching waiter", async () => {
   signalTaskQueue({ taskType: "match_agentic_plan", taskId: "one" });
   assert.equal((await Promise.all(waiting)).filter(Boolean).length, 1);
 });
+
+test("EFF-WAKE-04 transport bursts coalesce without dropping work arriving during delivery", async () => {
+  const { coalescedWorkerWake } = await import("../../lib/worker-wake.ts");
+  let release!: () => void, entered!: () => void;
+  const held = new Promise<void>(resolve => { release = resolve; }), started = new Promise<void>(resolve => { entered = resolve; });
+  const calls: TaskQueueSignal[] = [];
+  const wake = coalescedWorkerWake(async signal => { calls.push(signal); if (calls.length === 1) { entered(); await held; } });
+  const first = Array.from({ length: 100 }, () => wake({ taskType: "match", taskId: "one" }));
+  await started;
+  const later = wake({ taskType: "match", taskId: "two" }); release();
+  await Promise.all([...first, later]);
+  assert.equal(calls.length, 2); assert.equal(calls[0].taskId, "one"); assert.equal(calls[1].taskId, "two");
+});

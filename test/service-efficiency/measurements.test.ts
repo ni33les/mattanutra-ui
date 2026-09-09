@@ -29,3 +29,15 @@ test("EFF-MET-02 explicit diagnostic namespaces remain readable outside request 
   assert.deepEqual(queryBudgetSnapshot("eff-diagnostic"), { "plan.match.miss": 1 });
   resetQueryBudget();
 });
+
+test("EFF-MET-03 production measurement flushing is bounded and excludes request payloads", async t => {
+  const metrics = await import("../../lib/service-metrics.ts");
+  t.mock.timers.enable({ apis: ["setInterval"] });
+  const rows: unknown[] = [];
+  const stop = metrics.startServiceMeasurementReporting(value => rows.push(value));
+  const duplicate = metrics.startServiceMeasurementReporting(() => { throw new Error("duplicate reporter"); });
+  metrics.recordServiceMetric("cache.hit"); t.mock.timers.tick(59_999); assert.equal(rows.length, 0);
+  t.mock.timers.tick(1); assert.equal(rows.length, 1);
+  const text = JSON.stringify(rows[0]); assert.match(text, /cache.hit/); assert.ok(!/answers|email|token|credentials/.test(text));
+  duplicate(); stop(); t.mock.timers.tick(60_000); assert.equal(rows.length, 1);
+});

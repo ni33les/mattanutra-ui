@@ -6,7 +6,7 @@
     {
       "file": "test/service-efficiency/measurements.test.ts",
       "slice": "measurements",
-      "expectedCases": 2,
+      "expectedCases": 3,
       "reason": "Concurrent query measurement isolation and retained diagnostic namespace compatibility"
     },
     {
@@ -31,7 +31,7 @@
     {
       "file": "test/service-efficiency/wakeup.test.ts",
       "slice": "wakeup",
-      "expectedCases": 3,
+      "expectedCases": 4,
       "reason": "Lost task notification reproduction, bounded coalescing and single-consumer wakeups"
     },
     {
@@ -173,6 +173,54 @@
       "database": false,
       "expectedCases": 5,
       "reason": "Preserve bounded formulation reads, revision polling and one full result fetch per changed version"
+    },
+    {
+      "file": "test/mcp-conversation-pack/status.test.ts",
+      "slice": "mcp-consumers",
+      "expectedCases": 2,
+      "reason": "Affected MCP read and durable executor compatibility: exact compact fields, ownership, localized guides and unchanged public contract"
+    },
+    {
+      "file": "test/mcp-conversation-pack/cards.test.ts",
+      "slice": "mcp-consumers",
+      "expectedCases": 3,
+      "reason": "Affected MCP read and durable executor compatibility: exact compact fields, ownership, localized guides and unchanged public contract"
+    },
+    {
+      "file": "test/mcp-agent-surface/contracts.test.ts",
+      "slice": "mcp-consumers",
+      "expectedCases": 3,
+      "reason": "Affected MCP read and durable executor compatibility: exact compact fields, ownership, localized guides and unchanged public contract"
+    },
+    {
+      "file": "test/mcp-payload/projection.test.ts",
+      "slice": "mcp-consumers",
+      "expectedCases": 4,
+      "reason": "Affected MCP read and durable executor compatibility: exact compact fields, ownership, localized guides and unchanged public contract"
+    },
+    {
+      "file": "test/mcp-payload/status.test.ts",
+      "slice": "mcp-consumers",
+      "expectedCases": 1,
+      "reason": "Affected MCP read and durable executor compatibility: exact compact fields, ownership, localized guides and unchanged public contract"
+    },
+    {
+      "file": "test/mcp-7-2-2/transport.test.ts",
+      "slice": "mcp-consumers",
+      "expectedCases": 2,
+      "reason": "Affected MCP read and durable executor compatibility: exact compact fields, ownership, localized guides and unchanged public contract"
+    },
+    {
+      "file": "test/mcp-agent-surface/views.test.ts",
+      "slice": "mcp-consumers",
+      "expectedCases": 9,
+      "reason": "Affected MCP read and durable executor compatibility: exact compact fields, ownership, localized guides and unchanged public contract"
+    },
+    {
+      "file": "test/mcp-payload/narrative.test.ts",
+      "slice": "mcp-consumers",
+      "expectedCases": 4,
+      "reason": "Affected MCP read and durable executor compatibility: exact compact fields, ownership, localized guides and unchanged public contract"
     }
   ],
   "inputs": [
