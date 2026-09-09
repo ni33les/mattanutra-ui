@@ -371,7 +371,7 @@
       "file": "test/service-efficiency/retained-claims.integration.test.ts",
       "slice": "retained-claims",
       "database": true,
-      "expectedCases": 3,
+      "expectedCases": 4,
       "reason": "Audits 19/20/21: actual outbox and scheduled-action disjoint claims, dependency cycle serialization, FK protection and nonblocking reads"
     },
     {

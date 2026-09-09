@@ -4,6 +4,8 @@ import { after, test } from "node:test";
 import postgres from "postgres";
 import { createPostgresStore } from "../../lib/agentic/store/postgres.ts";
 import * as scheduler from "../../lib/task-worker.ts";
+import { processOmsOutbox } from "../../lib/agentic/retail/mock-thailand.ts";
+import type { AgenticStore } from "../../lib/agentic/store/types.ts";
 assert.ok(process.env.TEST_DB_URL,"Isolated PostgreSQL is mandatory");
 const url=new URL(process.env.TEST_DB_URL);assert.equal(url.hostname,"127.0.0.1");assert.match(url.pathname,/^\/mattanutra_lock_review_ax_/);
 const sql=postgres(url.href,{max:3,prepare:false,connection:{lock_timeout:"150ms",statement_timeout:"3s"}}),store=createPostgresStore(sql);
@@ -53,4 +55,25 @@ test("LOCK-RETAIN-21 dependency writes preserve acyclicity and foreign keys with
     release.release();await writer;
     await assert.rejects(sql`insert into public.task_dependencies(task_id,depends_on_task_id) values(${ids[1]}::uuid,${ids[0]}::uuid)`,{code:"23514"});
   }finally{release.release();await writer;await sql`delete from public.task_dependencies where task_id=any(${ids}::uuid[])`;await sql`delete from public.tasks where id=any(${ids}::uuid[])`;await sql`delete from public.organisations where id=${organisation}::uuid`;}
+});
+
+test("LOCK-RETAIN-19B fulfilment uses its already locked order once and replay does not duplicate its event",async()=>{
+  const planId=randomUUID(),orderId=randomUUID(),eventId=randomUUID(),now="2000-01-01T00:00:00Z";
+  await store.insertPlan({id:planId,currentRevision:1,environment:"dev",tenantScope:"mattanutra",principalScope:planId,createdAt:now,updatedAt:now});
+  await store.insertOrder({id:orderId,planId,planRevision:1,environment:"dev",tenantScope:"mattanutra",principalScope:planId,
+    createdAt:now,updatedAt:now,reference:orderId,currency:"THB",destinationCountry:"TH",totalPriceMinor:100,frozenPlan:{},
+    orderStatus:"open",paymentStatus:"paid",fulfilmentStatus:"not_started",stateVersion:1,cancelledAt:null,expiredAt:null,
+    completedAt:null,checkoutAccessHash:null,checkoutExpiresAt:null,checkoutUrl:null,latestPaymentAttempt:null,latestPaymentReason:null,providerSessionId:null});
+  await store.insertOutbox({id:eventId,type:"OMS_SUBMIT",orderId,payload:{fixture:true},createdAt:now,processedAt:null});
+  let acquisitions=0;
+  const wrap=(base:AgenticStore):AgenticStore=>({...base,transaction:work=>base.transaction(tx=>work(wrap(tx))),
+    getOrderForUpdate:async id=>{acquisitions++;return base.getOrderForUpdate(id);}});
+  try {
+    await processOmsOutbox({store:wrap(store),now});
+    assert.equal(acquisitions,1,"the outbox owns this order fence for the complete atomic transition");
+    assert.equal((await store.getOrder(orderId))?.fulfilmentStatus,"processing");
+    assert.equal((await store.listFulfilmentEvents(orderId)).length,1);
+    await processOmsOutbox({store:wrap(store),now});
+    assert.equal(acquisitions,1);assert.equal((await store.listFulfilmentEvents(orderId)).length,1);
+  }finally{await store.deletePrincipalScope(planId);}
 });
