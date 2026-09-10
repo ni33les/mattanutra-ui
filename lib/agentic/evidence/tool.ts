@@ -1,165 +1,29 @@
-import type { AgenticConfig } from "@/lib/agentic/config";
-import { businessError, type AgenticErrorResult } from "@/lib/agentic/contract/errors";
-import { agenticMessage, negotiateLocale } from "@/lib/agentic/i18n";
-import { claimById } from "@/lib/agentic/claims/corpus";
-import { RESEARCH_VERSION } from "@/lib/agentic/discovery/versions";
-import { createHash } from "node:crypto";
-import {
-  hashCapability,
-  nextTestUuid,
-  resolveCapability,
-  type CapabilityScope
-} from "@/lib/agentic/capabilities";
-import type { AgenticStore } from "@/lib/agentic/store/types";
-import type { PlanResult } from "@/lib/agentic/plan/types";
+import { businessError, isAgenticErrorResult } from "@/lib/agentic/contract/errors";
+import { readPlanPresentation } from "@/lib/agentic/presentation/plan-read";
+import { decisionOptions, decisionOptionId, presentDecision } from "@/lib/agentic/presentation/decision";
+import type { AgenticRuntime } from "@/lib/agentic/runtime";
 
-export type EvidenceMode = "sources" | "summary";
-
-export function evidenceHandleFor(planId: string, revision: number, tenantScope: string) {
-  return `cap_${createHash("sha256").update(`evidence:${planId}:${revision}:${tenantScope}`).digest("base64url").slice(0, 43)}`;
-}
-
-export async function issueEvidenceCapability(input: Readonly<{
-  config: AgenticConfig;
-  now: string;
-  planId: string;
-  revision: number;
-  scope: CapabilityScope;
-  store: AgenticStore;
+/** Evidence is scoped to one current choice and one returned ingredient or product. */
+export async function evidenceTool(input: Pick<AgenticRuntime, "config" | "now" | "scope" | "store"> & Readonly<{
+  planHandle: string; expectedRevision: number; optionId: string; ingredientId?: string; productId?: string;
 }>) {
-  const handle = evidenceHandleFor(input.planId, input.revision, input.scope.tenantScope);
-  const hash = hashCapability(input.config.capabilitySecret, handle);
-  const existing = await input.store.getCapabilityByHash(hash);
-  if (existing) {
-    return handle;
-  }
-
-  await input.store.insertCapability({
-    allowedActions: ["evidence.read"],
-    environment: input.scope.environment,
-    expiresAt: null,
-    hash,
-    id: nextTestUuid(),
-    issuedAt: input.now,
-    keyVersion: 1,
-    principalScope: input.scope.principalScope,
-    resourceId: input.planId,
-    resourceType: "evidence",
-    revokedAt: null,
-    tenantScope: input.scope.tenantScope
-  });
-  return handle;
-}
-
-export type EvidenceSuccess = Readonly<{
-  claims: readonly Readonly<{
-    claimId: string;
-    limitation: string;
-    researchVersion: string;
-    reviewDate: string;
-    source: string;
-    statement: string;
-    strength: string;
-  }>[];
-  mode: EvidenceMode;
-  ok: true;
-  planRevision: number;
-  researchVersion: string;
-}>;
-
-export async function evidenceTool(input: Readonly<{
-  claimIds?: readonly string[];
-  config: AgenticConfig;
-  evidenceHandle: string;
-  locale?: string;
-  mode?: string;
-  now: string;
-  scope: CapabilityScope;
-  store: AgenticStore;
-}>): Promise<EvidenceSuccess | AgenticErrorResult> {
-  const locale = negotiateLocale(input.locale);
-
-  if (input.mode != null && input.mode !== "summary" && input.mode !== "sources") {
-    return businessError({
-      fieldPath: "mode",
-      message: agenticMessage(locale, "mcp.errors.invalid_request"),
-      reasonCode: "invalid_request"
-    });
-  }
-
-  const capability = await resolveCapability({
-    action: "evidence.read",
-    config: input.config,
-    handle: input.evidenceHandle,
-    now: input.now,
-    resourceType: "evidence",
-    scope: input.scope,
-    store: input.store
-  });
-
-  if (!capability) {
-    const hashed = hashCapability(input.config.capabilitySecret, input.evidenceHandle);
-    const existing = await input.store.getCapabilityByHash(hashed);
-    if (existing && existing.resourceType !== "evidence") {
-      return businessError({
-        fieldPath: "evidenceHandle",
-        message: agenticMessage(locale, "mcp.errors.not_found"),
-        reasonCode: "wrong_purpose"
-      });
-    }
-    return businessError({
-      fieldPath: "evidenceHandle",
-      message: agenticMessage(locale, "mcp.errors.not_found"),
-      reasonCode: "not_found"
-    });
-  }
-
-  const plan = await input.store.getPlan(capability.resourceId);
-  if (!plan) {
-    return businessError({
-      fieldPath: "evidenceHandle",
-      message: agenticMessage(locale, "mcp.errors.not_found"),
-      reasonCode: "not_found"
-    });
-  }
-
-  const revision = await input.store.getPlanRevision(plan.id, plan.currentRevision);
-  const result = revision?.result as PlanResult | undefined;
-  const attached = result?.claimIds ?? [];
-  const requested = input.claimIds ?? attached;
-
-  for (const claimId of requested) {
-    if (!attached.includes(claimId)) {
-      return businessError({
-        fieldPath: "claimIds",
-        message: agenticMessage(locale, "mcp.errors.invalid_request"),
-        reasonCode: "unreferenced_claim"
-      });
-    }
-  }
-
-  const claims = requested.flatMap((claimId) => {
-    const claim = claimById(claimId);
-    return claim
-      ? [
-          {
-            claimId: claim.claimId,
-            limitation: claim.limitation,
-            researchVersion: claim.researchVersion,
-            reviewDate: claim.reviewDate,
-            source: claim.source,
-            statement: claim.statement,
-            strength: claim.strength
-          }
-        ]
-      : [];
-  });
-
-  return {
-    claims,
-    mode: input.mode === "sources" ? "sources" : "summary",
-    ok: true,
-    planRevision: plan.currentRevision,
-    researchVersion: result?.researchVersion ?? RESEARCH_VERSION
-  };
+  const saved = await readPlanPresentation(input, input.planHandle);
+  if (isAgenticErrorResult(saved)) return saved;
+  if (saved.revision.revision !== input.expectedRevision) return businessError({ reasonCode: "stale_revision", fieldPath: "expectedRevision",
+    currentRevision: saved.revision.revision, message: "Use the current revision and its returned IDs." });
+  const option = decisionOptions(saved.result).find(row => decisionOptionId(input.planHandle, input.expectedRevision, row) === input.optionId);
+  if (!option) return businessError({ reasonCode: "not_found", fieldPath: "optionId", message: "Not found." });
+  const decision = presentDecision(saved.result, input.planHandle, input.expectedRevision);
+  const choice = "choices" in decision ? decision.choices.find(row => row.optionId === input.optionId) : undefined;
+  const ingredient = choice?.ingredients.find(row => row.ingredientId === input.ingredientId);
+  const product = option.basket.find(row => row.productId === input.productId);
+  if (input.ingredientId ? !ingredient : !product) return businessError({ reasonCode: "not_found", fieldPath: input.ingredientId ? "ingredientId" : "productId", message: "Use an ID returned for this choice." });
+  const products = product ? [product] : option.basket.filter(row => ingredient!.productIds.includes(row.productId));
+  const facts = products.flatMap(row => (row.labelledFacts ?? []).filter(fact => !ingredient || fact.supplementId === ingredient.ingredientId || fact.name.toLowerCase() === ingredient.name.toLowerCase())
+    .map(fact => ({ productId: row.productId, ...fact })));
+  const findings = (option.safety?.guidance ?? []).filter(row => product ? row.productIds.includes(product.productId) : row.supplementIds.includes(ingredient!.ingredientId) || row.nutrientName?.toLowerCase() === ingredient!.name.toLowerCase());
+  return { ok: true as const, planHandle: input.planHandle, revision: input.expectedRevision, optionId: input.optionId,
+    ...(product ? { productId: product.productId, administration: product.administration ?? null } : { ingredientId: input.ingredientId }), facts,
+    findings: findings.map(row => ({ ruleId: row.ruleId, ruleVersion: row.rulesVersion, message: row.message, exposure: row.exposure,
+      reference: row.threshold, unit: row.unit, scope: row.sourceScope, source: row.authorityUrl ?? null, evidence: [...(row.evidence ?? [])], uncertainty: row.uncertainty ?? null })) };
 }

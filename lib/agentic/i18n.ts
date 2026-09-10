@@ -5,9 +5,9 @@ export const AGENTIC_LOCALES = ["en", "th", "zh-CN"] as const;
 
 const MESSAGES: Record<string, Record<(typeof AGENTIC_LOCALES)[number], string>> = {
   "plan.summary.refresh_required": {
-    en: "Refresh this saved plan against the current catalogue and contract before selecting or creating checkout. Revise with requestPatch={} and the current revision; your health information is preserved.",
-    th: "อัปเดตแผนที่บันทึกไว้ตามแคตตาล็อกและข้อกำหนดปัจจุบันก่อนเลือกหรือชำระเงิน ใช้ revise พร้อม requestPatch={} และ revision ปัจจุบัน โดยข้อมูลสุขภาพของคุณจะยังคงอยู่",
-    "zh-CN": "选择或创建结账前，请根据当前目录和协议刷新已保存的方案。使用 revise、requestPatch={} 和当前 revision；您的健康信息会保留。"
+    en: "Refresh this saved plan against the current catalogue and contract before selecting or creating checkout. Send scoring:{} and the current revision; your health information is preserved.",
+    th: "อัปเดตแผนที่บันทึกไว้ตามแคตตาล็อกและข้อกำหนดปัจจุบันก่อนเลือกหรือชำระเงิน ส่ง scoring:{} และ revision ปัจจุบัน โดยข้อมูลสุขภาพของคุณจะยังคงอยู่",
+    "zh-CN": "选择或创建结账前，请根据当前目录和协议刷新已保存的方案。使用scoring:{} 和当前 revision；您的健康信息会保留。"
   },
   "guidance.context_unassessed": {
     en: "Interactions for {codes} have not been assessed for this basket. No interaction finding does not mean cleared; ask a clinician or pharmacist to review the combination.",

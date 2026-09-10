@@ -1,4 +1,4 @@
-import { PLAN_OPERATION_SCHEMAS } from "@/lib/agentic/contract/schemas";
+import { PLAN_INPUT_SCHEMA } from "@/lib/agentic/contract/schemas";
 import { clientDiscovery, clientGuideMarkdown, CLIENT_GUIDE_URI, CONTRACT_SCHEMA_URI } from "@/lib/agentic/contract/guide";
 import type { AgenticConfig } from "@/lib/agentic/config";
 import {
@@ -38,7 +38,6 @@ export const PUBLIC_INFO_ALLOW_LIST = [
   "clientExamples",
   "clientGuideText",
   "planSchemaJson",
-  "planOperation",
   "contractSchema",
   "serviceName",
   "contractVersion",
@@ -70,7 +69,6 @@ export type PublicInfo = Readonly<{
   clientExamples: ReturnType<typeof clientDiscovery>["clientExamples"];
   clientGuideText?: string;
   planSchemaJson?: string;
-  planOperation?: keyof typeof PLAN_OPERATION_SCHEMAS;
   clientGuide: string;
   contractSchema: string;
   buildId?: string;
@@ -139,7 +137,6 @@ type InfoView = "overview" | "client_guide" | "plan_schema";
 function publicCapabilityInfo(input: Readonly<{
   environment: AgenticConfig["environment"];
   view?: InfoView;
-  planOperation?: keyof typeof PLAN_OPERATION_SCHEMAS;
   buildId?: string;
   conditionCodes: readonly string[];
   locale?: string;
@@ -150,9 +147,9 @@ function publicCapabilityInfo(input: Readonly<{
   void input.buildId;
   return {
     ok: true,
-    ...clientDiscovery(input.locale, input.view, input.planOperation, input.environment),
+    ...clientDiscovery(input.locale, input.view, input.environment),
     ...(input.view === "client_guide" ? { clientGuideText: clientGuideMarkdown(input.locale, input.environment) } : {}),
-    ...(input.view === "plan_schema" ? { planOperation: input.planOperation ?? "create", planSchemaJson: JSON.stringify(PLAN_OPERATION_SCHEMAS[input.planOperation ?? "create"]) } : {}),
+    ...(input.view === "plan_schema" ? { planSchemaJson: JSON.stringify(PLAN_INPUT_SCHEMA) } : {}),
     clientGuide: CLIENT_GUIDE_URI,
     contractSchema: CONTRACT_SCHEMA_URI,
     serviceName: AGENTIC_SERVICE_NAME,
@@ -256,7 +253,6 @@ export async function engineeringInfo(input: Readonly<{
 
 export async function infoTool(input: Readonly<{
   view?: InfoView;
-  planOperation?: keyof typeof PLAN_OPERATION_SCHEMAS;
   config: AgenticConfig;
   isolatedInfo?: {
     conditionCodes: readonly string[];
@@ -273,7 +269,7 @@ export async function infoTool(input: Readonly<{
 
   if (input.isolatedInfo) {
     return publicCapabilityInfo({
-      environment: input.config.environment, view: input.view, planOperation: input.planOperation,
+      environment: input.config.environment, view: input.view,
       buildId: input.config.buildId,
       conditionCodes: input.isolatedInfo.conditionCodes,
       locale,
@@ -285,7 +281,7 @@ export async function infoTool(input: Readonly<{
   const supportedCountries = await supportedCountriesFor(input.config);
   const key = [
     input.config.buildId, input.config.environment,
-    locale, input.view ?? "overview", input.planOperation ?? "create",
+    locale, input.view ?? "overview",
     supportedCountries.map((item) => item.countryCode).join(",")
   ].join(":");
   if (infoCache?.key === key) {
@@ -293,7 +289,7 @@ export async function infoTool(input: Readonly<{
   }
 
   const value = publicCapabilityInfo({
-    environment: input.config.environment, view: input.view, planOperation: input.planOperation,
+    environment: input.config.environment, view: input.view,
     buildId: input.config.buildId,
     conditionCodes: RECOGNISED_CONDITION_CODES,
     locale,

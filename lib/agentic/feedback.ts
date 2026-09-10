@@ -1,3 +1,5 @@
+import { AGENTIC_CONTRACT_VERSION } from "@/lib/agentic/config";
+import { decisionOptions, decisionOptionId } from "@/lib/agentic/presentation/decision";
 import { randomUUID } from "node:crypto";
 import type { AgenticConfig } from "@/lib/agentic/config";
 import { businessError, type AgenticErrorResult } from "@/lib/agentic/contract/errors";
@@ -111,19 +113,10 @@ export async function feedbackTool(input: Readonly<{
   }
 
   const result = revision.result as PlanResult;
-  const locale = negotiateLocale(result.requestSnapshot.locale);
-  const optionId = input.optionId ?? result.selected?.optionId ?? null;
-
-  if (
-    input.optionId &&
-    result.selected?.optionId !== input.optionId &&
-    result.alternatives.every((item) => item.optionId !== input.optionId)
-  ) {
-    return businessError({
-      message: agenticMessage(locale, "mcp.errors.not_found"),
-      reasonCode: "not_found"
-    });
-  }
+  if (result.contractVersion !== AGENTIC_CONTRACT_VERSION) return businessError({ reasonCode: "not_found", message: "Not found." });
+  const option = input.optionId ? decisionOptions(result).find(row => (result.requestSnapshot.scoring ? decisionOptionId(input.planHandle, input.expectedRevision, row) : row.optionId) === input.optionId) : result.selected;
+  if (input.optionId && !option) return businessError({ reasonCode: "not_found", fieldPath: "optionId", message: "Not found." });
+  const optionId = option?.optionId ?? null;
 
   let inserted = false;
   const response = await input.store.transaction(async (store) => {

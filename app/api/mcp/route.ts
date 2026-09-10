@@ -4,7 +4,7 @@ import { createLogger } from "@/lib/logger";
 import { requestCorrelationId } from "@/lib/request-correlation";
 import { AGENTIC_CONTRACT_VERSION, loadAgenticConfig } from "@/lib/agentic/config";
 import { agenticServerInstructions } from "@/lib/agentic/contract";
-import { CLIENT_CONTRACT_VERSION_HEADER } from "@/lib/agentic/contract/presentation-default";
+import { CLIENT_CONTRACT_VERSION_HEADER } from "@/lib/agentic/contract/version-pin";
 import {
   canonicalPublicToolName,
   handleLightweightJsonRpc,
@@ -143,7 +143,9 @@ async function handlePost(request: Request) {
     if (!Array.isArray(body) && !mcpCallNeedsStore(body)) {
       const light = await handleLightweightJsonRpc(
         loadAgenticConfig(request),
-        body as JsonRpcRequest
+        body as JsonRpcRequest,
+        undefined, { clientContractVersion: request.headers.get(CLIENT_CONTRACT_VERSION_HEADER) ?? undefined,
+          resultContent: request.headers.get("x-mattanutra-result-content") === "text" ? "text" : "structured" }
       );
 
       if (light === null) {
@@ -180,7 +182,7 @@ async function handlePost(request: Request) {
 
     const result = await withQaSessionSnapshot(qaNamespace || undefined, () =>
       handleJsonRpc({ ...runtime, clientContractVersion: request.headers.get(CLIENT_CONTRACT_VERSION_HEADER) ?? undefined,
-        resultContent: request.headers.get("x-mattanutra-result-content") === "structured" ? "structured" : undefined }, body as JsonRpcRequest)
+        resultContent: request.headers.get("x-mattanutra-result-content") === "text" ? "text" : "structured" }, body as JsonRpcRequest)
     );
 
     if (!result) {

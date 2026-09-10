@@ -1,3 +1,4 @@
+import { validateContractPin } from "@/lib/agentic/contract/version-pin";
 import { positioning } from "@/lib/agentic/discovery/positioning";
 import { measureService } from "@/lib/service-metrics";
 import { computeSchemaChecksum } from "@/lib/agentic/release-manifest";
@@ -161,10 +162,6 @@ export function toolText(value: unknown) {
     const fulfilment = record(recordValue.fulfilment).status;
     return `Order ${recordValue.orderReference}: payment=${recordValue.paymentStatus}${typeof fulfilment === "string" ? `; fulfilment=${fulfilment}` : ""}.`;
   }
-  if (recordValue.responseView === "status" && typeof recordValue.planHandle === "string") {
-    return `Plan revision ${recordValue.revision}; refinement=${recordValue.operationStatus ?? recordValue.status}.`;
-  }
-
   if (typeof recordValue.serviceName === "string") {
     return `${recordValue.serviceName} ${recordValue.environment ?? ""} contract ${recordValue.contractVersion ?? ""}`.trim();
   }
@@ -191,23 +188,16 @@ function structuredSummary(value: unknown) {
   return short + suffix;
 }
 
-export function toolResult(value: unknown, isError = false, tool?: string, resultContent?: "structured") {
-  const view = record(value).responseView ?? "full";
-  void resultContent; // Legacy opt-in remains accepted; concise views now always avoid JSON clones.
-  const concise = !isError && (view === "conversation" || view === "status");
+export function toolResult(value: unknown, isError = false, tool?: string, resultContent?: "structured" | "text") {
+  const textOnly = resultContent === "text";
   const sampled = Boolean(tool && process.env.NODE_ENV !== "test" && responseSample++ % 64 === 0);
   const finish = measureService("serialization.ms");
-  const serialized = !concise || sampled ? JSON.stringify(value) : "";
+  const serialized = textOnly || sampled ? JSON.stringify(value) : "";
   finish();
-  const content = concise ? [{ type: "text", text: structuredSummary(value) }] : [
-    { type: "text", text: toolText(value) }, { type: "text", text: serialized }
-  ];
-  const result = { content, isError, structuredContent: value };
-  if (sampled) {
-    responseLog.info("response_bytes", { tool, view, structuredBytes: Buffer.byteLength(serialized, "utf8"),
-      textBytes: content.reduce((sum, row) => sum + Buffer.byteLength(row.text, "utf8"), 0),
-      responseBytes: Buffer.byteLength(JSON.stringify({ content, isError, structuredContent: null }), "utf8") - 4 + Buffer.byteLength(serialized, "utf8"), sampleEvery: 64, concise, isError });
-  }
+  const content = [{ type: "text", text: textOnly ? serialized : structuredSummary(value) }];
+  const result = { content, isError, ...(!textOnly ? { structuredContent: value } : {}) };
+  if (sampled) responseLog.info("response_bytes", { tool, structuredBytes: textOnly ? 0 : Buffer.byteLength(serialized, "utf8"),
+    textBytes: Buffer.byteLength(content[0].text, "utf8"), responseBytes: Buffer.byteLength(JSON.stringify(result), "utf8"), sampleEvery: 64, textOnly, isError });
   return result;
 }
 
@@ -239,9 +229,12 @@ export function mcpCallNeedsStore(body: unknown) {
 export async function handleLightweightJsonRpc(
   config: AgenticConfig,
   body: JsonRpcRequest,
-  isolatedInfo?: IsolatedInfoCatalog
+  isolatedInfo?: IsolatedInfoCatalog,
+  transport: { clientContractVersion?: string; resultContent?: "structured" | "text" } = {}
 ): Promise<JsonRpcResponse | null | undefined> {
   const id = body.id ?? null;
+  const invalidPin = validateContractPin(transport.clientContractVersion);
+  if (invalidPin) return { id, jsonrpc: "2.0", result: toolResult(invalidPin, true, undefined, transport.resultContent) };
   const method = body.method ?? "";
   const params = record(body.params);
 
@@ -323,26 +316,25 @@ export async function handleLightweightJsonRpc(
       return {
         id,
         jsonrpc: "2.0",
-        result: toolResult(schemaIssueToError(issue), true)
+        result: toolResult(schemaIssueToError(issue), true, "info", transport.resultContent)
       };
     }
 
     // The public info schema was validated above. Keep every supported
     // discovery selector when bypassing the full store-backed dispatcher.
-    const infoArgs = args as Pick<Parameters<typeof infoTool>[0], "locale" | "view" | "planOperation">;
+    const infoArgs = args as Pick<Parameters<typeof infoTool>[0], "locale" | "view">;
 
     const value = await infoTool({
       config,
       isolatedInfo,
       locale: infoArgs.locale,
-      view: infoArgs.view,
-      planOperation: infoArgs.planOperation
+      view: infoArgs.view
     });
 
     const response = validateToolInput(AGENTIC_OUTPUT_SCHEMAS.info, value)
       ? businessError({ message: "The capability response is temporarily unavailable.", reasonCode: "temporarily_unavailable", nextActions: ["retry"] })
       : value;
-    return { id, jsonrpc: "2.0", result: toolResult(response, isAgenticErrorResult(response), "info") };
+    return { id, jsonrpc: "2.0", result: toolResult(response, isAgenticErrorResult(response), "info", transport.resultContent) };
   }
 
   return undefined;

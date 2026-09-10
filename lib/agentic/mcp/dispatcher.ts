@@ -1,8 +1,4 @@
-import { publicPlanFields } from "@/lib/agentic/public-mapper";
-import type { OrderViewInput } from "@/lib/agentic/presentation/order";
-import { readPlanStatus, readPlanPresentation } from "@/lib/agentic/presentation/plan-read";
-import { projectPlan, type PlanViewInput } from "@/lib/agentic/presentation/plan";
-import type { PlanSuccessWire } from "@/lib/agentic/contract/outputs";
+import { simplePlanTool } from "@/lib/agentic/plan/simple-service";
 import {
   AGENTIC_INPUT_SCHEMAS,
   AGENTIC_OUTPUT_SCHEMAS,
@@ -13,15 +9,11 @@ import {
 } from "@/lib/agentic/contract";
 import { createLogger } from "@/lib/logger";
 import { infoTool } from "@/lib/agentic/info";
-import { withLivePlanRequest } from "@/lib/agentic/plan/warm-dev";
-import { planTool } from "@/lib/agentic/plan/service";
-import { recordRequestStage, runObservedRequest } from "@/lib/agentic/qa/request-trace";
 import { executeTool } from "@/lib/agentic/commerce/execute";
 import { orderTool } from "@/lib/agentic/commerce/order";
 import { supportTool } from "@/lib/agentic/support";
 import { feedbackTool } from "@/lib/agentic/feedback";
 import { evidenceTool } from "@/lib/agentic/evidence/tool";
-import { planResponseView } from "@/lib/agentic/contract/presentation-default";
 import { nowIso, type AgenticRuntime } from "@/lib/agentic/runtime";
 import {
   canonicalPublicToolName,
@@ -44,78 +36,6 @@ export {
 } from "@/lib/agentic/mcp/rpc";
 export { AGENTIC_CONTRACT_VERSION } from "@/lib/agentic/config";
 
-function inferPlanOperation(params: Record<string, unknown>) {
-  if (typeof params.operation === "string") {
-    return params.operation;
-  }
-
-  if (!params.planHandle) {
-    return "create";
-  }
-
-  if (Array.isArray(params.answers) && params.answers.length > 0) {
-    return "answer";
-  }
-
-  if (params.safetyAcknowledgement != null) {
-    return "answer";
-  }
-
-  if (
-    typeof params.optionId === "string" ||
-    typeof params.selectOptionId === "string"
-  ) {
-    return "select";
-  }
-
-  if (params.request != null || params.requestPatch != null) {
-    return "revise";
-  }
-
-  return "get";
-}
-
-function withPlanOperation(args: unknown): unknown {
-  if (!args || typeof args !== "object" || Array.isArray(args)) {
-    return args;
-  }
-
-  const params = args as Record<string, unknown>;
-  const operation = inferPlanOperation(params);
-
-  if (operation === "get") {
-    return {
-      ...params,
-      operation: "get",
-      planHandle: params.planHandle
-    };
-  }
-
-  if (operation === "select") {
-    const optionId =
-      typeof params.optionId === "string" ? params.optionId : params.selectOptionId;
-    const { selectOptionId: _selectOptionId, ...rest } = params;
-    void _selectOptionId;
-    return {
-      ...rest,
-      operation,
-      optionId
-    };
-  }
-
-  if (operation === "answer") {
-    return {
-      ...params,
-      operation
-    };
-  }
-
-  return {
-    ...params,
-    operation
-  };
-}
-
 async function callTool(
   runtime: AgenticRuntime,
   name: string,
@@ -133,24 +53,14 @@ async function callTool(
   }
 
   const schema = AGENTIC_INPUT_SCHEMAS[canonical];
-  const args =
-    canonical === "plan"
-      ? withPlanOperation(rawArgs === undefined ? {} : rawArgs)
-      : rawArgs === undefined
-        ? {}
-        : rawArgs;
+  const args = rawArgs ?? {};
   const issues = validateToolIssues(schema, args);
 
   if (issues.length > 0) {
-    return { result: toolResult(schemaIssuesToError(issues), true) };
+    return { result: toolResult(schemaIssuesToError(issues), true, canonical, runtime.resultContent) };
   }
 
   const params = record(args);
-  if (canonical === "plan") {
-    const view = planResponseView(params.responseView as "conversation" | "full" | "status" | "details" | undefined, runtime.clientContractVersion);
-    if (typeof view !== "string") return { result: toolResult(view, true) };
-    params.responseView = view;
-  }
   const now = runtime.now ?? nowIso();
 
   try {
@@ -160,87 +70,14 @@ async function callTool(
       case "info":
         value = await infoTool({
           view: params.view as "overview" | "client_guide" | "plan_schema" | undefined,
-          planOperation: params.planOperation as "create" | "get" | "revise" | "answer" | "select" | undefined,
           config: runtime.config,
           isolatedInfo: runtime.isolatedInfo,
           locale: typeof params.locale === "string" ? params.locale : undefined
         });
         break;
-      case "plan": {
-        if (params.operation === "get" && params.responseView === "status") {
-          value = await readPlanStatus(runtime, String(params.planHandle), typeof params.knownResultVersion === "string" ? params.knownResultVersion : undefined);
-          break;
-        }
-        if (params.operation === "get" && params.responseView === "details") {
-          const state = await readPlanPresentation(runtime, String(params.planHandle));
-          if (isAgenticErrorResult(state)) value = state;
-          else {
-            const request = Array.isArray(params.sections) && params.sections.includes("request") ? state.originalRequest() : undefined;
-            if (isAgenticErrorResult(request)) value = request;
-            else {
-              const projected = projectPlan({ ...publicPlanFields(state.result), ok: true, planHandle: String(params.planHandle), revision: state.revision.revision,
-                ...(request ? { originalRequest: request } : {}) } as PlanSuccessWire, params as PlanViewInput & { responseView: "details" });
-              value = isAgenticErrorResult(projected) ? projected : { ...projected, resultVersion: state.resultVersion };
-            }
-          }
-          break;
-        }
-        const planKey =
-          typeof params.idempotencyKey === "string" && params.idempotencyKey.trim()
-            ? params.idempotencyKey
-            : `anon:${now}`;
-        value = await runObservedRequest(`plan:${planKey}`, async () => {
-          await recordRequestStage(`plan:${planKey}`, "ingress_accepted");
-          await recordRequestStage(`plan:${planKey}`, "handler_admitted");
-          const created = await withLivePlanRequest(() =>
-            planTool({
-              config: runtime.config,
-              deferProcessing: runtime.deferProcessing,
-              matchPort: runtime.matchPort,
-              now,
-              payload: {
-                answers: params.answers,
-                expectedRevision:
-                  typeof params.expectedRevision === "number"
-                    ? params.expectedRevision
-                    : undefined,
-                idempotencyKey:
-                  typeof params.idempotencyKey === "string"
-                    ? params.idempotencyKey
-                    : undefined,
-                operation:
-                  params.operation === "answer" ||
-                  params.operation === "create" ||
-                  params.operation === "get" ||
-                  params.operation === "revise" ||
-                  params.operation === "select"
-                    ? params.operation
-                    : undefined,
-                planHandle:
-                  typeof params.planHandle === "string" ? params.planHandle : undefined,
-                request: params.request,
-                requestPatch: params.requestPatch,
-                searchEffort: params.searchEffort === "expanded" ? "expanded" : params.searchEffort === "standard" ? "standard" : undefined,
-                safetyAcknowledgement: params.safetyAcknowledgement,
-                selectOptionId:
-                  typeof params.optionId === "string"
-                    ? params.optionId
-                    : typeof params.selectOptionId === "string"
-                      ? params.selectOptionId
-                      : undefined
-              },
-              scope: runtime.scope,
-              store: runtime.store
-            })
-          );
-          await recordRequestStage(`plan:${planKey}`, "durable_committed");
-          await recordRequestStage(`plan:${planKey}`, "serialization_completed");
-          await recordRequestStage(`plan:${planKey}`, "response_handed_to_transport");
-          await recordRequestStage(`plan:${planKey}`, "request_released");
-          return created;
-        });
+      case "plan":
+        value = await simplePlanTool(runtime, params);
         break;
-      }
       case "execute":
         value = await executeTool({
           config: runtime.config,
@@ -255,7 +92,7 @@ async function callTool(
         break;
       case "order":
         value = await orderTool({
-          ...(params as OrderViewInput),
+          ...(typeof params.locale === "string" ? { locale: params.locale } : {}),
           config: runtime.config,
           now,
           orderHandle: String(params.orderHandle),
@@ -278,8 +115,8 @@ async function callTool(
         break;
       case "evidence":
         value = await evidenceTool({ config: runtime.config, now, scope: runtime.scope, store: runtime.store,
-          evidenceHandle: String(params.evidenceHandle), claimIds: params.claimIds as string[] | undefined,
-          locale: params.locale as string | undefined, mode: params.mode as string | undefined });
+          planHandle: String(params.planHandle), expectedRevision: Number(params.expectedRevision), optionId: String(params.optionId),
+          ingredientId: params.ingredientId as string | undefined, productId: params.productId as string | undefined });
         break;
       case "feedback":
         value = await feedbackTool({
@@ -306,26 +143,6 @@ async function callTool(
         });
     }
 
-    if (canonical === "plan" && value && typeof value === "object" && "ok" in value && value.ok === true && params.responseView &&
-      (params.responseView !== "full" || params.operation !== "get") && params.responseView !== "status" && !("responseView" in value)) {
-      const full = value as PlanSuccessWire;
-      // Pending edits have an admitted operation, but intentionally no result
-      // row yet. Read the committed revision and operation for their version.
-      const state = await readPlanPresentation(runtime, full.planHandle, full.status === "processing" ? undefined : full.revision);
-      if (isAgenticErrorResult(state)) value = state;
-      else if (params.responseView === "details" && state.plan.currentRevision !== params.expectedRevision) value = businessError({ reasonCode: "stale_revision", fieldPath: "expectedRevision", currentRevision: state.plan.currentRevision, requestedRevision: Number(params.expectedRevision), message: "Reload the plan before requesting its details." });
-      else {
-        const request = params.responseView === "details" && Array.isArray(params.sections) && params.sections.includes("request") ? state.originalRequest() : undefined;
-        if (isAgenticErrorResult(request)) value = request;
-        else {
-          // A terminal idempotency receipt remains immutable. Present its current
-          // freshness without allowing an old ready response to authorize purchase.
-          const presented = (state.refreshRequired && full.status !== "processing" ? { ...full, ...publicPlanFields(state.result) } : full) as PlanSuccessWire;
-          const projected = projectPlan({ ...presented, ...(request ? { originalRequest: request as PlanSuccessWire["originalRequest"] } : {}) }, params as PlanViewInput);
-          value = isAgenticErrorResult(projected) || params.responseView === "full" ? projected : { ...projected, resultVersion: state.resultVersion };
-        }
-      }
-    }
     const outputIssues = validateToolIssues(AGENTIC_OUTPUT_SCHEMAS[canonical], value);
     if (outputIssues.length > 0) {
       log.error("contract_output_invalid", { tool: canonical, fields: outputIssues.map(issue => issue.fieldPath) });
@@ -347,7 +164,7 @@ async function callTool(
           reasonCode: "temporarily_unavailable",
           retryable: true
         }),
-        true
+        true, canonical, runtime.resultContent
       )
     };
   }
@@ -360,7 +177,8 @@ export async function handleJsonRpc(
   const light = await handleLightweightJsonRpc(
     runtime.config,
     body,
-    runtime.isolatedInfo
+    runtime.isolatedInfo,
+    runtime
   );
 
   if (light !== undefined) {

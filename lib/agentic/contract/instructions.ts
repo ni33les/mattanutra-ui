@@ -3,11 +3,11 @@ import { agentCard, OVERVIEW_CARD, SERVICE_SCOPE, READY_MEANING } from "@/lib/ag
 export { AGENTIC_PUBLIC_TOOLS, type AgenticPublicToolName } from "@/lib/agentic/contract/names";
 
 const OPERATIONAL_DESCRIPTIONS = {
-  info: `${SERVICE_SCOPE} ${READY_MEANING} Call first: view=overview | client_guide | plan_schema (choose planOperation). Medication/condition codes are accepted inputs, not evidence of an assessed interaction.`,
+  info: `${SERVICE_SCOPE} ${READY_MEANING} Optional discovery: overview, client_guide or the unified plan_schema. Medication/condition codes are accepted inputs, not evidence of an assessed interaction.`,
   plan: OVERVIEW_CARD,
-  evidence: "Read attached claim text for a plan’s returned evidenceHandle; mode=summary or sources. Does not change the plan.",
+  evidence: "Read supporting facts for a returned plan/option and ingredient or product ID. Requires current expectedRevision; does not change the plan.",
   execute: "After the person confirms the selected revision, create/recover checkout with the same idempotency key; health advice is advisory.",
-  order: "Read payment/fulfilment: conversation for recovery; status + knownResultVersion to poll; details for frozen_order/events. Honor the last pollAfterSeconds until terminal=true.",
+  order: "Read one concise payment/fulfilment and recovery response. Honor pollAfterSeconds while nextAction=poll; follow the returned action.",
   support: "Open an order help case; include its returned supportHandle to reply.",
   feedback: "Submit optional feedback for one plan revision only with consentConfirmed=true; this never changes a plan or checkout."
 } as const;

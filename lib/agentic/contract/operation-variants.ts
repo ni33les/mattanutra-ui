@@ -1,7 +1,6 @@
 import type { TSchema } from "@sinclair/typebox";
 
-/** Expose every field on the operation card. Keep the original anyOf intact:
- * required combinations and rejection of fields from another view are unchanged. */
+/** Expose every flat field to hosts while preserving mutually exclusive branches. */
 export function visibleOperationVariants<T extends TSchema>(schema: T): T {
   const variants = schema.anyOf as TSchema[];
   const keys = [...new Set(variants.flatMap(row => Object.keys(row.properties)))];

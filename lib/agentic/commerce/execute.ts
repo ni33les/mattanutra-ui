@@ -536,15 +536,12 @@ async function executeFresh(
       return stored;
     }
 
-    if (!planContractCompatible(result.contractVersion)) {
-      return businessError({ reasonCode: "contract_refresh_required",
-        message: "Refresh this unexecuted plan with revise, its expectedRevision and requestPatch:{} before creating checkout.",
-        nextAction: "revise_plan", fieldPath: "expectedRevision" });
-    }
+    if (!planContractCompatible(result.contractVersion)) return businessError({ reasonCode: "not_found", message: "Not found.", fieldPath: "planHandle" });
+    if (result.requestSnapshot.scoring && !result.requestSnapshot.pinnedOptionId) return businessError({ reasonCode: "plan_not_ready", fieldPath: "planHandle", message: "Select a returned option with the current revision before checkout." });
     if (revision.status !== "ready" || !snapshot) return executeError(locale, "plan_not_ready");
 
     const selected = result.selected;
-    if (selected?.snapshotId && selected.snapshotId !== catalogueSnapshotId(snapshot)) return businessError({ fieldPath: "expectedRevision", reasonCode: "availability_changed", message: "Catalogue facts changed after this plan was evaluated. Refresh the unexecuted plan with revise.requestPatch={} and review it before checkout.", nextActions: ["refresh_plan"] });
+    if (selected?.snapshotId && selected.snapshotId !== catalogueSnapshotId(snapshot)) return businessError({ fieldPath: "expectedRevision", reasonCode: "availability_changed", message: "Catalogue facts changed after this plan was evaluated. Refresh with scoring:{} and the current revision, then review and select before checkout.", nextActions: ["refresh_plan"] });
     const unavailable = Boolean(
       selected?.basket.some((item) => {
         const product = snapshot.products.find((row) => row.productId === item.productId);

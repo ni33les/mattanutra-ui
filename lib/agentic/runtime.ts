@@ -22,7 +22,7 @@ export type IsolatedInfoCatalog = Readonly<{
 export type AgenticRuntime = Readonly<{
   config: AgenticConfig;
   clientContractVersion?: string;
-  resultContent?: "structured";
+  resultContent?: "structured" | "text";
   deferProcessing?: boolean;
   isolatedInfo?: IsolatedInfoCatalog;
   matchPort?: PlanMatchPort;
@@ -45,7 +45,7 @@ export function createAgenticRuntime(overrides?: Partial<AgenticRuntime>): Agent
   return {
     config,
     ...(overrides?.clientContractVersion !== undefined ? { clientContractVersion: overrides.clientContractVersion } : {}),
-    ...(overrides?.resultContent === "structured" ? { resultContent: "structured" as const } : {}),
+    ...(overrides?.resultContent ? { resultContent: overrides.resultContent } : {}),
     ...(overrides?.deferProcessing ? { deferProcessing: true } : {}),
     ...(overrides?.isolatedInfo ? { isolatedInfo: overrides.isolatedInfo } : {}),
     ...(overrides?.matchPort ? { matchPort: overrides.matchPort } : {}),
