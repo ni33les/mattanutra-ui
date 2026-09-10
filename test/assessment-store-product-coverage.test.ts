@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { reconcileProductRecommendationCoverage } from "../lib/assessment-store.ts";
 import type { RecommendedProduct } from "../lib/formulation-types.ts";
+import { coveredRevealNeedCount } from "../lib/marketing-coverage.ts";
 
 function recommendation(input: Readonly<{
   covers: string[];
@@ -26,6 +27,17 @@ function recommendation(input: Readonly<{
 }
 
 describe("assessment store product coverage reconciliation", () => {
+  it("preserves fractional coverage across the reveal's strict 12 percent boundary", () => {
+    for (const percent of [12, 12.01, 12.49]) {
+      const result = reconcileProductRecommendationCoverage({
+        foodGuidance: [], recommendations: [],
+        rawNeedCoverage: [{ id: "supplement:magnesium", displayName: "Magnesium", itemType: "supplement", coveragePercent: percent }],
+        supplementBreakdown: [{ id: "magnesium", supplement: "Magnesium", category: "Mineral", dailyDose: "200 mg/day", effectivenessRank: 1, rationale: "Fixture", status: "add" }]
+      });
+      assert.equal(result.needCoverage[0].coveragePercent, percent);
+      assert.equal(coveredRevealNeedCount(result.needCoverage), percent > 12 ? 1 : 0);
+    }
+  });
   it("preserves matcher stack contribution instead of summing overlapping product coverage", () => {
     const result = reconcileProductRecommendationCoverage({
       foodGuidance: [],
