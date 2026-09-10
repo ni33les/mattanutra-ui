@@ -48,6 +48,7 @@ if (packageId === "efficiency" && mode === "validate") {
   stages.push({ label: "isolated-schema", passed: true });
 }
 const events = [], batches = [];
+if (packageId === "practical" && mode === "validate") await prepareCompiledBuild();
 if (packageId === "practical" && mode === "validate") {
   assert.ok(process.env.TEST_DB_URL, "Complete maintained matching requires isolated PostgreSQL");
   const report = await runBatch("complete-mcp-regression", ["scripts/run-matcher-test-suite.mjs"], { ...safe,
@@ -85,6 +86,14 @@ async function command(label, args, env = safe) {
   const code = await new Promise((done, reject) => { const child = spawn(process.execPath, args, { env, stdio: ["ignore", fd, fd] }); child.on("error", reject); child.on("close", done); }).finally(() => closeSync(fd));
   console.log(JSON.stringify({ stage: label, passed: code === 0 })); assert.equal(code, 0, `${label} failed`); stages.push({ label, passed: true });
 }
+async function prepareCompiledBuild() {
+  await command("typecheck", ["node_modules/typescript/bin/tsc", "--noEmit"]);
+  const lint = git("diff", "--name-only", "--diff-filter=ACMR", MCP721_BASE, "HEAD").split("\n").filter(file => /\.(?:[cm]?js|tsx?)$/.test(file));
+  save("lint-files.json", { releaseBase: MCP721_BASE, files: lint }); assert.ok(lint.length);
+  await command("release-diff-lint", ["node_modules/eslint/bin/eslint.js", ...lint]);
+
+  await command("production-build", ["node_modules/next/dist/bin/next", "build", "--webpack"], { ...safe, NODE_ENV: "production", NEXT_BUILD_SKIP_TYPECHECK: "1", ...(packageId === "efficiency" ? { NODE_OPTIONS: "--max-old-space-size=4096", NEXT_BUILD_CPUS: "1" } : {}) });
+}
 if (mode === "validate") {
   const identity = mcp721Identity(source.sha256, commit, packageId);
   if (packageId === "efficiency") {
@@ -97,12 +106,7 @@ if (mode === "validate") {
       deploymentBases:identity.deploymentBases, lockRegisterSha256:identity.lockRegisterSha256});
     stages.push({label:"lock-register-verification", passed:true});
   }
-  await command("typecheck", ["node_modules/typescript/bin/tsc", "--noEmit"]);
-  const lint = git("diff", "--name-only", "--diff-filter=ACMR", MCP721_BASE, "HEAD").split("\n").filter(file => /\.(?:[cm]?js|tsx?)$/.test(file));
-  save("lint-files.json", { releaseBase: MCP721_BASE, files: lint }); assert.ok(lint.length);
-  await command("release-diff-lint", ["node_modules/eslint/bin/eslint.js", ...lint]);
-
-  await command("production-build", ["node_modules/next/dist/bin/next", "build", "--webpack"], { ...safe, NODE_ENV: "production", NEXT_BUILD_SKIP_TYPECHECK: "1", ...(packageId === "efficiency" ? { NODE_OPTIONS: "--max-old-space-size=4096", NEXT_BUILD_CPUS: "1" } : {}) });
+  if (packageId !== "practical") await prepareCompiledBuild();
   if (packageId === "discovery") {
     assert.ok(process.env.TEST_DB_URL, "Complete MCP regression requires isolated PostgreSQL");
     await command("complete-mcp-regression", ["scripts/run-matcher-test-suite.mjs"], { ...safe,

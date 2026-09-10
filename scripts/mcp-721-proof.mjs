@@ -20,7 +20,7 @@ export const MCP_PACKAGES = {
 };
 export const MCP721_STAGES = ["affected-tests", "typecheck", "release-diff-lint", "production-build", "unchanged-source-and-inputs"];
 export function packageStages(packageId) {
-  if (packageId === "practical") return ["complete-mcp-regression", "affected-tests", "typecheck", "release-diff-lint", "production-build", "affected-browser-tests", "bounded-semantic-comparison", "no-new-locks", "unchanged-source-and-inputs"];
+  if (packageId === "practical") return ["typecheck", "release-diff-lint", "production-build", "complete-mcp-regression", "affected-tests", "affected-browser-tests", "bounded-semantic-comparison", "no-new-locks", "unchanged-source-and-inputs"];
   if (packageId === "discovery") return [...MCP721_STAGES.slice(0, 4), "complete-mcp-regression", ...MCP721_STAGES.slice(4)];
   return packageId === "efficiency" ? ["isolated-schema", "affected-tests", "lock-register-verification", "typecheck", "release-diff-lint", "production-build", "affected-browser-tests", "repeated-baseline-comparison", "unchanged-source-and-inputs"] : MCP721_STAGES;
 }
