@@ -61,7 +61,7 @@ test('SPLAN-SPEC-02 order and unified schema discovery have no response-mode sel
 test('SPLAN-REQ-06 normalized domain errors name the flat public field without a retired wrapper', async () => {
   const { installGoldCatalogue, uninstallGoldCatalogue }=await import('../helpers/gold-catalogue.ts');
   const { createAgenticRuntime }=await import('../../lib/agentic/runtime.ts');
-  const { handleJsonRpc }=await import('../../lib/agentic/mcp/dispatcher.ts');
+  const { handleCompletedJsonRpc: handleJsonRpc }=await import('../helpers/completed-mcp-client.ts');
   installGoldCatalogue();
   try {
     for (const [suffix, fields, expected] of [

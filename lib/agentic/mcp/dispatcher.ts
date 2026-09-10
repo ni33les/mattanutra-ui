@@ -78,6 +78,10 @@ async function callTool(
         break;
       case "plan":
         value = await simplePlanTool(runtime, params);
+        if (isAgenticErrorResult(value)) value = { ...value, error: { ...value.error,
+          fieldPath: value.error.fieldPath?.replace(/^request\./, "") ?? null,
+          ...(value.error.issues ? { issues: value.error.issues.map(issue => ({ ...issue, fieldPath: issue.fieldPath.replace(/^request\./, "") })) } : {})
+        } };
         break;
       case "execute": {
         const state = await readPlanState(runtime, String(params.planHandle));
