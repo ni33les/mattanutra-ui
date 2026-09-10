@@ -40,7 +40,7 @@ import {
   supportRespectsContract
 } from "../lib/agentic/contract/support-result.ts";
 import { publicCoverage, publicPlanFields } from "../lib/agentic/public-mapper.ts";
-import { handleCompletedFullJsonRpc as handleJsonRpc } from "./helpers/completed-mcp-client.ts";
+import { handleCompletedJsonRpc as handleJsonRpc } from "./helpers/completed-mcp-client.ts";
 import { validateToolIssues } from "../lib/agentic/contract/validate.ts";
 import { EVIDENCE_INPUT_SCHEMA } from "../lib/agentic/contract/schemas.ts";
 import { queryCount, resetQueryBudget } from "../lib/agentic/plan/query-budget.ts";

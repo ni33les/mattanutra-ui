@@ -8,7 +8,7 @@ import { checkoutResponsibilityCopy } from "../lib/agentic/responsibility/matrix
 import { RESEARCH_VERSION, RESPONSIBILITY_VERSION } from "../lib/agentic/discovery/versions.ts";
 import { FUNNEL_EVENT_TYPES } from "../lib/agentic/funnel/events.ts";
 import { recordFunnelEvent, resetFunnelLedger, listFunnelEvents } from "../lib/agentic/funnel/ledger.ts";
-import { handleCompletedFullJsonRpc as handleJsonRpc } from "./helpers/completed-mcp-client.ts";
+import { handleCompletedJsonRpc as handleJsonRpc } from "./helpers/completed-mcp-client.ts";
 import { handleQaJsonRpc } from "../lib/agentic/mcp/qa-dispatcher.ts";
 import { completedPlanTool as planTool } from "./helpers/completed-mcp-client.ts";
 import { executeTool } from "../lib/agentic/commerce/execute.ts";
