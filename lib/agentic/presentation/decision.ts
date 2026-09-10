@@ -44,11 +44,19 @@ export function decisionOptionId(planHandle: string, revision: number, option: S
 }
 export function decisionOptions(result: PlanResult) {
   const seen = new Set<string>();
-  return [result.selected, ...result.alternatives].filter((option): option is StackOption => {
+  const options = [result.selected, ...result.alternatives].filter((option): option is StackOption => {
     if (!option) return false;
     const key = JSON.stringify(option.basket.map(row => [row.productId, row.servingsPerDay]).sort());
     if (seen.has(key)) return false; seen.add(key); return true;
   });
+  // Empty supply is still a decision: preserve requested ingredients and gaps
+  // using the committed coverage, without inventing a purchasable routine.
+  if (!options.length && (result.requestSnapshot.originalRequest?.targets ?? result.requestSnapshot.targets).length) {
+    options.push({ optionId: "empty", basket: [], coverage: result.coverage, coveragePercent: 0, dailyPills: 0,
+      totalPriceMinor: 0, purchaseEligible: false, roles: ["best_match"], reason: result.summary,
+      matcherVersion: result.matcherTelemetry.matcherVersion, snapshotId: result.matcherTelemetry.snapshotId });
+  }
+  return options;
 }
 type Ready = Extract<SimplePlanDecision, { choices: unknown }>;
 type Ingredient = Ready["choices"][number]["ingredients"][number];
@@ -167,10 +175,12 @@ export function presentDecision(result: PlanResult, planHandle: string, revision
   const recommended = options.find(option => option.roles?.includes("best_match")) ?? result.selected;
   const noTargets = !(state.originalRequest?.targets ?? state.targets).length;
   const noPurchase = noTargets || result.status === "no_purchase";
+  const alreadyCovered = noTargets || result.matchingDiagnostics?.reasonCode === "targets_already_covered";
+  const purchaseAvailable = options.some(option => option.basket.length && option.purchaseEligible !== false);
   const refresh = Boolean(result.refreshRequired), questions = result.questions ?? [];
   const status = refresh || questions.length || (!(pinned ?? recommended)?.basket.length && !noPurchase) ? "needs_input" : noPurchase ? "no_purchase" : "ready";
-  const nextAction = refresh ? "change_request" : questions.length ? "answer_questions" : noPurchase ? result.horizon?.nextReplenishmentDay && result.horizon?.nextReplenishmentDay > 0 ? "replenish_later" : "no_purchase" : pinned?.basket.length ? "execute" : recommended?.basket.length ? "confirm_with_user" : "review_options";
-  let summary: string = refresh ? text.stale : questions.length ? text.question : noTargets ? text.noTargets : noPurchase ? text.none : pinned ? text.selected : recommended?.basket.length ? text.ready : text.review;
+  const nextAction = refresh ? "change_request" : questions.length ? "answer_questions" : noPurchase && !alreadyCovered ? purchaseAvailable ? "review_options" : "change_request" : noPurchase ? result.horizon?.nextReplenishmentDay && result.horizon?.nextReplenishmentDay > 0 ? "replenish_later" : "no_purchase" : pinned?.basket.length ? "execute" : recommended?.basket.length ? "confirm_with_user" : "review_options";
+  let summary: string = refresh ? text.stale : questions.length ? text.question : noTargets ? text.noTargets : noPurchase ? alreadyCovered ? text.none : text.review : pinned ? text.selected : recommended?.basket.length ? text.ready : text.review;
   const unassessed = state.medicationCodes.some(code => !(result.selected?.safety?.assessedMedicationCodes ?? []).includes(code)) || state.conditionCodes.some(code => !(result.selected?.safety?.assessedConditionCodes ?? []).includes(code));
   if (unassessed) summary += ` ${text.unknown}`;
   return { ok: true, planHandle, revision, status, summary, scoring: state.scoring ?? patchScoring(undefined), currency: state.currency,
@@ -178,7 +188,7 @@ export function presentDecision(result: PlanResult, planHandle: string, revision
     selectedOptionId: pinned ? decisionOptionId(planHandle, revision, pinned) : null, nextAction,
     ...(refresh ? { refreshRequired: true } : {}), ...(result.horizon?.nextReplenishmentDay && result.horizon?.nextReplenishmentDay > 0 ? { nextReplenishmentDay: result.horizon?.nextReplenishmentDay } : {}),
     ...(questions.length ? { questions: questions.map(row => ({ questionId: row.questionId, prompt: row.prompt, choices: row.choices.map(choice => ({ choice: choice.choice, label: choice.label })) })) } : {}),
-    choices: options.filter(option => option.basket.length > 0).map(option => {
+    choices: options.map(option => {
       const ingredients = choiceIngredients(result, option), requested = ingredients.filter(row => row.requested !== null);
       const coverageComplete = requested.every(row => typeof row.existing === "number" && row.supplied !== null);
       const coverage = requested.length ? 100 * requested.reduce((n, row) => n + Math.min(1, ((typeof row.existing === "number" ? row.existing : row.existing?.minimum ?? 0) + (row.supplied ?? row.suppliedAtLeast ?? 0)) / row.requested!), 0) / requested.length : 0;
