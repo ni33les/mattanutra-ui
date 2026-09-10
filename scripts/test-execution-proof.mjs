@@ -22,9 +22,18 @@ export function testSourceHygiene(source, file) {
           if (ts.isObjectLiteralExpression(argument)) {
             for (const prop of argument.properties) {
               if (ts.isPropertyAssignment(prop) && ["skip", "todo", "only"].includes(prop.name.getText(parsed)) && prop.initializer.kind !== ts.SyntaxKind.FalseKeyword && (prop.initializer.kind === ts.SyntaxKind.TrueKeyword || ts.isStringLiteral(prop.initializer))) report(`Acceptance cannot set ${prop.name.getText(parsed)}`);
+              if (ts.isPropertyAssignment(prop) && prop.name.getText(parsed) === "retries" && prop.initializer.getText(parsed) !== "0") report("Acceptance cannot use automatic retries");
             }
           }
           if ((ts.isArrowFunction(argument) || ts.isFunctionExpression(argument)) && ts.isBlock(argument.body) && argument.body.statements.length === 0) report("Acceptance cannot contain an empty test or suite");
+          if ((ts.isArrowFunction(argument) || ts.isFunctionExpression(argument)) && ts.isBlock(argument.body)) {
+            for (const statement of argument.body.statements) {
+              if (!ts.isIfStatement(statement)) continue;
+              const branch = statement.thenStatement;
+              const exits = ts.isReturnStatement(branch) ? [branch] : ts.isBlock(branch) ? branch.statements : [];
+              if (exits.length === 1 && ts.isReturnStatement(exits[0]) && !exits[0].expression) report("Acceptance cannot pass an empty precondition by returning without an assertion");
+            }
+          }
         }
       }
     }
