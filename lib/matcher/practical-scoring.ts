@@ -40,7 +40,7 @@ export function resolvePracticalProfile(request: ProfileRequest): Profile {
   const pricePreferenceBasis = request.pricePreferenceBasis ?? "first_order";
   if (!["first_order", "monthly_30_days"].includes(pricePreferenceBasis)) throw new Error("pricePreferenceBasis is invalid");
   const config = { id: request.optimization, version: PRACTICAL_SCORING_VERSION, multipliers: PROFILES[request.optimization], importance, pricePreferenceBasis,
-    importanceFactors: IMPORTANCE, coefficients: { preference: "0.25", routine: "0.05", uncertainty: "0.25", pillsScale: 3, priceScaleMinor: 100000, zeroPriceScaleMinor: 10000, currency: "THB" } };
+    importanceFactors: IMPORTANCE, fallbackObjectives: "only_when_corresponding_preference_is_absent", coefficients: { preference: "0.25", routine: "0.05", uncertainty: "0.25", pillsScale: 3, priceScaleMinor: 100000, zeroPriceScaleMinor: 10000, currency: "THB" } };
   const key = JSON.stringify(config);
   let value = profiles.get(key);
   if (!value) { value = Object.freeze({ id: config.id, version: config.version, hash: sha256Hex(key), multipliers: config.multipliers,
@@ -116,9 +116,9 @@ export function scorePracticalPenalties(request: Pick<CanonicalRequest, "currenc
       scale, importance: profile.importance[row.field], multiplier: row.multiplier, penalty: toNumber(penalty) }];
   })) as Record<Field, PreferencePenalty>;
   const exactComponents = {
-    pills: multiply(fromDecimal(0.05 * m.pills), divide(pills, fromDecimal(3))),
-    products: multiply(fromDecimal(0.05 * m.products), products),
-    price: multiply(fromDecimal(0.05 * m.price), divide(price, fromDecimal(100000))),
+    pills: request.maxDailyPills == null ? multiply(fromDecimal(0.05 * m.pills), divide(pills, fromDecimal(3))) : ZERO,
+    products: request.maxProductCount == null ? multiply(fromDecimal(0.05 * m.products), products) : ZERO,
+    price: request.maxPriceMinor == null ? multiply(fromDecimal(0.05 * m.price), divide(price, fromDecimal(100000))) : ZERO,
     servings: multiply(fromDecimal(0.05 * m.servings), actual.servingBurdenExact ?? sum(actual.servings.map((n, i) => square(positive(subtract(measurement(n, `servings[${i}]`), fromDecimal(1))))))),
     uncertainty: multiply(fromDecimal(0.25), uncertain),
     preferences: sum(exactPreferences)

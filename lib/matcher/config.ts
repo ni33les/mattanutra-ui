@@ -21,12 +21,8 @@ export const WEB_MATCHER_CONFIG: MatcherConfig = {
   skipPostMatchCompact: true
 };
 
-export const WEB_COMPACT_MATCHER_CONFIG: MatcherConfig = {
-  ...WEB_MATCHER_CONFIG,
-  initialBeamWidth: 48,
-  maxBeamWidth: 64,
-  sellerGroupLimit: 48
-};
+// Compatibility export: compact changes penalty weights, never the search policy.
+export const WEB_COMPACT_MATCHER_CONFIG: MatcherConfig = WEB_MATCHER_CONFIG;
 
 export const MATERIAL_COVERAGE_POINTS = 5;
 export const MATERIAL_PRICE_MINOR = 1000;

@@ -123,7 +123,7 @@
   "discoveryVersion": "discovery-7.2.4-positioning-v2",
   "positioningChecksum": "c6b7d800a1d7a45377bb002022697f6732cd544ce73bd0f6352c03b3bf222bf6",
   "contractVersion": "8.0.0",
-  "schemaChecksum": "d39aeaf682ce7e511b9ec4bceae17cab3fb20adca776face4ea8e7ff3552e07a",
+  "schemaChecksum": "711d924008ca9d5f981909888fe39b89a8ead5566215dc5de9e7df1589d27f92",
   "server_url": "/api/mcp",
   "tools": [
     "info",

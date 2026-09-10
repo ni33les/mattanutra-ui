@@ -172,7 +172,7 @@ function variantsFor(cursor: SearchCursor, index: number, state: SearchState, re
     if (!group.variants.some(row => row.variantId === id)) { const next = compileVariant({ product: group.product, request, dailyUnits, dailyUnitsRatio: ratio }); if (next) (group.variants as DoseVariant[]).push(next); }
     const exists = group.variants.some(row => row.variantId === id);
     // Invalid physical probes still consume an expansion attempt.
-    const candidate = exists ? add(cursor, state, index, id, request) : (cursor.expansionAttempts++, null);
+    const candidate = exists ? add(cursor, state, index, id, request) : (cursor.expansionAttempts++, completedAttempt(cursor, request), null);
     // Probes are productive expansions too. Preserve their continuation when
     // probing consumes the rest of this group's allowance.
     if (candidate && cursor.phase === "beam") cursor.expanded.push({ ...candidate, nextGroupIndex: index + 1 });
@@ -187,6 +187,15 @@ function variantsFor(cursor: SearchCursor, index: number, state: SearchState, re
   return job.ids;
 }
 
+function reduceReview(cursor: SearchCursor, request: CanonicalRequest) {
+  cursor.review = reviewFrontier([...cursor.review, ...cursor.unreviewed], request, [], undefined, cursor.groups);
+  cursor.unreviewed = [];
+}
+function completedAttempt(cursor: SearchCursor, request: CanonicalRequest) {
+  // Retention must depend on computational work, not caller chunk/checkpoint
+  // size. Keep at most 1,000 fresh states between deterministic reductions.
+  if (cursor.expansionAttempts % 1000 === 0) reduceReview(cursor, request);
+}
 function add(cursor: SearchCursor, state: SearchState, groupIndex: number, id: string, request: CanonicalRequest) {
   const ids = state.selectedVariantIds.map(selected => indexFor(cursor.variantIds, cursor.variantIndex, selected)).sort((a, b) => a - b);
   const edge = ids.join(",") + ">" + indexFor(cursor.variantIds, cursor.variantIndex, id);
@@ -197,6 +206,7 @@ function add(cursor: SearchCursor, state: SearchState, groupIndex: number, id: s
     next = { ...next, delivered: next.exposure };
   }
   cursor.edges.set(edge, next ? remember(cursor, next) : null);
+  completedAttempt(cursor, request);
   return next;
 }
 
@@ -376,11 +386,7 @@ export function advanceSearchCursor(cursor: SearchCursor, request: CanonicalRequ
     } else cursor.done=true;
   }
   if (cursor.expansionAttempts >= cursor.expansionBudget && !cursor.done) { cursor.done=true; cursor.trimmed=true; }
-  // Keep ranking work bounded at each checkpoint too. Static extrema can be
-  // merged incrementally; the full lightweight archive remains available for
-  // repair and replay evidence without rendering every losing basket.
-  cursor.review = reviewFrontier([...cursor.review, ...cursor.unreviewed], request, [], undefined, cursor.groups);
-  cursor.unreviewed = [];
+  if (cursor.done) reduceReview(cursor, request);
   return cursor;
 }
 
@@ -401,8 +407,8 @@ export function extendSearchCursor(cursor: SearchCursor, expansionBudget: number
 }
 
 export function searchCursorResult(cursor: SearchCursor, request: CanonicalRequest): SearchRun {
-  void request;
-  const complete=cursor.exact && cursor.done && !cursor.trimmed ? [...archivedSearchStates(cursor)] : cursor.review;
+  const complete=cursor.exact && cursor.done && !cursor.trimmed ? [...archivedSearchStates(cursor)] : cursor.done ? cursor.review :
+    reviewFrontier([...cursor.review, ...cursor.unreviewed], request, [], undefined, cursor.groups);
   return { complete, groups:cursor.groups, expansionAttempts:cursor.expansionAttempts,
     mode:cursor.exact && cursor.done && !cursor.trimmed ? "exact" : "bounded", trimmed:cursor.trimmed || !cursor.exact || !cursor.done };
 }

@@ -8,7 +8,6 @@ import { canonicalTargetSetHash, impliedOmegaPreference } from "@/lib/matcher/ca
 import { canonicalizeCurrents, canonicalizeTargets } from "@/lib/matcher/canonicalizer";
 import { compileGroups, contributionFor } from "@/lib/matcher/candidates";
 import {
-  WEB_COMPACT_MATCHER_CONFIG,
   WEB_MATCHER_CONFIG
 } from "@/lib/matcher/config";
 import { coverageUnits } from "@/lib/matcher/dominance";
@@ -450,8 +449,7 @@ export function recommendWithMatcher(
     retainProductIds: [],
     retainSubjectIds: [],
     safetyCeilings: matcherSafetyCeilings(),
-    selectorMode:
-      input.stackPreference === "compact" ? "agentic" : "web_single",
+    selectorMode: "web_single",
     targets: targets.targets
   } as const;
   const compileStartedAt = Date.now();
@@ -481,9 +479,7 @@ export function recommendWithMatcher(
   const result = match(
     request,
     compiled.catalog,
-    input.stackPreference === "compact"
-      ? WEB_COMPACT_MATCHER_CONFIG
-      : WEB_MATCHER_CONFIG,
+    WEB_MATCHER_CONFIG,
     compiled.groups
   );
   const variantCount = compiled.groups.reduce(
@@ -497,10 +493,7 @@ export function recommendWithMatcher(
     mode: result.searchMode,
     searchMs: Date.now() - searchStartedAt,
     stackPreference: input.stackPreference ?? "balanced",
-    beamWidth:
-      input.stackPreference === "compact"
-        ? WEB_COMPACT_MATCHER_CONFIG.initialBeamWidth
-        : WEB_MATCHER_CONFIG.initialBeamWidth,
+    beamWidth: WEB_MATCHER_CONFIG.initialBeamWidth,
     trimmed: result.trimmed,
     variants: variantCount
   });

@@ -11614,6 +11614,7 @@
                     "enum": [
                       "targets_already_covered",
                       "empty_closest_fit",
+                      "empty_practical_fit",
                       "catalogue_empty",
                       "no_eligible_products",
                       "no_supported_quantities",
@@ -13024,6 +13025,7 @@
             "enum": [
               "targets_already_covered",
               "empty_closest_fit",
+              "empty_practical_fit",
               "catalogue_empty",
               "no_eligible_products",
               "no_supported_quantities",

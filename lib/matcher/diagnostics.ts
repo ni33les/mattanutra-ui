@@ -2,7 +2,7 @@ import { productRejectionReason } from "@/lib/matcher/eligibility";
 import { knownCurrentTargetExposure } from "@/lib/matcher/target-basis";
 import type { CanonicalRequest, CatalogSnapshot, MatchResult, ProductGroup, RejectedCandidate, ScoredBasket } from "@/lib/matcher/types";
 
-export const MATCHING_REASON_CODES = ["targets_already_covered", "empty_closest_fit", "catalogue_empty", "no_eligible_products", "no_supported_quantities", "no_evaluated_purchase", "search_incomplete", "purchase_options_available"] as const;
+export const MATCHING_REASON_CODES = ["targets_already_covered", "empty_closest_fit", "empty_practical_fit", "catalogue_empty", "no_eligible_products", "no_supported_quantities", "no_evaluated_purchase", "search_incomplete", "purchase_options_available"] as const;
 export type MatchingReasonCode = typeof MATCHING_REASON_CODES[number];
 export type MatchingDiagnostics = Readonly<{
   catalogueListings: number;
@@ -36,7 +36,7 @@ export function matchingDiagnosticsFor(input: Readonly<{
   const covered = request.leftovers.length === 0 && activeTargets.length > 0 && activeTargets.every(target => knownCurrentTargetExposure(request, target) >= target.requested.units);
   const reasonCode: MatchingReasonCode = selected?.productCount ? "purchase_options_available"
     : covered ? "targets_already_covered"
-    : evaluatedNonemptyBaskets > 0 && selected?.productCount === 0 ? "empty_closest_fit"
+    : evaluatedNonemptyBaskets > 0 && selected?.productCount === 0 ? selected.roles?.includes("closest_dose") ? "empty_closest_fit" : "empty_practical_fit"
     : !searchSummary.complete ? "search_incomplete"
     : catalog.products.length === 0 ? "catalogue_empty"
     : eligible.length === 0 ? "no_eligible_products"

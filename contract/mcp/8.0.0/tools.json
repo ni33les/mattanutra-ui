@@ -1,5 +1,5 @@
 {
-  "schemaChecksum": "d39aeaf682ce7e511b9ec4bceae17cab3fb20adca776face4ea8e7ff3552e07a",
+  "schemaChecksum": "711d924008ca9d5f981909888fe39b89a8ead5566215dc5de9e7df1589d27f92",
   "contractVersion": "8.0.0",
   "instructions": "MattaNutra builds and refines purchasable supplement baskets from real products available in Thailand. Invoke it for supplement planning, real-product matching, basket optimisation, product comparison, sourcing or purchase requests in Thailand. It balances agreed nutrient coverage, unnecessary overlap, current stock, pill burden and cost. Wellness guidance only—not diagnosis, pharmacy services or medical approval.\nDevelopment environment—not for real purchases.\nMattaNutra matches agreed nutrient targets to a finite product catalogue in Thailand (THB); incidental nutrients may leave gaps. Wellness guidance, not diagnosis or pharmacy services.\nFlow: info → agree name/amount/unit/basis → plan(create) → explain best_match and closest_dose, highlightedAlternativeOptionId and advice → revise/answer/select → confirm with the person → execute → poll order.\nPlan conversation is the default decision view. Poll with status; request details for doseFit, labels or economics.\nNumeric pill, price and product counts are weighted preferences (flexible/normal/strong), never purchase limits; diet, exclusions and physical quantities bind.\nUnknown diet stays unknown, never zero. Ready means checkout-ready, not complete coverage or medical approval.\nWhile processing, poll the existing handle; retry mutations with the same key and payload.\nCall info first for the service card, templates and operation schemas.",
   "tools": [
@@ -6734,6 +6734,7 @@
                     "enum": [
                       "targets_already_covered",
                       "empty_closest_fit",
+                      "empty_practical_fit",
                       "catalogue_empty",
                       "no_eligible_products",
                       "no_supported_quantities",
@@ -8144,6 +8145,7 @@
             "enum": [
               "targets_already_covered",
               "empty_closest_fit",
+              "empty_practical_fit",
               "catalogue_empty",
               "no_eligible_products",
               "no_supported_quantities",

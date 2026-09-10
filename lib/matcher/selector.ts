@@ -384,7 +384,9 @@ export function protectedReferenceCandidates(baskets: readonly ScoredBasket[], r
     for (const key of keys) {
       const a = other.get(key) ?? 0, b = own.get(key) ?? 0;
       if (a > b) return false;
-      if (a < b) strict = true;
+      // Priority overrides ranking only for a worse protected fact. Extra
+      // burden with identical core fit is already priced by the overall score.
+      if (a < b && !key.startsWith("practical:")) strict = true;
     }
     return strict;
   }));
