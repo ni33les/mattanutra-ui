@@ -77,3 +77,12 @@ test('PRACTICAL-SEARCH-08 checkpointing every attempt preserves quantity search 
   const resumed = match(input, shelf, DEFAULT_MATCHER_CONFIG, undefined, undefined, cursor), direct = match(input, shelf);
   assert.deepEqual(resumed, direct); assert.equal(resumed.selected?.variantDoses?.[0].dailyUnits, 0.6);
 });
+
+test('PRACTICAL-SEARCH-09 nonterminating serving fractions keep exact burdens and monthly pack rounding', () => {
+  const p = tablet('thirds', 60, 3);
+  const shelf = catalog([{ ...p, administration: { ...administration(3), packQuantity: 50 } }]);
+  const result = match(request({ pricePreferenceBasis: 'monthly_30_days', maxPriceMinor: 50000, productDoses: [{ productId: 'thirds', servingsPerDay: 5 / 3 }] }), shelf);
+  assert.ok(result.selected?.overallScore);
+  assert.equal(result.selected.dailyPills, 5); assert.equal(result.selected.overallScore.preferences.maxPriceMinor.actual, 30000);
+  assert.deepEqual(result.selected.overallScore.overallExact, { numerator: '289', denominator: '1800' });
+});
