@@ -3,6 +3,7 @@ import { sha256Hex } from "@/lib/sha256";
 import { convertAmount } from "@/lib/matcher/dose";
 import { recommendedLimitFindings, recommendedLimitMessage } from "@/lib/agentic/presentation/limit-advice";
 import { patchScoring } from "@/lib/matcher/scoring-policy";
+import { publicScoring } from "@/lib/agentic/contract/scoring";
 import { administrationDailyPills, verifiedAdministration } from "@/lib/product-administration";
 import type { SimplePlanDecision } from "@/lib/agentic/contract/decision-schema";
 import type { PlanResult, StackOption, SafetyGuidance, BasketItem, PlanRequestTarget } from "@/lib/agentic/plan/types";
@@ -10,16 +11,16 @@ import type { MatcherUnit } from "@/lib/matcher/types";
 
 const COPY = {
   en: { processing: "Matching your targets. Wait before checking this plan again.", failed: "Matching did not finish. Retry this refinement with scoring:{} and a new idempotency key.",
-    ready: "Review the recommended routine, then confirm your choice.", selected: "Your choice is selected. Confirm the routine before checkout.",
-    review: "No purchase is recommended; review the available choices and remaining gaps.", none: "No new supplement purchase is needed for these targets.", noTargets: "No targets remain, so no purchase is recommended.",
+    ready: "Review the recommended routine, then confirm it or adjust the weights.", selected: "Your routine is selected. Confirm it before checkout.",
+    review: "No purchase is recommended. Review the gaps and adjust the targets or weights to refine this plan.", none: "No new supplement purchase is needed for these targets.", noTargets: "No targets remain, so no purchase is recommended.",
     stale: "Product facts changed. Refresh with scoring:{} before choosing a routine.", question: "Answer the question that affects your next choice." },
   th: { processing: "กำลังจับคู่ตามเป้าหมาย โปรดรอก่อนตรวจสอบแผนอีกครั้ง", failed: "การจับคู่ยังไม่เสร็จ ลองส่ง scoring:{} พร้อมคีย์ idempotency ใหม่",
-    ready: "ตรวจสอบชุดที่แนะนำก่อนยืนยันตัวเลือก", selected: "เลือกชุดแล้ว โปรดยืนยันกิจวัตรก่อนชำระเงิน",
-    review: "ยังไม่แนะนำให้ซื้อ โปรดตรวจสอบตัวเลือกและส่วนที่ยังขาด", none: "เป้าหมายเหล่านี้ไม่จำเป็นต้องซื้ออาหารเสริมเพิ่ม", noTargets: "ไม่มีเป้าหมายเหลืออยู่ จึงไม่แนะนำให้ซื้อ",
+    ready: "ตรวจสอบชุดที่แนะนำ แล้วยืนยันหรือปรับน้ำหนักความสำคัญ", selected: "เลือกชุดแล้ว โปรดยืนยันกิจวัตรก่อนชำระเงิน",
+    review: "ยังไม่แนะนำให้ซื้อ โปรดตรวจสอบส่วนที่ยังขาดและปรับเป้าหมายหรือน้ำหนักความสำคัญ", none: "เป้าหมายเหล่านี้ไม่จำเป็นต้องซื้ออาหารเสริมเพิ่ม", noTargets: "ไม่มีเป้าหมายเหลืออยู่ จึงไม่แนะนำให้ซื้อ",
     stale: "ข้อมูลผลิตภัณฑ์เปลี่ยนแล้ว ส่ง scoring:{} เพื่อปรับข้อมูลก่อนเลือก", question: "ตอบคำถามที่มีผลต่อตัวเลือกถัดไป" },
   "zh-CN": { processing: "正在匹配目标，请稍后再查询此计划。", failed: "匹配未完成。请使用 scoring:{} 和新的幂等键重试。",
-    ready: "查看推荐组合，然后确认选择。", selected: "已选择组合。结账前请确认日常用量。",
-    review: "目前不建议购买；请查看可选组合及尚未满足的目标。", none: "这些目标目前无需购买新的补充剂。", noTargets: "已无目标，因此不建议购买。",
+    ready: "查看推荐组合，然后确认或调整权重。", selected: "已选择组合。结账前请确认日常用量。",
+    review: "目前不建议购买。请查看尚未满足的目标，并调整目标或权重以完善方案。", none: "这些目标目前无需购买新的补充剂。", noTargets: "已无目标，因此不建议购买。",
     stale: "产品信息已变化。选择前请用 scoring:{} 刷新。", question: "请回答会影响下一步选择的问题。" }
 } as const;
 const copy = (locale?: string) => COPY[locale === "th" ? "th" : locale === "zh-CN" || locale === "zh" ? "zh-CN" : "en"];
@@ -33,12 +34,9 @@ export function decisionOptionId(planHandle: string, revision: number, option: S
   return `opt_${sha256Hex(JSON.stringify([planHandle, revision, option.basket.map(row => [row.productId, row.sellerId, row.servingsPerDay, row.quantity, row.unitPriceMinor]).sort()])).slice(0, 32)}`;
 }
 export function decisionOptions(result: PlanResult) {
-  const seen = new Set<string>();
-  const options = [result.selected, ...result.alternatives].filter((option): option is StackOption => {
-    if (!option) return false;
-    const key = JSON.stringify(option.basket.map(row => [row.productId, row.servingsPerDay]).sort());
-    if (seen.has(key)) return false; seen.add(key); return true;
-  });
+  // Internal candidates remain available to matching, but MCP exposes only the
+  // current winner (or the explicitly confirmed routine). Refinement re-ranks.
+  const options: StackOption[] = result.selected ? [result.selected] : [];
   // Empty supply is still a decision: preserve requested ingredients and gaps
   // using the committed coverage, without inventing a purchasable routine.
   if (!options.length && (result.requestSnapshot.originalRequest?.targets ?? result.requestSnapshot.targets).length) {
@@ -150,16 +148,15 @@ export function presentDecision(result: PlanResult, planHandle: string, revision
   const state = result.requestSnapshot, text = copy(state.locale);
   if (result.status === "processing") return processingDecision(planHandle, revision, state.locale);
   const options = decisionOptions(result), pinned = state.pinnedOptionId ? result.selected : null;
-  const recommended = options.find(option => option.roles?.includes("best_match")) ?? result.selected;
+  const recommended = options[0];
   const noTargets = !(state.originalRequest?.targets ?? state.targets).length;
   const noPurchase = noTargets || result.status === "no_purchase";
   const alreadyCovered = noTargets || result.matchingDiagnostics?.reasonCode === "targets_already_covered";
-  const purchaseAvailable = options.some(option => option.basket.length && option.purchaseEligible !== false);
   const refresh = Boolean(result.refreshRequired), questions = result.questions ?? [];
   const status = refresh || questions.length || (!(pinned ?? recommended)?.basket.length && !noPurchase) ? "needs_input" : noPurchase ? "no_purchase" : "ready";
-  const nextAction = refresh ? "change_request" : questions.length ? "answer_questions" : noPurchase && !alreadyCovered ? purchaseAvailable ? "review_options" : "change_request" : noPurchase ? result.horizon?.nextReplenishmentDay && result.horizon?.nextReplenishmentDay > 0 ? "replenish_later" : "no_purchase" : pinned?.basket.length ? "execute" : recommended?.basket.length ? "confirm_with_user" : "review_options";
+  const nextAction = refresh ? "change_request" : questions.length ? "answer_questions" : noPurchase && !alreadyCovered ? "change_request" : noPurchase ? result.horizon?.nextReplenishmentDay && result.horizon?.nextReplenishmentDay > 0 ? "replenish_later" : "no_purchase" : pinned?.basket.length ? "execute" : recommended?.basket.length ? "confirm_with_user" : "change_request";
   const summary: string = refresh ? text.stale : questions.length ? text.question : noTargets ? text.noTargets : noPurchase ? alreadyCovered ? text.none : text.review : pinned ? text.selected : recommended?.basket.length ? text.ready : text.review;
-  return { ok: true, planHandle, revision, status, summary, scoring: state.scoring ?? patchScoring(undefined), currency: state.currency,
+  return { ok: true, planHandle, revision, status, summary, scoring: publicScoring(state.scoring ?? patchScoring(undefined)), currency: state.currency,
     recommendedOptionId: !noPurchase && recommended?.basket.length ? decisionOptionId(planHandle, revision, recommended) : null,
     selectedOptionId: pinned ? decisionOptionId(planHandle, revision, pinned) : null, nextAction,
     ...(refresh ? { refreshRequired: true } : {}), ...(result.horizon?.nextReplenishmentDay && result.horizon?.nextReplenishmentDay > 0 ? { nextReplenishmentDay: result.horizon?.nextReplenishmentDay } : {}),

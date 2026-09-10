@@ -5,7 +5,7 @@ import { AGENTIC_CONTRACT_VERSION, type AgenticEnvironment } from "@/lib/agentic
 import { OVERVIEW_CARD } from "@/lib/agentic/contract/agent-card";
 import { AGENTIC_CONTRACT_REGISTRY } from "@/lib/agentic/contract/registry";
 import { PLAN_INPUT_SCHEMA } from "@/lib/agentic/contract/schemas";
-import { SCORING_PRESETS } from "@/lib/matcher/scoring-policy";
+import { MCP_SCORING_PRESETS } from "@/lib/agentic/contract/scoring";
 import { negotiateLocale } from "@/lib/agentic/i18n";
 
 export const CLIENT_GUIDE_URI = `mattanutra://contract/${AGENTIC_CONTRACT_VERSION}/client-guide`;
@@ -14,7 +14,7 @@ export { OVERVIEW_CARD as GUIDE_ESSENTIALS } from "@/lib/agentic/contract/agent-
 const handle = "cap_replace_with_returned_plan_handle";
 const controls = { planHandle: handle, expectedRevision: 1, idempotencyKey: "example-change-key-0001" };
 export const CLIENT_EXAMPLES = [
-  { name: "create-provisional-targets", tool: "plan", arguments: { idempotencyKey: "example-create-key-0001", locale: "en", destinationCountry: "TH", targets: [{ name: "Vitamin D3", amount: 2000, unit: "IU", basis: "supplemental" }], scoring: { profile: "balanced" } } },
+  { name: "create-provisional-targets", tool: "plan", arguments: { idempotencyKey: "example-create-key-0001", locale: "en", destinationCountry: "TH", targets: [{ name: "Vitamin D3", amount: 2000, unit: "IU", basis: "supplemental" }] } },
   { name: "read-or-poll", tool: "plan", arguments: { planHandle: handle } },
   { name: "fewer-pills", tool: "plan", arguments: { ...controls, requirements: { maxDailyPills: 3 }, scoring: { weights: { pills: 2 } } } },
   { name: "minimise-incidental-ingredient", tool: "plan", arguments: { ...controls, targets: [{ ingredientId: "sup_replace_with_returned_selenium", amount: 0, unit: "mcg" }], scoring: { weights: { nutrients: { sup_replace_with_returned_selenium: 1 } } } } },
@@ -25,11 +25,11 @@ export const CLIENT_EXAMPLES = [
   { name: "change-agreed-dose", tool: "plan", arguments: { ...controls, targets: [{ ingredientId: "sup_replace_with_returned_selenium", amount: 120 }] } },
   { name: "exclude-a-product", tool: "plan", arguments: { ...controls, requirements: { excludeProductIds: ["prd_replace_with_returned_product"] } } },
   { name: "clear-preference", tool: "plan", arguments: { ...controls, requirements: { maxDailyPills: null } } },
-  { name: "reset-preset", tool: "plan", arguments: { ...controls, scoring: { profile: "lowest_cost" } } },
+  { name: "reset-preset", tool: "plan", arguments: { ...controls, scoring: { profile: "best_match" } } },
   { name: "reset-one-weight", tool: "plan", arguments: { ...controls, scoring: { weights: { pills: null } } } },
   { name: "recover-failed-or-stale-work", tool: "plan", arguments: { ...controls, scoring: {} } },
   { name: "answer-current-question", tool: "plan", arguments: { ...controls, answers: [{ questionId: "returned_question", choice: "returned_choice" }] } },
-  { name: "select-returned-choice", tool: "plan", arguments: { ...controls, selectedOptionId: "opt_replace_with_returned_option" } },
+  { name: "confirm-recommendation", tool: "plan", arguments: { ...controls, selectedOptionId: "opt_replace_with_returned_option" } },
   { name: "confirmed-checkout", tool: "execute", arguments: { ...controls } },
   { name: "recover-or-track-order", tool: "order", arguments: { orderHandle: "cap_replace_with_returned_order_handle" } },
   { name: "ingredient-evidence", tool: "evidence", arguments: { planHandle: handle, expectedRevision: 1, optionId: "opt_replace_with_returned_option", ingredientId: "sup_replace_with_returned_ingredient" } }
@@ -37,7 +37,7 @@ export const CLIENT_EXAMPLES = [
 export function publicContractBundle() { return { contractVersion: AGENTIC_CONTRACT_VERSION, planSchema: PLAN_INPUT_SCHEMA, examples: CLIENT_EXAMPLES, tools: AGENTIC_CONTRACT_REGISTRY }; }
 const RULES = `Illustrative amounts are protocol examples, not personal dose recommendations. Answer using the actual questionId and choice corresponding to the customer’s answer. Replace placeholder identifiers with returned values; each new mutation needs a new idempotencyKey and current expectedRevision. Retry a lost response with exactly the same key and input. Handle-only calls poll existing work at pollAfterSeconds; stop at a terminal result.
 
-Use one flat plan call repeatedly. Omit unchanged fields. Selection, answers and refinements must be separate calls. profile is reported customer context; scoring.profile is a preset of effective weights. Nothing requires exact diet labels or demographics merely to explore.
+Use one flat plan call repeatedly. Omit unchanged fields. Start with best_match by omitting scoring; it uses the existing balanced coefficients, all initially one. balanced remains an accepted input alias and is returned as best_match. Adjust weights conversationally to get one recommendation per round. Selection, answers and refinements must be separate calls. profile is reported customer context; scoring.profile is a preset of effective weights. Nothing requires exact diet labels or demographics merely to explore.
 
 ${importanceInstructions()} Up to six decimal places (for example 0.543). Overrides replace preset values; they are never multiplied by the preset. Ask “How important is this preference?” rather than requiring coefficients from the person. A weight without a target does not create a hidden fitting or avoidance objective; add an explicit target first. Independently existing continued-dose terms may still apply.
 
@@ -53,9 +53,9 @@ scoring.weights patches overrides; null clears all overrides; {} preserves. Indi
 
 Explain the routine and any returned limit-excess advice. Keep other health-review commentary out of the plan response. supplied is new-product contribution; requested:null marks an incidental ingredient. total_daily includes applicable diet and supplements; supplemental includes continued and new supplements only. Unknown diet remains unknown. All requested targets count in coverage, including unsupported or weight-zero targets. When pillCount is null, pillCountAtLeast is a verified lower bound: say “at least …; total unknown”. Unknown quantities and prices remain unknown; first-order savings are not recurring savings.
 
-Choices are distinct product-and-dose baskets. roles may include best_match for current settings, closest_dose, lower_cost, simpler, fewer_concerns or purchase_fallback; one choice can carry several roles. recommendedOptionId is the recommended choice; selectedOptionId stays null until the customer chooses. Send a returned selectedOptionId with current revision. Selection advances revision without matching again; use the new revision and IDs. Confirm the selected routine and its ingredient advice with the customer before execute. plan never orders or charges. Finish naturally at no_purchase, or replenish_later when known. order reports verified payment and fulfilment state and recovery links. Narrow evidence calls use the returned plan, option and ingredient/product IDs; no automatic full-plan evidence dump.`;
+The existing choices envelope contains only the current recommendation, never alternative baskets. With no targets it may be empty; a no-purchase recommendation retains any requested ingredients and gaps. recommendedOptionId identifies this one routine; selectedOptionId stays null until the customer confirms. Adjust scoring.weights with the current revision and a new key to receive a revised recommendation; do not ask the customer to choose from a menu. Send the returned recommendedOptionId as selectedOptionId with current revision. Selection advances revision without matching again; use the new revision and IDs. Confirm the selected routine and its ingredient advice with the customer before execute. plan never orders or charges. Finish naturally at no_purchase, or replenish_later when known. order reports verified payment and fulfilment state and recovery links. Narrow evidence calls use the returned plan, option and ingredient/product IDs; unreturned internal candidates are unavailable.`;
 export function clientGuideMarkdown(locale?: string, environment: AgenticEnvironment = "dev") {
-  return `# MattaNutra conversational client guide ${AGENTIC_CONTRACT_VERSION}\n\n${positioning(locale).initialization}\n\n${environmentWarning(environment, locale)}\n\n${OVERVIEW_CARD}\n\n${importanceInstructions(locale)}\n\n${RULES}\n\nPresets (effective assignments):\n\n${JSON.stringify(SCORING_PRESETS, null, 2)}\n\nCopyable templates:\n\n${CLIENT_EXAMPLES.map(example => `### ${example.name}\n\n${example.tool}\n\n\`\`\`json\n${JSON.stringify(example.arguments, null, 2)}\n\`\`\``).join("\n\n")}`;
+  return `# MattaNutra conversational client guide ${AGENTIC_CONTRACT_VERSION}\n\n${positioning(locale).initialization}\n\n${environmentWarning(environment, locale)}\n\n${OVERVIEW_CARD}\n\n${importanceInstructions(locale)}\n\n${RULES}\n\nPresets (effective assignments):\n\n${JSON.stringify(MCP_SCORING_PRESETS, null, 2)}\n\nCopyable templates:\n\n${CLIENT_EXAMPLES.map(example => `### ${example.name}\n\n${example.tool}\n\n\`\`\`json\n${JSON.stringify(example.arguments, null, 2)}\n\`\`\``).join("\n\n")}`;
 }
 export const CONTRACT_RESOURCES = [
   { uri: CLIENT_GUIDE_URI, name: "MattaNutra conversational guide", mimeType: "text/markdown", description: "Flat conversational workflow, weight meanings, refinements and recovery." },

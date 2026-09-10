@@ -7,8 +7,8 @@ Development environment—not for real purchases.
 Thailand (TH) only; prices in THB, delivery separate; finite catalogue, real gaps. Agree name/amount/unit/basis; unknown diet is never zero. total_daily includes diet and supplements; supplemental includes continued and new supplements, excluding diet.
 Call plan with flat targets/context and idempotencyKey to create. Then send only planHandle to read/poll; wait pollAfterSeconds while processing and stop polling at a terminal result. No matching occurs in polls.
 Refine changed fields with planHandle, expectedRevision and idempotencyKey. Targets upsert by ingredientId; amount changes dose, amount:null removes. Context merges; supplied arrays replace; [] clears exclusions/proposals; numeric null clears a preference.
-profile means customer context. scoring.profile selects a preset; Targets and preferences describe the desired outcome. Weights describe its importance when comparing choices. Weights accept decimals from 0 to 2: zero removes that ranking component, one applies the normal penalty, and two doubles it. Changing a weight never changes the agreed target amount. Numerical preferences remain advisory. Safety penalties and factual advice remain active independently. A target amount of zero with a positive weight expresses soft minimisation. A weight of zero means that objective does not influence ranking. Use an exclusion only when the customer requires categorical avoidance. Up to six decimal places. Omission preserves; individual null resets; weights:null clears; preset changes reset overrides. A weight is not a dose or categorical exclusion.
-Review each choice's summary, ingredients and products. recommendedOptionId is advice; selectedOptionId is null until selection. After customer choice send selectedOptionId with revision/key, read its advice, confirm, then execute. Selection, answers and refinements are separate calls.
+profile means customer context. Start with scoring.profile=best_match (the default), then adjust weights from the conversation. Targets and preferences describe the desired outcome. Weights describe its importance when comparing choices. Weights accept decimals from 0 to 2: zero removes that ranking component, one applies the normal penalty, and two doubles it. Changing a weight never changes the agreed target amount. Numerical preferences remain advisory. Safety penalties and factual advice remain active independently. A target amount of zero with a positive weight expresses soft minimisation. A weight of zero means that objective does not influence ranking. Use an exclusion only when the customer requires categorical avoidance. Up to six decimal places. Omission preserves; individual null resets; weights:null clears; preset changes reset overrides. A weight is not a dose or categorical exclusion.
+Return one recommendation per round, never an options menu. Review its summary, ingredients and products; refine weights for a different routine. recommendedOptionId identifies that recommendation; selectedOptionId is null until confirmation. Send the returned ID as selectedOptionId with revision/key, confirm the routine, then execute. Selection, answers and refinements are separate calls.
 Health findings and numeric preferences never veto purchase; exclusions, diet and physical quantities bind. Ready means checkout-ready, not targets met or medical approval. Advice reports only quantified exposure above MattaNutra recommended limits. Equal, below-limit and unknown exposure produce no advice. Medication/condition codes are accepted inputs, not interaction coverage. Absence of advice is not medical clearance. Limits remain advisory, including at weight zero.
 Retry a lost response with the same key/input. Read current revision after conflicts. scoring:{} with revision/new key recovers failed/stale work; unchanged successful input is a no-op. Finish naturally at no_purchase; order recovers/tracks payment and fulfilment.
 Tools: info, plan, execute, order, support, feedback, evidence. Use host-listed names. info is optional; client_guide provides templates and plan_schema returns this same unified schema. Examples are protocol templates, not recommended regimens.
@@ -17,7 +17,7 @@ Targets and preferences describe the desired outcome. Weights describe its impor
 
 Illustrative amounts are protocol examples, not personal dose recommendations. Answer using the actual questionId and choice corresponding to the customer’s answer. Replace placeholder identifiers with returned values; each new mutation needs a new idempotencyKey and current expectedRevision. Retry a lost response with exactly the same key and input. Handle-only calls poll existing work at pollAfterSeconds; stop at a terminal result.
 
-Use one flat plan call repeatedly. Omit unchanged fields. Selection, answers and refinements must be separate calls. profile is reported customer context; scoring.profile is a preset of effective weights. Nothing requires exact diet labels or demographics merely to explore.
+Use one flat plan call repeatedly. Omit unchanged fields. Start with best_match by omitting scoring; it uses the existing balanced coefficients, all initially one. balanced remains an accepted input alias and is returned as best_match. Adjust weights conversationally to get one recommendation per round. Selection, answers and refinements must be separate calls. profile is reported customer context; scoring.profile is a preset of effective weights. Nothing requires exact diet labels or demographics merely to explore.
 
 Targets and preferences describe the desired outcome. Weights describe its importance when comparing choices. Weights accept decimals from 0 to 2: zero removes that ranking component, one applies the normal penalty, and two doubles it. Changing a weight never changes the agreed target amount. Numerical preferences remain advisory. Safety penalties and factual advice remain active independently. A target amount of zero with a positive weight expresses soft minimisation. A weight of zero means that objective does not influence ranking. Use an exclusion only when the customer requires categorical avoidance. Up to six decimal places (for example 0.543). Overrides replace preset values; they are never multiplied by the preset. Ask “How important is this preference?” rather than requiring coefficients from the person. A weight without a target does not create a hidden fitting or avoidance objective; add an explicit target first. Independently existing continued-dose terms may still apply.
 
@@ -33,12 +33,12 @@ scoring.weights patches overrides; null clears all overrides; {} preserves. Indi
 
 Explain the routine and any returned limit-excess advice. Keep other health-review commentary out of the plan response. supplied is new-product contribution; requested:null marks an incidental ingredient. total_daily includes applicable diet and supplements; supplemental includes continued and new supplements only. Unknown diet remains unknown. All requested targets count in coverage, including unsupported or weight-zero targets. When pillCount is null, pillCountAtLeast is a verified lower bound: say “at least …; total unknown”. Unknown quantities and prices remain unknown; first-order savings are not recurring savings.
 
-Choices are distinct product-and-dose baskets. roles may include best_match for current settings, closest_dose, lower_cost, simpler, fewer_concerns or purchase_fallback; one choice can carry several roles. recommendedOptionId is the recommended choice; selectedOptionId stays null until the customer chooses. Send a returned selectedOptionId with current revision. Selection advances revision without matching again; use the new revision and IDs. Confirm the selected routine and its ingredient advice with the customer before execute. plan never orders or charges. Finish naturally at no_purchase, or replenish_later when known. order reports verified payment and fulfilment state and recovery links. Narrow evidence calls use the returned plan, option and ingredient/product IDs; no automatic full-plan evidence dump.
+The existing choices envelope contains only the current recommendation, never alternative baskets. With no targets it may be empty; a no-purchase recommendation retains any requested ingredients and gaps. recommendedOptionId identifies this one routine; selectedOptionId stays null until the customer confirms. Adjust scoring.weights with the current revision and a new key to receive a revised recommendation; do not ask the customer to choose from a menu. Send the returned recommendedOptionId as selectedOptionId with current revision. Selection advances revision without matching again; use the new revision and IDs. Confirm the selected routine and its ingredient advice with the customer before execute. plan never orders or charges. Finish naturally at no_purchase, or replenish_later when known. order reports verified payment and fulfilment state and recovery links. Narrow evidence calls use the returned plan, option and ingredient/product IDs; unreturned internal candidates are unavailable.
 
 Presets (effective assignments):
 
 {
-  "balanced": {
+  "best_match": {
     "pills": 1,
     "products": 1,
     "price": 1,
@@ -86,10 +86,7 @@ plan
       "unit": "IU",
       "basis": "supplemental"
     }
-  ],
-  "scoring": {
-    "profile": "balanced"
-  }
+  ]
 }
 ```
 
@@ -279,7 +276,7 @@ plan
   "expectedRevision": 1,
   "idempotencyKey": "example-change-key-0001",
   "scoring": {
-    "profile": "lowest_cost"
+    "profile": "best_match"
   }
 }
 ```
@@ -332,7 +329,7 @@ plan
 }
 ```
 
-### select-returned-choice
+### confirm-recommendation
 
 plan
 

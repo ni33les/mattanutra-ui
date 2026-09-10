@@ -1,0 +1,49 @@
+{
+  "releaseBase": "cf9aa574b72898089e688f080d33fd6af1622db1",
+  "scope": "Single MCP recommendation and default profile naming; shared matching arithmetic and web unchanged",
+  "groups": [
+    {
+      "name": "single-recommendation",
+      "files": [
+        "test/simple-plan/single-recommendation.test.ts",
+        "test/simple-plan/response.test.ts",
+        "test/simple-plan/retained-choice-values.test.ts",
+        "test/simple-plan/advice.test.ts",
+        "test/simple-plan/limit-advice.test.ts",
+        "test/simple-plan/facts.test.ts",
+        "test/simple-plan/commerce-evidence.test.ts",
+        "test/simple-plan/journey.test.ts",
+        "test/simple-plan/refinement.test.ts",
+        "test/simple-plan/state.test.ts",
+        "test/simple-plan/requests.test.ts",
+        "test/simple-plan/publication.test.ts",
+        "test/simple-plan/hosted.test.ts",
+        "test/simple-plan/documented.test.ts",
+        "test/simple-plan/transport.test.ts",
+        "test/simple-plan/retained-public-invariants.test.ts",
+        "test/published-client-journey.test.ts",
+        "test/mcp-discovery/discovery.test.ts"
+      ],
+      "reason": "Changed public cardinality, alias, lifecycle, evidence/confirmation, generated native/hosted descriptors, localized documented journeys and preserved advice/facts"
+    },
+    {
+      "name": "empty-recommendation",
+      "files": [
+        "test/agentic-flexible-v5-journey.test.ts"
+      ],
+      "pattern": "refines an empty recommendation|describes a current-intake dose fit|keeps every valid requested target",
+      "reason": "Affected no-purchase/refinement behavior in three locales and complete unresolved-target retention"
+    }
+  ],
+  "expectationChanges": "test/simple-plan/expectation-changes.md",
+  "requirements": [
+    "one recommendation per completed round",
+    "best_match default with unchanged balanced coefficients",
+    "weight refinement preserves context and clears selection",
+    "no hidden-option selection/evidence",
+    "no alternative-menu action",
+    "no duplicated payloads",
+    "localized guide/card/schema alignment",
+    "no matching or web behavior changes"
+  ]
+}

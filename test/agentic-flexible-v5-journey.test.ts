@@ -49,19 +49,24 @@ describe("Current flat conversational plan mutations and immutable purchase", ()
 
         });
     for (const locale of ["en", "th", "zh-CN"])
-        it(`makes the empty default and selectable purchase trade-off clear in every concise view (${locale})`, async () => {
+        it(`refines an empty recommendation into one selectable routine without an option menu (${locale})`, async () => {
             const runtime = runtimeFor(), snapshot = sampleValueSnapshot(), target = snapshot.supplements.find(row => /vitamin d/i.test(row.name))!;
             const product = sampleRetailProduct({ id: "eeeeeeee-eeee-eeee-eeee-eeeeeeeeee18", title: "Whole-unit vitamin D fixture", supplementId: target.supplementId, name: target.name, amount: 2000, unit: "IU", unitPriceMinor: 10000, form: "capsule", servingLabel: "1 capsule; 30 capsules per bottle" });
             replaceCatalogueSnapshot({ ...snapshot, products: [product] });
             const plan = await call(runtime, "plan", { idempotencyKey: `v5-review-options-${locale}-01`, ...{ ...request, locale, targets: [{ name: target.name, amount: 500, unit: "IU" }] } });
             assert.equal(plan.ok, true, JSON.stringify(plan));
             assert.equal(plan.status, "no_purchase");
-            assert.equal(plan.nextAction, "review_options");
+            assert.equal(plan.nextAction, "change_request");
             assert.equal(plan.recommendedOptionId, null);
-            const purchase = (plan.choices as Array<{ optionId: string; products: unknown[] }>).find(row => row.products.length);
-            assert.ok(purchase);
-
-            const selected = await call(runtime, "plan", { planHandle: plan.planHandle, expectedRevision: plan.revision, selectedOptionId: purchase.optionId, idempotencyKey: `v5-review-select-${locale}-01` });
+            const choices = plan.choices as Array<{ optionId: string; products: unknown[] }>;
+            assert.equal(choices.length, 1); assert.deepEqual(choices[0].products, []);
+            // The user changes importance to remove target-fit ranking, while
+            // explicitly proposing a physical dose; neither instruction buys it.
+            const refined = await call(runtime, "plan", { planHandle: plan.planHandle, expectedRevision: plan.revision, idempotencyKey: `v5-review-refine-${locale}-01`,
+              scoring: { weights: { nutrients: { [target.supplementId]: 0 } } }, requirements: { productDoses: [{ productId: product.productId, servingsPerDay: 1 }] } });
+            assert.equal(refined.ok, true, JSON.stringify(refined));
+            const recommendation = purchase(refined); assert.equal(refined.choices.length, 1);
+            const selected = await call(runtime, "plan", { planHandle: plan.planHandle, expectedRevision: refined.revision, selectedOptionId: recommendation.optionId, idempotencyKey: `v5-review-select-${locale}-01` });
             assert.equal(selected.ok, true);
             assert.equal(selected.status, "ready");
         });

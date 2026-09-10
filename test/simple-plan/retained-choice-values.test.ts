@@ -6,22 +6,24 @@ import type { StackOption } from '../../lib/agentic/plan/types.ts';
 
 // Original AX5/AX6 prices and pill totals; request and composition are explicit,
 // so the percentages are independently calculated rather than copied labels.
-test('AX5-03 AX5-04 AX6-01 AX6-05 all three choices retain distinct prices, doses, pills and honest coverage',()=>{
+test('AX5-03 AX5-04 AX6-01 AX6-05 successive single recommendations retain original prices, doses, pills and honest coverage',()=>{
   const base=internalFixture(), line=base.selected!.basket[0];
   const inputs=[{id:'a',price:467300,pills:10,products:4,dose:490},{id:'b',price:292100,pills:7,products:3,dose:450},{id:'c',price:333000,pills:8,products:5,dose:450}];
   const options=inputs.map((x,index)=>({...base.selected!,optionId:x.id,roles:[index===0?'best_match':index===1?'lower_cost':'simpler'],dailyPills:x.pills,totalPriceMinor:x.price,safety:{guidance:[]},basket:Array.from({length:x.products},(_,i)=>({...line,productId:`prd_${x.id}_${i}`,quantity:1,servingsPerDay:1,administration:{...line.administration!,unitsPerServing:i===0?x.pills-x.products+1:1},unitPriceMinor:i===0?x.price:0,lineTotalMinor:i===0?x.price:0,dailyPills:i===0?x.pills:0,requestedNutrients:i===0?[{supplementId:'sup_test',name:'Magnesium',amount:x.dose,unit:'mg'}]:[],incidentalNutrients:[],labelledFacts:[]})),coverage:[{supplementId:'sup_test',name:'Magnesium',currentAmount:0,deliveredAmount:x.dose,intakeCertainty:'known',totalExposureComplete:true}]})) as unknown as StackOption[];
-  const decision=presentDecision({...base,selected:options[0],alternatives:options.slice(1),requestSnapshot:{...base.requestSnapshot,targets:[{supplementId:'sup_test',name:'Magnesium',amount:500,unit:'mg',basis:'supplemental'}],intake:[],currentSupplements:[]}},'cap_retained_choice_prices',1);
-  assert.ok('choices'in decision);assert.equal(decision.choices.length,3);
-  for(const [index,choice]of decision.choices.entries()){
-    const expected=inputs[index];assert.equal(choice.summary.goodsPrice,expected.price/100);assert.equal(choice.summary.pillCount,expected.pills);assert.equal(choice.products.length,expected.products);
-    assert.equal(choice.products.reduce((sum,row)=>sum+row.lineTotal,0),expected.price/100);
+  const rounds=options.map((selected,index)=>{
+    const decision=presentDecision({...base,selected,alternatives:options.filter(row=>row!==selected),requestSnapshot:{...base.requestSnapshot,targets:[{supplementId:'sup_test',name:'Magnesium',amount:500,unit:'mg',basis:'supplemental'}],intake:[],currentSupplements:[]}},'cap_retained_choice_prices',index+1);
+    assert.ok('choices'in decision);assert.equal(decision.choices.length,1);return decision;
+  });
+  for(const [index,decision]of rounds.entries()){
+    const choice=decision.choices[0],expected=inputs[index];assert.equal(choice.summary.goodsPrice,expected.price/100);assert.equal(choice.summary.pillCount,expected.pills);assert.equal(choice.products.length,expected.products);
+    assert.equal(choice.products.reduce((sum,row)=>sum+row.lineTotal!,0),expected.price/100);
     const ingredient=choice.ingredients.find(row=>row.ingredientId==='sup_test');assert.ok(ingredient);assert.equal(ingredient.supplied,expected.dose);assert.equal(ingredient.gap,500-expected.dose);
     assert.equal(choice.summary.coveragePercent,100*expected.dose/500);
   }
-  assert.equal((decision.choices[0].summary.goodsPrice!-decision.choices[1].summary.goodsPrice!)*100,175200);
-  assert.equal(decision.choices[0].summary.pillCount!-decision.choices[1].summary.pillCount!,3);
-  assert.equal(decision.choices[0].summary.coveragePercent!-decision.choices[1].summary.coveragePercent!,8);
-  assert.doesNotMatch(JSON.stringify(decision),/save.*(?:monthly|recurring)/i);
+  assert.equal((rounds[0].choices[0].summary.goodsPrice!-rounds[1].choices[0].summary.goodsPrice!)*100,175200);
+  assert.equal(rounds[0].choices[0].summary.pillCount!-rounds[1].choices[0].summary.pillCount!,3);
+  assert.equal(rounds[0].choices[0].summary.coveragePercent!-rounds[1].choices[0].summary.coveragePercent!,8);
+  assert.doesNotMatch(JSON.stringify(rounds),/save.*(?:monthly|recurring)/i);
 });
 test('AX8-01 the original 18900-minor focus product retains two verified nutrients and an unverified B12 fact',()=>{
   const base=internalFixture(), first=base.selected!.basket[0];

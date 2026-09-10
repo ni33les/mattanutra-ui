@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { it } from "node:test";
 import { readFileSync } from "node:fs";
-import { selectPublishedResources, publishedExample, selectPurchaseTradeOff, customerTargetConfirmation } from "../scripts/published-client-journey.mjs";
+import { selectPublishedResources, publishedExample, currentRecommendation, customerTargetConfirmation } from "../scripts/published-client-journey.mjs";
 
 it("ANNA-CLIENT-01 tools-only discovery reconstructs examples from published guide content", async () => {
   const { contractFromToolDiscovery } = await import("../scripts/published-client-journey.mjs");
@@ -31,12 +31,13 @@ it("V5-CLIENT-02 request templates come from the connector and never mutate thei
   assert.deepEqual(contract.examples[0].arguments.requirements, {});
   assert.throws(() => publishedExample(contract, "undocumented"), /missing published example/);
 });
-it("V5-CLIENT-03 trade-offs must be distinct returned and eligible choices", () => {
-  const closest = { optionId: "closest", roles: ["closest_dose"], products: [{ productId: "p" }] };
+it("V5-CLIENT-03 the client confirms only the single returned recommendation", () => {
+  const closest = { optionId: "closest", roles: ["best_match"], products: [{ productId: "p" }] };
   const cheaper = { optionId: "cheaper", roles: ["lower_cost"], products: [{ productId: "q" }] };
-  assert.equal(selectPurchaseTradeOff({ recommendedOptionId: "closest", choices: [closest, cheaper] }), cheaper);
-  assert.throws(() => selectPurchaseTradeOff({ recommendedOptionId: "closest", choices: [closest] }), /distinct purchasable trade-off/);
-  assert.throws(() => selectPurchaseTradeOff({ recommendedOptionId: "closest", choices: [closest, { ...cheaper, products: [] }] }), /distinct purchasable trade-off/);
+  assert.equal(currentRecommendation({ recommendedOptionId: "closest", choices: [closest] }), closest);
+  assert.throws(() => currentRecommendation({ recommendedOptionId: "closest", choices: [closest, cheaper] }), /one current recommendation/);
+  assert.throws(() => currentRecommendation({ recommendedOptionId: "closest", choices: [{ ...closest, products: [] }] }), /No current purchasable recommendation/);
+  assert.throws(() => currentRecommendation({ recommendedOptionId: null, choices: [closest] }), /No current purchasable recommendation/);
 });
 it("V5-CLIENT-04 documented client has no application, database, fixture-endpoint or private catalogue dependency", () => {
   const client = readFileSync("scripts/run-published-mcp-client.mjs", "utf8") + readFileSync("scripts/published-client-journey.mjs", "utf8");

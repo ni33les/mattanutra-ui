@@ -1,4 +1,5 @@
 import { IMPORTANCE_EXPLANATION } from "@/lib/agentic/contract/importance";
+import { MCP_SCORING_PROFILES } from "@/lib/agentic/contract/scoring";
 import { Type, type Static, type TSchema, type TProperties } from "@sinclair/typebox";
 import { visibleOperationVariants } from "@/lib/agentic/contract/operation-variants";
 
@@ -90,9 +91,9 @@ const scoringWeights = object({
   nutrients: optional(Type.Record(Type.String({ pattern: "^[A-Za-z][A-Za-z0-9_-]{0,127}$" }), nullable(WEIGHT_SCHEMA), { description: "Returned or published ingredient IDs only. Omission preserves; individual null resets to the preset." }))
 });
 export const SCORING_SCHEMA = object({
-  profile: optional(enumeration(["balanced", "best_coverage", "fewest_pills", "lowest_cost"] as const)),
+  profile: optional({ ...enumeration(MCP_SCORING_PROFILES), default: "best_match" }),
   weights: optional(nullable(scoringWeights))
-}, "profile is a scoring preset, not customer demographics. Omitted effective terms default to one. Changing preset resets old overrides, then applies supplied overrides. weights:null clears overrides; {} preserves them. Individual null resets. An empty scoring refinement can retry failed/stale work; otherwise unchanged input is a no-op.");
+}, "Start with best_match by default and refine weights conversationally; each round returns one recommendation. balanced is an accepted alias for best_match. profile is a scoring preset, not customer demographics. Omitted effective terms default to one. Changing preset resets old overrides, then applies supplied overrides. weights:null clears overrides; {} preserves them. Individual null resets. An empty scoring refinement can retry failed/stale work; otherwise unchanged input is a no-op.");
 const ingredientId = Type.String({ minLength: 1, maxLength: 128, pattern: "^[A-Za-z][A-Za-z0-9_-]*$" });
 const targetAmount = Type.Number({ minimum: 0, maximum: 1e15, description: "Positive amount fits the agreed target. Zero with positive importance softly minimises exposure on the stated basis using a reviewed comparison scale; it does not remove current intake. Reviewed zero scales: Vitamin D3 25 mcg (1000 IU), Selenium 50 mcg; other ingredients return an explicit missing-scale error. These scales are not dose recommendations. Weight zero ignores fitting; amount:null removes on refinement." });
 const targetFields = { ingredientId: optional(ingredientId), name: optional(text(240)), amount: targetAmount, unit: UNIT_SCHEMA,

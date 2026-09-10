@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { Value } from '@sinclair/typebox/value';
+import { validateToolIssues } from '../../lib/agentic/contract/validate.ts';
+import { prepareSimpleRequest } from '../../lib/agentic/plan/simple-input.ts';
+import { fixtureSnapshot } from '../../lib/agentic/catalogue/fixtures.ts';
+import { isAgenticErrorResult } from '../../lib/agentic/contract/errors.ts';
+import { effectiveWeights } from '../../lib/matcher/scoring-policy.ts';
 import { internalFixture, storedFixture } from '../mcp-conversation-pack/helpers.ts';
 import { presentDecision, decisionOptionId } from '../../lib/agentic/presentation/decision.ts';
 import { handleJsonRpc } from '../../lib/agentic/mcp/dispatcher.ts';
@@ -51,7 +55,18 @@ test('MCP-SINGLE-03 hidden alternatives are not available through selection or e
 
 test('MCP-SINGLE-04 best_match is the advertised and returned default with unchanged balanced coefficients', () => {
   assert.equal(SCORING_SCHEMA.properties.profile.default, 'best_match');
-  assert.ok(Value.Check(SCORING_SCHEMA, { profile: 'best_match', weights: { pills: 0.543 } }));
+  assert.deepEqual(validateToolIssues(SCORING_SCHEMA, { profile: 'best_match', weights: { pills: 0.543 } }), []);
+  const request = { locale: 'en', destinationCountry: 'TH', targets: [{ name: 'Vitamin D3', amount: 2000, unit: 'IU' }] };
+  const catalogue = fixtureSnapshot();
+  const implicit = prepareSimpleRequest(request, catalogue);
+  const explicit = prepareSimpleRequest({ ...request, scoring: { profile: 'best_match' } }, catalogue);
+  assert.ok(!isAgenticErrorResult(implicit) && !isAgenticErrorResult(explicit));
+  assert.deepEqual(effectiveWeights(implicit.scoring!), effectiveWeights(explicit.scoring!));
+  const weighted = prepareSimpleRequest({ scoring: { weights: { pills: 0.543 } } }, catalogue, explicit);
+  assert.ok(!isAgenticErrorResult(weighted)); assert.equal(weighted.scoring!.weights.pills, 0.543);
+  const reset = prepareSimpleRequest({ scoring: { profile: 'best_match' } }, catalogue, weighted);
+  assert.ok(!isAgenticErrorResult(reset)); assert.deepEqual(reset.scoring!.weights, {});
+  assert.deepEqual(reset.targets, explicit.targets);
   const response = presentDecision(internalFixture(), 'cap_single_default_profile', 1);
   assert.ok('scoring' in response); assert.equal(response.scoring.profile, 'best_match');
 });
@@ -59,8 +74,8 @@ test('MCP-SINGLE-04 best_match is the advertised and returned default with uncha
 test('MCP-SINGLE-05 schema and discovery enforce one recommendation with conversational weight refinement', () => {
   assert.equal(READY_DECISION_SCHEMA.properties.choices.maxItems, 1);
   const response = presentDecision(internalFixture(), 'cap_single_schema_fixture', 1);
-  assert.ok('choices' in response); assert.ok(Value.Check(READY_DECISION_SCHEMA, response));
-  assert.equal(Value.Check(READY_DECISION_SCHEMA, { ...response, choices: [response.choices[0], response.choices[0]] }), false);
+  assert.ok('choices' in response); assert.deepEqual(validateToolIssues(READY_DECISION_SCHEMA, response), []);
+  assert.ok(validateToolIssues(READY_DECISION_SCHEMA, { ...response, choices: [response.choices[0], response.choices[0]] }).some(row => row.fieldPath === 'choices' && row.reasonCode === 'too_many_items'));
   for (const locale of ['en', 'th', 'zh-CN']) {
     const text = AGENT_CARD + clientGuideMarkdown(locale);
     assert.match(text, /one recommendation per round/); assert.match(text, /best_match/);

@@ -17,7 +17,7 @@ export const POSITIONING: Readonly<Record<Locale, Positioning>> = {
   "en": {
     "displayName": "MattaNutra",
     "shortDescription": "Builds and refines a purchasable supplement basket from real Thailand products, balancing nutrient coverage, overlap, current stock, pill burden and cost.",
-    "longDescription": "Use MattaNutra when someone wants help planning, comparing, sourcing or buying supplements in Thailand. It turns agreed nutrient targets, health context, dietary constraints and current supplements into a purchasable basket of real products. The customer and agent can compare alternatives, reduce unnecessary overlap, balance nutrient coverage, current stock, pill burden and cost, refine quantities or exclusions, open checkout and track the order. MattaNutra provides wellness guidance and product matching—not diagnosis, pharmacy services or medical approval.",
+    "longDescription": "Use MattaNutra when someone wants help planning, comparing, sourcing or buying supplements in Thailand. It turns agreed nutrient targets, health context, dietary constraints and current supplements into a purchasable basket of real products. Each round returns one recommendation, starting with best_match. The agent adjusts weights conversationally to refine it, reduce unnecessary overlap, balance nutrient coverage, current stock, pill burden and cost, refine quantities or exclusions, open checkout and track the order. MattaNutra provides wellness guidance and product matching—not diagnosis, pharmacy services or medical approval.",
     "invocationGuidance": "Invoke MattaNutra for supplement planning, real-product matching, basket optimisation, product comparison, sourcing or purchase requests in Thailand.",
     "unsupportedUseGuidance": "Do not use MattaNutra as a diagnostic service, as evidence of medical suitability, or for product sourcing outside supported countries.",
     "initialization": "MattaNutra builds and refines purchasable supplement baskets from real products available in Thailand. Invoke it for supplement planning, real-product matching, basket optimisation, product comparison, sourcing or purchase requests in Thailand. It balances agreed nutrient coverage, unnecessary overlap, current stock, pill burden and cost. Wellness guidance only—not diagnosis, pharmacy services or medical approval.",
@@ -38,18 +38,18 @@ export const POSITIONING: Readonly<Record<Locale, Positioning>> = {
     },
     "purposes": {
       "info": "Understand when to use MattaNutra, its country and wellness boundaries, and retrieve the client guide or flat plan schema.",
-      "plan": "Match agreed nutrient targets and customer context to real Thailand products; compare and refine returned baskets.",
+      "plan": "Return one recommendation for agreed targets and context; start with best_match and refine weights conversationally.",
       "execute": "After customer confirmation, freeze the selected plan revision and create or recover checkout.",
       "order": "Read concise payment, fulfilment and recovery state for an existing order.",
       "support": "Open or continue an order-support case.",
       "feedback": "Submit optional consented feedback without changing the plan or checkout.",
-      "evidence": "Read facts and advisory sources for one returned ingredient or product in a current choice."
+      "evidence": "Read facts and advisory sources for one returned ingredient or product in the current recommendation."
     }
   },
   "th": {
     "displayName": "MattaNutra",
     "shortDescription": "สร้างและปรับชุดอาหารเสริมที่ซื้อได้จริงจากผลิตภัณฑ์ในประเทศไทย โดยช่วยพิจารณาความครอบคลุมของสารอาหาร ความซ้ำซ้อน สต็อกปัจจุบัน จำนวนเม็ดที่ต้องรับประทาน และค่าใช้จ่ายร่วมกัน",
-    "longDescription": "ใช้ MattaNutra เมื่อต้องการวางแผน เปรียบเทียบ หาแหล่งซื้อ หรือซื้ออาหารเสริมในประเทศไทย บริการนำเป้าหมายสารอาหารที่ตกลงกัน ข้อมูลสุขภาพ ข้อจำกัดด้านอาหาร และอาหารเสริมที่ใช้อยู่ มาจัดเป็นชุดผลิตภัณฑ์จริงที่ซื้อได้ ลูกค้าและเอเจนต์สามารถเปรียบเทียบทางเลือก ลดความซ้ำซ้อนที่ไม่จำเป็น พิจารณาความครอบคลุมของสารอาหาร สต็อกปัจจุบัน จำนวนเม็ด และค่าใช้จ่าย ปรับปริมาณหรือรายการที่ไม่ต้องการ เปิดหน้าชำระเงิน และติดตามคำสั่งซื้อ MattaNutra ให้คำแนะนำด้านสุขภาวะและจับคู่ผลิตภัณฑ์ ไม่ใช่การวินิจฉัย บริการเภสัชกรรม หรือการรับรองทางการแพทย์",
+    "longDescription": "ใช้ MattaNutra เมื่อต้องการวางแผน เปรียบเทียบ หาแหล่งซื้อ หรือซื้ออาหารเสริมในประเทศไทย บริการนำเป้าหมายสารอาหารที่ตกลงกัน ข้อมูลสุขภาพ ข้อจำกัดด้านอาหาร และอาหารเสริมที่ใช้อยู่ มาจัดเป็นชุดผลิตภัณฑ์จริงที่ซื้อได้ แต่ละรอบส่งคืนชุดที่แนะนำเพียงชุดเดียว เริ่มด้วย best_match และให้เอเจนต์ปรับน้ำหนักความสำคัญตามบทสนทนาเพื่อลดความซ้ำซ้อนที่ไม่จำเป็น พิจารณาความครอบคลุมของสารอาหาร สต็อกปัจจุบัน จำนวนเม็ด และค่าใช้จ่าย ปรับปริมาณหรือรายการที่ไม่ต้องการ เปิดหน้าชำระเงิน และติดตามคำสั่งซื้อ MattaNutra ให้คำแนะนำด้านสุขภาวะและจับคู่ผลิตภัณฑ์ ไม่ใช่การวินิจฉัย บริการเภสัชกรรม หรือการรับรองทางการแพทย์",
     "invocationGuidance": "เรียกใช้ MattaNutra สำหรับการวางแผนอาหารเสริม จับคู่ผลิตภัณฑ์จริง ปรับชุดอาหารเสริม เปรียบเทียบผลิตภัณฑ์ หาแหล่งซื้อ หรือซื้อสินค้าในประเทศไทย",
     "unsupportedUseGuidance": "อย่าใช้ MattaNutra เพื่อวินิจฉัยโรค เป็นหลักฐานรับรองความเหมาะสมทางการแพทย์ หรือหาแหล่งซื้อเพื่อจัดส่งนอกประเทศที่รองรับ",
     "initialization": "MattaNutra สร้างและปรับชุดอาหารเสริมที่ซื้อได้จริงจากผลิตภัณฑ์ในประเทศไทย เรียกใช้สำหรับการวางแผนอาหารเสริม จับคู่ผลิตภัณฑ์จริง ปรับชุดอาหารเสริม เปรียบเทียบผลิตภัณฑ์ หาแหล่งซื้อ หรือซื้อสินค้าในประเทศไทย บริการช่วยพิจารณาความครอบคลุมของสารอาหารตามเป้าหมายที่ตกลงกัน ความซ้ำซ้อนที่ไม่จำเป็น สต็อกปัจจุบัน จำนวนเม็ด และค่าใช้จ่ายร่วมกัน เป็นคำแนะนำด้านสุขภาวะเท่านั้น ไม่ใช่การวินิจฉัย บริการเภสัชกรรม หรือการรับรองทางการแพทย์",
@@ -70,7 +70,7 @@ export const POSITIONING: Readonly<Record<Locale, Positioning>> = {
     },
     "purposes": {
       "info": "ทำความเข้าใจว่าเมื่อใดควรใช้ MattaNutra ประเทศที่รองรับ และขอบเขตคำแนะนำด้านสุขภาวะ พร้อมเรียกดูคู่มือเอเจนต์หรือสคีมาแผนแบบเดียว",
-      "plan": "จับคู่เป้าหมายสารอาหารที่ตกลงกันและข้อมูลลูกค้ากับผลิตภัณฑ์จริงในประเทศไทย เพื่อเปรียบเทียบและปรับชุดที่ระบบเสนอ",
+      "plan": "ส่งคืนชุดที่แนะนำเพียงชุดเดียวตามเป้าหมายและข้อมูลผู้ใช้ เริ่มด้วย best_match และปรับน้ำหนักความสำคัญตามบทสนทนา",
       "execute": "หลังลูกค้ายืนยัน ให้ตรึงรายการของแผนฉบับที่เลือก แล้วสร้างหรือเรียกคืนหน้าชำระเงิน",
       "order": "อ่านสถานะการชำระเงิน การดำเนินการจัดส่งและการกู้คืนสำหรับคำสั่งซื้อที่มีอยู่",
       "support": "เปิดหรือติดตามเรื่องขอความช่วยเหลือเกี่ยวกับคำสั่งซื้อ",
@@ -81,7 +81,7 @@ export const POSITIONING: Readonly<Record<Locale, Positioning>> = {
   "zh-CN": {
     "displayName": "MattaNutra",
     "shortDescription": "从泰国真实产品中建立和调整可购买的补充剂组合，兼顾营养覆盖、成分重叠、当前库存、每日服用粒数与费用。",
-    "longDescription": "当用户需要在泰国规划、比较、寻找货源或购买补充剂时，使用 MattaNutra。它将商定的营养目标、健康背景、饮食限制和正在使用的补充剂转化为可购买的真实产品组合。用户和智能体可以比较替代方案，减少不必要的重叠，兼顾营养覆盖、当前库存、每日服用粒数和费用，调整用量或排除产品，打开结账页面并跟踪订单。MattaNutra 提供健康指导与产品匹配，不提供诊断、药房服务或医疗认可。",
+    "longDescription": "当用户需要在泰国规划、比较、寻找货源或购买补充剂时，使用 MattaNutra。它将商定的营养目标、健康背景、饮食限制和正在使用的补充剂转化为可购买的真实产品组合。每轮仅返回一个推荐方案，默认使用 best_match。智能体通过对话调整权重，减少不必要的重叠，兼顾营养覆盖、当前库存、每日服用粒数和费用，调整用量或排除产品，打开结账页面并跟踪订单。MattaNutra 提供健康指导与产品匹配，不提供诊断、药房服务或医疗认可。",
     "invocationGuidance": "需要在泰国规划补充剂、匹配真实产品、优化组合、比较产品、寻找货源或购买时，请调用 MattaNutra。",
     "unsupportedUseGuidance": "不要将 MattaNutra 用于诊断、作为医学适用性的证明，或寻找配送至不受支持国家的产品。",
     "initialization": "MattaNutra 从泰国真实可售产品中建立和调整可购买的补充剂组合。需要在泰国规划补充剂、匹配真实产品、优化组合、比较产品、寻找货源或购买时，请调用本服务。它兼顾商定的营养目标覆盖、不必要的重叠、当前库存、每日服用粒数和费用。仅提供健康指导，不提供诊断、药房服务或医疗认可。",
@@ -102,7 +102,7 @@ export const POSITIONING: Readonly<Record<Locale, Positioning>> = {
     },
     "purposes": {
       "info": "了解何时使用 MattaNutra、支持的国家和健康指导边界，并获取智能体指南或统一方案输入模式。",
-      "plan": "将商定的营养目标和用户背景与泰国真实产品匹配，比较并调整返回的组合。",
+      "plan": "根据商定目标和用户背景每轮返回一个推荐方案；默认 best_match，通过对话调整权重。",
       "execute": "用户确认后，冻结所选方案版本，并创建或恢复结账。",
       "order": "读取现有订单简明的付款、履约及恢复状态。",
       "support": "发起或继续订单支持请求。",

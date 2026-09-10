@@ -3,6 +3,7 @@ import { resolveSupplement } from "@/lib/agentic/plan/normalize";
 import { zeroTargetScale } from "@/lib/matcher/zero-target-policy";
 import { convertAmount } from "@/lib/matcher/dose";
 import { patchScoring, type ScoringPatch } from "@/lib/matcher/scoring-policy";
+import { internalScoringPatch } from "@/lib/agentic/contract/scoring";
 import { sha256Hex } from "@/lib/sha256";
 import type { CatalogueSnapshot, CatalogueUnit } from "@/lib/agentic/catalogue/types";
 import type { PlanRequest, PlanRequestTarget } from "@/lib/agentic/plan/types";
@@ -19,7 +20,7 @@ const failure = (fieldPath: string, message: string) => businessError({ fieldPat
 /** Pure preparation over immutable facts, before admission/publication transactions. */
 export function prepareSimpleRequest(input: Row, snapshot: CatalogueSnapshot, previous?: PlanRequest): PlanRequest | AgenticErrorResult {
   let scoring;
-  try { scoring = patchScoring(previous?.scoring, input.scoring as ScoringPatch | undefined); }
+  try { scoring = patchScoring(previous?.scoring, internalScoringPatch(input.scoring)); }
   catch (error) { const message = error instanceof Error ? error.message : "Invalid scoring settings"; return failure(message.split(":")[0].split(" ")[0], message); }
   const base: PlanRequest = previous ?? { locale: String(input.locale), destinationCountry: String(input.destinationCountry), optimization: scoring.profile, profile: {}, requirements: {}, targets: [] };
   const patch = Object.fromEntries(Object.entries(input).filter(([key]) => !["planHandle", "expectedRevision", "idempotencyKey", "targets", "scoring", "searchEffort"].includes(key)));

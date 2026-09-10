@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "source": "User-approved discoverability brief dated 2026-09-09",
   "reviewer": "Codex",
   "reviewMethod": "Bilingual semantic review against the English brief; independent goldens committed before runtime copy. No external human translation approval claimed.; v9 review replaces retired view/operation purpose wording with flat schema, concise order recovery and single-subject evidence in English, Thai and Chinese; other positioning goldens unchanged.",
@@ -11,7 +11,9 @@
     "current stock, pill burden and cost",
     "wellness, diagnostic and medical-approval boundaries",
     "test-environment identity",
-    "stable native identifiers"
+    "stable native identifiers",
+    "single recommendation per round",
+    "default best_match with conversational weight refinement"
   ],
   "locales": [
     "en",
@@ -19,5 +21,13 @@
     "zh-CN"
   ],
   "intentionalClarification": "Long description adds current stock to satisfy DISC-PRE-03.",
-  "contractVersion": "9.0.0"
+  "contractVersion": "10.0.0",
+  "amendments": [
+    {
+      "date": "2026-09-10",
+      "source": "User correction: one recommendation per round; default best_match; conversational weight refinement",
+      "reviewer": "Codex",
+      "reviewMethod": "Authored English, Thai and Chinese updates to long description and plan purpose, preserving routing and service boundaries. English evidence purpose now names the current recommendation. Prior golden files preserved in release evidence and git history; no external human translation approval claimed."
+    }
+  ]
 }

@@ -208,17 +208,19 @@
           },
           "scoring": {
             "additionalProperties": false,
-            "description": "profile is a scoring preset, not customer demographics. Omitted effective terms default to one. Changing preset resets old overrides, then applies supplied overrides. weights:null clears overrides; {} preserves them. Individual null resets. An empty scoring refinement can retry failed/stale work; otherwise unchanged input is a no-op.",
+            "description": "Start with best_match by default and refine weights conversationally; each round returns one recommendation. balanced is an accepted alias for best_match. profile is a scoring preset, not customer demographics. Omitted effective terms default to one. Changing preset resets old overrides, then applies supplied overrides. weights:null clears overrides; {} preserves them. Individual null resets. An empty scoring refinement can retry failed/stale work; otherwise unchanged input is a no-op.",
             "type": "object",
             "properties": {
               "profile": {
                 "type": "string",
                 "enum": [
+                  "best_match",
                   "balanced",
                   "best_coverage",
                   "fewest_pills",
                   "lowest_cost"
-                ]
+                ],
+                "default": "best_match"
               },
               "weights": {
                 "anyOf": [
@@ -1016,17 +1018,19 @@
           },
           "scoring": {
             "additionalProperties": false,
-            "description": "profile is a scoring preset, not customer demographics. Omitted effective terms default to one. Changing preset resets old overrides, then applies supplied overrides. weights:null clears overrides; {} preserves them. Individual null resets. An empty scoring refinement can retry failed/stale work; otherwise unchanged input is a no-op.",
+            "description": "Start with best_match by default and refine weights conversationally; each round returns one recommendation. balanced is an accepted alias for best_match. profile is a scoring preset, not customer demographics. Omitted effective terms default to one. Changing preset resets old overrides, then applies supplied overrides. weights:null clears overrides; {} preserves them. Individual null resets. An empty scoring refinement can retry failed/stale work; otherwise unchanged input is a no-op.",
             "type": "object",
             "properties": {
               "profile": {
                 "type": "string",
                 "enum": [
+                  "best_match",
                   "balanced",
                   "best_coverage",
                   "fewest_pills",
                   "lowest_cost"
-                ]
+                ],
+                "default": "best_match"
               },
               "weights": {
                 "anyOf": [
@@ -2054,17 +2058,19 @@
       },
       "scoring": {
         "additionalProperties": false,
-        "description": "profile is a scoring preset, not customer demographics. Omitted effective terms default to one. Changing preset resets old overrides, then applies supplied overrides. weights:null clears overrides; {} preserves them. Individual null resets. An empty scoring refinement can retry failed/stale work; otherwise unchanged input is a no-op.",
+        "description": "Start with best_match by default and refine weights conversationally; each round returns one recommendation. balanced is an accepted alias for best_match. profile is a scoring preset, not customer demographics. Omitted effective terms default to one. Changing preset resets old overrides, then applies supplied overrides. weights:null clears overrides; {} preserves them. Individual null resets. An empty scoring refinement can retry failed/stale work; otherwise unchanged input is a no-op.",
         "type": "object",
         "properties": {
           "profile": {
             "type": "string",
             "enum": [
+              "best_match",
               "balanced",
               "best_coverage",
               "fewest_pills",
               "lowest_cost"
-            ]
+            ],
+            "default": "best_match"
           },
           "weights": {
             "anyOf": [
@@ -2884,10 +2890,7 @@
             "unit": "IU",
             "basis": "supplemental"
           }
-        ],
-        "scoring": {
-          "profile": "balanced"
-        }
+        ]
       }
     },
     {
@@ -3044,7 +3047,7 @@
         "expectedRevision": 1,
         "idempotencyKey": "example-change-key-0001",
         "scoring": {
-          "profile": "lowest_cost"
+          "profile": "best_match"
         }
       }
     },
@@ -3088,7 +3091,7 @@
       }
     },
     {
-      "name": "select-returned-choice",
+      "name": "confirm-recommendation",
       "tool": "plan",
       "arguments": {
         "planHandle": "cap_replace_with_returned_plan_handle",
@@ -3227,13 +3230,13 @@
                                   "$ref": "#/$defs/s2"
                                 },
                                 "requirements": {
-                                  "$ref": "#/$defs/s0"
-                                },
-                                "scoring": {
                                   "$ref": "#/$defs/s1"
                                 },
+                                "scoring": {
+                                  "$ref": "#/$defs/s0"
+                                },
                                 "searchEffort": {
-                                  "$ref": "#/$defs/s52"
+                                  "$ref": "#/$defs/s53"
                                 },
                                 "medicationCodes": {
                                   "$ref": "#/$defs/s40"
@@ -3297,13 +3300,13 @@
                                   "$ref": "#/$defs/s2"
                                 },
                                 "requirements": {
-                                  "$ref": "#/$defs/s0"
-                                },
-                                "scoring": {
                                   "$ref": "#/$defs/s1"
                                 },
+                                "scoring": {
+                                  "$ref": "#/$defs/s0"
+                                },
                                 "searchEffort": {
-                                  "$ref": "#/$defs/s52"
+                                  "$ref": "#/$defs/s53"
                                 },
                                 "medicationCodes": {
                                   "$ref": "#/$defs/s40"
@@ -3487,13 +3490,13 @@
                               "$ref": "#/$defs/s2"
                             },
                             "requirements": {
-                              "$ref": "#/$defs/s0"
-                            },
-                            "scoring": {
                               "$ref": "#/$defs/s1"
                             },
+                            "scoring": {
+                              "$ref": "#/$defs/s0"
+                            },
                             "searchEffort": {
-                              "$ref": "#/$defs/s52"
+                              "$ref": "#/$defs/s53"
                             },
                             "medicationCodes": {
                               "$ref": "#/$defs/s40"
@@ -4190,7 +4193,7 @@
               }
             }
           },
-          "s51": {
+          "s52": {
             "type": "string",
             "enum": [
               "capsule",
@@ -4203,12 +4206,12 @@
               "other"
             ]
           },
-          "s54": {
+          "s55": {
             "uniqueItems": true,
             "maxItems": 8,
             "type": "array",
             "items": {
-              "$ref": "#/$defs/s51"
+              "$ref": "#/$defs/s52"
             }
           },
           "s32": {
@@ -4332,13 +4335,13 @@
               "type": "string"
             }
           },
-          "s0": {
+          "s1": {
             "additionalProperties": false,
             "description": "maxDailyPills, maxPriceMinor and maxProductCount are advisory, never purchase limits. Create/replacement omission or null means no preference; patch omission preserves, null clears. Zero permits purchase. Prominent advice: strictly over 20% above a positive preference, or any positive actual above zero. Unknown actuals stay unknown.",
             "type": "object",
             "properties": {
               "allowedForms": {
-                "$ref": "#/$defs/s54"
+                "$ref": "#/$defs/s55"
               },
               "dietaryPreference": {
                 "type": "string",
@@ -4381,6 +4384,17 @@
                 "$ref": "#/$defs/s35"
               }
             }
+          },
+          "s51": {
+            "type": "string",
+            "enum": [
+              "best_match",
+              "balanced",
+              "best_coverage",
+              "fewest_pills",
+              "lowest_cost"
+            ],
+            "default": "best_match"
           },
           "s49": {
             "minimum": 0,
@@ -4439,26 +4453,20 @@
               }
             ]
           },
-          "s1": {
+          "s0": {
             "additionalProperties": false,
-            "description": "profile is a scoring preset, not customer demographics. Omitted effective terms default to one. Changing preset resets old overrides, then applies supplied overrides. weights:null clears overrides; {} preserves them. Individual null resets. An empty scoring refinement can retry failed/stale work; otherwise unchanged input is a no-op.",
+            "description": "Start with best_match by default and refine weights conversationally; each round returns one recommendation. balanced is an accepted alias for best_match. profile is a scoring preset, not customer demographics. Omitted effective terms default to one. Changing preset resets old overrides, then applies supplied overrides. weights:null clears overrides; {} preserves them. Individual null resets. An empty scoring refinement can retry failed/stale work; otherwise unchanged input is a no-op.",
             "type": "object",
             "properties": {
               "profile": {
-                "type": "string",
-                "enum": [
-                  "balanced",
-                  "best_coverage",
-                  "fewest_pills",
-                  "lowest_cost"
-                ]
+                "$ref": "#/$defs/s51"
               },
               "weights": {
                 "$ref": "#/$defs/s16"
               }
             }
           },
-          "s52": {
+          "s53": {
             "type": "string",
             "enum": [
               "standard",
@@ -4848,7 +4856,7 @@
             "description": "Positive amount fits the agreed target. Zero with positive importance softly minimises exposure on the stated basis using a reviewed comparison scale; it does not remove current intake. Reviewed zero scales: Vitamin D3 25 mcg (1000 IU), Selenium 50 mcg; other ingredients return an explicit missing-scale error. These scales are not dose recommendations. Weight zero ignores fitting; amount:null removes on refinement.",
             "type": "number"
           },
-          "s53": {
+          "s54": {
             "type": "string",
             "enum": [
               "total_daily",
@@ -4917,7 +4925,7 @@
                 ]
               },
               "basis": {
-                "$ref": "#/$defs/s53"
+                "$ref": "#/$defs/s54"
               },
               "acceptableRange": {
                 "$ref": "#/$defs/s12"
@@ -4984,7 +4992,7 @@
                 ]
               },
               "basis": {
-                "$ref": "#/$defs/s53"
+                "$ref": "#/$defs/s54"
               },
               "acceptableRange": {
                 "$ref": "#/$defs/s12"
@@ -5252,17 +5260,19 @@
               },
               "scoring": {
                 "additionalProperties": false,
-                "description": "profile is a scoring preset, not customer demographics. Omitted effective terms default to one. Changing preset resets old overrides, then applies supplied overrides. weights:null clears overrides; {} preserves them. Individual null resets. An empty scoring refinement can retry failed/stale work; otherwise unchanged input is a no-op.",
+                "description": "Start with best_match by default and refine weights conversationally; each round returns one recommendation. balanced is an accepted alias for best_match. profile is a scoring preset, not customer demographics. Omitted effective terms default to one. Changing preset resets old overrides, then applies supplied overrides. weights:null clears overrides; {} preserves them. Individual null resets. An empty scoring refinement can retry failed/stale work; otherwise unchanged input is a no-op.",
                 "type": "object",
                 "properties": {
                   "profile": {
                     "type": "string",
                     "enum": [
+                      "best_match",
                       "balanced",
                       "best_coverage",
                       "fewest_pills",
                       "lowest_cost"
-                    ]
+                    ],
+                    "default": "best_match"
                   },
                   "weights": {
                     "anyOf": [
@@ -6060,17 +6070,19 @@
               },
               "scoring": {
                 "additionalProperties": false,
-                "description": "profile is a scoring preset, not customer demographics. Omitted effective terms default to one. Changing preset resets old overrides, then applies supplied overrides. weights:null clears overrides; {} preserves them. Individual null resets. An empty scoring refinement can retry failed/stale work; otherwise unchanged input is a no-op.",
+                "description": "Start with best_match by default and refine weights conversationally; each round returns one recommendation. balanced is an accepted alias for best_match. profile is a scoring preset, not customer demographics. Omitted effective terms default to one. Changing preset resets old overrides, then applies supplied overrides. weights:null clears overrides; {} preserves them. Individual null resets. An empty scoring refinement can retry failed/stale work; otherwise unchanged input is a no-op.",
                 "type": "object",
                 "properties": {
                   "profile": {
                     "type": "string",
                     "enum": [
+                      "best_match",
                       "balanced",
                       "best_coverage",
                       "fewest_pills",
                       "lowest_cost"
-                    ]
+                    ],
+                    "default": "best_match"
                   },
                   "weights": {
                     "anyOf": [
@@ -7098,17 +7110,19 @@
           },
           "scoring": {
             "additionalProperties": false,
-            "description": "profile is a scoring preset, not customer demographics. Omitted effective terms default to one. Changing preset resets old overrides, then applies supplied overrides. weights:null clears overrides; {} preserves them. Individual null resets. An empty scoring refinement can retry failed/stale work; otherwise unchanged input is a no-op.",
+            "description": "Start with best_match by default and refine weights conversationally; each round returns one recommendation. balanced is an accepted alias for best_match. profile is a scoring preset, not customer demographics. Omitted effective terms default to one. Changing preset resets old overrides, then applies supplied overrides. weights:null clears overrides; {} preserves them. Individual null resets. An empty scoring refinement can retry failed/stale work; otherwise unchanged input is a no-op.",
             "type": "object",
             "properties": {
               "profile": {
                 "type": "string",
                 "enum": [
+                  "best_match",
                   "balanced",
                   "best_coverage",
                   "fewest_pills",
                   "lowest_cost"
-                ]
+                ],
+                "default": "best_match"
               },
               "weights": {
                 "anyOf": [
@@ -8032,7 +8046,7 @@
                   "profile": {
                     "type": "string",
                     "enum": [
-                      "balanced",
+                      "best_match",
                       "best_coverage",
                       "fewest_pills",
                       "lowest_cost"
@@ -8103,6 +8117,8 @@
                 ]
               },
               "choices": {
+                "maxItems": 1,
+                "description": "One current recommendation, never an alternative menu. Empty only when no targets remain. Refine weights to receive the next recommendation.",
                 "type": "array",
                 "items": {
                   "additionalProperties": false,
@@ -8478,7 +8494,6 @@
                 "enum": [
                   "confirm_with_user",
                   "execute",
-                  "review_options",
                   "answer_questions",
                   "change_request",
                   "no_purchase",

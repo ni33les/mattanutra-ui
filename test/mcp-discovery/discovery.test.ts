@@ -62,7 +62,7 @@ test("DISC-MCP-05 descriptions lead with purpose and keep operation instructions
 });
 test("DISC-MCP-06 info uses the exact approved English description", async () => { const info = await call("tools/call"); assert.equal(info.serviceName, "MattaNutra"); assert.equal(info.description, golden().infoDescription); });
 test("DISC-MCP-07 existing info identity and capability fields remain intact", async () => {
-  const info = await call("tools/call"); assert.equal(info.contractVersion, "9.0.0"); assert.equal(info.schemaChecksum, CURRENT_CONTRACT_SCHEMA_CHECKSUM);
+  const info = await call("tools/call"); assert.equal(info.contractVersion, AGENTIC_CONTRACT_VERSION); assert.equal(info.schemaChecksum, CURRENT_CONTRACT_SCHEMA_CHECKSUM);
   for (const key of ["buildId", "valuePropositionId", "wellnessBoundary", "responsibilityVersion", "researchVersion"]) assert.ok(info[key]);
   assert.deepEqual(info.supportedLocales, locales); assert.deepEqual((info.supportedCountries as {countryCode:string}[]).map(row => row.countryCode), ["TH"]);
 });
@@ -98,7 +98,7 @@ test("DISC-DET-02 tools list order copy schemas and annotations are deterministi
 test("DISC-DET-03 info capabilities and positioning are deterministic per locale", async () => { for (const locale of locales) assert.deepEqual(await call("tools/call", {}, "dev", locale), await call("tools/call", {}, "dev", locale)); });
 test("DISC-DET-04 generated manifests bind the versioned positioning content", () => {
   const published = adapter(); assert.ok(existsSync("lib/agentic/discovery/positioning.ts")); assert.match(published.positioningChecksum, /^[a-f0-9]{64}$/);
-  assert.equal(published.positioningChecksum, sha(published.locales)); assert.match(published.discoveryVersion, /conversational/);
+  assert.equal(published.positioningChecksum, sha(published.locales)); assert.match(published.discoveryVersion, /single-recommendation/);
   for (const provider of ["anthropic", "xai"]) assert.deepEqual(read(`lib/agentic/adapters/${provider}.json`), published);
 });
 test("DISC-DET-05 package tests have no skipped focused or empty cases", () => {

@@ -28,14 +28,15 @@ const initial = { locale: 'en', destinationCountry: 'TH', idempotencyKey: 'simpl
 test('SPLAN-STATE-04/05 completed selection advances revision without rematching; refinement clears selection; stale-key replay wins', async () => {
   const app = createAgenticRuntime(); const first = await finish(app, initial);
   assert.equal(first.status, 'ready'); assert.equal(first.selectedOptionId, null); assert.ok(first.recommendedOptionId);
-  assert.equal(first.scoring.profile, 'balanced');
+  assert.equal(first.scoring.profile, 'best_match');
   const select = { planHandle: first.planHandle, expectedRevision: first.revision, selectedOptionId: first.recommendedOptionId, idempotencyKey: 'simple-journey-select' };
   const selected = await finish(app, select);
   assert.equal(selected.revision, first.revision + 1); assert.ok(selected.selectedOptionId); assert.equal(selected.nextAction, 'execute');
   assert.deepEqual(selected.choices.map((x: { products: unknown }) => x.products), first.choices.map((x: { products: unknown }) => x.products));
   assert.deepEqual(await call(app, select), selected);
+  assert.equal(first.choices.length, 1); assert.equal(selected.choices.length, 1);
   const refined = await finish(app, { planHandle: first.planHandle, expectedRevision: selected.revision, idempotencyKey: 'simple-journey-refine', scoring: { weights: { pills: 2 } } });
-  assert.equal(refined.selectedOptionId, null); assert.equal(refined.scoring.weights.pills, 2);
+  assert.equal(refined.choices.length, 1); assert.equal(refined.selectedOptionId, null); assert.equal(refined.scoring.weights.pills, 2);
   const noop = await finish(app, { planHandle: first.planHandle, expectedRevision: refined.revision, idempotencyKey: 'simple-journey-noop', scoring: {} });
   assert.equal(noop.revision, refined.revision);
 });

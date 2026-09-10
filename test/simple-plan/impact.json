@@ -417,6 +417,12 @@
       "expectedCases": 5,
       "reason": "MCP advice reports only strictly exceeded MattaNutra recommended limits with honest uncertainty and aligned publication",
       "slice": "responses"
+    },
+    {
+      "file": "test/simple-plan/single-recommendation.test.ts",
+      "expectedCases": 5,
+      "reason": "One current recommendation, default best_match, hidden candidate fencing and conversational publication",
+      "slice": "responses"
     }
   ],
   "inputs": [
