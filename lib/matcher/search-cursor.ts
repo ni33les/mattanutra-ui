@@ -1,3 +1,4 @@
+import { verifiedAdministration } from "@/lib/product-administration";
 import { sha256Hex } from "@/lib/sha256";
 import { serializeExactValue } from "@/lib/matcher/exact-values";
 import { compileVariant, isDeferredConditional } from "@/lib/matcher/candidates";
@@ -133,6 +134,30 @@ function variantsFor(cursor: SearchCursor, index: number, state: SearchState, re
       const tick = divide(divide(fromDecimal(remaining), fromDecimal(group.product.dailyPillsPerServing)), step);
       const nearest = tick.num / tick.den;
       for (const offset of [-BigInt(1), BigInt(0), BigInt(1)]) addTick(nearest + offset);
+    }
+    const administration = verifiedAdministration(group.product.administration);
+    if (request.pricePreferenceBasis === "monthly_30_days" && administration?.packQuantity && administration.unitsPerServing) {
+      // The objective is discontinuous when another pack is needed. Include both
+      // sides of a bounded set of pack boundaries; evaluation uses the same add()
+      // path and consumes the ordinary expansion budget when first attempted.
+      const unitsPerTick = multiply(multiply(step, fromDecimal(administration.unitsPerServing)), fromDecimal(30));
+      const packTicks = divide(fromDecimal(administration.packQuantity), unitsPerTick);
+      const packs = new Set<bigint>([BigInt(1)]);
+      if (request.maxPriceMinor != null && group.product.unitPriceMinor > 0) {
+        const remaining = Math.max(0, request.maxPriceMinor - (state.monthlyPriceLowerBound ?? 0));
+        const affordable = BigInt(Math.floor(remaining / group.product.unitPriceMinor));
+        for (const offset of [-BigInt(1), BigInt(0), BigInt(1)]) if (affordable + offset > 0) packs.add(affordable + offset);
+      }
+      for (const quantity of initial.slice(0, 12)) {
+        const count = divide(divide(quantity.dailyUnitsRatio ?? fromDecimal(quantity.dailyUnits), step), packTicks);
+        const near = count.num / count.den;
+        if (near > 0) packs.add(near);
+        packs.add(near + BigInt(1));
+      }
+      for (const count of packs) {
+        const boundary = multiply(rational(count), packTicks), below = boundary.num / boundary.den;
+        addTick(below); addTick(below + BigInt(1));
+      }
     }
   }
   // Bounded discrete convex probes add useful interior quantities. First-order
