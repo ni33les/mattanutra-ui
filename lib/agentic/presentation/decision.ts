@@ -168,7 +168,7 @@ export function presentDecision(result: PlanResult, planHandle: string, revision
   const noTargets = !(state.originalRequest?.targets ?? state.targets).length;
   const noPurchase = noTargets || result.status === "no_purchase";
   const refresh = Boolean(result.refreshRequired), questions = result.questions ?? [];
-  const status = refresh || questions.length || (!recommended?.basket.length && !noPurchase) ? "needs_input" : noPurchase ? "no_purchase" : "ready";
+  const status = refresh || questions.length || (!(pinned ?? recommended)?.basket.length && !noPurchase) ? "needs_input" : noPurchase ? "no_purchase" : "ready";
   const nextAction = refresh ? "change_request" : questions.length ? "answer_questions" : noPurchase ? result.horizon?.nextReplenishmentDay && result.horizon?.nextReplenishmentDay > 0 ? "replenish_later" : "no_purchase" : pinned?.basket.length ? "execute" : recommended?.basket.length ? "confirm_with_user" : "review_options";
   let summary: string = refresh ? text.stale : questions.length ? text.question : noTargets ? text.noTargets : noPurchase ? text.none : pinned ? text.selected : recommended?.basket.length ? text.ready : text.review;
   const unassessed = state.medicationCodes.some(code => !(result.selected?.safety?.assessedMedicationCodes ?? []).includes(code)) || state.conditionCodes.some(code => !(result.selected?.safety?.assessedConditionCodes ?? []).includes(code));

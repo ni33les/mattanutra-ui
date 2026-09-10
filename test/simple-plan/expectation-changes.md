@@ -30,3 +30,11 @@ The first v9 DEV D3 smoke (source `53d66a24`) returned 25,546 structured bytes b
 ## Live fact identity correction — SPLAN-DTO-02
 
 The final real D3 inspection exposed the same supplement represented as a raw catalogue UUID in labelled facts and its public `sup_` identity in contributions. Source `b286807a` therefore duplicated one known D3 row as an unknown incidental row and could fail to associate conflicting labels with the contribution. The new RED case reports two rows instead of one. Presentation now applies the existing UUID-to-public-ID mapping before joining facts; no name-based merging or confidence upgrade occurs. Verified and conflicting variants are asserted independently. Product offers, quantities, source facts and matcher scoring remain unchanged. The additional qualification is required by this relevant correction; earlier evidence remains preserved.
+
+## Remaining test-entry-point audit
+
+The full source audit found additional older public clients still constructing retired operation/view payloads outside the initial scoped inventory. They are being adapted or retired explicitly, not silently counted as passing. `baseline-all-tests-before-clean-break.tar.gz` preserves every baseline test and fixture before this migration. Current helpers send flat requests without runtime input/output translation; direct domain tests retain their separate internal entry point.
+
+The five execute-reuse assertions remain maintained against flat requests and explicit returned-option selection. Retired plan handles now return standard not-found; unpaid order recovery uses its independent order handle. Original execute receipts remain stable and current payment state is read independently from the order. The eight internal QA access/evidence tests retain their original domain and payment assertions.
+
+`SPLAN-STATE-04` and the retained checkout tests exposed a genuine selection bug: a selected nonempty purchase fallback was still labelled `needs_input` because the empty recommendation controlled the status. The selected basket now controls operational readiness; this changes no scoring, choices, prices or advice.
