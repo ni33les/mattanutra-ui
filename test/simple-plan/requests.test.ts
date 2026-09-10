@@ -57,3 +57,20 @@ test('SPLAN-SPEC-02 order and unified schema discovery have no response-mode sel
   assert.deepEqual(validateToolIssues(AGENTIC_INPUT_SCHEMAS.info, { view: 'plan_schema' }), []);
   assert.ok(validateToolIssues(AGENTIC_INPUT_SCHEMAS.info, { view: 'plan_schema', planOperation: 'get' }).length);
 });
+
+test('SPLAN-REQ-06 normalized domain errors name the flat public field without a retired wrapper', async () => {
+  const { installGoldCatalogue, uninstallGoldCatalogue }=await import('../helpers/gold-catalogue.ts');
+  const { createAgenticRuntime }=await import('../../lib/agentic/runtime.ts');
+  const { handleJsonRpc }=await import('../../lib/agentic/mcp/dispatcher.ts');
+  installGoldCatalogue();
+  try {
+    for (const [suffix, fields, expected] of [
+      ['tiny',{targets:[{name:'Magnesium',amount:1e-12,unit:'mg'}]},'targets[0].amount'],
+      ['diet-duration',{targets:[{name:'Vitamin D3',amount:2000,unit:'IU'}],intake:[{source:'diet',certainty:'known',name:'Vitamin D3',amount:1000,unit:'IU',daysRemaining:30}]},'intake[0].daysRemaining']] as const) {
+      const response=await handleJsonRpc(createAgenticRuntime(),{id:1,method:'tools/call',params:{name:'plan',arguments:{locale:'en',destinationCountry:'TH',idempotencyKey:`flat-errors-${suffix}`, ...fields}}});
+      const value=response?.result?.structuredContent as {ok:boolean;error:{fieldPath:string;issues?:Array<{fieldPath:string}>}};
+      assert.equal(value.ok,false);assert.equal(value.error.fieldPath,expected);
+      for (const issue of value.error.issues??[])assert.doesNotMatch(issue.fieldPath,/^request\./);
+    }
+  } finally {uninstallGoldCatalogue();}
+});
