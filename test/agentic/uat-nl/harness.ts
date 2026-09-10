@@ -12,7 +12,6 @@ import type { CatalogueSnapshot } from "../../../lib/agentic/catalogue/types.ts"
 import { AGENTIC_CONTRACT_VERSION, loadAgenticConfig } from "../../../lib/agentic/config.ts";
 import { RESEARCH_VERSION } from "../../../lib/agentic/discovery/versions.ts";
 import { AGENTIC_SCHEMA_CHECKSUM, resetInfoCache } from "../../../lib/agentic/info.ts";
-import { handleCompletedJsonRpc as handleJsonRpc } from "../../helpers/completed-mcp-client.ts";
 import { refreshAdminSafetyCeilings } from "../../../lib/agentic/catalogue/load-safety-ceilings.ts";
 import { MATCHER_VERSION } from "../../../lib/matcher/config.ts";
 import { resetMatchPlanCache } from "../../../lib/agentic/plan/matching.ts";

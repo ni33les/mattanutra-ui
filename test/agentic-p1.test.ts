@@ -559,7 +559,7 @@ describe("agentic P1 pack fixes", () => {
         });
         assert.equal(unrelated.selectedOptionId, null, "Refinement invalidates selection while retaining eligible choices");
         const purchased = (items: unknown) => (items as Array<Record<string, unknown>>).map(item => ({ productId: item.productId, servingsPerDay: item.servingsPerDay, lineTotalMinor: item.lineTotalMinor }));
-        assert.ok((unrelated.choices as any[]).some(choice => choice.products.length === 1), JSON.stringify(unrelated));
+        assert.ok((unrelated.choices as Array<{products: unknown[]}>).some(choice => choice.products.length === 1), JSON.stringify(unrelated));
         const [planId] = await runtime.store.listPlanIdsByPrincipal("tester");
         assert.ok(planId);
         const stored = await runtime.store.getPlanRevision(planId, Number(unrelated.revision));
@@ -593,7 +593,7 @@ describe("agentic P1 pack fixes", () => {
     });
     it("drops leftover gap questions when selecting a fully covered option", async () => {
         const runtime = runtimeFor();
-        let created = await call(runtime, "plan", {
+        const created = await call(runtime, "plan", {
             idempotencyKey: "p1-select-option-000001",
             ...{
                 destinationCountry: "TH",
@@ -642,7 +642,7 @@ describe("agentic P1 pack fixes", () => {
         assert.ok((info.supportedCountries as Array<{
             countryCode: string;
         }>).every((item) => /^[A-Z]{2}$/.test(item.countryCode)));
-        let plan = await call(runtime, "plan", {
+        const plan = await call(runtime, "plan", {
             idempotencyKey: "p1-public-slim-0000001",
             ...{
                 destinationCountry: "TH",
@@ -674,7 +674,7 @@ describe("agentic P1 pack fixes", () => {
     });
     it("keeps client-visible trade-offs free of matcher internals", async () => {
         const runtime = runtimeFor();
-        let plan = await call(runtime, "plan", {
+        const plan = await call(runtime, "plan", {
             idempotencyKey: "p1-tradeoffs-public-01",
             ...{
                 destinationCountry: "TH",
@@ -739,7 +739,7 @@ describe("agentic P1 pack fixes", () => {
     });
     it("preserves explicit uncertainty and serious condition advice in a purchasable plan", async () => {
         const runtime = runtimeFor();
-        let plan = await call(runtime, "plan", {
+        const plan = await call(runtime, "plan", {
             idempotencyKey: "p1-d410-blocked-00001",
             ...{
                 conditionCodes: ["ckd"],
@@ -764,7 +764,7 @@ describe("agentic P1 pack fixes", () => {
             exposure?: unknown;
         }>).some(item => item.exposure === null));
         assert.equal(encoded.includes("rulesVersion"), false, "Sources are retrieved through narrow evidence, not cloned into the decision");
-        assert.ok((plan.choices as any[]).some(choice => choice.ingredients.some((row: any) => row.advice?.length)));
+        assert.ok((plan.choices as Array<{ingredients: Array<{advice?: unknown[]}>}>).some(choice => choice.ingredients.some(row => row.advice?.length)));
         const guidance = (await storedFields(runtime, plan)).safetyGuidance as Array<{
             ruleId: string;
             rulesVersion: string;
@@ -802,7 +802,7 @@ describe("agentic P1 pack fixes", () => {
     });
     it("accepts Creatine by official name and does not call it a legacy ID", async () => {
         const runtime = runtimeFor();
-        let plan = await call(runtime, "plan", {
+        const plan = await call(runtime, "plan", {
             idempotencyKey: "p1-creatine-name-00001",
             ...{
                 destinationCountry: "TH",
@@ -854,7 +854,7 @@ describe("agentic P1 pack fixes", () => {
     });
     it("omits alternatives that duplicate the selected stack", async () => {
         const runtime = runtimeFor();
-        let plan = await call(runtime, "plan", {
+        const plan = await call(runtime, "plan", {
             idempotencyKey: "p1-no-twin-alt-00001",
             ...{
                 destinationCountry: "TH",
@@ -901,7 +901,7 @@ describe("agentic P1 pack fixes", () => {
     });
     it("agrees error category with error_code and treats missing order as an error", async () => {
         const runtime = runtimeFor();
-        let created = await call(runtime, "plan", {
+        const created = await call(runtime, "plan", {
             idempotencyKey: "p1-err-shape-plan-001",
             ...{
                 destinationCountry: "TH",
@@ -1014,7 +1014,7 @@ describe("agentic P1 pack fixes", () => {
     });
     it("recognises Calcium, Vitamin B6, Iodine and Selenium by name", async () => {
         const runtime = runtimeFor();
-        let plan = await call(runtime, "plan", {
+        const plan = await call(runtime, "plan", {
             idempotencyKey: "p1-extra-names-000001",
             ...{
                 destinationCountry: "TH",
@@ -1041,7 +1041,7 @@ describe("agentic P1 pack fixes", () => {
     });
     it("reuses a planHandle hours later and expires it after the 7-day TTL", async () => {
         const runtime = runtimeFor();
-        let created = await call(runtime, "plan", {
+        const created = await call(runtime, "plan", {
             idempotencyKey: "p1-plan-ttl-create-01",
             ...{
                 destinationCountry: "TH",

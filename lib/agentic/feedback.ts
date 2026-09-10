@@ -7,7 +7,7 @@ import { resolveCapability, type CapabilityScope } from "@/lib/agentic/capabilit
 import { beginIdempotency, commitIdempotency } from "@/lib/agentic/idempotency";
 import { persistMcpPlanFeedback } from "@/lib/agentic/commerce/retail-join";
 import type { AgenticStore } from "@/lib/agentic/store/types";
-import { agenticMessage, negotiateLocale } from "@/lib/agentic/i18n";
+import { agenticMessage } from "@/lib/agentic/i18n";
 import type { PlanResult } from "@/lib/agentic/plan/types";
 
 const SECRETISH =

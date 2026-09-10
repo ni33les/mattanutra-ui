@@ -1,7 +1,6 @@
 import { planTool as admitDomainPlan } from "../lib/agentic/plan/service.ts";
 import { after } from "node:test";
 import { closeSqlPool } from "../lib/db.ts";
-import { handleJsonRpc as admitJsonRpc } from "../lib/agentic/mcp/dispatcher.ts";
 import { runAdmittedPlanOperation } from "../lib/agentic/plan/service.ts";
 import { setQueryNamespace } from "../lib/agentic/plan/query-budget.ts";
 import { CURRENT_CONTRACT_SCHEMA_CHECKSUM } from "./helpers/current-contract-lock.ts";

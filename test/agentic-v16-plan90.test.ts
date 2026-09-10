@@ -1,7 +1,6 @@
 import { planTool as admitDomainPlan } from "../lib/agentic/plan/service.ts";
 import { after } from "node:test";
 import { closeSqlPool } from "../lib/db.ts";
-import { handleJsonRpc as admitJsonRpc } from "../lib/agentic/mcp/dispatcher.ts";
 import { runAdmittedPlanOperation } from "../lib/agentic/plan/service.ts";
 import { PLAN_OPERATION_TERMINAL_MS } from "../lib/agentic/plan/operations.ts";
 import { F_READY_MAG } from "./agentic/v16/manifest.ts";
