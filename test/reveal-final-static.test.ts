@@ -64,8 +64,16 @@ function assertOrder(source: string, labels: readonly string[]) {
 
 describe("final reveal UX", () => {
   it("counts covered nutrients from dose percent, not product cover tags", () => {
-    assert.match(reveal, /coveredFormulaNeedCount\(needCoverage\)/);
+    assert.match(reveal, /coveredRevealNeedCount\(needCoverage\)/);
     assert.match(reveal, /formulaNeedCount\(needCoverage\)/);
+  });
+
+  it("omits preference advice boxes and Other options while retaining selected cautions and replan controls", () => {
+    assert.doesNotMatch(reveal, /WebPreferenceAdvice|selected-matching-preferences|matchingCopy\.alternatives|data-testid="matching-option"/);
+    assert.match(reveal, /WebMatchingAdvice advice=\{selectedMatchingOption\.advice\} locale=\{locale\} selected/);
+    assert.match(reveal, /WebMatchingPillCount count=\{selectedMatchingOption\.dailyPills\}/);
+    assert.match(reveal, /replanProducts\(true\)/);
+    assert.match(reveal, /basket\/checkout/);
   });
 
   it("explains formula match as an equal average of all formula nutrients", () => {
