@@ -89,3 +89,15 @@ test('PRACTICAL-SCORE-09 overall score preserves symmetric dose arithmetic and a
   assert.equal(above.dosePenalty, 1); // 50/100 + 2*(150-120)/120.
   assert.equal(above.overallPenalty, 1.105);
 });
+
+test('PRACTICAL-SCORE-10 missing pack prices are unavailable without inventing a monetary uncertainty coefficient', async () => {
+  const { scorePracticalPenalties } = await scoring();
+  const score = scorePracticalPenalties(request({maxPriceMinor:10000,pricePreferenceBasis:'monthly_30_days'}), {
+    dailyPills:3,pillLowerBound:3,productCount:1,priceMinor:10000,currency:'THB',servings:[1],uncertainProductCount:0,monthlyPriceMinor:null
+  });
+  assert.equal(score.preferences.maxPriceMinor.actual,null);
+  assert.equal(score.preferences.maxPriceMinor.complete,false);
+  assert.equal(score.preferences.maxPriceMinor.penalty,0);
+  assert.ok(score.missingComponents.includes('maxPriceMinor'));
+  assert.equal(score.components.uncertainty,0, 'The approved 0.25 term applies to unverified administration, not an extra invented monetary weight');
+});
