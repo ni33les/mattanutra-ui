@@ -1,0 +1,56 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import { match } from '../../lib/matcher/index.ts';
+import { catalog, product, request } from '../matcher/flexible-v5-fixtures.ts';
+import { canonicalizeTargets } from '../../lib/matcher/canonicalizer.ts';
+import type { ProductAdministration } from '../../lib/product-administration.ts';
+
+function administration(units: number): ProductAdministration { return { route: 'oral', physicalUnit: 'tablet', unitsPerServing: units,
+  doseIncrement: 1, packQuantity: 60, provenance: { status: 'verified', sourceUrl: 'https://example.com/controlled-label', sourceText: 'Controlled fixture label: verified tablet serving and pack basis.', verifiedAt: '2026-09-10' } }; }
+const tablet = (id: string, amount: number, units: number, price = 10000) => product(id, { a: amount }, price, { administration: administration(units), dailyPillsPerServing: units, pillCountKnown: true });
+
+test('PRACTICAL-SEARCH-01 strong profile selects a useful routine while retaining closest-dose choice', () => {
+  const input = request({ maxDailyPills: 3, preferenceImportance: { maxDailyPills: 'strong' } });
+  const result = match(input, catalog([tablet('sixteen', 100, 16), tablet('manageable', 80, 3)]));
+  assert.ok(result.selected && result.selected.productCount > 0);
+  assert.deepEqual(result.selected.productIds, ['manageable']); assert.ok(result.selected.dailyPills <= 4);
+  assert.ok(result.selected.roles?.includes('best_match')); assert.ok(!result.selected.roles?.includes('closest_dose'));
+  const closest = result.alternatives.find(row => row.roles?.includes('closest_dose'));
+  assert.ok(closest); assert.equal(closest.doseFit?.total, 0); assert.equal(closest.purchaseEligible, true);
+});
+
+test('PRACTICAL-SEARCH-02 weighted price objective changes selection without changing eligibility', () => {
+  const shelf = catalog([tablet('cheap-near', 97, 1, 1000), tablet('exact', 100, 1, 30000)]);
+  const balanced = match(request(), shelf), cheaper = match(request({ optimization: 'lowest_cost' }), shelf);
+  assert.deepEqual(balanced.selected?.productIds, ['exact']); assert.deepEqual(cheaper.selected?.productIds, ['cheap-near']);
+  assert.ok(cheaper.alternatives.some(row => row.productIds.includes('exact') && row.roles?.includes('closest_dose')));
+  assert.deepEqual(balanced.rejected, cheaper.rejected);
+});
+
+test('PRACTICAL-SEARCH-03 supported interior quantity is explored within the same budget', () => {
+  const input = request({ maxDailyPills: 5, preferenceImportance: { maxDailyPills: 'strong' } });
+  const result = match(input, catalog([tablet('interior', 125, 10)]));
+  assert.ok(result.selected); assert.equal(result.selected.variantDoses?.[0].dailyUnits, 0.6);
+  assert.equal(result.selected.dailyPills, 6); assert.equal(result.selected.doseFit?.total, 0.25);
+  assert.ok(result.searchSummary.expansionAttempts <= 8000);
+});
+
+test('PRACTICAL-SEARCH-04 unknown administration does not become a zero-pill advantage', () => {
+  const result = match(request({ maxDailyPills: 1 }), catalog([tablet('known', 100, 2), product('unknown', { a: 100 }, 10000, { dailyPillsPerServing: 0, pillCountKnown: false })]));
+  assert.deepEqual(result.selected?.productIds, ['known']);
+  const unknown = [result.selected, ...result.alternatives].find(row => row?.productIds.includes('unknown'));
+  if (unknown) assert.equal(unknown.pillCountKnown, false);
+  assert.equal(result.selected?.purchaseEligible, true);
+});
+
+test('PRACTICAL-SEARCH-05 optional-only improvements cannot displace core coverage', () => {
+  const targets = canonicalizeTargets({ targets: [{ subjectId: 'a', name: 'A', amount: 100, unit: 'mg', importance: 'core' }, { subjectId: 'b', name: 'B', amount: 100, unit: 'mg', importance: 'optional' }] }).targets;
+  const result = match(request({ targets }), catalog([tablet('core', 100, 1), product('optional-trade', { a: 90, b: 100 }, 10000, { administration: administration(1), dailyPillsPerServing: 1, pillCountKnown: true })]));
+  assert.deepEqual(result.selected?.productIds, ['core']);
+});
+
+test('PRACTICAL-SEARCH-06 numerical preferences never veto fixed quantities or purchase choices', () => {
+  const result = match(request({ maxDailyPills: 0, maxProductCount: 0, maxPriceMinor: 0, preferenceImportance: { maxDailyPills: 'strong' }, productDoses: [{ productId: 'fixed', servingsPerDay: 4 }] }), catalog([tablet('fixed', 100, 1)]));
+  assert.ok(result.selected); assert.equal(result.selected.variantDoses?.[0].dailyUnits, 4); assert.equal(result.selected.purchaseEligible, true);
+  assert.equal(result.selected.safety.hardBlocked, false); assert.equal(result.selected.safety.requiresAck, false);
+});
