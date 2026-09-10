@@ -201,6 +201,13 @@ export function compareDoseFit(left: DoseFitScore, right: DoseFitScore) {
   return delta < BigInt(0) ? -1 : delta > BigInt(0) ? 1 : 0;
 }
 
+/** Fresh scoring callers reuse the original exact sum, never a rounded DTO. */
+export function exactDoseFit(score: DoseFitScore): Fraction {
+  const exact = exactTotals.get(score);
+  if (!exact) throw new Error("Exact dose-fit score must be calculated from immutable inputs");
+  return exact;
+}
+
 /** Annotate incomplete product evidence without changing the independently
  * tested arithmetic or losing its exact rational comparison identity. */
 export function withProductUncertainty(score: DoseFitScore, subjectIds: readonly string[] = []): DoseFitScore {

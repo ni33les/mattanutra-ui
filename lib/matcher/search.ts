@@ -3,6 +3,7 @@ import { servingIncrement } from "@/lib/matcher/serving-grid";
 import { comparePillCounts } from "@/lib/matcher/pill-burden";
 import { compileVariant, isDeferredConditional } from "@/lib/matcher/candidates";
 import { compareDoseFit, doseFitScore } from "@/lib/matcher/dose-fit";
+import { compareOverallScores, searchStateScore } from "@/lib/matcher/practical-scoring";
 import { DEFAULT_MATCHER_CONFIG } from "@/lib/matcher/config";
 import { fingerprintState } from "@/lib/matcher/dominance";
 import { aggregateDailyExposure, isDoseError } from "@/lib/matcher/dose";
@@ -128,6 +129,8 @@ function skipGroup(state: SearchState): SearchState {
 }
 
 export function compareSearchStates(a: SearchState, b: SearchState, request: CanonicalRequest) {
+  const practical = compareOverallScores(searchStateScore(request, a), searchStateScore(request, b));
+  if (practical !== 0) return practical;
   const fit = compareDoseFit(doseFitScore(request, a.exposure), doseFitScore(request, b.exposure));
   if (fit !== 0) return fit;
   // Use the final dose-first routine ordering during retention and repair.

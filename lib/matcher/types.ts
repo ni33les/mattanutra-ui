@@ -31,6 +31,9 @@ export type OptimizationMode =
   | "fewest_pills"
   | "lowest_cost";
 
+export type PreferenceImportance = "flexible" | "normal" | "strong";
+export type PreferenceImportanceMap = Readonly<Partial<Record<"maxDailyPills" | "maxProductCount" | "maxPriceMinor", PreferenceImportance>>>;
+
 export type SelectorMode = "agentic" | "web_single";
 
 export type DietaryPreference = "any" | "plant_based" | "vegan";
@@ -138,6 +141,9 @@ export type CanonicalRequest = Readonly<{
   medicationCodes: readonly string[];
   omega3SourcePreference: OmegaPreference;
   optimization: OptimizationMode;
+  preferenceImportance?: PreferenceImportanceMap;
+  /** Web budgets are monthly; MCP's compatible price preference is first-order goods. */
+  pricePreferenceBasis?: "first_order" | "monthly_30_days";
   profile: Readonly<{
     ageYears: number;
     lifeStage: LifeStage;
@@ -272,6 +278,10 @@ export type ProductGroup = Readonly<{
 }>;
 
 export type SearchState = Readonly<{
+  routineServings?: readonly number[];
+  uncertainAdministrationCount?: number;
+  monthlyPriceMinor?: number | null;
+  monthlyPriceLowerBound?: number;
   count: number;
   delivered: ReadonlyMap<string, bigint>;
   exposure: ReadonlyMap<string, bigint>;

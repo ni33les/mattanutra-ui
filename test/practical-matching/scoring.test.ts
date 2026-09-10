@@ -45,7 +45,7 @@ test('PRACTICAL-SCORE-04 zero and omitted preferences have finite distinct seman
 
 test('PRACTICAL-SCORE-05 unknown pills preserve verified lower bound and uncertainty', async () => {
   const { scorePracticalPenalties } = await scoring();
-  const score = scorePracticalPenalties(request({ maxDailyPills: 3 }), actuals({ dailyPills: null, pillLowerBound: 16, uncertainProductCount: 2 }));
+  const score = scorePracticalPenalties(request({ maxDailyPills: 3 }), actuals({ productCount: 2, dailyPills: null, pillLowerBound: 16, uncertainProductCount: 2 }));
   assert.equal(score.preferences.maxDailyPills.actual, null); assert.equal(score.preferences.maxDailyPills.actualLowerBound, 16);
   assert.equal(score.preferences.maxDailyPills.complete, false); assert.equal(score.complete, false);
   assert.equal(score.preferences.maxDailyPills.penalty, 169 / 36); assert.equal(score.components.uncertainty, 0.5);
@@ -77,4 +77,15 @@ test('PRACTICAL-SCORE-08 invalid profile, importance, currency and measurements 
   assert.throws(() => scorePracticalPenalties(request(), actuals({ currency: 'USD' })), /currency/);
   assert.throws(() => scorePracticalPenalties(request(), actuals({ dailyPills: -1 })), /dailyPills/);
   assert.throws(() => scorePracticalPenalties(request(), actuals({ productCount: 1.5 })), /productCount/);
+});
+
+test('PRACTICAL-SCORE-09 overall score preserves symmetric dose arithmetic and additional 2x safety excess', async () => {
+  const { overallMatchingScore } = await scoring();
+  const input = request({ safetyCeilings: [{ subjectId: 'a', name: 'A', maxAmount: 120, maxUnit: 'mg' }] });
+  const exposure = (amount: number) => new Map([['a', BigInt(amount) * 1000000n]]);
+  assert.equal(overallMatchingScore(request(), exposure(50), actuals()).dosePenalty, 0.5);
+  assert.equal(overallMatchingScore(request(), exposure(150), actuals()).dosePenalty, 0.5);
+  const above = overallMatchingScore(input, exposure(150), actuals());
+  assert.equal(above.dosePenalty, 1); // 50/100 + 2*(150-120)/120.
+  assert.equal(above.overallPenalty, 1.105);
 });
