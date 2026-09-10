@@ -93,3 +93,33 @@ test('PRACTICAL-API-07 contract advances intentionally without losing presentati
   assert.equal(planResponseView(undefined, '7.1.0'), 'full');
   assert.equal(planResponseView('status', '7.1.0'), 'status');
 });
+
+
+test('PRACTICAL-API-08 compact changes penalty weights without a second search policy', async () => {
+  const { WEB_MATCHER_CONFIG, WEB_COMPACT_MATCHER_CONFIG } = await import('../../lib/matcher/config.ts');
+  assert.deepEqual(WEB_COMPACT_MATCHER_CONFIG, WEB_MATCHER_CONFIG);
+});
+
+test('PRACTICAL-API-09 web and MCP emit identical complete scores for identical resolved parameters', async () => {
+  const { matchPlan } = await import('../../lib/agentic/plan/matching.ts');
+  const { sampleRetailProduct } = await import('../agentic/value/sample-catalogue.ts');
+  const row = sampleRetailProduct({ id: 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeea09', title: 'Controlled A', name: 'A', supplementId: 'sup_a',
+    amount: 100, unit: 'mg', unitPriceMinor: 60000, form: 'capsule', servingLabel: '1 capsule; 60 capsules per bottle' });
+  setMatcherSafetyCeilings([]);
+  try {
+    for (const compact of [false, true]) {
+      const optimization = compact ? 'fewest_pills' : 'balanced';
+      const state = aug25PlanState({ optimization, targets: [{ name: 'A', supplementId: 'sup_a', amount: 100, unit: 'mg', basis: 'supplemental' }],
+        requirements: { maxDailyPills: 3, maxProductCount: 1, maxPriceMinor: 60000, preferenceImportance: { maxDailyPills: 'strong' }, productDoses: [{ productId: row.productId, servingsPerDay: 4 }] },
+        currentSupplements: [], medicationCodes: [], conditionCodes: [] });
+      const mcp = matchPlan({ state, snapshot: { availabilityAsOf: '2026-09-10T00:00:00Z', catalogueVersion: 'same-score-fixture', products: [row], supplements: [] } });
+      const web = recommendWithMatcher({ needs: [need], candidates: [{ ...row.candidate, priceAmount: 600, selectedRetailerOrganisationId: row.sellerId }],
+        stackPreference: compact ? 'compact' : 'balanced', maxProducts: 1, budgetAmount: 600,
+        productDoses: [{ productId: row.candidate.id, servingsPerDay: 4 }], clientContext: { ageYears: 38, lifestage: 'adult', pillLimit: '1-3', currentSupplements: 'none' } });
+      const selected = web.diagnostics.matching?.options.find(option => option.optionId === web.diagnostics.matching?.selectedOptionId);
+      assert.ok(mcp.selected?.overallScore); assert.ok(selected?.overallScore);
+      assert.deepEqual(selected.overallScore, mcp.selected.overallScore);
+      assert.equal(selected.dailyPills, 4); assert.equal(selected.purchaseEligible, true);
+    }
+  } finally { resetMatcherSafetyCeilings(); }
+});

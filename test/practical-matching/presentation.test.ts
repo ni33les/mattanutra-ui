@@ -52,3 +52,16 @@ test('PRACTICAL-WEB-05 monthly preferences display THB values without changing t
   const html = renderToStaticMarkup(createElement(components.WebPreferenceAdvice, { preferences, locale: 'en' }));
   assert.match(html, /30.day|monthly/i); assert.match(html, /1200|1,200/); assert.doesNotMatch(html, /120000|120,000/);
 });
+
+
+test('PRACTICAL-WEB-06 practical empty-result copy preserves honest recovery in all three locales', async () => {
+  const { matchingExplanationFor } = await import('../../lib/agentic/value/matching-explanation.ts');
+  for (const [locale, phrase] of [['en', /overall penalty/], ['th', /คะแนนโทษรวม/], ['zh-CN', /综合惩罚/]] as const) {
+    const explanation = matchingExplanationFor({ diagnostics: { catalogueListings: 1, catalogueProducts: 1, eligibleListings: 1, eligibleProducts: 1,
+      supportedDoseVariants: 1, evaluatedNonemptyBaskets: 1, reasonCode: 'empty_practical_fit', rejectionCounts: [], targets: [] },
+      empty: true, hasPurchaseOptions: true, hasUnmetTargets: true, locale });
+    assert.ok(explanation); assert.match(explanation.message, phrase);
+    assert.doesNotMatch(explanation.message, /closest dose fit|ปริมาณใกล้เป้าหมายที่สุด|剂量最接近目标/);
+    assert.equal(explanation.recoveryActions[0], 'review_options');
+  }
+});

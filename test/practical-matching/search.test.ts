@@ -86,3 +86,34 @@ test('PRACTICAL-SEARCH-09 nonterminating serving fractions keep exact burdens an
   assert.equal(result.selected.dailyPills, 5); assert.equal(result.selected.overallScore.preferences.maxPriceMinor.actual, 30000);
   assert.deepEqual(result.selected.overallScore.overallExact, { numerator: '289', denominator: '1800' });
 });
+
+test('PRACTICAL-SEARCH-10 an empty practical winner does not claim the closest dose fit', () => {
+  const result = match(request({ maxProductCount: 0, preferenceImportance: { maxProductCount: 'strong' } }), catalog([tablet('exact', 100, 1)]));
+  assert.equal(result.selected?.productCount, 0);
+  assert.ok(result.selected?.roles?.includes('best_match'));
+  assert.ok(!result.selected?.roles?.includes('closest_dose'));
+  const closest = result.alternatives.find(option => option.roles?.includes('closest_dose'));
+  assert.ok(closest); assert.equal(closest.doseFit?.total, 0); assert.equal(closest.purchaseEligible, true);
+  assert.equal(result.matchingDiagnostics?.reasonCode, 'empty_practical_fit');
+});
+
+test('PRACTICAL-SEARCH-11 stronger pill importance changes the routine and still allows a modest overrun', () => {
+  const shelf = catalog([tablet('importance-interior', 125, 10)]);
+  const normal = match(request({ maxDailyPills: 5 }), shelf);
+  const strong = match(request({ maxDailyPills: 5, preferenceImportance: { maxDailyPills: 'strong' } }), shelf);
+  assert.equal(normal.selected?.dailyPills, 8);
+  assert.equal(normal.selected?.doseFit?.total, 0);
+  assert.equal(strong.selected?.dailyPills, 6);
+  assert.equal(strong.selected?.doseFit?.total, 0.25);
+  assert.ok(strong.selected!.dailyPills > 5, 'A modest overrun remains legitimate when its dose benefit wins');
+  assert.equal(strong.selected?.purchaseEligible, true);
+});
+
+test('PRACTICAL-SEARCH-12 an optional improvement with unchanged required fit is weighed rather than excluded', () => {
+  const targets = canonicalizeTargets({ targets: [{ subjectId: 'a', name: 'A', amount: 100, unit: 'mg', importance: 'core' }, { subjectId: 'b', name: 'B', amount: 100, unit: 'mg', importance: 'optional' }] }).targets;
+  const optional = product('optional', { b: 100 }, 10000, { administration: administration(1), dailyPillsPerServing: 1, pillCountKnown: true });
+  const result = match(request({ targets }), catalog([tablet('core', 100, 1), optional]));
+  assert.ok(result.selected); assert.deepEqual([...result.selected.productIds].sort(), ['core', 'optional']);
+  assert.equal(result.selected.doseFit?.total, 0);
+  assert.ok(result.selected.roles?.includes('closest_dose'));
+});
