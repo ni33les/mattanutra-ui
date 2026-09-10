@@ -1,7 +1,7 @@
 "use client";
 
 import { webMatchingCopy } from "@/lib/web-health-advice";
-import { WebHealthAdviceText, WebMatchingPillCount, WebPreferenceAdvice } from "@/components/web-health-advice";
+import { WebMatchingAdvice, WebMatchingPillCount, WebPreferenceAdvice } from "@/components/web-health-advice";
 import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -1517,12 +1517,10 @@ function RevealProductsFinalSection({
             <WebPreferenceAdvice preferences={selectedMatchingOption.preferences} locale={locale} />
           </div>
         ) : null}
-        {selectedMatchingOption?.advice.length ? (
-          <aside className="mx-auto my-6 max-w-[880px] rounded-xl border border-[var(--mn-line)] p-5" aria-label={matchingCopy.advice}>
-            <h3 className="font-semibold">{matchingCopy.advice}</h3>
-            {selectedMatchingOption.advice.map((advice, index) => <WebHealthAdviceText key={`${advice.code}:${index}`} advice={advice} locale={locale} />)}
-          </aside>
-        ) : null}
+        {selectedMatchingOption ? <div className="mx-auto my-6 max-w-[880px]">
+          <WebMatchingPillCount count={selectedMatchingOption.dailyPills} lowerBound={selectedMatchingOption.overallScore?.preferences.maxDailyPills.actualLowerBound ?? selectedMatchingOption.preferences?.find(row => row.kind === "daily_pills")?.actualLowerBound} locale={locale} />
+          <WebMatchingAdvice advice={selectedMatchingOption.advice} locale={locale} selected />
+        </div> : null}
         {matching && (matching.options.some(option => option.optionId !== matching.selectedOptionId) || matching.alternativeSearch?.status !== "not_needed") ? (
           <section className="mx-auto my-6 max-w-[880px]" aria-label={matchingCopy.alternatives}>
             <h3 className="font-semibold">{matchingCopy.alternatives}</h3>
@@ -1532,10 +1530,10 @@ function RevealProductsFinalSection({
               const subtotal = option.recommendations.reduce((sum, item) => sum + (item.unitPriceAmount ?? item.product.priceAmount ?? 0), 0);
               return <div className="mt-4 rounded-xl border border-[var(--mn-line)] p-5" key={option.optionId} data-testid="matching-option" data-option-id={option.optionId}>
                 <p>{option.recommendations.map(item => item.product.title).join(", ")}</p>
-                <p className="mt-2 text-sm">{matchingCopy.coverage}: {option.coveragePercent}% · <WebMatchingPillCount count={option.dailyPills} locale={locale} /></p>
+                <p className="mt-2 text-sm">{matchingCopy.coverage}: {option.coveragePercent}% · <WebMatchingPillCount count={option.dailyPills} lowerBound={option.overallScore?.preferences.maxDailyPills.actualLowerBound ?? option.preferences?.find(row => row.kind === "daily_pills")?.actualLowerBound} locale={locale} /></p>
                 <p className="mt-2 text-sm">{matchingCopy.subtotal}: {new Intl.NumberFormat(localeHtmlLang(locale), { style: "currency", currency: option.recommendations[0]?.product.currency ?? "THB" }).format(subtotal)}</p>
                 <WebPreferenceAdvice preferences={option.preferences} locale={locale} />
-                {option.advice.map((advice, index) => <WebHealthAdviceText key={`${advice.code}:${index}`} advice={advice} locale={locale} />)}
+                <WebMatchingAdvice advice={option.advice} locale={locale} selected={false} />
                 {!awaitingReplan && option.productIds.length ? <Link className="mt-3 inline-block underline" href={`/${locale}/basket/checkout?${params}`}>{matchingCopy.choose}</Link> : null}
               </div>;
             })}
@@ -2434,7 +2432,7 @@ function RevealSafetyFinalSection({
             ),
       })),
     ),
-  ].filter((caution) => caution.body);
+  ].filter((caution, index, rows) => caution.body && rows.findIndex(other => other.body === caution.body) === index);
   const hasStatinContext = result.assessmentSummary.constraints.some(
     (constraint) => /statin|สแตติน/i.test(constraint),
   );

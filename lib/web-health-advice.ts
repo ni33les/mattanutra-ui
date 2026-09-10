@@ -57,3 +57,24 @@ export const webMatchingCopy = {
   th: { evidence: "หลักฐาน", retry: "ลองค้นหาตัวเลือกอื่นอีกครั้ง", advice: "คำแนะนำด้านสุขภาพ", alternatives: "ตัวเลือกอื่น", none: "ไม่พบตัวเลือกที่แตกต่างและมีข้อควรระวังน้อยกว่าภายใต้ข้อกำหนดเหล่านี้", incomplete: "การค้นหาตัวเลือกอื่นยังไม่เสร็จสมบูรณ์ คุณลองใหม่ได้", coverage: "ความครอบคลุม", pills: "จำนวนเม็ดต่อวัน", pillsUnknown: "ไม่ทราบ เนื่องจากข้อมูลหน่วยของผลิตภัณฑ์ไม่ครบถ้วน", subtotal: "ราคารวมสินค้า คำนวณค่าจัดส่งเมื่อชำระเงิน", choose: "ยืนยันตัวเลือกนี้", replan: "ยกเว้นสินค้าที่นำออกและจัดแผนใหม่", clear: "ล้างรายการยกเว้นสินค้าและจัดแผนใหม่", error: "จัดแผนใหม่ไม่สำเร็จ โปรดลองอีกครั้ง" },
   "zh-CN": { evidence: "依据", retry: "重试其他选项搜索", advice: "健康建议", alternatives: "其他选项", none: "在这些要求内，未找到注意事项更少的不同选项。", incomplete: "其他选项的搜索尚未完成，您可以重试。", coverage: "覆盖率", pills: "每日粒数", pillsUnknown: "未知，产品的实际单位信息不完整", subtotal: "商品小计；运费在结账时计算", choose: "确认此选项", replan: "排除已移除的商品并重新规划", clear: "清除商品排除项并重新规划", error: "重新规划失败，请重试。" }
 } as const;
+
+/** Explicit finding codes keep target deviations and unknown facts out of medical cautions. */
+export function partitionWebMatchingAdvice(advice: readonly WebHealthAdvice[]) {
+  const seen = new Set<string>(), medical: WebHealthAdvice[] = [], details: WebHealthAdvice[] = [];
+  for (const row of advice) {
+    const key = JSON.stringify([row.code, row.ingredient, row.amount, row.amountRange, row.unit, row.referenceDose, row.referenceLimit, row.evidence]);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const measuredLimit = ['reference_limit_exceeded', 'dose_review_required'].includes(row.code) && row.referenceLimit != null &&
+      Number.isFinite(row.referenceLimit.amount) && (row.amountRange?.maximum ?? row.amount ?? -1) >= row.referenceLimit.amount;
+    const context = ['medication_interaction', 'condition_review_required', 'pediatric_review_required', 'pregnancy_review_required', 'allergy_review_required'].includes(row.code);
+    (measuredLimit || context ? medical : details).push(row);
+  }
+  return { medical, details };
+}
+
+export const webRoutineCopy = {
+  en: { medical: 'Medical cautions for this option', details: 'Matching details', lower: (n: number) => `At least ${n}; total unknown` },
+  th: { medical: 'ข้อควรระวังทางการแพทย์สำหรับตัวเลือกนี้', details: 'รายละเอียดการจับคู่', lower: (n: number) => `อย่างน้อย ${n}; ไม่ทราบจำนวนรวม` },
+  'zh-CN': { medical: '此选项的医学注意事项', details: '匹配详情', lower: (n: number) => `至少 ${n}；总数未知` }
+} as const;

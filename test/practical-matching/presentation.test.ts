@@ -48,7 +48,7 @@ test('PRACTICAL-WEB-04 routine totals preserve verified lower bounds instead of 
 });
 
 test('PRACTICAL-WEB-05 monthly preferences display THB values without changing the input basis', () => {
-  const preferences = assessPreferences({ maxPriceMinor: 100000, pricePreferenceBasis: 'monthly_30_days' }, { productCount: 1, dailyPills: 1, goodsPriceMinor: 60000, monthlyGoodsPriceMinor: 120000, currency: 'THB' });
+  const preferences = assessPreferences({ maxPriceMinor: 100000, pricePreferenceBasis: 'monthly_30_days' }, { productCount: 1, dailyPills: 1, firstOrderGoodsPriceMinor: 60000, monthlyGoodsPriceMinor: 120000, currency: 'THB' });
   const html = renderToStaticMarkup(createElement(components.WebPreferenceAdvice, { preferences, locale: 'en' }));
   assert.match(html, /30.day|monthly/i); assert.match(html, /1200|1,200/); assert.doesNotMatch(html, /120000|120,000/);
 });
