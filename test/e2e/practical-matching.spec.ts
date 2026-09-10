@@ -7,7 +7,7 @@ import { join } from 'node:path';
 import { expect, test } from '../helpers/offline-browser';
 const execute = promisify(execFile);
 assert.ok(process.env.TEST_DB_URL, 'Practical browser cases require isolated PostgreSQL; missing prerequisites fail');
-for (const locale of ['en', 'th', 'zh-CN']) test(`PRACTICAL-BROWSER-01 ${locale} selected cautions and alternate checkout preserve advisory purchase`, async ({ page }) => {
+for (const locale of ['en', 'th', 'zh-CN']) test(`PRACTICAL-BROWSER-01 ${locale} concise reveal and existing alternate checkout preserve advisory purchase`, async ({ page }) => {
   const directory = await mkdtemp(join(tmpdir(), 'practical-browser-'));
   let seeded;
   try {
@@ -28,8 +28,13 @@ for (const locale of ['en', 'th', 'zh-CN']) test(`PRACTICAL-BROWSER-01 ${locale}
   await expect(details).not.toHaveAttribute('open'); await details.locator('summary').click();
   await expect(details.locator('[data-advice-code="intake_unknown"]')).toBeVisible();
   const alternative = page.locator(`[data-option-id="${seeded.preferenceScenario.alternative.optionId}"]`);
-  await expect(alternative.getByTestId('medical-cautions')).toHaveCount(0);
-  await alternative.locator('a[href*="/basket/checkout?"]').click();
+  await expect(alternative).toHaveCount(0);
+  await expect(page.getByTestId('selected-matching-preferences')).toHaveCount(0);
+  // Removing reveal's alternative cards does not invalidate existing option checkout links.
+  const params = new URLSearchParams({ plan: seeded.planId, run: seeded.runId,
+    option: seeded.preferenceScenario.alternative.optionId, selected: seeded.preferenceScenario.alternative.productIds.join(','),
+    revision: '1', selectionRevision: '0' });
+  await page.goto(`/${locale}/basket/checkout?${params}`);
   await expect(page).toHaveURL(/\/basket\/checkout\?/);
   await expect(page.getByTestId('medical-cautions')).toContainText('Alternative fixture nutrient');
   await expect(page.getByTestId('medical-cautions')).not.toContainText('Selected fixture nutrient');

@@ -60,7 +60,7 @@ test('PRACTICAL-API-04 web balanced and compact use shared profiles and strong e
       const result = recommendWithMatcher({ needs: [need], candidates: [candidate(60)], stackPreference: preference, clientContext: { pillLimit: '1-3', currentSupplements: 'none' } });
       const selected = result.diagnostics.matching?.options.find(row => row.optionId === result.diagnostics.matching?.selectedOptionId);
       assert.ok(selected?.overallScore);
-      assert.equal(selected.overallScore.profile.hash, resolvePracticalProfile({ optimization: preference === 'compact' ? 'fewest_pills' : 'balanced', preferenceImportance: { maxDailyPills: 'strong' } }).hash);
+      assert.equal(selected.overallScore.profile.hash, resolvePracticalProfile({ selectorMode: 'web_single', optimization: preference === 'compact' ? 'fewest_pills' : 'balanced', preferenceImportance: { maxDailyPills: 'strong' } }).hash);
       assert.equal(selected.overallScore.preferences.maxDailyPills.preferred, 3);
     }
   } finally { resetMatcherSafetyCeilings(); }
@@ -98,7 +98,7 @@ test('PRACTICAL-API-08 compact changes penalty weights without a second search p
   assert.deepEqual(WEB_COMPACT_MATCHER_CONFIG, WEB_MATCHER_CONFIG);
 });
 
-test('PRACTICAL-API-09 web and MCP emit identical complete scores for identical resolved parameters', async () => {
+test('PRACTICAL-API-09 web and MCP share arithmetic with the explicit web product-weight adjustment', async () => {
   const { matchPlan } = await import('../../lib/agentic/plan/matching.ts');
   const { sampleRetailProduct } = await import('../agentic/value/sample-catalogue.ts');
   const row = sampleRetailProduct({ id: 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeea09', title: 'Controlled A', name: 'A', supplementId: 'sup_a',
@@ -116,7 +116,14 @@ test('PRACTICAL-API-09 web and MCP emit identical complete scores for identical 
         productDoses: [{ productId: row.candidate.id, servingsPerDay: 4 }], clientContext: { ageYears: 38, lifestage: 'adult', pillLimit: '1-3', currentSupplements: 'none' } });
       const selected = web.diagnostics.matching?.options.find(option => option.optionId === web.diagnostics.matching?.selectedOptionId);
       assert.ok(mcp.selected?.overallScore); assert.ok(selected?.overallScore);
-      assert.deepEqual(selected.overallScore, mcp.selected.overallScore);
+      const { profile: webProfile, ...webScore } = selected.overallScore;
+      const { profile: mcpProfile, ...mcpScore } = mcp.selected.overallScore;
+      const { maxProductCount: webPreference, ...webPreferences } = webScore.preferences;
+      const { maxProductCount: mcpPreference, ...mcpPreferences } = mcpScore.preferences;
+      assert.equal(webProfile.multipliers.products, mcpProfile.multipliers.products * 1.25);
+      assert.equal(webPreference.multiplier, mcpPreference.multiplier * 1.25);
+      assert.deepEqual({ ...webPreference, multiplier: mcpPreference.multiplier }, mcpPreference);
+      assert.deepEqual({ ...webScore, preferences: webPreferences }, { ...mcpScore, preferences: mcpPreferences });
       assert.equal(selected.dailyPills, 4); assert.equal(selected.purchaseEligible, true);
     }
   } finally { resetMatcherSafetyCeilings(); }

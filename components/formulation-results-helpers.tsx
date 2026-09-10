@@ -14,11 +14,12 @@ import type {
 import type { Locale } from "@/lib/i18n";
 import {
   coveredFormulaNeedCount,
+  coveredRevealNeedCount,
   formulaNeedCount,
   marketingCoveragePercentFromNeedCoverage
 } from "@/lib/marketing-coverage";
 
-export { coveredFormulaNeedCount, formulaNeedCount };
+export { coveredFormulaNeedCount, coveredRevealNeedCount, formulaNeedCount };
 import {
   nutritionHealthScorePath,
   nutritionRevealPath,

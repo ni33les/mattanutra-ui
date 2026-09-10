@@ -1,0 +1,24 @@
+{
+  "releaseBase": "a352fb8f0d5fd794579d01c0617c5fe1fadfddaf",
+  "scope": "web reveal contribution count, quieter presentation and modest product burden",
+  "files": [
+    {"file":"test/web-reveal-tidy.test.ts","reason":"Strict 12 percent boundary, saved coverage controls, web-only profile delta and shared ranking"},
+    {"file":"test/assessment-store-product-coverage.test.ts","reason":"Do not round away meaningful partial coverage during read projection"},
+    {"file":"test/product-recommendation-metrics.test.ts","reason":"Shared coverage averages and fully met counts retain their meaning"},
+    {"file":"test/practical-matching/scoring.test.ts","reason":"Preserve every other practical penalty and nutrient arithmetic"},
+    {"file":"test/practical-matching/search.test.ts","reason":"Affected shared search and advisory eligibility"},
+    {"file":"test/practical-matching/adapters.test.ts","reason":"Web profile resolution, MCP isolation, quantity and budget compatibility"},
+    {"file":"test/practical-matching/presentation.test.ts","reason":"Selected medical cautions, unknown totals and localization remain available"},
+    {"file":"test/reveal-final-static.test.ts","reason":"Removed sections, headline wiring and retained reveal controls"}
+  ],
+  "browser": [
+    {"file":"test/e2e/practical-matching.spec.ts","grep":"PRACTICAL-BROWSER-01","expectedCases":3},
+    {"file":"test/e2e/web-funnel-recovery.spec.ts","grep":"ANNA-BROWSER-06","expectedCases":3}
+  ],
+  "intentionalChanges": [
+    "Reveal nutrient headline counts contributions strictly above 12%; fully met target counts and averaged coverage remain unchanged.",
+    "PRACTICAL-API-09 retains equal arithmetic and quantity assertions; the web product multiplier alone is now 1.25 times its internal control.",
+    "ANNA-BROWSER-06 and PRACTICAL-BROWSER-01 now require absent preference boxes and Other options. Existing returned-option checkout, selected cautions, unknown totals and exclusion/revision assertions remain.",
+    "Web product burden is 25% higher for new calculations, versioned in scoring/task identity. MCP scoring and frozen baskets are unchanged."
+  ]
+}

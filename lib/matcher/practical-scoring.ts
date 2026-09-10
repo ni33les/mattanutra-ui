@@ -6,6 +6,8 @@ import { add, compare, divide, fromDecimal, multiply, positive, rational, serial
 import type { CanonicalRequest, MatcherProduct, OptimizationMode, PreferenceImportance, SearchState } from "@/lib/matcher/types";
 
 export const PRACTICAL_SCORING_VERSION = "practical-penalties-1";
+const WEB_PRACTICAL_SCORING_VERSION = "web-practical-penalties-2";
+const WEB_PRODUCT_PENALTY_MULTIPLIER = 1.25;
 const PROFILES = Object.freeze({
   balanced: Object.freeze({ pills: 1, products: 1, price: 1, servings: 1 }),
   best_coverage: Object.freeze({ pills: 0.25, products: 0.25, price: 0.25, servings: 0.25 }),
@@ -15,7 +17,7 @@ const PROFILES = Object.freeze({
 const IMPORTANCE = Object.freeze({ flexible: 0.25, normal: 1, strong: 4 });
 const FIELDS = ["maxDailyPills", "maxProductCount", "maxPriceMinor"] as const;
 type Field = typeof FIELDS[number];
-type ProfileRequest = Pick<CanonicalRequest, "optimization" | "preferenceImportance" | "pricePreferenceBasis" | "scoring">;
+type ProfileRequest = Pick<CanonicalRequest, "optimization" | "preferenceImportance" | "pricePreferenceBasis" | "scoring"> & Partial<Pick<CanonicalRequest, "selectorMode">>;
 type Profile = Readonly<{ id: OptimizationMode; version: string; hash: string; multipliers: Readonly<Record<"pills" | "products" | "price" | "servings", number>>;
   importance: Readonly<Record<Field, PreferenceImportance>>; pricePreferenceBasis: "first_order" | "monthly_30_days" }>;
 // Four fixed profiles and three importance values per field: bounded immutable configuration, no lock or I/O.
@@ -45,7 +47,10 @@ export function resolvePracticalProfile(request: ProfileRequest): Profile {
   })) as Record<Field, PreferenceImportance>;
   const pricePreferenceBasis = request.pricePreferenceBasis ?? "first_order";
   if (!["first_order", "monthly_30_days"].includes(pricePreferenceBasis)) throw new Error("pricePreferenceBasis is invalid");
-  const config = { id: request.optimization, version: PRACTICAL_SCORING_VERSION, multipliers: PROFILES[request.optimization], importance, pricePreferenceBasis,
+  const web = request.selectorMode === "web_single";
+  const baseMultipliers = PROFILES[request.optimization];
+  const multipliers = web ? Object.freeze({ ...baseMultipliers, products: baseMultipliers.products * WEB_PRODUCT_PENALTY_MULTIPLIER }) : baseMultipliers;
+  const config = { id: request.optimization, version: web ? WEB_PRACTICAL_SCORING_VERSION : PRACTICAL_SCORING_VERSION, multipliers, importance, pricePreferenceBasis,
     importanceFactors: IMPORTANCE, fallbackObjectives: "only_when_corresponding_preference_is_absent", coefficients: { preference: "0.25", routine: "0.05", uncertainty: "0.25", pillsScale: 3, priceScaleMinor: 100000, zeroPriceScaleMinor: 10000, currency: "THB" } };
   const key = JSON.stringify(config);
   let value = profiles.get(key);

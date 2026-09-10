@@ -35,6 +35,13 @@ export function coveredFormulaNeedCount(needs: readonly NeedCoverageRow[]) {
   ).length;
 }
 
+/** Web headline: a meaningful contribution, separately from a fully met dose. */
+export function coveredRevealNeedCount(needs: readonly NeedCoverageRow[]) {
+  return formulaNeedRows(needs).filter(
+    (need) => boundedNeedPercent(need.coveragePercent) > 12
+  ).length;
+}
+
 export function marketingCoveragePercentFromNeedCoverage(
   needs: readonly NeedCoverageRow[]
 ) {

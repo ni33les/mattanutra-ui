@@ -1,7 +1,7 @@
 "use client";
 
 import { webMatchingCopy } from "@/lib/web-health-advice";
-import { WebMatchingAdvice, WebMatchingPillCount, WebPreferenceAdvice } from "@/components/web-health-advice";
+import { WebMatchingAdvice, WebMatchingPillCount } from "@/components/web-health-advice";
 import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -10,7 +10,7 @@ import { LandingReveal } from "@/components/landing-reveal";
 import { PreviewPaywallPanel } from "@/components/formulation-results-panels";
 import { SafeImage } from "@/components/safe-image";
 import {
-  coveredFormulaNeedCount,
+  coveredRevealNeedCount,
   formulaNeedCount,
   productCoveredNeedCount,
   replaceRevealStackUrl,
@@ -1376,7 +1376,7 @@ function RevealProductsFinalSection({
     Math.max(
       0,
       formulaNeeds > 0
-        ? coveredFormulaNeedCount(needCoverage)
+        ? coveredRevealNeedCount(needCoverage)
         : productCoveredNeedCount(products),
     ),
     Math.max(0, supplementSelectedCount, productNeedCount),
@@ -1512,35 +1512,10 @@ function RevealProductsFinalSection({
           </div>
         </div>
 
-        {selectedMatchingOption?.preferences?.some(row => row.status !== "not_requested") ? (
-          <div className="mx-auto my-6 max-w-[880px] rounded-xl border border-[var(--mn-line)] p-5" data-testid="selected-matching-preferences">
-            <WebPreferenceAdvice preferences={selectedMatchingOption.preferences} locale={locale} />
-          </div>
-        ) : null}
         {selectedMatchingOption ? <div className="mx-auto my-6 max-w-[880px]">
           <WebMatchingPillCount count={selectedMatchingOption.dailyPills} lowerBound={selectedMatchingOption.overallScore?.preferences.maxDailyPills.actualLowerBound ?? selectedMatchingOption.preferences?.find(row => row.kind === "daily_pills")?.actualLowerBound} locale={locale} />
           <WebMatchingAdvice advice={selectedMatchingOption.advice} locale={locale} selected />
         </div> : null}
-        {matching && (matching.options.some(option => option.optionId !== matching.selectedOptionId) || matching.alternativeSearch?.status !== "not_needed") ? (
-          <section className="mx-auto my-6 max-w-[880px]" aria-label={matchingCopy.alternatives}>
-            <h3 className="font-semibold">{matchingCopy.alternatives}</h3>
-            {matching.options.filter(option => option.optionId !== matching.selectedOptionId).map(option => {
-              const params = new URLSearchParams({ plan: planId, selected: option.productIds.join(","), option: option.optionId,
-                run: activeProductRecommendations?.runId ?? "", revision: String(result.assessmentRevision ?? ""), selectionRevision: String(result.selectionRevision ?? 0) });
-              const subtotal = option.recommendations.reduce((sum, item) => sum + (item.unitPriceAmount ?? item.product.priceAmount ?? 0), 0);
-              return <div className="mt-4 rounded-xl border border-[var(--mn-line)] p-5" key={option.optionId} data-testid="matching-option" data-option-id={option.optionId}>
-                <p>{option.recommendations.map(item => item.product.title).join(", ")}</p>
-                <p className="mt-2 text-sm">{matchingCopy.coverage}: {option.coveragePercent}% · <WebMatchingPillCount count={option.dailyPills} lowerBound={option.overallScore?.preferences.maxDailyPills.actualLowerBound ?? option.preferences?.find(row => row.kind === "daily_pills")?.actualLowerBound} locale={locale} /></p>
-                <p className="mt-2 text-sm">{matchingCopy.subtotal}: {new Intl.NumberFormat(localeHtmlLang(locale), { style: "currency", currency: option.recommendations[0]?.product.currency ?? "THB" }).format(subtotal)}</p>
-                <WebPreferenceAdvice preferences={option.preferences} locale={locale} />
-                <WebMatchingAdvice advice={option.advice} locale={locale} selected={false} />
-                {!awaitingReplan && option.productIds.length ? <Link className="mt-3 inline-block underline" href={`/${locale}/basket/checkout?${params}`}>{matchingCopy.choose}</Link> : null}
-              </div>;
-            })}
-            {matching.alternativeSearch?.status === "none_found" ? <p className="mt-3 text-sm">{matchingCopy.none}</p> : null}
-            {matching.alternativeSearch?.status === "incomplete" ? <div className="mt-3 text-sm"><p>{matchingCopy.incomplete}</p>{matching.searchSummary?.canExpand !== false ? <button className="mt-2 underline" disabled={replanning} onClick={() => void replanProducts(false, true)}>{matchingCopy.retry}</button> : <p className="mt-2">{matchingCopy.replan}</p>}</div> : null}
-          </section>
-        ) : null}
         {removedBasketIdList.length || result.excludedProductIds?.length ? <div className="mx-auto my-6 flex max-w-[880px] flex-wrap gap-4">
           {removedBasketIdList.length ? <button className="underline" disabled={replanning} onClick={() => void replanProducts()}>{matchingCopy.replan}</button> : null}
           {result.excludedProductIds?.length ? <button className="underline" disabled={replanning} onClick={() => void replanProducts(true)}>{matchingCopy.clear}</button> : null}

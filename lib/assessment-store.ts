@@ -502,12 +502,10 @@ function currentNeedCoverage(
         100,
         Math.max(
           0,
-          Math.round(
-            coverageLookup.get(need.id) ??
-              coverageLookup.get(need.sourceId) ??
-              coverageLookup.get(normalizeReviewName(need.displayName)) ??
-              0
-          )
+          coverageLookup.get(need.id) ??
+            coverageLookup.get(need.sourceId) ??
+            coverageLookup.get(normalizeReviewName(need.displayName)) ??
+            0
         )
       ),
       displayName: need.displayName,

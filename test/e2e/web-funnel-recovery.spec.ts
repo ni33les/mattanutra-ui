@@ -103,7 +103,7 @@ test("capture failure, persistence failure, reload and analysis retry remain sep
 });
 
 for (const locale of ["en", "th", "zh-CN"] as const) {
-  test(`ANNA-BROWSER-06 preference advice, unknown pills and exclusion binding in ${locale}`, async ({ page }) => {
+  test(`ANNA-BROWSER-06 concise reveal, unknown pills and exclusion binding in ${locale}`, async ({ page }) => {
     const seeded = await preferenceFixture(locale);
     const scenario = seeded.preferenceScenario;
     expect(scenario.selectedProductCount).toBe(2);
@@ -112,11 +112,8 @@ for (const locale of ["en", "th", "zh-CN"] as const) {
     await page.goto(reveal);
     await expect(page.locator(".mn-reveal-final")).toBeVisible();
     const preferences = page.getByTestId("selected-matching-preferences");
-    await expect(preferences.locator("[data-preference]")).toHaveCount(3);
-    for (const kind of ["product_count", "daily_pills", "first_order_goods_price"]) {
-      await expect(preferences.locator(`[data-preference="${kind}"]`)).toHaveAttribute("data-prominent", "true");
-    }
-    await expect(preferences).not.toContainText("THB_minor");
+    await expect(preferences).toHaveCount(0);
+    await expect(page.getByTestId("matching-option")).toHaveCount(0);
 
     // A declared response fixture exercises incomplete physical metadata in the
     // browser. The real stored purchase option and monetary facts remain intact.
@@ -142,21 +139,16 @@ for (const locale of ["en", "th", "zh-CN"] as const) {
       await route.fulfill({ response, json: payload });
     });
     await page.reload();
-    const unknown = { en: "the actual amount is unknown", th: "ยังไม่ทราบจำนวนจริง", "zh-CN": "实际数值未知" }[locale]!;
-    await expect(preferences.locator('[data-preference="daily_pills"]')).toContainText(unknown);
-    await expect(preferences.locator('[data-preference="daily_pills"]')).not.toHaveAttribute("data-prominent", "true");
+    const unknown = { en: "total unknown", th: "ไม่ทราบจำนวนรวม", "zh-CN": "总数未知" }[locale]!;
+    await expect(page.locator("#products")).toContainText(unknown);
+    await expect(preferences).toHaveCount(0);
     expect(unknownResponses).toBeGreaterThan(0);
-    const alternative = page.locator(`[data-testid="matching-option"][data-option-id="${scenario.alternative.optionId}"]`);
-    await expect(alternative.locator('[data-preference="daily_pills"]')).toContainText(unknown);
-    const choose = alternative.locator('a[href*="/basket/checkout?"]');
-    await expect(choose).toBeVisible();
-    const selectedUrl = new URL((await choose.getAttribute("href"))!, "http://127.0.0.1:3100");
-    expect(selectedUrl.searchParams.get("option")).toBe(scenario.alternative.optionId);
-    expect(selectedUrl.searchParams.get("run")).toBe(seeded.runId);
-    expect(selectedUrl.searchParams.get("revision")).toBe("1");
-    expect(selectedUrl.searchParams.get("selectionRevision")).toBe("0");
+    await expect(page.getByTestId("matching-option")).toHaveCount(0);
+    // Previously issued checkout URLs remain valid even though reveal no longer lists alternatives.
+    const params = new URLSearchParams({ plan: seeded.planId, selected: scenario.alternative.productIds.join(","),
+      option: scenario.alternative.optionId, run: seeded.runId, revision: "1", selectionRevision: "0" });
     await expect(page.getByRole("checkbox", { name: /acknowledge|รับทราบ|确认风险/i })).toHaveCount(0);
-    await choose.click();
+    await page.goto(`/${locale}/basket/checkout?${params}`);
     await expect(page).toHaveURL(/\/basket\/checkout\?/);
     await expect(page.locator('input[name="customerName"]').first()).toBeVisible();
     const selection = { action: "checkoutSelection", locale, planId: seeded.planId, runId: seeded.runId,
