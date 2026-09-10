@@ -1,3 +1,4 @@
+import { closestDoseOption } from "./flexible-v5-fixtures.ts";
 import assert from 'node:assert/strict';
 import { it } from 'node:test';
 import { match } from '../../lib/matcher/index.ts';
@@ -8,9 +9,10 @@ const verified = (unitsPerServing: number, physicalUnit: ProductAdministration['
   provenance: { status: 'verified', sourceUrl: 'https://example.test/label', sourceText: 'Verified test label', verifiedAt: '2026-09-07T00:00:00Z' } }) as const;
 it('V5-DOSE-01: four supported units reach the target without a three-serving ceiling', () => {
   const result = match(request(), catalog([product('quarter', { a: 25 }, 100, { administration: verified(1) })]));
-  assert.equal(result.selected?.doseFit?.total, 0);
-  assert.deepEqual(result.selected?.variantIds, ['seller:quarter:x4']);
-  assert.equal(result.selected?.dailyPills, 4);
+  const selected = closestDoseOption(result);
+  assert.equal(selected?.doseFit?.total, 0);
+  assert.deepEqual(selected?.variantIds, ['seller:quarter:x4']);
+  assert.equal(selected?.dailyPills, 4);
 });
 it('V5-DOSE-02: verified physical units allow one capsule of a two-capsule serving', () => {
   const result = match(request(), catalog([product('double', { a: 200 }, 100, { administration: verified(2), dailyPillsPerServing: 2 })]));

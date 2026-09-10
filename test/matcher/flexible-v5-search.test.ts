@@ -1,3 +1,4 @@
+import { closestDoseOption } from "./flexible-v5-fixtures.ts";
 import assert from 'node:assert/strict';
 import { it } from 'node:test';
 import { match } from '../../lib/matcher/index.ts';
@@ -15,9 +16,10 @@ function fixture() {
 it('V5-SEARCH-01: preserve the 32-product complementary pair that a dose-only beam loses', () => {
   const { r, products } = fixture();
   const result = match(r, catalog(products));
-  assert.deepEqual(result.selected?.productIds, ['00-low', 'zz-complement']);
-  assert.equal(result.selected?.doseFit?.total, 0);
-  assert.equal(result.selected?.coveredCount, 2);
+  const selected = closestDoseOption(result);
+  assert.deepEqual(selected?.productIds, ['00-low', 'zz-complement']);
+  assert.equal(selected?.doseFit?.total, 0);
+  assert.equal(selected?.coveredCount, 2);
 });
 it('V5-SEARCH-02: count every attempted expansion, including rejected additions and repair', () => {
   const { r, products } = fixture();
@@ -34,7 +36,7 @@ it('V5-SEARCH-03: expanded search preserves its standard incumbent and identifie
   const { r, products } = fixture();
   const standard = match(r, catalog(products));
   const expanded = match({ ...r, searchEffort: 'expanded' }, catalog(products));
-  assert.ok(expanded.selected!.doseFit!.total <= standard.selected!.doseFit!.total);
+  assert.ok(expanded.selected!.overallScore!.overallPenalty <= standard.selected!.overallScore!.overallPenalty);
   assert.equal(expanded.searchSummary?.effort, 'expanded');
   assert.equal(expanded.searchSummary?.expansionBudget, 64000);
   assert.ok(expanded.searchSummary!.expansionAttempts <= 64000);

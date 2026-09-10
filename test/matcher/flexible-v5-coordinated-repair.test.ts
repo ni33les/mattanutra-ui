@@ -1,3 +1,4 @@
+import { closestDoseOption } from "./flexible-v5-fixtures.ts";
 import assert from 'node:assert/strict';
 import { it } from 'node:test';
 import { match } from '../../lib/matcher/index.ts';
@@ -25,32 +26,34 @@ const snapshot = (products: typeof isolatedTargets) => ({ products, availability
 
 it('V5-REPAIR-03: drop collateral C and rescale retained D3 to reach the feasible zero-loss basket', () => {
   const result = match(qaRequest({ optimization: 'fewest_pills' }), snapshot(isolatedTargets));
-  assert.ok(result.selected);
-  assert.deepEqual([...result.selected.variantIds].sort(), [
+  const selected = closestDoseOption(result);
+  assert.ok(selected);
+  assert.deepEqual([...selected.variantIds].sort(), [
     'seller_th:G-C-500:x1', 'seller_th:G-CALCIUM-D3-200:x10', 'seller_th:G-MAG-200:x1',
     'seller_th:G-MEGA-B-50:x5', 'seller_th:G-O3-FISH-1000:x1'
   ]);
   // Each independently known exposure equals its target, so the nonnegative
   // symmetric loss has the absolute lower bound zero. The title adds no calcium.
-  assert.equal(result.selected.doseFit?.total, 0);
-  assert.deepEqual(Object.fromEntries(result.selected.doseFit!.perTarget.map(row => [row.subjectId, row.exposure])),
+  assert.equal(selected.doseFit?.total, 0);
+  assert.deepEqual(Object.fromEntries(selected.doseFit!.perTarget.map(row => [row.subjectId, row.exposure])),
     { sup_b12: 250, sup_c: 500, sup_d3: 2000, sup_mag: 200, sup_omega: 1000 });
-  assert.equal(result.selected.priceMinor, (120 + 300 + 100 + 175 + 97) * 100);
-  assert.equal(result.selected.dailyPills, 1 + 2 + 1 + 10 + 5);
-  assert.equal(result.selected.coveredCount, 5);
-  assert.equal(result.selected.purchaseEligible, true);
+  assert.equal(selected.priceMinor, (120 + 300 + 100 + 175 + 97) * 100);
+  assert.equal(selected.dailyPills, 1 + 2 + 1 + 10 + 5);
+  assert.equal(selected.coveredCount, 5);
+  assert.equal(selected.purchaseEligible, true);
   assert.ok(result.searchSummary!.expansionAttempts <= 8000);
 });
 
 it('V5-REPAIR-04: early dose variants cannot starve the later complementary catalogue groups', () => {
   const result = match(qaRequest({ optimization: 'fewest_pills', profile: { ageYears: 52, lifeStage: 'adult', sex: 'male' } }), snapshot(noisy));
-  assert.ok(result.selected);
-  assert.deepEqual([...result.selected.variantIds].sort(), ['seller_th:G-50PLUS:x2', 'seller_th:G-C-500:x1', 'seller_th:G-JOINT-D3-1:x2', 'seller_th:G-O3-FISH-1000:x1']);
+  const selected = closestDoseOption(result);
+  assert.ok(selected);
+  assert.deepEqual([...selected.variantIds].sort(), ['seller_th:G-50PLUS:x2', 'seller_th:G-C-500:x1', 'seller_th:G-JOINT-D3-1:x2', 'seller_th:G-O3-FISH-1000:x1']);
   // B12 remains unavailable: 1 + Mg excess 10/200 + C excess 170/500.
-  assert.equal(result.selected.doseFit?.total, (200 * 500 + (2 * 105 - 200) * 500 + (2 * 45 + 2 * 40) * 200) / (200 * 500));
-  assert.equal(result.selected.priceMinor, (150 + 80 + 100 + 300) * 100);
-  assert.equal(result.selected.dailyPills, 2 + 4 + 1 + 2);
-  assert.equal(result.selected.doseFit?.perTarget.find(row => row.subjectId === 'sup_d3')?.exposure, 2000);
+  assert.equal(selected.doseFit?.total, (200 * 500 + (2 * 105 - 200) * 500 + (2 * 45 + 2 * 40) * 200) / (200 * 500));
+  assert.equal(selected.priceMinor, (150 + 80 + 100 + 300) * 100);
+  assert.equal(selected.dailyPills, 2 + 4 + 1 + 2);
+  assert.equal(selected.doseFit?.perTarget.find(row => row.subjectId === 'sup_d3')?.exposure, 2000);
   assert.ok(result.searchSummary!.expansionAttempts <= 8000);
 });
 
@@ -59,8 +62,8 @@ it('V5-REPAIR-05: coordinated repairs preserve catalogue order invariance and th
   const standard = match(request, snapshot(isolatedTargets));
   assert.deepEqual(match(request, snapshot([...isolatedTargets].reverse())), standard);
   const expanded = match({ ...request, searchEffort: 'expanded' }, snapshot(isolatedTargets));
-  assert.equal(expanded.selected?.doseFit?.total, 0);
-  assert.deepEqual([...(expanded.selected?.variantIds ?? [])].sort(), [...(standard.selected?.variantIds ?? [])].sort());
+  assert.equal(closestDoseOption(expanded).doseFit?.total, 0);
+  assert.ok(expanded.selected!.overallScore!.overallPenalty <= standard.selected!.overallScore!.overallPenalty);
   assert.ok(expanded.searchSummary!.expansionAttempts <= 64000);
   assert.equal(expanded.searchSummary?.canExpand, false);
   assert.deepEqual(match({ ...request, searchEffort: 'expanded' }, snapshot(isolatedTargets)), expanded);

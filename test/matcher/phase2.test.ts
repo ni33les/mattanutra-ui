@@ -1,3 +1,4 @@
+import { closestDoseOption } from "./flexible-v5-fixtures.ts";
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { FIXTURE_SUPPLEMENTS } from "../../lib/agentic/catalogue/fixtures.ts";
@@ -270,18 +271,19 @@ describe("matcher phase 2 oversupply, source, and ontology", () => {
     assert.equal(publicCoveragePercent(result.selected), 50);
   });
 
-  it("M-01 fewest_pills selects G-BASE-COMBO + G-O3-ALGAE-500", () => {
+  it("M-01 fewest_pills retains the exact-dose choice G-BASE-COMBO + G-O3-ALGAE-500", () => {
     const result = match(request({ optimization: "fewest_pills" }), catalog());
-    assert.ok(result.selected);
-    assert.deepEqual(result.selected?.productIds, ["G-BASE-COMBO", "G-O3-ALGAE-500"]);
-    assert.equal(result.selected?.productCount, 2);
-    assert.equal(result.selected?.dailyPills, 4);
-    assert.equal(publicCoveragePercent(result.selected), 100);
-    assert.equal(result.selected?.productIds.includes("G-HIGH-TRAP"), false);
-    assert.equal(result.selected?.incidentalCount, 0);
-    assert.equal(result.selected?.priceMinor, 61000);
-    assert.equal(result.selected?.doseFit?.total, 0);
-    assert.equal(result.selected?.coveredCount, 5);
+    const selected = closestDoseOption(result);
+    assert.ok(selected);
+    assert.deepEqual(selected?.productIds, ["G-BASE-COMBO", "G-O3-ALGAE-500"]);
+    assert.equal(selected?.productCount, 2);
+    assert.equal(selected?.dailyPills, 4);
+    assert.equal(publicCoveragePercent(selected), 100);
+    assert.equal(selected?.productIds.includes("G-HIGH-TRAP"), false);
+    assert.equal(selected?.incidentalCount, 0);
+    assert.equal(selected?.priceMinor, 61000);
+    assert.equal(selected?.doseFit?.total, 0);
+    assert.equal(selected?.coveredCount, 5);
   });
 
   it("M-02 lowest_cost does not select G-HIGH-TRAP", () => {

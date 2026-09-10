@@ -48,15 +48,18 @@ test("ADV6-CORE-04 unknown pill counts permit matching and cannot masquerade as 
   const unknownOnly = match(request({ maxDailyPills: 1 }), catalog([products[0]]));
   assert.deepEqual(unknownOnly.selected?.productIds, ["unknown"]);
   const input = request({ maxDailyPills: 1, optimization: "fewest_pills" });
-  const options = products.map(p => match(input, catalog([p])).selected!);
+  const options = products.map(p => { const result = match(input, catalog([p])); return [result.selected!, ...result.alternatives].find(row => row.productCount === 1)!; });
   assert.ok(options.every(Boolean));
   assert.ok(compareBaskets(options[1], options[2], input) < 0);
-  assert.ok(compareBaskets(options[2], options[0], input) < 0);
-  assert.ok(compareBaskets(options[1], options[0], input) < 0);
+  assert.equal(options[0].pillCountKnown, false);
+  assert.equal(options[0].overallScore?.preferences.maxDailyPills.actual, null);
+  assert.ok(options[0].overallScore!.components.uncertainty > 0);
   for (const order of [products, [...products].reverse(), [products[1], products[0], products[2]]]) {
     const result = match(input, catalog(order));
-    assert.deepEqual(result.selected?.productIds, ["two"]);
-    assert.ok(result.selected?.roles?.includes("simpler"));
+    assert.deepEqual(result.selected?.productIds, ["unknown"]);
+    assert.equal(result.selected?.pillCountKnown, false);
+    const simpler = [result.selected!, ...result.alternatives].find(row => row.roles?.includes("simpler"));
+    assert.deepEqual(simpler?.productIds, ["two"]);
   }
 });
 

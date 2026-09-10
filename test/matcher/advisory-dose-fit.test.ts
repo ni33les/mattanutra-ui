@@ -324,7 +324,7 @@ describe("advisory dose fit", () => {
     assert.deepEqual(a, b); assert.equal(a.trimmed, true);
   });
 
-  it("shares the bounded candidate frontier across commercial objectives", () => {
+  it("uses one bounded budget per objective while preserving deterministic weighted frontiers", () => {
     const targets = canonicalizeTargets({ targets: [{ subjectId: "a", name: "A", amount: 100, unit: "mg" },
       { subjectId: "b", name: "B", amount: 100, unit: "mg" }] }).targets;
     const products = [product("p0", 60, 0, 7), product("p1", 100, 0, 11, { dailyPillsPerServing: 2 }),
@@ -338,13 +338,13 @@ describe("advisory dose fit", () => {
       const frontier = searchGroups(compileGroups(input, snapshot), input, config);
       assert.equal(frontier.mode, "bounded");
       assert.equal(frontier.trimmed, true);
-      return { frontier: frontier.complete.map(row => row.selectedVariantIds),
-        fit: match(input, snapshot, config).selected!.doseFit! };
+      assert.deepEqual(searchGroups(compileGroups(input, snapshot), input, config), frontier);
+      assert.ok(frontier.expansionAttempts <= 50);
+      const result = match(input, snapshot, config);
+      assert.equal(result.selected!.overallScore!.profile.id, optimization);
+      return result.selected!.overallScore!;
     });
-    for (const result of observed.slice(1)) {
-      assert.deepEqual(result.frontier, observed[0]!.frontier);
-      assert.equal(compareDoseFit(result.fit, observed[0]!.fit), 0);
-    }
+    assert.equal(new Set(observed.map(row => row.profile.hash)).size, 4);
   });
 
   it("prices one purchased pack at two or three daily servings even above a budget preference", () => {

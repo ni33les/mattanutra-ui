@@ -1,3 +1,4 @@
+import { closestDoseOption } from "./flexible-v5-fixtures.ts";
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { match } from "../../lib/matcher/index.ts";
@@ -282,10 +283,11 @@ describe("matcher phase 3 rejected-candidate reasons", () => {
       request({ maxPriceMinor: 1000, targets: [d3] }),
       catalog([G_D3_2000])
     );
+    const selected = closestDoseOption(result);
     assert.deepEqual(reasonsFor("G-D3-2000", result), []);
-    assert.deepEqual(result.selected?.productIds, ["G-D3-2000"]);
-    assert.equal(result.selected?.priceMinor, G_D3_2000.unitPriceMinor);
-    assert.equal(result.selected?.doseFit?.total, 0);
+    assert.deepEqual(selected?.productIds, ["G-D3-2000"]);
+    assert.equal(selected?.priceMinor, G_D3_2000.unitPriceMinor);
+    assert.equal(selected?.doseFit?.total, 0);
   });
 
   it("keeps a supported serving above the advisory maxDailyPills", () => {
