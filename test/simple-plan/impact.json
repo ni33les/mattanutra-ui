@@ -1,7 +1,7 @@
 {
   "releaseBase": "2d4c259a6775b57f3182306955a57ccfa6796ca4",
   "deploymentBases": {
-    "dev": "2d4c259a6775b57f3182306955a57ccfa6796ca4"
+    "dev": "53d66a24478cefdb89e7c203909b0af04e7c2724"
   },
   "scope": "conversational_v9_and_affected_consumers",
   "testPolicy": "Only affected inventory. No full application, historical contract or full MCP matrix. Each file reconciled against executed cases; missing PostgreSQL fails.",
@@ -152,7 +152,7 @@
     },
     {
       "file": "test/simple-plan/advice.test.ts",
-      "expectedCases": 2,
+      "expectedCases": 3,
       "reason": "Conversational v9 protocol, state, response, policy and release boundary assertions",
       "slice": "responses"
     },

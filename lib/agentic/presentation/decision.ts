@@ -55,10 +55,14 @@ function converted(amount: number | null | undefined, from: string | null | unde
   if (amount == null || !from || !to) return null;
   return convertAmount({ amount, fromUnit: from, toUnit: to as MatcherUnit, subjectId: id, subjectName: name });
 }
+function adviceIdentity(row: SafetyGuidance) {
+  return JSON.stringify([row.code, row.ruleId, row.rulesVersion, row.sourceScope, row.exposure, row.threshold, row.unit,
+    row.authorityUrl, row.uncertainty, row.productIds.slice().sort(), row.supplementIds.slice().sort()]);
+}
 function adviceRows(findings: readonly SafetyGuidance[], ingredient: Ingredient, locale: string): NonNullable<Ingredient["advice"]> {
   const seen = new Set<string>(), text = copy(locale);
   return findings.flatMap(row => {
-    const key = JSON.stringify([row.ruleId, row.rulesVersion, row.sourceScope, row.exposure, row.threshold, row.authorityUrl, row.uncertainty, row.productIds.slice().sort()]);
+    const key = adviceIdentity(row);
     if (seen.has(key)) return []; seen.add(key);
     const kind = adviceKind(row), measured = row.threshold != null && row.threshold > 0;
     const exposure = converted(row.exposure, row.unit, ingredient.unit, ingredient.name, ingredient.ingredientId);
@@ -129,8 +133,22 @@ function choiceIngredients(result: PlanResult, option: StackOption): Ingredient[
       row.gap = Math.max(0, row.requested - row.existing - row.supplied);
       row.excess = Math.max(0, row.existing + row.supplied - row.requested);
     }
-    const findings = guidance.filter(finding => finding.supplementIds.includes(row.ingredientId) || finding.nutrientName?.toLowerCase() === row.name.toLowerCase() || (adviceKind(finding) === "product_data" && finding.productIds.some(id => row.productIds.includes(id))));
-    const advice = adviceRows(findings, row, state.locale); if (advice.length) row.advice = advice;
+  }
+  // A source finding belongs to the choice once. Link its other affected
+  // ingredients instead of cloning the same body on every label constituent.
+  const emitted = new Set<string>();
+  for (const finding of guidance) {
+    const key = adviceIdentity(finding);
+    if (emitted.has(key)) continue;
+    const affected = [...rows.values()].filter(row => finding.supplementIds.includes(row.ingredientId) ||
+      finding.nutrientName?.toLowerCase() === row.name.toLowerCase() ||
+      (adviceKind(finding) === "product_data" && finding.productIds.some(id => row.productIds.includes(id))));
+    const anchor = affected[0]; if (!anchor) continue;
+    emitted.add(key);
+    const advice = adviceRows([finding], anchor, state.locale)[0];
+    const related = [...new Set([...affected.map(row => row.ingredientId), ...finding.supplementIds])].filter(id => id !== anchor.ingredientId);
+    if (related.length) advice.relatedIngredientIds = related;
+    (anchor.advice ??= []).push(advice);
   }
   return [...rows.values()];
 }
