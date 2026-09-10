@@ -198,13 +198,13 @@ describe("HealthScore v4 deterministic scoring", () => {
         (left, right) => right - left
       )
     );
-    assert.equal(page.copySeeds.subtraction.labelChosen, "Shortlisted for your score");
+    assert.equal(page.copySeeds.subtraction.labelChosen, "Ingredients in your formula");
     assert.equal(
       page.locked.subtraction.evaluated,
       DEFAULT_HEALTHSCORE_EVALUATED_INGREDIENT_COUNT
     );
-    assert.ok(page.locked.subtraction.chosen >= 6);
-    assert.ok(page.locked.subtraction.chosen <= 12);
+    assert.equal(page.locked.subtraction.chosen, null);
+    assert.equal(page.locked.subtraction.setAside, null);
   });
 
   it("uses rank-framed relativity above median and caps visible percentile", () => {
@@ -225,15 +225,15 @@ describe("HealthScore v4 deterministic scoring", () => {
     const expected = {
       en: {
         bandPill: "Building foundation",
-        shortlisted: "Shortlisted for your score"
+        shortlisted: "Ingredients in your formula"
       },
       th: {
         bandPill: "กำลังสร้างพื้นฐาน",
-        shortlisted: "คัดเลือกสำหรับคะแนนของคุณ"
+        shortlisted: "ส่วนผสมในสูตรของคุณ"
       },
       "zh-CN": {
         bandPill: "正在建立基础",
-        shortlisted: "进入你的备选"
+        shortlisted: "您配方中的成分"
       }
     } as const;
 
@@ -342,7 +342,7 @@ describe("HealthScore v4 deterministic scoring", () => {
     assert.ok(domainScore(well, "activity") > domainScore(poor, "activity"));
   });
 
-  it("derives the HealthScore selected nutrient count from assessment complexity", () => {
+  it("keeps the shortlist unknown regardless of assessment complexity", () => {
     const simple = computeHealthScore(
       {
         activity: "active",
@@ -407,14 +407,14 @@ describe("HealthScore v4 deterministic scoring", () => {
       "en"
     );
 
-    assert.equal(simple.pageContent?.locked.subtraction.chosen, 6);
-    assert.equal(simple.pageContent?.locked.nutrientsChosen, 6);
-    assert.equal(broad.pageContent?.locked.subtraction.chosen, 12);
+    assert.equal(simple.pageContent?.locked.subtraction.chosen, null);
+    assert.equal(simple.pageContent?.locked.nutrientsChosen, null);
+    assert.equal(broad.pageContent?.locked.subtraction.chosen, null);
     assert.equal(
       broad.pageContent?.locked.subtraction.setAside,
-      DEFAULT_HEALTHSCORE_EVALUATED_INGREDIENT_COUNT - 12
+      null
     );
-    assert.equal(broad.pageContent?.locked.nutrientsChosen, 12);
+    assert.equal(broad.pageContent?.locked.nutrientsChosen, null);
   });
 
   it("allows the live supplement catalogue count to override the fallback", () => {
@@ -425,7 +425,7 @@ describe("HealthScore v4 deterministic scoring", () => {
     assert.equal(result.pageContent?.locked.subtraction.evaluated, 160);
     assert.equal(
       result.pageContent?.locked.subtraction.setAside,
-      160 - (result.pageContent?.locked.subtraction.chosen ?? 0)
+      null
     );
   });
 

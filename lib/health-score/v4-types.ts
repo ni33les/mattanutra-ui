@@ -97,10 +97,10 @@ export type HealthScorePageAiCopy = Readonly<{
 export type HealthScoreSubtractionMode = "nutrients" | "products";
 
 export type HealthScoreSubtraction = Readonly<{
-  chosen: number;
+  chosen: number | null;
   evaluated: number;
   mode: HealthScoreSubtractionMode;
-  setAside: number;
+  setAside: number | null;
 }>;
 
 export type HealthScorePillarContent = Readonly<{
@@ -159,7 +159,7 @@ export type HealthScorePageContent = Readonly<{
     band: string;
     flagCodes: string[];
     median: number;
-    nutrientsChosen: number;
+    nutrientsChosen: number | null;
     nutrientsEvaluated: number;
     percentile: number;
     pillars: HealthScorePillarContent[];

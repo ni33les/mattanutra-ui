@@ -44,20 +44,20 @@ describe("HealthScore panel static guardrails", () => {
     assert.match(panelSource, /page\?\.locked\.score\s*\?\?\s*result\.score/);
     assert.match(panelSource, /normalizedPillars\(result\)/);
     assert.match(panelSource, /page\?\.locked\.subtraction/);
-    assert.match(panelSource, /subtractionSeed\?\.labelChosen/);
+    assert.match(panelSource, /copy.chosenFallback/);
     assert.match(panelSource, /subtraction\.chosen/);
     assert.match(panelSource, /const \[display, setDisplay\] = useState\(value\)/);
     assert.match(panelSource, /let startedAt: number \| null = null;/);
     assert.match(panelSource, /reducedMotion \|\| !active \? value : display/);
   });
 
-  it("renders HealthScore prose from aiCopy only", () => {
+  it("renders personalised AI prose while formula facts use current deterministic data", () => {
     assert.match(panelSource, /localize\(ai\?\.heroTitle, locale\)/);
     assert.match(panelSource, /localize\(ai\?\.heroBody, locale\)/);
     assert.match(panelSource, /localize\(ai\?\.bandLine, locale\)/);
     assert.match(panelSource, /localize\(ai\?\.strengthNote, locale\)/);
     assert.match(panelSource, /localize\(ai\?\.pillarHeadline, locale\)/);
-    assert.match(panelSource, /localize\(ai\?\.subtractionBody, locale\)/);
+    assert.match(panelSource, /chosen === null \? copy.formulaPendingBody : copy.formulaReadyBody/);
     assert.match(panelSource, /aiCardHeadline\(aiCard, locale\)/);
     assert.doesNotMatch(panelSource, /copySeeds\.heroBody/);
     assert.doesNotMatch(panelSource, /copySeeds\.bandLine/);
@@ -174,8 +174,8 @@ describe("HealthScore panel static guardrails", () => {
     assert.match(panelSource, /ai\?\.heroTitle/);
   });
 
-  it("does not label HealthScore subtraction as a final selected formula count", () => {
-    assert.match(copySource, /Shortlisted for your score/);
+  it("labels actual formulation count without claiming customer selection", () => {
+    assert.match(copySource, /Ingredients in your formula/);
     assert.doesNotMatch(copySource, /right for your score/);
     assert.doesNotMatch(copySource, /เหมาะกับคะแนนของคุณ/);
     assert.doesNotMatch(copySource, /适合您的分数/);

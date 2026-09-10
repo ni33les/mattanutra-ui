@@ -1,4 +1,4 @@
-import { getRevisionHealthScore } from "@/lib/assessment-revisions";
+import { getRevisionHealthScore, getRevisionFormulationNutrientCount } from "@/lib/assessment-revisions";
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { PublicNutritionShell } from "@/components/nutrition-flow/public-nutrition-shell";
@@ -58,10 +58,12 @@ function refreshedHealthScore(
   evaluatedIngredientCount: number,
   locale: Locale,
   storedHealthScore: HealthScoreResult | null | undefined,
-  storedLocale: Locale
+  storedLocale: Locale,
+  chosenNutrients: number | null
 ): HealthScoreResult {
   const refreshed = computeHealthScore(answers ?? null, locale, {
-    evaluatedIngredientCount
+    evaluatedIngredientCount,
+    ...(chosenNutrients == null ? {} : { chosenNutrients })
   });
   const refreshedPageContent = refreshed.pageContent;
 
@@ -145,7 +147,8 @@ export default async function NutritionHealthScorePage({
     cachedEvaluatedIngredientCatalogueCount(),
     locale,
     currentHealthScore,
-    locale
+    locale,
+    await getRevisionFormulationNutrientCount(planId, locale, prefill.revision)
   );
   const firstName = firstNameFromAssessmentAnswers(prefill.answers);
 

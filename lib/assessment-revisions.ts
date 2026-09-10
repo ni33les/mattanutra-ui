@@ -78,3 +78,20 @@ export async function getRevisionHealthScore(planId: string, locale: Locale): Pr
   `;
   return row?.result ?? null;
 }
+
+/** Small, read-only count from the same formulation revision used by reveal. */
+export async function getRevisionFormulationNutrientCount(planId: string, locale: Locale, revision: number, sql = getSql()): Promise<number | null> {
+  if (!sql) return null;
+  const [row] = await sql`
+    select case when f.read_projection->>'version' = '1' then (f.read_projection->>'visibleCount')::int else
+      (select count(*)::int from jsonb_array_elements(coalesce(f.formulation->'supplementBreakdown', '[]'::jsonb)) item
+        where coalesce(item #>> '{safety,visibility}', 'visible') <> 'hidden') end as count
+    from public.formulations f
+    join public.assessments a on a.plan_id=f.plan_id and a.input_revision=f.assessment_revision
+    where f.plan_id=${planId}::uuid and f.assessment_revision=${revision}
+      and f.generation_locale=${locale} and f.generator_version=${FUNNEL_GENERATOR_VERSION}
+      and (f.model_version is null or f.model_version not like '%:example')
+    order by f.version desc, f.generated_at desc limit 1
+  `;
+  return row?.count == null ? null : Number(row.count);
+}

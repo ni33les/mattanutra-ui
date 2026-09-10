@@ -1203,69 +1203,6 @@ function opportunityPill(band: string, percentile: number, locale: Locale) {
   return healthScorePageText(locale, "opportunity.high");
 }
 
-function healthScoreSelectedNutrientCount(answers: NormalizedAnswers) {
-  let count = 6;
-
-  if (answers.goals.length >= 3) {
-    count += 1;
-  }
-
-  if (answers.symptoms.filter((symptom) => symptom !== "great").length >= 2) {
-    count += 1;
-  }
-
-  const labSignalCount = [
-    answers.labB12,
-    answers.labFerritin,
-    answers.labHba1c,
-    answers.labHomo,
-    answers.labO3,
-    answers.labVitd
-  ].filter((value) => value > 0).length;
-
-  if (labSignalCount >= 3) {
-    count += 1;
-  }
-
-  if (answers.hrv > 0 || answers.vo2 > 0) {
-    count += 1;
-  }
-
-  const foodGapCount = [answers.fFish, answers.fFruitVeg].filter((value) =>
-    ["never", "rare", "1-2"].includes(value)
-  ).length;
-
-  if (foodGapCount >= 1) {
-    count += 1;
-  }
-
-  const safetySignals = [
-    answers.medTypes.length > 0,
-    answers.kidney !== "normal",
-    answers.liver !== "normal",
-    answers.reproStatus !== "none"
-  ].filter(Boolean).length;
-
-  if (safetySignals > 0) {
-    count += 1;
-  }
-
-  const lifestyleSignals = [
-    ["sitting", "light"].includes(answers.activity),
-    ["low", "ok"].includes(answers.energy),
-    ["moderate", "high"].includes(answers.stress),
-    answers.digestion !== "none",
-    ["4-7", "8+"].includes(answers.alcohol),
-    answers.smoking !== "never"
-  ].filter(Boolean).length;
-
-  if (lifestyleSignals >= 2) {
-    count += 1;
-  }
-
-  return Math.max(6, Math.min(12, count));
-}
-
 function buildPageContent({
   answers,
   chosenNutrients,
@@ -1290,9 +1227,9 @@ function buildPageContent({
     ? findings
     : buildStrengthFindings(pillarsWithNames, locale);
   const selectedNutrients =
-    chosenNutrients ?? healthScoreSelectedNutrientCount(answers);
+    chosenNutrients ?? null;
   const evaluatedNutrients = Math.max(
-    selectedNutrients,
+    selectedNutrients ?? 0,
     Number.isFinite(evaluatedIngredientCount)
       ? Math.round(Number(evaluatedIngredientCount))
       : DEFAULT_HEALTHSCORE_EVALUATED_INGREDIENT_COUNT
@@ -1302,7 +1239,7 @@ function buildPageContent({
       chosen: selectedNutrients,
       evaluated: evaluatedNutrients,
       mode: "nutrients" as const,
-      setAside: Math.max(0, evaluatedNutrients - selectedNutrients)
+      setAside: null
     };
   const subtractionText = subtractionCopy(
     selectedSubtraction,
@@ -1423,8 +1360,10 @@ export function computeHealthScore(
   locale: Locale = "en",
   options: Readonly<{
     evaluatedIngredientCount?: number;
+    chosenNutrients?: number;
   }> = {}
 ): HealthScoreResult {
+  if (options.chosenNutrients !== undefined && (!Number.isSafeInteger(options.chosenNutrients) || options.chosenNutrients < 0)) throw new RangeError("chosenNutrients must be a nonnegative safe integer");
   const answers = normalizeAnswers(answersInput);
   const engine = scoreEngine(answers);
   const domains = buildDomains(engine, locale);
@@ -1440,6 +1379,7 @@ export function computeHealthScore(
       answers,
       engine,
       evaluatedIngredientCount: options.evaluatedIngredientCount,
+      chosenNutrients: options.chosenNutrients,
       locale
     }),
     raw: engine.raw,

@@ -9,7 +9,6 @@ import {
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import type { AssessmentPlan } from "@/lib/assessment-snapshot";
 import {
-  DEFAULT_HEALTHSCORE_EVALUATED_INGREDIENT_COUNT,
   type HealthScoreGapCard,
   type HealthScoreMethodCard,
   type HealthScorePageAiCard,
@@ -452,8 +451,8 @@ type HealthScoreViewModel = Readonly<{
   strengthNote: string;
   subtraction: Readonly<{
     body: string;
-    labels: readonly [string, string, string];
-    numbers: readonly [number, number, number];
+    labels: readonly string[];
+    numbers: readonly number[];
   }>;
 }>;
 
@@ -473,13 +472,7 @@ function buildHealthScoreViewModel({
   const median = page?.locked.median ?? page?.copySeeds.relativity.spectrumMedian ?? 60;
   const percentile = page?.locked.percentile ?? 0;
   const relativity = page?.copySeeds.relativity;
-  const subtraction = page?.locked.subtraction ?? {
-    chosen: 8,
-    evaluated: DEFAULT_HEALTHSCORE_EVALUATED_INGREDIENT_COUNT,
-    mode: "nutrients" as const,
-    setAside: DEFAULT_HEALTHSCORE_EVALUATED_INGREDIENT_COUNT - 8,
-  };
-  const subtractionSeed = page?.copySeeds.subtraction;
+  const chosen = page?.locked.subtraction.chosen ?? null;
   const scoreMarker = relativity?.spectrumYouPct ?? scorePosition(score);
   const medianMarker = relativity?.spectrumMedianPct ?? scorePosition(median);
 
@@ -515,8 +508,8 @@ function buildHealthScoreViewModel({
     pillarHeadline: localize(ai?.pillarHeadline, locale),
     pillars: normalizedPillars(result),
     percentile,
-    relativityHeadline: localize(ai?.relativityHeadline, locale),
-    relativitySub: localize(ai?.relativitySub, locale),
+    relativityHeadline: relativity?.headline ?? "",
+    relativitySub: relativity?.sub ?? "",
     result,
     score,
     spectrum: {
@@ -533,29 +526,9 @@ function buildHealthScoreViewModel({
     },
     strengthNote: localize(ai?.strengthNote, locale),
     subtraction: {
-      body: localize(ai?.subtractionBody, locale),
-      labels: [
-        localizedLegacyText(
-          subtractionSeed?.labelEvaluated,
-          locale,
-          copy.evaluatedFallback,
-        ),
-        localizedLegacyText(
-          subtractionSeed?.labelSetAside,
-          locale,
-          copy.setAsideFallback,
-        ),
-        localizedLegacyText(
-          subtractionSeed?.labelChosen,
-          locale,
-          copy.chosenFallback,
-        ),
-      ],
-      numbers: [
-        subtraction.evaluated,
-        subtraction.setAside,
-        subtraction.chosen,
-      ],
+      body: chosen === null ? copy.formulaPendingBody : copy.formulaReadyBody,
+      labels: chosen === null ? [] : [copy.chosenFallback],
+      numbers: chosen === null ? [] : [chosen],
     },
   };
 }

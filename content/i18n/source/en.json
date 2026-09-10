@@ -2228,7 +2228,7 @@
     "translatable": true
   },
   "customer.healthScore.page.relativity.gap.headline": {
-    "defaultMessage": "The average person who finishes this assessment scores about {median}. Your gap is {gap} points — and none of them are about age.",
+    "defaultMessage": "The model reference is {median}. Your score is {gap} points below it. This reference is not a measured customer average.",
     "description": "Relative gap headline when score is below median.",
     "namespace": "customer.healthScore",
     "audience": "customer",
@@ -2267,25 +2267,21 @@
     "translatable": true
   },
   "customer.healthScore.page.relativity.gap.sub": {
-    "defaultMessage": "Those {gap} points aren’t genetics, and they aren’t willpower. They are a few specific, recoverable things — and the biggest are exactly the goals you told us mattered most.",
+    "defaultMessage": "Your answers identify where there is room to improve, especially in the areas linked to your goals.",
     "description": "Relative gap subcopy when score is below median.",
     "namespace": "customer.healthScore",
     "audience": "customer",
     "surface": "health-score",
-    "variables": [
-      "gap"
-    ],
+    "variables": [],
     "translatable": true
   },
   "customer.healthScore.page.relativity.rank.headline": {
-    "defaultMessage": "You are ahead of about {percentile}% of people who finish this assessment.",
+    "defaultMessage": "Your score is above the model reference. This is not a ranking against other customers.",
     "description": "Relative rank headline when score is above median.",
     "namespace": "customer.healthScore",
     "audience": "customer",
     "surface": "health-score",
-    "variables": [
-      "percentile"
-    ],
+    "variables": [],
     "translatable": true
   },
   "customer.healthScore.page.relativity.rank.legend.0": {
@@ -2316,7 +2312,7 @@
     "translatable": true
   },
   "customer.healthScore.page.relativity.rank.sub": {
-    "defaultMessage": "You are clearly doing a lot right. What is left is refinement — a few targeted points between you and your personal best.",
+    "defaultMessage": "Build on the habits already supporting your score and review the areas connected to your goals.",
     "description": "Relative rank subcopy when score is above median.",
     "namespace": "customer.healthScore",
     "audience": "customer",
@@ -2384,7 +2380,7 @@
     "translatable": true
   },
   "customer.healthScore.page.subtraction.labelChosen": {
-    "defaultMessage": "Shortlisted for your score",
+    "defaultMessage": "Ingredients in your formula",
     "description": "Subtraction chosen label.",
     "namespace": "customer.healthScore",
     "audience": "customer",
