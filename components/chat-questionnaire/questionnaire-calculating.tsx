@@ -27,8 +27,7 @@ export function QuestionnaireCalculating({ locale, status, onSeeResults, canOpen
   const requested = delivery && ["waiting", "queued", "sending"].includes(delivery.status);
   const sent = delivery?.status === "sent";
   const isReady = status === "ready", isBuilding = status === "building";
-  const statusLabel = sent ? copy.calcEmailSent : requested ? copy.calcEmailRequested
-    : isReady ? copy.calcReady : isBuilding ? copy.calcBuilding : onRetryCapture ? copy.calcCaptureFailed : copy.calcSavedNote;
+  const statusLabel = isReady ? copy.calcReady : isBuilding ? copy.calcBuilding : onRetryCapture ? copy.calcCaptureFailed : copy.calcSavedNote;
 
   async function submitEmail() {
     if (emailBusy) return;
@@ -52,13 +51,15 @@ export function QuestionnaireCalculating({ locale, status, onSeeResults, canOpen
       {status === "error" ? <div className="mn-quiz-calc__fallback" data-testid="calc-fallback">
         {onRetryCapture ? <button type="button" className="mn-quiz-calc__ready-btn" data-testid="retry-capture" onClick={onRetryCapture}>{copy.calcRetryCapture}</button> : null}
         {onRetryAnalysis ? <button type="button" className="mn-quiz-calc__ready-btn" data-testid="retry-analysis" onClick={onRetryAnalysis}>{copy.calcRetryAnalysis}</button> : null}
-        {!requested && !sent ? <div className="mn-quiz-calc__email-stack" data-testid="calc-emailbox">
-          <input type="email" inputMode="email" autoComplete="email" placeholder={copy.calcEmailPlaceholder} value={email} disabled={emailBusy}
-            onChange={event => setEmail(event.target.value)} onKeyDown={event => { if (event.key === "Enter") { event.preventDefault(); void submitEmail(); } }} aria-label={copy.calcEmailPlaceholder} />
-          <button type="button" className="mn-quiz-calc__email-submit" disabled={emailBusy} onClick={() => void submitEmail()}>{copy.calcSendWhenReady}</button>
-        </div> : null}
-        {emailError ? <p role="alert" className="mn-quiz-calc__email-thanks">{emailError}</p> : null}
       </div> : null}
+      {!isReady && !onRetryCapture && !requested && !sent ? <form className="mn-quiz-calc__email-stack" data-testid="calc-emailbox"
+        onSubmit={event => { event.preventDefault(); void submitEmail(); }}>
+        <input type="email" inputMode="email" autoComplete="email" required placeholder={copy.calcEmailPlaceholder} value={email} disabled={emailBusy}
+          onChange={event => setEmail(event.target.value)} aria-label={copy.calcEmailPlaceholder} />
+        <button type="submit" className="mn-quiz-calc__email-submit" disabled={emailBusy}>{copy.calcSendWhenReady}</button>
+      </form> : null}
+      {emailError ? <p role="alert" className="mn-quiz-calc__email-thanks mn-quiz-calc__email-error">{emailError}</p> : null}
+      {requested || sent ? <p role="status" className="mn-quiz-calc__email-thanks" data-testid="calc-email-status">{sent ? copy.calcEmailSent : copy.calcEmailRequested}</p> : null}
     </CalculatingWait>
   );
 }

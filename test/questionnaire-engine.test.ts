@@ -55,7 +55,7 @@ describe("questionnaire engine v6", () => {
 
     assert.equal(filled.ok, true);
     if (!filled.ok) {
-      return;
+      assert.fail("Expected a successful questionnaire transition");
     }
 
     assert.equal(filled.state.phase, "complete");
@@ -93,7 +93,7 @@ describe("questionnaire engine v6", () => {
     const r1 = applyAnswer(state, "firstName", "Alex");
     assert.equal(r1.ok, true);
     if (!r1.ok) {
-      return;
+      assert.fail("Expected a successful questionnaire transition");
     }
     assert.ok(!r1.events.some((e) => e.type === "chat_part_break"));
     assert.ok(r1.state.log.some((m) => m.kind === "section" && m.sectionIndex === 0));
@@ -103,13 +103,13 @@ describe("questionnaire engine v6", () => {
     const goals = applyAnswer(state, "goals", ["energy", "sleep"]);
     assert.equal(goals.ok, true);
     if (!goals.ok) {
-      return;
+      assert.fail("Expected a successful questionnaire transition");
     }
     state = goals.state;
     const symptoms = applyAnswer(state, "symptoms", ["great"]);
     assert.equal(symptoms.ok, true);
     if (!symptoms.ok) {
-      return;
+      assert.fail("Expected a successful questionnaire transition");
     }
     // symptoms → sex crosses sec 0 → sec 1
     assert.ok(
@@ -132,7 +132,7 @@ describe("questionnaire engine v6", () => {
     const r = applyAnswer(state, "firstName", "Alex");
     assert.equal(r.ok, true);
     if (!r.ok) {
-      return;
+      assert.fail("Expected a successful questionnaire transition");
     }
 
     state = r.state;
@@ -222,7 +222,7 @@ describe("questionnaire engine v6", () => {
     const dietResult = applyAnswer(state, "diet", "vegan");
     assert.equal(dietResult.ok, true);
     if (!dietResult.ok) {
-      return;
+      assert.fail("Expected a successful questionnaire transition");
     }
 
     state = dietResult.state;
@@ -255,7 +255,7 @@ describe("questionnaire engine v6", () => {
     const result = applyAnswer(state, "precisionGate", "skip");
     assert.equal(result.ok, true);
     if (!result.ok) {
-      return;
+      assert.fail("Expected a successful questionnaire transition");
     }
 
     state = result.state;
@@ -289,7 +289,7 @@ describe("questionnaire engine v6", () => {
     const result = applyAnswer(state, "precisionGate", "skip");
     assert.equal(result.ok, true);
     if (!result.ok) {
-      return;
+      assert.fail("Expected a successful questionnaire transition");
     }
 
     state = result.state;

@@ -9,7 +9,7 @@ import {expect,test} from '../helpers/offline-browser';
 const execute=promisify(execFile);
 assert.ok(process.env.TEST_DB_URL,'Isolated PostgreSQL is required');
 const url=new URL(process.env.TEST_DB_URL);assert.equal(url.hostname,'127.0.0.1');assert.match(url.pathname,/^\/mattanutra_lock_review_/);
-for(const locale of ['en','th','zh-CN']) test(`HS-WAIT-BROWSER-01 ${locale} inline email preserves waiting and eventual navigation`,async({page})=>{
+for(const locale of ['en','th','zh-CN']) test(`HS-WAIT-BROWSER-01 ${locale} inline email preserves waiting and eventual navigation`,async({page},testInfo)=>{
   const sql=postgres(url.href,{max:1,prepare:false}),dir=await mkdtemp(join(tmpdir(),'hs-wait-'));
   try {
     await page.setViewportSize({width:375,height:850});
@@ -33,6 +33,7 @@ for(const locale of ['en','th','zh-CN']) test(`HS-WAIT-BROWSER-01 ${locale} inli
     await expect(page.getByTestId('calc-fallback')).toHaveCount(0);
     const box=await email.boundingBox();assert.ok(box);expect(box.x).toBeGreaterThanOrEqual(0);expect(box.x+box.width).toBeLessThanOrEqual(375);
     expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(375);
+    await page.screenshot({path:testInfo.outputPath('email-inline.png')});
     await page.clock.fastForward(91_000);
     await expect(calc.locator('.mn-quiz-calc__spinner')).toBeVisible();await expect(page.getByTestId('calc-fallback')).toHaveCount(0);
     await email.locator('input').fill('fixture@example.test');await email.locator('button').click();

@@ -530,7 +530,7 @@ export function ChatQuestionnaire({
             channel: "web",
             planId: returningPlanId ?? null
           });
-    const filled = fastForwardQuestionnaire(initial);
+    const filled = fastForwardQuestionnaire(initial, Math.random);
 
     if (!filled.ok) {
       setProcessingError(filled.error || "Unable to fill questionnaire");

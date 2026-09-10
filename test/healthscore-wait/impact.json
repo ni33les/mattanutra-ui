@@ -1,0 +1,13 @@
+{
+  "releaseBase":"e291667e27f427b84888e9f38f1c970141ef998c",
+  "files":[
+    {"file":"test/healthscore-wait/behaviour.test.ts","reason":"Five-minute observation windows, continued pending polling, cancellation, real failures, randomized DEV answers and preserved entered answers"},
+    {"file":"test/funnel-polling.test.ts","reason":"One outstanding request, deadlines, transient errors and hidden-tab pause remain intact"},
+    {"file":"test/service-efficiency/funnel.test.ts","reason":"Shared subscriptions remain isolated and cancellable"},
+    {"file":"test/healthscore-parallel/behaviour.test.ts","reason":"Continue gating on both advice and reveal preparation"},
+    {"file":"test/healthscore-copy-static.test.ts","reason":"Complete advice and durable email acknowledgement remain distinct"},
+    {"file":"test/questionnaire-engine.test.ts","reason":"Shared engine default and questionnaire transitions remain deterministic without random opt-in"},
+    {"file":"test/dev-shortcuts.test.ts","reason":"DEV shortcut exposure and production hiding remain unchanged"}
+  ],
+  "browser":[{"file":"test/e2e/healthscore-wait.spec.ts","grep":"HS-WAIT-BROWSER-01","expectedCases":3}]
+}

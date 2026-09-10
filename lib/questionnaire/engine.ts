@@ -1126,7 +1126,8 @@ export function defaultAnswerForTurn(
 }
 
 export function fastForwardQuestionnaire(
-  state: QuestionnaireState
+  state: QuestionnaireState,
+  random?: () => number
 ): ApplyAnswerResult {
   const started =
     state.phase === "active"
@@ -1146,7 +1147,13 @@ export function fastForwardQuestionnaire(
       return { ok: true, events: completed.events, state: completed.state };
     }
 
-    const applied = applyAnswer(next, turn.k, defaultAnswerForTurn(definition, turn));
+    const option = random && turn.opts?.length
+      ? turn.opts[Math.floor(random() * turn.opts.length)]
+      : undefined;
+    const answer = next.answers[turn.k] ?? (option
+      ? turn.kind === "multi" ? [option.v] : option.v
+      : defaultAnswerForTurn(definition, turn));
+    const applied = applyAnswer(next, turn.k, answer);
 
     if (!applied.ok) {
       const skipped = skipTurn(next, turn.k);
