@@ -114,6 +114,7 @@ export type ProductRecommendationNeedDiagnostic = Readonly<{
 }>;
 
 export type ProductRecommendationAlgorithmVersion =
+  | "practical-matching-1"
   | "flexible-dose-fit-9"
   | "flexible-dose-fit-8"
   | "flexible-dose-fit-7"

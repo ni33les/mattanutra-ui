@@ -3,13 +3,17 @@ import { serializeExactValue } from "@/lib/matcher/exact-values";
 import { compileVariant, isDeferredConditional } from "@/lib/matcher/candidates";
 import { servingIncrement } from "@/lib/matcher/serving-grid";
 import { targetDoseTicks } from "@/lib/matcher/target-basis";
+import { compareOverallScores, resolvePracticalProfile, searchStateScore, type OverallMatchingScore } from "@/lib/matcher/practical-scoring";
+import { divide, fromDecimal, multiply, rational, toNumber } from "@/lib/matcher/rational";
 import { fingerprintState } from "@/lib/matcher/dominance";
-import { compareSearchStates, residualPattern, reviewFrontier, seedState, tryAddVariant, type SearchRun } from "@/lib/matcher/search";
+import { compareSearchStates, profileLeaders, residualPattern, reviewFrontier, seedState, tryAddVariant, type SearchRun } from "@/lib/matcher/search";
 import type { CanonicalRequest, DoseVariant, MatcherConfig, ProductGroup, SearchState } from "@/lib/matcher/types";
 
 type ExactFrame = { state: SearchState; variantIds: string[] | null; position: number };
 type ExactVector = (number | bigint)[];
-type ArchivedState = [number, number, number, number, boolean, number[], ExactVector, ExactVector, string[]];
+type ArchivedState = [number, number, number, number, boolean, number[], ExactVector, ExactVector, string[],
+  [number[], number, number | null, number]?];
+type QuantitySearch = { key: string; ids: string[]; low: bigint; high: bigint; steps: number; left?: OverallMatchingScore | null };
 type RepairJob = { leader: SearchState; removal: number; base: SearchState | null; retained: string[]; build: number; group: number; variant: number; variants: string[] | null; stage: "prepare" | "build" | "add" | "done" };
 export type SearchCursor = {
   version: "search-cursor-1"; identity: string; groups: ProductGroup[]; baseline: string[][];
@@ -26,6 +30,8 @@ export type SearchCursor = {
   repairJobs: RepairJob[]; repairJob: number; repairLimit: number;
   repaired: SearchState[]; second: SearchState[]; secondIndex: number;
   exactStack: ExactFrame[];
+  /** Resumable quantity probes; partial probe pairs survive checkpoint boundaries. */
+  quantitySearch?: QuantitySearch;
 };
 
 function indexFor(values: string[], indices: Map<string, number>, id: string) {
@@ -50,7 +56,8 @@ function restoreState(cursor: SearchCursor, packed: ArchivedState): SearchState 
       const group = cursor.groups.find(row => id.startsWith(`${row.sellerId}:${row.productId}:x`));
       if (!group) throw new Error("Archive lost a selected product");
       return group.productId;
-    }), exposure, delivered: packed[7] === packed[6] ? exposure : unpackedExposure(cursor, packed[7]), unknownProductIds: packed[8] };
+    }), exposure, delivered: packed[7] === packed[6] ? exposure : unpackedExposure(cursor, packed[7]), unknownProductIds: packed[8],
+    ...(packed[9] ? { routineServings: packed[9][0], uncertainAdministrationCount: packed[9][1], monthlyPriceMinor: packed[9][2], monthlyPriceLowerBound: packed[9][3] } : {}) };
 }
 export function* archivedSearchStates(cursor: SearchCursor) {
   for (const packed of cursor.archive.values()) yield restoreState(cursor, packed);
@@ -62,7 +69,8 @@ function remember(cursor: SearchCursor, state: SearchState) {
     const exposure = packedExposure(cursor, state.exposure);
     cursor.archive.set(key, [state.nextGroupIndex, state.price, state.pills, state.count, state.pillCountKnown !== false,
       ids, exposure,
-      state.delivered === state.exposure ? exposure : packedExposure(cursor, state.delivered), [...(state.unknownProductIds ?? [])]]);
+      state.delivered === state.exposure ? exposure : packedExposure(cursor, state.delivered), [...(state.unknownProductIds ?? [])],
+      [[...(state.routineServings ?? [])], state.uncertainAdministrationCount ?? state.count, state.monthlyPriceMinor ?? null, state.monthlyPriceLowerBound ?? 0]]);
     cursor.unreviewed.push(state);
   }
   return key;
@@ -72,7 +80,7 @@ function explorationLimit(cursor: SearchCursor) { return cursor.expansionBudget 
 
 export function createSearchCursor(groups: readonly ProductGroup[], request: CanonicalRequest, config: MatcherConfig): SearchCursor {
   const copy = structuredClone([...groups]);
-  const identity = sha256Hex(JSON.stringify(serializeExactValue({ version: "search-cursor-1", groups, request: { ...request, searchEffort: undefined }, config: { ...config, expansionBudget: undefined } })));
+  const identity = sha256Hex(JSON.stringify(serializeExactValue({ version: "search-cursor-1", scoringProfileHash: resolvePracticalProfile(request).hash, groups, request: { ...request, searchEffort: undefined }, config: { ...config, expansionBudget: undefined } })));
   const exact = groups.length <= config.exactGroupLimit && groups.reduce((sum, group) => sum + group.variants.length, 0) <= config.exactVariantLimit;
   const seed = seedState(request);
   const cursor: SearchCursor = { version: "search-cursor-1", identity, groups: copy, baseline: copy.map(group => group.variants.map(row => row.variantId)), config: { ...config },
@@ -93,7 +101,7 @@ function variant(cursor: SearchCursor, index: number, id: string) {
   if (!found) throw new Error("Search cursor lost a physical quantity");
   return found;
 }
-function variantsFor(cursor: SearchCursor, index: number, state: SearchState, request: CanonicalRequest) {
+function variantsFor(cursor: SearchCursor, index: number, state: SearchState, request: CanonicalRequest, stop: number): string[] | null {
   const group = cursor.groups[index]!, initial = cursor.baseline[index]!.map(id => variant(cursor, index, id));
   if (request.productDoses?.some(row => row.productId === group.productId) || !initial.length) return initial.map(row => row.variantId);
   const step = servingIncrement(group.product), result = new Set(initial.map(row => row.variantId));
@@ -108,7 +116,45 @@ function variantsFor(cursor: SearchCursor, index: number, state: SearchState, re
       if (found) result.add(id);
     }
   }
-  return [...result];
+  const key = `${fingerprintState(state)}>${index}`;
+  let job = cursor.quantitySearch;
+  if (!job || job.key !== key) {
+    const ticks = initial.map(row => divide(row.dailyUnitsRatio ?? fromDecimal(row.dailyUnits), step)).map(row => (row.num + row.den - BigInt(1)) / row.den);
+    const upper = ticks.reduce((a, b) => a > b ? a : b, BigInt(1));
+    job = { key, ids: [...result], low: BigInt(1), high: upper, steps: 0 }; cursor.quantitySearch = job;
+    const addTick = (tick: bigint) => {
+      if (tick < BigInt(1)) return;
+      const ratio = multiply(rational(tick), step), dailyUnits = toNumber(ratio), id = `${group.sellerId}:${group.productId}:x${dailyUnits}`;
+      if (!group.variants.some(row => row.variantId === id)) { const next = compileVariant({ product: group.product, request, dailyUnits, dailyUnitsRatio: ratio }); if (next) (group.variants as DoseVariant[]).push(next); }
+      if (group.variants.some(row => row.variantId === id) && !job!.ids.includes(id)) job!.ids.push(id);
+    };
+    if (request.maxDailyPills != null && group.product.pillCountKnown !== false && group.product.dailyPillsPerServing > 0) {
+      const remaining = Math.max(0, request.maxDailyPills - state.pills);
+      const tick = divide(divide(fromDecimal(remaining), fromDecimal(group.product.dailyPillsPerServing)), step);
+      const nearest = tick.num / tick.den;
+      for (const offset of [-BigInt(1), BigInt(0), BigInt(1)]) addTick(nearest + offset);
+    }
+  }
+  // Bounded discrete convex probes add useful interior quantities. First-order
+  // price is constant in this context. Monthly pack-price steps are sampled,
+  // never advertised as a globally convex objective or an exhaustive optimum.
+  while (job.low < job.high && job.steps < 8) {
+    const middle = (job.low + job.high) / BigInt(2);
+    const tick = job.left === undefined ? middle : middle + BigInt(1);
+    if (cursor.expansionAttempts >= stop) return null;
+    const ratio = multiply(rational(tick), step), dailyUnits = toNumber(ratio), id = `${group.sellerId}:${group.productId}:x${dailyUnits}`;
+    if (!group.variants.some(row => row.variantId === id)) { const next = compileVariant({ product: group.product, request, dailyUnits, dailyUnitsRatio: ratio }); if (next) (group.variants as DoseVariant[]).push(next); }
+    const exists = group.variants.some(row => row.variantId === id);
+    // Invalid physical probes still consume an expansion attempt.
+    const candidate = exists ? add(cursor, state, index, id, request) : (cursor.expansionAttempts++, null);
+    if (exists && !job.ids.includes(id)) job.ids.push(id);
+    const score = candidate ? searchStateScore(request, candidate) : null;
+    if (job.left === undefined) { job.left = score; continue; }
+    if (job.left && (!score || compareOverallScores(job.left, score) <= 0)) job.high = middle;
+    else job.low = middle + BigInt(1);
+    job.left = undefined; job.steps++;
+  }
+  return job.ids;
 }
 
 function add(cursor: SearchCursor, state: SearchState, groupIndex: number, id: string, request: CanonicalRequest) {
@@ -142,7 +188,8 @@ function diverseSingles(cursor: SearchCursor, request: CanonicalRequest) {
 }
 function finishBeamLayer(cursor: SearchCursor, request: CanonicalRequest) {
   const ranked = [...new Map(cursor.expanded.map(row => [fingerprintState(row), row])).values()].sort((a,b) => compareSearchStates(a,b,request));
-  const size = width(cursor), chosen = ranked.slice(0, Math.ceil(size / 2));
+  const size = width(cursor), chosen = profileLeaders(ranked, request, size);
+  for (const row of ranked) { if (chosen.length >= Math.ceil(size / 2)) break; if (!chosen.includes(row)) chosen.push(row); }
   if (ranked.length > size) cursor.trimmed = true;
   const patterns = new Set(chosen.map(row => residualPattern(row,request)));
   for (const row of ranked) {
@@ -156,7 +203,9 @@ function finishBeamLayer(cursor: SearchCursor, request: CanonicalRequest) {
 function startRepair(cursor: SearchCursor, request: CanonicalRequest) {
   cursor.phase = "repair";
   cursor.repairLimit = cursor.expansionAttempts + Math.floor((cursor.expansionBudget - cursor.expansionAttempts) * .75);
-  const leaders = [...cursor.review, ...cursor.unreviewed].sort((a,b) => compareSearchStates(a,b,request)).slice(0, 4);
+  const candidates = [...cursor.review, ...cursor.unreviewed].sort((a,b) => compareSearchStates(a,b,request));
+  const leaders = profileLeaders(candidates, request, 4);
+  for (const row of candidates) { if (leaders.length >= 4) break; if (!leaders.includes(row)) leaders.push(row); }
   // Preserve unmodified leaders for the second-addition pass. Start the repair
   // allowance with an actual removal; otherwise adding to four already full
   // leaders spends it before even one replacement receives an opportunity.
@@ -187,7 +236,7 @@ export function advanceSearchCursor(cursor: SearchCursor, request: CanonicalRequ
       if (!frame) { cursor.phase="finished"; cursor.done=true; break; }
       const index=frame.state.nextGroupIndex;
       if (index >= cursor.groups.length) { remember(cursor,frame.state); cursor.exactStack.pop(); continue; }
-      if (!frame.variantIds) frame.variantIds=variantsFor(cursor,index,frame.state,request);
+      if (!frame.variantIds) { frame.variantIds=variantsFor(cursor,index,frame.state,request,stop); if (!frame.variantIds) continue; }
       if (frame.position === -1) {
         frame.position=0;
         if (!mustSelect(cursor.groups[index]!,request)) { cursor.exactStack.push({ state:{...frame.state,nextGroupIndex:index+1},variantIds:null,position:-1 }); continue; }
@@ -209,7 +258,8 @@ export function advanceSearchCursor(cursor: SearchCursor, request: CanonicalRequ
       if (cursor.parent >= cursor.beam.length || cursor.expansionAttempts >= cursor.groupLimit) { finishBeamLayer(cursor,request); continue; }
       const base=cursor.beam[cursor.parent]!, group=cursor.groups[cursor.group]!;
       if (!cursor.variants) {
-        cursor.variants=variantsFor(cursor,cursor.group,base,request); cursor.variant=0;
+        cursor.variants=variantsFor(cursor,cursor.group,base,request,Math.min(stop,cursor.groupLimit)); cursor.variant=0;
+        if (!cursor.variants) continue;
         if (!mustSelect(group,request)) cursor.expanded.push({...base,nextGroupIndex:cursor.group+1});
       }
       if (cursor.variant >= cursor.variants.length) { cursor.parent++; cursor.variants=null; continue; }
@@ -248,7 +298,7 @@ export function advanceSearchCursor(cursor: SearchCursor, request: CanonicalRequ
       }
       if (job.group >= cursor.groups.length) { job.stage="prepare"; continue; }
       if (job.base!.selectedProductIds?.includes(cursor.groups[job.group]!.productId)) { job.group++; job.variants=null; continue; }
-      if (!job.variants) { job.variants=variantsFor(cursor,job.group,job.base!,request); job.variant=0; }
+      if (!job.variants) { job.variants=variantsFor(cursor,job.group,job.base!,request,Math.min(stop,cursor.repairLimit)); job.variant=0; if (!job.variants) { cursor.repairJob--; continue; } }
       if (job.variant >= job.variants.length) { job.group++; job.variants=null; continue; }
       const next=add(cursor,job.base!,job.group,job.variants[job.variant++]!,request); if (next) cursor.repaired.push(next);
     } else if (cursor.phase === "second") {
@@ -256,7 +306,7 @@ export function advanceSearchCursor(cursor: SearchCursor, request: CanonicalRequ
       const base=cursor.second[cursor.secondIndex]!;
       if (cursor.group >= cursor.groups.length) { cursor.secondIndex++; cursor.group=0; cursor.variants=null; continue; }
       if (base.selectedProductIds?.includes(cursor.groups[cursor.group]!.productId)) { cursor.group++; cursor.variants=null; continue; }
-      if (!cursor.variants) { cursor.variants=variantsFor(cursor,cursor.group,base,request); cursor.variant=0; }
+      if (!cursor.variants) { cursor.variants=variantsFor(cursor,cursor.group,base,request,stop); cursor.variant=0; if (!cursor.variants) continue; }
       if (cursor.variant >= cursor.variants.length) { cursor.group++; cursor.variants=null; continue; }
       add(cursor,base,cursor.group,cursor.variants[cursor.variant++]!,request);
     } else cursor.done=true;

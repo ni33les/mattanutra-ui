@@ -1,4 +1,5 @@
 import { sha256Hex } from "@/lib/sha256";
+import { resolvePracticalProfile } from "@/lib/matcher/practical-scoring";
 import { scaleAmount, isDoseError } from "@/lib/matcher/dose";
 import { DOSE_FIT_VERSION } from "@/lib/matcher/config";
 import type {
@@ -166,6 +167,7 @@ export function canonicalTargetSetHash(request: CanonicalRequest): string {
         medicationCodes: canonical.medicationCodes,
         omega3SourcePreference: canonical.omega3SourcePreference,
         optimization: canonical.optimization,
+        scoringProfileHash: resolvePracticalProfile(canonical).hash,
         profile: canonical.profile,
         retainProductIds: canonical.retainProductIds,
         retainSubjectIds: canonical.retainSubjectIds,

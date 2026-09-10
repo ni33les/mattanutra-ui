@@ -11,6 +11,7 @@ import { seedState, tryAddVariant, revalidateState } from "@/lib/matcher/search"
 import { minUnits } from "@/lib/matcher/dose";
 import { knownTargetExposure } from "@/lib/matcher/target-basis";
 import { comparePillCounts } from "@/lib/matcher/pill-burden";
+import { compareOverallScores, overallMatchingScore, searchStateScore } from "@/lib/matcher/practical-scoring";
 import type {
   CanonicalRequest,
   ConversationalOptionRole,
@@ -226,6 +227,7 @@ export function scoreState(input: Readonly<{
     incidentalCount: incidentalNutrientCount(input.groups, productIds, input.request),
     oversupplyScore: oversupplyScore(input.request, input.state.exposure),
     doseFit: withProductUncertainty(doseFitScore(input.request, input.state.exposure), validated.exposure.unknownSubjectIds),
+    overallScore: searchStateScore(input.request, input.state),
     priceMinor: input.state.price,
     productCount: input.state.count,
     productIds,
@@ -258,6 +260,20 @@ export function basketSignature(basket: Pick<ScoredBasket, "sellerId" | "variant
 /** One total ordering shared by ranking, salvage and the final selection. */
 export function compareBaskets(left: ScoredBasket, right: ScoredBasket, request: CanonicalRequest, _config: MatcherConfig = DEFAULT_MATCHER_CONFIG) {
   void _config;
+  const practical = compareOverallScores(overallOf(left, request), overallOf(right, request));
+  if (practical !== 0) return practical;
+  return compareClosestDose(left, right, request);
+}
+
+function overallOf(basket: ScoredBasket, request: CanonicalRequest) {
+  return basket.overallScore ?? overallMatchingScore(request, new Map([...basket.exposure.totals].map(([id, row]) => [id, row.units])), {
+    dailyPills: basket.pillCountKnown === false ? null : basket.dailyPills, pillLowerBound: basket.dailyPills,
+    productCount: basket.productCount, priceMinor: basket.priceMinor, currency: request.currency,
+    servings: (basket.variantDoses ?? []).map(row => row.dailyUnits), uncertainProductCount: basket.productCount
+  });
+}
+
+export function compareClosestDose(left: ScoredBasket, right: ScoredBasket, request: CanonicalRequest) {
   const fit = compareDoseFit(fitOf(left, request), fitOf(right, request));
   if (fit !== 0) return fit;
   // For a single requested nutrient, prefer an equally accurate dedicated
@@ -291,9 +307,10 @@ export function materiallyDifferent(left: ScoredBasket, right: ScoredBasket) {
 export function requestWithoutOptionalPurchases(request: CanonicalRequest): CanonicalRequest { return request; }
 
 function selectedReason(request: CanonicalRequest) {
-  if (request.optimization === "lowest_cost") return "Closest dose fit with a target-focused daily routine; lower-cost trade-offs remain available";
-  if (request.optimization === "fewest_pills") return "Closest dose fit with a target-focused daily routine; simpler trade-offs remain available";
-  return "Closest overall fit to the agreed daily targets";
+  if (request.optimization === "lowest_cost") return "Best overall match with stronger price penalties; dose and routine trade-offs remain available";
+  if (request.optimization === "fewest_pills") return "Best overall match with stronger daily-routine penalties; dose and price trade-offs remain available";
+  if (request.optimization === "best_coverage") return "Best overall match with greater emphasis on nutrient fit and disclosed routine trade-offs";
+  return "Best overall match balancing dose fit, daily routine, preferences and price";
 }
 
 function satisfiesRetained(request: CanonicalRequest, basket: ScoredBasket) {
@@ -353,6 +370,10 @@ export function protectedReferenceCandidates(baskets: readonly ScoredBasket[], r
     }
     for (const row of fit.perContinuedDose ?? []) vector.set(`continued:${row.subjectId}`, row.over);
     for (const row of fit.perLimit) vector.set(`limit:${row.sourceScope}:${row.subjectId}`, row.excess);
+    // Optional-only nutrient gains cannot displace core fit. A real practical
+    // improvement remains a trade-off, rather than restoring dose-first ranking.
+    const overall = overallOf(basket, request);
+    for (const [key, value] of Object.entries(overall.components)) vector.set(`practical:${key}`, value);
     return vector;
   });
   return baskets.filter((_, i) => !vectors.some((other, j) => {
@@ -378,6 +399,8 @@ function optionDominates(left: ScoredBasket, right: ScoredBasket, request: Canon
   if (!samePillCertainty) return false;
   const pills = left.pillCountKnown === false ? 0 : left.dailyPills - right.dailyPills;
   if (fit > 0 || left.priceMinor > right.priceMinor || pills > 0 || left.productCount > right.productCount) return false;
+  const leftScore = overallOf(left, request), rightScore = overallOf(right, request);
+  if (leftScore.components.servings > rightScore.components.servings || leftScore.components.uncertainty > rightScore.components.uncertainty) return false;
   if (request.targets.some(target => (left.coverageBySubject.get(target.subjectId) ?? 0) < (right.coverageBySubject.get(target.subjectId) ?? 0))) return false;
   const a = concernMap(left, request), b = concernMap(right, request);
   if ([...a].some(([key, value]) => value > (b.get(key) ?? 0))) return false;
@@ -400,6 +423,7 @@ export function selectOptions(input: Readonly<{ baskets: readonly ScoredBasket[]
   const best = protectedReferenceCandidates(ranked, input.request)[0];
   if (!best) return { alternatives: [] as ScoredBasket[], selected: null };
   const nonempty = ranked.filter(row => row.productCount > 0);
+  const closest = protectedReferenceCandidates([...ranked].sort((a, b) => compareClosestDose(a, b, input.request)), input.request)[0];
   // These sorted extremal choices are Pareto-valid without quadratic pruning:
   // any strict dominator sorts before them on that objective then full fit.
   const lowerCost = [...nonempty].sort((a, b) => a.priceMinor - b.priceMinor || compare(a, b)).find(row => !nonempty.some(other => other !== row && optionDominates(other, row, input.request)));
@@ -418,14 +442,15 @@ export function selectOptions(input: Readonly<{ baskets: readonly ScoredBasket[]
     if (!row.roles.includes(role)) row.roles.push(role);
     options.set(key, row);
   };
-  add(best, "closest_dose"); add(lowerCost, "lower_cost"); add(simpler, "simpler"); add(fewerConcerns, "fewer_concerns"); add(fallback, "purchase_fallback");
+  add(best, "best_match"); add(closest, "closest_dose"); add(lowerCost, "lower_cost"); add(simpler, "simpler"); add(fewerConcerns, "fewer_concerns"); add(fallback, "purchase_fallback");
   if (focused && !options.has(productDoseSignature(focused))) options.set(productDoseSignature(focused), { basket: focused, roles: [] });
   const mapped = [...options.values()].map(({ basket, roles }) => {
-    const recommended = roles.includes("closest_dose");
+    const recommended = roles.includes("best_match");
     const reason = roles.length === 0 ? "Target-focused option with disclosed dose and product-data uncertainty" : recommended ? selectedReason(input.request) : roles.includes("purchase_fallback")
       ? "Available to purchase with the disclosed gaps, excesses and health advice; purchasing is not the closest dose fit."
       : roles.includes("fewer_concerns") ? "Fewer concerns without lower requested-target coverage"
       : roles.includes("simpler") ? "Fewer products or daily pills with the disclosed coverage trade-off"
+      : roles.includes("closest_dose") ? "Closest dose fit with the disclosed daily-routine and price trade-offs"
       : "Lower first-order goods price with the disclosed coverage trade-off";
     return { ...basket, roles, purchaseEligible: basket.productCount > 0, recommended, reason,
       optionRole: recommended ? "requested_objective" as const : roles.includes("fewer_concerns") ? "fewer_concerns" as const : "best_value" as const };

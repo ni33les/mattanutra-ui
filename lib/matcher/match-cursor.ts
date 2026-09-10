@@ -2,6 +2,7 @@ import { sha256Hex } from "@/lib/sha256";
 import { serializeExactValue } from "@/lib/matcher/exact-values";
 import { compileGroups, groupsBySeller } from "@/lib/matcher/candidates";
 import { orderInvariantRequest } from "@/lib/matcher/canonicalizer";
+import { resolvePracticalProfile } from "@/lib/matcher/practical-scoring";
 import { createSearchCursor, advanceSearchCursor, extendSearchCursor, type SearchCursor } from "@/lib/matcher/search-cursor";
 import type { CanonicalRequest, CatalogSnapshot, MatcherConfig, ProductGroup } from "@/lib/matcher/types";
 
@@ -14,7 +15,7 @@ function allocation(budget: number, count: number, index: number) {
   return Math.floor(budget / count) + (index < budget % count ? 1 : 0);
 }
 export function matchCursorIdentity(request: CanonicalRequest, catalog: CatalogSnapshot, config: MatcherConfig) {
-  return sha256Hex(JSON.stringify(serializeExactValue({ version: "match-cursor-1", request: { ...orderInvariantRequest(request), searchEffort: undefined }, catalog: { ...catalog, availabilityAsOf: undefined }, config })));
+  return sha256Hex(JSON.stringify(serializeExactValue({ version: "match-cursor-1", scoringProfileHash: resolvePracticalProfile(request).hash, request: { ...orderInvariantRequest(request), searchEffort: undefined }, catalog: { ...catalog, availabilityAsOf: undefined }, config })));
 }
 export function createMatchCursor(request: CanonicalRequest, catalog: CatalogSnapshot, config: MatcherConfig, compiledGroups?: readonly ProductGroup[]): MatchCursor {
   request = orderInvariantRequest(request);

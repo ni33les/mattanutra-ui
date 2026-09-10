@@ -3,7 +3,7 @@ import { servingIncrement } from "@/lib/matcher/serving-grid";
 import { comparePillCounts } from "@/lib/matcher/pill-burden";
 import { compileVariant, isDeferredConditional } from "@/lib/matcher/candidates";
 import { compareDoseFit, doseFitScore } from "@/lib/matcher/dose-fit";
-import { compareOverallScores, searchStateScore } from "@/lib/matcher/practical-scoring";
+import { administrationBasisKnown, compareOverallScores, monthlyGoodsPrice, PRACTICAL_OBJECTIVES, requestForProfile, searchStateScore } from "@/lib/matcher/practical-scoring";
 import { DEFAULT_MATCHER_CONFIG } from "@/lib/matcher/config";
 import { fingerprintState } from "@/lib/matcher/dominance";
 import { aggregateDailyExposure, isDoseError } from "@/lib/matcher/dose";
@@ -47,6 +47,7 @@ export function seedState(request: CanonicalRequest): SearchState {
   }
 
   return {
+    routineServings: [], uncertainAdministrationCount: 0, monthlyPriceMinor: 0, monthlyPriceLowerBound: 0,
     count: 0,
     delivered: new Map(exposure),
     exposure,
@@ -87,6 +88,7 @@ export function tryAddVariant(
   // Checkout acquires one pack per selected product. Daily servings affect
   // depletion and replenishment, not the number of packs in this order.
   const price = state.price + group.product.unitPriceMinor;
+  const monthly = monthlyGoodsPrice(group.product, variant.dailyUnits);
 
   const delivered = cloneMap(state.delivered);
   const exposure = cloneMap(state.exposure);
@@ -111,6 +113,10 @@ export function tryAddVariant(
   }
 
   return {
+    routineServings: [...(state.routineServings ?? []), variant.dailyUnits],
+    uncertainAdministrationCount: (state.uncertainAdministrationCount ?? state.count) + Number(!administrationBasisKnown(group.product)),
+    monthlyPriceMinor: state.monthlyPriceMinor === null || monthly === null ? null : (state.monthlyPriceMinor ?? 0) + monthly,
+    monthlyPriceLowerBound: (state.monthlyPriceLowerBound ?? 0) + (monthly ?? 0),
     count,
     delivered,
     exposure,
@@ -137,6 +143,18 @@ export function compareSearchStates(a: SearchState, b: SearchState, request: Can
   // Independent price extrema remain in reviewFrontier for cheaper choices.
   return comparePillCounts(a.pills, a.pillCountKnown, b.pills, b.pillCountKnown) ||
     a.count - b.count || a.price - b.price || fingerprintState(a).localeCompare(fingerprintState(b));
+}
+
+/** Representatives share one explored pool and one expansion budget. */
+export function profileLeaders(states: readonly SearchState[], request: CanonicalRequest, limit: number): SearchState[] {
+  const chosen = new Set<SearchState>();
+  for (const objective of [request.optimization, ...PRACTICAL_OBJECTIVES.filter(value => value !== request.optimization)]) {
+    const profile = requestForProfile(request, objective);
+    const best = states.reduce<SearchState | undefined>((previous, state) => !previous || compareSearchStates(state, previous, profile) < 0 ? state : previous, undefined);
+    if (best) chosen.add(best);
+    if (chosen.size >= limit) break;
+  }
+  return [...chosen];
 }
 
 /** Count actual attempted additions, including infeasible additions and repair.
@@ -400,7 +418,12 @@ export function revalidateState(
 export function reviewFrontier(states: readonly SearchState[], request: CanonicalRequest, incumbents: readonly SearchState[], order = (a: SearchState, b: SearchState) => compareSearchStates(a, b, request), groups: readonly ProductGroup[] = []) {
   if (states.length <= 192) return [...states];
   const fitOrder = [...states].sort((a, b) => order(a, b));
-  const chosen = new Set<SearchState>([...incumbents, ...fitOrder.slice(0, 64)]);
+  const doseOrder = (a: SearchState, b: SearchState) => compareDoseFit(doseFitScore(request, a.exposure), doseFitScore(request, b.exposure)) || order(a, b);
+  const chosen = new Set<SearchState>([...incumbents, ...[...states].sort(doseOrder).slice(0, 16)]);
+  for (const objective of PRACTICAL_OBJECTIVES) {
+    const profile = requestForProfile(request, objective);
+    for (const state of [...states].sort((a, b) => compareSearchStates(a, b, profile)).slice(0, 12)) chosen.add(state);
+  }
   const nonempty = states.filter(row => row.count > 0);
   const targetIds = new Set(request.targets.map(row => row.subjectId));
   const focusedIds = new Set(groups.filter(group => {

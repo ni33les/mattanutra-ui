@@ -1,7 +1,8 @@
 import { sha256Hex } from "@/lib/sha256";
+import { verifiedAdministration } from "@/lib/product-administration";
 import { doseFitScore, exactDoseFit } from "@/lib/matcher/dose-fit";
 import { add, compare, divide, fromDecimal, multiply, positive, rational, serialize, subtract, sum, toNumber, ZERO, type Rational } from "@/lib/matcher/rational";
-import type { CanonicalRequest, OptimizationMode, PreferenceImportance, SearchState } from "@/lib/matcher/types";
+import type { CanonicalRequest, MatcherProduct, OptimizationMode, PreferenceImportance, SearchState } from "@/lib/matcher/types";
 
 export const PRACTICAL_SCORING_VERSION = "practical-penalties-1";
 const PROFILES = Object.freeze({
@@ -18,6 +19,16 @@ type Profile = Readonly<{ id: OptimizationMode; version: string; hash: string; m
   importance: Readonly<Record<Field, PreferenceImportance>>; pricePreferenceBasis: "first_order" | "monthly_30_days" }>;
 // Four fixed profiles and three importance values per field: bounded immutable configuration, no lock or I/O.
 const profiles = new Map<string, Profile>();
+const requestsByProfile = new WeakMap<CanonicalRequest, Map<OptimizationMode, CanonicalRequest>>();
+const doseRequest = new WeakMap<CanonicalRequest, CanonicalRequest>();
+export const PRACTICAL_OBJECTIVES = Object.freeze(Object.keys(PROFILES) as OptimizationMode[]);
+export function requestForProfile(request: CanonicalRequest, optimization: OptimizationMode): CanonicalRequest {
+  if (request.optimization === optimization) return request;
+  let variants = requestsByProfile.get(request); if (!variants) { variants = new Map(); requestsByProfile.set(request, variants); }
+  let copy = variants.get(optimization);
+  if (!copy) { copy = { ...request, optimization }; variants.set(optimization, copy); doseRequest.set(copy, doseRequest.get(request) ?? request); }
+  return copy;
+}
 
 export function resolvePracticalProfile(request: ProfileRequest): Profile {
   if (!Object.hasOwn(PROFILES, request.optimization)) throw new Error("optimization must be balanced, best_coverage, fewest_pills or lowest_cost");
@@ -80,6 +91,7 @@ export function scorePracticalPenalties(request: Pick<CanonicalRequest, "currenc
   const uncertain = measurement(actual.uncertainProductCount, "uncertainProductCount", true);
   if (actual.uncertainProductCount > actual.productCount) throw new Error("uncertainProductCount cannot exceed productCount");
   const missing = new Set<string>();
+  if (actual.uncertainProductCount > 0) missing.add("administrationBasis");
   if (actual.dailyPills === null) missing.add("dailyPills");
   if (actual.priceMinor === null) missing.add("firstOrderPrice");
   const preferencePrice = profile.pricePreferenceBasis === "monthly_30_days" ? actual.monthlyPriceMinor ?? null : actual.priceMinor;
@@ -117,7 +129,7 @@ export function scorePracticalPenalties(request: Pick<CanonicalRequest, "currenc
 }
 
 export function overallMatchingScore(request: CanonicalRequest, exposure: ReadonlyMap<string, bigint>, actual: PracticalActuals): OverallMatchingScore {
-  const penalties = scorePracticalPenalties(request, actual), dose = doseFitScore(request, exposure);
+  const penalties = scorePracticalPenalties(request, actual), dose = doseFitScore(doseRequest.get(request) ?? request, exposure);
   const total = add(exactDoseFit(dose), decoded(penalties.exact));
   return { ...penalties, dosePenalty: dose.total, overallPenalty: toNumber(total), overallExact: serialize(total) };
 }
@@ -137,4 +149,19 @@ export function searchStateScore(request: CanonicalRequest, state: SearchState):
 export function compareOverallScores(left: OverallMatchingScore, right: OverallMatchingScore) {
   if (left.profile.hash !== right.profile.hash) throw new Error("Cannot compare different matching profiles as one score");
   return compare(decoded(left.overallExact), decoded(right.overallExact));
+}
+
+export function administrationBasisKnown(product: MatcherProduct) {
+  const administration = verifiedAdministration(product.administration);
+  return Boolean(administration && administration.route !== "unknown" && administration.physicalUnit !== "unknown" && administration.unitsPerServing !== null);
+}
+
+/** Thirty-day packs use the verified physical pack basis and round packs up, never a title number. */
+export function monthlyGoodsPrice(product: MatcherProduct, servings: number): number | null {
+  const administration = verifiedAdministration(product.administration);
+  if (!administrationBasisKnown(product) || !administration?.packQuantity || !administration.unitsPerServing) return null;
+  const packs = divide(multiply(multiply(fromDecimal(servings), fromDecimal(30)), fromDecimal(administration.unitsPerServing)), fromDecimal(administration.packQuantity));
+  const count = (packs.num + packs.den - BigInt(1)) / packs.den;
+  const price = count * BigInt(product.unitPriceMinor);
+  return price <= BigInt(Number.MAX_SAFE_INTEGER) ? Number(price) : null;
 }

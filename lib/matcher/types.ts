@@ -328,7 +328,7 @@ export type DoseFitScore = Readonly<{
   estimatedSubjectIds: readonly string[];
 }>;
 
-export type ConversationalOptionRole = "closest_dose" | "lower_cost" | "simpler" | "fewer_concerns" | "purchase_fallback";
+export type ConversationalOptionRole = "best_match" | "closest_dose" | "lower_cost" | "simpler" | "fewer_concerns" | "purchase_fallback";
 
 export type ValueOptionRole = "requested_objective" | "fewer_concerns" | "best_value" | "complete" | "minimum_core";
 
@@ -354,6 +354,7 @@ export type ScoredBasket = Readonly<{
   purchaseEligible?: boolean;
   oversupplyScore: number;
   doseFit?: DoseFitScore;
+  overallScore?: import("@/lib/matcher/practical-scoring").OverallMatchingScore;
   priceMinor: number;
   productCount: number;
   productIds: readonly string[];

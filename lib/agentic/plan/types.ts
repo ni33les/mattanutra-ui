@@ -664,7 +664,7 @@ export type StackOption = Readonly<{
   recommended?: boolean;
   retainedCurrent?: readonly RetainedCurrent[];
   role?: ValueOptionRole;
-  roles?: readonly ("closest_dose" | "lower_cost" | "simpler" | "fewer_concerns" | "purchase_fallback")[];
+  roles?: readonly import("@/lib/matcher/types").ConversationalOptionRole[];
   purchaseEligible?: boolean;
   safety?: OptionSafety;
   snapshotId: string;
