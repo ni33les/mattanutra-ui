@@ -20,6 +20,7 @@ import {
   nutritionRevealPath
 } from "@/lib/nutrition-paths";
 import { assessmentSkipsHealthScore } from "@/lib/pharmacy-in-store";
+import { getFunnelReadiness } from "@/lib/funnel-readiness";
 import { localizedRouteMetadata } from "@/lib/seo";
 import { cachedEvaluatedIngredientCatalogueCount } from "@/lib/supplement-catalogue-count";
 
@@ -127,8 +128,11 @@ export default async function NutritionHealthScorePage({
     redirect(nutritionQuizPath(locale, planId));
   }
 
-  const currentHealthScore = await getRevisionHealthScore(planId, locale);
-  if (!hasHealthScoreAiCopy(currentHealthScore, locale)) {
+  const [currentHealthScore, readiness, chosenNutrients] = await Promise.all([
+    getRevisionHealthScore(planId, locale), getFunnelReadiness(planId, locale),
+    getRevisionFormulationNutrientCount(planId, locale, prefill.revision)
+  ]);
+  if (!readiness?.readyForHealthScore || readiness.revision !== prefill.revision || chosenNutrients === null || !hasHealthScoreAiCopy(currentHealthScore, locale)) {
     return (
       <main className="mn-customer-shell flex min-h-screen flex-col bg-[var(--mn-cream)] text-[var(--mn-ink)]">
         <TitleBar
@@ -148,7 +152,7 @@ export default async function NutritionHealthScorePage({
     locale,
     currentHealthScore,
     locale,
-    await getRevisionFormulationNutrientCount(planId, locale, prefill.revision)
+    chosenNutrients
   );
   const firstName = firstNameFromAssessmentAnswers(prefill.answers);
 

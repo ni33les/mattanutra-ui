@@ -1,4 +1,4 @@
-import { assessmentInputHash } from "@/lib/assessment-revisions";
+import { assessmentInputHash, loadGenerationInput, withGenerationInput } from "@/lib/assessment-revisions";
 import { captureInputProvenance, inputProvenance } from "@/lib/assessment-input-provenance";
 import { toAssessmentAnswers } from "@/lib/questionnaire/normalize";
 import { deserializeState } from "@/lib/questionnaire/engine";
@@ -16,7 +16,7 @@ import { computeHealthScore } from "@/lib/health-score";
 import { isLocale } from "@/lib/i18n";
 import { IN_STORE_PHARMACY_ANSWERS_KEY, mergeInStorePharmacyAnswers, resolveCapturePharmacy } from "@/lib/pharmacy-in-store";
 import { bindPaidReservationToAssessment } from "@/lib/stripe-payments";
-import { enqueueAssessmentPregenerationTasks, enqueueHealthScoreAnalysisTask, enqueueNutritionPlanTasks, scheduleReassessmentAction } from "@/lib/task-worker";
+import { enqueueAssessmentPregenerationTasks, enqueueNutritionPlanTasks, scheduleReassessmentAction } from "@/lib/task-worker";
 import { cachedEvaluatedIngredientCatalogueCount } from "@/lib/supplement-catalogue-count";
 import { bpmContextFromBody, writeBpmEvent } from "@/lib/bpm";
 
@@ -149,7 +149,9 @@ export async function retryAssessmentHealthScore(planId: string, locale: unknown
   return withDatabaseTransaction(sql, async tx => {
     const [row] = await tx`select input_revision from public.assessments where plan_id = ${planId}::uuid for no key update`;
     if (!row) throw new FunnelError("Assessment not found", 404, "assessment_not_found");
-    const taskId = await enqueueHealthScoreAnalysisTask({ planId, locale });
-    return { planId, revision: Number(row.input_revision), taskId, generationStatus: taskId ? "pending" : "ready" };
+    const generation = await loadGenerationInput(tx, planId, locale);
+    if (!generation) throw new FunnelError("Assessment changed. Reload before retrying.", 409, "assessment_changed");
+    const tasks = await withGenerationInput(planId, generation, () => enqueueAssessmentPregenerationTasks({ planId, locale, answers: generation.answers }));
+    return { planId, revision: Number(row.input_revision), taskId: tasks?.healthScoreTaskId ?? null, generationStatus: "pending" };
   });
 }

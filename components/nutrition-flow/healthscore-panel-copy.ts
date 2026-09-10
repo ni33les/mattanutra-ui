@@ -104,14 +104,12 @@ const basePageCopy = {
     fallbackFindingTitle: "Your HealthScore has a clear starting point",
     fallbackFindingBody:
       "The lowest pillar and safety context decide what the plan should prioritise first.",
-    subtractionEyebrow: "Your formula",
+    subtractionEyebrow: "How your formula was built",
     subtractionTitle:
       "This preview filters broad nutrition possibilities before your final formula is generated.",
     evaluatedFallback: "evaluated",
     setAsideFallback: "set aside",
-    chosenFallback: "Ingredients in your formula",
-    formulaPendingBody: "Your nutrient targets are being prepared from your answers. The exact count will appear when your formula is ready.",
-    formulaReadyBody: "These are the ingredients in your current formula. The reveal uses the same list and shows how much the matched products provide.",
+    chosenFallback: "Shortlisted for your score",
     methodEyebrow: "How MattaNutra thinks",
     methodTitle:
       "A fixed scoring model across five domains, not a guess and not an average of strangers.",
@@ -351,14 +349,12 @@ const basePageCopy = {
     fallbackFindingTitle: "คะแนนสุขภาพของคุณมีจุดเริ่มต้นที่ชัดเจน",
     fallbackFindingBody:
       "เสาหลักที่ต่ำที่สุดและบริบทความเหมาะสมเป็นตัวกำหนดว่าแผนควรเริ่มจากอะไร",
-    subtractionEyebrow: "สูตรของคุณ",
+    subtractionEyebrow: "สูตรของคุณถูกสร้างอย่างไร",
     subtractionTitle:
       "ตัวอย่างนี้คัดกรองความเป็นไปได้ด้านโภชนาการก่อนสร้างสูตรจริงของคุณ",
     evaluatedFallback: "ประเมิน",
     setAsideFallback: "ตัดออก",
-    chosenFallback: "ส่วนผสมในสูตรของคุณ",
-    formulaPendingBody: "เรากำลังจัดทำเป้าหมายสารอาหารจากคำตอบของคุณ จำนวนที่แน่นอนจะแสดงเมื่อสูตรพร้อมแล้ว",
-    formulaReadyBody: "นี่คือส่วนผสมในสูตรปัจจุบันของคุณ หน้าผลลัพธ์ใช้รายการเดียวกันและแสดงปริมาณที่ได้รับจากผลิตภัณฑ์ที่จับคู่",
+    chosenFallback: "คัดเลือกสำหรับคะแนนของคุณ",
     methodEyebrow: "วิธีคิดของ MattaNutra",
     methodTitle:
       "โมเดลคะแนนคงที่ห้าด้าน ไม่ใช่การเดา และไม่ใช่ค่าเฉลี่ยของคนอื่น",
@@ -617,13 +613,11 @@ export const pageCopy = {
     whatCaughtSub: "你的数据里藏着信号，我们把它揪出来了。",
     fallbackFindingTitle: "你的日常，就是知量方案的底稿",
     fallbackFindingBody: "防晒、日晒少、油性鱼吃得不多——几个信号，指向同一个方向。不套公式，照你的生活习惯配。",
-    subtractionEyebrow: "你的配方",
+    subtractionEyebrow: "不是选进来，是筛出去",
     subtractionTitle: "一份好的方案，不是加法，是减法。不堆成分，只留对的。你的知量方案，就这么配。",
     evaluatedFallback: "已评估",
     setAsideFallback: "被淘汰",
-    chosenFallback: "您配方中的成分",
-    formulaPendingBody: "我们正在根据您的回答制定营养目标。配方准备好后，会显示确切的成分数量。",
-    formulaReadyBody: "这些是您当前配方中的成分。结果页使用同一份清单，并显示匹配产品提供的用量。",
+    chosenFallback: "进入你的备选",
     methodEyebrow: "知量配方怎么算",
     methodTitle: "五个维度，一套模型。不算命、不凑数、不套模板。",
     fallbackMethodCards: [

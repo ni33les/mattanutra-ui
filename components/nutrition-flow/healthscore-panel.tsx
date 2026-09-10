@@ -9,6 +9,7 @@ import {
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import type { AssessmentPlan } from "@/lib/assessment-snapshot";
 import {
+  DEFAULT_HEALTHSCORE_EVALUATED_INGREDIENT_COUNT,
   type HealthScoreGapCard,
   type HealthScoreMethodCard,
   type HealthScorePageAiCard,
@@ -451,8 +452,8 @@ type HealthScoreViewModel = Readonly<{
   strengthNote: string;
   subtraction: Readonly<{
     body: string;
-    labels: readonly string[];
-    numbers: readonly number[];
+    labels: readonly [string, string, string];
+    numbers: readonly (number | null)[];
   }>;
 }>;
 
@@ -472,7 +473,13 @@ function buildHealthScoreViewModel({
   const median = page?.locked.median ?? page?.copySeeds.relativity.spectrumMedian ?? 60;
   const percentile = page?.locked.percentile ?? 0;
   const relativity = page?.copySeeds.relativity;
-  const chosen = page?.locked.subtraction.chosen ?? null;
+  const subtraction = page?.locked.subtraction ?? {
+    chosen: null,
+    evaluated: DEFAULT_HEALTHSCORE_EVALUATED_INGREDIENT_COUNT,
+    mode: "nutrients" as const,
+    setAside: null,
+  };
+  const subtractionSeed = page?.copySeeds.subtraction;
   const scoreMarker = relativity?.spectrumYouPct ?? scorePosition(score);
   const medianMarker = relativity?.spectrumMedianPct ?? scorePosition(median);
 
@@ -526,9 +533,29 @@ function buildHealthScoreViewModel({
     },
     strengthNote: localize(ai?.strengthNote, locale),
     subtraction: {
-      body: chosen === null ? copy.formulaPendingBody : copy.formulaReadyBody,
-      labels: chosen === null ? [] : [copy.chosenFallback],
-      numbers: chosen === null ? [] : [chosen],
+      body: localize(ai?.subtractionBody, locale),
+      labels: [
+        localizedLegacyText(
+          subtractionSeed?.labelEvaluated,
+          locale,
+          copy.evaluatedFallback,
+        ),
+        localizedLegacyText(
+          subtractionSeed?.labelSetAside,
+          locale,
+          copy.setAsideFallback,
+        ),
+        localizedLegacyText(
+          subtractionSeed?.labelChosen,
+          locale,
+          copy.chosenFallback,
+        ),
+      ],
+      numbers: [
+        subtraction.evaluated,
+        subtraction.setAside,
+        subtraction.chosen,
+      ],
     },
   };
 }
@@ -943,7 +970,7 @@ function SubtractionBeat({
                     active={visible}
                     className="n"
                     duration={900 + index * 200}
-                    value={number}
+                    value={number ?? 0}
                   />
                   <p
                     className={cx(

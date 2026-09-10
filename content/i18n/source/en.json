@@ -2380,7 +2380,7 @@
     "translatable": true
   },
   "customer.healthScore.page.subtraction.labelChosen": {
-    "defaultMessage": "Ingredients in your formula",
+    "defaultMessage": "Shortlisted for your score",
     "description": "Subtraction chosen label.",
     "namespace": "customer.healthScore",
     "audience": "customer",

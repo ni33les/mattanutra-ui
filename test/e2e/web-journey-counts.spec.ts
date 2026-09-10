@@ -22,9 +22,10 @@ for (const locale of ['en', 'th', 'zh-CN']) test(`WEB-JOURNEY-BROWSER-01 ${local
     await page.goto(`/${locale}/nutrition/healthscore?plan=${fixture.planId}`);
     const section = page.locator('.mn-hs-shortlist-section');
     await section.scrollIntoViewIfNeeded();
-    await expect(section.locator('.n')).toHaveCount(1);
-    await expect(section.locator('.n')).toHaveText(String(count));
-    await expect(section).not.toContainText('Shortlisted for your score');
+    await expect(section.locator('.n')).toHaveCount(3);
+    await expect(section.locator('.n').nth(2)).toHaveText(String(count));
+    const totals = (await section.locator('.n').allTextContents()).map(Number);
+    expect(totals[0] - totals[1]).toBe(totals[2]);
     await page.goto(`/${locale}/nutrition/reveal?plan=${fixture.planId}`);
     await expect(page.locator('.nutrient-card')).toHaveCount(count);
   } finally { await rm(directory, { recursive: true, force: true }); }

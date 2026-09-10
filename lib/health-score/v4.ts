@@ -1239,7 +1239,7 @@ function buildPageContent({
       chosen: selectedNutrients,
       evaluated: evaluatedNutrients,
       mode: "nutrients" as const,
-      setAside: null
+      setAside: selectedNutrients === null ? null : Math.max(0, evaluatedNutrients - selectedNutrients)
     };
   const subtractionText = subtractionCopy(
     selectedSubtraction,

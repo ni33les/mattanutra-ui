@@ -256,7 +256,7 @@
   "customer.healthScore.page.subtraction.constraint.safety": "你的安全资料",
   "customer.healthScore.page.subtraction.constraint.statin": "你的他汀用药",
   "customer.healthScore.page.subtraction.goalFallback": "你的分数",
-  "customer.healthScore.page.subtraction.labelChosen": "您配方中的成分",
+  "customer.healthScore.page.subtraction.labelChosen": "进入你的备选",
   "customer.healthScore.page.subtraction.labelEvaluated": "已评估成分",
   "customer.healthScore.page.subtraction.labelSetAside": "已为你淘汰",
   "customer.healthScore.page.summary": "你最清晰的机会点是{lowestLabel}。这个分数帮助我们围绕真实缺口确定计划优先级。",

@@ -14,6 +14,7 @@ export async function getFunnelReadiness(planId: string, localeOption?: string |
       case when score.read_projection->>'version' = '1' then (score.read_projection->'ready'->>coalesce(${requestedLocale}, a.locale))::boolean else null end as copy_ready,
       score.created_at as score_version,
       formula.version as formula_version, formula.visible_count, formula.section_status,
+      prepared_formula.version as prepared_formula_version, prepared_formula.visible_count as prepared_visible_count,
       products.id as product_version, products.generated_at as product_generated_at, products.status as product_status,
       products.stack_coverage_percent, products.product_count,
       payment.status as payment_status, payment.fulfillment_status, payment.fulfillment_error,
@@ -32,6 +33,15 @@ export async function getFunnelReadiness(planId: string, localeOption?: string |
         and (case when a.selected_plan is null then f.model_version like '%:example'
           else (f.model_version is null or f.model_version not like '%:example') end) order by f.version desc limit 1
     ) formula on true
+    left join lateral (
+      select f.version, case when f.read_projection->>'version' = '1' then (f.read_projection->>'visibleCount')::int else
+        (select count(*)::int from jsonb_array_elements(coalesce(f.formulation->'supplementBreakdown', '[]'::jsonb)) item
+          where coalesce(item #>> '{safety,visibility}', 'visible') <> 'hidden') end as visible_count
+      from public.formulations f where f.plan_id = a.plan_id and f.assessment_revision = a.input_revision
+        and f.generation_locale = coalesce(${requestedLocale}, a.locale) and f.generator_version = ${FUNNEL_GENERATOR_VERSION}
+        and (f.model_version is null or f.model_version not like '%:example')
+      order by f.version desc limit 1
+    ) prepared_formula on true
     left join lateral (
       select r.id, r.generated_at, r.status, r.stack_coverage_percent,
         (select count(*)::int from public.product_recommendation_items i where i.run_id = r.id) as product_count
@@ -65,6 +75,15 @@ export async function getFunnelReadiness(planId: string, localeOption?: string |
   const locale = row.requested_locale as Locale;
   const copyReady = row.skip_healthscore === true || (row.copy_ready ?? hasHealthScoreAiCopy(row.health_score, locale));
   const copyFailed = !copyReady && ["failed", "cancelled", "completed"].includes(row.copy_status ?? "");
+  // Preparation is independent of payment/access: submission starts the full
+  // formula alongside advice, while reveal retains its existing access checks.
+  const preparedFormula = row.prepared_formula_version != null;
+  const preparedProducts = preparedFormula && (Number(row.prepared_visible_count) === 0 ||
+    (row.product_version != null && ["completed", "partial"].includes(row.product_status)));
+  const readyForHealthScore = Boolean(copyReady && preparedFormula && preparedProducts);
+  const healthScorePageFailed = !readyForHealthScore && (copyFailed ||
+    (!preparedFormula && ["failed", "cancelled", "completed"].includes(row.formula_status ?? "")) ||
+    (!preparedProducts && ["failed", "cancelled", "completed"].includes(row.product_task_status ?? "")));
   const hasPaidPlan = Boolean(row.selected_plan || row.payment_status);
   const fulfillmentStatus = row.fulfillment_status ?? (row.selected_plan ? "complete" : "not_started");
   const fulfillmentPending = Boolean(row.payment_status && fulfillmentStatus !== "complete");
@@ -83,10 +102,11 @@ export async function getFunnelReadiness(planId: string, localeOption?: string |
     : row.formula_status === "completed" ? "inconsistent"
     : ["failed", "cancelled"].includes(row.formula_status ?? "") ? "failed" : "pending";
   return { ...timeline, planId, locale, revision: Number(row.input_revision), inputHash: row.input_hash as string | null,
-    copyReady, copyFailed, hasHealthScore: copyReady, hasPaidPlan, fulfillmentStatus, fulfillmentError: row.fulfillment_error as string | null,
+    copyReady, copyFailed, readyForHealthScore, healthScorePageFailed,
+    hasHealthScore: copyReady, hasPaidPlan, fulfillmentStatus, fulfillmentError: row.fulfillment_error as string | null,
     formulationStatus, refreshPending: ["queued", "reserved", "running", "needs_review", "waiting_approval"].includes(row.product_task_status ?? ""), generationStatus: timeline.readyForReveal ? "ready" : timeline.failed ? "failed" : "pending",
     resultVersion: [row.input_revision, locale, FUNNEL_GENERATOR_VERSION, row.score_version ? new Date(row.score_version).getTime() : 0,
-      row.formula_version ?? 0, row.product_version ?? "", row.product_generated_at ? new Date(row.product_generated_at).getTime() : 0,
+      row.formula_version ?? 0, row.prepared_formula_version ?? 0, row.product_version ?? "", row.product_generated_at ? new Date(row.product_generated_at).getTime() : 0,
       row.food_version ?? 0, row.report_version ?? 0, row.product_task_status ?? "",
       copyReady, row.copy_status ?? "", row.formula_status ?? "", row.payment_status ?? "", fulfillmentStatus].join(":") };
 }

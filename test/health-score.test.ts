@@ -198,7 +198,7 @@ describe("HealthScore v4 deterministic scoring", () => {
         (left, right) => right - left
       )
     );
-    assert.equal(page.copySeeds.subtraction.labelChosen, "Ingredients in your formula");
+    assert.equal(page.copySeeds.subtraction.labelChosen, "Shortlisted for your score");
     assert.equal(
       page.locked.subtraction.evaluated,
       DEFAULT_HEALTHSCORE_EVALUATED_INGREDIENT_COUNT
@@ -225,15 +225,15 @@ describe("HealthScore v4 deterministic scoring", () => {
     const expected = {
       en: {
         bandPill: "Building foundation",
-        shortlisted: "Ingredients in your formula"
+        shortlisted: "Shortlisted for your score"
       },
       th: {
         bandPill: "กำลังสร้างพื้นฐาน",
-        shortlisted: "ส่วนผสมในสูตรของคุณ"
+        shortlisted: "คัดเลือกสำหรับคะแนนของคุณ"
       },
       "zh-CN": {
         bandPill: "正在建立基础",
-        shortlisted: "您配方中的成分"
+        shortlisted: "进入你的备选"
       }
     } as const;
 

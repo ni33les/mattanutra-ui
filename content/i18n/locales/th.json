@@ -256,7 +256,7 @@
   "customer.healthScore.page.subtraction.constraint.safety": "โปรไฟล์ความปลอดภัยของคุณ",
   "customer.healthScore.page.subtraction.constraint.statin": "ยา statin ของคุณ",
   "customer.healthScore.page.subtraction.goalFallback": "คะแนนของคุณ",
-  "customer.healthScore.page.subtraction.labelChosen": "ส่วนผสมในสูตรของคุณ",
+  "customer.healthScore.page.subtraction.labelChosen": "คัดเลือกสำหรับคะแนนของคุณ",
   "customer.healthScore.page.subtraction.labelEvaluated": "ส่วนผสมที่ประเมิน",
   "customer.healthScore.page.subtraction.labelSetAside": "ตัดออกสำหรับคุณ",
   "customer.healthScore.page.summary": "พื้นที่ที่ควรให้ความสำคัญที่สุดคือ {lowestLabel} คะแนนนี้ช่วยให้เราเห็นรูปแบบที่ควรเริ่มก่อน",
