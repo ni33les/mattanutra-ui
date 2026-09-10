@@ -116,6 +116,7 @@ export type SafetyCeiling = Readonly<{
 }>;
 
 export type CanonicalRequest = Readonly<{
+  scoring?: import("@/lib/matcher/scoring-policy").ScoringSettings;
   acceptedGapSubjectIds: readonly string[];
   allowedForms: readonly string[] | null;
   conditionCodes: readonly string[];

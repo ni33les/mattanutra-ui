@@ -2,12 +2,15 @@ import { DOSE_FIT_VERSION, UPPER_LIMIT_EXTRA_WEIGHT } from "@/lib/matcher/config
 import { amountFromScaled, isDoseError, scaleAmount } from "@/lib/matcher/dose";
 import { catalogBandRuleId, safetyCeilingFor } from "@/lib/matcher/safety-ceilings";
 import { intakeIsKnown, targetBasis } from "@/lib/matcher/target-basis";
+import { effectiveWeights } from "@/lib/matcher/scoring-policy";
+import { fromDecimal, multiply, positive, subtract } from "@/lib/matcher/rational";
 import type { CanonicalRequest, DoseDimension, DoseFitScore, MatcherUnit, SafetyCeiling } from "@/lib/matcher/types";
 
 type Fraction = Readonly<{ num: bigint; den: bigint }>;
 const ZERO: Fraction = { num: BigInt(0), den: BigInt(1) };
 const exactTotals = new WeakMap<DoseFitScore, Fraction>();
 const scoreCache = new WeakMap<CanonicalRequest, WeakMap<object, DoseFitScore>>();
+const weightedCache = new WeakMap<CanonicalRequest, WeakMap<object, DoseFitScore>>();
 
 function gcd(a: bigint, b: bigint): bigint {
   while (b !== BigInt(0)) [a, b] = [b, a % b];
@@ -98,11 +101,19 @@ function compareFractions(a: Fraction, b: Fraction) {
 }
 
 export function doseFitScore(request: CanonicalRequest, exposure: ReadonlyMap<string, bigint>): DoseFitScore {
-  let cache = scoreCache.get(request);
-  if (!cache) { cache = new WeakMap(); scoreCache.set(request, cache); }
+  return calculateDoseFit(request, exposure, false);
+}
+export function weightedDoseFitScore(request: CanonicalRequest, exposure: ReadonlyMap<string, bigint>): DoseFitScore {
+  return calculateDoseFit(request, exposure, true);
+}
+function calculateDoseFit(request: CanonicalRequest, exposure: ReadonlyMap<string, bigint>, applyWeights: boolean): DoseFitScore {
+  const memo = applyWeights ? weightedCache : scoreCache;
+  let cache = memo.get(request);
+  if (!cache) { cache = new WeakMap(); memo.set(request, cache); }
   const previous = cache.get(exposure);
   if (previous) return previous;
-  let under = ZERO, over = ZERO, limit = ZERO;
+  let under = ZERO, over = ZERO, limit = ZERO, intentTotal = ZERO;
+  const settings = applyWeights && request.scoring ? effectiveWeights(request.scoring) : null;
   const perTarget: DoseFitScore["perTarget"][number][] = [];
   const perContinuedDose: NonNullable<DoseFitScore["perContinuedDose"]>[number][] = [];
   const perLimit: DoseFitScore["perLimit"][number][] = [];
@@ -122,6 +133,10 @@ export function doseFitScore(request: CanonicalRequest, exposure: ReadonlyMap<st
     const reference = referenceRows.reduce((sum, row) => sum + row.daily.units, BigInt(0));
     const added = known > ranges.base ? known - ranges.base : BigInt(0);
     const continuedIncrease = reference > BigInt(0) ? { num: added, den: reference } : ZERO;
+    const weight = fromDecimal(settings ? settings.nutrients[subjectId] ?? settings.defaultNutrient : 1);
+    const verifiedContinued = request.currentSupplements.filter(row => row.subjectId === subjectId && intakeIsKnown(row)).reduce((n, row) => n + row.daily.units, BigInt(0));
+    const scale = target && target.requested.units > BigInt(0) ? target.requested.units : verifiedContinued > BigInt(0) ? verifiedContinued : BigInt(1);
+    const avoidance = multiply(positive(subtract(fromDecimal(1), weight)), { num: added, den: scale });
     const bounds = limitsFor(request, subjectId);
     const cases = [...new Set([minimum, maximum])].flatMap((supplemental) =>
       [...new Set([dietary.minimum, dietary.maximum])].map((food) => {
@@ -135,12 +150,13 @@ export function doseFitScore(request: CanonicalRequest, exposure: ReadonlyMap<st
           return { row, total, sourceScope, excess: excess(total, row.units) };
         });
         const limitLoss = limits.reduce((sum, row) => add(sum, row.excess), ZERO);
-        const total = add(add(shortfall, overshoot), { num: limitLoss.num * BigInt(UPPER_LIMIT_EXTRA_WEIGHT), den: limitLoss.den });
+        const total = add(add(multiply(weight, add(shortfall, overshoot)), avoidance), { num: limitLoss.num * BigInt(UPPER_LIMIT_EXTRA_WEIGHT), den: limitLoss.den });
         return { supplemental, food, targetExposure, shortfall, overshoot, limits, limitLoss, total };
       }));
     // Convex absolute deviation plus hinge penalties attains its worst value at
     // an interval endpoint. Choose the whole penalty, not max intake alone.
     const worst = cases.reduce((a, b) => compareFractions(b.total, a.total) > 0 ? b : a);
+    intentTotal = add(intentTotal, worst.total);
     under = add(under, worst.shortfall);
     over = add(over, worst.overshoot);
     limit = add(limit, worst.limitLoss);
@@ -182,7 +198,7 @@ export function doseFitScore(request: CanonicalRequest, exposure: ReadonlyMap<st
     }
   }
   const weighted = { num: limit.num * BigInt(UPPER_LIMIT_EXTRA_WEIGHT), den: limit.den };
-  const exact = add(add(under, over), weighted);
+  const exact = settings ? intentTotal : add(add(under, over), weighted);
   const score: DoseFitScore = { version: DOSE_FIT_VERSION, limitWeight: 2, under: value(under), over: value(over),
     limit: value(limit), weightedLimit: value(weighted), total: value(exact), perTarget, perContinuedDose, perLimit,
     unknownSubjectIds: [...new Set(request.unknownIntakeSubjectIds ?? [])].sort(),

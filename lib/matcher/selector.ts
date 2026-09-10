@@ -359,6 +359,7 @@ export function hasFewerConcerns(candidate: ScoredBasket, selected: ScoredBasket
 /** The default may trade between incomparable required targets, but optional
  * gains cannot displace a candidate that is no worse on every protected fact. */
 export function protectedReferenceCandidates(baskets: readonly ScoredBasket[], request: CanonicalRequest): ScoredBasket[] {
+  if (request.scoring) return [...baskets];
   const protectedIds = new Set(request.targets.filter(row => row.importance === "required" || row.importance === "core").map(row => row.subjectId));
   if (!protectedIds.size || !request.targets.some(row => row.importance === "optional")) return [...baskets];
   const vectors = baskets.map(basket => {
