@@ -243,7 +243,9 @@ function positiveContributions(
       unit: String(hit.unit || row.unit)
     });
   }
-  return out;
+  // Product facts and their generated explanation use stable identity order.
+  // The plan's main coverage list still follows the person's requested order.
+  return out.sort((a, b) => a.supplementId.localeCompare(b.supplementId) || a.name.localeCompare(b.name) || a.unit.localeCompare(b.unit));
 }
 
 function joinNames(names: readonly string[], locale: string) {
