@@ -13,7 +13,7 @@ assert.ok(MCP_PACKAGES[packageId], "Unknown work package");
 const args = rawArgs[0]?.startsWith("--package=") ? rawArgs.slice(1) : [...rawArgs];
 const sliceIndex = args.indexOf("--slice");
 const slice = sliceIndex < 0 ? null : args.splice(sliceIndex, 2)[1];
-assert.ok(!slice || (mode === "test" && packageId === "efficiency"), "Slices are limited to efficiency development tests");
+assert.ok(!slice || (mode === "test" && ["efficiency", "practical"].includes(packageId)), "Slices are limited to efficiency development tests");
 const definition = MCP_PACKAGES[packageId], MCP721_BASE = definition.base;
 assert.ok(["test", "validate"].includes(mode));
 const inventory = JSON.parse(readFileSync(`${definition.directory}/impact.json`, "utf8"));
@@ -27,7 +27,7 @@ const commit = git("rev-parse", "HEAD"), files = inventory.files.map(row => row.
 assert.equal(new Set(files).size, files.length); assert.ok(files.length > 0);
 const discovered = readdirSync(definition.directory, { recursive: true }).filter(file => file.endsWith(".test.ts")).map(file => `${definition.directory}/${file}`);
 for (const file of discovered.filter(file => !slice || files.includes(file))) assert.ok(files.includes(file), `Undeclared package test ${file}`);
-for (const file of (slice ? [] : git("diff", "--name-only", "--diff-filter=ACMR", MCP721_BASE, "--", "test").split("\n").filter(file => file.endsWith(".test.ts")))) assert.ok(files.includes(file) || (packageId === "discovery" && inventory.regressionFiles.includes(file)), `Changed test omitted ${file}`);
+for (const file of (slice ? [] : git("diff", "--name-only", "--diff-filter=ACMR", MCP721_BASE, "--", "test").split("\n").filter(file => file.endsWith(".test.ts")))) assert.ok(files.includes(file) || (["discovery", "practical"].includes(packageId) && inventory.regressionFiles.includes(file)), `Changed test omitted ${file}`);
 for (const row of inventory.files) {
   assert.ok(row.reason.length > 20 && row.expectedCases > 0 && existsSync(row.file));
   assert.deepEqual(testSourceHygiene(readFileSync(row.file, "utf8"), row.file), []);
@@ -48,7 +48,19 @@ if (packageId === "efficiency" && mode === "validate") {
   stages.push({ label: "isolated-schema", passed: true });
 }
 const events = [], batches = [];
-for (const database of [false, true]) {
+if (packageId === "practical" && mode === "validate") {
+  assert.ok(process.env.TEST_DB_URL, "Complete maintained matching requires isolated PostgreSQL");
+  const report = await runBatch("complete-mcp-regression", ["scripts/run-matcher-test-suite.mjs"], { ...safe,
+    TEST_DB_URL: process.env.TEST_DB_URL, DB_URL: process.env.TEST_DB_URL, DB_WORKER_URL: process.env.TEST_DB_URL,
+    DB_ALLOW_DIRECT_CONNECTION: "true", MATCHER_TEST_EVIDENCE_DIR: resolve(output, "mcp-regression") }, output);
+  assert.ok(report.passed, "Complete maintained matching failed; preserve its evidence before fixing failures");
+  for (const batch of ["node-matcher-a", "node-matcher-postgres-a"]) {
+    events.push(...readFileSync(resolve(output, `mcp-regression/${batch}-events.jsonl`), "utf8").trim().split("\n").filter(Boolean).map(JSON.parse).filter(row => files.includes(row.file)));
+  }
+  batches.push(report); stages.push({ label: "complete-mcp-regression", passed: true });
+}
+
+for (const database of (packageId === "practical" && mode === "validate" ? [] : [false, true])) {
   const selected = inventory.files.filter(row => Boolean(row.database) === database).map(row => row.file);
   if (!selected.length) continue;
   const env = { ...safe }, label = database ? "node-database-tests" : "node-affected-tests";
@@ -97,15 +109,22 @@ if (mode === "validate") {
       TEST_DB_URL: process.env.TEST_DB_URL, DB_URL: process.env.TEST_DB_URL, DB_WORKER_URL: process.env.TEST_DB_URL,
       DB_ALLOW_DIRECT_CONNECTION: "true", MATCHER_TEST_EVIDENCE_DIR: resolve(output, "mcp-regression") });
   }
-  if (packageId === "efficiency") {
+  if (["efficiency", "practical"].includes(packageId)) {
     const { runEfficiencyBrowser } = await import("./service-efficiency/release-stages.mjs");
-    await runEfficiencyBrowser(output, isolated, inventory.browser);
+    await runEfficiencyBrowser(output, isolated ?? { ...safe, TEST_DB_URL: process.env.TEST_DB_URL, DB_URL: process.env.TEST_DB_URL, DB_WORKER_URL: process.env.TEST_DB_URL, DB_ALLOW_DIRECT_CONNECTION: "true", DB_POOL_MAX: "3" }, inventory.browser);
     stages.push({ label: "affected-browser-tests", passed: true });
   }
   if (packageId === "efficiency") {
     const { benchmarkServices } = await import("./service-efficiency/benchmark.mjs");
     const comparison = await benchmarkServices(resolve(output, "benchmarks"), isolated, inventory.benchmarks);
     save("benchmark-comparison.json", comparison); stages.push({ label: "repeated-baseline-comparison", passed: true });
+  }
+  if (packageId === "practical") {
+    const { runPracticalComparison, verifyPracticalLocks } = await import("./practical-matching/comparison.mjs");
+    await runPracticalComparison(resolve(output, "comparison"), safe, MCP721_BASE);
+    stages.push({ label: "bounded-semantic-comparison", passed: true });
+    save("no-new-locks.json", verifyPracticalLocks("/tmp/mattanutra-practical-control-ab102ab3"));
+    stages.push({ label: "no-new-locks", passed: true });
   }
   save("build.json", { sourceCommit: commit, nextBuildId: readFileSync(".next/BUILD_ID", "utf8").trim(), buildSha256: compiledBuildIdentity() });
   const after = sourceManifest(); assert.deepEqual(after, source); assert.deepEqual(mcp721Identity(after.sha256, commit, packageId), identity);

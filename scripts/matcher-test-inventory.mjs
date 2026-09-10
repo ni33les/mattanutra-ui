@@ -3,7 +3,7 @@ import { join, relative } from "node:path";
 
 /** Maintained by subsystem, so new suites in a supported family join every replay. */
 export const MATCHER_TEST_FAMILIES = Object.freeze({
-  core: /^test\/matcher(?:\/|-)/,
+  core: /^test\/(?:matcher(?:\/|-)|practical-matching\/)/,
   connector: /^test\/(?:agentic(?:\/|-)|mcp-|published-client-)/,
   catalogue: /^test\/(?:catalogue-|dose-conversion|nutrient-identity|magnesium-ul-source|pack-facts|product-(?:advisory-cache-refresh|catalogue|countries|fact-canonical|form|health-advisory|validation)|retail-(?:listing-availability|sellability-pricing)|sale-states-catalogue)/,
   web: /^test\/(?:web-advisory|product-(?:matcher|matching|recommendation|recommendations|coverage)|recommendation-selection|assessment-(?:revisions|store-product-coverage)|formulation-|consistency-r|plan-(?:guidance-adjustments|reveal)|reveal-final|nutrition-(?:journey|report-reveal))/, 

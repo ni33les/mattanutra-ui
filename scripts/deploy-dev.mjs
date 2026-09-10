@@ -117,6 +117,7 @@ async function main() {
   }
 
   console.log(`[deploy:dev] Branch: ${branch}`);
+  const practicalIndex = process.argv.indexOf("--practical-matching-attestation");
   const discoveryIndex = process.argv.indexOf("--mcp-discovery-attestation");
   const efficiencyIndex = process.argv.indexOf("--service-efficiency-attestation");
   const scopedIndex = process.argv.indexOf("--ax-refinement-attestation");
@@ -126,15 +127,20 @@ async function main() {
   const toolCardIndex = process.argv.indexOf("--mcp-tool-card-attestation");
   const latestPatchIndex = process.argv.indexOf("--mcp-723-attestation");
   const currentPatchIndex = process.argv.indexOf("--mcp-722-attestation");
-  if ([discoveryIndex, efficiencyIndex, scopedIndex, payloadIndex, patchIndex, currentPatchIndex, latestPatchIndex, toolCardIndex, conversationIndex].filter(index => index >= 0).length > 1) throw new Error("Choose exactly one release attestation path");
-  if (discoveryIndex >= 0 || efficiencyIndex >= 0 || patchIndex >= 0 || currentPatchIndex >= 0 || latestPatchIndex >= 0 || toolCardIndex >= 0 || conversationIndex >= 0) {
-    const packageId = discoveryIndex >= 0 ? "discovery" : efficiencyIndex >= 0 ? "efficiency" : conversationIndex >= 0 ? "conversation" : toolCardIndex >= 0 ? "724" : latestPatchIndex >= 0 ? "723" : currentPatchIndex >= 0 ? "722" : "721";
+  if ([practicalIndex, discoveryIndex, efficiencyIndex, scopedIndex, payloadIndex, patchIndex, currentPatchIndex, latestPatchIndex, toolCardIndex, conversationIndex].filter(index => index >= 0).length > 1) throw new Error("Choose exactly one release attestation path");
+  if (practicalIndex >= 0 || discoveryIndex >= 0 || efficiencyIndex >= 0 || patchIndex >= 0 || currentPatchIndex >= 0 || latestPatchIndex >= 0 || toolCardIndex >= 0 || conversationIndex >= 0) {
+    const packageId = practicalIndex >= 0 ? "practical" : discoveryIndex >= 0 ? "discovery" : efficiencyIndex >= 0 ? "efficiency" : conversationIndex >= 0 ? "conversation" : toolCardIndex >= 0 ? "724" : latestPatchIndex >= 0 ? "723" : currentPatchIndex >= 0 ? "722" : "721";
     if (branch !== "dev" || process.env.MATTANUTRA_ENV !== "dev") throw new Error("MCP work-package proof is DEV-only");
-    const file = process.argv[(discoveryIndex >= 0 ? discoveryIndex : efficiencyIndex >= 0 ? efficiencyIndex : conversationIndex >= 0 ? conversationIndex : toolCardIndex >= 0 ? toolCardIndex : latestPatchIndex >= 0 ? latestPatchIndex : currentPatchIndex >= 0 ? currentPatchIndex : patchIndex) + 1];
+    const file = process.argv[(practicalIndex >= 0 ? practicalIndex : discoveryIndex >= 0 ? discoveryIndex : efficiencyIndex >= 0 ? efficiencyIndex : conversationIndex >= 0 ? conversationIndex : toolCardIndex >= 0 ? toolCardIndex : latestPatchIndex >= 0 ? latestPatchIndex : currentPatchIndex >= 0 ? currentPatchIndex : patchIndex) + 1];
     if (!file?.startsWith("/")) throw new Error("Pass the absolute MCP work-package attestation path");
     if (await runCapture("git", ["status", "--porcelain"])) throw new Error("Validated source must remain clean");
     const identity=mcp721Identity(sourceManifest().sha256, await runCapture("git", ["rev-parse", "HEAD"]), packageId);
     checkMcp721Proof(file, identity, packageId);
+    if (packageId === "practical") {
+      const active = await fetch("http://127.0.0.1:3000/api/mcp", { method: "HEAD", signal: AbortSignal.timeout(5000) });
+      const base = active.headers.get("x-agentic-build-id");
+      if (base !== identity.deploymentBases.dev && base !== identity.sourceCommit) throw new Error("DEV changed since practical matching qualification");
+    }
     if(packageId === "efficiency") {
       const active=await fetch("http://127.0.0.1:3000/api/mcp",{method:"HEAD",signal:AbortSignal.timeout(5000)});
       validateRolloutBinding(JSON.parse(await readFile(resolve(dirname(file),"rollout.json"),"utf8")),identity,"dev",active.headers.get("x-agentic-build-id"));
@@ -170,7 +176,7 @@ async function main() {
   if (efficiencyIndex >= 0) {
     await run(process.execPath, ["--experimental-strip-types", "--import", "./scripts/register-ts-path-loader.mjs", "scripts/apply-service-efficiency-schema.ts"]);
     await npmRun("dev-runtime-schema:verify");
-  } else if (discoveryIndex >= 0 || payloadIndex >= 0 || patchIndex >= 0 || latestPatchIndex >= 0 || toolCardIndex >= 0 || conversationIndex >= 0) {
+  } else if (practicalIndex >= 0 || discoveryIndex >= 0 || payloadIndex >= 0 || patchIndex >= 0 || latestPatchIndex >= 0 || toolCardIndex >= 0 || conversationIndex >= 0) {
     // These packages, including maintained MCP recovery fixes, require no migrations or catalogue changes.
     await npmRun("dev-runtime-schema:verify");
   } else await applyOrVerifyRuntimeSchema();
@@ -182,7 +188,7 @@ async function main() {
     `[Service]\nEnvironment=AGENTIC_BUILD_ID=${sha}\nEnvironment=AGENTIC_WORKER_VERSION=${sha}\n`,
     "utf8"
   );
-  if (discoveryIndex >= 0 || efficiencyIndex >= 0 || payloadIndex >= 0 || patchIndex >= 0 || currentPatchIndex >= 0 || latestPatchIndex >= 0 || toolCardIndex >= 0 || conversationIndex >= 0) await writeFile(`${dropInDir}/mcp-payload-worker-version.conf`, `[Service]\nEnvironment=WORKER_VERSION=${sha}\nEnvironment=AGENTIC_WORKER_VERSION=${sha}\n`, "utf8");
+  if (practicalIndex >= 0 || discoveryIndex >= 0 || efficiencyIndex >= 0 || payloadIndex >= 0 || patchIndex >= 0 || currentPatchIndex >= 0 || latestPatchIndex >= 0 || toolCardIndex >= 0 || conversationIndex >= 0) await writeFile(`${dropInDir}/mcp-payload-worker-version.conf`, `[Service]\nEnvironment=WORKER_VERSION=${sha}\nEnvironment=AGENTIC_WORKER_VERSION=${sha}\n`, "utf8");
   await run("systemctl", ["daemon-reload"]);
   console.log(`[deploy:dev] AGENTIC_BUILD_ID=${sha}`);
   console.log(`[deploy:dev] Restarting ${serviceName}...`);

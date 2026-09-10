@@ -166,7 +166,9 @@
     "test:service-efficiency": "node scripts/mcp-721.mjs test --package=efficiency",
     "validate:dev:service-efficiency": "node scripts/mcp-721.mjs validate --package=efficiency",
     "test:mcp:discovery": "node scripts/mcp-721.mjs test --package=discovery",
-    "validate:dev:mcp:discovery": "node scripts/mcp-721.mjs validate --package=discovery"
+    "validate:dev:mcp:discovery": "node scripts/mcp-721.mjs validate --package=discovery",
+    "test:practical-matching": "node scripts/mcp-721.mjs test --package=practical",
+    "validate:dev:practical-matching": "node scripts/mcp-721.mjs validate --package=practical"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1045.0",

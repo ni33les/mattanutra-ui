@@ -9,7 +9,7 @@ import { validateRolloutBinding, withUatWorkerIdentity } from "./rollout-proof.m
 
 const appId = "ea15bb05-f418-47e3-9d2d-2c4161ad7cf2";
 export async function deployEfficiencyUat(file, schemaEnv, packageId = "efficiency") {
-  assert.ok(["efficiency", "discovery"].includes(packageId));
+  assert.ok(["efficiency", "discovery", "practical"].includes(packageId));
   assert.ok(file?.startsWith("/"), "An absolute scoped attestation is required");
   assert.equal(await runCapture("git", ["status", "--porcelain"]), "", "Validated source must remain clean");
   assert.equal(await runCapture("git", ["branch", "--show-current"]), "dev");

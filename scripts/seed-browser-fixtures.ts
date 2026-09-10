@@ -1,3 +1,4 @@
+import { webHealthAdvice } from "../lib/web-health-advice.ts";
 /** Disposable browser fixtures only: no provider calls, charges, fulfillment or email sending. */
 import "../test/helpers/offline-network.mjs";
 import assert from "node:assert/strict";
@@ -34,7 +35,7 @@ const planId = randomUUID(), runId = randomUUID(), paymentId = randomUUID(), ord
 const orderNumber = `E2E-${randomUUID().slice(0, 8).toUpperCase()}`;
 const outputPath = resolve(process.argv[2] ?? `/tmp/mattanutra-browser-fixtures-${Date.now()}.json`);
 const scenario = process.argv[3] ? JSON.parse(process.argv[3]) : null;
-assert.ok(scenario === null || (scenario.scenario === "numeric_preferences" && isLocale(scenario.locale)), "Unknown isolated browser fixture scenario");
+assert.ok(scenario === null || (["numeric_preferences", "practical_advice"].includes(scenario.scenario) && isLocale(scenario.locale)), "Unknown isolated browser fixture scenario");
 const locale = scenario?.locale ?? "en";
 try {
   // Organisation writes advance catalogue identity. Provision every admin
@@ -87,10 +88,26 @@ try {
     effectivenessRank: index + 1, rationale: "Browser fixture for current advisory guidance.", status: "add"
   })) };
   const needs = buildProductNeeds({ formulation, foodGuidance: null });
-  const recommendation = recommendWithMatcher({ candidates: selectedCandidates, needs, countryCode: "TH",
+  let recommendation = recommendWithMatcher({ candidates: selectedCandidates, needs, countryCode: "TH",
     ...(scenario ? { maxProducts: 0, budgetAmount: 0 } : {}),
     clientContext: { ageYears: 40, lifestage: "adult", currentSupplements: "none", ...(scenario ? { pillLimit: "0" } : {}) },
     stackPreference: "balanced", catalogueFingerprint: valueCatalogueFingerprint(catalogue) });
+  if (scenario) {
+    // This journey intentionally selects the returned full-coverage basket above
+    // zero preferences. Contract 8 may recommend no purchase; selection stays valid.
+    const matching = recommendation.diagnostics.matching!;
+    const chosen = matching.options.find(option => option.productIds.length === 2 && option.roles?.includes("closest_dose"));
+    assert.ok(chosen, "Controlled C/D3 labels must retain their exact-dose purchase alternative");
+    const options = matching.options.map(option => {
+      if (scenario.scenario !== "practical_advice") return option;
+      const medical = webHealthAdvice({ code: "medication_interaction", kind: "context", ingredient: option.optionId === chosen.optionId ? "Selected fixture nutrient" : "Alternative fixture nutrient", evidence: "Explicit isolated UI interaction fixture" });
+      const incomplete = webHealthAdvice({ code: "intake_unknown", kind: "unknown", ingredient: "Fixture intake" });
+      return { ...option, advice: [medical, medical, incomplete, incomplete] };
+    });
+    recommendation = { ...recommendation, recommendations: [...chosen.recommendations],
+      stackCoveragePercent: chosen.coveragePercent, supplementProductCoveragePercent: chosen.coveragePercent,
+      diagnostics: { ...recommendation.diagnostics, matching: { ...matching, operationalStatus: "ready", selectedOptionId: chosen.optionId, options } } };
+  }
   assert.ok(recommendation.recommendations.length, "Browser fixture must contain an actual product basket");
   const selectedIds = recommendation.recommendations.map(item => item.product.id);
   const selectedOptionId = recommendation.diagnostics.matching!.selectedOptionId!;
@@ -143,7 +160,7 @@ try {
   });
   const checkoutQuery = new URLSearchParams({ plan: planId, selected: selectedIds.join(","), removed: "", run: runId, option: selectedOptionId, revision: "1", selectionRevision: "0", retailer: set.organisationId });
   const selectedOption = recommendation.diagnostics.matching!.options.find(option => option.optionId === selectedOptionId)!;
-  const alternative = recommendation.diagnostics.matching!.options.find(option => option.optionId !== selectedOptionId && option.purchaseEligible);
+  const alternative = recommendation.diagnostics.matching!.options.find(option => option.optionId !== selectedOptionId && option.purchaseEligible && option.productIds.length > 0);
   if (scenario) {
     assert.equal(selectedOption.productIds.length, 2); assert.ok(alternative, "Numeric preference browser fixture requires a selectable simpler option");
     const [rrp] = await sql`select sum(price_amount)::numeric as amount from public.products where id=any(${selectedOption.productIds}::uuid[])`;

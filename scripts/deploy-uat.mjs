@@ -243,6 +243,8 @@ async function runImageStorageProbeIfConfigured() {
 }
 
 async function main() {
+  const practicalIndex = process.argv.indexOf("--practical-matching-attestation");
+  if (practicalIndex >= 0) return deployEfficiencyUat(process.argv[practicalIndex + 1], uatSchemaDatabaseEnv(), "practical");
   const discoveryIndex = process.argv.indexOf("--mcp-discovery-attestation");
   if (discoveryIndex >= 0) return deployEfficiencyUat(process.argv[discoveryIndex + 1], uatSchemaDatabaseEnv(), "discovery");
   const efficiencyIndex = process.argv.indexOf("--service-efficiency-attestation");

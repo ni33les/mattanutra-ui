@@ -11,24 +11,102 @@
       "file": "test/practical-matching/scoring.test.ts",
       "slice": "scoring",
       "expectedCases": 9,
-      "reason": "Exact shared penalties, strong live-ranking regression, unknown lower bounds and immutable objective profiles."
+      "reason": "Exact shared penalties, advisory importance and unknown measurements with preserved raw dose scoring."
     },
     {
       "file": "test/practical-matching/search.test.ts",
       "slice": "search",
-      "expectedCases": 8,
-      "reason": "Practical winners, selectable dose-fit alternatives, physical interior quantities, profile fencing and checkpoint-equivalent work."
+      "expectedCases": 9,
+      "reason": "Shared search retention, supported interior quantities, profile identities and checkpoint equivalence."
     },
     {
       "file": "test/practical-matching/oracle.test.ts",
       "slice": "search",
+      "expectedCases": 4,
+      "reason": "Independent finite arithmetic, pack discontinuities and monotonic penalty importance."
+    },
+    {
+      "file": "test/practical-matching/adapters.test.ts",
+      "slice": "adapters",
+      "expectedCases": 7,
+      "reason": "MCP and web profile resolution, monthly budgets, patches and detail output."
+    },
+    {
+      "file": "test/practical-matching/presentation.test.ts",
+      "slice": "presentation",
+      "expectedCases": 7,
+      "reason": "Selected medical cautions, collapsed details and honest routine totals in three locales."
+    },
+    {
+      "file": "test/practical-matching/checkout.test.ts",
+      "slice": "commerce",
+      "expectedCases": 5,
+      "reason": "Nonlocking selection reads, explicit write fencing and stale profile recovery."
+    },
+    {
+      "file": "test/practical-matching/checkout.integration.test.ts",
+      "slice": "commerce",
+      "expectedCases": 1,
+      "reason": "PostgreSQL preview completes under an actual held catalogue writer while preserving selection rows.",
+      "database": true
+    },
+    {
+      "file": "test/practical-matching/reported-journey.test.ts",
+      "slice": "regression",
+      "expectedCases": 2,
+      "reason": "Immutable reported basket and current captured-input regression for practical web scoring."
+    },
+    {
+      "file": "test/practical-matching/release.test.ts",
+      "slice": "release",
       "expectedCases": 3,
-      "reason": "Independent finite arithmetic, monotonic preference weighting and explicit exhaustive-enumeration bounds."
+      "reason": "Existing runner and deployment paths bind full maintained regression, semantic evidence and lock inventory."
     }
   ],
   "inputs": [
-    "lib/matcher/practical-scoring.ts"
+    "lib/matcher/practical-scoring.ts",
+    "lib/matcher/rational.ts",
+    "test/practical-matching/fixtures/manifest.json",
+    "test/practical-matching/fixtures/reported-web-plan.json",
+    "test/practical-matching/fixtures/reported-client-context.json",
+    "test/service-efficiency/lock-register.json"
   ],
-  "regressionFiles": [],
-  "browser": []
+  "regressionFiles": [
+    "test/agentic-contract-v4.test.ts",
+    "test/agentic-flexible-v5-contract.test.ts",
+    "test/ax-refinement/contract.test.ts",
+    "test/matcher/advisory-dose-fit.test.ts",
+    "test/matcher/advisory-v6-preferences.test.ts",
+    "test/matcher/flexible-v5-coordinated-repair.test.ts",
+    "test/matcher/flexible-v5-counts.test.ts",
+    "test/matcher/flexible-v5-doses.test.ts",
+    "test/matcher/flexible-v5-intake.test.ts",
+    "test/matcher/flexible-v5-options.test.ts",
+    "test/matcher/flexible-v5-repair.test.ts",
+    "test/matcher/flexible-v5-residual.test.ts",
+    "test/matcher/flexible-v5-search.test.ts",
+    "test/matcher/phase2.test.ts",
+    "test/matcher/phase3.test.ts",
+    "test/matcher/qa-gold.test.ts",
+    "test/mcp-agent-surface/contracts.test.ts",
+    "test/mcp-discovery/discovery.test.ts",
+    "test/mcp-payload/discovery.test.ts",
+    "test/retail-checkout-catalogue-v5.integration.test.ts",
+    "test/retail-checkout-catalogue-v5.test.ts",
+    "test/service-efficiency/lock-register.test.ts"
+  ],
+  "browser": [
+    {
+      "file": "test/e2e/practical-matching.spec.ts",
+      "grep": "PRACTICAL-BROWSER-01",
+      "expectedCases": 3,
+      "reason": "Actual reveal and checkout selection show distinct relevant cautions in English, Thai and Chinese without acknowledgements."
+    },
+    {
+      "file": "test/e2e/web-funnel-recovery.spec.ts",
+      "grep": "ANNA-BROWSER-06",
+      "expectedCases": 3,
+      "reason": "Existing above-preference selection, unknown counts, exclusion and revision recovery consumers remain functional."
+    }
+  ]
 }

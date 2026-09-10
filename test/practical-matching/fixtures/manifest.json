@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "source": "ab102ab3930cbaea0594847152ac010bcae722ca",
+  "environment": "dev",
+  "assessmentUrl": "https://dev.mattanutra.com/en/nutrition/reveal?plan=67921dc2-be8e-4072-9d0d-b6a7fd96f8f4",
+  "provenance": "Original saved results preserved separately; current read-only catalogue/reference/context capture is not a reconstruction of all historical generation-time inputs. Feedback and guidance adjustments were not reconstructed.",
+  "files": [
+    {
+      "file": "test/practical-matching/fixtures/reported-web-plan.json",
+      "sha256": "90d3cf50d7794a29fafe1992bd684833257707c810ec1f666d00c8e68be09335"
+    },
+    {
+      "file": "test/practical-matching/fixtures/reported-client-context.json",
+      "sha256": "df37baef037426fe0f1cfc848181d03ed12708e7cdfd324ae293838342e9c21b"
+    }
+  ]
+}
