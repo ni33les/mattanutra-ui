@@ -1,3 +1,4 @@
+import { isUuid, publicSupplementId } from "@/lib/agentic/contract/ids";
 import { sha256Hex } from "@/lib/sha256";
 import { convertAmount } from "@/lib/matcher/dose";
 import { formatNutrientAmount } from "@/lib/agentic/presentation/amount";
@@ -80,7 +81,7 @@ function choiceIngredients(result: PlanResult, option: StackOption): Ingredient[
   const rows = new Map<string, Ingredient>();
   const unknown = new Set<string>();
   const quantified = new Map<string, number>();
-  const identity = (fact: { supplementId?: string | null; name: string }) => fact.supplementId ??
+  const identity = (fact: { supplementId?: string | null; name: string }) => (fact.supplementId ? isUuid(fact.supplementId) ? publicSupplementId(fact.supplementId) : fact.supplementId : null) ??
     [...rows.values()].find(row => row.name.toLowerCase() === fact.name.toLowerCase())?.ingredientId ??
     `ing_${sha256Hex(fact.name.toLowerCase()).slice(0, 24)}`;
   for (const target of targets) {
