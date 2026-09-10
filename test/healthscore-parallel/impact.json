@@ -1,0 +1,23 @@
+{
+  "releaseBase": "a797023ce588a363de7cdbee6271758d7de57a23",
+  "scope": "Restore the original HealthScore presentation; gate on parallel advice and reveal preparation; verify repeated-score input origin",
+  "files": [
+    {"file":"test/healthscore-parallel/behaviour.test.ts","reason":"Three original numeric columns, client readiness and actionable preparation failures"},
+    {"file":"test/healthscore-parallel/readiness.integration.test.ts","reason":"Independent durable admission, both completion orders, unpaid preparation, revision/locale isolation, recovery and distinct submitted scores"},
+    {"file":"test/health-score.test.ts","reason":"Unchanged score arithmetic and restored localized shortlist labels"},
+    {"file":"test/health-score-panel-static.test.ts","reason":"Original layout, styles, fonts, section order and personalized prose"},
+    {"file":"test/health-score-analysis.test.ts","reason":"Complete AI narrative retained with current numeric metadata"},
+    {"file":"test/healthscore-copy-static.test.ts","reason":"Complete localized advice and email acknowledgement remain enforced"},
+    {"file":"test/assessment-capture.integration.test.ts","reason":"Existing capture/retry idempotency and revision rules"},
+    {"file":"test/assessment-capture-static.test.ts","reason":"Chat and classic callers share the updated gate"},
+    {"file":"test/funnel-readiness.integration.test.ts","reason":"Preview access, payment fulfillment and revision consumers remain intact"},
+    {"file":"test/service-efficiency/funnel-reads.integration.test.ts","reason":"Read-only lightweight readiness under writer contention"},
+    {"file":"test/service-efficiency/lock-register.test.ts","reason":"No new unregistered locks"},
+    {"file":"test/web-journey-fix/presentation.test.ts","reason":"Unknown counts stay unknown; actual count and score reference correction preserved"},
+    {"file":"test/web-journey-fix/reads.integration.test.ts","reason":"Actual formula counts remain nonlocking and revision-aware"}
+  ],
+  "browser": [
+    {"file":"test/e2e/healthscore-parallel.spec.ts","grep":"HS-PAR-BROWSER-01","expectedCases":3},
+    {"file":"test/e2e/web-journey-counts.spec.ts","grep":"WEB-JOURNEY-BROWSER-01","expectedCases":3}
+  ]
+}

@@ -40,3 +40,17 @@ test('HS-PAR-PG-02 analysis retry also repairs failed formulation for the saved 
   assert.ok((await sql`select id from tasks where plan_id=${id}::uuid and task_type='generate_supplement_guidance' and status in ('queued','reserved','running')`).length > 0);
   assert.deepEqual(await sql`select answers,input_revision from assessments where plan_id=${id}::uuid`, before);
 });
+
+test('HS-PAR-PG-03 different submitted lifestyle answers produce distinct stored scores, not a reused 38', async () => {
+  const { createInitialState, fastForwardQuestionnaire } = await import('../../lib/questionnaire/engine.ts');
+  const { toAssessmentAnswers } = await import('../../lib/questionnaire/normalize.ts');
+  const filled = fastForwardQuestionnaire(createInitialState({ locale: 'en', channel: 'web' })); assert.ok(filled.ok);
+  const original = toAssessmentAnswers(filled.state.answers);
+  const changed = { ...original, sleepHrs: '7-8', energy: 'good', activity: 'active' };
+  const first = await captureAssessment({ answers: original, locale: 'en' }, { idempotencyKey: randomUUID() });
+  const second = await captureAssessment({ answers: changed, locale: 'en' }, { idempotencyKey: randomUUID() });
+  const rows = await sql`select plan_id,(health_score->>'score')::int as score from assessments where plan_id=any(${[first.planId, second.planId]}::uuid[])`;
+  assert.equal(rows.find(r => r.plan_id === first.planId)?.score, 38);
+  assert.equal(rows.find(r => r.plan_id === second.planId)?.score, 66);
+  assert.notEqual(first.inputHash, second.inputHash);
+});

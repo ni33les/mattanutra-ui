@@ -22,7 +22,10 @@ describe("HealthScore requires complete localized AI advice", () => {
     const execution = source("lib/task-execution.ts");
     assert.doesNotMatch(execution, /deterministicHealthScorePageCopy|withDeterministicHealthScoreFallback/);
     assert.match(execution, /throw new Error\(`HealthScore advice failed:/);
-    assert.match(source("lib/task-result-applier.ts"), /hasHealthScoreAiCopy\(healthScore, locale\)/);
+    const publication = source("lib/task-result-applier.ts");
+    assert.match(publication, /projection: healthScoreReadProjection\(score\)/);
+    assert.match(publication, /if \(!prepared\.projection\.ready\[locale\]\) throw new Error\("HealthScore AI advice is incomplete"\)/);
+    assert.match(source("lib/healthscore-readiness.ts"), /ready: \{ en: hasHealthScoreAiCopy\(value, "en"\), th: hasHealthScoreAiCopy\(value, "th"\), "zh-CN": hasHealthScoreAiCopy\(value, "zh-CN"\)/);
   });
   it("keeps the public gate closed and reflects durable email acknowledgement", () => {
     assert.match(source("components/nutrition-flow/healthscore-copy-gate.tsx"), /canOpenResults=\{false\}/);
