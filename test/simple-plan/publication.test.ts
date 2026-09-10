@@ -29,3 +29,14 @@ test('SPLAN-SPEC-02 instructions and guides describe the same bounded weight/res
     assert.ok(/0.*1.*2/s.test(guide));
   }
 });
+test('IMP-12 generated, native and tools-only descriptions teach pure importance and explicit soft avoidance in every locale', () => {
+  for (const locale of ['en', 'th', 'zh-CN']) {
+    const text = agenticServerInstructions('dev', locale) + clientGuideMarkdown(locale, 'dev');
+    assert.doesNotMatch(text, /0 softly minimises|Below one blends|zero.*stronger minimisation/);
+    assert.match(text, /zero removes that ranking component/);
+    assert.match(text, /target amount of zero/);
+    assert.match(text, /0\.543/);
+    if (locale === 'th') assert.match(text, /น้ำหนัก/);
+    if (locale === 'zh-CN') assert.match(text, /权重/);
+  }
+});
