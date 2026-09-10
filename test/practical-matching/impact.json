@@ -1,0 +1,12 @@
+{
+  "scope": "shared_practical_matching_and_affected_journeys",
+  "releaseBase": "ab102ab3930cbaea0594847152ac010bcae722ca",
+  "deploymentBases": { "dev": "ab102ab3930cbaea0594847152ac010bcae722ca", "uat": "ab102ab3930cbaea0594847152ac010bcae722ca" },
+  "testPolicy": "RED before implementation, scoped development, complete maintained matcher/MCP final regression plus affected web/PG/browser; no skipped, focused, todo, cancelled, retried or empty-precondition cases.",
+  "files": [
+    { "file": "test/practical-matching/scoring.test.ts", "slice": "scoring", "expectedCases": 8, "reason": "Exact shared penalties, strong live-ranking regression, unknown lower bounds and immutable objective profiles." }
+  ],
+  "inputs": [],
+  "regressionFiles": [],
+  "browser": []
+}
