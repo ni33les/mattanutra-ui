@@ -1,3 +1,6 @@
+import { catalogueRecordFingerprint } from "../lib/catalogue-corrections.ts";
+import { after } from "node:test";
+import { closeSqlPool } from "../lib/db.ts";
 import { CURRENT_CONTRACT_SCHEMA_CHECKSUM } from "./helpers/current-contract-lock.ts";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -5,7 +8,10 @@ import { afterEach, before, beforeEach, describe, it } from "node:test";
 import { AGENTIC_SCHEMA_CHECKSUM } from "../lib/agentic/info.ts";
 import { publicBasketItem } from "../lib/agentic/public-mapper.ts";
 import type { BasketItem, CoverageRow } from "../lib/agentic/plan/types.ts";
-import { deferred } from "./agentic/v16/harness.ts";
+import { deferred, frozenSnapshot } from "./agentic/v16/harness.ts";
+import { matcherSafetyCeilings, setMatcherSafetyCeilings, matcherSafetyReferenceIdentity } from "../lib/matcher/safety-ceilings.ts";
+let previousCeilings: ReturnType<typeof matcherSafetyCeilings>;
+let previousIdentity: ReturnType<typeof matcherSafetyReferenceIdentity>;
 import {
   canonicalizeOpaque,
   firstForbiddenDiff,
@@ -26,7 +32,7 @@ import {
   endV18Run,
   freezeRealThailandCatalogue,
   hasThaiScript,
-  publicPlanCreate,
+  domainPlanCreate,
   selectionReasons,
   serialize
 } from "./agentic/v18/harness.ts";
@@ -111,10 +117,15 @@ describe("v1.8 TECH-04 locale/business boundary", () => {
 
   beforeEach(() => {
     beginV18Run();
+    previousCeilings=matcherSafetyCeilings();previousIdentity=matcherSafetyReferenceIdentity();
+    const magnesium=frozenSnapshot()?.supplements.find(row=>row.name === "Magnesium");assert.ok(magnesium);
+    const ceilings=[{subjectId:magnesium.supplementId,name:"Magnesium",maxAmount:350,maxUnit:"mg" as const,sourceScope:"supplemental" as const,lifeStage:"adult" as const}];
+    setMatcherSafetyCeilings(ceilings,{runtimeRevision:frozenSnapshot()!.runtimeRevision!,fingerprint:catalogueRecordFingerprint(ceilings)});
   });
 
   afterEach(() => {
     endV18Run();
+    setMatcherSafetyCeilings(previousCeilings,previousIdentity);
   });
 
   it("DEV-HYGIENE-01 locked QA v3.0 hashes", () => {
@@ -320,9 +331,9 @@ describe("v1.8 TECH-04 locale/business boundary", () => {
     for (const locale of ["en", "th"] as const) {
       const { runtime } = createV18Runtime(`qa-v3:l8:det001-${locale}`);
       const key = v18Key("det001", 1, locale);
-      const first = await publicPlanCreate(runtime, key, locale === "th" ? F_READY_TH : F_READY_EN);
-      await publicPlanCreate(runtime, v18Key("det001", 1, `${locale}-other`), locale === "th" ? F_READY_TH : F_READY_EN);
-      const replay = await publicPlanCreate(runtime, key, locale === "th" ? F_READY_TH : F_READY_EN);
+      const first = await domainPlanCreate(runtime, key, locale === "th" ? F_READY_TH : F_READY_EN);
+      await domainPlanCreate(runtime, v18Key("det001", 1, `${locale}-other`), locale === "th" ? F_READY_TH : F_READY_EN);
+      const replay = await domainPlanCreate(runtime, key, locale === "th" ? F_READY_TH : F_READY_EN);
       assert.equal(serialize(replay), serialize(first));
     }
   });
@@ -355,11 +366,11 @@ describe("v1.8 TECH-04 locale/business boundary", () => {
     const hold = deferred();
     const english = Array.from({ length: 10 }, (_, index) => {
       const { runtime } = createV18Runtime(`qa-v3:l8:det003-en-${index}`);
-      return hold.promise.then(() => publicPlanCreate(runtime, v18Key("det003", 1, `en${index}`), F_READY_EN));
+      return hold.promise.then(() => domainPlanCreate(runtime, v18Key("det003", 1, `en${index}`), F_READY_EN));
     });
     const thai = Array.from({ length: 10 }, (_, index) => {
       const { runtime } = createV18Runtime(`qa-v3:l8:det003-th-${index}`);
-      return hold.promise.then(() => publicPlanCreate(runtime, v18Key("det003", 1, `th${index}`), F_READY_TH));
+      return hold.promise.then(() => domainPlanCreate(runtime, v18Key("det003", 1, `th${index}`), F_READY_TH));
     });
     hold.resolve();
     const [enResults, thResults] = await Promise.all([Promise.all(english), Promise.all(thai)]);
@@ -373,7 +384,7 @@ describe("v1.8 TECH-04 locale/business boundary", () => {
     const secondHold = deferred();
     const again = Array.from({ length: 10 }, (_, index) => {
       const { runtime } = createV18Runtime(`qa-v3:l8:det003-th-b-${index}`);
-      return secondHold.promise.then(() => publicPlanCreate(runtime, v18Key("det003", 2, `th${index}`), F_READY_TH));
+      return secondHold.promise.then(() => domainPlanCreate(runtime, v18Key("det003", 2, `th${index}`), F_READY_TH));
     });
     secondHold.resolve();
     const thAgain = await Promise.all(again);
@@ -381,3 +392,5 @@ describe("v1.8 TECH-04 locale/business boundary", () => {
     assert.deepEqual(basketOf(thAgain[0]!), basketOf(thResults[0]!));
   });
 });
+
+if (process.env.NODE_TEST_CONTEXT) after(closeSqlPool);

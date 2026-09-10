@@ -5,7 +5,6 @@ import {
 } from "../../../lib/agentic/capabilities.ts";
 import { loadAgenticConfig } from "../../../lib/agentic/config.ts";
 import { handleQaJsonRpc } from "../../../lib/agentic/mcp/qa-dispatcher.ts";
-import { handleCompletedFullJsonRpc as handleJsonRpc } from "../../helpers/completed-mcp-client.ts";
 import {
   createAgenticRuntime,
   setAgenticRuntimeForTests,
@@ -352,28 +351,6 @@ export async function qaCall(
   );
 }
 
-export async function publicCall(
-  runtime: AgenticRuntime,
-  name: string,
-  args: Record<string, unknown>,
-  namespace?: string
-) {
-  const bound = bindQaRuntime(
-    runtime,
-    new Request("https://dev.mattanutra.com/api/mcp", {
-      headers: namespace ? { "x-mattanutra-qa-namespace": namespace } : {}
-    }),
-    namespace ?? null
-  );
-  return structured(
-    await handleJsonRpc(bound, {
-      id: 1,
-      jsonrpc: "2.0",
-      method: "tools/call",
-      params: { arguments: args, name }
-    })
-  );
-}
 
 export function contributionOf(executed: Record<string, unknown>) {
   const frozen = asRecord(executed.frozenPlan);

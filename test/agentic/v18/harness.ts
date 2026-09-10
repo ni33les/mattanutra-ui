@@ -4,10 +4,10 @@ import {
   createV16Runtime,
   endV16Run,
   freezeRealThailandCatalogue,
-  publicPlanCreate,
+  domainPlanCreate,
   structured
 } from "../v16/harness.ts";
-import { handleCompletedFullJsonRpc as handleJsonRpc } from "../../helpers/completed-mcp-client.ts";
+import { handleCompletedJsonRpc as handleJsonRpc } from "../../helpers/completed-mcp-client.ts";
 import { loadAgenticConfig } from "../../../lib/agentic/config.ts";
 import { createAgenticRuntime, setAgenticRuntimeForTests } from "../../../lib/agentic/runtime.ts";
 import { createMockPaymentAdapter } from "../../../lib/agentic/commerce/payment.ts";
@@ -18,7 +18,7 @@ export {
   beginV16Run as beginV18Run,
   endV16Run as endV18Run,
   freezeRealThailandCatalogue,
-  publicPlanCreate
+  domainPlanCreate
 };
 
 export function createV18Runtime(namespace: string) {
@@ -51,7 +51,7 @@ export async function createReady(
   request: Record<string, unknown> = locale === "th" ? F_READY_TH : F_READY_EN
 ) {
   const { runtime } = createV18Runtime(namespace);
-  const result = await publicPlanCreate(runtime, key, request as typeof F_READY_EN);
+  const result = await domainPlanCreate(runtime, key, request as typeof F_READY_EN);
   return { runtime, result };
 }
 

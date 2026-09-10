@@ -56,13 +56,6 @@ if (!process.execArgv.includes(strip)) {
         {
           a: {
             contract: a.contract.passedCases,
-            honesty: a.honesty.passedCases,
-            planning: a.planning.passedCases,
-            explanations: a.explanations.passedCases,
-            copy: a.copy.passedCases,
-            state: a.state.passedCases,
-            boundary: a.boundary.passedCases,
-            evidence: a.evidence.passedCases,
             commercial: a.commercial.passedCases,
             valueRemediation: a.valueRemediation.passedCases,
             valueR4: a.valueR4.passedCases,
@@ -70,13 +63,6 @@ if (!process.execArgv.includes(strip)) {
           },
           b: {
             contract: b.contract.passedCases,
-            honesty: b.honesty.passedCases,
-            planning: b.planning.passedCases,
-            explanations: b.explanations.passedCases,
-            copy: b.copy.passedCases,
-            state: b.state.passedCases,
-            boundary: b.boundary.passedCases,
-            evidence: b.evidence.passedCases,
             commercial: b.commercial.passedCases,
             valueRemediation: b.valueRemediation.passedCases,
             valueR4: b.valueR4.passedCases,

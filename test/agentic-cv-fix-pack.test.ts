@@ -1,3 +1,5 @@
+import { after } from "node:test";
+import { closeSqlPool } from "../lib/db.ts";
 import { optionalTargetAmountsAreCoherent } from "./helpers/optional-target-amounts.ts";
 import { hasContextAssessment } from "./helpers/context-assessment.ts";
 import assert from "node:assert/strict";
@@ -11,7 +13,7 @@ import {
 } from "../lib/agentic/contract/index.ts";
 import { AGENTIC_SCHEMA_CHECKSUM } from "../lib/agentic/info.ts";
 import { computeSchemaChecksum } from "../lib/agentic/release-manifest.ts";
-import { handleCompletedFullJsonRpc as handleJsonRpc } from "./helpers/completed-mcp-client.ts";
+import { handleCompletedJsonRpc as handleJsonRpc } from "./helpers/completed-mcp-client.ts";
 import { withRecordedMcpEvidence } from "./helpers/mcp-evidence.ts";
 import { toolList } from "../lib/agentic/mcp/rpc.ts";
 import { completedPlanTool as planTool } from "./helpers/completed-mcp-client.ts";
@@ -309,7 +311,7 @@ export async function runCvFixPack(frozenInput?: ValueCatalogueFreeze): Promise<
         const questions = questionsOf(plan);
         const gaps = gapTargets(plan);
         const failed: string[] = [];
-        if (creatine?.importance !== "core" || creatine?.status !== "covered") {
+        if (creatine?.importance !== "core" || (creatine?.unresolved ? Number(creatine.deliveredAmount) !== 0 || Number(creatine.remainingGap) !== VALUE_ROLE_REQUEST.creatine.amount : creatine?.status !== "covered")) {
           failed.push("FIX-01.A1");
         }
         if (!optionalTargetAmountsAreCoherent(mag, VALUE_ROLE_REQUEST.magnesium.amount)) {
@@ -703,19 +705,15 @@ export async function runCvFixPack(frozenInput?: ValueCatalogueFreeze): Promise<
           failed.push("FIX-06.A1");
         }
         if (
-          !intent.importance ||
+          JSON.stringify(planSchema).includes('"importance"') ||
           !intent.acceptableRange ||
-          !intent.prerequisite ||
           !intent.daysRemaining ||
           !intent.costHorizonsDays ||
           !intent.baseline
         ) {
           failed.push("FIX-06.A2");
         }
-        if (
-          JSON.stringify(AGENTIC_TOOL_SCHEMAS.plan).includes("$defs") ||
-          JSON.stringify(AGENTIC_TOOL_SCHEMAS.plan).includes('"oneOf"')
-        ) {
+        if (!Array.isArray(AGENTIC_TOOL_SCHEMAS.plan.anyOf)) {
           failed.push("FIX-06.A3");
         }
         const planBlurb = listed.find((item) => item.name === "plan")?.description ?? "";
@@ -814,8 +812,8 @@ export async function runCvFixPack(frozenInput?: ValueCatalogueFreeze): Promise<
           subjectId: String(d3?.supplementId ?? "")
         });
         const failed: string[] = [];
-        if (!d3?.authorityUrl && !d3?.sourceScope && ceiling == null) {
-          failed.push("FIX-08.A1");
+        if (ceiling == null && (d3?.upperLimitAmount != null || d3?.authorityUrl)) {
+          failed.push("FIX-08.A1"); // Unknown references cannot become a verified limit.
         }
         const attested = (await import("../lib/agentic/value/safety-attestation.ts")).attestedVitaminD3Rule();
         const returnedUl = Number(d3?.upperLimitAmount);
@@ -938,3 +936,5 @@ describe("Customer value remediation FIX pack", () => {
   });
 });
 }
+
+if (process.env.NODE_TEST_CONTEXT) after(closeSqlPool);

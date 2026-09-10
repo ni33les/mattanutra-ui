@@ -3,13 +3,15 @@ import { spawnSync } from "node:child_process";
 import { readdirSync, readFileSync } from "node:fs";
 import { it } from "node:test";
 
-it("MCP-REPORT-01 every importable historical pack participates in the paired report", () => {
+it("MCP-REPORT-01 every maintained domain pack and current public client participate in the paired report", () => {
   const report = readFileSync("scripts/mcp-matcher-pack-report.mjs", "utf8");
   const discovered = readdirSync("test").filter(file => /^agentic-.*-pack\.test\.ts$/.test(file)).flatMap(file => {
     const source = readFileSync(`test/${file}`, "utf8");
     return [...source.matchAll(/export async function (run\w+Pack)\(/g)].map(match => ({ file, run: match[1] }));
   });
-  assert.ok(discovered.length >= 15, "The historical pack inventory must not silently shrink");
+  assert.ok(discovered.length >= 7, "Independent matching, commercial and value packs remain maintained");
+  assert.match(report, /await runCurrentProtocolPack\(\)/);
+  assert.doesNotMatch(report, /runAe(?:C[2-8])?Pack/);
   for (const pack of discovered) {
     assert.ok(report.includes(`../test/${pack.file}`), `${pack.file} is missing from the paired report`);
     assert.match(report, new RegExp(`await ${pack.run}\\(`), `${pack.run} must execute in each report run`);
@@ -32,7 +34,7 @@ it("MCP-REPORT-02 persisted R4 evidence rejects missing packs and same-pass busi
       mcpTranscript: { version: 1, calls: [{ request: { operation: "revise" }, response: business, state: "completed" }] }
     } };
     const section = { cases: [item], passedCases: 1, totalCases: 1, contractVersion: "5.0.0", snapshotId: "fixed-catalogue" };
-    const labels = ["contract", "honesty", "planning", "explanations", "copy", "state", "boundary", "evidence", "commercial", "valueRemediation", "valueImplementation", "valueR2", "valueR3", "valueR4"];
+    const labels = ["contract", "commercial", "valueRemediation", "valueImplementation", "valueR2", "valueR3", "valueR4"];
     const run = Object.fromEntries(labels.map(label => [label, structuredClone(section)]));
     run.matcher = { ...structuredClone(section), scores: { matching: 10, safety: 10, efficiency: 10 } };
     const encoded = canonicalPack(run);

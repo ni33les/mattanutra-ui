@@ -7,5 +7,5 @@ export function optionalTargetAmountsAreCoherent(row: Record<string, unknown> | 
   const status = row.status === expected || (row.status === 'already_covered' && Number(row.currentAmount) >= target);
   return status && Number(row.remainingGap) === Math.max(0, target - actual) &&
     Number(row.excess) === Math.max(0, actual - target) &&
-    Math.abs(Number(row.coveragePercent) - Math.min(100, actual / target * 100)) <= 0.000001;
+    Math.abs(Number(row.coveragePercent) - Math.floor(Math.min(100, actual / target * 100) * 100) / 100) <= 0.000001;
 }

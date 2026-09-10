@@ -1,7 +1,7 @@
 {
   "releaseBase": "2d4c259a6775b57f3182306955a57ccfa6796ca4",
   "deploymentBases": {
-    "dev": "b286807a7fc41f3229509a949134894d35f02192"
+    "dev": "f3f63e24f345746056ba02e686a7a2ebfe7b7461"
   },
   "scope": "conversational_v9_and_affected_consumers",
   "testPolicy": "Only affected inventory. No full application, historical contract or full MCP matrix. Each file reconciled against executed cases; missing PostgreSQL fails.",
@@ -20,8 +20,39 @@
       "slice": "responses"
     },
     {
+      "file": "test/agentic-contract-v4.test.ts",
+      "expectedCases": 18,
+      "reason": "Directly affected public transport, immutable input and payment recovery invariants adapted to conversational v9",
+      "slice": "publication"
+    },
+    {
+      "file": "test/agentic-cv-fix-pack.test.ts",
+      "expectedCases": 1,
+      "reason": "Directly affected shared test executor: private domain/QA lifecycle and financial invariants; original retail fixture prices and arithmetic remain maintained",
+      "slice": "postgres",
+      "database": true
+    },
+    {
       "file": "test/agentic-cv-snapshot-store.test.ts",
       "expectedCases": 2,
+      "reason": "Directly affected public transport, immutable input and payment recovery invariants adapted to conversational v9",
+      "slice": "publication"
+    },
+    {
+      "file": "test/agentic-det-v3-scored.test.ts",
+      "expectedCases": 19,
+      "reason": "Directly affected public transport, immutable input and payment recovery invariants adapted to conversational v9",
+      "slice": "publication"
+    },
+    {
+      "file": "test/agentic-det-v3.test.ts",
+      "expectedCases": 40,
+      "reason": "Directly affected public transport, immutable input and payment recovery invariants adapted to conversational v9",
+      "slice": "publication"
+    },
+    {
+      "file": "test/agentic-execute-reuse.test.ts",
+      "expectedCases": 5,
       "reason": "Directly affected public transport, immutable input and payment recovery invariants adapted to conversational v9",
       "slice": "publication"
     },
@@ -32,16 +63,103 @@
       "slice": "responses"
     },
     {
+      "file": "test/agentic-flexible-v5-journey.test.ts",
+      "expectedCases": 13,
+      "reason": "Directly affected public transport, immutable input and payment recovery invariants adapted to conversational v9",
+      "slice": "publication"
+    },
+    {
+      "file": "test/agentic-flexible-v5-legacy.test.ts",
+      "expectedCases": 2,
+      "reason": "Directly affected public transport, immutable input and payment recovery invariants adapted to conversational v9",
+      "slice": "publication"
+    },
+    {
+      "file": "test/agentic-flow.test.ts",
+      "expectedCases": 6,
+      "reason": "Directly affected public transport, immutable input and payment recovery invariants adapted to conversational v9",
+      "slice": "publication"
+    },
+    {
       "file": "test/agentic-form-alias-roundtrip.test.ts",
       "expectedCases": 4,
       "reason": "Directly affected shared matching, publication, durable recovery or commerce consumer assertions",
       "slice": "responses"
     },
     {
+      "file": "test/agentic-mcp-sale-states.test.ts",
+      "expectedCases": 3,
+      "reason": "Directly affected public transport, immutable input and payment recovery invariants adapted to conversational v9",
+      "slice": "publication"
+    },
+    {
+      "file": "test/agentic-mcp-transcript-evidence.test.ts",
+      "expectedCases": 13,
+      "reason": "Directly affected public transport, immutable input and payment recovery invariants adapted to conversational v9",
+      "slice": "publication"
+    },
+    {
       "file": "test/agentic-mcp-transport-reliability.test.ts",
       "expectedCases": 6,
       "reason": "Directly affected public transport, immutable input and payment recovery invariants adapted to conversational v9",
       "slice": "publication"
+    },
+    {
+      "file": "test/agentic-p1.test.ts",
+      "expectedCases": 34,
+      "reason": "Directly affected public transport, immutable input and payment recovery invariants adapted to conversational v9",
+      "slice": "publication"
+    },
+    {
+      "file": "test/agentic-plan-recovery.test.ts",
+      "expectedCases": 8,
+      "reason": "Directly affected public transport, immutable input and payment recovery invariants adapted to conversational v9",
+      "slice": "publication"
+    },
+    {
+      "file": "test/agentic-purchased-pack-quote.test.ts",
+      "expectedCases": 4,
+      "reason": "Directly affected public transport, immutable input and payment recovery invariants adapted to conversational v9",
+      "slice": "publication"
+    },
+    {
+      "file": "test/agentic-qa-harness.test.ts",
+      "expectedCases": 8,
+      "reason": "Directly affected public transport, immutable input and payment recovery invariants adapted to conversational v9",
+      "slice": "publication"
+    },
+    {
+      "file": "test/agentic-qa-pack.test.ts",
+      "expectedCases": 18,
+      "reason": "Directly affected public transport, immutable input and payment recovery invariants adapted to conversational v9",
+      "slice": "publication"
+    },
+    {
+      "file": "test/agentic-reliability.test.ts",
+      "expectedCases": 15,
+      "reason": "Directly affected public transport, immutable input and payment recovery invariants adapted to conversational v9",
+      "slice": "publication"
+    },
+    {
+      "file": "test/agentic-uat-nl-v10.test.ts",
+      "expectedCases": 15,
+      "reason": "Directly affected shared test executor: private domain/QA lifecycle and financial invariants; original retail fixture prices and arithmetic remain maintained",
+      "slice": "postgres",
+      "database": true
+    },
+    {
+      "file": "test/agentic-v16-plan90.test.ts",
+      "expectedCases": 18,
+      "reason": "Directly affected shared test executor: private domain/QA lifecycle and financial invariants; original retail fixture prices and arithmetic remain maintained",
+      "slice": "postgres",
+      "database": true
+    },
+    {
+      "file": "test/agentic-v18-locale.test.ts",
+      "expectedCases": 11,
+      "reason": "Directly affected shared test executor: private domain/QA lifecycle and financial invariants; original retail fixture prices and arithmetic remain maintained",
+      "slice": "postgres",
+      "database": true
     },
     {
       "file": "test/agentic-v6-conversation.test.ts",
@@ -74,6 +192,24 @@
       "expectedCases": 3,
       "reason": "Directly affected shared matching, publication, durable recovery or commerce consumer assertions",
       "slice": "responses"
+    },
+    {
+      "file": "test/mcp-discovery/discovery.test.ts",
+      "expectedCases": 29,
+      "reason": "Directly affected public transport, immutable input and payment recovery invariants adapted to conversational v9",
+      "slice": "publication"
+    },
+    {
+      "file": "test/mcp-paired-report-coverage.test.ts",
+      "expectedCases": 2,
+      "reason": "Directly affected public transport, immutable input and payment recovery invariants adapted to conversational v9",
+      "slice": "publication"
+    },
+    {
+      "file": "test/mcp-test-completed-client.test.ts",
+      "expectedCases": 6,
+      "reason": "Directly affected public transport, immutable input and payment recovery invariants adapted to conversational v9",
+      "slice": "publication"
     },
     {
       "file": "test/practical-matching/adapters.test.ts",
@@ -212,15 +348,27 @@
     },
     {
       "file": "test/simple-plan/requests.test.ts",
-      "expectedCases": 10,
+      "expectedCases": 11,
       "reason": "Conversational v9 protocol, state, response, policy and release boundary assertions",
       "slice": "requests"
     },
     {
       "file": "test/simple-plan/response.test.ts",
-      "expectedCases": 1,
+      "expectedCases": 2,
       "reason": "Conversational v9 protocol, state, response, policy and release boundary assertions",
       "slice": "responses"
+    },
+    {
+      "file": "test/simple-plan/retained-choice-values.test.ts",
+      "expectedCases": 3,
+      "reason": "Directly affected public transport, immutable input and payment recovery invariants adapted to conversational v9",
+      "slice": "publication"
+    },
+    {
+      "file": "test/simple-plan/retained-public-invariants.test.ts",
+      "expectedCases": 4,
+      "reason": "Directly affected public transport, immutable input and payment recovery invariants adapted to conversational v9",
+      "slice": "publication"
     },
     {
       "file": "test/simple-plan/search.test.ts",
@@ -267,6 +415,9 @@
     "lib/agentic/contract/decision-schema.ts",
     "test/simple-plan/documented-harness.ts",
     "db-schema.sql",
-    "scripts/service-efficiency-schema.sql"
+    "scripts/service-efficiency-schema.sql",
+    "test/helpers/completed-mcp-client.ts",
+    "test/simple-plan/retained-choice-values.test.ts",
+    "test/simple-plan/retained-public-invariants.test.ts"
   ]
 }

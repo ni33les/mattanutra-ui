@@ -108,14 +108,14 @@ it('MCP-TRANSCRIPT-06: an unawaited call fails acceptance with its pending reque
 });
 
 it('MCP-TRANSCRIPT-07: all maintained selective-evidence packs attach actual harness calls', () => {
-  const packs = ['agentic-ae-pack.test.ts', ...Array.from({ length: 7 }, (_, index) => `agentic-ae-c${index + 2}-pack.test.ts`), 'agentic-com-pack.test.ts', 'agentic-cv-fix-pack.test.ts'];
+  const packs = ['agentic-com-pack.test.ts', 'agentic-cv-fix-pack.test.ts'];
   for (const name of packs) {
     const source = readFileSync(new URL(name, import.meta.url), 'utf8');
     assert.match(source, /withRecordedMcpEvidence\(/, `${name} must retain per-case transcripts`);
-    if (name !== 'agentic-com-pack.test.ts') assert.match(source, /import \{ (?:handleJsonRpc|handleCompletedFullJsonRpc as handleJsonRpc) \} from "\.\/helpers\/(?:recording-mcp-dispatcher|completed-mcp-client)\.ts"/);
+    if (name !== 'agentic-com-pack.test.ts') assert.match(source, /import \{ (?:handleJsonRpc|handleCompletedJsonRpc as handleJsonRpc) \} from "\.\/helpers\/(?:recording-mcp-dispatcher|completed-mcp-client)\.ts"/);
   }
   const commercial = readFileSync(new URL('./helpers/com-fixtures.ts', import.meta.url), 'utf8');
-  assert.match(commercial, /import \{ (?:handleJsonRpc|handleCompletedFullJsonRpc as handleJsonRpc) \} from "\.\/(?:recording-mcp-dispatcher|completed-mcp-client)\.ts"/);
+  assert.match(commercial, /import \{ (?:handleJsonRpc|handleCompletedJsonRpc as handleJsonRpc) \} from "\.\/(?:recording-mcp-dispatcher|completed-mcp-client)\.ts"/);
   const fix = readFileSync(new URL('./agentic-cv-fix-pack.test.ts', import.meta.url), 'utf8');
   assert.match(fix, /import \{ completedPlanTool as planTool \} from "\.\/helpers\/completed-mcp-client\.ts"/,
     'Direct plan-service cases must capture their matching results too');
@@ -123,7 +123,8 @@ it('MCP-TRANSCRIPT-07: all maintained selective-evidence packs attach actual har
   assert.match(det, /captureMcpTranscript\(/);
   assert.match(det, /import \{ completedPlanTool as planTool \} from "\.\/helpers\/completed-mcp-client\.ts"/);
   assert.match(det, /import \{ matchPlan, evaluateSafety \} from "\.\/helpers\/recording-mcp-dispatcher\.ts"/);
-  assert.match(readFileSync(new URL('../scripts/mcp-matcher-pack-report.mjs', import.meta.url), 'utf8'), /matcher: JSON\.parse\(canonicalDetReport\(run\.matcher\)\)/);
+  assert.match(readFileSync(new URL('../scripts/mcp-matcher-pack-report.mjs', import.meta.url), 'utf8'), /matcher:canonicalDetReport/);
+  const current=readFileSync(new URL('./simple-plan/documented-harness.ts',import.meta.url),'utf8');assert.match(current,/captureMcpTranscript\(/);assert.match(current,/recording-mcp-dispatcher/);
 });
 
 it('MCP-TRANSCRIPT-08: real dispatcher and direct-plan adapters capture public payloads without runtime secrets', async () => {

@@ -1,3 +1,5 @@
+import { runObservedRequest, recordRequestStage } from "../../../lib/agentic/qa/request-trace.ts";
+import { completedPlanTool as domainPlan } from "../../helpers/completed-mcp-client.ts";
 import { CURRENT_CONTRACT_SCHEMA_CHECKSUM } from "../../helpers/current-contract-lock.ts";
 import { beginDeterministicIdsForTests, endDeterministicIdsForTests } from "../../../lib/agentic/capabilities.ts";
 import { catalogueSnapshotId, freezeCatalogueSnapshot } from "../../../lib/agentic/catalogue/freeze.ts";
@@ -10,7 +12,7 @@ import type { CatalogueSnapshot } from "../../../lib/agentic/catalogue/types.ts"
 import { AGENTIC_CONTRACT_VERSION, loadAgenticConfig } from "../../../lib/agentic/config.ts";
 import { RESEARCH_VERSION } from "../../../lib/agentic/discovery/versions.ts";
 import { AGENTIC_SCHEMA_CHECKSUM, resetInfoCache } from "../../../lib/agentic/info.ts";
-import { handleCompletedFullJsonRpc as handleJsonRpc } from "../../helpers/completed-mcp-client.ts";
+import { handleCompletedJsonRpc as handleJsonRpc } from "../../helpers/completed-mcp-client.ts";
 import { refreshAdminSafetyCeilings } from "../../../lib/agentic/catalogue/load-safety-ceilings.ts";
 import { MATCHER_VERSION } from "../../../lib/matcher/config.ts";
 import { resetMatchPlanCache } from "../../../lib/agentic/plan/matching.ts";
@@ -173,26 +175,12 @@ export function createUatNlRuntime(namespace = "qa-v3:uat-nl:dev") {
   return { namespace, runtime, store };
 }
 
-export async function publicPlanCreate(
+export async function domainPlanCreate(
   runtime: AgenticRuntime,
   idempotencyKey: string,
   request: typeof F_READY = F_READY
 ) {
-  return structured(
-    await handleJsonRpc(runtime, {
-      id: 1,
-      jsonrpc: "2.0",
-      method: "tools/call",
-      params: {
-        arguments: {
-          idempotencyKey,
-          operation: "create",
-          request
-        },
-        name: "plan"
-      }
-    })
-  );
+  return asRecord(await runObservedRequest(`plan:${idempotencyKey}`,async()=>{await recordRequestStage(`plan:${idempotencyKey}`,"ingress_accepted");return domainPlan({config:runtime.config,scope:runtime.scope,store:runtime.store,now:runtime.now ?? new Date().toISOString(),payload:{operation:"create",idempotencyKey,request}});}));
 }
 
 export async function qaObserve(
@@ -226,7 +214,7 @@ export async function tenBurst(
   hold: ReturnType<typeof deferred>
 ) {
   const keys = burstKeys(repeat);
-  const pending = keys.map((key) => hold.promise.then(() => publicPlanCreate(runtime, key)));
+  const pending = keys.map((key) => hold.promise.then(() => domainPlanCreate(runtime, key)));
   hold.resolve();
   return { keys, results: await Promise.all(pending) };
 }

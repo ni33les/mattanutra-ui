@@ -5,32 +5,12 @@ import { handleJsonRpc as dispatchJsonRpc, canonicalPublicToolName } from "../..
 import { planTool as admitPlan, runAdmittedPlanOperation } from "../../lib/agentic/plan/service.ts";
 import { recordMcpCall } from "./mcp-evidence.ts";
 
-/** Explicit full-data client for completed-journey assertions. Raw dispatcher
- * tests keep the public conversation default and admission/processing boundary. */
-export function fullPlanRequest(body: Parameters<typeof dispatchJsonRpc>[1]) {
-  if (body?.method !== "tools/call" || canonicalPublicToolName(String(body.params?.name)) !== "plan") return body;
-  const args=body.params?.arguments;
-  if (!args || typeof args !== "object" || Array.isArray(args)) return body;
-  return {...body,params:{...body.params,arguments:{responseView:"full",...args}}};
-}
-
 async function executeAdmitted(input: Pick<Parameters<typeof admitPlan>[0],"store"|"config"|"scope">, key: string) {
   const scope=input.scope;
   const operation=await input.store.getPlanOperationByKey(`${scope.environment}:${scope.tenantScope}:${scope.principalScope ?? "anon"}`,key);
   assert.ok(operation,"A processing mutation must have a durable operation before the external test executor can run it");
   await runAdmittedPlanOperation({store:input.store,config:input.config,operationId:operation.id});
 }
-
-export const handleCompletedFullJsonRpc: typeof dispatchJsonRpc = async (runtime, body) => {
-  const request=fullPlanRequest(body);
-  const invoke=() => recordMcpCall(request,()=>dispatchJsonRpc(runtime,request));
-  const admitted=await invoke();
-  const result=admitted?.result?.structuredContent as Record<string,unknown>|undefined;
-  const args=request?.params?.arguments as Record<string,unknown>|undefined;
-  if (runtime.matchPort || canonicalPublicToolName(String(request?.params?.name)) !== "plan" || args?.operation === "get" || typeof args?.idempotencyKey !== "string" || result?.status !== "processing") return admitted;
-  await executeAdmitted(runtime,args.idempotencyKey);
-  return invoke();
-};
 
 /** Current flat-protocol test client. Work is driven by the separate durable
  * executor; a handle-only read never starts work. No input or output translation. */

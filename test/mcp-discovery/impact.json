@@ -59,14 +59,6 @@
     }
   ],
   "regressionFiles": [
-    "test/agentic-ae-c2-pack.test.ts",
-    "test/agentic-ae-c3-pack.test.ts",
-    "test/agentic-ae-c4-pack.test.ts",
-    "test/agentic-ae-c5-pack.test.ts",
-    "test/agentic-ae-c6-pack.test.ts",
-    "test/agentic-ae-c7-pack.test.ts",
-    "test/agentic-ae-c8-pack.test.ts",
-    "test/agentic-ae-pack.test.ts",
     "test/agentic-catalogue-cache-identity.test.ts",
     "test/agentic-com-pack.test.ts",
     "test/agentic-contract-v4.test.ts",
@@ -204,14 +196,6 @@
     {
       "behaviour": "Published full/details clients, seven tools, current discovery and historical resources",
       "files": [
-        "test/agentic-ae-c2-pack.test.ts",
-        "test/agentic-ae-c3-pack.test.ts",
-        "test/agentic-ae-c4-pack.test.ts",
-        "test/agentic-ae-c5-pack.test.ts",
-        "test/agentic-ae-c6-pack.test.ts",
-        "test/agentic-ae-c7-pack.test.ts",
-        "test/agentic-ae-c8-pack.test.ts",
-        "test/agentic-ae-pack.test.ts",
         "test/agentic-det-ab.test.ts",
         "test/agentic-det-pack.test.ts",
         "test/agentic-det-v3-preflight.test.ts",

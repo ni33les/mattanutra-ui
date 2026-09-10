@@ -1,3 +1,6 @@
+import { planTool as admitDomainPlan } from "../lib/agentic/plan/service.ts";
+import { after } from "node:test";
+import { closeSqlPool } from "../lib/db.ts";
 import { handleJsonRpc as admitJsonRpc } from "../lib/agentic/mcp/dispatcher.ts";
 import { runAdmittedPlanOperation } from "../lib/agentic/plan/service.ts";
 import { setQueryNamespace } from "../lib/agentic/plan/query-budget.ts";
@@ -36,7 +39,7 @@ import {
   beginUatNlRun,
   endUatNlRun,
   orphanCensus,
-  publicPlanCreate,
+  domainPlanCreate,
   qaObserve,
   reasonCodeOf,
   tenBurst
@@ -185,12 +188,12 @@ describe("UAT-NL v1.0 TECH-02 and MKT-10", () => {
     const entered = deferred();
     const heldKey = uatNlFreshKey(1, 3);
     setPlanClaimLatchForTests(heldKey, hold.promise, () => entered.resolve());
-    const pendingHeld = publicPlanCreate(runtime, heldKey);
+    const pendingHeld = domainPlanCreate(runtime, heldKey);
     await entered.promise;
     const others = await Promise.all(
       burstKeys(1)
         .filter((key) => key !== heldKey)
-        .map((key) => publicPlanCreate(runtime, key))
+        .map((key) => domainPlanCreate(runtime, key))
     );
     assert.equal(others.length, 9);
     for (const result of others) {
@@ -210,12 +213,12 @@ describe("UAT-NL v1.0 TECH-02 and MKT-10", () => {
     const entered = deferred();
     const heldKey = uatNlFreshKey(1, 3);
     setPlanClaimLatchForTests(heldKey, hold.promise, () => entered.resolve());
-    const pendingHeld = publicPlanCreate(runtime, heldKey);
+    const pendingHeld = domainPlanCreate(runtime, heldKey);
     await entered.promise;
     const others = await Promise.all(
       burstKeys(1)
         .filter((key) => key !== heldKey)
-        .map((key) => publicPlanCreate(runtime, key))
+        .map((key) => domainPlanCreate(runtime, key))
     );
     assert.equal(others.every((item) => item.ok === true && item.status === "ready"), true);
     advanceServiceClock(UAT_NL_SUCCESS_DEADLINE_MS);
@@ -241,7 +244,7 @@ describe("UAT-NL v1.0 TECH-02 and MKT-10", () => {
     const entered = deferred();
     setQueryBudgetPersistEnteredForTests(() => entered.resolve());
     setQueryBudgetCommitGateForTests(hold.promise);
-    const pending = publicPlanCreate(runtime, uatNlFreshKey(1, 0));
+    const pending = domainPlanCreate(runtime, uatNlFreshKey(1, 0));
     await entered.promise;
     let resolved = false;
     void pending.then(() => {
@@ -257,7 +260,7 @@ describe("UAT-NL v1.0 TECH-02 and MKT-10", () => {
       namespace
     });
     assertEstablishedCounters(observed, namespace, "T02-RED-04");
-    const replay = await publicPlanCreate(runtime, uatNlFreshKey(1, 0));
+    const replay = await domainPlanCreate(runtime, uatNlFreshKey(1, 0));
     assert.equal(replay.planHandle, result.planHandle);
     assert.equal(canonicalTuple(replay), canonicalTuple(result));
   });
@@ -288,7 +291,7 @@ describe("UAT-NL v1.0 TECH-02 and MKT-10", () => {
     const entered = deferred();
     setQueryBudgetPersistEnteredForTests(() => entered.resolve());
     setQueryBudgetCommitGateForTests(hold.promise);
-    const pending = publicPlanCreate(runtime, uatNlFreshKey(1, 0));
+    const pending = domainPlanCreate(runtime, uatNlFreshKey(1, 0));
     await entered.promise;
     const observedEarly = await qaObserve(runtime, { namespace });
     const early = counterTuple(observedEarly, namespace);
@@ -305,7 +308,7 @@ describe("UAT-NL v1.0 TECH-02 and MKT-10", () => {
 
   it("UAT-NL-MKT10-RED-02 observation is a pure repeated read", async () => {
     const { runtime, namespace } = createUatNlRuntime();
-    const created = await publicPlanCreate(runtime, uatNlFreshKey(1, 0));
+    const created = await domainPlanCreate(runtime, uatNlFreshKey(1, 0));
     assertReadyPlan(created, "mkt10-02-plan");
     const first = await qaObserve(runtime, {
       correlationId: String(created.planHandle ?? namespace),
@@ -328,7 +331,7 @@ describe("UAT-NL v1.0 TECH-02 and MKT-10", () => {
     const entered = deferred();
     const key = uatNlFreshKey(1, 0);
     setPlanClaimLatchForTests(key, hold.promise, () => entered.resolve());
-    const pending = publicPlanCreate(runtime, key);
+    const pending = domainPlanCreate(runtime, key);
     await entered.promise;
     advanceServiceClock(UAT_NL_SUCCESS_DEADLINE_MS);
     const failed = await pending;
@@ -340,7 +343,7 @@ describe("UAT-NL v1.0 TECH-02 and MKT-10", () => {
     }
     const after = counterTuple(await qaObserve(runtime, { namespace }), namespace);
     assert.deepEqual(after, before);
-    const fresh = await publicPlanCreate(runtime, uatNlFreshKey(1, 1));
+    const fresh = await domainPlanCreate(runtime, uatNlFreshKey(1, 1));
     assertReadyPlan(fresh, "fresh-after-cancel");
     const observed = await qaObserve(runtime, {
       correlationId: String(fresh.planHandle ?? namespace),
@@ -352,7 +355,7 @@ describe("UAT-NL v1.0 TECH-02 and MKT-10", () => {
   it("UAT-NL-MKT10-RED-04 replay and downstream operations do not increment match counters", async () => {
     const { runtime, namespace } = createUatNlRuntime();
     const key = uatNlFreshKey(1, 0);
-    const created = await publicPlanCreate(runtime, key);
+    const created = await domainPlanCreate(runtime, key);
     assertReadyPlan(created, "mkt10-04");
     const baseline = counterTuple(
       await qaObserve(runtime, {
@@ -361,7 +364,7 @@ describe("UAT-NL v1.0 TECH-02 and MKT-10", () => {
       }),
       namespace
     );
-    await publicPlanCreate(runtime, key);
+    await domainPlanCreate(runtime, key);
     const again = await qaObserve(runtime, {
       correlationId: String(created.planHandle ?? namespace),
       namespace
@@ -372,7 +375,7 @@ describe("UAT-NL v1.0 TECH-02 and MKT-10", () => {
 
   it("UAT-NL-MKT10-RED-05 Run A and Run B are logically isolated", async () => {
     const a = createUatNlRuntime("qa-v3:uat-nl:A");
-    const createdA = await publicPlanCreate(a.runtime, uatNlFreshKey(1, 0));
+    const createdA = await domainPlanCreate(a.runtime, uatNlFreshKey(1, 0));
     assertReadyPlan(createdA, "ns-A");
     const observeA = await qaObserve(a.runtime, {
       correlationId: String(createdA.planHandle ?? a.namespace),
@@ -382,7 +385,7 @@ describe("UAT-NL v1.0 TECH-02 and MKT-10", () => {
     endUatNlRun();
     beginUatNlRun();
     const b = createUatNlRuntime("qa-v3:uat-nl:B");
-    const createdB = await publicPlanCreate(b.runtime, uatNlFreshKey(2, 0));
+    const createdB = await domainPlanCreate(b.runtime, uatNlFreshKey(2, 0));
     assertReadyPlan(createdB, "ns-B");
     const observeB = await qaObserve(b.runtime, {
       correlationId: String(createdB.planHandle ?? b.namespace),
@@ -398,8 +401,8 @@ describe("UAT-NL v1.0 TECH-02 and MKT-10", () => {
   it("UAT-NL-X-RED-01 cancelled durable execution closes publication rights", async () => {
     const { runtime, namespace, store } = createUatNlRuntime();
     const key = uatNlFreshKey(1, 0);
-    const reply = await admitJsonRpc(runtime, { id: 1, method: "tools/call", params: { name: "plan", arguments: { operation: "create", idempotencyKey: key, request: F_READY } } });
-    assert.equal((reply?.result?.structuredContent as { status: string }).status, "processing");
+    const reply = await admitDomainPlan({config:runtime.config,store:runtime.store,scope:runtime.scope,now:runtime.now!,payload:{operation:"create",idempotencyKey:key,request:F_READY}});
+    assert.equal((reply as {status:string}).status, "processing");
     const operation = await store.getPlanOperationByKey(`dev:mattanutra:${namespace}`, key); assert.ok(operation);
     const hold = deferred(), entered = deferred(), controller = new AbortController();
     setMatcherGateForTests(hold.promise); setMatcherEnteredForTests(entered.resolve);
@@ -426,7 +429,7 @@ describe("UAT-NL v1.0 TECH-02 and MKT-10", () => {
 
   it("UAT-NL-X-RED-03 original failures are detectable", async () => {
     const { runtime, namespace } = createUatNlRuntime();
-    const created = await publicPlanCreate(runtime, uatNlFreshKey(1, 0));
+    const created = await domainPlanCreate(runtime, uatNlFreshKey(1, 0));
     assertReadyPlan(created, "x-03-plan");
     const first = counterTuple(
       await qaObserve(runtime, {
@@ -455,3 +458,5 @@ describe("UAT-NL v1.0 TECH-02 and MKT-10", () => {
     );
   });
 });
+
+if (process.env.NODE_TEST_CONTEXT) after(closeSqlPool);

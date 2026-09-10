@@ -1,3 +1,6 @@
+import { planTool as admitDomainPlan } from "../lib/agentic/plan/service.ts";
+import { after } from "node:test";
+import { closeSqlPool } from "../lib/db.ts";
 import { handleJsonRpc as admitJsonRpc } from "../lib/agentic/mcp/dispatcher.ts";
 import { runAdmittedPlanOperation } from "../lib/agentic/plan/service.ts";
 import { PLAN_OPERATION_TERMINAL_MS } from "../lib/agentic/plan/operations.ts";
@@ -53,7 +56,7 @@ import {
   freezeRealThailandCatalogue,
   frozenSnapshot,
   publicInfo,
-  publicPlanCreate
+  domainPlanCreate
 } from "./agentic/v16/harness.ts";
 import {
   V16_CLIENT_DEADLINE_MS,
@@ -87,7 +90,7 @@ async function tenBurst(
 ) {
   const keys = burstKeys(repeat);
   const pending = keys.map((key) =>
-    hold.promise.then(() => publicPlanCreate(runtime, key))
+    hold.promise.then(() => domainPlanCreate(runtime, key))
   );
   hold.resolve();
   return { keys, results: await Promise.all(pending) };
@@ -199,7 +202,7 @@ describe("v1.6 TECH-02 plan(create) completion", () => {
     const reversed = deferred();
     const keys = burstKeys(2);
     const pending = [...keys].reverse().map((key) =>
-      reversed.promise.then(() => publicPlanCreate(runtime, key))
+      reversed.promise.then(() => domainPlanCreate(runtime, key))
     );
     reversed.resolve();
     const second = await Promise.all(pending);
@@ -212,7 +215,7 @@ describe("v1.6 TECH-02 plan(create) completion", () => {
     const { keys, results } = await tenBurst(runtime, 1, hold);
     const before = (await store.listPlanIdsByPrincipal("qa-v3:l2:dev")).length;
     for (let index = 0; index < keys.length; index += 1) {
-      const replay = await publicPlanCreate(runtime, keys[index]!);
+      const replay = await domainPlanCreate(runtime, keys[index]!);
       assert.equal(replay.planHandle, results[index]!.planHandle);
       assert.equal(canonicalBusiness(replay), canonicalBusiness(results[index]!));
     }
@@ -226,12 +229,12 @@ describe("v1.6 TECH-02 plan(create) completion", () => {
     const entered00 = deferred();
     const key00 = v16FreshKey(1, 0);
     setPlanClaimLatchForTests(key00, hold00.promise, () => entered00.resolve());
-    const pending00 = publicPlanCreate(runtime, key00);
+    const pending00 = domainPlanCreate(runtime, key00);
     await entered00.promise;
     const others = await Promise.all(
       burstKeys(1)
         .slice(1)
-        .map((key) => publicPlanCreate(runtime, key))
+        .map((key) => domainPlanCreate(runtime, key))
     );
     assert.equal(others.length, 9);
     assert.equal(
@@ -250,7 +253,7 @@ describe("v1.6 TECH-02 plan(create) completion", () => {
     const entered = deferred();
     setMatcherGateForTests(hold.promise);
     setMatcherEnteredForTests(() => entered.resolve());
-    const pending = publicPlanCreate(runtime, v16FreshKey(1, 0));
+    const pending = domainPlanCreate(runtime, v16FreshKey(1, 0));
     await entered.promise;
     const info = await publicInfo(runtime);
     assert.equal(info.ok, true);
@@ -279,8 +282,8 @@ describe("v1.6 TECH-02 plan(create) completion", () => {
 
   it("L2-PLAN-RED-07 controlled durable-operation deadline", async () => {
     const { runtime, store } = createV16Runtime(), key = v16FreshKey(1, 0);
-    const reply = await admitJsonRpc(runtime, { id: 1, method: "tools/call", params: { name: "plan", arguments: { operation: "create", idempotencyKey: key, request: F_READY_MAG } } });
-    assert.equal((reply?.result?.structuredContent as { status: string }).status, "processing");
+    const reply = await admitDomainPlan({config:runtime.config,store:runtime.store,scope:runtime.scope,now:runtime.now!,payload:{operation:"create",idempotencyKey:key,request:F_READY_MAG}});
+    assert.equal((reply as { status:string }).status, "processing");
     const operation = await store.getPlanOperationByKey(`dev:mattanutra:${runtime.scope.principalScope}`, key); assert.ok(operation);
     assert.equal(PLAN_OPERATION_TERMINAL_MS, 175000);
     const expired = { ...operation, deadlineAt: new Date(Date.now() - 1).toISOString() };
@@ -298,7 +301,7 @@ describe("v1.6 TECH-02 plan(create) completion", () => {
 
   it("L2-PLAN-RED-08 worker cancellation and clean same-key replay", async () => {
     const { runtime, store } = createV16Runtime(), key = v16FreshKey(1, 0);
-    await admitJsonRpc(runtime, { id: 1, method: "tools/call", params: { name: "plan", arguments: { operation: "create", idempotencyKey: key, request: F_READY_MAG } } });
+    await admitDomainPlan({config:runtime.config,store:runtime.store,scope:runtime.scope,now:runtime.now!,payload:{operation:"create",idempotencyKey:key,request:F_READY_MAG}});
     const operation = await store.getPlanOperationByKey(`dev:mattanutra:${runtime.scope.principalScope}`, key); assert.ok(operation);
     const hold = deferred(), entered = deferred(), controller = new AbortController();
     setMatcherGateForTests(hold.promise); setMatcherEnteredForTests(entered.resolve);
@@ -306,7 +309,7 @@ describe("v1.6 TECH-02 plan(create) completion", () => {
     await entered.promise; controller.abort(); hold.resolve();
     assert.equal((await pending).ok, false);
     setMatcherGateForTests(null); setMatcherEnteredForTests(null);
-    const replay = await publicPlanCreate(runtime, key);
+    const replay = await domainPlanCreate(runtime, key);
     assert.equal(replay.ok, true, JSON.stringify(replay)); assert.equal(replay.status, "ready");
     assert.equal((await store.getPlanOperationByKey(`dev:mattanutra:${runtime.scope.principalScope}`, key))?.id, operation.id);
     assert.equal((await store.getPlan(operation.planId))?.currentRevision, 1);
@@ -318,7 +321,7 @@ describe("v1.6 TECH-02 plan(create) completion", () => {
     const entered = deferred();
     setMatcherGateForTests(hold.promise);
     setMatcherEnteredForTests(() => entered.resolve());
-    const first = publicPlanCreate(runtime, v16FreshKey(1, 0));
+    const first = domainPlanCreate(runtime, v16FreshKey(1, 0));
     await entered.promise;
     await Promise.resolve();
     await Promise.resolve();
@@ -327,13 +330,13 @@ describe("v1.6 TECH-02 plan(create) completion", () => {
     hold.resolve();
     setMatcherGateForTests(null);
     useInjectedServiceClock();
-    const later = await publicPlanCreate(runtime, v16FreshKey(1, 1));
+    const later = await domainPlanCreate(runtime, v16FreshKey(1, 1));
     assert.equal(later.ok === true || timedOut.ok === false, true);
   });
 
   it("L2-OBS-RED-01 trace completeness", async () => {
     const { runtime } = createV16Runtime();
-    const result = await publicPlanCreate(runtime, v16FreshKey(1, 0));
+    const result = await domainPlanCreate(runtime, v16FreshKey(1, 0));
     assert.equal(result.ok, true);
     const traces = listRequestTraces();
     assert.equal(traces.length >= 1, true, "plan(create) emitted no correlated trace");
@@ -431,3 +434,5 @@ function asError(result: Record<string, unknown>) {
     ? (error as { reasonCode?: string; retryable?: boolean })
     : {};
 }
+
+if (process.env.NODE_TEST_CONTEXT) after(closeSqlPool);

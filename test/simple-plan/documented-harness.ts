@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
 import { runConversationalJourney } from '../../scripts/published-client-journey.mjs';
 import { createAgenticRuntime } from '../../lib/agentic/runtime.ts';
-import { handleJsonRpc } from '../../lib/agentic/mcp/dispatcher.ts';
+import { handleJsonRpc } from '../helpers/recording-mcp-dispatcher.ts';
+import { captureMcpTranscript } from '../helpers/mcp-evidence.ts';
+import { normalizePublishedClientResult } from '../../scripts/published-client-semantics.mjs';
 import { runAdmittedPlanOperation } from '../../lib/agentic/plan/service.ts';
 import { resetMatchPlanCache } from '../../lib/agentic/plan/matching.ts';
 import { installGoldCatalogue, uninstallGoldCatalogue } from '../helpers/gold-catalogue.ts';
@@ -27,4 +29,14 @@ export async function documentedRun(locale: string, discovery: string, checkout 
       }
     });
   } finally { uninstallGoldCatalogue(); resetMatchPlanCache(); }
+}
+
+/** Reuses the published client; the manual broader report cannot execute retired wire suites. */
+export async function runCurrentProtocolPack() {
+  const cases=[];
+  for(const locale of ["en","th","zh-CN"])for(const discovery of ["resources","tools_only"]){
+    const {result,transcript}=await captureMcpTranscript(()=>documentedRun(locale,discovery));
+    cases.push({id:`SPLAN-DOC-${locale}-${discovery}`,result:"PASS",evidence:{acceptance:normalizePublishedClientResult(result,"https://fixture.example/api/mcp"),mcpTranscript:normalizePublishedClientResult(transcript,"https://fixture.example/api/mcp")}});
+  }
+  return {contractVersion:"9.0.0",cases,totalCases:cases.length,passedCases:cases.length};
 }

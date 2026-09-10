@@ -31,10 +31,7 @@
     "file": "test/mcp-7-2-1/deployment.test.ts",
     "cases": [
       "M721-DEPLOY-01 scoped release proof rejects missing, changed and wrong-environment evidence",
-      "M721-DEPLOY-02 source hygiene rejects focused, skipped and empty cases without matching assertion text",
-      "bad",
-      "bad",
-      "good"
+      "M721-DEPLOY-02 source hygiene rejects focused, skipped and empty cases without matching assertion text"
     ],
     "reason": "v9 intentionally removes response modes, operation wrappers and historical publications; relevant invariants transfer to current tests. Original sources and evidence remain archived.",
     "replacement": "test/simple-plan/release.test.ts (v9 scoped proof)"
@@ -330,5 +327,173 @@
     ],
     "reason": "v9 intentionally removes response modes, operation wrappers and historical publications; relevant invariants transfer to current tests. Original sources and evidence remain archived.",
     "replacement": "test/simple-plan/release.test.ts (v9 scoped proof)"
+  },
+  {
+    "file": "test/agentic-ae-pack.test.ts",
+    "cases": [
+      "AE-01",
+      "AE-02",
+      "AE-03",
+      "AE-04",
+      "AE-05",
+      "AE-06",
+      "AE-07",
+      "AE-08",
+      "AE-09",
+      "AE-10",
+      "AE-11",
+      "AE-12",
+      "AE-13",
+      "AE-14",
+      "AE-15",
+      "AE-16",
+      "AE-17",
+      "AE-18",
+      "AE-19"
+    ],
+    "reason": "Retired duplicated v3\u2013v8 wire/projector, response-mode and legacy claim/evidenceHandle assertions. Current requirements are maintained by the listed flat-protocol tests; historical source/results and original fixture prices are archived, not rewritten. Aggregate prior-pack score assertions are retired with those protocols.",
+    "replacement": "publication.test.ts + hosted.test.ts + requests.test.ts + retained-public-invariants.test.ts + agentic-flow.test.ts"
+  },
+  {
+    "file": "test/agentic-ae-c2-pack.test.ts",
+    "cases": [
+      "AX2-01",
+      "AX2-02",
+      "AX2-03",
+      "AX2-04",
+      "AX2-05",
+      "AX2-06",
+      "AX2-07",
+      "AX2-08",
+      "AX2-09",
+      "AX2-10",
+      "AX2-11",
+      "AX2-12",
+      "AX2-13"
+    ],
+    "reason": "Retired duplicated v3\u2013v8 wire/projector, response-mode and legacy claim/evidenceHandle assertions. Current requirements are maintained by the listed flat-protocol tests; historical source/results and original fixture prices are archived, not rewritten. Aggregate prior-pack score assertions are retired with those protocols.",
+    "replacement": "facts.test.ts + advice.test.ts + retained-public-invariants.test.ts + agentic-flexible-v5-journey.test.ts"
+  },
+  {
+    "file": "test/agentic-ae-c3-pack.test.ts",
+    "cases": [
+      "AX3-01",
+      "AX3-02",
+      "AX3-03",
+      "AX3-04",
+      "AX3-05",
+      "AX3-06",
+      "AX3-07",
+      "AX3-08",
+      "AX3-09",
+      "AX3-10",
+      "AX3-11",
+      "AX3-12",
+      "AX3-13",
+      "AX3-14",
+      "AX3-15"
+    ],
+    "reason": "Retired duplicated v3\u2013v8 wire/projector, response-mode and legacy claim/evidenceHandle assertions. Current requirements are maintained by the listed flat-protocol tests; historical source/results and original fixture prices are archived, not rewritten. Aggregate prior-pack score assertions are retired with those protocols.",
+    "replacement": "requests.test.ts + refinement.test.ts + state.test.ts + agentic-plan-recovery.test.ts"
+  },
+  {
+    "file": "test/agentic-ae-c4-pack.test.ts",
+    "cases": [
+      "AX4-01",
+      "AX4-02",
+      "AX4-03",
+      "AX4-04",
+      "AX4-05",
+      "AX4-06",
+      "AX4-07",
+      "AX4-08",
+      "AX4-09"
+    ],
+    "reason": "Retired duplicated v3\u2013v8 wire/projector, response-mode and legacy claim/evidenceHandle assertions. Current requirements are maintained by the listed flat-protocol tests; historical source/results and original fixture prices are archived, not rewritten. Aggregate prior-pack score assertions are retired with those protocols.",
+    "replacement": "advice.test.ts + facts.test.ts + retained-public-invariants.test.ts + response.test.ts"
+  },
+  {
+    "file": "test/agentic-ae-c5-pack.test.ts",
+    "cases": [
+      "AX5-01",
+      "AX5-02",
+      "AX5-03",
+      "AX5-04",
+      "AX5-05",
+      "AX5-06",
+      "AX5-07"
+    ],
+    "reason": "Retired duplicated v3\u2013v8 wire/projector, response-mode and legacy claim/evidenceHandle assertions. Current requirements are maintained by the listed flat-protocol tests; historical source/results and original fixture prices are archived, not rewritten. Aggregate prior-pack score assertions are retired with those protocols.",
+    "replacement": "retained-choice-values.test.ts + documented.test.ts + advice.test.ts"
+  },
+  {
+    "file": "test/agentic-ae-c6-pack.test.ts",
+    "cases": [
+      "AX6-01",
+      "AX6-02",
+      "AX6-03",
+      "AX6-04",
+      "AX6-05",
+      "AX6-06"
+    ],
+    "reason": "Retired duplicated v3\u2013v8 wire/projector, response-mode and legacy claim/evidenceHandle assertions. Current requirements are maintained by the listed flat-protocol tests; historical source/results and original fixture prices are archived, not rewritten. Aggregate prior-pack score assertions are retired with those protocols.",
+    "replacement": "retained-choice-values.test.ts + retained-public-invariants.test.ts + response.test.ts"
+  },
+  {
+    "file": "test/agentic-ae-c7-pack.test.ts",
+    "cases": [
+      "AX7-01",
+      "AX7-02",
+      "AX7-03",
+      "AX7-04",
+      "AX7-05",
+      "AX7-06"
+    ],
+    "reason": "Retired duplicated v3\u2013v8 wire/projector, response-mode and legacy claim/evidenceHandle assertions. Current requirements are maintained by the listed flat-protocol tests; historical source/results and original fixture prices are archived, not rewritten. Aggregate prior-pack score assertions are retired with those protocols.",
+    "replacement": "transport.test.ts + publication.test.ts + agentic-contract-v4.test.ts"
+  },
+  {
+    "file": "test/agentic-ae-c8-pack.test.ts",
+    "cases": [
+      "AX8-01",
+      "AX8-02",
+      "AX8-03",
+      "AX8-04",
+      "AX8-05",
+      "AX8-06",
+      "AX8-07"
+    ],
+    "reason": "Retired duplicated v3\u2013v8 wire/projector, response-mode and legacy claim/evidenceHandle assertions. Current requirements are maintained by the listed flat-protocol tests; historical source/results and original fixture prices are archived, not rewritten. Aggregate prior-pack score assertions are retired with those protocols.",
+    "replacement": "retained-choice-values.test.ts + facts.test.ts + commerce-evidence.test.ts"
+  },
+  {
+    "file": "test/agentic-det-v3.test.ts",
+    "cases": [
+      "G-ISOLATION-01 plan handles are not accepted by the public evidence tool",
+      "B-SECURITY-01 the public evidence tool rejects another principal",
+      "B-INTEGRATION-01 returned evidence handles retrieve scoped claims without changing the plan"
+    ],
+    "reason": "Removed evidenceHandle/research-claims public protocol. Narrow option/ingredient/product evidence and same-store ownership remain maintained.",
+    "replacement": "test/simple-plan/commerce-evidence.test.ts + retained-public-invariants.test.ts"
+  },
+  {
+    "file": "test/agentic-det-v3-scored.test.ts",
+    "cases": [
+      "S4-03 evidence claims each carry researchVersion"
+    ],
+    "reason": "Removed evidenceHandle/research-claims public protocol. Narrow option/ingredient/product evidence and same-store ownership remain maintained.",
+    "replacement": "test/simple-plan/commerce-evidence.test.ts + retained-public-invariants.test.ts"
+  },
+  {
+    "file": "test/agentic-flexible-v5-legacy.test.ts",
+    "cases": [
+      "LEGACY5-01",
+      "LEGACY5-02",
+      "LEGACY5-03",
+      "LEGACY5-04",
+      "LEGACY5-06"
+    ],
+    "reason": "Explicitly approved retirement of old-plan refresh, migration and historical default-limit interpretation. Independent paid/unpaid order recovery remains unchanged.",
+    "replacement": "test/simple-plan/version.test.ts + agentic-flexible-v5-legacy.test.ts (two frozen order recovery cases)"
   }
 ]

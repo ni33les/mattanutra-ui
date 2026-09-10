@@ -1,4 +1,4 @@
-import { orderTool } from "../../../lib/agentic/commerce/order.ts";
+import { readOrderForQa as orderTool } from "../../../lib/agentic/qa/order-read.ts";
 import {
   asRecord,
   beginV14Run,
