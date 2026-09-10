@@ -73,6 +73,7 @@ for (const database of (packageId === "practical" && mode === "validate" ? [] : 
     Object.assign(env, { TEST_DB_URL: db.href, DB_URL: db.href, DB_WORKER_URL: db.href, DB_POOL_MAX: "3", DB_ALLOW_DIRECT_CONNECTION: "true" });
   }
   batches.push(await runBatch(label, ["--test", "--test-concurrency=1", "--experimental-strip-types", ...(!database ? ["--import", "./test/helpers/offline-network.mjs"] : []), "--import", "./scripts/register-ts-path-loader.mjs", ...selected], env, output));
+  assert.ok(batches.at(-1).passed, `${label} failed; later stages were not started`);
   events.push(...readFileSync(resolve(output, `${label}-events.jsonl`), "utf8").trim().split("\n").filter(Boolean).map(line => JSON.parse(line)));
 }
 const result = { passed: batches.every(row => row.passed) };
