@@ -4,7 +4,7 @@ import { after, test } from "node:test";
 import postgres from "postgres";
 import { createPostgresStore } from "../../lib/agentic/store/postgres.ts";
 import { issueCapability } from "../../lib/agentic/capabilities.ts";
-import { readPlanStatus } from "../../lib/agentic/presentation/plan-read.ts";
+import { readPlanState } from "../../lib/agentic/presentation/plan-read.ts";
 import { internalFixture } from "../mcp-conversation-pack/helpers.ts";
 import { runtime } from "../ax-refinement/helpers.ts";
 
@@ -45,8 +45,8 @@ test("EFF-READ-PG-01 ordinary status reads complete behind held updates while mu
   }).catch(error => { assert.match(error.message, /rollback isolated lock probe/); });
   await held;
   try {
-    const status = await readPlanStatus(app, handle);
-    assert.ok(status.ok && "responseView" in status && status.responseView === "status");
+    const status = await readPlanState(app, handle);
+    assert.ok("projection" in status);
     await assert.rejects(store.transaction(tx => tx.getActiveOrderForPlanRevisionForUpdate(id, 1)), (error: { code?: string }) => error.code === "55P03");
     await assert.rejects(store.transaction(tx => tx.isCatalogueRevisionCurrent!(1)), (error: { code?: string }) => error.code === "55P03");
   } finally { release(); await writer; }
@@ -73,10 +73,10 @@ test("LOCK-READ-04 ordinary active/open order lookups never wait behind checkout
 
 test("EFF-READ-PG-02 warm status uses two SELECTs and the read state contains no large result or command", async () => {
   const { app, id, handle } = await fixture();
-  const first = await readPlanStatus(app, handle); assert.ok(first.ok && "resultVersion" in first);
+  const first = await readPlanState(app, handle); assert.ok("resultVersion" in first);
   queries.length = 0;
-  const result = await readPlanStatus(app, handle, first.resultVersion);
-  assert.ok(result.ok && "unchanged" in result && result.unchanged);
+  const result = await readPlanState(app, handle);
+  assert.ok("resultVersion" in result); assert.equal(result.resultVersion, first.resultVersion);
   assert.equal(queries.length, 2); assert.ok(queries.every(query => /^\s*select/i.test(query)));
   const state = await store.getPlanReadState(id); assert.ok(state?.projection);
   assert.equal(state.result, null); assert.equal(state.operation, null);
@@ -97,7 +97,7 @@ test("EFF-ORDER-PG-01 expired order status stays read-only behind a held checkou
   await held;
   try {
     const { orderTool } = await import("../../lib/agentic/commerce/order.ts");
-    const result = await orderTool({ ...app, now: app.now!, orderHandle: handle, responseView: "status" });
+    const result = await orderTool({ ...app, now: app.now!, orderHandle: handle });
     assert.ok(result.ok); assert.equal(result.orderStatus, "expired");
     assert.equal((await store.getOrder(orderId))!.orderStatus, "open");
   } finally { release(); await writer; }
@@ -109,22 +109,22 @@ test("EFF-ORDER-PG-02 warm order polls read small facts in two SELECTs and retai
     resourceType: "order", allowedActions: ["order.read"] });
   const { orderTool } = await import("../../lib/agentic/commerce/order.ts");
   queries.length = 0;
-  const first = await orderTool({ ...app, now: app.now!, orderHandle: handle, responseView: "status" }); assert.ok(first.ok);
+  const first = await orderTool({ ...app, now: app.now!, orderHandle: handle }); assert.ok(first.ok);
   assert.equal(queries.length, 2); assert.ok(queries.every(query => /^\s*select/i.test(query)));
   const state = await store.getOrderReadState(orderId); assert.ok(state);
   assert.ok(Buffer.byteLength(JSON.stringify(state)) < 2500);
   assert.deepEqual((await store.getOrder(orderId))!.frozenPlan, internalFixture());
-  const second = await orderTool({ ...app, now: app.now!, orderHandle: handle, responseView: "status", knownResultVersion: first.resultVersion });
-  assert.ok(second.ok && "unchanged" in second && second.unchanged);
+  const second = await orderTool({ ...app, now: app.now!, orderHandle: handle });
+  assert.deepEqual(second, first);
 });
 
 test("EFF-READ-PG-03 payment transitions invalidate the small plan version without loading frozen contents", async () => {
   const { app, handle, id, orderId } = await fixture();
-  const first = await readPlanStatus(app, handle); assert.ok(first.ok && "resultVersion" in first);
+  const first = await readPlanState(app, handle); assert.ok("resultVersion" in first);
   const order = await store.getOrder(orderId); assert.ok(order);
   await store.updateOrder({ ...order, paymentStatus: "paid", stateVersion: 2 });
-  const second = await readPlanStatus(app, handle, first.resultVersion);
-  assert.ok(second.ok && "unchanged" in second && !second.unchanged);
+  const second = await readPlanState(app, handle);
+  assert.ok("resultVersion" in second); assert.notEqual(second.resultVersion, first.resultVersion);
   const state = await store.getPlanReadState(id); assert.equal(state?.payment?.paymentStatus, "paid");
   assert.equal(state?.result, null); assert.ok(Buffer.byteLength(JSON.stringify(state)) < 2500);
 });

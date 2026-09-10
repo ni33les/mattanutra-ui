@@ -49,14 +49,11 @@ it("V5-INFRA-05 complete matcher pack uses real isolated HTTP handlers without a
       const guide = await callInfo({ view: "client_guide" });
       assert.equal(typeof guide.clientGuideText, "string", `${locale}: tools-only guide must survive HTTP dispatch`);
       assert.match(guide.clientGuideText, /supplemental/);
-      for (const operation of ["create", "get", "revise", "answer", "select"]) {
-        const detail = await callInfo({ view: "plan_schema", planOperation: operation });
-        assert.equal(detail.planOperation, operation);
-        const definition = JSON.parse(detail.planSchemaJson);
-        const branches = definition.anyOf ?? [definition];
-        assert.ok(branches.length > 0);
-        for (const branch of branches) assert.equal(branch.properties.operation.const, operation);
-      }
+      const schema = await callInfo({ view: "plan_schema" });
+      const definition = JSON.parse(schema.planSchemaJson as string);
+      assert.equal(schema.planOperation, undefined);
+      assert.equal(definition.anyOf.length, 5);
+      for (const branch of definition.anyOf) assert.equal(branch.properties.operation, undefined);
       const overview = await callInfo({});
       assert.equal(overview.clientGuideText, undefined);
       assert.equal(overview.planSchemaJson, undefined);

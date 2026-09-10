@@ -3,8 +3,8 @@ import test from 'node:test';
 import * as checkout from '../../lib/retail-product-checkout.ts';
 import { MATCHER_VERSION } from '../../lib/matcher/config.ts';
 import { webHealthAdvice } from '../../lib/web-health-advice.ts';
-import { originalRequestFor } from '../../lib/agentic/plan/request-patch.ts';
-import { internalFixture } from '../mcp-conversation-pack/helpers.ts';
+import { readPlanPresentation } from '../../lib/agentic/presentation/plan-read.ts';
+import { internalFixture, storedFixture } from '../mcp-conversation-pack/helpers.ts';
 
 const advice = webHealthAdvice({ code: 'medication_interaction', kind: 'context', ingredient: 'Omega-3', evidence: 'controlled-rule' });
 const input = { planId: '10000000-0000-4000-8000-000000000001', locale: 'en' as const, selectedItemIds: ['20000000-0000-4000-8000-000000000001'], recommendationRunId: '30000000-0000-4000-8000-000000000001', optionId: 'other', assessmentRevision: 1, selectionRevision: 0 };
@@ -43,8 +43,9 @@ test('PRACTICAL-CHECKOUT-04 old unexecuted profile results require refresh befor
   await assert.rejects(checkout.currentWebCheckoutRecommendations(sql, input), (error: unknown) => error instanceof Error && 'code' in error && error.code === 'stale_product_selection');
 });
 
-test('PRACTICAL-CHECKOUT-05 refreshing a prior advisory contract preserves explicitly stored product preferences', () => {
-  const result = internalFixture(); result.contractVersion = '7.2.4'; result.originalRequest = undefined; result.requestSnapshot.originalRequest = undefined;
-  result.requestSnapshot.requirements.maxProductCount = 9;
-  const request = originalRequestFor(result); assert.ok(!('ok' in request)); assert.equal(request.requirements.maxProductCount, 9);
+test('PRACTICAL-CHECKOUT-05 retired plan handles are not translated or refreshed into new recommendations', async () => {
+  const result = internalFixture(); result.contractVersion = '7.2.4'; result.requestSnapshot.requirements.maxProductCount = 9;
+  const { app, handle } = await storedFixture(result);
+  const read = await readPlanPresentation(app, handle); assert.ok('error' in read); assert.equal(read.error.reasonCode, 'not_found');
+  assert.equal(result.requestSnapshot.requirements.maxProductCount, 9);
 });

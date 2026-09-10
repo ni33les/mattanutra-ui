@@ -43,9 +43,9 @@ it('V5-PUBLISH-PG-01: matching publishes without waiting for catalogue writers a
       assert.equal(completed.ok,true,JSON.stringify(completed));
       assert.equal((await store.getPlanOperation(operation.id))?.status,'complete');
     } finally {release();await writer;}
-    const {readPlanStatus}=await import('../lib/agentic/presentation/plan-read.ts');
+    const {simplePlanTool}=await import('../lib/agentic/plan/simple-service.ts');
     const {createAgenticRuntime}=await import('../lib/agentic/runtime.ts');
-    const status=await readPlanStatus(createAgenticRuntime({config,store,scope}),admitted.planHandle);
+    const status=await simplePlanTool(createAgenticRuntime({config,store,scope}),{planHandle:admitted.planHandle});
     assert.ok(status.ok && status.refreshRequired);assert.equal(status.status,'needs_input');
     const saved=await store.getPlanRevision(operation.planId,1);assert.equal(saved?.status,'no_purchase');
     assert.equal((await store.getPlanReadState(operation.planId))?.projection?.catalogueRevision,Number(epoch.revision));

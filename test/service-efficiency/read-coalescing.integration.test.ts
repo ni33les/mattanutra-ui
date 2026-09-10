@@ -10,7 +10,7 @@ import {appendSupplementSafetyLimitVersion} from "../../lib/supplement-safety-li
 import {listDeliverableMarkets} from "../../lib/agentic/catalogue/market.ts";
 import {ensureCatalogueSnapshot,setCatalogueInitGateForTests,setCatalogueInitEnteredForTests} from "../../lib/agentic/catalogue/snapshot.ts";
 import {installGoldCatalogue,uninstallGoldCatalogue} from "../helpers/gold-catalogue.ts";
-import {readPlanStatus} from "../../lib/agentic/presentation/plan-read.ts";
+import {readPlanState} from "../../lib/agentic/presentation/plan-read.ts";
 import {storedFixture,internalFixture} from "../mcp-conversation-pack/helpers.ts";
 import {withLivePlanRequest,isLivePlanInFlight,keepPlanPathWarm} from "../../lib/agentic/plan/warm-dev.ts";
 
@@ -24,7 +24,7 @@ test("LOCK-COALESCE-32 catalogue single-flight waits only its own immutable load
   let release!:()=>void,entered=0;const barrier=new Promise<void>(resolve=>{release=resolve;});
   setCatalogueInitGateForTests(barrier);setCatalogueInitEnteredForTests(()=>{entered++;});
   const calls=Array.from({length:12},()=>ensureCatalogueSnapshot("dev","TH"));
-  try {assert.equal(entered,1);assert.equal((await readPlanStatus(app,handle)).ok,true);}
+  try {assert.equal(entered,1);assert.ok("projection" in await readPlanState(app,handle));}
   finally {release();setCatalogueInitGateForTests(null);setCatalogueInitEnteredForTests(null);}
   const rows=await Promise.all(calls);assert.ok(rows[0].products.length);assert.ok(rows.every(row=>row===rows[0]));
 });

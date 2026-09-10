@@ -9,6 +9,7 @@ import {validateUatResources} from "./service-efficiency/runtime-resources.mjs";
 
 export const MCP721_BASE = "22f3ce60f17158c68a251abe4070f582dd39253a";
 export const MCP_PACKAGES = {
+  "simple-plan": { version: "9.0.0", directory: "test/simple-plan", base: "2d4c259a6775b57f3182306955a57ccfa6796ca4", scope: "conversational_v9_and_affected_consumers" },
   practical: { version: "8.0.0", directory: "test/practical-matching", base: "ab102ab3930cbaea0594847152ac010bcae722ca", scope: "shared_practical_matching_and_affected_journeys" },
   "discovery": { version: "7.2.4", directory: "test/mcp-discovery", base: "41ed9fd07e8b9c8814d361eab33d72b27ac7c157", scope: "mcp_discoverability_and_maintained_regression" },
   "efficiency": { version: "7.2.4", directory: "test/service-efficiency", base: "a28f3b27d6bde5a21803fa5e33622e89ce2a708d", scope: "core_service_efficiency_and_funnel" },
@@ -20,6 +21,7 @@ export const MCP_PACKAGES = {
 };
 export const MCP721_STAGES = ["affected-tests", "typecheck", "release-diff-lint", "production-build", "unchanged-source-and-inputs"];
 export function packageStages(packageId) {
+  if (packageId === "simple-plan") return ["isolated-schema", "affected-tests", "typecheck", "release-diff-lint", "production-build", "documented-journeys-paired", "no-new-locks", "unchanged-source-and-inputs"];
   if (packageId === "practical") return ["typecheck", "release-diff-lint", "production-build", "complete-mcp-regression", "affected-tests", "affected-browser-tests", "bounded-semantic-comparison", "no-new-locks", "unchanged-source-and-inputs"];
   if (packageId === "discovery") return [...MCP721_STAGES.slice(0, 4), "complete-mcp-regression", ...MCP721_STAGES.slice(4)];
   return packageId === "efficiency" ? ["isolated-schema", "affected-tests", "lock-register-verification", "typecheck", "release-diff-lint", "production-build", "affected-browser-tests", "repeated-baseline-comparison", "unchanged-source-and-inputs"] : MCP721_STAGES;
@@ -28,7 +30,7 @@ export function mcp721Identity(sourceSha256, sourceCommit, packageId = "721") {
   const definition = MCP_PACKAGES[packageId]; assert.ok(definition, "Unknown work package");
   const inventory = readFileSync(`${definition.directory}/impact.json`);
   const inputs = JSON.parse(inventory).inputs.map(file => ({ file, sha256: payloadHash(readFileSync(file)) }));
-  return { ...(packageId === "practical" ? { deploymentBases: JSON.parse(inventory).deploymentBases, profileSha256: payloadHash(readFileSync("lib/matcher/practical-scoring.ts")), lockRegisterSha256: payloadHash(readFileSync("test/service-efficiency/lock-register.json")) } : {}), ...(packageId === "discovery" ? { deploymentBases: JSON.parse(inventory).deploymentBases,
+  return { ...(packageId === "simple-plan" ? { deploymentBases: JSON.parse(inventory).deploymentBases, profileSha256: payloadHash(readFileSync("lib/matcher/scoring-policy.ts")) } : {}), ...(packageId === "practical" ? { deploymentBases: JSON.parse(inventory).deploymentBases, profileSha256: payloadHash(readFileSync("lib/matcher/practical-scoring.ts")), lockRegisterSha256: payloadHash(readFileSync("test/service-efficiency/lock-register.json")) } : {}), ...(packageId === "discovery" ? { deploymentBases: JSON.parse(inventory).deploymentBases,
     positioningSha256: payloadHash(readFileSync("lib/agentic/discovery/positioning.ts")), connectorManifestSha256: payloadHash(readFileSync("lib/agentic/adapters/openai.json")) } : {}), ...(packageId === "efficiency" ? { deploymentBases: JSON.parse(inventory).deploymentBases,
     lockRegisterSha256: payloadHash(readFileSync("test/service-efficiency/lock-register.json")),
     schemaSha256: payloadHash(readFileSync("scripts/service-efficiency-schema.sql")), workerProtocolSha256: payloadHash(readFileSync("lib/agentic/plan/match-worker-protocol.ts")) } : {}), sourceSha256, sourceCommit, releaseBase: definition.base,
@@ -56,6 +58,14 @@ export function checkMcp721Proof(file, expected, packageId = "721") {
   assert.equal(tests.execution.cases, inventory.files.reduce((sum, row) => sum + row.expectedCases, 0));
   assert.ok(tests.execution.cases > 0 && build.buildSha256 && build.nextBuildId);
   assert.equal(json("source-after.json").sha256, expected.sourceSha256);
+  if (packageId === "simple-plan") {
+    const paired = json("documented-paired.json"), locks = json("no-new-locks.json");
+    assert.equal(paired.passed, true); assert.equal(paired.runs.length, 2);
+    assert.deepEqual(paired.runs[0].semantic, paired.runs[1].semantic);
+    assert.deepEqual(paired.locales, ["en", "th", "zh-CN"]);
+    assert.equal(locks.passed, true); assert.ok(locks.candidateCount <= locks.controlCount);
+    assert.equal(build.sourceCommit, expected.sourceCommit);
+  }
   if (["discovery", "practical"].includes(packageId)) {
     const full = json("mcp-regression/results.json"), selected = json("mcp-regression/inventory.json");
     assert.equal(full.passed, true); assert.equal(full.unchangedSource, true); assert.equal(full.sourceSha256, expected.sourceSha256); assert.equal(full.sourceCommit, expected.sourceCommit);

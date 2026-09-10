@@ -43,13 +43,13 @@ it('V5-PUBLISH-01: a catalogue-only change preserves the completed snapshot and 
     assert.equal(ids.length, 1);
     const revision = await store.getPlanRevision(ids[0]!, 1); assert.equal(revision?.status, 'no_purchase');
     assert.equal((await store.getPlanOperation(operation.id))?.status, 'complete');
-    const {readPlanStatus}=await import('../lib/agentic/presentation/plan-read.ts');
+    const {simplePlanTool}=await import('../lib/agentic/plan/simple-service.ts');
     const {createAgenticRuntime}=await import('../lib/agentic/runtime.ts');
     const read = store.getPlanReadState.bind(store);
     store.getPlanReadState = async (...args) => { const state=await read(...args); return state ? {...state,catalogueRevision:epoch}:state; };
-    const status=await readPlanStatus(createAgenticRuntime({config,store,scope,now:'2026-09-07T00:00:01Z'}), admitted.ok ? admitted.planHandle : '');
+    const status=await simplePlanTool(createAgenticRuntime({config,store,scope,now:'2026-09-07T00:00:01Z'}), {planHandle: admitted.ok ? admitted.planHandle : ''});
     assert.ok(status.ok && status.refreshRequired); assert.equal(status.status,'needs_input');
-    assert.equal(status.nextActions[0],'change_request');
+    assert.equal(status.nextAction,'change_request');
     assert.equal((await store.getPlanRevision(ids[0]!,1))?.status,'no_purchase','Reading stale data must not overwrite the saved result');
   } finally {
     release?.(); setMatcherGateForTests(null); setMatcherEnteredForTests(null); uninstallGoldCatalogue();

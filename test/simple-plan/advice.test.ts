@@ -1,3 +1,4 @@
+import { adviceKind } from "../../lib/agentic/value/advice-kind.ts";
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { internalFixture } from '../mcp-conversation-pack/helpers.ts';
@@ -26,4 +27,10 @@ test('SPLAN-ADV-01/03 PAY-VIEW-03 ingredient advice deduplicates facts but prese
     for (const finding of row.advice) { assert.ok([...finding.message].length <= 240); assert.doesNotMatch(finding.message, /\d\.\d{8}/); }
     assert.match(row.advice[0].message, locale === 'th' ? /[ก-๙]/ : locale === 'zh-CN' ? /[\u4e00-\u9fff]/ : /Review/);
   }
+});
+
+test("M721-ADVICE-03 explicit missing-reference rule classification does not change other dose or interaction rules", () => {
+  assert.equal(adviceKind({ code: "dose_review_required", ruleId: "ul:missing:d3" }), "incomplete_information");
+  assert.equal(adviceKind({ code: "dose_review_required", ruleId: "ul:total:d3" }), "dose_review");
+  assert.equal(adviceKind({ code: "medication_interaction" }), "interaction");
 });

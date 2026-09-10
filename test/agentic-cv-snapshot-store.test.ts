@@ -10,7 +10,7 @@ import { completedPlanTool } from './helpers/completed-mcp-client.ts';
 import { captureMatcherSafetySnapshot } from '../lib/matcher/safety-ceilings.ts';
 import { runWithMatcherSafetySnapshot } from '../lib/matcher/safety-ceilings-server.ts';
 import { canonicalHash } from '../lib/agentic/value/canonical.ts';
-import { readPlanStatus } from '../lib/agentic/presentation/plan-read.ts';
+import { simplePlanTool } from '../lib/agentic/plan/simple-service.ts';
 import { createAgenticRuntime } from '../lib/agentic/runtime.ts';
 
 it('V5-CV-STORE-01: frozen memory fixtures validate their exact epoch only inside a transaction', async () => {
@@ -46,9 +46,9 @@ it('V5-CV-STORE-02: snapshot publication is nonlocking while stale selection ret
       const current = await within(() => completedPlanTool({ ...runtime, now: runtime.now!, payload }));
       assert.equal(current.ok, true); if (!current.ok) throw new Error('Missing completed fixture');
       assert.equal(current.status, 'no_purchase'); assert.equal(current.revision, 1);
-      const status = await readPlanStatus(runtime, current.planHandle);
+      const status = await simplePlanTool(runtime, { planHandle: current.planHandle });
       assert.equal(status.ok, true); if (!status.ok) throw new Error('Missing status');
-      assert.equal(status.refreshRequired, epoch !== 41);
+      assert.equal(Boolean(status.refreshRequired), epoch !== 41);
       assert.equal(status.status, epoch === 41 ? 'no_purchase' : 'needs_input');
       const purchase = current.options?.find(option => option.purchaseEligible && option.basket.length > 0);
       assert.ok(purchase, 'A valid above-target purchase must remain selectable');

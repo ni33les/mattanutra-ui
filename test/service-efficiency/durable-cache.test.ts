@@ -11,7 +11,7 @@ test("EFF-CACHE-07 real durable owners share matching and reuse completed facts 
   Worker.prototype.postMessage = function(message, ...args) { if (message?.kind === "session-start") starts++; return original.call(this, message, ...args); };
   try {
     const apps = [runtime("cache-owner-one"), runtime("cache-owner-two"), runtime("cache-owner-three")];
-    const admitted = await Promise.all(apps.map((app, index) => rpc(app, "plan", { operation: "create", idempotencyKey: `efficiency-owner-${index}`, request: goldens.d3 })));
+    const admitted = await Promise.all(apps.map((app, index) => rpc(app, "plan", { ...Object.fromEntries(Object.entries(goldens.d3).filter(([key]) => key !== "optimization")), idempotencyKey: `efficiency-owner-${index}`, scoring: { profile: goldens.d3.optimization } })));
     for (const response of admitted) assert.equal(response.status, "processing", JSON.stringify(response));
     const run = async (index: number) => {
       const app = apps[index], op = await app.store.getPlanOperationByKey(`dev:mattanutra:${app.scope.principalScope}`, `efficiency-owner-${index}`); assert.ok(op);
@@ -22,6 +22,6 @@ test("EFF-CACHE-07 real durable owners share matching and reuse completed facts 
     assert.equal(starts, 1); assert.notEqual(admitted[0].planHandle, admitted[1].planHandle);
     assert.ok(one.ok && two.ok); assert.deepEqual(one.basket, two.basket); assert.deepEqual(one.coverage, two.coverage);
     const three = await run(2); assert.equal(starts, 1); assert.ok(three.ok); assert.deepEqual(three.basket, one.basket);
-    const denied = await rpc(apps[2], "plan", { operation: "get", planHandle: admitted[0].planHandle, responseView: "status" }); assert.equal(denied.ok, false);
+    const denied = await rpc(apps[2], "plan", { planHandle: admitted[0].planHandle }); assert.equal(denied.ok, false);
   } finally { Worker.prototype.postMessage = original; if (previous === undefined) delete process.env.AX_REFINEMENT_REAL_WORKERS; else process.env.AX_REFINEMENT_REAL_WORKERS = previous; uninstallRealCatalogue(); }
 });

@@ -15,8 +15,9 @@ describe("MCP client and HTTP contract", () => {
       { ok: true, planHandle: "opaque", revision: 2, nextAction: "execute", optionId: "choice" },
       { ok: false, error: { reasonCode: "stale_revision", message: "Refresh the plan.", retryable: false } }
     ]) {
-      const result = toolResult(payload, !payload.ok);
-      assert.deepEqual(JSON.parse(result.content[1].text), result.structuredContent);
+      const result = toolResult(payload, !payload.ok, "plan", "text");
+      assert.deepEqual(JSON.parse(result.content[0].text), payload);
+      assert.equal(result.structuredContent, undefined);
       assert.equal(result.isError, !payload.ok);
     }
   });
@@ -51,14 +52,11 @@ describe("MCP client and HTTP contract", () => {
       const guide = await call({ view: "client_guide" });
       assert.equal(typeof guide.clientGuideText, "string", `${locale}: the real discovery path must return the requested guide`);
       assert.match(guide.clientGuideText as string, /supplemental/);
-      for (const operation of ["create", "get", "revise", "answer", "select"]) {
-        const schema = await call({ view: "plan_schema", planOperation: operation });
-        assert.equal(schema.planOperation, operation);
-        const definition = JSON.parse(schema.planSchemaJson as string);
-        const branches = definition.anyOf ?? [definition];
-        assert.ok(branches.length > 0);
-        for (const branch of branches) assert.equal(branch.properties.operation.const, operation);
-      }
+      const schema = await call({ view: "plan_schema" });
+      const definition = JSON.parse(schema.planSchemaJson as string);
+      assert.equal(schema.planOperation, undefined);
+      assert.equal(definition.anyOf.length, 5);
+      for (const branch of definition.anyOf) assert.equal(branch.properties.operation, undefined);
       const overview = await call({});
       assert.equal(overview.clientGuideText, undefined, "A detail request must not contaminate the compact overview");
       assert.equal(overview.planSchemaJson, undefined);

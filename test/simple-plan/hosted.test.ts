@@ -4,8 +4,8 @@ import { readFileSync } from "node:fs";
 import { toolList } from "../../lib/agentic/mcp/rpc.ts";
 import { validateInstalledConnectorProjection } from "../../scripts/validate-installed-connector-projection.mjs";
 
-const published = { contractVersion: "7.2.1", schemaChecksum: "fixture-checksum", tools: toolList() };
-const installed = () => ({ ...structuredClone(published), source: "installed_connector", connectorId: "dev-host", environment: "dev", observedAt: "2026-09-08T10:00:00Z" });
+const published = { contractVersion: "9.0.0", schemaChecksum: "fixture-checksum", tools: toolList() };
+const installed = () => ({ ...structuredClone(published), source: "installed_connector", connectorId: "dev-host", environment: "dev", observedAt: "2026-09-10T10:00:00Z" });
 
 test("M721-HOST-01 current seven-tool exports pass while missing evidence and native-only evidence fail", () => {
   assert.equal(validateInstalledConnectorProjection(installed(), published).passed, true);

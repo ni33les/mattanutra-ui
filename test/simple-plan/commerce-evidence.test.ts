@@ -8,7 +8,7 @@ import type { AgenticRuntime } from '../../lib/agentic/runtime.ts';
 
 async function call(app: AgenticRuntime, name: string, args: Record<string, unknown>) {
   const rpc = await handleJsonRpc(app, { id: 1, method: 'tools/call', params: { name, arguments: args } });
-  assert.ok(rpc?.result?.structuredContent); return rpc.result.structuredContent as Record<string, any>;
+  assert.ok(rpc?.result?.structuredContent); return rpc.result.structuredContent as Record<string, unknown>;
 }
 test('SPLAN-EVID-01 narrow evidence uses current option and product IDs; rejects unrelated IDs and stale revisions', async () => {
   const { app, handle } = await storedFixture(internalFixture());

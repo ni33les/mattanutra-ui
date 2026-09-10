@@ -1,18 +1,19 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { AGENTIC_CONTRACT_VERSION } from '../../lib/agentic/config.ts';
-import { PLAN_REQUEST, PLAN_OPERATION_SCHEMAS } from '../../lib/agentic/contract/schemas.ts';
+import { PLAN_REQUEST, PLAN_BRANCH_SCHEMAS } from '../../lib/agentic/contract/schemas.ts';
 import { validateToolIssues } from '../../lib/agentic/contract/validate.ts';
-import { mergeRequestPatch } from '../../lib/agentic/plan/request-patch.ts';
+import { prepareSimpleRequest } from '../../lib/agentic/plan/simple-input.ts';
+import { fixtureSnapshot } from '../../lib/agentic/catalogue/fixtures.ts';
 import { toCanonicalRequest } from '../../lib/agentic/plan/matching.ts';
 import { planRematchFingerprint } from '../../lib/agentic/plan/normalize.ts';
 import { aug25PlanState } from '../../lib/agentic/plan/mode-d.ts';
 import { recommendWithMatcher } from '../../lib/matcher/adapters/web.ts';
 import { resolvePracticalProfile } from '../../lib/matcher/practical-scoring.ts';
 import { setMatcherSafetyCeilings, resetMatcherSafetyCeilings } from '../../lib/matcher/safety-ceilings.ts';
-import { projectPlan } from '../../lib/agentic/presentation/plan.ts';
-import { d3Fixture } from '../mcp-conversation-pack/helpers.ts';
-import { planResponseView } from '../../lib/agentic/contract/presentation-default.ts';
+import { presentDecision } from '../../lib/agentic/presentation/decision.ts';
+import { internalFixture } from '../mcp-conversation-pack/helpers.ts';
+import { validateContractPin } from '../../lib/agentic/contract/version-pin.ts';
 import type { PlanRequest } from '../../lib/agentic/plan/types.ts';
 import type { ProductCandidate, ProductRecommendationNeed } from '../../lib/product-recommendation-types.ts';
 
@@ -28,20 +29,20 @@ const candidate = (pack: number | null): ProductCandidate => ({ id: 'a', title: 
     provenance: { status: 'verified', sourceUrl: 'https://example.test/label', sourceText: 'Fixture label: one tablet per serving.', verifiedAt: '2026-09-10' } },
   facts: [{ name: 'A', normalizedName: 'a', amount: 100, comparableAmount: 100000, unit: 'mg', itemType: 'supplement', confidence: 'high' }] });
 
-test('PRACTICAL-API-01 published request validates preference importance without a hard mode', () => {
+test('PRACTICAL-API-01 internal web importance remains valid while MCP uses bounded weights', () => {
   assert.deepEqual(validateToolIssues(PLAN_REQUEST, wire()), []);
   assert.ok(validateToolIssues(PLAN_REQUEST, { ...wire(), requirements: { preferenceImportance: { maxDailyPills: 'hard' } } }).length > 0);
-  assert.deepEqual(validateToolIssues(PLAN_OPERATION_SCHEMAS.create, { operation: 'create', idempotencyKey: 'practical-create-test-01', request: wire() }), []);
+  assert.deepEqual(validateToolIssues(PLAN_BRANCH_SCHEMAS.create, { locale: 'en', destinationCountry: 'TH', targets: wire().targets, scoring: { weights: { pills: 2 } }, idempotencyKey: 'practical-create-test-01' }), []);
 });
 
-test('PRACTICAL-API-02 patching objectives preserves importance, targets and medication context', () => {
-  const result = mergeRequestPatch(wire(), { optimization: 'lowest_cost' });
-  assert.ok(!('ok' in result)); assert.equal(result.requirements.preferenceImportance?.maxDailyPills, 'strong');
-  assert.deepEqual(result.targets, wire().targets); assert.deepEqual(result.medicationCodes, ['apixaban']);
-  const cleared = mergeRequestPatch(result, { requirements: { maxDailyPills: null } }); assert.ok(!('ok' in cleared));
-  assert.equal(cleared.requirements.maxDailyPills, null);
-  const reset = mergeRequestPatch(result, { requirements: { preferenceImportance: { maxDailyPills: 'normal' } } }); assert.ok(!('ok' in reset));
-  assert.equal(reset.requirements.preferenceImportance?.maxDailyPills, 'normal');
+test('PRACTICAL-API-02 sparse refinement preserves weights, targets and medication context', () => {
+  const original = prepareSimpleRequest({ locale: 'en', destinationCountry: 'TH', targets: wire().targets, medicationCodes: ['apixaban'], requirements: { maxDailyPills: 3 }, scoring: { weights: { pills: 2 } } }, fixtureSnapshot());
+  assert.ok(!('ok' in original));
+  const result = prepareSimpleRequest({ requirements: { maxDailyPills: null } }, fixtureSnapshot(), original);
+  assert.ok(!('ok' in result)); assert.equal(result.requirements.maxDailyPills, null); assert.equal(result.scoring?.weights.pills, 2);
+  assert.deepEqual(result.targets, original.targets); assert.deepEqual(result.medicationCodes, ['apixaban']);
+  const reset = prepareSimpleRequest({ scoring: { profile: 'lowest_cost' } }, fixtureSnapshot(), result);
+  assert.ok(!('ok' in reset)); assert.deepEqual(reset.scoring?.weights, {});
 });
 
 test('PRACTICAL-API-03 canonical MCP and task identities retain the selected preference weight', () => {
@@ -79,21 +80,18 @@ test('PRACTICAL-API-05 monthly budget uses verified packs and preserves unknown 
   } finally { resetMatcherSafetyCeilings(); }
 });
 
-test('PRACTICAL-API-06 score details include overall breakdown while conversation stays compact', () => {
-  const plan = d3Fixture(); const marker = { profile: { id: 'balanced', hash: 'fixture-profile', version: 'practical-penalties-1' }, overallPenalty: 1.25 };
-  const first = plan.options![0]; (first as unknown as { overallScore: unknown }).overallScore = marker;
-  const details = projectPlan(plan, { responseView: 'details', expectedRevision: plan.revision, sections: ['score'] });
-  assert.ok(details.ok && 'options' in details); assert.deepEqual(details.options[0].overallScore, marker);
-  const conversation = projectPlan(plan, { responseView: 'conversation' }); assert.ok(!('overallScore' in conversation.options[0]));
+test('PRACTICAL-API-06 internal scores remain inspectable without adding public arithmetic trees', () => {
+  const result = internalFixture(); const marker = { overallPenalty: 1.25 };
+  (result.selected as unknown as { overallScore: unknown }).overallScore = marker;
+  const decision = presentDecision(result, 'cap_current_returned_fixture_handle', 1);
+  assert.ok('choices' in decision && decision.choices.length); assert.ok(!('overallScore' in decision.choices[0]));
+  assert.equal(result.selected?.overallScore?.overallPenalty, 1.25);
 });
 
-test('PRACTICAL-API-07 contract advances intentionally without losing presentation compatibility', () => {
-  assert.equal(AGENTIC_CONTRACT_VERSION, '8.0.0');
-  assert.equal(planResponseView(undefined), 'conversation');
-  assert.equal(planResponseView(undefined, '7.1.0'), 'full');
-  assert.equal(planResponseView('status', '7.1.0'), 'status');
+test('PRACTICAL-API-07 contract supports v9 only without changing stored web settings', () => {
+  assert.equal(AGENTIC_CONTRACT_VERSION, '9.0.0'); assert.equal(validateContractPin(undefined), null);
+  assert.equal(validateContractPin('9.0.0'), null); assert.equal(validateContractPin('8.0.0')?.ok, false);
 });
-
 
 test('PRACTICAL-API-08 compact changes penalty weights without a second search policy', async () => {
   const { WEB_MATCHER_CONFIG, WEB_COMPACT_MATCHER_CONFIG } = await import('../../lib/matcher/config.ts');

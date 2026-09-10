@@ -13,7 +13,7 @@ assert.ok(MCP_PACKAGES[packageId], "Unknown work package");
 const args = rawArgs[0]?.startsWith("--package=") ? rawArgs.slice(1) : [...rawArgs];
 const sliceIndex = args.indexOf("--slice");
 const slice = sliceIndex < 0 ? null : args.splice(sliceIndex, 2)[1];
-assert.ok(!slice || (mode === "test" && ["efficiency", "practical"].includes(packageId)), "Slices are limited to efficiency development tests");
+assert.ok(!slice || (mode === "test" && ["efficiency", "practical", "simple-plan"].includes(packageId)), "Slices are limited to efficiency development tests");
 const definition = MCP_PACKAGES[packageId], MCP721_BASE = definition.base;
 assert.ok(["test", "validate"].includes(mode));
 const inventory = JSON.parse(readFileSync(`${definition.directory}/impact.json`, "utf8"));
@@ -42,7 +42,7 @@ Object.assign(safe, { NODE_ENV: "test", MATTANUTRA_ENV: "dev", AGENTIC_BUILD_ID:
   NEXT_TELEMETRY_DISABLED: "1", NEXT_BUILD_CPUS: "2", NODE_OPTIONS: "--max-old-space-size=6144", [`MCP_${packageId}_EVIDENCE_DIR`]: output });
 const stages = [];
 let isolated = null;
-if (packageId === "efficiency" && mode === "validate") {
+if (["efficiency", "simple-plan"].includes(packageId) && mode === "validate") {
   const { prepareEfficiencyDatabase } = await import("./service-efficiency/release-stages.mjs");
   isolated = await prepareEfficiencyDatabase(process.env.TEST_DB_URL, output, safe);
   stages.push({ label: "isolated-schema", passed: true });
@@ -107,6 +107,13 @@ if (mode === "validate") {
     stages.push({label:"lock-register-verification", passed:true});
   }
   if (packageId !== "practical") await prepareCompiledBuild();
+  if (packageId === "simple-plan") {
+    await command("documented-journeys-paired", ["--experimental-strip-types", "--import", "./test/helpers/offline-network.mjs", "--import", "./scripts/register-ts-path-loader.mjs", "scripts/simple-plan-comparison.ts", output]);
+    const { verifyPracticalLocks } = await import("./practical-matching/comparison.mjs");
+    const control = resolve(output, "../simple-plan-control-" + commit.slice(0, 12));
+    if (!existsSync(control)) git("worktree", "add", "--detach", control, MCP721_BASE);
+    save("no-new-locks.json", verifyPracticalLocks(control)); stages.push({label:"no-new-locks", passed:true});
+  }
   if (packageId === "discovery") {
     assert.ok(process.env.TEST_DB_URL, "Complete MCP regression requires isolated PostgreSQL");
     await command("complete-mcp-regression", ["scripts/run-matcher-test-suite.mjs"], { ...safe,

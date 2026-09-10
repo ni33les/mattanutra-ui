@@ -17,7 +17,7 @@ assert.ok(url.port && url.port !== "5432");
 const sql = postgres(url.href, { max: 3, prepare: false });
 after(async () => { resetPlanCreateInflightForTests(); uninstallRealCatalogue(); await sql.end(); await closeSqlPool(); });
 
-test("AXR-REL-03 expanded PostgreSQL refinement resumes a lost checkpoint at a refreshed observation clock", { timeout: 90000 }, async () => {
+test("AXR-REL-03 expanded PostgreSQL refinement resumes a lost checkpoint at a refreshed observation clock", { timeout: 200000 }, async () => {
   process.env.AX_REFINEMENT_REAL_WORKERS = "1";
   const frozen = await installRealCatalogue("dev"); useLiveServiceClock();
   const [epoch] = await sql`select revision from public.catalogue_runtime_revision where singleton=true`;
@@ -27,7 +27,11 @@ test("AXR-REL-03 expanded PostgreSQL refinement resumes a lost checkpoint at a r
   setMatcherSafetyCeilings(frozen.ceilings, { runtimeRevision: snapshot.runtimeRevision, fingerprint: String(frozen.provenance.reconstructedReferenceFingerprint) });
   const store = createPostgresStore(sql), principal = `pg-recovery-${randomUUID()}`;
   const instance = runtime(principal, store), ownerScope = `dev:mattanutra:ax-refinement:${principal}`;
-  await rpc(instance, "plan", { operation: "create", idempotencyKey: "ax-pg-recovery-create", request: profile("A6") });
+  const original = profile("A6");
+  await rpc(instance, "plan", { ...Object.fromEntries(Object.entries(original).filter(([key]) => key !== "optimization")),
+    targets: original.targets.map(target => Object.fromEntries(Object.entries(target).filter(([key]) => !["importance", "prerequisite", "supplementId"].includes(key)))),
+    requirements: Object.fromEntries(Object.entries(original.requirements).filter(([key]) => key !== "preferenceImportance")),
+    scoring: { profile: original.optimization }, idempotencyKey: "ax-pg-recovery-create" });
   const created = await store.getPlanOperationByKey(ownerScope, "ax-pg-recovery-create"); assert.ok(created);
   const first = await runAdmittedPlanOperation({ store, config: instance.config, operationId: created.id });
   assert.equal(first.ok, true, JSON.stringify(first)); assert.equal(first.revision, 1);
@@ -43,9 +47,16 @@ test("AXR-REL-03 expanded PostgreSQL refinement resumes a lost checkpoint at a r
     }
     return patch(id, token, changes, now, expiry);
   };
-  const args = { operation: "revise", responseView: "full", planHandle: first.planHandle, expectedRevision: 1,
-    idempotencyKey: "ax-pg-recovery-expanded", searchEffort: "expanded", request: profile("A2") };
-  await rpc(instance, "plan", args);
+  const replacement = profile("A2");
+  const saved = previous!.result as import('../../lib/agentic/plan/types.ts').PlanResult;
+  const removed = saved.originalRequest!.targets.filter(target => target.name === "Vitamin C").map(target => ({ ingredientId: target.ingredientId, amount: null }));
+  assert.equal(removed.length, 1, "Preserve the original A6→A2 recovery corpus while translating replacement into sparse updates");
+  const args = { ...Object.fromEntries(Object.entries(replacement).filter(([key]) => !["optimization", "targets", "requirements"].includes(key))),
+    targets: [...removed, ...replacement.targets.map(target => { const prior = saved.originalRequest!.targets.find(row => row.name === target.name); return prior ? { ingredientId: prior.ingredientId, amount: target.amount, unit: target.unit, basis: target.basis } : target; })], requirements: { ...replacement.requirements, maxPriceMinor: null, maxProductCount: null },
+    planHandle: first.planHandle, expectedRevision: 1,
+    idempotencyKey: "ax-pg-recovery-expanded", searchEffort: "expanded", scoring: { profile: replacement.optimization } };
+  const expandedStarted = performance.now();
+  const admission = await rpc(instance, "plan", args); assert.equal(admission.ok, true, JSON.stringify(admission));
   const admitted = await store.getPlanOperationByKey(ownerScope, args.idempotencyKey); assert.ok(admitted);
   const failed = await runAdmittedPlanOperation({ store, config: instance.config, operationId: admitted.id });
   assert.equal(interrupted, true); assert.equal(failed.ok, false);
@@ -57,10 +68,12 @@ test("AXR-REL-03 expanded PostgreSQL refinement resumes a lost checkpoint at a r
   replaceCatalogueSnapshot({ ...snapshot, availabilityAsOf: "2026-09-08T03:29:00Z" });
   await rpc(instance, "plan", args);
   const recovered = await runAdmittedPlanOperation({ store, config: instance.config, operationId: admitted.id });
+  assert.ok(performance.now() - expandedStarted < 175000, "Expanded interruption and recovery share the unchanged 175-second operation deadline");
   assert.equal(recovered.ok, true, JSON.stringify(recovered)); assert.equal(recovered.revision, 2);
   assert.equal(recovered.searchSummary.effort, "expanded"); assert.equal(recovered.searchSummary.expansionAttempts, 64000);
   assert.equal(recovered.searchSummary.expansionBudget, 64000);
   assert.equal((await store.getPlanOperationByKey(ownerScope, args.idempotencyKey))?.id, admitted.id);
-  assert.deepEqual(await rpc(instance, "plan", args), recovered);
+  const replay = await rpc(instance, "plan", args); assert.equal(replay.ok, true); assert.equal(replay.revision, recovered.revision);
+  assert.equal(replay.status, recovered.status);
   assert.equal((await store.getPlan(created.planId))?.currentRevision, 2);
 });

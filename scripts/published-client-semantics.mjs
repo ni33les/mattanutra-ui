@@ -1,14 +1,14 @@
 /** Normalize only declared run identities and clocks; preserve business values and identity relationships. */
 export const CLIENT_NORMALIZATION = Object.freeze({
   discarded: ["latencyMs", "ackMs", "catalogueMs", "matchMs", "searchMs", "serializeMs"],
-  opaqueIdentityFields: ["planHandle", "orderHandle", "evidenceHandle", "supportHandle", "orderReference", "caseReference", "messageId", "correlationId", "idempotencyKey", "runKey"],
+  opaqueIdentityFields: ["planHandle", "orderHandle", "optionId", "recommendedOptionId", "selectedOptionId", "evidenceHandle", "supportHandle", "orderReference", "caseReference", "messageId", "correlationId", "idempotencyKey", "runKey"],
   eventIdentities: "Only UUID-backed order:, payment: and fulfilment: event IDs; ordinals preserve repeated and distinct events.",
   supportMessageIdentities: "UUID-backed thread[].id values in support payloads containing caseReference and supportHandle share the messageId mapping; message references and distinct thread entries remain distinguishable.",
   identityMapping: "Consistent first-occurrence ordinals preserve equality and distinctness within each identity type. Exact registered references in prose and URLs share those mappings.",
-  jsonText: "JSON text blocks are parsed before semantic normalization; tools/call JSON text must equal structuredContent before normalization.",
+  jsonText: "JSON text blocks are parsed before semantic normalization; transport must contain only one substantive representation.",
   clockFields: ["createdAt", "updatedAt", "paidAt", "checkoutExpiresAt", "availabilityAsOf"],
   checkoutUrls: "Normalize only registered handles and generated provider session/UUID components; retain other parameters and URL structure.",
-  preserved: "All product/target/option IDs, dose scores, coverage, advice, prices, statuses, revisions, payment state and error semantics."
+  preserved: "All product/target IDs, option order and equality relationships, dose scores, coverage, advice, prices, statuses, revisions, payment state and error semantics."
 });
 const UUID = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
 const uuidId = new RegExp(`^${UUID}$`, "i");
@@ -30,6 +30,7 @@ export function normalizePublishedClientResult(input, endpoint) {
     return { parsed: false, value };
   }
   function identityType(value, key, supportIdentity) {
+    if (["optionId", "recommendedOptionId", "selectedOptionId"].includes(key)) return "optionId";
     if (CLIENT_NORMALIZATION.opaqueIdentityFields.includes(key)) return key;
     if (key === "id" && supportIdentity && uuidId.test(value)) return "messageId";
     if (key === "id" && eventId.test(value)) return `${value.split(":")[0]}EventId`;

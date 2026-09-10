@@ -4,7 +4,7 @@ import { loadAgenticConfig } from "../lib/agentic/config.ts";
 import { isAgenticErrorResult } from "../lib/agentic/contract/errors.ts";
 import { normalizePlanRequest } from "../lib/agentic/plan/normalize.ts";
 import { matchPlan, toCanonicalRequest } from "../lib/agentic/plan/matching.ts";
-import { mergeRequestPatch } from "../lib/agentic/plan/request-patch.ts";
+import { prepareSimpleRequest } from "../lib/agentic/plan/simple-input.ts";
 import { sampleRetailProduct, sampleValueSnapshot } from "./agentic/value/sample-catalogue.ts";
 import { resetMatcherSafetyCeilings, setMatcherSafetyCeilings } from "../lib/matcher/safety-ceilings.ts";
 
@@ -35,7 +35,7 @@ for (const [index, example] of cases.entries()) it(`keeps the explicit ${example
   assert.notEqual(canonical.targets[0]!.name, example.family, "The explicit form must survive generic concept resolution");
   assert.equal(result.selected.coverage[0]!.deliveredAmount, 100);
   assert.equal(result.selected.coverage[0]!.coveragePercent, 100);
-  const patched = mergeRequestPatch(state.originalRequest, { requirements: { excludeProductIds: [wrong.productId] } });
+  const patched = prepareSimpleRequest({ requirements: { excludeProductIds: [wrong.productId] } }, snapshot, state.originalRequest);
   assert.ok(!isAgenticErrorResult(patched));
   assert.deepEqual(patched.targets, original.targets); assert.deepEqual(patched.medicationCodes, original.medicationCodes);
   const revised = await normalize(patched); assert.ok(!isAgenticErrorResult(revised));

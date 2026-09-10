@@ -1,0 +1,334 @@
+[
+  {
+    "file": "test/mcp-7-2-1/advice.test.ts",
+    "cases": [
+      "M721-ADVICE-01 only foreground and plan-wide advice is inline; other options and complete details survive",
+      "M721-ADVICE-02 missing references collapse without erasing measured excess or interaction facts",
+      "M721-ADVICE-03 explicit missing-reference rule classification does not change other dose or interaction rules"
+    ],
+    "reason": "v9 intentionally removes response modes, operation wrappers and historical publications; relevant invariants transfer to current tests. Original sources and evidence remain archived.",
+    "replacement": "test/simple-plan/advice.test.ts + facts.test.ts + response.test.ts"
+  },
+  {
+    "file": "test/mcp-7-2-1/golden.test.ts",
+    "cases": [
+      "M721-GOLD-01 frozen DEV D3 admits and reads conversation below 30 KB within 15 seconds, with selectable preferences"
+    ],
+    "reason": "v9 intentionally removes response modes, operation wrappers and historical publications; relevant invariants transfer to current tests. Original sources and evidence remain archived.",
+    "replacement": "test/simple-plan/publication.test.ts + requests.test.ts + version.test.ts + documented.test.ts"
+  },
+  {
+    "file": "test/mcp-7-2-1/transport.test.ts",
+    "cases": [
+      "M721-TEXT-01 conversation/status avoid clones by default; full/details and errors remain complete",
+      "M721-TEXT-02 compact status preserves payment and fulfilment independently",
+      "M721-TEXT-03 request-scoped capability reaches dispatcher without becoming stored or global state"
+    ],
+    "reason": "v9 intentionally removes response modes, operation wrappers and historical publications; relevant invariants transfer to current tests. Original sources and evidence remain archived.",
+    "replacement": "test/simple-plan/transport.test.ts + journey.test.ts + version.test.ts"
+  },
+  {
+    "file": "test/mcp-7-2-1/deployment.test.ts",
+    "cases": [
+      "M721-DEPLOY-01 scoped release proof rejects missing, changed and wrong-environment evidence",
+      "M721-DEPLOY-02 source hygiene rejects focused, skipped and empty cases without matching assertion text",
+      "bad",
+      "bad",
+      "good"
+    ],
+    "reason": "v9 intentionally removes response modes, operation wrappers and historical publications; relevant invariants transfer to current tests. Original sources and evidence remain archived.",
+    "replacement": "test/simple-plan/release.test.ts (v9 scoped proof)"
+  },
+  {
+    "file": "test/mcp-7-2-2/advice.test.ts",
+    "cases": [
+      "test_conversation_advice_capped_to_selected_and_highlighted",
+      "test_incomplete_information_is_plan_level_once",
+      "test_dose_review_without_threshold_is_not_high_severity",
+      "test_no_float_junk_in_messages"
+    ],
+    "reason": "v9 intentionally removes response modes, operation wrappers and historical publications; relevant invariants transfer to current tests. Original sources and evidence remain archived.",
+    "replacement": "test/simple-plan/advice.test.ts + facts.test.ts + response.test.ts"
+  },
+  {
+    "file": "test/mcp-7-2-2/golden.test.ts",
+    "cases": [
+      "test_d3_2000_does_not_select_ten_caps_of_an_incidental",
+      "test_highlighted_alternative_present_when_alternativeSearch_found",
+      "L4_omit_create_defaults_to_conversation",
+      "L5_omit_get_defaults_to_conversation",
+      "L6_status_known_version_is_a_small_envelope",
+      "L7_standard_D3_reaches_terminal_within_15_seconds",
+      "D3_payload_and_localized_advice_budget"
+    ],
+    "reason": "v9 intentionally removes response modes, operation wrappers and historical publications; relevant invariants transfer to current tests. Original sources and evidence remain archived.",
+    "replacement": "test/simple-plan/publication.test.ts + requests.test.ts + version.test.ts + documented.test.ts"
+  },
+  {
+    "file": "test/mcp-7-2-2/transport.test.ts",
+    "cases": [
+      "test_conversation_text_is_not_a_json_clone",
+      "test_status_payload_under_2kb"
+    ],
+    "reason": "v9 intentionally removes response modes, operation wrappers and historical publications; relevant invariants transfer to current tests. Original sources and evidence remain archived.",
+    "replacement": "test/simple-plan/transport.test.ts + journey.test.ts + version.test.ts"
+  },
+  {
+    "file": "test/mcp-7-2-2/listing.test.ts",
+    "cases": [
+      "test_hosted_plan_get_schema_advertises_response_view",
+      "test_hosted_plan_create_schema_defaults_conversation",
+      "test_hosted_plan_description_advertises_service"
+    ],
+    "reason": "v9 intentionally removes response modes, operation wrappers and historical publications; relevant invariants transfer to current tests. Original sources and evidence remain archived.",
+    "replacement": "test/simple-plan/publication.test.ts + requests.test.ts + version.test.ts + documented.test.ts"
+  },
+  {
+    "file": "test/mcp-7-2-2/identity.test.ts",
+    "cases": [
+      "test_tools_list_schema_checksum_matches_info",
+      "test_client_guide_uri_matches_contractVersion"
+    ],
+    "reason": "v9 intentionally removes response modes, operation wrappers and historical publications; relevant invariants transfer to current tests. Original sources and evidence remain archived.",
+    "replacement": "test/simple-plan/publication.test.ts + requests.test.ts + version.test.ts + documented.test.ts"
+  },
+  {
+    "file": "test/mcp-7-2-2/deployment.test.ts",
+    "cases": [
+      "M722-DEPLOY-01 scoped release proof rejects missing, changed and wrong-environment evidence"
+    ],
+    "reason": "v9 intentionally removes response modes, operation wrappers and historical publications; relevant invariants transfer to current tests. Original sources and evidence remain archived.",
+    "replacement": "test/simple-plan/release.test.ts (v9 scoped proof)"
+  },
+  {
+    "file": "test/mcp-7-2-3/advice.test.ts",
+    "cases": [
+      "conversation_has_at_most_five_advice_rows",
+      "incomplete_information_appears_once",
+      "dose_review_with_no_threshold_is_not_high_severity",
+      "advice_messages_have_no_float_junk"
+    ],
+    "reason": "v9 intentionally removes response modes, operation wrappers and historical publications; relevant invariants transfer to current tests. Original sources and evidence remain archived.",
+    "replacement": "test/simple-plan/advice.test.ts + facts.test.ts + response.test.ts"
+  },
+  {
+    "file": "test/mcp-7-2-3/goldens.test.ts",
+    "cases": [
+      "d3_2000_selected_is_one_product_and_at_most_two_pills",
+      "highlighted_alternative_is_a_different_option",
+      "k2_plus_d3_does_not_require_a_calcium_stack_when_a_simpler_option_exists",
+      "locks_omit_views_status_speed_and_unassessed_context"
+    ],
+    "reason": "v9 intentionally removes response modes, operation wrappers and historical publications; relevant invariants transfer to current tests. Original sources and evidence remain archived.",
+    "replacement": "test/simple-plan/publication.test.ts + requests.test.ts + version.test.ts + documented.test.ts"
+  },
+  {
+    "file": "test/mcp-7-2-3/transport.test.ts",
+    "cases": [
+      "conversation_text_is_a_short_summary",
+      "status_body_stays_tiny"
+    ],
+    "reason": "v9 intentionally removes response modes, operation wrappers and historical publications; relevant invariants transfer to current tests. Original sources and evidence remain archived.",
+    "replacement": "test/simple-plan/transport.test.ts + journey.test.ts + version.test.ts"
+  },
+  {
+    "file": "test/mcp-7-2-3/listing.test.ts",
+    "cases": [
+      "hosted_get_schema_includes_response_view",
+      "hosted_create_defaults_to_conversation",
+      "hosted_plan_blurb_mentions_thailand_gaps_and_conversation"
+    ],
+    "reason": "v9 intentionally removes response modes, operation wrappers and historical publications; relevant invariants transfer to current tests. Original sources and evidence remain archived.",
+    "replacement": "test/simple-plan/publication.test.ts + requests.test.ts + version.test.ts + documented.test.ts"
+  },
+  {
+    "file": "test/mcp-7-2-3/identity.test.ts",
+    "cases": [
+      "published_listing_version_matches_info"
+    ],
+    "reason": "v9 intentionally removes response modes, operation wrappers and historical publications; relevant invariants transfer to current tests. Original sources and evidence remain archived.",
+    "replacement": "test/simple-plan/publication.test.ts + requests.test.ts + version.test.ts + documented.test.ts"
+  },
+  {
+    "file": "test/mcp-7-2-3/deployment.test.ts",
+    "cases": [
+      "M723-DEPLOY-01 scoped release proof rejects missing, changed and wrong-environment evidence"
+    ],
+    "reason": "v9 intentionally removes response modes, operation wrappers and historical publications; relevant invariants transfer to current tests. Original sources and evidence remain archived.",
+    "replacement": "test/simple-plan/release.test.ts (v9 scoped proof)"
+  },
+  {
+    "file": "test/mcp-tool-card/listing.test.ts",
+    "cases": [
+      "hosted_get_schema_includes_response_view",
+      "hosted_create_defaults_to_conversation",
+      "hosted_plan_blurb_mentions_thailand_gaps_and_conversation",
+      "\\n"
+    ],
+    "reason": "v9 intentionally removes response modes, operation wrappers and historical publications; relevant invariants transfer to current tests. Original sources and evidence remain archived.",
+    "replacement": "test/simple-plan/publication.test.ts + requests.test.ts + version.test.ts + documented.test.ts"
+  },
+  {
+    "file": "test/mcp-tool-card/publication.test.ts",
+    "cases": [
+      "production build regenerates a stale publication while server startup does not write it",
+      "visible operation fields preserve prior view and refinement validation"
+    ],
+    "reason": "v9 intentionally removes response modes, operation wrappers and historical publications; relevant invariants transfer to current tests. Original sources and evidence remain archived.",
+    "replacement": "test/simple-plan/publication.test.ts + requests.test.ts + version.test.ts + documented.test.ts"
+  },
+  {
+    "file": "test/mcp-tool-card/deployment.test.ts",
+    "cases": [
+      "CARD-DEPLOY-01 scoped release proof rejects missing, changed and wrong-environment evidence"
+    ],
+    "reason": "v9 intentionally removes response modes, operation wrappers and historical publications; relevant invariants transfer to current tests. Original sources and evidence remain archived.",
+    "replacement": "test/simple-plan/release.test.ts (v9 scoped proof)"
+  },
+  {
+    "file": "test/mcp-agent-surface/contracts.test.ts",
+    "cases": [
+      "AG72-DOC-01 current guide has one plan default, a dated compatibility window and a valid evidence template",
+      "AG72-CARD-01 seven short descriptors and an honest overview support resource-free clients in every environment",
+      "AG72-SCHEMA-01 live tool and info get schemas agree on conversation, polling, details and invalid field combinations"
+    ],
+    "reason": "v9 intentionally removes response modes, operation wrappers and historical publications; relevant invariants transfer to current tests. Original sources and evidence remain archived.",
+    "replacement": "test/simple-plan/publication.test.ts + requests.test.ts + version.test.ts + documented.test.ts"
+  },
+  {
+    "file": "test/mcp-agent-surface/compatibility.test.ts",
+    "cases": [
+      "AG72-COMPAT-01 legacy omission retires after one release and cannot accept malformed or future pins"
+    ],
+    "reason": "v9 intentionally removes response modes, operation wrappers and historical publications; relevant invariants transfer to current tests. Original sources and evidence remain archived.",
+    "replacement": "test/simple-plan/publication.test.ts + requests.test.ts + version.test.ts + documented.test.ts"
+  },
+  {
+    "file": "test/mcp-agent-surface/views.test.ts",
+    "cases": [
+      "AG72-VIEW-01 every plan operation defaults to conversation without changing mutation replay identity",
+      "AG72-VIEW-02 a legacy client pin preserves the omitted full view while explicit views take precedence",
+      "AG72-EVIDENCE-01 a listed evidence tool reads only attached claims through the returned capability"
+    ],
+    "reason": "v9 intentionally removes response modes, operation wrappers and historical publications; relevant invariants transfer to current tests. Original sources and evidence remain archived.",
+    "replacement": "test/simple-plan/publication.test.ts + requests.test.ts + version.test.ts + documented.test.ts"
+  },
+  {
+    "file": "test/mcp-conversation-pack/cards.test.ts",
+    "cases": [
+      "test_conversation_omits_advice_bodies",
+      "test_conversation_options_are_cards_not_baskets",
+      "test_conversation_highlighted_option_has_no_high_product_data_wall"
+    ],
+    "reason": "v9 intentionally removes response modes, operation wrappers and historical publications; relevant invariants transfer to current tests. Original sources and evidence remain archived.",
+    "replacement": "test/simple-plan/publication.test.ts + requests.test.ts + version.test.ts + documented.test.ts"
+  },
+  {
+    "file": "test/mcp-conversation-pack/status.test.ts",
+    "cases": [
+      "test_ready_status_and_conversation_share_primary_next_action",
+      "conversation pack preserves no-purchase and pending primary actions"
+    ],
+    "reason": "v9 intentionally removes response modes, operation wrappers and historical publications; relevant invariants transfer to current tests. Original sources and evidence remain archived.",
+    "replacement": "test/service-efficiency/reads.test.ts + reads.integration.test.ts; v9 processing and terminal decisions"
+  },
+  {
+    "file": "test/mcp-conversation-pack/deployment.test.ts",
+    "cases": [
+      "CONVERSATION-DEPLOY-01 scoped release proof rejects missing, changed and wrong-environment evidence"
+    ],
+    "reason": "v9 intentionally removes response modes, operation wrappers and historical publications; relevant invariants transfer to current tests. Original sources and evidence remain archived.",
+    "replacement": "test/simple-plan/release.test.ts (v9 scoped proof)"
+  },
+  {
+    "file": "test/mcp-payload/projection.test.ts",
+    "cases": [
+      "PAY-VIEW-01 eighteen frozen decisions retain all choices, doses, amounts, unknowns and foreground advice below 40% bytes",
+      "PAY-VIEW-02 batch details return exact stored sections and reject unknown options and stale revisions",
+      "PAY-VIEW-03 advice with identical rule IDs but different exposure, source or uncertainty stays distinct",
+      "PAY-VIEW-04 plan-wide advice survives empty and processing decisions without a product option"
+    ],
+    "reason": "v9 intentionally removes response modes, operation wrappers and historical publications; relevant invariants transfer to current tests. Original sources and evidence remain archived.",
+    "replacement": "test/simple-plan/facts.test.ts + advice.test.ts + response.test.ts"
+  },
+  {
+    "file": "test/mcp-payload/transport.test.ts",
+    "cases": [
+      "PAY-TRANSPORT-01 create replay changes presentation without new work, get details recovers context and select confirms another option",
+      "PAY-TRANSPORT-02 operation/view matrix rejects unsupported fields and requires fenced batched details",
+      "PAY-TRANSPORT-03 saved 7.0 decisions refresh before new selection while frozen checkout recovers unchanged",
+      "PAY-TRANSPORT-04 covered targets finish naturally and above-limit findings remain visible and selectable"
+    ],
+    "reason": "v9 intentionally removes response modes, operation wrappers and historical publications; relevant invariants transfer to current tests. Original sources and evidence remain archived.",
+    "replacement": "test/simple-plan/transport.test.ts + journey.test.ts + version.test.ts"
+  },
+  {
+    "file": "test/mcp-payload/order.test.ts",
+    "cases": [
+      "PAY-POLL-02 order status avoids frozen projection and histories while details preserve frozen prices and events"
+    ],
+    "reason": "v9 intentionally removes response modes, operation wrappers and historical publications; relevant invariants transfer to current tests. Original sources and evidence remain archived.",
+    "replacement": "test/simple-plan/commerce-evidence.test.ts; retained PostgreSQL order/payment contention cases"
+  },
+  {
+    "file": "test/mcp-payload/text-status.test.ts",
+    "cases": [
+      "PAY-TRANSPORT-05 concise text headlines preserve refunds and distinguish payment from delivery"
+    ],
+    "reason": "v9 intentionally removes response modes, operation wrappers and historical publications; relevant invariants transfer to current tests. Original sources and evidence remain archived.",
+    "replacement": "test/simple-plan/publication.test.ts + requests.test.ts + version.test.ts + documented.test.ts"
+  },
+  {
+    "file": "test/mcp-payload/discovery.test.ts",
+    "cases": [
+      "PAY-SCHEMA-01 discovery preserves self-contained current schemas with bounded positioning overhead",
+      "PAY-SCHEMA-02 overview offers one starting example and operation help works without resources",
+      "PAY-SCHEMA-03 factored schemas preserve acceptance and normalized field errors"
+    ],
+    "reason": "v9 intentionally removes response modes, operation wrappers and historical publications; relevant invariants transfer to current tests. Original sources and evidence remain archived.",
+    "replacement": "test/simple-plan/publication.test.ts + requests.test.ts + version.test.ts + documented.test.ts"
+  },
+  {
+    "file": "test/mcp-payload/narrative.test.ts",
+    "cases": [
+      "PAY-SCHEMA-04 narrative identifies detail-only fields and publishes distinct review, poll and detail examples"
+    ],
+    "reason": "v9 intentionally removes response modes, operation wrappers and historical publications; relevant invariants transfer to current tests. Original sources and evidence remain archived.",
+    "replacement": "test/simple-plan/publication.test.ts + requests.test.ts + version.test.ts + documented.test.ts"
+  },
+  {
+    "file": "test/mcp-payload/status.test.ts",
+    "cases": [
+      "PAY-POLL-01 unchanged reads are small, ownership fenced and failure/cancellation cannot hide behind the committed revision"
+    ],
+    "reason": "v9 intentionally removes response modes, operation wrappers and historical publications; relevant invariants transfer to current tests. Original sources and evidence remain archived.",
+    "replacement": "test/service-efficiency/reads.test.ts + reads.integration.test.ts; v9 processing and terminal decisions"
+  },
+  {
+    "file": "test/mcp-payload/journeys.test.ts",
+    "cases": [],
+    "reason": "v9 intentionally removes response modes, operation wrappers and historical publications; relevant invariants transfer to current tests. Original sources and evidence remain archived.",
+    "replacement": "test/simple-plan/documented.test.ts; published v9 client journeys"
+  },
+  {
+    "file": "test/mcp-payload/journeys-th.test.ts",
+    "cases": [],
+    "reason": "v9 intentionally removes response modes, operation wrappers and historical publications; relevant invariants transfer to current tests. Original sources and evidence remain archived.",
+    "replacement": "test/simple-plan/publication.test.ts + requests.test.ts + version.test.ts + documented.test.ts"
+  },
+  {
+    "file": "test/mcp-payload/journeys-zh.test.ts",
+    "cases": [],
+    "reason": "v9 intentionally removes response modes, operation wrappers and historical publications; relevant invariants transfer to current tests. Original sources and evidence remain archived.",
+    "replacement": "test/simple-plan/publication.test.ts + requests.test.ts + version.test.ts + documented.test.ts"
+  },
+  {
+    "file": "test/mcp-payload/deployment.test.ts",
+    "cases": [
+      "PAY-AX-02 deployment rejects missing, altered, stale and wrong-environment package evidence",
+      "PAY-AX-03 compiled build identity rejects changed executable bytes even with the same BUILD_ID"
+    ],
+    "reason": "v9 intentionally removes response modes, operation wrappers and historical publications; relevant invariants transfer to current tests. Original sources and evidence remain archived.",
+    "replacement": "test/simple-plan/release.test.ts (v9 scoped proof)"
+  }
+]
