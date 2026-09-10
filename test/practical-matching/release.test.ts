@@ -29,3 +29,10 @@ test('PRACTICAL-RELEASE-03 lock comparison permits an explicitly renamed checkou
   assert.doesNotThrow(() => verifyNoAddedLocks(before, [{ ...before[0], owner: 'lockCheckout' }]));
   assert.throws(() => verifyNoAddedLocks(before, [...before, { file: 'lib/matcher/search.ts', owner: 'match', statement: 'select id from catalogue for share' }]));
 });
+
+test('PRACTICAL-RELEASE-04 compiled worker identity exists before the complete PostgreSQL and HTTP inventory', () => {
+  const stages = packageStages('practical');
+  assert.deepEqual(stages.slice(0, 3), ['typecheck', 'release-diff-lint', 'production-build']);
+  assert.equal(stages.filter(stage => stage === 'production-build').length, 1);
+  assert.ok(stages.indexOf('production-build') < stages.indexOf('complete-mcp-regression'));
+});
