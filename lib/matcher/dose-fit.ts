@@ -103,10 +103,10 @@ function compileSubject(request: CanonicalRequest, subjectId: string) {
   const target = requested?.importance === "conditional" && requested.prerequisite?.status !== "satisfied" ? undefined : requested;
   const ranges = rangeOffsets(request.currentSupplements, subjectId), dietary = rangeOffsets(request.dietaryIntake ?? [], subjectId);
   const knownRows = request.currentSupplements.filter(row => row.subjectId === subjectId && intakeIsKnown(row));
-  const referenceRows = !requested ? knownRows.filter(row => row.daily.units > 0n) : [];
-  const reference = referenceRows.reduce((n, row) => n + row.daily.units, 0n);
-  const verifiedContinued = knownRows.reduce((n, row) => n + row.daily.units, 0n);
-  const scale = target && target.requested.units > 0n ? target.requested.units : verifiedContinued > 0n ? verifiedContinued : 1n;
+  const referenceRows = !requested ? knownRows.filter(row => row.daily.units > BigInt(0)) : [];
+  const reference = referenceRows.reduce((n, row) => n + row.daily.units, BigInt(0));
+  const verifiedContinued = knownRows.reduce((n, row) => n + row.daily.units, BigInt(0));
+  const scale = target && target.requested.units > BigInt(0) ? target.requested.units : verifiedContinued > BigInt(0) ? verifiedContinued : BigInt(1);
   return { requested, target, ranges, dietary, referenceRows, reference, scale, bounds: limitsFor(request, subjectId) };
 }
 function subjectInputs(request: CanonicalRequest, subjectId: string) {
@@ -158,10 +158,10 @@ function calculateDoseFit(request: CanonicalRequest, exposure: ReadonlyMap<strin
   const subjects = new Set([...exposure.keys(), ...(request.dietaryIntake ?? []).map((row) => row.subjectId), ...request.targets.map((row) => row.subjectId)]);
   for (const subjectId of [...subjects].sort()) {
     const { target, ranges, dietary, referenceRows, reference, scale, bounds } = subjectInputs(request, subjectId);
-    const known = exposure.get(subjectId) ?? 0n;
+    const known = exposure.get(subjectId) ?? BigInt(0);
     const minimum = known + ranges.minimum - ranges.base, maximum = known + ranges.maximum - ranges.base;
-    const added = known > ranges.base ? known - ranges.base : 0n;
-    const continuedIncrease = reference > 0n ? { num: added, den: reference } : ZERO;
+    const added = known > ranges.base ? known - ranges.base : BigInt(0);
+    const continuedIncrease = reference > BigInt(0) ? { num: added, den: reference } : ZERO;
     const weightValue = settings ? settings.nutrients[subjectId] ?? settings.defaultNutrient : 1;
     const weight = fromDecimal(weightValue);
     const avoidance = weightValue < 1 ? multiply(positive(subtract(fromDecimal(1), weight)), { num: added, den: scale }) : ZERO;

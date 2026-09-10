@@ -242,7 +242,7 @@
     },
     {
       "file": "test/simple-plan/version.test.ts",
-      "expectedCases": 2,
+      "expectedCases": 3,
       "reason": "Conversational v9 protocol, state, response, policy and release boundary assertions",
       "slice": "responses"
     },

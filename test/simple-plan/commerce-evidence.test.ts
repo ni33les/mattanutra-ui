@@ -22,7 +22,7 @@ test('SPLAN-EVID-01 narrow evidence uses current option and product IDs; rejects
   assert.equal((await call(app, 'evidence', { ...args, expectedRevision: 2 })).error.reasonCode, 'stale_revision');
 });
 test('SPLAN-ORDER-01 default order reads are concise and preserve payment, tracking and frozen contents', async () => {
-  const { app } = await storedFixture(internalFixture()); const frozen = { items: [{ productId: 'frozen-product', quantity: 1, unitPriceMinor: 999 }], subtotalMinor: 999, shippingMinor: 50 };
+  const { app } = await storedFixture({ ...internalFixture(), contractVersion: "8.0.0" }); const frozen = { items: [{ productId: 'frozen-product', quantity: 1, unitPriceMinor: 999 }], subtotalMinor: 999, shippingMinor: 50 };
   const order = { id: 'simple-order', planId: 'conversation-pack-plan', planRevision: 1, ...app.scope, createdAt: app.now!, updatedAt: app.now!,
     cancelledAt: null, completedAt: null, expiredAt: null, checkoutAccessHash: null, checkoutExpiresAt: '2099-01-01T00:00:00Z', checkoutUrl: 'https://example.test/checkout',
     currency: 'THB', destinationCountry: 'TH', frozenPlan: frozen, fulfilmentStatus: 'not_started', latestPaymentAttempt: null, latestPaymentReason: null,

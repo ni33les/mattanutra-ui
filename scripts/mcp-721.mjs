@@ -89,7 +89,7 @@ async function command(label, args, env = safe) {
 }
 async function prepareCompiledBuild() {
   await command("typecheck", ["node_modules/typescript/bin/tsc", "--noEmit"]);
-  const lint = git("diff", "--name-only", "--diff-filter=ACMR", MCP721_BASE, "HEAD").split("\n").filter(file => /\.(?:[cm]?js|tsx?)$/.test(file));
+  const lint = git("diff", "--name-only", "--diff-filter=ACMR", MCP721_BASE, "HEAD").split("\n").filter(file => /\.(?:[cm]?[jt]s|tsx)$/.test(file));
   save("lint-files.json", { releaseBase: MCP721_BASE, files: lint }); assert.ok(lint.length);
   await command("release-diff-lint", ["node_modules/eslint/bin/eslint.js", ...lint]);
 

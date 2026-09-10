@@ -61,9 +61,9 @@ export function nutrientWeightEvidence(request: import('@/lib/matcher/types').Ca
   return [...ids].sort().map(ingredientId => {
     const target = request.targets.find(row => row.subjectId === ingredientId)?.requested;
     const currents = request.currentSupplements.filter(row => row.subjectId === ingredientId && (row.certainty ?? 'known') === 'known');
-    const continued = currents.reduce((n, row) => n + row.daily.units, 0n);
-    const source = target && target.units > 0n ? 'requested' : continued > 0n ? 'verified_continued' : 'canonical_quantum';
-    const amount = source === 'requested' ? target!.units : source === 'verified_continued' ? continued : 1n;
+    const continued = currents.reduce((n, row) => n + row.daily.units, BigInt(0));
+    const source = target && target.units > BigInt(0) ? 'requested' : continued > BigInt(0) ? 'verified_continued' : 'canonical_quantum';
+    const amount = source === 'requested' ? target!.units : source === 'verified_continued' ? continued : BigInt(1);
     const dim = target?.dim ?? currents[0]?.daily.dim ?? exposure.totals.get(ingredientId)?.dim;
     return { ingredientId, weight: weights.nutrients[ingredientId] ?? weights.defaultNutrient, scale: { amount: amount.toString(), unit: dim ? unit[dim] : null, source }, policy: weights.version, policyHash: weights.hash };
   });

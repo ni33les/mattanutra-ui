@@ -1,3 +1,4 @@
+import { readPlanState } from "@/lib/agentic/presentation/plan-read";
 import { simplePlanTool } from "@/lib/agentic/plan/simple-service";
 import {
   AGENTIC_INPUT_SCHEMAS,
@@ -78,7 +79,9 @@ async function callTool(
       case "plan":
         value = await simplePlanTool(runtime, params);
         break;
-      case "execute":
+      case "execute": {
+        const state = await readPlanState(runtime, String(params.planHandle));
+        if (isAgenticErrorResult(state)) { value = state; break; }
         value = await executeTool({
           config: runtime.config,
           expectedRevision: Number(params.expectedRevision),
@@ -90,6 +93,7 @@ async function callTool(
           store: runtime.store
         });
         break;
+      }
       case "order":
         value = await orderTool({
           ...(typeof params.locale === "string" ? { locale: params.locale } : {}),
