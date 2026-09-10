@@ -17,6 +17,7 @@ export const CLIENT_EXAMPLES = [
   { name: "create-provisional-targets", tool: "plan", arguments: { idempotencyKey: "example-create-key-0001", locale: "en", destinationCountry: "TH", targets: [{ name: "Vitamin D3", amount: 2000, unit: "IU", basis: "supplemental" }] } },
   { name: "read-or-poll", tool: "plan", arguments: { planHandle: handle } },
   { name: "fewer-pills", tool: "plan", arguments: { ...controls, requirements: { maxDailyPills: 3 }, scoring: { weights: { pills: 2 } } } },
+  { name: "prioritise-lower-cost", tool: "plan", arguments: { ...controls, scoring: { weights: { price: 2 } } } },
   { name: "minimise-incidental-ingredient", tool: "plan", arguments: { ...controls, targets: [{ ingredientId: "sup_replace_with_returned_selenium", amount: 0, unit: "mcg" }], scoring: { weights: { nutrients: { sup_replace_with_returned_selenium: 1 } } } } },
   { name: "pill-count-matters-a-little", tool: "plan", arguments: { ...controls, scoring: { weights: { pills: 0.543 } } } },
   { name: "pill-count-does-not-matter", tool: "plan", arguments: { ...controls, scoring: { weights: { pills: 0 } } } },
@@ -39,7 +40,7 @@ const RULES = `Illustrative amounts are protocol examples, not personal dose rec
 
 Use one flat plan call repeatedly. Omit unchanged fields. Start with best_match by omitting scoring; it uses the existing balanced coefficients, all initially one. balanced remains an accepted input alias and is returned as best_match. Adjust weights conversationally to get one recommendation per round. Selection, answers and refinements must be separate calls. profile is reported customer context; scoring.profile is a preset of effective weights. Nothing requires exact diet labels or demographics merely to explore.
 
-${importanceInstructions()} Up to six decimal places (for example 0.543). Overrides replace preset values; they are never multiplied by the preset. Ask “How important is this preference?” rather than requiring coefficients from the person. A weight without a target does not create a hidden fitting or avoidance objective; add an explicit target first. Independently existing continued-dose terms may still apply.
+${importanceInstructions()} Up to six decimal places (for example 0.543). Overrides replace preset values; they are never multiplied by the preset. Ask “How important is this preference?” rather than requiring coefficients from the person. A nutrient weight without a target does not create a hidden fitting or avoidance objective; add an explicit target first. Independently existing continued-dose terms may still apply.
 
 Zero-target comparison scales: Vitamin D3 25 mcg (1000 IU); Selenium 50 mcg. These are versioned engineering scales anchored to captured catalogue amounts, not recommended doses or safety limits, and are not claimed to be clinically calibrated. Other ingredients require an explicit scale review; an unsupported zero target returns a field error. At zero, exposure divided by this scale replaces proportional deviation. total_daily includes fixed diet and continued intake; supplemental excludes diet. The matcher cannot remove fixed intake. Coverage of a zero goal is binary: fully quantified zero contributes 100%, confirmed positive or uncertain exposure contributes 0%; unknown remains explicit. No zero-target percentage divides by zero.
 

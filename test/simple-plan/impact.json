@@ -423,6 +423,12 @@
       "expectedCases": 5,
       "reason": "One current recommendation, default best_match, hidden candidate fencing and conversational publication",
       "slice": "responses"
+    },
+    {
+      "file": "test/simple-plan/cost-weight.test.ts",
+      "expectedCases": 4,
+      "reason": "Existing price cost-weight arithmetic, sparse refinements, field documentation and conversational discovery",
+      "slice": "publication"
     }
   ],
   "inputs": [

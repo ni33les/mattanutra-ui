@@ -1,0 +1,22 @@
+{
+  "releaseBase": "256968322e6e61b230d85466d2f447a56e2feb49",
+  "scope": "Existing MCP cost-weight discovery and generated contract; no scoring/locking/web changes",
+  "files": [
+    {
+      "file": "test/simple-plan/cost-weight.test.ts",
+      "expectedCases": 4,
+      "reason": "Cost schema/card/guide, price arithmetic, budget basis and refinements"
+    },
+    {
+      "file": "test/simple-plan/publication.test.ts",
+      "expectedCases": 4,
+      "reason": "All current generated examples validate; localized instructions match shared contract"
+    },
+    {
+      "file": "test/simple-plan/hosted.test.ts",
+      "expectedCases": 3,
+      "reason": "Generated seven-tool projections, complete schemas and stale-description rejection"
+    }
+  ],
+  "expectationChanges": "test/simple-plan/expectation-changes.md"
+}

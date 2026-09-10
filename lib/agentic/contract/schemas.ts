@@ -1,4 +1,4 @@
-import { IMPORTANCE_EXPLANATION } from "@/lib/agentic/contract/importance";
+import { IMPORTANCE_EXPLANATION, COST_WEIGHT_EXPLANATION } from "@/lib/agentic/contract/importance";
 import { MCP_SCORING_PROFILES } from "@/lib/agentic/contract/scoring";
 import { Type, type Static, type TSchema, type TProperties } from "@sinclair/typebox";
 import { visibleOperationVariants } from "@/lib/agentic/contract/operation-variants";
@@ -87,7 +87,8 @@ const handle = Type.String({ minLength: 32, maxLength: 4096 });
 const revision = Type.Integer({ minimum: 1 });
 export const WEIGHT_SCHEMA = Type.Number({ minimum: 0, maximum: 2, multipleOf: 0.000001, description: `${IMPORTANCE_EXPLANATION} Up to six decimal places.` });
 const scoringWeights = object({
-  pills: optional(nullable(WEIGHT_SCHEMA)), products: optional(nullable(WEIGHT_SCHEMA)), price: optional(nullable(WEIGHT_SCHEMA)), servings: optional(nullable(WEIGHT_SCHEMA)),
+  pills: optional(nullable(WEIGHT_SCHEMA)), products: optional(nullable(WEIGHT_SCHEMA)),
+  price: optional({ ...nullable(WEIGHT_SCHEMA), description: COST_WEIGHT_EXPLANATION }), servings: optional(nullable(WEIGHT_SCHEMA)),
   nutrients: optional(Type.Record(Type.String({ pattern: "^[A-Za-z][A-Za-z0-9_-]{0,127}$" }), nullable(WEIGHT_SCHEMA), { description: "Returned or published ingredient IDs only. Omission preserves; individual null resets to the preset." }))
 });
 export const SCORING_SCHEMA = object({
