@@ -1,4 +1,3 @@
-import { planContractCompatible } from "@/lib/agentic/presentation/compatibility";
 import { businessError, type AgenticErrorResult } from "@/lib/agentic/contract/errors";
 import { PLAN_REQUEST } from "@/lib/agentic/contract/schemas";
 import { validateToolIssues, schemaIssuesToError } from "@/lib/agentic/contract/validate";
@@ -31,7 +30,7 @@ export function originalRequestFor(result: PlanResult): PlanRequest | AgenticErr
   const state = result.requestSnapshot;
   // An old default count is not evidence of a customer preference. Missing
   // numeric provenance must not obstruct recovery of the known request inputs.
-  const requirements = !planContractCompatible(result.contractVersion)
+  const requirements = !result.contractVersion || Number(result.contractVersion.split(".")[0]) < 5
     ? { ...state.requirements, maxProductCount: null }
     : state.requirements;
   // Legacy leftovers did not distinguish requested targets from existing intake.

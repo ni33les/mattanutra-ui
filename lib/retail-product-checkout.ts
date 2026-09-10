@@ -1,3 +1,4 @@
+import { MATCHER_VERSION } from "@/lib/matcher/config";
 import { requireCurrentProductSelection } from "@/lib/assessment-product-preferences";
 import { FunnelError } from "@/lib/funnel-errors";
 import { ensureRetailProviderSession, recordRetailProviderSession, retailPaymentConfirmed } from "@/lib/retail-checkout-provider-session";
@@ -360,14 +361,24 @@ async function recordVersion(
   `;
 }
 
-export async function currentWebCheckoutRecommendations(
-  sql: RetailCheckoutDb,
-  input: Pick<RetailCheckoutQuoteInput, "planId" | "locale" | "selectedItemIds" | "recommendationRunId" | "optionId" | "assessmentRevision" | "selectionRevision">
-) {
-  // The second call runs inside checkout's short intent transaction. Sharing
-  // this epoch row serializes a new purchase snapshot with catalogue edits.
+type WebCheckoutSelectionInput = Pick<RetailCheckoutQuoteInput, "planId" | "locale" | "selectedItemIds" | "recommendationRunId" | "optionId" | "assessmentRevision" | "selectionRevision">;
+
+/** Presentation observes a committed snapshot without acquiring any row locks. */
+export async function currentWebCheckoutSelection(sql: RetailCheckoutDb, input: WebCheckoutSelectionInput) {
+  const [catalogue] = await sql<Array<{ revision: number | string }>>`
+    select revision from public.catalogue_runtime_revision where singleton = true`;
+  return readCurrentWebCheckoutSelection(sql, input, catalogue?.revision);
+}
+export async function currentWebCheckoutRecommendations(sql: RetailCheckoutDb, input: WebCheckoutSelectionInput) {
+  return (await currentWebCheckoutSelection(sql, input)).recommendations;
+}
+/** Existing new-checkout publication fence: retain current commercial facts until the intent commits. */
+export async function lockCurrentWebCheckoutRecommendations(sql: RetailCheckoutDb, input: WebCheckoutSelectionInput) {
   const [catalogue] = await sql<Array<{ revision: number | string }>>`
     select revision from public.catalogue_runtime_revision where singleton = true for share`;
+  return (await readCurrentWebCheckoutSelection(sql, input, catalogue?.revision)).recommendations;
+}
+async function readCurrentWebCheckoutSelection(sql: RetailCheckoutDb, input: WebCheckoutSelectionInput, catalogueRevision: number | string | undefined) {
   const runs = await sql`select distinct on (coalesce(r.diagnostics ->> 'stackPreference', 'balanced'))
       r.id::text, r.diagnostics, r.selection_revision, r.catalogue_revision, a.input_revision,
       coalesce(p.revision, 0) as current_selection_revision, coalesce(p.excluded_product_ids, '{}'::uuid[]) as excluded_product_ids
@@ -378,8 +389,9 @@ export async function currentWebCheckoutRecommendations(
       and r.selection_revision = coalesce(p.revision, 0) and r.status in ('completed', 'partial')
     order by coalesce(r.diagnostics ->> 'stackPreference', 'balanced'), r.generated_at desc, r.id desc`;
   for (const run of runs) {
-    if (catalogue?.revision == null || run.catalogue_revision == null || String(run.catalogue_revision) !== String(catalogue.revision)) continue;
+    if (catalogueRevision == null || run.catalogue_revision == null || String(run.catalogue_revision) !== String(catalogueRevision)) continue;
     if (input.recommendationRunId && input.recommendationRunId !== run.id) continue;
+    if (objectValue(run.diagnostics).algorithmVersion !== MATCHER_VERSION) continue;
     const matching = objectValue(run.diagnostics).matching as ProductRecommendationDiagnostics["matching"];
     const option = matching?.options.find(item => item.optionId === (input.optionId ?? matching.selectedOptionId));
     const rows = await sql`select i.product_id::text, i.rank, i.price_amount, i.currency,
@@ -395,7 +407,7 @@ export async function currentWebCheckoutRecommendations(
       optionId: input.optionId, availableOptionIds: matching?.options.map(item => item.optionId) ?? [],
       selectedIds: input.selectedItemIds, allowedIds, excludedIds: run.excluded_product_ids
     });
-    return input.selectedItemIds.map((id, index) => {
+    const recommendations = input.selectedItemIds.map((id, index) => {
       const row = rows.find(item => item.product_id === id);
       const alternative = option?.recommendations.find(item => item.product.id === id);
       return {
@@ -406,6 +418,7 @@ export async function currentWebCheckoutRecommendations(
         currency: String(row?.currency ?? alternative?.product.currency ?? "THB")
       };
     });
+    return { recommendations, advice: option?.advice ?? [] };
   }
   throw new FunnelError("Product options changed. Reload and confirm the current recommendation stack.", 409, "stale_product_selection");
 }
@@ -960,7 +973,7 @@ export async function createRetailCheckoutSession(input: RetailCheckoutQuoteInpu
       if (checkoutMode === "web") {
         // Only new intents require the current revision and catalogue. Exact
         // retries retain their existing payment and frozen commercial facts.
-        await currentWebCheckoutRecommendations(tx, { ...input, recommendationRunId: runId, selectedItemIds: selectedProductIds });
+        await lockCurrentWebCheckoutRecommendations(tx, { ...input, recommendationRunId: runId, selectedItemIds: selectedProductIds });
       }
       const rows = await tx<CheckoutPaymentRow[]>`
         insert into public.retail_checkout_payments (

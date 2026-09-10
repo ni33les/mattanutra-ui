@@ -1,4 +1,5 @@
-import { currentWebCheckoutRecommendations } from "@/lib/retail-product-checkout";
+import { WebMatchingAdvice } from "@/components/web-health-advice";
+import { currentWebCheckoutSelection } from "@/lib/retail-product-checkout";
 import { FunnelError } from "@/lib/funnel-errors";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -58,13 +59,13 @@ async function selectedProductsForCheckout(
   selection: { recommendationRunId?: string | null; optionId?: string | null; assessmentRevision?: number | null; selectionRevision?: number | null }
 ) {
   const sql = getSql();
-  if (!sql || !selectedItemIds.length) return [];
-  const rows = await currentWebCheckoutRecommendations(sql, { planId, selectedItemIds, locale, ...selection }).catch(error => {
+  if (!sql || !selectedItemIds.length) return { products: [], advice: [] };
+  const selectionResult = await currentWebCheckoutSelection(sql, { planId, selectedItemIds, locale, ...selection }).catch(error => {
     if (error instanceof FunnelError && error.status === 409) redirect(`${nutritionRevealPath(locale, planId)}&reason=stale_product_selection`);
     throw error;
   });
-  return rows.map(row => ({ id: row.product_id, name: row.title, imageUrl: row.image_url,
-    currency: row.currency, unitPriceAmount: row.price_amount == null ? null : Number(row.price_amount) }));
+  return { advice: selectionResult.advice, products: selectionResult.recommendations.map(row => ({ id: row.product_id, name: row.title, imageUrl: row.image_url,
+    currency: row.currency, unitPriceAmount: row.price_amount == null ? null : Number(row.price_amount) })) };
 }
 
 export function generateStaticParams() {
@@ -142,8 +143,8 @@ export default async function BasketCheckoutPage({
   const labels = getNamespace<BasketCheckoutCopy>(locale, "customer.basketCheckout");
   const currentQuery = new URLSearchParams(Object.entries(query).filter((entry): entry is [string, string] => typeof entry[1] === "string"));
   const currentPath = `/${locale}/basket/checkout?${currentQuery}`;
-  const selectedProducts = agenticBasket
-    ? agenticBasket.selectedProducts
+  const selectedBasket = agenticBasket
+    ? { products: agenticBasket.selectedProducts, advice: [] }
     : await selectedProductsForCheckout(
         planId,
         selectedItemIds,
@@ -177,6 +178,7 @@ export default async function BasketCheckoutPage({
             {selectedItemIds.length < 1 ? labels.empty : labels.body}
           </p>
         </div>
+        {checkoutMode === "web" ? <WebMatchingAdvice advice={selectedBasket.advice} locale={locale} selected /> : null}
         {selectedItemIds.length < 1 ? null : (
           <ProductBasketCheckoutPanel
             {...selection}
@@ -193,7 +195,7 @@ export default async function BasketCheckoutPage({
             removedItemIds={removedItemIds}
             selectedRetailerOrganisationId={selectedRetailerOrganisationId}
             selectedItemIds={selectedItemIds}
-            selectedProducts={selectedProducts}
+            selectedProducts={selectedBasket.products}
             shippingAmount={agenticBasket?.shippingAmount ?? null}
           />
         )}
