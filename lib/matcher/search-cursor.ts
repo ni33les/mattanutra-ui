@@ -344,14 +344,22 @@ export function advanceSearchCursor(cursor: SearchCursor, request: CanonicalRequ
       if (a.group !== b.group) add(cursor,a.state,b.group,b.variant,request);
     } else if (cursor.phase === "repair") {
       if (cursor.expansionAttempts >= cursor.repairLimit || cursor.repairJobs.every(job => job.stage === "done")) {
-        cursor.phase="second"; const ranked = [...new Map(cursor.repaired.map(row => [fingerprintState(row),row])).values()].sort((a,b)=>compareSearchStates(a,b,request));
-        cursor.second=profileLeaders(ranked,request,width(cursor));
+        cursor.phase="second";
+        // Explored complementary bases remain useful even when they did not win
+        // a repair role. Give each target's closest base a completion opportunity.
+        const ranked = [...new Map([...cursor.repaired, ...cursor.review, ...cursor.unreviewed].map(row => [fingerprintState(row),row])).values()].sort((a,b)=>compareSearchStates(a,b,request));
+        const additiveBases = ranked.filter(state => { const targets=doseFitScore(request,state.exposure).perTarget; return targets.every(row=>row.over===0) && targets.some(row=>row.under>0); });
+        const references = request.targets.filter(target => !isDeferredConditional(target)).map(target => {
+          const loss = (state: SearchState) => { const row = doseFitScore(request,state.exposure).perTarget.find(row=>row.subjectId===target.subjectId); return row ? row.under + row.over : Infinity; };
+          return [...additiveBases].sort((a,b)=>loss(a)-loss(b) || compareDoseFit(doseFitScore(request,a.exposure),doseFitScore(request,b.exposure)) || compareSearchStates(a,b,request))[0];
+        }).filter((row): row is SearchState => Boolean(row));
+        cursor.second=[...new Set([...references.slice(0,Math.ceil(width(cursor)/4)), ...profileLeaders(ranked,request,width(cursor))])];
         for (const row of rawDoseLeaders(ranked,request,Math.ceil(width(cursor)/2))) {
           if (cursor.second.length >= width(cursor)) break;
           if (!cursor.second.includes(row)) cursor.second.push(row);
         }
         for (const row of ranked) { if (cursor.second.length >= width(cursor)) break; if (!cursor.second.includes(row)) cursor.second.push(row); }
-        cursor.secondIndex=0; cursor.group=0; cursor.variant=0; cursor.variants=null; continue;
+        cursor.secondIndex=0; cursor.group=0; cursor.variant=0; cursor.variants=null; cursor.groupLimit=-1; continue;
       }
       const job=cursor.repairJobs[cursor.repairJob++ % cursor.repairJobs.length]!;
       if (job.stage === "done") continue;
@@ -378,10 +386,12 @@ export function advanceSearchCursor(cursor: SearchCursor, request: CanonicalRequ
     } else if (cursor.phase === "second") {
       if (cursor.secondIndex >= cursor.second.length) { cursor.phase="finished"; cursor.done=true; cursor.exhausted=true; continue; }
       const base=cursor.second[cursor.secondIndex]!;
-      if (cursor.group >= cursor.groups.length) { cursor.secondIndex++; cursor.group=0; cursor.variants=null; continue; }
-      if (base.selectedProductIds?.includes(cursor.groups[cursor.group]!.productId)) { cursor.group++; cursor.variants=null; continue; }
-      if (!cursor.variants) { cursor.variants=variantsFor(cursor,cursor.group,base,request,stop); cursor.variant=0; if (!cursor.variants) continue; }
-      if (cursor.variant >= cursor.variants.length) { cursor.group++; cursor.variants=null; continue; }
+      if (cursor.group >= cursor.groups.length) { cursor.secondIndex++; cursor.group=0; cursor.variants=null; cursor.groupLimit=-1; continue; }
+      if (base.selectedProductIds?.includes(cursor.groups[cursor.group]!.productId)) { cursor.group++; cursor.variants=null; cursor.groupLimit=-1; continue; }
+      if (cursor.groupLimit < 0) cursor.groupLimit=cursor.expansionAttempts + Math.max(1,Math.floor((cursor.expansionBudget-cursor.expansionAttempts)/(cursor.groups.length-cursor.group)));
+      if (cursor.expansionAttempts >= cursor.groupLimit) { cursor.group++; cursor.variants=null; cursor.groupLimit=-1; continue; }
+      if (!cursor.variants) { cursor.variants=variantsFor(cursor,cursor.group,base,request,Math.min(stop,cursor.groupLimit)); cursor.variant=0; if (!cursor.variants) continue; }
+      if (cursor.variant >= cursor.variants.length) { cursor.group++; cursor.variants=null; cursor.groupLimit=-1; continue; }
       add(cursor,base,cursor.group,cursor.variants[cursor.variant++]!,request);
     } else cursor.done=true;
   }

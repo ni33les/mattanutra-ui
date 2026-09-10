@@ -426,6 +426,14 @@ export function reviewFrontier(states: readonly SearchState[], request: Canonica
   const fitOrder = [...states].sort((a, b) => order(a, b));
   const doseOrder = (a: SearchState, b: SearchState) => compareDoseFit(doseFitScore(request, a.exposure), doseFitScore(request, b.exposure)) || order(a, b);
   const chosen = new Set<SearchState>([...incumbents, ...[...states].sort(doseOrder).slice(0, 16)]);
+  // A close fit on one target can become the best complete basket after a
+  // complementary addition, despite losing every aggregate/profile ranking.
+  const additiveBases = states.filter(state => doseFitScore(request,state.exposure).perTarget.every(row=>row.over===0));
+  for (const target of request.targets.filter(row => !isDeferredConditional(row)).slice(0, 32)) {
+    const deviation = (state: SearchState) => { const row = doseFitScore(request,state.exposure).perTarget.find(row=>row.subjectId===target.subjectId); return row ? row.under + row.over : Infinity; };
+    const reference = [...additiveBases].sort((a,b)=>deviation(a)-deviation(b) || doseOrder(a,b))[0];
+    if (reference) chosen.add(reference);
+  }
   for (const objective of PRACTICAL_OBJECTIVES) {
     const profile = requestForProfile(request, objective);
     for (const state of [...states].sort((a, b) => compareSearchStates(a, b, profile)).slice(0, 12)) chosen.add(state);
