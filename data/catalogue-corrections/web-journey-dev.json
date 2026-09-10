@@ -1,0 +1,42 @@
+{
+  "version": 1,
+  "environment": "dev",
+  "corrections": [
+    {
+      "correctionId": "web-journey-dev-relacza-active-b12-20260910",
+      "entityTable": "product_facts",
+      "entityId": "35ef675e-2290-4c79-bbde-095cd88efbe5",
+      "before": {
+        "id": "35ef675e-2290-4c79-bbde-095cd88efbe5",
+        "product_id": "44f3a282-8c3e-4f9d-898a-a68d9b27ccbc",
+        "name": "Vitamin B12",
+        "normalized_name": "vitamin_b12",
+        "amount": 1,
+        "unit": "mg",
+        "source": "admin",
+        "source_url": null,
+        "source_text": "page_text: วิตามินบี 12 1 มคก.",
+        "confidence": "high"
+      },
+      "after": {
+        "id": "35ef675e-2290-4c79-bbde-095cd88efbe5",
+        "product_id": "44f3a282-8c3e-4f9d-898a-a68d9b27ccbc",
+        "name": "Vitamin B12",
+        "normalized_name": "vitamin_b12",
+        "amount": 1,
+        "unit": "mcg",
+        "source": "admin",
+        "source_url": "https://www.vistra.co.th/product/vistra-relacza-plus/",
+        "source_text": "Manufacturer composition per capsule: vitamin B12 preparation (0.1%) 1 mg supplies active vitamin B12 1 mcg.",
+        "confidence": "high"
+      },
+      "beforeFingerprint": "df0c8d1217635b2df42befcbd06c6daf6114b11a45f6b28be4aa2c75e131494b",
+      "afterFingerprint": "43fe66fb960ea76367aa7149094620943b6c2aafab2715738daeb0e7cada8a52",
+      "evidence": {
+        "sourceUrl": "https://www.vistra.co.th/product/vistra-relacza-plus/",
+        "checkedAt": "2026-09-10T14:10:00Z",
+        "summary": "Manufacturer distinguishes 1 mg of 0.1% preparation from 1 mcg active B12. Preserve amount, fact identity, confidence, prices, pack quantities and all other nutrient facts."
+      }
+    }
+  ]
+}
