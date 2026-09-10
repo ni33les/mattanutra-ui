@@ -28,16 +28,16 @@ test('WEB-TIDY-02 preserved nine-target result covers eight; current eight-targe
   assert.equal(coverage.formulaNeedCount(current), 8);
 });
 
-test('WEB-TIDY-03 web product penalties increase by one quarter; other terms and MCP policy stay unchanged', () => {
+test('WEB-TIDY-03 web product penalties use the calibrated web multiplier; other terms and MCP policy stay unchanged', () => {
   const actual = { dailyPills: 3, pillLowerBound: 3, productCount: 3, priceMinor: 10000, currency: 'THB', servings: [1, 1, 1], uncertainProductCount: 0 };
   for (const optimization of ['balanced', 'fewest_pills', 'best_coverage', 'lowest_cost'] as const) {
     for (const maxProductCount of [null, 1, 0]) {
       const control = request({ optimization, maxProductCount });
       const web = { ...control, selectorMode: 'web_single' as const };
       const baseline = scorePracticalPenalties(control, actual), updated = scorePracticalPenalties(web, actual);
-      assert.equal(updated.profile.multipliers.products, baseline.profile.multipliers.products * 1.25);
-      assert.equal(updated.components.products, baseline.components.products * 1.25);
-      assert.equal(updated.preferences.maxProductCount.penalty, baseline.preferences.maxProductCount.penalty * 1.25);
+      assert.equal(updated.profile.multipliers.products, baseline.profile.multipliers.products * 5);
+      assert.equal(updated.components.products, baseline.components.products * 5);
+      assert.equal(updated.preferences.maxProductCount.penalty, baseline.preferences.maxProductCount.penalty * 5);
       for (const key of ['pills', 'price', 'servings', 'uncertainty'] as const) assert.equal(updated.components[key], baseline.components[key]);
       assert.notEqual(updated.profile.hash, baseline.profile.hash);
       assert.notEqual(canonicalTargetSetHash(web), canonicalTargetSetHash(control));
@@ -53,7 +53,7 @@ test('WEB-TIDY-04 shared ranking favours a slightly simpler web routine without 
   const simpler = { ...seed, count: 1, exposure: new Map([['a', 94000000n]]) };
   const exact = { ...seed, count: 2, exposure: new Map([['a', 100000000n]]) };
   assert.ok(compareSearchStates(exact, simpler, input) < 0, 'Old product delta 0.05 favours closing a 0.06 dose gap');
-  assert.ok(compareSearchStates(simpler, exact, web) < 0, 'Web product delta 0.0625 favours one product at 94%');
+  assert.ok(compareSearchStates(simpler, exact, web) < 0, 'Web product delta 0.25 favours one product at 94%');
   const largeGap = { ...simpler, exposure: new Map([['a', 50000000n]]) };
   assert.ok(compareSearchStates(exact, largeGap, web) < 0, 'An additional product can still win when its benefit outweighs its cost');
 });

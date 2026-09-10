@@ -120,8 +120,8 @@ test('PRACTICAL-API-09 web and MCP share arithmetic with the explicit web produc
       const { profile: mcpProfile, ...mcpScore } = mcp.selected.overallScore;
       const { maxProductCount: webPreference, ...webPreferences } = webScore.preferences;
       const { maxProductCount: mcpPreference, ...mcpPreferences } = mcpScore.preferences;
-      assert.equal(webProfile.multipliers.products, mcpProfile.multipliers.products * 1.25);
-      assert.equal(webPreference.multiplier, mcpPreference.multiplier * 1.25);
+      assert.equal(webProfile.multipliers.products, mcpProfile.multipliers.products * 5);
+      assert.equal(webPreference.multiplier, mcpPreference.multiplier * 5);
       assert.deepEqual({ ...webPreference, multiplier: mcpPreference.multiplier }, mcpPreference);
       assert.deepEqual({ ...webScore, preferences: webPreferences }, { ...mcpScore, preferences: mcpPreferences });
       assert.equal(selected.dailyPills, 4); assert.equal(selected.purchaseEligible, true);

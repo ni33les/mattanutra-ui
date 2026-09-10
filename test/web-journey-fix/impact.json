@@ -1,0 +1,29 @@
+{
+  "releaseBase": "5bc1caf57636765bb68beb7fa4bd9115323467dc",
+  "scope": "DEV web shortlist accuracy, reviewed active B12 correction, web product burden and bounded consolidation",
+  "files": [
+    {"file":"test/web-journey-fix/presentation.test.ts","reason":"Unknown and actual counts, unchanged score 38, honest model reference"},
+    {"file":"test/web-journey-fix/catalogue.test.ts","reason":"Reviewed active-unit correction, fingerprint conflicts and preserved fact identity"},
+    {"file":"test/web-journey-fix/scoring.test.ts","reason":"Calibrated web-only product term"},
+    {"file":"test/web-journey-fix/priorities.test.ts","reason":"Web categories reach canonical target priority"},
+    {"file":"test/web-journey-fix/search.test.ts","reason":"Consolidation, deterministic attempt accounting and checkpoint equivalence"},
+    {"file":"test/web-journey-fix/reported.test.ts","reason":"Frozen reported journey, unchanged prices and corrected active amount"},
+    {"file":"test/web-journey-fix/reads.integration.test.ts","reason":"Revision/locale count projection and read contention"},
+    {"file":"test/catalogue-corrections.integration.test.ts","reason":"Existing correction transaction rollback, immutable receipts and replay"},
+    {"file":"test/health-score.test.ts","reason":"Deterministic scores, normalization and localized content"},
+    {"file":"test/health-score-analysis.test.ts","reason":"AI copy validation accepts unknown counts and revised factual reference copy"},
+    {"file":"test/health-score-panel-static.test.ts","reason":"Current formula facts coexist with complete personalized AI copy"},
+    {"file":"test/web-reveal-tidy.test.ts","reason":"Strict 12% coverage and superseded product coefficient"},
+    {"file":"test/practical-matching/scoring.test.ts","reason":"Unchanged nutrient symmetry, safety term and other burdens"},
+    {"file":"test/practical-matching/search.test.ts","reason":"Affected cursor consumers, advisory eligibility and recovery"},
+    {"file":"test/practical-matching/adapters.test.ts","reason":"Web/MCP isolation, budget bases and profile identity"},
+    {"file":"test/practical-matching/oracle.test.ts","reason":"Independent arithmetic and finite-pool ranking"},
+    {"file":"test/service-efficiency/lock-register.test.ts","reason":"No unregistered locking sites"},
+    {"file":"test/service-efficiency/funnel-reads.integration.test.ts","reason":"Affected readiness and immutable projection consumers"},
+    {"file":"test/simple-plan/publication.test.ts","reason":"Public MCP contract remains unchanged"}
+  ],
+  "browser": [
+    {"file":"test/e2e/web-journey-counts.spec.ts","grep":"WEB-JOURNEY-BROWSER-01","expectedCases":3},
+    {"file":"test/e2e/practical-matching.spec.ts","grep":"PRACTICAL-BROWSER-01","expectedCases":3}
+  ]
+}

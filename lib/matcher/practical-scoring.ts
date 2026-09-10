@@ -6,8 +6,8 @@ import { add, compare, divide, fromDecimal, multiply, positive, rational, serial
 import type { CanonicalRequest, MatcherProduct, OptimizationMode, PreferenceImportance, SearchState } from "@/lib/matcher/types";
 
 export const PRACTICAL_SCORING_VERSION = "practical-penalties-1";
-const WEB_PRACTICAL_SCORING_VERSION = "web-practical-penalties-2";
-const WEB_PRODUCT_PENALTY_MULTIPLIER = 1.25;
+const WEB_PRACTICAL_SCORING_VERSION = "web-practical-penalties-3";
+const WEB_PRODUCT_PENALTY_MULTIPLIER = 5;
 const PROFILES = Object.freeze({
   balanced: Object.freeze({ pills: 1, products: 1, price: 1, servings: 1 }),
   best_coverage: Object.freeze({ pills: 0.25, products: 0.25, price: 0.25, servings: 0.25 }),

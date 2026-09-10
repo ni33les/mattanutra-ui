@@ -354,19 +354,15 @@ function needDiagnosticsFromBasket(
   }));
 }
 
-export function recommendWithMatcher(
-  input: ProductRecommendationInput
-): ProductRecommendationResult {
-  const supplementNeeds = input.needs.filter(
-    (need) => need.itemType === "supplement" || need.itemType === "nutrient"
-  );
-  const targets = canonicalizeTargets({
-    targets: supplementNeeds.map((need) => ({
+export function webTargetsForNeeds(needs: readonly ProductRecommendationNeed[]) {
+  return canonicalizeTargets({
+    targets: needs.filter(need => need.itemType === "supplement" || need.itemType === "nutrient").map((need) => ({
       amount:
         need.targetDose?.amount ??
         need.targetComparableAmount ??
         0,
       basis: "supplemental",
+      importance: /(?:add[ -]?on|optional)/i.test(need.category) ? "optional" : /^foundation$/i.test(need.category.trim()) ? "core" : "required",
       name: need.displayName,
       subjectId: need.normalizedName || need.sourceId || need.id,
       unit: need.targetDose
@@ -374,6 +370,15 @@ export function recommendWithMatcher(
         : "mcg"
     }))
   });
+}
+
+export function recommendWithMatcher(
+  input: ProductRecommendationInput
+): ProductRecommendationResult {
+  const supplementNeeds = input.needs.filter(
+    (need) => need.itemType === "supplement" || need.itemType === "nutrient"
+  );
+  const targets = webTargetsForNeeds(supplementNeeds);
   const empty: ProductRecommendationResult = {
     clientNeeds: input.needs,
     diagnostics: {

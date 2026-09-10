@@ -16,7 +16,8 @@ type ExactVector = (number | bigint)[];
 type ArchivedState = [number, number, number, number, boolean, number[], ExactVector, ExactVector, string[],
   [number[], number, number | null, number, { num: bigint; den: bigint }?]?];
 type QuantitySearch = { key: string; ids: string[]; low: bigint; high: bigint; steps: number; left?: OverallMatchingScore | null };
-type RepairJob = { leader: SearchState; removal: number; base: SearchState | null; retained: string[]; build: number; group: number; variant: number; variants: string[] | null; stage: "prepare" | "build" | "add" | "done" };
+type RepairJob = { leader: SearchState; removal: number; base: SearchState | null; retained: string[]; build: number; group: number; variant: number; variants: string[] | null; stage: "prepare" | "build" | "add" | "done";
+  fixedRemoval?: string[]; replacementGroups?: number[] };
 export type SearchCursor = {
   version: "search-cursor-1"; identity: string; groups: ProductGroup[]; baseline: string[][];
   config: MatcherConfig; expansionBudget: number; expansionAttempts: number;
@@ -278,7 +279,30 @@ function startRepair(cursor: SearchCursor, request: CanonicalRequest) {
   // allowance with an actual removal; otherwise adding to four already full
   // leaders spends it before even one replacement receives an opportunity.
   cursor.repaired.push(...leaders);
-  cursor.repairJobs = leaders.map(leader => ({ leader, removal: 1, base: null, retained: [], build: 0, group: 0, variant: 0, variants: null, stage: "prepare" }));
+  const jobs: RepairJob[] = leaders.map(leader => ({ leader, removal: 1, base: null, retained: [], build: 0, group: 0, variant: 0, variants: null, stage: "prepare" }));
+  if (request.selectorMode === "web_single") {
+    // Try collapsing overlapping lines before spending the repair allowance on
+    // unrelated replacements. All rebuilds/probes still use add() and the same
+    // durable attempt budget. Fixed quantities and retained products stay binding.
+    const consolidation: RepairJob[] = [];
+    for (const leader of leaders) {
+      const selected = leader.selectedVariantIds.map(id => ({ id, index: cursor.groups.findIndex(g => g.variants.some(v => v.variantId === id)) }));
+      for (let a = 0; a < selected.length && consolidation.length < 8; a++) {
+        for (let b = a + 1; b < selected.length && consolidation.length < 8; b++) {
+          const left = selected[a]!, right = selected[b]!;
+          if (left.index < 0 || right.index < 0) continue;
+          const first = cursor.groups[left.index]!, second = cursor.groups[right.index]!;
+          if (mustSelect(first, request) || mustSelect(second, request)) continue;
+          const x = first.variants.find(v => v.variantId === left.id)!, y = second.variants.find(v => v.variantId === right.id)!;
+          if (!request.targets.some(t => x.contributions.has(t.subjectId) && y.contributions.has(t.subjectId))) continue;
+          consolidation.push({ leader, removal: 1, base: null, retained: [], build: 0, group: 0, variant: 0, variants: null, stage: "prepare",
+            fixedRemoval: [left.id, right.id], replacementGroups: [left.index, right.index] });
+        }
+      }
+    }
+    jobs.unshift(...consolidation);
+  }
+  cursor.repairJobs = jobs;
 }
 function removal(ids: readonly string[], index: number): readonly string[] | null {
   if (!index) return [];
@@ -364,7 +388,7 @@ export function advanceSearchCursor(cursor: SearchCursor, request: CanonicalRequ
       const job=cursor.repairJobs[cursor.repairJob++ % cursor.repairJobs.length]!;
       if (job.stage === "done") continue;
       if (job.stage === "prepare") {
-        const removed=removal(job.leader.selectedVariantIds,job.removal++);
+        const removed=job.fixedRemoval ? (job.removal++ === 1 ? job.fixedRemoval : null) : removal(job.leader.selectedVariantIds,job.removal++);
         if (!removed) { job.stage="done"; continue; }
         job.retained=job.leader.selectedVariantIds.filter(id=>!removed.includes(id)); job.build=0; job.base=seed; job.stage="build";
       }
@@ -378,11 +402,12 @@ export function advanceSearchCursor(cursor: SearchCursor, request: CanonicalRequ
         if (!job.base) throw new Error("Repair has no base");
         remember(cursor,job.base); cursor.repaired.push(job.base); job.stage="add"; job.group=0; job.variant=0; job.variants=null;
       }
-      if (job.group >= cursor.groups.length) { job.stage="prepare"; continue; }
-      if (job.base!.selectedProductIds?.includes(cursor.groups[job.group]!.productId)) { job.group++; job.variants=null; continue; }
-      if (!job.variants) { job.variants=variantsFor(cursor,job.group,job.base!,request,Math.min(stop,cursor.repairLimit)); job.variant=0; if (!job.variants) { cursor.repairJob--; continue; } }
+      if (job.group >= (job.replacementGroups?.length ?? cursor.groups.length)) { job.stage="prepare"; continue; }
+      const groupIndex = job.replacementGroups?.[job.group] ?? job.group;
+      if (job.base!.selectedProductIds?.includes(cursor.groups[groupIndex]!.productId)) { job.group++; job.variants=null; continue; }
+      if (!job.variants) { job.variants=variantsFor(cursor,groupIndex,job.base!,request,Math.min(stop,cursor.repairLimit)); job.variant=0; if (!job.variants) { cursor.repairJob--; continue; } }
       if (job.variant >= job.variants.length) { job.group++; job.variants=null; continue; }
-      const next=add(cursor,job.base!,job.group,job.variants[job.variant++]!,request); if (next) cursor.repaired.push(next);
+      const next=add(cursor,job.base!,groupIndex,job.variants[job.variant++]!,request); if (next) cursor.repaired.push(next);
     } else if (cursor.phase === "second") {
       if (cursor.secondIndex >= cursor.second.length) { cursor.phase="finished"; cursor.done=true; cursor.exhausted=true; continue; }
       const base=cursor.second[cursor.secondIndex]!;
