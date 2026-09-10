@@ -34,3 +34,19 @@ test('SPLAN-DTO-04 conflicting composition never becomes a verified lower bound;
   const target = rows.find(row => row.ingredientId === 'sup_d3'); assert.ok(target); assert.equal(target.supplied, null);
   assert.equal(target.suppliedAtLeast ?? 0, 0);
 });
+
+test('SPLAN-DTO-02 live label UUIDs and public contribution IDs identify one ingredient without upgrading conflicting facts', () => {
+  const raw = '927083fb-b90a-5a24-b4c5-5067b06ead5f', id = 'sup_927083fbb90a5a24b4c55067b06ead5f';
+  for (const mappingStatus of ['verified', 'conflicting'] as const) {
+    const result = fixture(), first = result.selected!.basket[0];
+    const target = { ...result.requestSnapshot.targets[0], supplementId: id };
+    const selected = { ...result.selected!, basket: [{ ...first,
+      requestedNutrients: [{ supplementId: id, name: 'Vitamin D3', amount: 500, unit: 'IU' as const }],
+      labelledFacts: [{ supplementId: raw, name: 'Vitamin D3', amount: 500, unit: 'IU', confidence: 'high' as const, mappingStatus, sourceUrl: null, sourceText: null }] }] };
+    const displayed = choice({ ...result, selected, requestSnapshot: { ...result.requestSnapshot, targets: [target] } });
+    assert.equal(displayed.ingredients.length, 1, 'A raw/public identity pair must not create a second incidental row');
+    assert.equal(displayed.ingredients[0].ingredientId, id);
+    assert.equal(displayed.ingredients[0].supplied, mappingStatus === 'verified' ? 500 : null);
+    assert.equal(displayed.summary.ingredientDataComplete, mappingStatus === 'verified');
+  }
+});
