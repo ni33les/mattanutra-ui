@@ -1,3 +1,4 @@
+import { resolveMarket } from "@/lib/agentic/catalogue/market";
 import type { AgenticRuntime } from "@/lib/agentic/runtime";
 import { businessError, isAgenticErrorResult } from "@/lib/agentic/contract/errors";
 import { readPlanState, readPlanPresentation } from "@/lib/agentic/presentation/plan-read";
@@ -40,7 +41,10 @@ export async function simplePlanTool(runtime: AgenticRuntime, params: Record<str
   const payload: PlanToolInput = { operation: kind, publicInput: params, idempotencyKey: key, ...(handle ? { planHandle: handle, expectedRevision: Number(params.expectedRevision) } : {}) };
   let request;
   if (kind === "create" || kind === "revise") {
-    const snapshot = await ensureCatalogueSnapshot(runtime.config.environment, String(params.destinationCountry ?? prior?.result.requestSnapshot.destinationCountry ?? "TH"));
+    const countryCode = String(params.destinationCountry ?? prior?.result.requestSnapshot.destinationCountry ?? "TH");
+    const market = await resolveMarket({ countryCode, locale: String(params.locale ?? prior?.result.requestSnapshot.locale ?? "en"), retailerAdapter: runtime.config.thailandRetailerAdapter });
+    if (isAgenticErrorResult(market)) return market;
+    const snapshot = await ensureCatalogueSnapshot(runtime.config.environment, countryCode);
     request = prepareSimpleRequest(params, snapshot, prior?.result.originalRequest ?? prior?.result.requestSnapshot.originalRequest);
     if (isAgenticErrorResult(request)) return request;
     Object.assign(payload, { request, searchEffort: params.searchEffort ?? prior?.result.requestSnapshot.searchEffort ?? "standard" });
