@@ -1,0 +1,42 @@
+import assert from 'node:assert/strict';
+import test, { after } from 'node:test';
+import { randomUUID } from 'node:crypto';
+import { getSql, closeSqlPool } from '../../lib/db.ts';
+import { captureAssessment, retryAssessmentHealthScore } from '../../lib/assessment-capture.ts';
+import { getFunnelReadiness } from '../../lib/funnel-readiness.ts';
+import { FUNNEL_GENERATOR_VERSION } from '../../lib/assessment-revisions.ts';
+import { completeHealthScoreFixture } from '../fixtures/healthscore.ts';
+assert.ok(process.env.TEST_DB_URL, 'Isolated PostgreSQL is required');
+const url = new URL(process.env.TEST_DB_URL); assert.equal(url.hostname, '127.0.0.1'); assert.match(url.pathname, /^\/mattanutra_lock_review_/);
+after(closeSqlPool);
+const sql = getSql()!;
+const answers = { firstName: 'Parallel Fixture', age: '36-45', sex: 'male', goals: ['energy'] };
+
+test('HS-PAR-PG-01 submission admits independent advice/formula work; unpaid display waits for both current outputs', async () => {
+  const receipt = await captureAssessment({ answers, locale: 'en', intent: 'capture' }, { idempotencyKey: randomUUID() });
+  const id = receipt.planId;
+  const tasks = await sql`select id,task_type,payload->>'dependsOnTaskId' as depends_on_task_id,status from tasks where plan_id=${id}::uuid`;
+  const copy = tasks.find(t => t.task_type === 'analyze_healthscore'), formula = tasks.find(t => t.task_type === 'generate_supplement_guidance'), product = tasks.find(t => t.task_type === 'generate_product_recommendations');
+  assert.ok(copy && formula && product); assert.equal(copy.depends_on_task_id, null); assert.equal(formula.depends_on_task_id, null); assert.equal(product.depends_on_task_id, formula.id);
+  await sql`insert into assessment_healthscore_results(plan_id,revision,locale,generator_version,result) values(${id}::uuid,1,'en',${FUNNEL_GENERATOR_VERSION},${sql.json(completeHealthScoreFixture('en'))})`;
+  const read = () => getFunnelReadiness(id, 'en');
+  assert.equal((await read())?.readyForHealthScore, false);
+  await sql`insert into formulations(plan_id,version,assessment_revision,generation_locale,generator_version,formulation) values(${id}::uuid,1,1,'en',${FUNNEL_GENERATOR_VERSION},'{"supplementBreakdown":[{"id":"target"}]}')`;
+  assert.equal((await read())?.readyForHealthScore, false);
+  await sql`insert into product_recommendation_runs(plan_id,assessment_revision,generation_locale,generator_version,catalogue_revision) values(${id}::uuid,1,'en',${FUNNEL_GENERATOR_VERSION},(select revision from catalogue_runtime_revision where singleton=true))`;
+  const ready = await read(); assert.equal(ready?.readyForHealthScore, true); assert.equal(ready?.hasPaidPlan, false);
+  assert.equal((await getFunnelReadiness(id, 'th'))?.readyForHealthScore, false);
+  await sql`update assessments set input_revision=2 where plan_id=${id}::uuid`;
+  assert.equal((await read())?.readyForHealthScore, false);
+});
+
+test('HS-PAR-PG-02 analysis retry also repairs failed formulation for the saved assessment without recapture', async () => {
+  const receipt = await captureAssessment({ answers, locale: 'en', intent: 'capture' }, { idempotencyKey: randomUUID() });
+  const id = receipt.planId;
+  await sql`insert into assessment_healthscore_results(plan_id,revision,locale,generator_version,result) values(${id}::uuid,1,'en',${FUNNEL_GENERATOR_VERSION},${sql.json(completeHealthScoreFixture('en'))})`;
+  await sql`update tasks set status='failed' where plan_id=${id}::uuid and task_type='generate_supplement_guidance'`;
+  const before = await sql`select answers,input_revision from assessments where plan_id=${id}::uuid`;
+  await retryAssessmentHealthScore(id, 'en');
+  assert.ok((await sql`select id from tasks where plan_id=${id}::uuid and task_type='generate_supplement_guidance' and status in ('queued','reserved','running')`).length > 0);
+  assert.deepEqual(await sql`select answers,input_revision from assessments where plan_id=${id}::uuid`, before);
+});
