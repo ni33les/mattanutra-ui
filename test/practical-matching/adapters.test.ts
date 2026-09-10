@@ -123,3 +123,17 @@ test('PRACTICAL-API-09 web and MCP emit identical complete scores for identical 
     }
   } finally { resetMatcherSafetyCeilings(); }
 });
+
+test('PRACTICAL-API-10 per-product dose explanations remain stable when requested coverage display order changes', async () => {
+  const { internalFixture } = await import('../mcp-conversation-pack/helpers.ts');
+  const { publicBasketItem } = await import('../../lib/agentic/public-mapper.ts');
+  const fixture = internalFixture(), item = fixture.selected!.basket[0]; assert.ok(item);
+  const rows = ['A', 'B'].map((name, i) => ({ ...fixture.coverage[0], name, supplementId: `sup_${name.toLowerCase()}`, unit: 'mg' as const, remainingGap: 0,
+    contributors: [{ productId: item.productId, productName: item.productName, amount: (i + 1) * 25, unit: 'mg' as const }] }));
+  for (const locale of ['en', 'th', 'zh-CN']) {
+    const forward = publicBasketItem(item, locale, undefined, rows);
+    assert.deepEqual(publicBasketItem(item, locale, undefined, [...rows].reverse()), forward);
+    assert.deepEqual(forward.requestedNutrients, [{ name: 'A', amount: 25, unit: 'mg' }, { name: 'B', amount: 50, unit: 'mg' }]);
+    assert.deepEqual(forward.selectionReason?.requestedSupplementIds, ['sup_a', 'sup_b']);
+  }
+});

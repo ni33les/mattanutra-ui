@@ -1,3 +1,4 @@
+import { optionalTargetAmountsAreCoherent } from "./helpers/optional-target-amounts.ts";
 import { hasContextAssessment } from "./helpers/context-assessment.ts";
 import assert from "node:assert/strict";
 import { createHash, randomUUID } from "node:crypto";
@@ -311,19 +312,8 @@ export async function runCvFixPack(frozenInput?: ValueCatalogueFreeze): Promise<
         if (creatine?.importance !== "core" || creatine?.status !== "covered") {
           failed.push("FIX-01.A1");
         }
-        if (mag) {
-          // Optional targets can be partially supplied or exceeded by a useful
-          // practical routine. Assert its quantities, rather than requiring an
-          // exact match or dropping the optional target from the request.
-          const actual = Number(mag.quantifiedExposureAmount);
-          const target = Number(mag.requestedAmount);
-          const expectedStatus = actual > target ? "over_target" : actual === target ? "covered" : actual > 0 ? "partial" : "optional_omitted";
-          if (!Number.isFinite(actual) || !(target > 0) || mag.status !== expectedStatus ||
-              Number(mag.remainingGap) !== Math.max(0, target - actual) ||
-              Number(mag.excess) !== Math.max(0, actual - target) ||
-              Math.abs(Number(mag.coveragePercent) - Math.min(100, actual / target * 100)) > 0.000001) {
-            failed.push("FIX-01.A2");
-          }
+        if (!optionalTargetAmountsAreCoherent(mag, VALUE_ROLE_REQUEST.magnesium.amount)) {
+          failed.push("FIX-01.A2");
         }
         if (d3?.status !== "conditional_deferred") {
           failed.push("FIX-01.A3");

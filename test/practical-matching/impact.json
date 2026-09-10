@@ -28,7 +28,7 @@
     {
       "file": "test/practical-matching/adapters.test.ts",
       "slice": "adapters",
-      "expectedCases": 9,
+      "expectedCases": 10,
       "reason": "MCP and web profile resolution, monthly budgets, patches and detail output."
     },
     {
