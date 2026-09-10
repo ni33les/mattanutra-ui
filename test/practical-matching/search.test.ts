@@ -4,6 +4,9 @@ import { match } from '../../lib/matcher/index.ts';
 import { catalog, product, request } from '../matcher/flexible-v5-fixtures.ts';
 import { canonicalizeTargets } from '../../lib/matcher/canonicalizer.ts';
 import type { ProductAdministration } from '../../lib/product-administration.ts';
+import { canonicalTargetSetHash } from '../../lib/matcher/canonicalizer.ts';
+import { createMatchCursor, advanceMatchCursor, matchCursorAttempts } from '../../lib/matcher/match-cursor.ts';
+import { DEFAULT_MATCHER_CONFIG } from '../../lib/matcher/config.ts';
 
 function administration(units: number): ProductAdministration { return { route: 'oral', physicalUnit: 'tablet', unitsPerServing: units,
   doseIncrement: 1, packQuantity: 60, provenance: { status: 'verified', sourceUrl: 'https://example.com/controlled-label', sourceText: 'Controlled fixture label: verified tablet serving and pack basis.', verifiedAt: '2026-09-10' } }; }
@@ -36,7 +39,7 @@ test('PRACTICAL-SEARCH-03 supported interior quantity is explored within the sam
 });
 
 test('PRACTICAL-SEARCH-04 unknown administration does not become a zero-pill advantage', () => {
-  const result = match(request({ maxDailyPills: 1 }), catalog([tablet('known', 100, 2), product('unknown', { a: 100 }, 10000, { dailyPillsPerServing: 0, pillCountKnown: false })]));
+  const result = match(request({ maxDailyPills: 2 }), catalog([tablet('known', 100, 2), product('unknown', { a: 100 }, 10000, { dailyPillsPerServing: 0, pillCountKnown: false })]));
   assert.deepEqual(result.selected?.productIds, ['known']);
   const unknown = [result.selected, ...result.alternatives].find(row => row?.productIds.includes('unknown'));
   if (unknown) assert.equal(unknown.pillCountKnown, false);
@@ -53,4 +56,24 @@ test('PRACTICAL-SEARCH-06 numerical preferences never veto fixed quantities or p
   const result = match(request({ maxDailyPills: 0, maxProductCount: 0, maxPriceMinor: 0, preferenceImportance: { maxDailyPills: 'strong' }, productDoses: [{ productId: 'fixed', servingsPerDay: 4 }] }), catalog([tablet('fixed', 100, 1)]));
   assert.ok(result.selected); assert.equal(result.selected.variantDoses?.[0].dailyUnits, 4); assert.equal(result.selected.purchaseEligible, true);
   assert.equal(result.selected.safety.hardBlocked, false); assert.equal(result.selected.safety.requiresAck, false);
+});
+
+test('PRACTICAL-SEARCH-07 importance and budget basis identify immutable matching inputs', () => {
+  const input = request({ maxDailyPills: 3 });
+  assert.notEqual(canonicalTargetSetHash(input), canonicalTargetSetHash({ ...input, preferenceImportance: { maxDailyPills: 'strong' } }));
+  assert.notEqual(canonicalTargetSetHash(input), canonicalTargetSetHash({ ...input, pricePreferenceBasis: 'monthly_30_days' }));
+});
+
+test('PRACTICAL-SEARCH-08 checkpointing every attempt preserves quantity search and work counts', () => {
+  const input = request({ maxDailyPills: 5, preferenceImportance: { maxDailyPills: 'strong' } });
+  const shelf = catalog([tablet('interior', 125, 10)]);
+  let cursor = createMatchCursor(input, shelf, DEFAULT_MATCHER_CONFIG);
+  let previous = 0;
+  while (!cursor.done) {
+    advanceMatchCursor(cursor, input, 1);
+    const attempts = matchCursorAttempts(cursor); assert.ok(attempts - previous <= 1); previous = attempts;
+    assert.ok(previous <= 8000); cursor = structuredClone(cursor);
+  }
+  const resumed = match(input, shelf, DEFAULT_MATCHER_CONFIG, undefined, undefined, cursor), direct = match(input, shelf);
+  assert.deepEqual(resumed, direct); assert.equal(resumed.selected?.variantDoses?.[0].dailyUnits, 0.6);
 });
