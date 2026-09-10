@@ -50,3 +50,19 @@ test('PRACTICAL-ORACLE-03 oversized and empty fixtures fail instead of silently 
   assert.throws(() => oracle([], 3, 'normal', 'balanced'), /bound/);
   assert.throws(() => oracle(Array.from({ length: 17 }, (_, i) => ({ id: String(i), dose: 10, units: 1, price: 1000, quantities: [0, 1] })), 3, 'normal', 'balanced'), /bound/);
 });
+
+test('PRACTICAL-ORACLE-04 monthly pack discontinuities retain the independent useful optimum', () => {
+  const price = 30000, budget = 30000, dose = 40, pack = 7;
+  const pool = Array.from({ length: 101 }, (_, ticks) => {
+    const q = ticks / 10, monthly = ticks ? Math.ceil(30 * ticks / (10 * pack)) * price : 0;
+    return { q, score: Math.abs(q * dose - 100) / 100 + (ticks ? 0.05 + price / 2000000 : 0) + Math.max(0, q - 1) ** 2 / 20 + (Math.max(0, monthly - budget) / budget) ** 2 };
+  }).sort((a, b) => a.score - b.score);
+  assert.equal(pool.length, 101); assert.equal(pool[0].q, 0.2);
+  const powder = product('monthly', { a: dose }, price, { dailyPillsPerServing: 0, pillCountKnown: true,
+    administration: { route: 'oral', physicalUnit: 'g', unitsPerServing: 1, doseIncrement: 0.1, packQuantity: pack,
+      provenance: { status: 'verified', sourceUrl: 'https://example.test/independent-powder', sourceText: 'Controlled powder: 1g labelled serving; 0.1g measure; 7g pack.', verifiedAt: '2026-09-10' } } });
+  const result = match(request({ maxPriceMinor: budget, pricePreferenceBasis: 'monthly_30_days', preferenceImportance: { maxPriceMinor: 'strong' } }), catalog([powder]));
+  assert.ok(result.selected?.overallScore); assert.equal(result.selected.variantDoses?.[0]?.dailyUnits, pool[0].q);
+  assert.ok(Math.abs(result.selected.overallScore.overallPenalty - pool[0].score) < 1e-12);
+  assert.equal(result.selected.overallScore.preferences.maxPriceMinor.actual, price);
+});
