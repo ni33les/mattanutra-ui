@@ -38,7 +38,7 @@ test("M721-ADVICE-03 explicit missing-reference rule classification does not cha
 test('SPLAN-ADV-04 live D3 product finding is emitted once per choice while all 19 ingredients remain addressable', () => {
   const result = internalFixture(), first = result.selected!.basket[0];
   const facts = Array.from({ length: 19 }, (_, index) => ({ supplementId: `sup_label_${index}`, name: `Label ingredient ${index}`, amount: null, unit: 'mg' as const, confidence: 'low' as const, mappingStatus: 'unverified' as const }));
-  const finding = { kind: 'product_data', code: 'product_data_unverified', severity: 'high', supplementIds: facts.slice(0, 10).map(row => row.supplementId),
+  const finding = { kind: 'product_data', code: 'unverified_product_facts', severity: 'high', supplementIds: facts.slice(0, 10).map(row => row.supplementId),
     productIds: [first.productId], ruleId: 'labels:unverified', rulesVersion: 'frozen', exposure: null, threshold: null,
     uncertainty: 'Some product quantities or label facts are unverified. Treat reported amounts as provisional; missing physical units, pill counts and supply duration remain unknown. Conflicting nutrient mappings do not establish coverage. Review the label evidence before relying on these amounts.' } as unknown as SafetyGuidance;
   const selected = { ...result.selected!, basket: [{ ...first, labelledFacts: facts }], safety: { ...result.selected!.safety, guidance: [finding, finding] } };
