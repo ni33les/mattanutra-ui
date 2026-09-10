@@ -151,6 +151,9 @@ export function compareSearchStates(a: SearchState, b: SearchState, request: Can
 /** Representatives share one explored pool and one expansion budget. */
 export function profileLeaders(states: readonly SearchState[], request: CanonicalRequest, limit: number): SearchState[] {
   const chosen = new Set<SearchState>();
+  const closest = states.reduce<SearchState | undefined>((best, state) => !best ||
+    (compareDoseFit(doseFitScore(request, state.exposure), doseFitScore(request, best.exposure)) || compareSearchStates(state, best, request)) < 0 ? state : best, undefined);
+  if (closest) chosen.add(closest);
   for (const objective of [request.optimization, ...PRACTICAL_OBJECTIVES.filter(value => value !== request.optimization)]) {
     const profile = requestForProfile(request, objective);
     const best = states.reduce<SearchState | undefined>((previous, state) => !previous || compareSearchStates(state, previous, profile) < 0 ? state : previous, undefined);

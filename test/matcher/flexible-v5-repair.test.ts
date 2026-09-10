@@ -45,7 +45,7 @@ it('V5-REPAIR-02: reserved repair remains deterministic, keeps the expanded incu
 it('ADV6-REPAIR-01: large-catalogue complementary repair completes two proposed one-unit products', () => {
   const result = match({ ...requirements, productDoses: [{ productId: '00-a', servingsPerDay: 1 }, { productId: '01-b', servingsPerDay: 1 }] }, catalog(products));
   const selected = closestDoseOption(result);
-  assert.deepEqual(selected?.variantIds, ['seller:00-a:x1', 'seller:zz-complement:x1', 'seller:01-b:x1']);
+  assert.deepEqual(selected?.variantIds, ['seller:00-a:x1', 'seller:01-b:x1', 'seller:zz-complement:x1']);
   assert.equal(selected?.doseFit?.total, 0);
   assert.equal(selected?.priceMinor, 300);
   assert.equal(selected?.dailyPills, 3);

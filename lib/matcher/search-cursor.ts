@@ -7,6 +7,7 @@ import { targetDoseTicks } from "@/lib/matcher/target-basis";
 import { compareOverallScores, resolvePracticalProfile, searchStateScore, type OverallMatchingScore } from "@/lib/matcher/practical-scoring";
 import { divide, fromDecimal, multiply, rational, toNumber } from "@/lib/matcher/rational";
 import { fingerprintState } from "@/lib/matcher/dominance";
+import { compareDoseFit, doseFitScore } from "@/lib/matcher/dose-fit";
 import { compareSearchStates, profileLeaders, residualPattern, reviewFrontier, seedState, tryAddVariant, type SearchRun } from "@/lib/matcher/search";
 import type { CanonicalRequest, DoseVariant, MatcherConfig, ProductGroup, SearchState } from "@/lib/matcher/types";
 
@@ -172,6 +173,10 @@ function variantsFor(cursor: SearchCursor, index: number, state: SearchState, re
     const exists = group.variants.some(row => row.variantId === id);
     // Invalid physical probes still consume an expansion attempt.
     const candidate = exists ? add(cursor, state, index, id, request) : (cursor.expansionAttempts++, null);
+    // Probes are productive expansions too. Preserve their continuation when
+    // probing consumes the rest of this group's allowance.
+    if (candidate && cursor.phase === "beam") cursor.expanded.push({ ...candidate, nextGroupIndex: index + 1 });
+    if (candidate && cursor.phase === "repair") cursor.repaired.push(candidate);
     if (exists && !job.ids.includes(id)) job.ids.push(id);
     const score = candidate ? searchStateScore(request, candidate) : null;
     if (job.left === undefined) { job.left = score; continue; }
@@ -211,9 +216,37 @@ function diverseSingles(cursor: SearchCursor, request: CanonicalRequest) {
   for (let depth=0; result.length < cursor.singles.length; depth++) for (const rows of buckets) if (rows[depth]) result.push(rows[depth]!);
   return result;
 }
+function rawDoseLeaders(states: readonly SearchState[], request: CanonicalRequest, limit: number) {
+  const ranked = [...states].sort((a,b) => compareDoseFit(doseFitScore(request,a.exposure),doseFitScore(request,b.exposure)) || compareSearchStates(a,b,request));
+  // A basket that exactly meets several targets is a useful completion base,
+  // even when one remaining gap gives it a larger aggregate dose loss.
+  const exactCount = (state: SearchState) => doseFitScore(request,state.exposure).perTarget.filter(row => row.under === 0 && row.over === 0).length;
+  const exact = [...ranked].sort((a,b) => exactCount(b)-exactCount(a) || compareDoseFit(doseFitScore(request,a.exposure),doseFitScore(request,b.exposure)) || compareSearchStates(a,b,request));
+  const chosen: SearchState[] = [...new Set([ranked[0], ...exact.slice(0,2)].filter((row): row is SearchState => Boolean(row)))].slice(0,limit);
+  const patterns = new Set(chosen.map(state => residualPattern(state,request)));
+  for (const state of ranked) {
+    const pattern = residualPattern(state, request);
+    if (!patterns.has(pattern)) { chosen.push(state); patterns.add(pattern); }
+    if (chosen.length >= limit) break;
+  }
+  for (const state of ranked) { if (chosen.length >= limit) break; if (!chosen.includes(state)) chosen.push(state); }
+  return chosen;
+}
 function finishBeamLayer(cursor: SearchCursor, request: CanonicalRequest) {
+  // Skipping an optional group costs no expansion. Keep unvisited parents when
+  // the bounded quantity probes exhaust the layer before every parent runs.
+  if (!mustSelect(cursor.groups[cursor.group]!, request)) {
+    cursor.expanded.push(...cursor.beam.map(state => ({ ...state, nextGroupIndex: cursor.group + 1 })));
+  }
   const ranked = [...new Map(cursor.expanded.map(row => [fingerprintState(row), row])).values()].sort((a,b) => compareSearchStates(a,b,request));
   const size = width(cursor), chosen = profileLeaders(ranked, request, size);
+  // Keep a small raw-dose lane as well as each practical profile's incumbent.
+  // A single incumbent can contain collateral nutrients that require replacing
+  // two products; its neighbours must survive long enough to be repaired.
+  for (const row of rawDoseLeaders(ranked, request, Math.ceil(size / 2))) {
+    if (chosen.length >= size) break;
+    if (!chosen.includes(row)) chosen.push(row);
+  }
   for (const row of ranked) { if (chosen.length >= Math.ceil(size / 2)) break; if (!chosen.includes(row)) chosen.push(row); }
   if (ranked.length > size) cursor.trimmed = true;
   const patterns = new Set(chosen.map(row => residualPattern(row,request)));
@@ -229,8 +262,8 @@ function startRepair(cursor: SearchCursor, request: CanonicalRequest) {
   cursor.phase = "repair";
   cursor.repairLimit = cursor.expansionAttempts + Math.floor((cursor.expansionBudget - cursor.expansionAttempts) * .75);
   const candidates = [...cursor.review, ...cursor.unreviewed].sort((a,b) => compareSearchStates(a,b,request));
-  const leaders = profileLeaders(candidates, request, 4);
-  for (const row of candidates) { if (leaders.length >= 4) break; if (!leaders.includes(row)) leaders.push(row); }
+  const leaders = profileLeaders(candidates, request, 5);
+  for (const row of candidates) { if (leaders.length >= 5) break; if (!leaders.includes(row)) leaders.push(row); }
   // Preserve unmodified leaders for the second-addition pass. Start the repair
   // allowance with an actual removal; otherwise adding to four already full
   // leaders spends it before even one replacement receives an opportunity.
@@ -301,7 +334,13 @@ export function advanceSearchCursor(cursor: SearchCursor, request: CanonicalRequ
       if (a.group !== b.group) add(cursor,a.state,b.group,b.variant,request);
     } else if (cursor.phase === "repair") {
       if (cursor.expansionAttempts >= cursor.repairLimit || cursor.repairJobs.every(job => job.stage === "done")) {
-        cursor.phase="second"; cursor.second=[...new Map(cursor.repaired.map(row => [fingerprintState(row),row])).values()].sort((a,b)=>compareSearchStates(a,b,request)).slice(0,width(cursor));
+        cursor.phase="second"; const ranked = [...new Map(cursor.repaired.map(row => [fingerprintState(row),row])).values()].sort((a,b)=>compareSearchStates(a,b,request));
+        cursor.second=profileLeaders(ranked,request,width(cursor));
+        for (const row of rawDoseLeaders(ranked,request,Math.ceil(width(cursor)/2))) {
+          if (cursor.second.length >= width(cursor)) break;
+          if (!cursor.second.includes(row)) cursor.second.push(row);
+        }
+        for (const row of ranked) { if (cursor.second.length >= width(cursor)) break; if (!cursor.second.includes(row)) cursor.second.push(row); }
         cursor.secondIndex=0; cursor.group=0; cursor.variant=0; cursor.variants=null; continue;
       }
       const job=cursor.repairJobs[cursor.repairJob++ % cursor.repairJobs.length]!;
