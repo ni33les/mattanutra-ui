@@ -1,3 +1,4 @@
+import { nutrientWeightEvidence } from "@/lib/matcher/scoring-policy";
 import { decodeMatchCursor, encodeMatchCursor, encodeMatchCursorBytes } from "@/lib/matcher/cursor-codec-server";
 import { createHash } from "node:crypto";
 import type { CatalogueProduct, CatalogueSnapshot } from "@/lib/agentic/catalogue/types";
@@ -116,7 +117,7 @@ function matchPlanCacheKey(
   hash.update("\0");
   hash.update(GUIDANCE_RULES_VERSION);
   hash.update(MATCHER_VERSION);
-  hash.update(resolvePracticalProfile({ optimization: state.optimization, preferenceImportance: state.requirements.preferenceImportance }).hash);
+  hash.update(resolvePracticalProfile({ optimization: state.optimization, preferenceImportance: state.requirements.preferenceImportance, scoring: state.scoring }).hash);
   hash.update("\0");
   hash.update(JSON.stringify(state.acceptedGaps));
   hash.update("\0");
@@ -206,6 +207,7 @@ export function toCanonicalRequest(
   const dietaryPreference = state.requirements.dietaryPreference ?? "any";
 
   return {
+    ...(state.scoring ? { scoring: state.scoring } : {}),
     acceptedGapSubjectIds: state.acceptedGaps.map((item) => item.supplementId),
     allowedForms: state.requirements.allowedForms ?? null,
     conditionCodes: state.conditionCodes,
@@ -565,11 +567,11 @@ const CATALOGUE_UNITS = new Set([
 ]);
 
 function uniqueBoundedNutrients(
-  facts: readonly { amount: number; name: string; unit: string }[],
+  facts: readonly { amount: number; name: string; unit: string; supplementId?: string }[],
   limit = 12
 ) {
   const seen = new Set<string>();
-  const out: Array<{ amount: number; name: string; unit: BasketItem["incidentalNutrients"][number]["unit"] }> = [];
+  const out: Array<{ amount: number; name: string; supplementId?: string; unit: BasketItem["incidentalNutrients"][number]["unit"] }> = [];
 
   for (const fact of facts) {
     const name = fact.name.trim();
@@ -588,6 +590,7 @@ function uniqueBoundedNutrients(
     seen.add(key);
     out.push({
       amount: fact.amount,
+      ...(fact.supplementId ? { supplementId: fact.supplementId } : {}),
       name,
       unit: unit as BasketItem["incidentalNutrients"][number]["unit"]
     });
@@ -606,8 +609,8 @@ function nutrientSplit(
   servingsPerDay: number
 ) {
   const matcherProduct = toMatcherProduct(product);
-  const requested: { amount: number; name: string; unit: string }[] = [];
-  const incidental: { amount: number; name: string; unit: string }[] = [];
+  const requested: { amount: number; name: string; unit: string; supplementId?: string }[] = [];
+  const incidental: { amount: number; name: string; unit: string; supplementId?: string }[] = [];
   const multiplier = servingsPerDay;
   const requestedKeys = new Set<string>();
 
@@ -641,6 +644,7 @@ function nutrientSplit(
 
       requested.push({
         amount: scaled,
+        ...(state.scoring ? { supplementId: target.supplementId } : {}),
         name: fact.name,
         unit: fact.unit
       });
@@ -660,12 +664,13 @@ function nutrientSplit(
 
     incidental.push({
       amount: fact.amount * multiplier,
+      ...(state.scoring && fact.subjectId ? { supplementId: fact.subjectId } : {}),
       name: fact.name,
       unit: fact.unit
     });
   }
 
-  const incidentalNutrients = uniqueBoundedNutrients(incidental);
+  const incidentalNutrients = uniqueBoundedNutrients(incidental, state.scoring ? incidental.length : undefined);
   // These quantities are the coverage ledger, so presentation limits and small
   // contribution thresholds must never discard a requested measured nutrient.
   const requestedNutrients = uniqueBoundedNutrients(requested, requested.length);
@@ -770,7 +775,7 @@ function basketFromIds(
       return enrichBasketPackFacts({
         availabilityAsOf: snapshot.availabilityAsOf,
         administration: product.candidate.administration ?? null,
-        labelledFacts: product.candidate.facts.map(fact => ({ name: fact.name, amount: fact.amount ?? null, unit: fact.unit ?? null, confidence: fact.confidence, mappingStatus: fact.mappingStatus ?? "unverified", sourceUrl: fact.sourceUrl ?? null, sourceText: fact.sourceText ?? null })),
+        labelledFacts: product.candidate.facts.map(fact => ({ supplementId: fact.supplementId, name: fact.name, amount: fact.amount ?? null, unit: fact.unit ?? null, confidence: fact.confidence, mappingStatus: fact.mappingStatus ?? "unverified", sourceUrl: fact.sourceUrl ?? null, sourceText: fact.sourceText ?? null })),
         pillCountKnown: toMatcherProduct(product).pillCountKnown,
         contributionSupplementIds: product.contributionSupplementIds,
         currency: product.candidate.currency || state.currency,
@@ -786,6 +791,7 @@ function basketFromIds(
         fixture: product.source === "fixture",
         form: product.form,
         imageUrl: product.candidate.imageUrl?.trim() || null,
+        productUrl: product.candidate.productUrl?.trim() || null,
         incidentalNutrientNames: nutrients.incidentalNutrientNames,
         incidentalNutrients: nutrients.incidentalNutrients,
         incompleteCommercialFacts: product.incompleteCommercialFacts,
@@ -813,7 +819,8 @@ function toStackOption(
   state: CanonicalPlanState,
   snapshot: CatalogueSnapshot,
   basket: ScoredBasket,
-  recommendedBasket?: ScoredBasket | null
+  recommendedBasket?: ScoredBasket | null,
+  request?: CanonicalRequest
 ): StackOption {
   const items = basketFromIds(state, snapshot, basket);
   const coverage = coverageFor(state, basket, items);
@@ -870,6 +877,7 @@ function toStackOption(
     coveragePercent: requestedTargetCoverage(coverage).coveragePercent,
     doseFit: basket.doseFit,
     overallScore: basket.overallScore,
+    ...(request?.scoring ? { scoringEvidence: nutrientWeightEvidence(request, basket.exposure) } : {}),
     dailyPills: basket.dailyPills,
     deferredTargetIds,
     economics,
@@ -1188,10 +1196,10 @@ function computeMatchPlan(input: Readonly<{
     })
   });
   const selectedRaw = result.selected
-    ? withSafety(toStackOption(input.state, snapshot, result.selected, result.selected))
+    ? withSafety(toStackOption(input.state, snapshot, result.selected, result.selected, request))
     : null;
   const alternatives = result.alternatives.map((item) =>
-    withSafety(toStackOption(input.state, snapshot, item, result.selected))
+    withSafety(toStackOption(input.state, snapshot, item, result.selected, request))
   );
   const selected =
     selectedRaw && alternatives.length === 0

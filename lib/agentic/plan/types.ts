@@ -87,6 +87,7 @@ export type PlanAnswer = Readonly<{
 }>;
 
 export type PlanRequestTarget = Readonly<{
+  ingredientId?: string;
   basis?: "total_daily" | "supplemental";
   acceptableRange?: TargetAcceptableRange;
   amount: number;
@@ -117,6 +118,7 @@ export type PlanBaseline = Readonly<{
 }>;
 
 export type PlanRequest = Readonly<{
+  scoring?: import("@/lib/matcher/scoring-policy").ScoringSettings;
   answers?: readonly PlanAnswer[];
   baseline?: PlanBaseline;
   conditionCodes?: readonly string[];
@@ -133,7 +135,6 @@ export type PlanRequest = Readonly<{
   targets: readonly PlanRequestTarget[];
 }>;
 
-export type PlanRequestPatch = Partial<Omit<PlanRequest, "profile" | "requirements" | "baseline">> & Readonly<{ profile?: Partial<PlanProfile>; requirements?: Partial<PlanRequirements>; baseline?: Partial<PlanBaseline> }>;
 
 export type AcceptedGap = Readonly<{
   revision: number;
@@ -160,6 +161,7 @@ export type PlanLeftover = Readonly<{
 }>;
 
 export type CanonicalPlanState = Readonly<{
+  scoring?: import("@/lib/matcher/scoring-policy").ScoringSettings;
   searchEffort?: "standard" | "expanded";
   acceptedGaps: readonly AcceptedGap[];
   acknowledgedUnassessedConditionCodes?: readonly string[];
@@ -291,6 +293,7 @@ export type FactLedgerRow = Readonly<{
 }>;
 
 export type BasketNutrient = Readonly<{
+  supplementId?: string;
   amount: number;
   name: string;
   unit: CatalogueUnit;
@@ -321,12 +324,14 @@ export type SelectionReason = Readonly<{
 }>;
 
 export type PublicLabelFact = Readonly<{
+  supplementId?: string | null;
   name: string; amount: number | null; unit: string | null;
   confidence: "high" | "moderate" | "low";
   mappingStatus: "verified" | "unverified" | "conflicting";
   sourceUrl: string | null; sourceText: string | null;
 }>;
 export type BasketItem = Readonly<{
+  productUrl?: string | null;
   labelledFacts?: readonly PublicLabelFact[];
   administration?: import("@/lib/product-administration").ProductAdministration | null;
   pillCountKnown?: boolean;
@@ -647,6 +652,7 @@ export type CanonicalPlanStamp = Readonly<{
 }>;
 
 export type StackOption = Readonly<{
+  scoringEvidence?: ReturnType<typeof import("@/lib/matcher/scoring-policy").nutrientWeightEvidence>;
   overallScore?: import("@/lib/matcher/practical-scoring").OverallMatchingScore;
   doseFit?: import("@/lib/matcher/types").DoseFitScore;
   basket: readonly BasketItem[];

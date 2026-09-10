@@ -9,6 +9,8 @@ import type { CanonicalRequest, DoseDimension, DoseFitScore, MatcherUnit, Safety
 type Fraction = Readonly<{ num: bigint; den: bigint }>;
 const ZERO: Fraction = { num: BigInt(0), den: BigInt(1) };
 const exactTotals = new WeakMap<DoseFitScore, Fraction>();
+const exactParts = new WeakMap<DoseFitScore, { fitting: Fraction; safety: Fraction }>();
+const fixedWeights = new WeakMap<CanonicalRequest, number | null>();
 const scoreCache = new WeakMap<CanonicalRequest, WeakMap<object, DoseFitScore>>();
 const weightedCache = new WeakMap<CanonicalRequest, WeakMap<object, DoseFitScore>>();
 
@@ -95,6 +97,23 @@ function rangeOffsets(rows: CanonicalRequest["currentSupplements"], subjectId: s
   return { minimum, maximum, base };
 }
 
+const subjectCache = new WeakMap<CanonicalRequest, Map<string, ReturnType<typeof compileSubject>>>();
+function compileSubject(request: CanonicalRequest, subjectId: string) {
+  const requested = request.targets.find(row => row.subjectId === subjectId);
+  const target = requested?.importance === "conditional" && requested.prerequisite?.status !== "satisfied" ? undefined : requested;
+  const ranges = rangeOffsets(request.currentSupplements, subjectId), dietary = rangeOffsets(request.dietaryIntake ?? [], subjectId);
+  const knownRows = request.currentSupplements.filter(row => row.subjectId === subjectId && intakeIsKnown(row));
+  const referenceRows = !requested ? knownRows.filter(row => row.daily.units > 0n) : [];
+  const reference = referenceRows.reduce((n, row) => n + row.daily.units, 0n);
+  const verifiedContinued = knownRows.reduce((n, row) => n + row.daily.units, 0n);
+  const scale = target && target.requested.units > 0n ? target.requested.units : verifiedContinued > 0n ? verifiedContinued : 1n;
+  return { requested, target, ranges, dietary, referenceRows, reference, scale, bounds: limitsFor(request, subjectId) };
+}
+function subjectInputs(request: CanonicalRequest, subjectId: string) {
+  let compiled = subjectCache.get(request); if (!compiled) { compiled = new Map(); subjectCache.set(request, compiled); }
+  let value = compiled.get(subjectId); if (!value) { value = compileSubject(request, subjectId); compiled.set(subjectId, value); } return value;
+}
+
 function compareFractions(a: Fraction, b: Fraction) {
   const delta = a.num * b.den - b.num * a.den;
   return delta < BigInt(0) ? -1 : delta > BigInt(0) ? 1 : 0;
@@ -104,6 +123,25 @@ export function doseFitScore(request: CanonicalRequest, exposure: ReadonlyMap<st
   return calculateDoseFit(request, exposure, false);
 }
 export function weightedDoseFitScore(request: CanonicalRequest, exposure: ReadonlyMap<string, bigint>): DoseFitScore {
+  const settings = request.scoring ? effectiveWeights(request.scoring) : null;
+  if (!settings || (settings.defaultNutrient === 1 && Object.values(settings.nutrients).every(weight => weight === 1))) return doseFitScore(request, exposure);
+  // With one physical endpoint and uniform fitting weights >=1 there is no
+  // endpoint choice or avoidance term. Reuse the exact fit/safety components.
+  // Estimated ranges must always evaluate the complete weighted endpoints.
+  let uniform = fixedWeights.get(request);
+  if (uniform === undefined) {
+    const varying = [...request.currentSupplements, ...(request.dietaryIntake ?? [])].some(row =>
+      (row.minimumDailyAmount ?? row.dailyAmount) !== (row.maximumDailyAmount ?? row.dailyAmount));
+    uniform = !varying && settings.defaultNutrient >= 1 && Object.values(settings.nutrients).every(weight => weight === settings.defaultNutrient) ? settings.defaultNutrient : null;
+    fixedWeights.set(request, uniform);
+  }
+  if (uniform !== null) {
+    let cache = weightedCache.get(request); if (!cache) { cache = new WeakMap(); weightedCache.set(request, cache); }
+    const found = cache.get(exposure); if (found) return found;
+    const base = doseFitScore(request, exposure), parts = exactParts.get(base)!;
+    const exact = add(multiply(fromDecimal(uniform), parts.fitting), parts.safety);
+    const score = { ...base, total: value(exact) }; exactTotals.set(score, exact); cache.set(exposure, score); return score;
+  }
   return calculateDoseFit(request, exposure, true);
 }
 function calculateDoseFit(request: CanonicalRequest, exposure: ReadonlyMap<string, bigint>, applyWeights: boolean): DoseFitScore {
@@ -119,25 +157,14 @@ function calculateDoseFit(request: CanonicalRequest, exposure: ReadonlyMap<strin
   const perLimit: DoseFitScore["perLimit"][number][] = [];
   const subjects = new Set([...exposure.keys(), ...(request.dietaryIntake ?? []).map((row) => row.subjectId), ...request.targets.map((row) => row.subjectId)]);
   for (const subjectId of [...subjects].sort()) {
-    const requested = request.targets.find((row) => row.subjectId === subjectId);
-    const target = requested?.importance === "conditional" && requested.prerequisite?.status !== "satisfied" ? undefined : requested;
-    const ranges = rangeOffsets(request.currentSupplements, subjectId);
-    const dietary = rangeOffsets(request.dietaryIntake ?? [], subjectId);
-    const known = exposure.get(subjectId) ?? BigInt(0);
-    const minimum = known + ranges.minimum - ranges.base;
-    const maximum = known + ranges.maximum - ranges.base;
-    // Continued intake is a reference only when explicitly quantified as known.
-    // The numerator is newly added product exposure, never pre-existing estimates.
-    const referenceRows = !requested ? request.currentSupplements.filter(row => row.subjectId === subjectId &&
-      intakeIsKnown(row) && row.daily.units > BigInt(0)) : [];
-    const reference = referenceRows.reduce((sum, row) => sum + row.daily.units, BigInt(0));
-    const added = known > ranges.base ? known - ranges.base : BigInt(0);
-    const continuedIncrease = reference > BigInt(0) ? { num: added, den: reference } : ZERO;
-    const weight = fromDecimal(settings ? settings.nutrients[subjectId] ?? settings.defaultNutrient : 1);
-    const verifiedContinued = request.currentSupplements.filter(row => row.subjectId === subjectId && intakeIsKnown(row)).reduce((n, row) => n + row.daily.units, BigInt(0));
-    const scale = target && target.requested.units > BigInt(0) ? target.requested.units : verifiedContinued > BigInt(0) ? verifiedContinued : BigInt(1);
-    const avoidance = multiply(positive(subtract(fromDecimal(1), weight)), { num: added, den: scale });
-    const bounds = limitsFor(request, subjectId);
+    const { target, ranges, dietary, referenceRows, reference, scale, bounds } = subjectInputs(request, subjectId);
+    const known = exposure.get(subjectId) ?? 0n;
+    const minimum = known + ranges.minimum - ranges.base, maximum = known + ranges.maximum - ranges.base;
+    const added = known > ranges.base ? known - ranges.base : 0n;
+    const continuedIncrease = reference > 0n ? { num: added, den: reference } : ZERO;
+    const weightValue = settings ? settings.nutrients[subjectId] ?? settings.defaultNutrient : 1;
+    const weight = fromDecimal(weightValue);
+    const avoidance = weightValue < 1 ? multiply(positive(subtract(fromDecimal(1), weight)), { num: added, den: scale }) : ZERO;
     const cases = [...new Set([minimum, maximum])].flatMap((supplemental) =>
       [...new Set([dietary.minimum, dietary.maximum])].map((food) => {
         const want = target?.requested.units ?? BigInt(0);
@@ -204,6 +231,7 @@ function calculateDoseFit(request: CanonicalRequest, exposure: ReadonlyMap<strin
     unknownSubjectIds: [...new Set(request.unknownIntakeSubjectIds ?? [])].sort(),
     estimatedSubjectIds: [...new Set([...(request.estimatedIntakeSubjectIds ?? []), ...perTarget.filter((row) => row.certainty === "estimated").map((row) => row.subjectId)])].sort() };
   exactTotals.set(score, exact);
+  exactParts.set(score, { fitting: add(under, over), safety: weighted });
   cache.set(exposure, score);
   return score;
 }

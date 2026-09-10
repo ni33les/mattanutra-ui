@@ -61,7 +61,8 @@ export async function admitPlanOperation(store: AgenticStore, input: Readonly<{
     const plan = await tx.getPlanForUpdate(input.planId);
     if (!plan) throw new Error("plan_not_found");
     const existing = await tx.getPlanOperationByKey(input.ownerScope, input.key);
-    const requestHash = canonicalRequestHash(input.payload);
+    const identity = input.payload && typeof input.payload === "object" && "publicInput" in input.payload ? input.payload.publicInput : input.payload;
+    const requestHash = canonicalRequestHash(identity);
     if (existing) {
       if (existing.requestHash !== requestHash) throw new Error("idempotency_conflict");
       return existing;

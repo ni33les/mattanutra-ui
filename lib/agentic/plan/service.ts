@@ -9,7 +9,6 @@ import { planReturnWaitMs } from "@/lib/agentic/plan/operations";
 import { catalogueSnapshotId } from "@/lib/agentic/catalogue/freeze";
 import { validateProductDoseProposals } from "@/lib/matcher/serving-grid";
 import { toMatcherProduct } from "@/lib/agentic/plan/to-matcher-product";
-import { mergeRequestPatch, originalRequestFor } from "@/lib/agentic/plan/request-patch";
 import { requestLifetime, withRequestLifetime } from "@/lib/request-lifetime";
 import { admitPlanOperation, claimPlanOperation, failPlanOperation, updateClaimedOperation, releaseUnstartedAttempts, withOperationCleanup } from "@/lib/agentic/plan/operations";
 import type { PlanOperationRecord } from "@/lib/agentic/store/types";
@@ -65,7 +64,6 @@ import { publicPlanFields } from "@/lib/agentic/public-mapper";
 import { SharedMatchWork } from "@/lib/match-work-cache";
 import { matchingResultIdentity } from "@/lib/agentic/plan/matching";
 import { matchPlanInWorker, matchPlanResidentChunkInWorker, closePlanMatchSession, acknowledgePlanMatchSession, MatcherUnavailableError } from "@/lib/agentic/plan/match-worker-pool";
-import { evidenceHandleFor, issueEvidenceCapability } from "@/lib/agentic/evidence/tool";
 import { planCompactApplicable } from "@/lib/agentic/contract/plan-result";
 import { planClaimIds, planResearchVersion } from "@/lib/agentic/value/compact-decision";
 import { commitFunnelEvent } from "@/lib/agentic/funnel/ledger";
@@ -87,7 +85,6 @@ import type {
   PlanAnswer,
   PlanQuestion,
   PlanRequest,
-  PlanRequestPatch,
   PlanResult,
   SafetyAcknowledgement,
   StackOption
@@ -170,11 +167,11 @@ export type PlanToolInput = Readonly<{
   answers?: unknown;
   expectedRevision?: number;
   idempotencyKey?: string;
+  publicInput?: Record<string, unknown>;
   operation?: "answer" | "create" | "get" | "revise" | "select";
   optionId?: string;
   planHandle?: string;
   request?: unknown;
-  requestPatch?: unknown;
   safetyAcknowledgement?: unknown;
   selectOptionId?: string;
   searchEffort?: "standard" | "expanded";
@@ -202,27 +199,7 @@ function asAnswers(value: unknown): PlanAnswer[] {
   );
 }
 
-function asAck(value: unknown): SafetyAcknowledgement | null {
-  if (!value || typeof value !== "object") {
-    return null;
-  }
 
-  const record = value as Record<string, unknown>;
-
-  if (
-    record.confirmed !== true ||
-    !Array.isArray(record.guidanceIds) ||
-    typeof record.revision !== "number"
-  ) {
-    return null;
-  }
-
-  return {
-    confirmed: true,
-    guidanceIds: record.guidanceIds.filter((item): item is string => typeof item === "string"),
-    revision: record.revision
-  };
-}
 
 function requestRecord(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" && !Array.isArray(value)
@@ -238,13 +215,11 @@ function incomingAnswers(payload: PlanToolInput) {
   ];
 }
 
-function incomingAck(payload: PlanToolInput) {
-  return asAck(payload.safetyAcknowledgement) ?? asAck(requestRecord(payload.request)?.safetyAcknowledgement);
-}
+
 
 function hasFullRequest(payload: PlanToolInput) {
   const nested = requestRecord(payload.request);
-  return (Array.isArray(nested?.targets) && nested.targets.length > 0) || Boolean(requestRecord(payload.requestPatch));
+  return (Array.isArray(nested?.targets) && (nested.targets.length > 0 || Boolean(nested.scoring)));
 }
 
 function composeResult(input: Readonly<{
@@ -277,7 +252,7 @@ function composeResult(input: Readonly<{
   const workState = {
     ...input.state,
     leftovers: input.leftovers,
-    pinnedOptionId: input.selected?.optionId ?? input.state.pinnedOptionId
+    pinnedOptionId: input.state.scoring ? input.state.pinnedOptionId : input.selected?.optionId ?? input.state.pinnedOptionId
   };
   const safety = evaluateSafety({
     coverage,
@@ -789,7 +764,8 @@ function draftStateFromPayload(input: Readonly<{
         locale: request.locale,
         medicationCodes: [...new Set(request.medicationCodes ?? [])],
         optimization: request.optimization,
-        pinnedOptionId: input.previous?.selected?.optionId ?? null,
+        ...(request.scoring ? { scoring: request.scoring } : {}),
+        pinnedOptionId: request.scoring ? null : input.previous?.selected?.optionId ?? null,
         profile: { ...request.profile, ageYears: request.profile.ageYears ?? 0, lifeStage: request.profile.lifeStage ?? "adult" },
         profileKnown: { ageYears: request.profile.ageYears != null, lifeStage: request.profile.lifeStage != null, sex: request.profile.sex != null },
         originalRequest: structuredClone(request),
@@ -992,6 +968,12 @@ export async function runAdmittedPlanOperation(input: Readonly<{
   const signal = input.signal ? AbortSignal.any([input.signal, controller.signal]) : controller.signal;
   const attempt: PlanAttempt = { correlationId: `plan-operation:${claim.id}`, signal, operation: claim, operationStore: input.store };
   const prepared = claim.command.prepared as PreparedPlanCommand;
+  if (prepared.processing.contractVersion !== AGENTIC_CONTRACT_VERSION) {
+    clearTimeout(deadline);
+    const error = businessError({ reasonCode: "not_found", message: "Not found." });
+    await withOperationCleanup(() => updateClaimedOperation(input.store, claim, { status: "failed", error }, new Date().toISOString()));
+    return error;
+  }
   const work = withRequestLifetime({ signal, correlationId: attempt.correlationId }, () => withServiceMeasurements(() => planAttempts.run(attempt, async () => {
     if (claim.command.scope.principalScope?.startsWith("qa-v3:")) setQueryNamespace(claim.command.scope.principalScope);
     try {
@@ -1116,7 +1098,7 @@ async function executePlanTool(input: Readonly<{
   if (!input.matchPort && input.payload.idempotencyKey) {
     const admitted = await input.store.getPlanOperationByKey(ownerScope, input.payload.idempotencyKey);
     if (admitted) {
-      if (admitted.requestHash !== canonicalRequestHash(input.payload)) return businessError({ fieldPath: "idempotencyKey", reasonCode: "idempotency_conflict", message: "This key belongs to a different request." });
+      if (admitted.requestHash !== canonicalRequestHash(input.payload.publicInput ?? input.payload)) return businessError({ fieldPath: "idempotencyKey", reasonCode: "idempotency_conflict", message: "This key belongs to a different request." });
       return admittedResponse(input, admitted);
     }
   }
@@ -1147,7 +1129,7 @@ async function executePlanTool(input: Readonly<{
         now: input.now,
         operation: "plan",
         ownerScope,
-        payload: input.payload,
+        payload: input.payload.publicInput ?? input.payload,
         store: input.store
       });
 
@@ -1216,7 +1198,7 @@ async function executePlanTool(input: Readonly<{
     if (!input.matchPort && input.payload.idempotencyKey) {
       const admitted = await input.store.getPlanOperationByKey(ownerScope, input.payload.idempotencyKey);
       if (admitted) {
-        if (admitted.requestHash !== canonicalRequestHash(input.payload)) return businessError({fieldPath:"idempotencyKey", reasonCode:"idempotency_conflict", message:"This key belongs to a different request."});
+        if (admitted.requestHash !== canonicalRequestHash(input.payload.publicInput ?? input.payload)) return businessError({fieldPath:"idempotencyKey", reasonCode:"idempotency_conflict", message:"This key belongs to a different request."});
         return admittedResponse(input, admitted);
       }
     }
@@ -1228,7 +1210,7 @@ async function executePlanTool(input: Readonly<{
           now: input.now,
           operation: "plan",
           ownerScope,
-          payload: input.payload,
+          payload: input.payload.publicInput ?? input.payload,
           store: input.store
         });
 
@@ -1259,7 +1241,7 @@ async function executePlanTool(input: Readonly<{
     if (!input.matchPort && payload.idempotencyKey) {
       const existing = await store.getPlanOperationByKey(ownerScope, payload.idempotencyKey);
       if (existing) {
-        if (existing.requestHash !== canonicalRequestHash(input.payload)) throw new Error("idempotency_conflict");
+        if (existing.requestHash !== canonicalRequestHash(input.payload.publicInput ?? input.payload)) throw new Error("idempotency_conflict");
         return { ...(existing.command.prepared as PreparedPlanCommand), operationId: existing.id };
       }
     }
@@ -1325,10 +1307,7 @@ async function executePlanTool(input: Readonly<{
       }
 
       previous = previousResult(current.result);
-      if (previous && !planContractCompatible(previous.contractVersion) && current.status !== "processing") {
-        const existingOrder = await store.getActiveOrderForPlanRevision(plan.id, plan.currentRevision);
-        previous = { ...previous, sourceContractVersion: previous.contractVersion ?? "3.0.0", refreshRequired: !existingOrder };
-      }
+      if (previous && !planContractCompatible(previous.contractVersion)) return businessError({ reasonCode: "not_found", message: "Not found." });
       existingPlan = plan;
       planId = plan.id;
       shownRevision = payload.expectedRevision ?? 1;
@@ -1373,16 +1352,8 @@ async function executePlanTool(input: Readonly<{
       }
     }
 
-    let effectiveRequest = payload.request as PlanRequest | undefined;
-    if (payload.requestPatch != null) {
-      if (!previous) return businessError({ fieldPath: "planHandle", reasonCode: "not_found", message: "A patch requires an existing plan." });
-      const original = originalRequestFor(previous);
-      if (isAgenticErrorResult(original)) return original;
-      const merged = mergeRequestPatch(original, payload.requestPatch as PlanRequestPatch);
-      if (isAgenticErrorResult(merged)) return merged;
-      effectiveRequest = merged;
-    }
-    if (previous?.refreshRequired && !hasFullRequest(payload) && (selectOptionId || answers.length > 0)) return businessError({ fieldPath: "planHandle", reasonCode: "contract_refresh_required", message: "Refresh this unexecuted plan with revise.requestPatch={} and the current revision before selecting or answering.", nextActions: ["refresh_plan"] });
+    const effectiveRequest = payload.request as PlanRequest | undefined;
+    if (previous?.refreshRequired && !hasFullRequest(payload) && (selectOptionId || answers.length > 0)) return businessError({ fieldPath: "planHandle", reasonCode: "contract_refresh_required", message: "Refresh this unexecuted plan with scoring:{} and the current revision before selecting or answering.", nextActions: ["refresh_plan"] });
     for (const [index, answer] of answers.entries()) {
       const question = previous?.questions?.find(item => item.questionId === answer.questionId);
       const fieldPath = `answers[${index}].${question ? "choice" : "questionId"}`;
@@ -1495,7 +1466,7 @@ async function executePlanTool(input: Readonly<{
           now: input.now,
           operation: "plan",
           ownerScope,
-          payload: input.payload,
+          payload: input.payload.publicInput ?? input.payload,
           resourceIds: { planId },
           response: processingResponse,
           store
@@ -1561,7 +1532,7 @@ async function executePlanTool(input: Readonly<{
           key: input.payload.idempotencyKey,
           now: input.now,
           ownerScope,
-          payload: input.payload,
+          payload: input.payload.publicInput ?? input.payload,
           planId: prepared.planId,
           response,
           store: input.store
@@ -1696,16 +1667,8 @@ async function completePreparedPlan(
 
   const pendingInput = prepared.resume ? prepared.processing.pendingInput : undefined;
   const replacingPendingRequest = prepared.resume && Boolean(input.payload.planHandle) && hasFullRequest(input.payload);
-  const verifiedLegacyRequest = prepared.resume && !pendingInput && hasFullRequest(input.payload) &&
-    input.payload.idempotencyKey && !input.payload.planHandle
-    ? input.payload.request as PlanRequest
-    : undefined;
-  const answers = [
-    ...(replacingPendingRequest ? [] : pendingInput?.answers ?? (verifiedLegacyRequest ? incomingAnswers(input.payload) : [])),
-    ...prepared.answers
-  ];
-  const ack = prepared.ack ?? pendingInput?.safetyAcknowledgement ??
-    (verifiedLegacyRequest ? incomingAck(input.payload) : null);
+  const answers = [...(replacingPendingRequest ? [] : pendingInput?.answers ?? []), ...prepared.answers];
+  const ack = prepared.ack ?? pendingInput?.safetyAcknowledgement ?? null;
   const selectOptionId = prepared.selectOptionId;
   const previous = prepared.previous;
   const revision = prepared.revision;
@@ -1735,7 +1698,7 @@ async function completePreparedPlan(
     }
 
     if (!isolated && option.snapshotId && option.snapshotId !== catalogueSnapshotId(snapshot)) {
-      return businessError({ fieldPath: "optionId", reasonCode: "availability_changed", message: "Catalogue facts changed after this option was evaluated. Revise with requestPatch={} and the current revision, review the new options, then select a returned option ID.", nextActions: ["refresh_plan"] });
+      return businessError({ fieldPath: "optionId", reasonCode: "availability_changed", message: "Catalogue facts changed after this option was evaluated. Refine with scoring:{} and the current revision, review the new options, then select a returned option ID.", nextActions: ["refresh_plan"] });
     }
     const nextResult = buildPinnedResult({
       locale: prepared.locale,
@@ -1826,19 +1789,10 @@ async function completePreparedPlan(
         }
       : merged;
   } else if (prepared.resume || hasFullRequest(input.payload)) {
-    // Legacy processing rows lack pendingInput. Only a create whose original
-    // payload passed the durable idempotency check can supply that missing input.
-    // A name-as-ID placeholder is ambiguous and must never become a trusted ID.
-    if (prepared.resume && !pendingInput && !verifiedLegacyRequest &&
-      [...prepared.state.targets, ...prepared.state.currentSupplements].some(item => item.supplementId === item.name)) {
-      return businessError({
-        message: "Retry this unfinished plan with the original request and idempotency key.",
-        reasonCode: "temporarily_unavailable", retryable: true
-      });
-    }
+    if (prepared.resume && !pendingInput) return businessError({ reasonCode: "not_found", message: "Not found." });
     const normalized = await normalizePlanRequest({
       config: input.config,
-      request: pendingInput?.request ?? verifiedLegacyRequest ?? requestFromState(prepared.state),
+      request: pendingInput?.request ?? requestFromState(prepared.state),
       searchEffort: pendingInput?.searchEffort ?? prepared.state.searchEffort,
       snapshot
     });
@@ -1867,6 +1821,8 @@ async function completePreparedPlan(
       reasonCode: "required"
     });
   }
+
+  if (state.scoring) state = { ...state, pinnedOptionId: null };
 
   if (state.targets.length === 1) {
     const only = state.targets[0]!;
@@ -1982,6 +1938,11 @@ async function completePreparedPlan(
   });
 }
 
+export function commitPlanNoop(input: PlanExecutionInput, result: PlanResult, planId: string, planHandle: string, revision: number) {
+  return persistTerminalPlan({ input, result, planId, planHandle, revision, locale: negotiateLocale(result.requestSnapshot.locale),
+    ownerScope: `${input.scope.environment}:${input.scope.tenantScope}:${input.scope.principalScope ?? "anon"}`, skipSideEffects: true, noop: true });
+}
+
 async function persistTerminalPlan(input: Readonly<{
   input: Readonly<{
     config: AgenticConfig;
@@ -1998,12 +1959,11 @@ async function persistTerminalPlan(input: Readonly<{
   revision: number;
   expectedCatalogueRevision?: number;
   skipSideEffects?: boolean;
+  noop?: boolean;
 }>): Promise<PlanToolSuccess | AgenticErrorResult> {
   let committedResult: PlanResult | null = null;
-  const needsEvidence = planCompactApplicable(input.result.status) && !input.result.evidenceHandle;
-  const terminalResult = needsEvidence ? { ...input.result,
-    evidenceHandle: evidenceHandleFor(input.planId, input.revision, input.input.scope.tenantScope),
-    claimIds: planClaimIds(input.result), researchVersion: planResearchVersion() } : input.result;
+  const terminalResult = { ...input.result,
+    claimIds: planClaimIds(input.result), researchVersion: planResearchVersion() };
   // Render before acquiring the publication lock. Only the capability, revision
   // and receipt writes belong to the atomic commit.
   const projectedSuccess = successFromResult({ locale: input.locale, planHandle: input.planHandle,
@@ -2012,7 +1972,7 @@ async function persistTerminalPlan(input: Readonly<{
   const preparedRevision=preparePlanRevisionRecord({...revisionRecord(input.planId,input.revision,terminalResult,input.input.now),statusProjection});
   const key=input.input.payload.idempotencyKey;
   const preparedReceipt=key?prepareIdempotencyRecord({key,now:input.input.now,operation:"plan",ownerScope:input.ownerScope,
-    payload:input.input.payload,resourceIds:{planId:input.planId},response:projectedSuccess}):undefined;
+    payload:input.input.payload.publicInput ?? input.input.payload,resourceIds:{planId:input.planId},response:projectedSuccess}):undefined;
   const terminalChanges={status:"complete" as const,response:projectedSuccess,error:null};
   const terminalChangesJson=JSON.stringify(terminalChanges);
   const response = await input.input.store.transaction(async (store) => {
@@ -2029,7 +1989,7 @@ async function persistTerminalPlan(input: Readonly<{
     if (key) {
       const replay = await beginIdempotency<PlanToolSuccess>({
         key, now: input.input.now, operation: "plan", ownerScope: input.ownerScope,
-        payload: input.input.payload, store
+        payload: input.input.payload.publicInput ?? input.input.payload, store
       });
       if (replay.kind === "conflict") return replay.error;
       if (replay.kind === "replay" && replay.response.status !== "processing") return replay.response;
@@ -2037,7 +1997,7 @@ async function persistTerminalPlan(input: Readonly<{
 
     const current = store.getPlanRevisionHeader?await store.getPlanRevisionHeader(input.planId,input.revision):await store.getPlanRevision(input.planId, input.revision);
     const baseRevision = input.input.payload.expectedRevision ?? input.revision;
-    if (plan.currentRevision !== baseRevision || (current && current.status !== "processing")) {
+    if (plan.currentRevision !== baseRevision || (current && current.status !== "processing" && !input.noop)) {
       return businessError({
         currentRevision: plan.currentRevision, fieldPath: "expectedRevision",
         message: "This plan changed. Reload the current plan and retry.",
@@ -2061,9 +2021,11 @@ async function persistTerminalPlan(input: Readonly<{
       });
     }
     const result = terminalResult;
-    if (needsEvidence) {
-      await issueEvidenceCapability({ config: input.input.config, now: input.input.now,
-        planId: input.planId, revision: input.revision, scope: input.input.scope, store });
+    if (input.noop) {
+      if (plan.currentRevision !== input.revision || await store.getActivePlanOperation(input.planId)) return businessError({ reasonCode: "stale_revision", fieldPath: "expectedRevision", currentRevision: plan.currentRevision, message: "Read the current plan before refining it." });
+      if (key) await commitTerminalIdempotency({ key, now: input.input.now, ownerScope: input.ownerScope, payload: input.input.payload.publicInput ?? input.input.payload,
+        planId: input.planId, response: projectedSuccess, store, preparedRecord: preparedReceipt });
+      return projectedSuccess;
     }
     const success = projectedSuccess;
     const record = {...preparedRevision,createdAt:current?.createdAt ?? input.input.now};
@@ -2073,7 +2035,7 @@ async function persistTerminalPlan(input: Readonly<{
     if (key) {
       await commitTerminalIdempotency({
         key, now: input.input.now, ownerScope: input.ownerScope,
-        payload: input.input.payload, planId: input.planId, response: success, store, preparedRecord:preparedReceipt
+        payload: input.input.payload.publicInput ?? input.input.payload, planId: input.planId, response: success, store, preparedRecord:preparedReceipt
       });
     }
     if (operationClaim && !await updateClaimedOperation(store, operationClaim, terminalChanges, new Date().toISOString(),terminalChangesJson)) {

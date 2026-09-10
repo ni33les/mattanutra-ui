@@ -122,7 +122,7 @@ function matchByName(snapshot: CatalogueSnapshot, wanted: string) {
   return [];
 }
 
-function resolveSupplement(
+export function resolveSupplement(
   snapshot: CatalogueSnapshot,
   input: Readonly<{ name?: string; supplementId?: string }>,
   fieldPath: string
@@ -414,7 +414,7 @@ export function applyPlanAnswers(
 
 export function planRematchFingerprint(state: CanonicalPlanState) {
   return JSON.stringify({
-    scoringProfileHash: resolvePracticalProfile({ optimization: state.optimization, preferenceImportance: state.requirements.preferenceImportance }).hash,
+    scoringProfileHash: resolvePracticalProfile({ optimization: state.optimization, preferenceImportance: state.requirements.preferenceImportance, scoring: state.scoring }).hash,
     ageYears: state.profile.ageYears,
     conditionCodes: state.conditionCodes,
     currency: state.currency,
@@ -646,6 +646,7 @@ export async function normalizePlanRequest(input: Readonly<{
   }
   const acceptedGaps: AcceptedGap[] = [];
   let state: CanonicalPlanState = {
+    ...(request.scoring ? { scoring: request.scoring } : {}),
     acceptedGaps,
     ...(request.baseline ? { baseline: request.baseline } : {}),
     conditionCodes: [...new Set((request.conditionCodes ?? []).map((item) =>

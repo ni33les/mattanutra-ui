@@ -32,3 +32,23 @@ test('SPLAN-REQ-02 mixed select/refine returns offending field before admission'
   const owner = `${app.scope.environment}:${app.scope.tenantScope}:${app.scope.principalScope ?? 'anon'}`;
   assert.equal(await app.store.getPlanOperationByKey(owner, 'simple-plan-ambiguous'), null);
 });
+test('SPLAN-STATE-07 concurrent flat admission shares identity; different same-key content conflicts', async () => {
+  const app = createAgenticRuntime();
+  const responses = await Promise.all(Array.from({ length: 4 }, () => call(app, initial)));
+  assert.ok(responses.every(row => row.ok)); assert.equal(new Set(responses.map(row => row.planHandle)).size, 1);
+  const conflict = await call(app, { ...initial, scoring: { weights: { pills: 2 } } });
+  assert.equal(conflict.ok, false); assert.equal((conflict.error as {reasonCode: string}).reasonCode, 'idempotency_conflict');
+});
+test('SPLAN-COMPAT-02 queued retired work is terminally rejected before any matching attempts', async () => {
+  const { runAdmittedPlanOperation } = await import('../../lib/agentic/plan/service.ts');
+  const app = createAgenticRuntime(); await call(app, initial);
+  const owner = `${app.scope.environment}:${app.scope.tenantScope}:${app.scope.principalScope ?? 'anon'}`;
+  const op = await app.store.getPlanOperationByKey(owner, initial.idempotencyKey); assert.ok(op);
+  const command = structuredClone(op.command), prepared = command.prepared as { processing: { contractVersion: string } };
+  prepared.processing.contractVersion = '8.0.0';
+  assert.equal(await app.store.transaction(tx => tx.updatePlanOperation({ ...op, command, version: op.version + 1 }, op.version)), true);
+  const result = await runAdmittedPlanOperation({ store: app.store, config: app.config, operationId: op.id });
+  assert.equal(result.ok, false); if (result.ok) throw new Error('Retired work unexpectedly executed');
+  assert.equal(result.error.reasonCode, 'not_found');
+  const saved = await app.store.getPlanOperation(op.id); assert.equal(saved?.status, 'failed'); assert.equal(saved?.checkpoint, null);
+});
