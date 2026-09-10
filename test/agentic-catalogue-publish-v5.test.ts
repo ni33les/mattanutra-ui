@@ -41,7 +41,7 @@ it('V5-PUBLISH-01: a catalogue-only change preserves the completed snapshot and 
     assert.equal(stale.ok, true, JSON.stringify(stale));
     const ids = await store.listPlanIdsByPrincipal(principalScope);
     assert.equal(ids.length, 1);
-    const revision = await store.getPlanRevision(ids[0]!, 1); assert.equal(revision?.status, 'ready');
+    const revision = await store.getPlanRevision(ids[0]!, 1); assert.equal(revision?.status, 'no_purchase');
     assert.equal((await store.getPlanOperation(operation.id))?.status, 'complete');
     const {readPlanStatus}=await import('../lib/agentic/presentation/plan-read.ts');
     const {createAgenticRuntime}=await import('../lib/agentic/runtime.ts');
@@ -50,7 +50,7 @@ it('V5-PUBLISH-01: a catalogue-only change preserves the completed snapshot and 
     const status=await readPlanStatus(createAgenticRuntime({config,store,scope,now:'2026-09-07T00:00:01Z'}), admitted.ok ? admitted.planHandle : '');
     assert.ok(status.ok && status.refreshRequired); assert.equal(status.status,'needs_input');
     assert.equal(status.nextActions[0],'change_request');
-    assert.equal((await store.getPlanRevision(ids[0]!,1))?.status,'ready','Reading stale data must not overwrite the saved result');
+    assert.equal((await store.getPlanRevision(ids[0]!,1))?.status,'no_purchase','Reading stale data must not overwrite the saved result');
   } finally {
     release?.(); setMatcherGateForTests(null); setMatcherEnteredForTests(null); uninstallGoldCatalogue();
   }

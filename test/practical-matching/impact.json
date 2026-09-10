@@ -10,7 +10,7 @@
     {
       "file": "test/practical-matching/scoring.test.ts",
       "slice": "scoring",
-      "expectedCases": 9,
+      "expectedCases": 10,
       "reason": "Exact shared penalties, advisory importance and unknown measurements with preserved raw dose scoring."
     },
     {
@@ -72,7 +72,12 @@
     "test/service-efficiency/lock-register.json"
   ],
   "regressionFiles": [
+    "test/agentic-catalogue-publish-v5.test.ts",
     "test/agentic-contract-v4.test.ts",
+    "test/agentic-cv-impl-pack.test.ts",
+    "test/agentic-cv-r2-pack.test.ts",
+    "test/agentic-cv-r3-pack.test.ts",
+    "test/agentic-cv-r4-pack.test.ts",
     "test/agentic-flexible-v5-contract.test.ts",
     "test/ax-refinement/contract.test.ts",
     "test/matcher/advisory-dose-fit.test.ts",
