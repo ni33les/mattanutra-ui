@@ -19,3 +19,9 @@ test('WEB-JOURNEY-02 HealthScore uses actual formula count in every locale witho
     assert.equal(result.pageContent?.locked.subtraction.chosen, 10);
   }
 });
+
+test('WEB-JOURNEY-07 fixed score reference is not advertised as an observed customer average', () => {
+  const below = computeHealthScore(frozen.healthAnswers, 'en');
+  assert.doesNotMatch(below.pageContent!.copySeeds.relativity.headline, /average person|people who finish/i);
+  assert.match(below.pageContent!.copySeeds.relativity.headline, /model.*reference/i);
+});
