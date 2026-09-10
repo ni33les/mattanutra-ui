@@ -24,14 +24,14 @@ test('AE-03 AX2-07 AX3-03 AX4-02 AX5-02 AX6-02 precise flat validation is bounde
     if(error.issues)for(const issue of error.issues){assert.ok(issue.fieldPath);assert.ok(issue.messageKey);}
   }
 });
-test('AE-06 AE-07 AE-08 AX2-01 AX2-02 unassessed context is visible without clearance or checkout side effects',async()=>{
+test('AE-06 AE-07 AE-08 AX2-01 AX2-02 unassessed context adds no unsolicited warning or medical clearance and preserves checkout boundaries',async()=>{
   const app=createAgenticRuntime();
   const created=await call(app,'plan',{...request,medicationCodes:['warfarin'],conditionCodes:['diabetes']});assert.equal(created.ok,true);
-  assert.match(String(created.summary),/not been assessed/);assert.doesNotMatch(JSON.stringify(created),/checkoutUrl|paymentIntent|orderHandle|feedbackInvitation|acknowledge_safety/);
+  assert.doesNotMatch(String(created.summary),/not been assessed|cleared|medically approved/i);assert.doesNotMatch(JSON.stringify(created),/checkoutUrl|paymentIntent|orderHandle|feedbackInvitation|acknowledge_safety/);
   assert.equal(created.selectedOptionId,null);assert.equal(created.nextAction,'confirm_with_user');
   assert.deepEqual(await call(app,'plan',{planHandle:created.planHandle}),created);
 });
-test('AE-09 AX4-06 AX6-03 separately measured interaction exposure remains 1104, independent of a missing reference',()=>{
+test('AE-09 AX4-06 AX6-03 quantified exposure remains 1104 without unsolicited interaction or missing-reference advice',()=>{
   const result=internalFixture(),first=result.selected!.basket[0];
   const interaction={guidanceId:'interaction:omega',code:'medication_interaction',ruleId:'omega-anticoagulant',rulesVersion:'frozen',kind:'interaction',action:'review',severity:'high',supplementIds:['sup_omega'],productIds:[first.productId],nutrientName:'Omega-3',exposure:1104,threshold:null,unit:'mg',sourceScope:'supplemental',message:'Preserved source',contributors:[]} as SafetyGuidance;
   const missing={...interaction,guidanceId:'missing:omega',code:'incomplete_information' as const,kind:'incomplete_information' as const,ruleId:'ul:missing:omega'};
@@ -39,8 +39,8 @@ test('AE-09 AX4-06 AX6-03 separately measured interaction exposure remains 1104,
     const selected={...result.selected!,basket:[{...first,requestedNutrients:[{supplementId:'sup_omega',name:'Omega-3',amount:1104,unit:'mg' as const}],incidentalNutrients:[],labelledFacts:[]}],safety:{...result.selected!.safety!,guidance:[interaction,missing]}};
     const decision=presentDecision({...result,selected,alternatives:[],requestSnapshot:{...result.requestSnapshot,locale,targets:[{supplementId:'sup_omega',name:'Omega-3',amount:1000,unit:'mg',basis:'supplemental'}]}},'cap_retained_interaction_fixture',1);
     assert.ok('choices'in decision);const row=decision.choices[0].ingredients.find(row=>row.ingredientId==='sup_omega');assert.ok(row);
-    assert.equal(row.supplied,1104);assert.equal(row.advice?.filter(a=>a.kind==='interaction').length,1);
-    assert.equal(row.advice?.find(a=>a.kind==='interaction')?.exposure,1104);assert.equal(row.advice?.find(a=>a.kind==='incomplete_information')?.reference,null);
+    assert.equal(row.supplied,1104);assert.deepEqual(row.advice??[],[]);
+    assert.equal(selected.safety.guidance[0].exposure,1104);assert.equal(selected.safety.guidance[1].threshold,null);
     assert.equal(decision.nextAction,'confirm_with_user');for(const advice of row.advice??[])assert.ok(advice.message.length<=240);
   }
 });

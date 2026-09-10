@@ -5,7 +5,7 @@ import { internalFixture } from '../mcp-conversation-pack/helpers.ts';
 import { presentDecision } from '../../lib/agentic/presentation/decision.ts';
 import type { SafetyGuidance } from '../../lib/agentic/plan/types.ts';
 
-test('SPLAN-ADV-01/03 PAY-VIEW-03 ingredient advice deduplicates facts but preserves distinct measured scopes and sources in all locales', () => {
+test('SPLAN-ADV-01/03 PAY-VIEW-03 ingredient advice keeps only distinct exceeded recommended limits in all locales', () => {
   const result = internalFixture(); const first = result.selected!.basket[0];
   const guidance = { code: 'dose_review_required', kind: 'dose_review', action: 'review', severity: 'high', exposure: 150, threshold: 100,
     nutrientName: 'Vitamin D3', supplementIds: ['sup_d3'], productIds: [first.productId], unit: 'mcg', sourceScope: 'total',
@@ -21,11 +21,10 @@ test('SPLAN-ADV-01/03 PAY-VIEW-03 ingredient advice deduplicates facts but prese
     const decision = presentDecision({ ...result, selected, alternatives: [], requestSnapshot: { ...result.requestSnapshot, locale,
       targets: [{ supplementId: 'sup_d3', name: 'Vitamin D3', amount: 2000, unit: 'IU', basis: 'supplemental' }] } }, 'cap_advice_current_fixture_handle', 1);
     assert.ok('choices' in decision); const row = decision.choices[0].ingredients.find(row => row.ingredientId === 'sup_d3'); assert.ok(row?.advice);
-    assert.equal(row.advice.length, 5); assert.equal(row.advice.filter(row => row.kind === 'dose_review').length, 3);
-    assert.equal(row.advice.find(row => row.kind === 'incomplete_information')?.severity, 'low');
-    assert.ok(row.advice.some(row => row.kind === 'interaction')); assert.equal(decision.nextAction, 'confirm_with_user');
+    assert.equal(row.advice.length, 2); assert.ok(row.advice.every(row => row.kind === 'dose_review'));
+    assert.deepEqual(row.advice.map(row => row.reference), [4000, 3200]); assert.equal(decision.nextAction, 'confirm_with_user');
     for (const finding of row.advice) { assert.ok([...finding.message].length <= 240); assert.doesNotMatch(finding.message, /\d\.\d{8}/); }
-    assert.match(row.advice[0].message, locale === 'th' ? /[ก-๙]/ : locale === 'zh-CN' ? /[\u4e00-\u9fff]/ : /Review/);
+    assert.match(row.advice[0].message, locale === 'th' ? /[ก-๙]/ : locale === 'zh-CN' ? /[\u4e00-\u9fff]/ : /exceeds the MattaNutra recommended limit/);
   }
 });
 
@@ -35,7 +34,7 @@ test("M721-ADVICE-03 explicit missing-reference rule classification does not cha
   assert.equal(adviceKind({ code: "medication_interaction" }), "interaction");
 });
 
-test('SPLAN-ADV-04 live D3 product finding is emitted once per choice while all 19 ingredients remain addressable', () => {
+test('SPLAN-ADV-04 live D3 omits product advice while all 19 unknown ingredient facts remain addressable', () => {
   const result = internalFixture(), first = result.selected!.basket[0];
   const facts = Array.from({ length: 19 }, (_, index) => ({ supplementId: `sup_label_${index}`, name: `Label ingredient ${index}`, amount: null, unit: 'mg' as const, confidence: 'low' as const, mappingStatus: 'unverified' as const }));
   const finding = { kind: 'product_data', code: 'unverified_product_facts', severity: 'high', supplementIds: facts.slice(0, 10).map(row => row.supplementId),
@@ -46,10 +45,8 @@ test('SPLAN-ADV-04 live D3 product finding is emitted once per choice while all 
     const decision = presentDecision({ ...result, selected, alternatives: [], requestSnapshot: { ...result.requestSnapshot, locale } }, 'cap_live_d3_payload_regression', 1);
     assert.ok('choices' in decision); const choice = decision.choices[0];
     for (const fact of facts) assert.ok(choice.ingredients.some(row => row.ingredientId === fact.supplementId && row.supplied === null));
-    const attached = choice.ingredients.flatMap(row => (row.advice ?? []).filter(advice => advice.kind === 'product_data').map(advice => ({ row, advice })));
-    assert.equal(attached.length, 1, 'One scoped source fact must not be cloned onto every ingredient');
-    const affected = new Set([attached[0].row.ingredientId, ...(attached[0].advice.relatedIngredientIds ?? [])]);
-    for (const fact of facts) assert.ok(affected.has(fact.supplementId), 'Every affected ingredient remains linked to the finding');
+    assert.equal(choice.ingredients.flatMap(row => row.advice ?? []).length, 0);
+    assert.deepEqual(selected.safety.guidance, [finding, finding], 'Presentation never deletes the stored findings');
     assert.ok(Buffer.byteLength(JSON.stringify(decision)) < 20000);
   }
 });
