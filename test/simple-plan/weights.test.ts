@@ -18,7 +18,9 @@ test('SPLAN-WGT-08 ingredient zero minimises newly supplied exposure instead of 
 test('SPLAN-WGT-03/10 below-one avoidance blends independently with symmetric fitting', () => {
   const low = overallMatchingScore(weighted({ nutrients: { a: 0.25 } }), exposure(0), actual);
   const high = overallMatchingScore(weighted({ nutrients: { a: 0.25 } }), exposure(100), actual);
-  assert.equal(high.overallPenalty - low.overallPenalty, 0.5);
+  // Compare the exact rational delta; subtracting two display floats introduces rounding.
+  const h = high.overallExact, l = low.overallExact;
+  assert.equal(2n * (BigInt(h.numerator) * BigInt(l.denominator) - BigInt(l.numerator) * BigInt(h.denominator)), BigInt(h.denominator) * BigInt(l.denominator));
   assert.equal(overallMatchingScore(weighted({ nutrients: { a: 2 } }), exposure(50), actual).dosePenalty, 0.5);
 });
 test('SPLAN-WGT-03 fixed safety excess survives zero ingredient fitting weight', () => {
