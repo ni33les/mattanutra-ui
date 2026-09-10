@@ -1,0 +1,50 @@
+import {execFile} from 'node:child_process';
+import {promisify} from 'node:util';
+import {mkdtemp,readFile,rm} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
+import assert from 'node:assert/strict';
+import postgres from 'postgres';
+import {expect,test} from '../helpers/offline-browser';
+const execute=promisify(execFile);
+assert.ok(process.env.TEST_DB_URL,'Isolated PostgreSQL is required');
+const url=new URL(process.env.TEST_DB_URL);assert.equal(url.hostname,'127.0.0.1');assert.match(url.pathname,/^\/mattanutra_lock_review_/);
+for(const locale of ['en','th','zh-CN']) test(`HS-WAIT-BROWSER-01 ${locale} inline email preserves waiting and eventual navigation`,async({page})=>{
+  const sql=postgres(url.href,{max:1,prepare:false}),dir=await mkdtemp(join(tmpdir(),'hs-wait-'));
+  try {
+    await page.setViewportSize({width:375,height:850});
+    await page.clock.install();
+    const output=join(dir,'fixture.json');
+    await execute(process.execPath,['--experimental-strip-types','--import','./scripts/register-ts-path-loader.mjs','scripts/seed-browser-fixtures.ts',output,JSON.stringify({scenario:'practical_advice',locale})],{env:process.env,timeout:60_000,maxBuffer:1024*1024});
+    const fixture=JSON.parse(await readFile(output,'utf8'));
+    const [copy]=await sql`select result from assessment_healthscore_results where plan_id=${fixture.planId}::uuid and locale=${locale}`;assert.ok(copy);
+    await sql`update assessment_healthscore_results set result='{}'::jsonb where plan_id=${fixture.planId}::uuid and locale=${locale}`;
+    let reads=0,ready=false,emails=0;
+    await page.route(`**/api/assessment/${fixture.planId}/healthscore/retry`,r=>r.fulfill({json:{taskId:'existing-task'}}));
+    await page.route(`**/api/assessment/${fixture.planId}/journey?**`,r=>{reads++;return r.fulfill({json:{copyReady:ready,readyForHealthScore:ready,copyFailed:false,healthScorePageFailed:false}});});
+    await page.route(`**/api/assessment/${fixture.planId}/healthscore-delivery`,r=>{
+      emails++;expect(r.request().postDataJSON().email).toBe('fixture@example.test');
+      return r.fulfill(emails===1?{status:503,json:{message:'Fixture delivery unavailable'}}:{json:{id:'delivery-fixture',status:'waiting'}});
+    });
+    await page.goto(`/${locale}/nutrition/healthscore?plan=${fixture.planId}`);
+    const calc=page.getByTestId('questionnaire-calculating'),email=page.getByTestId('calc-emailbox');
+    await expect(calc).toBeVisible();await expect(email).toBeVisible();
+    await expect(calc.locator('.mn-quiz-calc__spinner')).toBeVisible();
+    await expect(page.getByTestId('calc-fallback')).toHaveCount(0);
+    const box=await email.boundingBox();assert.ok(box);expect(box.x).toBeGreaterThanOrEqual(0);expect(box.x+box.width).toBeLessThanOrEqual(375);
+    expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(375);
+    await page.clock.fastForward(91_000);
+    await expect(calc.locator('.mn-quiz-calc__spinner')).toBeVisible();await expect(page.getByTestId('calc-fallback')).toHaveCount(0);
+    await email.locator('input').fill('fixture@example.test');await email.locator('button').click();
+    await expect(calc.getByRole('alert')).toContainText('Fixture delivery unavailable');
+    await expect(calc.locator('.mn-quiz-calc__spinner')).toBeVisible();
+    await email.locator('button').click();await expect(calc.getByTestId('calc-email-status')).toBeVisible();
+    await expect(calc.getByTestId('calc-email-status')).not.toContainText(/has been sent/);
+    await expect(calc.locator('.mn-quiz-calc__spinner')).toBeVisible();
+    const previousReads=reads;await page.clock.fastForward(220_000);await expect.poll(()=>reads).toBeGreaterThan(previousReads);
+    await expect(page.getByTestId('calc-fallback')).toHaveCount(0);await expect(calc.locator('.mn-quiz-calc__spinner')).toBeVisible();
+    await sql`update assessment_healthscore_results set result=${sql.json(copy.result)} where plan_id=${fixture.planId}::uuid and locale=${locale}`;
+    ready=true;await page.clock.fastForward(2000);
+    await expect(page.locator('.mn-healthscore-v7')).toBeVisible();expect(emails).toBe(2);
+  }finally{await sql.end();await rm(dir,{recursive:true,force:true});}
+});
