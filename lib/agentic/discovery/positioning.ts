@@ -37,13 +37,13 @@ export const POSITIONING: Readonly<Record<Locale, Positioning>> = {
       "evidence": "Review research evidence"
     },
     "purposes": {
-      "info": "Understand when to use MattaNutra, its country and wellness boundaries, and retrieve the client guide or operation schema.",
+      "info": "Understand when to use MattaNutra, its country and wellness boundaries, and retrieve the client guide or flat plan schema.",
       "plan": "Match agreed nutrient targets and customer context to real Thailand products; compare and refine returned baskets.",
       "execute": "After customer confirmation, freeze the selected plan revision and create or recover checkout.",
-      "order": "Read payment, fulfilment, frozen-order and recovery state for an existing order.",
+      "order": "Read concise payment, fulfilment and recovery state for an existing order.",
       "support": "Open or continue an order-support case.",
       "feedback": "Submit optional consented feedback without changing the plan or checkout.",
-      "evidence": "Read research claims and sources attached to a returned plan."
+      "evidence": "Read facts and advisory sources for one returned ingredient or product in a current choice."
     }
   },
   "th": {
@@ -69,13 +69,13 @@ export const POSITIONING: Readonly<Record<Locale, Positioning>> = {
       "evidence": "ดูหลักฐานงานวิจัย"
     },
     "purposes": {
-      "info": "ทำความเข้าใจว่าเมื่อใดควรใช้ MattaNutra ประเทศที่รองรับ และขอบเขตคำแนะนำด้านสุขภาวะ พร้อมเรียกดูคู่มือเอเจนต์หรือสคีมาการดำเนินการ",
+      "info": "ทำความเข้าใจว่าเมื่อใดควรใช้ MattaNutra ประเทศที่รองรับ และขอบเขตคำแนะนำด้านสุขภาวะ พร้อมเรียกดูคู่มือเอเจนต์หรือสคีมาแผนแบบเดียว",
       "plan": "จับคู่เป้าหมายสารอาหารที่ตกลงกันและข้อมูลลูกค้ากับผลิตภัณฑ์จริงในประเทศไทย เพื่อเปรียบเทียบและปรับชุดที่ระบบเสนอ",
       "execute": "หลังลูกค้ายืนยัน ให้ตรึงรายการของแผนฉบับที่เลือก แล้วสร้างหรือเรียกคืนหน้าชำระเงิน",
-      "order": "อ่านสถานะการชำระเงิน การดำเนินการจัดส่ง รายการคำสั่งซื้อที่ตรึงไว้ และการกู้คืนสำหรับคำสั่งซื้อที่มีอยู่",
+      "order": "อ่านสถานะการชำระเงิน การดำเนินการจัดส่งและการกู้คืนสำหรับคำสั่งซื้อที่มีอยู่",
       "support": "เปิดหรือติดตามเรื่องขอความช่วยเหลือเกี่ยวกับคำสั่งซื้อ",
       "feedback": "ส่งความคิดเห็นโดยสมัครใจและได้รับความยินยอม โดยไม่เปลี่ยนแผนหรือการชำระเงิน",
-      "evidence": "อ่านข้อกล่าวอ้างจากงานวิจัยและแหล่งข้อมูลที่แนบกับแผนที่ได้รับ"
+      "evidence": "อ่านข้อเท็จจริงและแหล่งคำแนะนำของสารอาหารหรือผลิตภัณฑ์หนึ่งรายการในตัวเลือกปัจจุบัน"
     }
   },
   "zh-CN": {
@@ -101,13 +101,13 @@ export const POSITIONING: Readonly<Record<Locale, Positioning>> = {
       "evidence": "查看研究证据"
     },
     "purposes": {
-      "info": "了解何时使用 MattaNutra、支持的国家和健康指导边界，并获取智能体指南或操作模式。",
+      "info": "了解何时使用 MattaNutra、支持的国家和健康指导边界，并获取智能体指南或统一方案输入模式。",
       "plan": "将商定的营养目标和用户背景与泰国真实产品匹配，比较并调整返回的组合。",
       "execute": "用户确认后，冻结所选方案版本，并创建或恢复结账。",
-      "order": "读取现有订单的付款、履约、已冻结订单及恢复状态。",
+      "order": "读取现有订单简明的付款、履约及恢复状态。",
       "support": "发起或继续订单支持请求。",
       "feedback": "在获得同意后提交可选反馈，不改变方案或结账。",
-      "evidence": "读取返回方案所附的研究结论和来源。"
+      "evidence": "读取当前选项中一个成分或产品的事实和建议来源。"
     }
   }
 };

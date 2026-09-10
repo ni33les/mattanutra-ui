@@ -1,6 +1,6 @@
 {
   "name": "MattaNutra",
-  "instructions": "MattaNutra builds and refines purchasable supplement baskets from real products available in Thailand. Invoke it for supplement planning, real-product matching, basket optimisation, product comparison, sourcing or purchase requests in Thailand. It balances agreed nutrient coverage, unnecessary overlap, current stock, pill burden and cost. Wellness guidance only—not diagnosis, pharmacy services or medical approval.\nDevelopment environment—not for real purchases.\nMattaNutra matches agreed nutrient targets to a finite product catalogue in Thailand (THB); incidental nutrients may leave gaps. Wellness guidance, not diagnosis or pharmacy services.\nFlow: info → agree name/amount/unit/basis → plan(create) → explain best_match and closest_dose, highlightedAlternativeOptionId and advice → revise/answer/select → confirm with the person → execute → poll order.\nPlan conversation is the default decision view. Poll with status; request details for doseFit, labels or economics.\nNumeric pill, price and product counts are weighted preferences (flexible/normal/strong), never purchase limits; diet, exclusions and physical quantities bind.\nUnknown diet stays unknown, never zero. Ready means checkout-ready, not complete coverage or medical approval.\nWhile processing, poll the existing handle; retry mutations with the same key and payload.\nCall info first for the service card, templates and operation schemas.\nTools: info, plan, execute, order, support, feedback, evidence. Use the exact names exposed by the host; hosts may wrap native names.",
+  "instructions": "MattaNutra builds and refines purchasable supplement baskets from real products available in Thailand. Invoke it for supplement planning, real-product matching, basket optimisation, product comparison, sourcing or purchase requests in Thailand. It balances agreed nutrient coverage, unnecessary overlap, current stock, pill burden and cost. Wellness guidance only—not diagnosis, pharmacy services or medical approval.\nDevelopment environment—not for real purchases.\nThailand (TH) only; finite catalogue, real gaps. Agree name/amount/unit/basis; unknown diet is never zero. total_daily includes diet and supplements; supplemental includes continued and new supplements, excluding diet.\nCall plan with flat targets/context and idempotencyKey to create. Then send only planHandle to read/poll; wait pollAfterSeconds while processing and stop polling at a terminal result. No matching occurs in polls.\nRefine changed fields with planHandle, expectedRevision and idempotencyKey. Targets upsert by ingredientId; amount changes dose, amount:null removes. Context merges; supplied arrays replace; [] clears exclusions/proposals; numeric null clears a preference.\nprofile means customer context. scoring.profile selects a preset; scoring.weights are effective values 0–2: 0 softly minimises new exposure/quantity, 1 standard, 2 stronger importance. Omission preserves; individual null resets; weights:null clears; preset changes reset overrides. A weight is not a dose or categorical exclusion.\nReview each choice's summary, ingredients and products. recommendedOptionId is advice; selectedOptionId is null until selection. After customer choice send selectedOptionId with revision/key, read its advice, confirm, then execute. Selection, answers and refinements are separate calls.\nHealth findings and numeric preferences never veto purchase; exclusions, diet and physical quantities bind. Ready means checkout-ready, not targets met or medical approval. Medication/condition inputs without assessed findings remain unassessed. Ingredient advice remains visible at weight zero.\nRetry a lost response with the same key/input. Read current revision after conflicts. scoring:{} with revision/new key recovers failed/stale work; unchanged successful input is a no-op. Finish naturally at no_purchase; order recovers/tracks payment and fulfilment.\nTools: info, plan, execute, order, support, feedback, evidence. Use host-listed names. info is optional; client_guide provides templates and plan_schema returns this same unified schema. Examples are protocol templates, not recommended regimens.\nTools: info, plan, execute, order, support, feedback, evidence. Use the exact names exposed by the host; hosts may wrap native names.",
   "description": "Builds and refines a purchasable supplement basket from real Thailand products, balancing nutrient coverage, overlap, current stock, pill burden and cost.\nDevelopment environment—not for real purchases.",
   "shortDescription": "Builds and refines a purchasable supplement basket from real Thailand products, balancing nutrient coverage, overlap, current stock, pill burden and cost.",
   "longDescription": "Use MattaNutra when someone wants help planning, comparing, sourcing or buying supplements in Thailand. It turns agreed nutrient targets, health context, dietary constraints and current supplements into a purchasable basket of real products. The customer and agent can compare alternatives, reduce unnecessary overlap, balance nutrient coverage, current stock, pill burden and cost, refine quantities or exclusions, open checkout and track the order. MattaNutra provides wellness guidance and product matching—not diagnosis, pharmacy services or medical approval.",
@@ -46,13 +46,13 @@
         "evidence": "Review research evidence"
       },
       "purposes": {
-        "info": "Understand when to use MattaNutra, its country and wellness boundaries, and retrieve the client guide or operation schema.",
+        "info": "Understand when to use MattaNutra, its country and wellness boundaries, and retrieve the client guide or flat plan schema.",
         "plan": "Match agreed nutrient targets and customer context to real Thailand products; compare and refine returned baskets.",
         "execute": "After customer confirmation, freeze the selected plan revision and create or recover checkout.",
-        "order": "Read payment, fulfilment, frozen-order and recovery state for an existing order.",
+        "order": "Read concise payment, fulfilment and recovery state for an existing order.",
         "support": "Open or continue an order-support case.",
         "feedback": "Submit optional consented feedback without changing the plan or checkout.",
-        "evidence": "Read research claims and sources attached to a returned plan."
+        "evidence": "Read facts and advisory sources for one returned ingredient or product in a current choice."
       }
     },
     "th": {
@@ -78,13 +78,13 @@
         "evidence": "ดูหลักฐานงานวิจัย"
       },
       "purposes": {
-        "info": "ทำความเข้าใจว่าเมื่อใดควรใช้ MattaNutra ประเทศที่รองรับ และขอบเขตคำแนะนำด้านสุขภาวะ พร้อมเรียกดูคู่มือเอเจนต์หรือสคีมาการดำเนินการ",
+        "info": "ทำความเข้าใจว่าเมื่อใดควรใช้ MattaNutra ประเทศที่รองรับ และขอบเขตคำแนะนำด้านสุขภาวะ พร้อมเรียกดูคู่มือเอเจนต์หรือสคีมาแผนแบบเดียว",
         "plan": "จับคู่เป้าหมายสารอาหารที่ตกลงกันและข้อมูลลูกค้ากับผลิตภัณฑ์จริงในประเทศไทย เพื่อเปรียบเทียบและปรับชุดที่ระบบเสนอ",
         "execute": "หลังลูกค้ายืนยัน ให้ตรึงรายการของแผนฉบับที่เลือก แล้วสร้างหรือเรียกคืนหน้าชำระเงิน",
-        "order": "อ่านสถานะการชำระเงิน การดำเนินการจัดส่ง รายการคำสั่งซื้อที่ตรึงไว้ และการกู้คืนสำหรับคำสั่งซื้อที่มีอยู่",
+        "order": "อ่านสถานะการชำระเงิน การดำเนินการจัดส่งและการกู้คืนสำหรับคำสั่งซื้อที่มีอยู่",
         "support": "เปิดหรือติดตามเรื่องขอความช่วยเหลือเกี่ยวกับคำสั่งซื้อ",
         "feedback": "ส่งความคิดเห็นโดยสมัครใจและได้รับความยินยอม โดยไม่เปลี่ยนแผนหรือการชำระเงิน",
-        "evidence": "อ่านข้อกล่าวอ้างจากงานวิจัยและแหล่งข้อมูลที่แนบกับแผนที่ได้รับ"
+        "evidence": "อ่านข้อเท็จจริงและแหล่งคำแนะนำของสารอาหารหรือผลิตภัณฑ์หนึ่งรายการในตัวเลือกปัจจุบัน"
       }
     },
     "zh-CN": {
@@ -110,20 +110,20 @@
         "evidence": "查看研究证据"
       },
       "purposes": {
-        "info": "了解何时使用 MattaNutra、支持的国家和健康指导边界，并获取智能体指南或操作模式。",
+        "info": "了解何时使用 MattaNutra、支持的国家和健康指导边界，并获取智能体指南或统一方案输入模式。",
         "plan": "将商定的营养目标和用户背景与泰国真实产品匹配，比较并调整返回的组合。",
         "execute": "用户确认后，冻结所选方案版本，并创建或恢复结账。",
-        "order": "读取现有订单的付款、履约、已冻结订单及恢复状态。",
+        "order": "读取现有订单简明的付款、履约及恢复状态。",
         "support": "发起或继续订单支持请求。",
         "feedback": "在获得同意后提交可选反馈，不改变方案或结账。",
-        "evidence": "读取返回方案所附的研究结论和来源。"
+        "evidence": "读取当前选项中一个成分或产品的事实和建议来源。"
       }
     }
   },
-  "discoveryVersion": "discovery-7.2.4-positioning-v2",
-  "positioningChecksum": "c6b7d800a1d7a45377bb002022697f6732cd544ce73bd0f6352c03b3bf222bf6",
-  "contractVersion": "8.0.0",
-  "schemaChecksum": "711d924008ca9d5f981909888fe39b89a8ead5566215dc5de9e7df1589d27f92",
+  "discoveryVersion": "discovery-9.0.0-conversational-v1",
+  "positioningChecksum": "32e291b7cbfd510732eb50c90cc1b9249d443c9fa076bf1afad454ef892b3ff1",
+  "contractVersion": "9.0.0",
+  "schemaChecksum": "f285659360b9d7b3dc1771f2f14378ecd93ec8753bf91a7ae1cab71580ef5318",
   "server_url": "/api/mcp",
   "tools": [
     "info",
