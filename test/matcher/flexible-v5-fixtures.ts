@@ -1,5 +1,4 @@
 import assert from "node:assert/strict";
-import type { match } from "../../lib/matcher/index.ts";
 import { canonicalizeTargets } from '../../lib/matcher/canonicalizer.ts';
 import type { CanonicalRequest, MatcherProduct } from '../../lib/matcher/types.ts';
 export function request(overrides: Partial<CanonicalRequest> = {}): CanonicalRequest {
@@ -21,7 +20,7 @@ export function product(id: string, nutrients: Record<string, number>, price = 1
 export const catalog = (products: MatcherProduct[]) => ({ catalogueVersion: 'v5-frozen', availabilityAsOf: '2026-09-07T00:00:00Z', products });
 
 /** Historical exact-dose witnesses stay mandatory even when a practical option is recommended. */
-export function closestDoseOption(result: ReturnType<typeof match>) {
+export function closestDoseOption<T extends { roles?: readonly string[] }>(result: { selected: T | null; alternatives: readonly T[] }) {
   const row = [result.selected, ...result.alternatives].find(option => option?.roles?.includes('closest_dose'));
   assert.ok(row, 'The evaluated closest-dose trade-off must remain exposed');
   return row;

@@ -1,3 +1,4 @@
+import { closestDoseOption } from "../matcher/flexible-v5-fixtures.ts";
 import { baseline } from "../mcp-payload/fixtures.ts";
 import assert from "node:assert/strict";
 import { test } from "node:test";
@@ -43,13 +44,13 @@ for (const [id, loss, price] of [["A4", 4/300, 91900], ["A5", 5/100, 70300]] as 
   try {
     const normalized = await normalizePlanRequest({ config: loadAgenticConfig(), request, snapshot }); assert.ok("state" in normalized);
     const canonical = toCanonicalRequest(normalized.state); assert.ok(!("error" in canonical));
-    const result = match(canonical, { ...snapshot, products: snapshot.products.map(toMatcherProduct) }); assert.ok(result.selected);
-    assert.ok(result.selected.doseFit!.total <= loss, `Dose loss ${result.selected.doseFit!.total} exceeds control ${loss}`);
+    const result = match(canonical, { ...snapshot, products: snapshot.products.map(toMatcherProduct) }); assert.ok(closestDoseOption(result));
+    assert.ok(closestDoseOption(result).doseFit!.total <= loss, `Dose loss ${closestDoseOption(result).doseFit!.total} exceeds control ${loss}`);
     const control = baseline.cases.find(row => row.caseId === `${id}-en`)!.plan;
     assert.equal(control.stackSummary!.totalPriceMinor, price, "Historical prices are unchanged");
     const controlPills = control.stackSummary!.totalDailyPills;
-    if (result.selected.doseFit!.total === loss) {
-      const selected = result.selected, pills = selected.pillCountKnown === false ? null : selected.dailyPills;
+    if (closestDoseOption(result).doseFit!.total === loss) {
+      const selected = closestDoseOption(result), pills = selected.pillCountKnown === false ? null : selected.dailyPills;
       // Since 7.2.1 equal fit prefers known pills, then products, then cost.
       // Price is still enforced whenever the higher-priority routine ties.
       const routineOrder = Number(pills === null) - Number(controlPills === null) ||
