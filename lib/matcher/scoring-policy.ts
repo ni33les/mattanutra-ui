@@ -1,7 +1,8 @@
+import { ZERO_TARGET_POLICY_HASH, zeroTargetScale } from "@/lib/matcher/zero-target-policy";
 import { fromDecimal } from "@/lib/matcher/rational";
 import { sha256Hex } from "@/lib/sha256";
 
-export const CONVERSATIONAL_POLICY_VERSION = "conversational-weights-1";
+export const CONVERSATIONAL_POLICY_VERSION = "pure-importance-1";
 export const SCORING_PRESETS = Object.freeze({
   balanced: Object.freeze({ pills: 1, products: 1, price: 1, servings: 1, nutrients: 1 }),
   best_coverage: Object.freeze({ pills: 1, products: 1, price: 1, servings: 1, nutrients: 2 }),
@@ -14,7 +15,7 @@ export type ScoringSettings = Readonly<{ profile: ScoringPreset; weights: Readon
 export type ScoringPatch = Readonly<{ profile?: ScoringPreset; weights?: null | Readonly<Partial<Record<WeightAxis, number | null>> & { nutrients?: Readonly<Record<string, number | null>> }> }>;
 export function validateWeight(value: unknown, field: string): number {
   if (typeof value !== "number" || !Number.isFinite(value) || value < 0 || value > 2) throw new Error(`${field}: ${String(value)} must be a finite number in [0,2]`);
-  try { fromDecimal(value); } catch { throw new Error(`${field}: value exceeds supported exact decimal precision`); }
+  try { const exact = fromDecimal(value); if (BigInt(1000000) % exact.den !== BigInt(0)) throw new Error("precision"); } catch { throw new Error(`${field}: value supports at most six decimal places`); }
   return value;
 }
 /** Returns canonical explicit overrides only; no implicit multipliers or mutable shared state. */
@@ -45,7 +46,7 @@ function computeWeights(settings: ScoringSettings) {
   const preset = SCORING_PRESETS[settings.profile];
   const axes = Object.freeze(Object.fromEntries((["pills", "products", "price", "servings"] as const).map(axis => [axis, validateWeight(settings.weights[axis] ?? preset[axis], `scoring.weights.${axis}`)])) as Record<WeightAxis, number>);
   const nutrients = Object.freeze(Object.fromEntries(Object.entries(settings.weights.nutrients ?? {}).sort(([a], [b]) => a.localeCompare(b)).map(([id, weight]) => [id, validateWeight(weight, `scoring.weights.nutrients.${id}`)])));
-  const effective = { axes, defaultNutrient: preset.nutrients, nutrients, version: CONVERSATIONAL_POLICY_VERSION, avoidanceScale: "positive-target_then-verified-continued_then-one-canonical-quantum" };
+  const effective = { axes, defaultNutrient: preset.nutrients, nutrients, version: CONVERSATIONAL_POLICY_VERSION, precision: 6, normalization: "preference-positive-or-pill1-product1-THB100;routine-pill3-product1-THB1000;preference0.25-routine0.05-uncertainty0.25", zeroTargetPolicyHash: ZERO_TARGET_POLICY_HASH };
   return Object.freeze({ ...effective, hash: sha256Hex(JSON.stringify(effective)) });
 }
 export function effectiveWeights(settings: ScoringSettings) {
@@ -59,12 +60,14 @@ export function nutrientWeightEvidence(request: import('@/lib/matcher/types').Ca
   const ids = new Set([...request.targets.map(row => row.subjectId), ...exposure.totals.keys()]);
   const unit = { mass_ng: 'ng', iu: 'IU', cfu: 'CFU', serving_milli: 'milli-serving' } as const;
   return [...ids].sort().map(ingredientId => {
-    const target = request.targets.find(row => row.subjectId === ingredientId)?.requested;
+    const requested = request.targets.find(row => row.subjectId === ingredientId);
+    const target = requested?.requested;
+    const zero = requested && target?.units === BigInt(0) ? zeroTargetScale(requested.name, ingredientId) : null;
     const currents = request.currentSupplements.filter(row => row.subjectId === ingredientId && (row.certainty ?? 'known') === 'known');
     const continued = currents.reduce((n, row) => n + row.daily.units, BigInt(0));
-    const source = target && target.units > BigInt(0) ? 'requested' : continued > BigInt(0) ? 'verified_continued' : 'canonical_quantum';
-    const amount = source === 'requested' ? target!.units : source === 'verified_continued' ? continued : BigInt(1);
+    const source = target && target.units > BigInt(0) ? 'requested' : zero ? 'reviewed_zero_target' : !target && continued > BigInt(0) ? 'verified_continued' : 'no_fitting_objective';
+    const amount = source === 'requested' ? target!.units : source === 'reviewed_zero_target' ? zero!.units : source === 'verified_continued' ? continued : null;
     const dim = target?.dim ?? currents[0]?.daily.dim ?? exposure.totals.get(ingredientId)?.dim;
-    return { ingredientId, weight: weights.nutrients[ingredientId] ?? weights.defaultNutrient, scale: { amount: amount.toString(), unit: dim ? unit[dim] : null, source }, policy: weights.version, policyHash: weights.hash };
+    return { ingredientId, weight: weights.nutrients[ingredientId] ?? weights.defaultNutrient, scale: { amount: amount?.toString() ?? null, unit: dim ? unit[dim] : null, source }, policy: weights.version, policyHash: weights.hash };
   });
 }

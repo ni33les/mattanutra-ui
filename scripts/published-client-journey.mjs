@@ -27,9 +27,9 @@ export async function runConversationalJourney({ rpc, locale = "en", discovery =
   const { default: Ajv } = await import("ajv");
   const assert = (await import("node:assert/strict")).default;
   const listing = await rpc("tools/list", {});
-  assert.equal(listing.contractVersion, "9.0.0"); assert.equal(listing.tools.length, 7);
+  assert.equal(listing.contractVersion, "10.0.0"); assert.equal(listing.tools.length, 7);
   const nameOf = name => listing.tools.find(row => row.name === name || row.name.endsWith(`___${name}`))?.name;
-  const ajv = new Ajv({ strict: false, allErrors: true, validateFormats: false, useDefaults: false });
+  const ajv = new Ajv({ multipleOfPrecision: 8, strict: false, allErrors: true, validateFormats: false, useDefaults: false });
   const schemas = new Map(listing.tools.map(row => [row.name, { input: ajv.compile(row.inputSchema), output: ajv.compile(row.outputSchema) }]));
   const observations = [], terminal = [], measurements = [];
   async function call(name, args) {
@@ -77,11 +77,12 @@ export async function runConversationalJourney({ rpc, locale = "en", discovery =
   const original = plan;
   const change = async (suffix, fields) => { plan = await complete(await call("plan", { planHandle: plan.planHandle, expectedRevision: plan.revision, idempotencyKey: `${key}-${suffix}`, ...fields })); return plan; };
   await change("noop", { scoring: {} }); assert.equal(plan.revision, original.revision);
-  await change("pills", { scoring: { weights: { pills: 2 } } }); assert.equal(plan.scoring.weights.pills, 2);
+  await change("pills", { scoring: { weights: { pills: 0.543 } } }); assert.equal(plan.scoring.weights.pills, 0.543);
   const ingredient = plan.choices.flatMap(row => row.ingredients).find(row => row.requested === 2000); assert.ok(ingredient);
-  await change("avoid", { scoring: { weights: { nutrients: { [ingredient.ingredientId]: 0 } } } });
-  assert.equal(plan.scoring.weights.nutrients[ingredient.ingredientId], 0);
-  await change("reset", { scoring: { weights: null } }); assert.deepEqual(plan.scoring.weights, {});
+  await change("avoid", { targets: [{ ingredientId: ingredient.ingredientId, amount: 0 }], scoring: { weights: { nutrients: { [ingredient.ingredientId]: 1 } } } });
+  assert.equal(plan.scoring.weights.nutrients[ingredient.ingredientId], 1);
+  assert.ok(plan.choices.flatMap(row => row.ingredients).some(row => row.requested === 0));
+  await change("reset", { targets: [{ ingredientId: ingredient.ingredientId, amount: 2000 }], scoring: { weights: null } }); assert.deepEqual(plan.scoring.weights, {});
   const candidate = plan.choices.find(row => row.optionId === plan.recommendedOptionId) ?? plan.choices[0]; assert.ok(candidate?.products.length);
   const stale = await call("plan", { planHandle: plan.planHandle, expectedRevision: original.revision, selectedOptionId: candidate.optionId, idempotencyKey: `${key}-stale` });
   assert.equal(stale.ok, false); assert.equal(stale.error.reasonCode, "stale_revision");

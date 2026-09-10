@@ -1,9 +1,9 @@
 {
-  "releaseBase": "2d4c259a6775b57f3182306955a57ccfa6796ca4",
+  "releaseBase": "afa47794825f523ccf5332c0f890fc2ddcc12162",
   "deploymentBases": {
-    "dev": "f3f63e24f345746056ba02e686a7a2ebfe7b7461"
+    "dev": "afa47794825f523ccf5332c0f890fc2ddcc12162"
   },
-  "scope": "conversational_v9_and_affected_consumers",
+  "scope": "pure_importance_v10_affected_behaviour",
   "testPolicy": "Only affected inventory. No full application, historical contract or full MCP matrix. Each file reconciled against executed cases; missing PostgreSQL fails.",
   "files": [
     {
@@ -330,7 +330,7 @@
     },
     {
       "file": "test/simple-plan/publication.test.ts",
-      "expectedCases": 3,
+      "expectedCases": 4,
       "reason": "Conversational v9 protocol, state, response, policy and release boundary assertions",
       "slice": "publication"
     },
@@ -372,7 +372,7 @@
     },
     {
       "file": "test/simple-plan/search.test.ts",
-      "expectedCases": 3,
+      "expectedCases": 4,
       "reason": "Conversational v9 protocol, state, response, policy and release boundary assertions",
       "slice": "weights"
     },
@@ -399,6 +399,18 @@
       "expectedCases": 7,
       "reason": "Conversational v9 protocol, state, response, policy and release boundary assertions",
       "slice": "weights"
+    },
+    {
+      "file": "test/simple-plan/importance.test.ts",
+      "expectedCases": 10,
+      "reason": "Pure importance and explicit zero-target arithmetic, precision, scale provenance and shared search outcomes",
+      "slice": "weights"
+    },
+    {
+      "file": "test/simple-plan/zero-scales.test.ts",
+      "expectedCases": 2,
+      "reason": "Pure importance and explicit zero-target arithmetic, precision, scale provenance and shared search outcomes",
+      "slice": "weights"
     }
   ],
   "inputs": [
@@ -410,7 +422,7 @@
     "test/fixtures/matcher-experiments/anna-dev.json",
     "test/fixtures/ax-refinement/dev-corrections.json",
     "lib/matcher/scoring-policy.ts",
-    "contract/mcp/9.0.0/schema.json",
+    "contract/mcp/10.0.0/schema.json",
     "lib/agentic/adapters/openai.json",
     "lib/agentic/contract/decision-schema.ts",
     "test/simple-plan/documented-harness.ts",
@@ -418,6 +430,32 @@
     "scripts/service-efficiency-schema.sql",
     "test/helpers/completed-mcp-client.ts",
     "test/simple-plan/retained-choice-values.test.ts",
-    "test/simple-plan/retained-public-invariants.test.ts"
+    "test/simple-plan/retained-public-invariants.test.ts",
+    "lib/matcher/zero-target-policy.ts",
+    "test/fixtures/anna-v6/dev-baseline.json",
+    "docs/matcher/zero-target-scale-review.md"
+  ],
+  "releaseFiles": [
+    "test/practical-matching/adapters.test.ts",
+    "test/practical-matching/checkout.test.ts",
+    "test/practical-matching/oracle.test.ts",
+    "test/practical-matching/scoring.test.ts",
+    "test/practical-matching/search.test.ts",
+    "test/simple-plan/advice.test.ts",
+    "test/simple-plan/documented.test.ts",
+    "test/simple-plan/facts.test.ts",
+    "test/simple-plan/hosted.test.ts",
+    "test/simple-plan/hygiene.test.ts",
+    "test/simple-plan/publication.test.ts",
+    "test/simple-plan/refinement.test.ts",
+    "test/simple-plan/release.test.ts",
+    "test/simple-plan/requests.test.ts",
+    "test/simple-plan/response.test.ts",
+    "test/simple-plan/search.test.ts",
+    "test/simple-plan/state.test.ts",
+    "test/simple-plan/version.test.ts",
+    "test/simple-plan/weights.test.ts",
+    "test/simple-plan/importance.test.ts",
+    "test/simple-plan/zero-scales.test.ts"
   ]
 }

@@ -1,4 +1,4 @@
-# MattaNutra conversational client guide 9.0.0
+# MattaNutra conversational client guide 10.0.0
 
 MattaNutra builds and refines purchasable supplement baskets from real products available in Thailand. Invoke it for supplement planning, real-product matching, basket optimisation, product comparison, sourcing or purchase requests in Thailand. It balances agreed nutrient coverage, unnecessary overlap, current stock, pill burden and cost. Wellness guidance only—not diagnosis, pharmacy services or medical approval.
 
@@ -7,17 +7,21 @@ Development environment—not for real purchases.
 Thailand (TH) only; prices in THB, delivery separate; finite catalogue, real gaps. Agree name/amount/unit/basis; unknown diet is never zero. total_daily includes diet and supplements; supplemental includes continued and new supplements, excluding diet.
 Call plan with flat targets/context and idempotencyKey to create. Then send only planHandle to read/poll; wait pollAfterSeconds while processing and stop polling at a terminal result. No matching occurs in polls.
 Refine changed fields with planHandle, expectedRevision and idempotencyKey. Targets upsert by ingredientId; amount changes dose, amount:null removes. Context merges; supplied arrays replace; [] clears exclusions/proposals; numeric null clears a preference.
-profile means customer context. scoring.profile selects a preset; scoring.weights are effective values 0–2: 0 softly minimises new exposure/quantity, 1 standard, 2 stronger importance. Omission preserves; individual null resets; weights:null clears; preset changes reset overrides. A weight is not a dose or categorical exclusion.
+profile means customer context. scoring.profile selects a preset; Targets and preferences describe the desired outcome. Weights describe its importance when comparing choices. Weights accept decimals from 0 to 2: zero removes that ranking component, one applies the normal penalty, and two doubles it. Changing a weight never changes the agreed target amount. Numerical preferences remain advisory. Safety penalties and factual advice remain active independently. A target amount of zero with a positive weight expresses soft minimisation. A weight of zero means that objective does not influence ranking. Use an exclusion only when the customer requires categorical avoidance. Up to six decimal places. Omission preserves; individual null resets; weights:null clears; preset changes reset overrides. A weight is not a dose or categorical exclusion.
 Review each choice's summary, ingredients and products. recommendedOptionId is advice; selectedOptionId is null until selection. After customer choice send selectedOptionId with revision/key, read its advice, confirm, then execute. Selection, answers and refinements are separate calls.
 Health findings and numeric preferences never veto purchase; exclusions, diet and physical quantities bind. Ready means checkout-ready, not targets met or medical approval. Medication/condition inputs without assessed findings remain unassessed. Ingredient advice remains visible at weight zero.
 Retry a lost response with the same key/input. Read current revision after conflicts. scoring:{} with revision/new key recovers failed/stale work; unchanged successful input is a no-op. Finish naturally at no_purchase; order recovers/tracks payment and fulfilment.
 Tools: info, plan, execute, order, support, feedback, evidence. Use host-listed names. info is optional; client_guide provides templates and plan_schema returns this same unified schema. Examples are protocol templates, not recommended regimens.
 
+Targets and preferences describe the desired outcome. Weights describe its importance when comparing choices. Weights accept decimals from 0 to 2: zero removes that ranking component, one applies the normal penalty, and two doubles it. Changing a weight never changes the agreed target amount. Numerical preferences remain advisory. Safety penalties and factual advice remain active independently. A target amount of zero with a positive weight expresses soft minimisation. A weight of zero means that objective does not influence ranking. Use an exclusion only when the customer requires categorical avoidance.
+
 Illustrative amounts are protocol examples, not personal dose recommendations. Answer using the actual questionId and choice corresponding to the customer’s answer. Replace placeholder identifiers with returned values; each new mutation needs a new idempotencyKey and current expectedRevision. Retry a lost response with exactly the same key and input. Handle-only calls poll existing work at pollAfterSeconds; stop at a terminal result.
 
 Use one flat plan call repeatedly. Omit unchanged fields. Selection, answers and refinements must be separate calls. profile is reported customer context; scoring.profile is a preset of effective weights. Nothing requires exact diet labels or demographics merely to explore.
 
-Weights: 0 softly minimises new exposure or quantity; 1 is standard; 2 increases importance. Below one blends avoidance with fitting. Two fits the agreed amount more strongly; a higher dose requires an explicit target amount change. Missing effective weights equal one unless a preset or saved override supplies them. A weight never disables safety advice. Exclusions and dietary requirements remain binding.
+Targets and preferences describe the desired outcome. Weights describe its importance when comparing choices. Weights accept decimals from 0 to 2: zero removes that ranking component, one applies the normal penalty, and two doubles it. Changing a weight never changes the agreed target amount. Numerical preferences remain advisory. Safety penalties and factual advice remain active independently. A target amount of zero with a positive weight expresses soft minimisation. A weight of zero means that objective does not influence ranking. Use an exclusion only when the customer requires categorical avoidance. Up to six decimal places (for example 0.543). Overrides replace preset values; they are never multiplied by the preset. Ask “How important is this preference?” rather than requiring coefficients from the person. A weight without a target does not create a hidden fitting or avoidance objective; add an explicit target first. Independently existing continued-dose terms may still apply.
+
+Zero-target comparison scales: Vitamin D3 25 mcg (1000 IU); Selenium 50 mcg. These are versioned engineering scales anchored to captured catalogue amounts, not recommended doses or safety limits, and are not claimed to be clinically calibrated. Other ingredients require an explicit scale review; an unsupported zero target returns a field error. At zero, exposure divided by this scale replaces proportional deviation. total_daily includes fixed diet and continued intake; supplemental excludes diet. The matcher cannot remove fixed intake. Coverage of a zero goal is binary: fully quantified zero contributes 100%, confirmed positive or uncertain exposure contributes 0%; unknown remains explicit. No zero-target percentage divides by zero.
 
 Result delivery: clients that consume structuredContent receive one structured decision plus brief text. Verified text-only clients send X-MattaNutra-Result-Content: text to receive complete JSON text instead. X-MattaNutra-Result-Content: structured explicitly confirms structured support. Do not concatenate both representations.
 
@@ -108,6 +112,9 @@ plan
   "planHandle": "cap_replace_with_returned_plan_handle",
   "expectedRevision": 1,
   "idempotencyKey": "example-change-key-0001",
+  "requirements": {
+    "maxDailyPills": 3
+  },
   "scoring": {
     "weights": {
       "pills": 2
@@ -125,12 +132,70 @@ plan
   "planHandle": "cap_replace_with_returned_plan_handle",
   "expectedRevision": 1,
   "idempotencyKey": "example-change-key-0001",
+  "targets": [
+    {
+      "ingredientId": "sup_replace_with_returned_selenium",
+      "amount": 0,
+      "unit": "mcg"
+    }
+  ],
   "scoring": {
     "weights": {
       "nutrients": {
-        "sup_replace_with_returned_ingredient": 0
+        "sup_replace_with_returned_selenium": 1
       }
     }
+  }
+}
+```
+
+### pill-count-matters-a-little
+
+plan
+
+```json
+{
+  "planHandle": "cap_replace_with_returned_plan_handle",
+  "expectedRevision": 1,
+  "idempotencyKey": "example-change-key-0001",
+  "scoring": {
+    "weights": {
+      "pills": 0.543
+    }
+  }
+}
+```
+
+### pill-count-does-not-matter
+
+plan
+
+```json
+{
+  "planHandle": "cap_replace_with_returned_plan_handle",
+  "expectedRevision": 1,
+  "idempotencyKey": "example-change-key-0001",
+  "scoring": {
+    "weights": {
+      "pills": 0
+    }
+  }
+}
+```
+
+### exclude-selenium
+
+plan
+
+```json
+{
+  "planHandle": "cap_replace_with_returned_plan_handle",
+  "expectedRevision": 1,
+  "idempotencyKey": "example-change-key-0001",
+  "requirements": {
+    "excludeSupplementIds": [
+      "sup_replace_with_returned_selenium"
+    ]
   }
 }
 ```

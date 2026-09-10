@@ -1,3 +1,4 @@
+import { IMPORTANCE_EXPLANATION } from "@/lib/agentic/contract/importance";
 import { Type, type Static, type TSchema, type TProperties } from "@sinclair/typebox";
 import { visibleOperationVariants } from "@/lib/agentic/contract/operation-variants";
 
@@ -83,7 +84,7 @@ export type PlanRequestWire = Static<typeof PLAN_REQUEST>;
 const key = Type.String({ minLength: 16, maxLength: 128 });
 const handle = Type.String({ minLength: 32, maxLength: 4096 });
 const revision = Type.Integer({ minimum: 1 });
-export const WEIGHT_SCHEMA = Type.Number({ minimum: 0, maximum: 2, description: "Effective intent weight: 0 softly minimises exposure/quantity, 1 is standard, 2 increases importance. Never an exclusion or dose change." });
+export const WEIGHT_SCHEMA = Type.Number({ minimum: 0, maximum: 2, multipleOf: 0.000001, description: `${IMPORTANCE_EXPLANATION} Up to six decimal places.` });
 const scoringWeights = object({
   pills: optional(nullable(WEIGHT_SCHEMA)), products: optional(nullable(WEIGHT_SCHEMA)), price: optional(nullable(WEIGHT_SCHEMA)), servings: optional(nullable(WEIGHT_SCHEMA)),
   nutrients: optional(Type.Record(Type.String({ pattern: "^[A-Za-z][A-Za-z0-9_-]{0,127}$" }), nullable(WEIGHT_SCHEMA), { description: "Returned or published ingredient IDs only. Omission preserves; individual null resets to the preset." }))
@@ -93,10 +94,11 @@ export const SCORING_SCHEMA = object({
   weights: optional(nullable(scoringWeights))
 }, "profile is a scoring preset, not customer demographics. Omitted effective terms default to one. Changing preset resets old overrides, then applies supplied overrides. weights:null clears overrides; {} preserves them. Individual null resets. An empty scoring refinement can retry failed/stale work; otherwise unchanged input is a no-op.");
 const ingredientId = Type.String({ minLength: 1, maxLength: 128, pattern: "^[A-Za-z][A-Za-z0-9_-]*$" });
-const targetFields = { ingredientId: optional(ingredientId), name: optional(text(240)), amount: positiveAmount, unit: UNIT_SCHEMA,
+const targetAmount = Type.Number({ minimum: 0, maximum: 1e15, description: "Positive amount fits the agreed target. Zero with positive importance softly minimises exposure on the stated basis using a reviewed comparison scale; it does not remove current intake. Reviewed zero scales: Vitamin D3 25 mcg (1000 IU), Selenium 50 mcg; other ingredients return an explicit missing-scale error. These scales are not dose recommendations. Weight zero ignores fitting; amount:null removes on refinement." });
+const targetFields = { ingredientId: optional(ingredientId), name: optional(text(240)), amount: targetAmount, unit: UNIT_SCHEMA,
   basis: TARGET_SCHEMA.properties.basis, acceptableRange: TARGET_SCHEMA.properties.acceptableRange };
 const targetCreate = { ...object(targetFields), anyOf: [{ required: ["ingredientId"] }, { required: ["name"] }] };
-const targetEdit = object({ ingredientId, amount: optional(nullable(positiveAmount)), unit: optional(UNIT_SCHEMA), basis: TARGET_SCHEMA.properties.basis,
+const targetEdit = object({ ingredientId, amount: optional(nullable(targetAmount)), unit: optional(UNIT_SCHEMA), basis: TARGET_SCHEMA.properties.basis,
   acceptableRange: TARGET_SCHEMA.properties.acceptableRange });
 const conversationalRequirements = Type.Omit(REQUIREMENTS_SCHEMA, ["preferenceImportance"]);
 const contextFields = { locale: PLAN_REQUEST.properties.locale, destinationCountry: PLAN_REQUEST.properties.destinationCountry,

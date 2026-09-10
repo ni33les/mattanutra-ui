@@ -4,7 +4,7 @@ import { COVERED_THRESHOLD, DEFAULT_MATCHER_CONFIG } from "@/lib/matcher/config"
 import { contributionFor, productIsDedicatedForTarget } from "@/lib/matcher/candidates";
 import {
   aggregateCoverage,
-  coverageUnits,
+  targetCoverageUnits,
   oversupplyScore
 } from "@/lib/matcher/dominance";
 import { seedState, tryAddVariant, revalidateState } from "@/lib/matcher/search";
@@ -31,7 +31,7 @@ function coverageMap(
   for (const target of request.targets) {
     map.set(
       target.subjectId,
-      coverageUnits(knownTargetExposure(request, target, delivered.get(target.subjectId) ?? BigInt(0)), target.requested.units)
+      targetCoverageUnits(request, target, delivered.get(target.subjectId) ?? BigInt(0))
     );
   }
 

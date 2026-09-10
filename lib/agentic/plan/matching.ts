@@ -358,6 +358,8 @@ export function coverageFor(
 
     if (deferredConditional) {
       status = "conditional_deferred";
+    } else if (target.amount === 0) {
+      status = evaluatedCoverage?.fullyMet ? "covered" : targetExposureAmount > 0 ? "over_target" : "uncovered";
     } else if (
       currentAmount > 0 &&
       exposurePercent >= COVERED_THRESHOLD &&

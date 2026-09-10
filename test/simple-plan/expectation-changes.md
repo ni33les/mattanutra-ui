@@ -51,3 +51,9 @@ The five execute-reuse assertions remain maintained against flat requests and ex
 - `SPLAN-STATE-05/06` retains empty target facts and review-options recovery, including all 30 unresolved targets. Empty choices remain nonpurchasable; useful purchase alternatives retain their returned IDs.
 
 The current acceptance inventory distinguishes PostgreSQL prerequisites and reconciles every executed file/case. Development diagnostics containing failures or interrupted processes are retained as such, never included in a green attestation. Actual installed connector alignment remains a separate owner-refresh/fresh-session requirement.
+
+## Pure importance 10.0.0 (IMP-01–12)
+
+Approved replacement: SPLAN-WGT-08, SPLAN-WGT-03/10 and SPLAN-WGT-10 asserted v9's zero/below-one avoidance blend. They now assert pure scaling and unchanged targets; SPLAN-WGT-03 retains the independent safety term. The finite search oracle removes only that obsolete blend, preserving its quantities and prices. Explicit zero-target cases IMP-06/07 replace implicit avoidance. V9 publications/handles are retired; order/payment recovery stays independent. Baseline and eight behavioural RED failures are preserved outside this checkout under importance-v10.
+
+IMP-01/02/03/04/05/06/07/08/10: importance.test.ts; IMP-07/09: zero-scales.test.ts plus search.test.ts; IMP-09/10: search.test.ts and practical-matching/adapters.test.ts; IMP-11: documented.test.ts and paired documented clients; IMP-12: publication.test.ts, hosted.test.ts plus separate installed connector evidence. A generated projection is not installed connector proof.

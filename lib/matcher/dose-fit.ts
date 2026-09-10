@@ -2,8 +2,9 @@ import { DOSE_FIT_VERSION, UPPER_LIMIT_EXTRA_WEIGHT } from "@/lib/matcher/config
 import { amountFromScaled, isDoseError, scaleAmount } from "@/lib/matcher/dose";
 import { catalogBandRuleId, safetyCeilingFor } from "@/lib/matcher/safety-ceilings";
 import { intakeIsKnown, targetBasis } from "@/lib/matcher/target-basis";
+import { zeroTargetScale } from "@/lib/matcher/zero-target-policy";
 import { effectiveWeights } from "@/lib/matcher/scoring-policy";
-import { fromDecimal, multiply, positive, subtract } from "@/lib/matcher/rational";
+import { fromDecimal, multiply } from "@/lib/matcher/rational";
 import type { CanonicalRequest, DoseDimension, DoseFitScore, MatcherUnit, SafetyCeiling } from "@/lib/matcher/types";
 
 type Fraction = Readonly<{ num: bigint; den: bigint }>;
@@ -105,8 +106,9 @@ function compileSubject(request: CanonicalRequest, subjectId: string) {
   const knownRows = request.currentSupplements.filter(row => row.subjectId === subjectId && intakeIsKnown(row));
   const referenceRows = !requested ? knownRows.filter(row => row.daily.units > BigInt(0)) : [];
   const reference = referenceRows.reduce((n, row) => n + row.daily.units, BigInt(0));
-  const verifiedContinued = knownRows.reduce((n, row) => n + row.daily.units, BigInt(0));
-  const scale = target && target.requested.units > BigInt(0) ? target.requested.units : verifiedContinued > BigInt(0) ? verifiedContinued : BigInt(1);
+  const zeroScale = request.scoring && target?.requested.units === BigInt(0) ? zeroTargetScale(target.name, subjectId) : null;
+  if (request.scoring && target?.requested.units === BigInt(0) && (!zeroScale || zeroScale.dim !== target.requested.dim)) throw new Error(`No reviewed zero-target normalization scale for ${target.name}`);
+  const scale = zeroScale?.units;
   return { requested, target, ranges, dietary, referenceRows, reference, scale, bounds: limitsFor(request, subjectId) };
 }
 function subjectInputs(request: CanonicalRequest, subjectId: string) {
@@ -126,13 +128,13 @@ export function weightedDoseFitScore(request: CanonicalRequest, exposure: Readon
   const settings = request.scoring ? effectiveWeights(request.scoring) : null;
   if (!settings || (settings.defaultNutrient === 1 && Object.values(settings.nutrients).every(weight => weight === 1))) return doseFitScore(request, exposure);
   // With one physical endpoint and uniform fitting weights >=1 there is no
-  // endpoint choice or avoidance term. Reuse the exact fit/safety components.
+  // endpoint choice. Reuse the exact fit/safety components.
   // Estimated ranges must always evaluate the complete weighted endpoints.
   let uniform = fixedWeights.get(request);
   if (uniform === undefined) {
     const varying = [...request.currentSupplements, ...(request.dietaryIntake ?? [])].some(row =>
       (row.minimumDailyAmount ?? row.dailyAmount) !== (row.maximumDailyAmount ?? row.dailyAmount));
-    uniform = !varying && settings.defaultNutrient >= 1 && Object.values(settings.nutrients).every(weight => weight === settings.defaultNutrient) ? settings.defaultNutrient : null;
+    uniform = !varying && Object.values(settings.nutrients).every(weight => weight === settings.defaultNutrient) ? settings.defaultNutrient : null;
     fixedWeights.set(request, uniform);
   }
   if (uniform !== null) {
@@ -164,20 +166,19 @@ function calculateDoseFit(request: CanonicalRequest, exposure: ReadonlyMap<strin
     const continuedIncrease = reference > BigInt(0) ? { num: added, den: reference } : ZERO;
     const weightValue = settings ? settings.nutrients[subjectId] ?? settings.defaultNutrient : 1;
     const weight = fromDecimal(weightValue);
-    const avoidance = weightValue < 1 ? multiply(positive(subtract(fromDecimal(1), weight)), { num: added, den: scale }) : ZERO;
     const cases = [...new Set([minimum, maximum])].flatMap((supplemental) =>
       [...new Set([dietary.minimum, dietary.maximum])].map((food) => {
         const want = target?.requested.units ?? BigInt(0);
         const targetExposure = supplemental + (target && targetBasis(target) === "total_daily" ? food : BigInt(0));
         const shortfall = want > BigInt(0) && targetExposure < want ? { num: want - targetExposure, den: want } : ZERO;
-        const overshoot = add(excess(targetExposure, want), continuedIncrease);
+        const overshoot = add(target && want === BigInt(0) && scale ? { num: targetExposure, den: scale } : excess(targetExposure, want), continuedIncrease);
         const limits = bounds.map((row) => {
           const sourceScope = row.ceiling.sourceScope ?? "supplemental";
           const total = supplemental + (sourceScope === "total" ? food : BigInt(0));
           return { row, total, sourceScope, excess: excess(total, row.units) };
         });
         const limitLoss = limits.reduce((sum, row) => add(sum, row.excess), ZERO);
-        const total = add(add(multiply(weight, add(shortfall, overshoot)), avoidance), { num: limitLoss.num * BigInt(UPPER_LIMIT_EXTRA_WEIGHT), den: limitLoss.den });
+        const total = add(multiply(weight, add(shortfall, overshoot)), { num: limitLoss.num * BigInt(UPPER_LIMIT_EXTRA_WEIGHT), den: limitLoss.den });
         return { supplemental, food, targetExposure, shortfall, overshoot, limits, limitLoss, total };
       }));
     // Convex absolute deviation plus hinge penalties attains its worst value at
@@ -189,7 +190,7 @@ function calculateDoseFit(request: CanonicalRequest, exposure: ReadonlyMap<strin
     limit = add(limit, worst.limitLoss);
     const estimated = minimum !== maximum || dietary.minimum !== dietary.maximum;
     const rowCertainty = certainty(request, subjectId) === "unknown" ? "unknown" : estimated ? "estimated" : certainty(request, subjectId);
-    if (target && target.requested.units > BigInt(0)) {
+    if (target) {
       const amount = (units: bigint) => amountFromScaled({ ...target.requested, units }, target.requestedUnit, target.name) ?? 0;
       const includeFood = targetBasis(target) === "total_daily";
       perTarget.push({ basis: targetBasis(target), subjectId, name: target.name, unit: target.requestedUnit, target: target.requestedAmount,

@@ -1,7 +1,7 @@
 {
-  "contractVersion": "9.0.0",
+  "contractVersion": "10.0.0",
   "name": "mattanutra_dev",
-  "instructions": "MattaNutra builds and refines purchasable supplement baskets from real products available in Thailand. Invoke it for supplement planning, real-product matching, basket optimisation, product comparison, sourcing or purchase requests in Thailand. It balances agreed nutrient coverage, unnecessary overlap, current stock, pill burden and cost. Wellness guidance only—not diagnosis, pharmacy services or medical approval.\nDevelopment environment—not for real purchases.\nThailand (TH) only; prices in THB, delivery separate; finite catalogue, real gaps. Agree name/amount/unit/basis; unknown diet is never zero. total_daily includes diet and supplements; supplemental includes continued and new supplements, excluding diet.\nCall plan with flat targets/context and idempotencyKey to create. Then send only planHandle to read/poll; wait pollAfterSeconds while processing and stop polling at a terminal result. No matching occurs in polls.\nRefine changed fields with planHandle, expectedRevision and idempotencyKey. Targets upsert by ingredientId; amount changes dose, amount:null removes. Context merges; supplied arrays replace; [] clears exclusions/proposals; numeric null clears a preference.\nprofile means customer context. scoring.profile selects a preset; scoring.weights are effective values 0–2: 0 softly minimises new exposure/quantity, 1 standard, 2 stronger importance. Omission preserves; individual null resets; weights:null clears; preset changes reset overrides. A weight is not a dose or categorical exclusion.\nReview each choice's summary, ingredients and products. recommendedOptionId is advice; selectedOptionId is null until selection. After customer choice send selectedOptionId with revision/key, read its advice, confirm, then execute. Selection, answers and refinements are separate calls.\nHealth findings and numeric preferences never veto purchase; exclusions, diet and physical quantities bind. Ready means checkout-ready, not targets met or medical approval. Medication/condition inputs without assessed findings remain unassessed. Ingredient advice remains visible at weight zero.\nRetry a lost response with the same key/input. Read current revision after conflicts. scoring:{} with revision/new key recovers failed/stale work; unchanged successful input is a no-op. Finish naturally at no_purchase; order recovers/tracks payment and fulfilment.\nTools: info, plan, execute, order, support, feedback, evidence. Use host-listed names. info is optional; client_guide provides templates and plan_schema returns this same unified schema. Examples are protocol templates, not recommended regimens.\nTools: info, plan, execute, order, support, feedback, evidence. Use the exact names exposed by the host; hosts may wrap native names.",
+  "instructions": "MattaNutra builds and refines purchasable supplement baskets from real products available in Thailand. Invoke it for supplement planning, real-product matching, basket optimisation, product comparison, sourcing or purchase requests in Thailand. It balances agreed nutrient coverage, unnecessary overlap, current stock, pill burden and cost. Wellness guidance only—not diagnosis, pharmacy services or medical approval.\nDevelopment environment—not for real purchases.\nThailand (TH) only; prices in THB, delivery separate; finite catalogue, real gaps. Agree name/amount/unit/basis; unknown diet is never zero. total_daily includes diet and supplements; supplemental includes continued and new supplements, excluding diet.\nCall plan with flat targets/context and idempotencyKey to create. Then send only planHandle to read/poll; wait pollAfterSeconds while processing and stop polling at a terminal result. No matching occurs in polls.\nRefine changed fields with planHandle, expectedRevision and idempotencyKey. Targets upsert by ingredientId; amount changes dose, amount:null removes. Context merges; supplied arrays replace; [] clears exclusions/proposals; numeric null clears a preference.\nprofile means customer context. scoring.profile selects a preset; Targets and preferences describe the desired outcome. Weights describe its importance when comparing choices. Weights accept decimals from 0 to 2: zero removes that ranking component, one applies the normal penalty, and two doubles it. Changing a weight never changes the agreed target amount. Numerical preferences remain advisory. Safety penalties and factual advice remain active independently. A target amount of zero with a positive weight expresses soft minimisation. A weight of zero means that objective does not influence ranking. Use an exclusion only when the customer requires categorical avoidance. Up to six decimal places. Omission preserves; individual null resets; weights:null clears; preset changes reset overrides. A weight is not a dose or categorical exclusion.\nReview each choice's summary, ingredients and products. recommendedOptionId is advice; selectedOptionId is null until selection. After customer choice send selectedOptionId with revision/key, read its advice, confirm, then execute. Selection, answers and refinements are separate calls.\nHealth findings and numeric preferences never veto purchase; exclusions, diet and physical quantities bind. Ready means checkout-ready, not targets met or medical approval. Medication/condition inputs without assessed findings remain unassessed. Ingredient advice remains visible at weight zero.\nRetry a lost response with the same key/input. Read current revision after conflicts. scoring:{} with revision/new key recovers failed/stale work; unchanged successful input is a no-op. Finish naturally at no_purchase; order recovers/tracks payment and fulfilment.\nTools: info, plan, execute, order, support, feedback, evidence. Use host-listed names. info is optional; client_guide provides templates and plan_schema returns this same unified schema. Examples are protocol templates, not recommended regimens.\nTools: info, plan, execute, order, support, feedback, evidence. Use the exact names exposed by the host; hosts may wrap native names.",
   "description": "Builds and refines a purchasable supplement basket from real Thailand products, balancing nutrient coverage, overlap, current stock, pill burden and cost.\nDevelopment environment—not for real purchases.",
   "shortDescription": "Builds and refines a purchasable supplement basket from real Thailand products, balancing nutrient coverage, overlap, current stock, pill burden and cost.",
   "longDescription": "Use MattaNutra when someone wants help planning, comparing, sourcing or buying supplements in Thailand. It turns agreed nutrient targets, health context, dietary constraints and current supplements into a purchasable basket of real products. The customer and agent can compare alternatives, reduce unnecessary overlap, balance nutrient coverage, current stock, pill burden and cost, refine quantities or exclusions, open checkout and track the order. MattaNutra provides wellness guidance and product matching—not diagnosis, pharmacy services or medical approval.",
@@ -121,9 +121,9 @@
       }
     }
   },
-  "discoveryVersion": "discovery-9.0.0-conversational-v1",
+  "discoveryVersion": "discovery-10.0.0-conversational-v1",
   "positioningChecksum": "32e291b7cbfd510732eb50c90cc1b9249d443c9fa076bf1afad454ef892b3ff1",
-  "schemaChecksum": "f285659360b9d7b3dc1771f2f14378ecd93ec8753bf91a7ae1cab71580ef5318",
+  "schemaChecksum": "904928cadb52c52781dcc570866029fc52b1511ae35fa7f9f6a1a33b3eeb9bee",
   "server_url": "/api/mcp",
   "tools": [
     {
@@ -224,7 +224,7 @@
                                   "$ref": "#/$defs/s43"
                                 },
                                 "destinationCountry": {
-                                  "$ref": "#/$defs/s49"
+                                  "$ref": "#/$defs/s50"
                                 },
                                 "profile": {
                                   "$ref": "#/$defs/s2"
@@ -236,7 +236,7 @@
                                   "$ref": "#/$defs/s1"
                                 },
                                 "searchEffort": {
-                                  "$ref": "#/$defs/s51"
+                                  "$ref": "#/$defs/s52"
                                 },
                                 "medicationCodes": {
                                   "$ref": "#/$defs/s40"
@@ -294,7 +294,7 @@
                                   "$ref": "#/$defs/s43"
                                 },
                                 "destinationCountry": {
-                                  "$ref": "#/$defs/s49"
+                                  "$ref": "#/$defs/s50"
                                 },
                                 "profile": {
                                   "$ref": "#/$defs/s2"
@@ -306,7 +306,7 @@
                                   "$ref": "#/$defs/s1"
                                 },
                                 "searchEffort": {
-                                  "$ref": "#/$defs/s51"
+                                  "$ref": "#/$defs/s52"
                                 },
                                 "medicationCodes": {
                                   "$ref": "#/$defs/s40"
@@ -484,7 +484,7 @@
                               "$ref": "#/$defs/s43"
                             },
                             "destinationCountry": {
-                              "$ref": "#/$defs/s49"
+                              "$ref": "#/$defs/s50"
                             },
                             "profile": {
                               "$ref": "#/$defs/s2"
@@ -496,7 +496,7 @@
                               "$ref": "#/$defs/s1"
                             },
                             "searchEffort": {
-                              "$ref": "#/$defs/s51"
+                              "$ref": "#/$defs/s52"
                             },
                             "medicationCodes": {
                               "$ref": "#/$defs/s40"
@@ -1143,12 +1143,12 @@
             "description": "BCP 47 locale; supported locales are advertised by info. Unsupported locales fall back to English.",
             "type": "string"
           },
-          "s49": {
+          "s50": {
             "pattern": "^[A-Z]{2}$",
             "description": "Deliverable ISO country from info.supportedCountries.",
             "type": "string"
           },
-          "s47": {
+          "s48": {
             "minimum": 0,
             "maximum": 120,
             "description": "Reported age. Omit when unknown; scoring defaults are not health evidence.",
@@ -1169,7 +1169,7 @@
             "type": "object",
             "properties": {
               "ageYears": {
-                "$ref": "#/$defs/s47"
+                "$ref": "#/$defs/s48"
               },
               "goals": {
                 "$ref": "#/$defs/s36"
@@ -1193,7 +1193,7 @@
               }
             }
           },
-          "s50": {
+          "s51": {
             "type": "string",
             "enum": [
               "capsule",
@@ -1206,12 +1206,12 @@
               "other"
             ]
           },
-          "s53": {
+          "s54": {
             "uniqueItems": true,
             "maxItems": 8,
             "type": "array",
             "items": {
-              "$ref": "#/$defs/s50"
+              "$ref": "#/$defs/s51"
             }
           },
           "s32": {
@@ -1242,7 +1242,7 @@
             "description": "Preferred daily pill count; unknown counts remain unknown.",
             "type": "number"
           },
-          "s18": {
+          "s17": {
             "anyOf": [
               {
                 "$ref": "#/$defs/s44"
@@ -1258,7 +1258,7 @@
             "description": "Preferred first-order goods price in destination currency minor units; delivery quoted separately.",
             "type": "integer"
           },
-          "s19": {
+          "s18": {
             "anyOf": [
               {
                 "$ref": "#/$defs/s45"
@@ -1341,7 +1341,7 @@
             "type": "object",
             "properties": {
               "allowedForms": {
-                "$ref": "#/$defs/s53"
+                "$ref": "#/$defs/s54"
               },
               "dietaryPreference": {
                 "type": "string",
@@ -1358,10 +1358,10 @@
                 "$ref": "#/$defs/s34"
               },
               "maxDailyPills": {
-                "$ref": "#/$defs/s18"
+                "$ref": "#/$defs/s17"
               },
               "maxPriceMinor": {
-                "$ref": "#/$defs/s19"
+                "$ref": "#/$defs/s18"
               },
               "maxProductCount": {
                 "$ref": "#/$defs/s21"
@@ -1385,16 +1385,17 @@
               }
             }
           },
-          "s48": {
+          "s49": {
             "minimum": 0,
             "maximum": 2,
-            "description": "Effective intent weight: 0 softly minimises exposure/quantity, 1 is standard, 2 increases importance. Never an exclusion or dose change.",
+            "multipleOf": 0.000001,
+            "description": "Targets and preferences describe the desired outcome. Weights describe its importance when comparing choices. Weights accept decimals from 0 to 2: zero removes that ranking component, one applies the normal penalty, and two doubles it. Changing a weight never changes the agreed target amount. Numerical preferences remain advisory. Safety penalties and factual advice remain active independently. Up to six decimal places.",
             "type": "number"
           },
           "s20": {
             "anyOf": [
               {
-                "$ref": "#/$defs/s48"
+                "$ref": "#/$defs/s49"
               },
               {
                 "type": "null"
@@ -1460,7 +1461,7 @@
               }
             }
           },
-          "s51": {
+          "s52": {
             "type": "string",
             "enum": [
               "standard",
@@ -1844,7 +1845,13 @@
               ]
             }
           },
-          "s52": {
+          "s47": {
+            "minimum": 0,
+            "maximum": 1000000000000000,
+            "description": "Positive amount fits the agreed target. Zero with positive importance softly minimises exposure on the stated basis using a reviewed comparison scale; it does not remove current intake. Reviewed zero scales: Vitamin D3 25 mcg (1000 IU), Selenium 50 mcg; other ingredients return an explicit missing-scale error. These scales are not dose recommendations. Weight zero ignores fitting; amount:null removes on refinement.",
+            "type": "number"
+          },
+          "s53": {
             "type": "string",
             "enum": [
               "total_daily",
@@ -1898,7 +1905,7 @@
                 "type": "string"
               },
               "amount": {
-                "$ref": "#/$defs/s25"
+                "$ref": "#/$defs/s47"
               },
               "unit": {
                 "type": "string",
@@ -1913,7 +1920,7 @@
                 ]
               },
               "basis": {
-                "$ref": "#/$defs/s52"
+                "$ref": "#/$defs/s53"
               },
               "acceptableRange": {
                 "$ref": "#/$defs/s12"
@@ -1944,10 +1951,10 @@
               "$ref": "#/$defs/s10"
             }
           },
-          "s17": {
+          "s19": {
             "anyOf": [
               {
-                "$ref": "#/$defs/s25"
+                "$ref": "#/$defs/s47"
               },
               {
                 "type": "null"
@@ -1965,7 +1972,7 @@
                 "type": "string"
               },
               "amount": {
-                "$ref": "#/$defs/s17"
+                "$ref": "#/$defs/s19"
               },
               "unit": {
                 "type": "string",
@@ -1980,7 +1987,7 @@
                 ]
               },
               "basis": {
-                "$ref": "#/$defs/s52"
+                "$ref": "#/$defs/s53"
               },
               "acceptableRange": {
                 "$ref": "#/$defs/s12"
@@ -2049,7 +2056,7 @@
     },
     {
       "title": "Build or refine a supplement basket",
-      "description": "Match agreed nutrient targets and customer context to real Thailand products; compare and refine returned baskets. Thailand (TH) only; prices in THB, delivery separate; finite catalogue, real gaps. Agree name/amount/unit/basis; unknown diet is never zero. total_daily includes diet and supplements; supplemental includes continued and new supplements, excluding diet.\nCall plan with flat targets/context and idempotencyKey to create. Then send only planHandle to read/poll; wait pollAfterSeconds while processing and stop polling at a terminal result. No matching occurs in polls.\nRefine changed fields with planHandle, expectedRevision and idempotencyKey. Targets upsert by ingredientId; amount changes dose, amount:null removes. Context merges; supplied arrays replace; [] clears exclusions/proposals; numeric null clears a preference.\nprofile means customer context. scoring.profile selects a preset; scoring.weights are effective values 0–2: 0 softly minimises new exposure/quantity, 1 standard, 2 stronger importance. Omission preserves; individual null resets; weights:null clears; preset changes reset overrides. A weight is not a dose or categorical exclusion.\nReview each choice's summary, ingredients and products. recommendedOptionId is advice; selectedOptionId is null until selection. After customer choice send selectedOptionId with revision/key, read its advice, confirm, then execute. Selection, answers and refinements are separate calls.\nHealth findings and numeric preferences never veto purchase; exclusions, diet and physical quantities bind. Ready means checkout-ready, not targets met or medical approval. Medication/condition inputs without assessed findings remain unassessed. Ingredient advice remains visible at weight zero.\nRetry a lost response with the same key/input. Read current revision after conflicts. scoring:{} with revision/new key recovers failed/stale work; unchanged successful input is a no-op. Finish naturally at no_purchase; order recovers/tracks payment and fulfilment.\nTools: info, plan, execute, order, support, feedback, evidence. Use host-listed names. info is optional; client_guide provides templates and plan_schema returns this same unified schema. Examples are protocol templates, not recommended regimens.",
+      "description": "Match agreed nutrient targets and customer context to real Thailand products; compare and refine returned baskets. Thailand (TH) only; prices in THB, delivery separate; finite catalogue, real gaps. Agree name/amount/unit/basis; unknown diet is never zero. total_daily includes diet and supplements; supplemental includes continued and new supplements, excluding diet.\nCall plan with flat targets/context and idempotencyKey to create. Then send only planHandle to read/poll; wait pollAfterSeconds while processing and stop polling at a terminal result. No matching occurs in polls.\nRefine changed fields with planHandle, expectedRevision and idempotencyKey. Targets upsert by ingredientId; amount changes dose, amount:null removes. Context merges; supplied arrays replace; [] clears exclusions/proposals; numeric null clears a preference.\nprofile means customer context. scoring.profile selects a preset; Targets and preferences describe the desired outcome. Weights describe its importance when comparing choices. Weights accept decimals from 0 to 2: zero removes that ranking component, one applies the normal penalty, and two doubles it. Changing a weight never changes the agreed target amount. Numerical preferences remain advisory. Safety penalties and factual advice remain active independently. A target amount of zero with a positive weight expresses soft minimisation. A weight of zero means that objective does not influence ranking. Use an exclusion only when the customer requires categorical avoidance. Up to six decimal places. Omission preserves; individual null resets; weights:null clears; preset changes reset overrides. A weight is not a dose or categorical exclusion.\nReview each choice's summary, ingredients and products. recommendedOptionId is advice; selectedOptionId is null until selection. After customer choice send selectedOptionId with revision/key, read its advice, confirm, then execute. Selection, answers and refinements are separate calls.\nHealth findings and numeric preferences never veto purchase; exclusions, diet and physical quantities bind. Ready means checkout-ready, not targets met or medical approval. Medication/condition inputs without assessed findings remain unassessed. Ingredient advice remains visible at weight zero.\nRetry a lost response with the same key/input. Read current revision after conflicts. scoring:{} with revision/new key recovers failed/stale work; unchanged successful input is a no-op. Finish naturally at no_purchase; order recovers/tracks payment and fulfilment.\nTools: info, plan, execute, order, support, feedback, evidence. Use host-listed names. info is optional; client_guide provides templates and plan_schema returns this same unified schema. Examples are protocol templates, not recommended regimens.",
       "inputSchema": {
         "anyOf": [
           {
@@ -2281,7 +2288,8 @@
                               {
                                 "minimum": 0,
                                 "maximum": 2,
-                                "description": "Effective intent weight: 0 softly minimises exposure/quantity, 1 is standard, 2 increases importance. Never an exclusion or dose change.",
+                                "multipleOf": 0.000001,
+                                "description": "Targets and preferences describe the desired outcome. Weights describe its importance when comparing choices. Weights accept decimals from 0 to 2: zero removes that ranking component, one applies the normal penalty, and two doubles it. Changing a weight never changes the agreed target amount. Numerical preferences remain advisory. Safety penalties and factual advice remain active independently. Up to six decimal places.",
                                 "type": "number"
                               },
                               {
@@ -2294,7 +2302,8 @@
                               {
                                 "minimum": 0,
                                 "maximum": 2,
-                                "description": "Effective intent weight: 0 softly minimises exposure/quantity, 1 is standard, 2 increases importance. Never an exclusion or dose change.",
+                                "multipleOf": 0.000001,
+                                "description": "Targets and preferences describe the desired outcome. Weights describe its importance when comparing choices. Weights accept decimals from 0 to 2: zero removes that ranking component, one applies the normal penalty, and two doubles it. Changing a weight never changes the agreed target amount. Numerical preferences remain advisory. Safety penalties and factual advice remain active independently. Up to six decimal places.",
                                 "type": "number"
                               },
                               {
@@ -2307,7 +2316,8 @@
                               {
                                 "minimum": 0,
                                 "maximum": 2,
-                                "description": "Effective intent weight: 0 softly minimises exposure/quantity, 1 is standard, 2 increases importance. Never an exclusion or dose change.",
+                                "multipleOf": 0.000001,
+                                "description": "Targets and preferences describe the desired outcome. Weights describe its importance when comparing choices. Weights accept decimals from 0 to 2: zero removes that ranking component, one applies the normal penalty, and two doubles it. Changing a weight never changes the agreed target amount. Numerical preferences remain advisory. Safety penalties and factual advice remain active independently. Up to six decimal places.",
                                 "type": "number"
                               },
                               {
@@ -2320,7 +2330,8 @@
                               {
                                 "minimum": 0,
                                 "maximum": 2,
-                                "description": "Effective intent weight: 0 softly minimises exposure/quantity, 1 is standard, 2 increases importance. Never an exclusion or dose change.",
+                                "multipleOf": 0.000001,
+                                "description": "Targets and preferences describe the desired outcome. Weights describe its importance when comparing choices. Weights accept decimals from 0 to 2: zero removes that ranking component, one applies the normal penalty, and two doubles it. Changing a weight never changes the agreed target amount. Numerical preferences remain advisory. Safety penalties and factual advice remain active independently. Up to six decimal places.",
                                 "type": "number"
                               },
                               {
@@ -2337,7 +2348,8 @@
                                   {
                                     "minimum": 0,
                                     "maximum": 2,
-                                    "description": "Effective intent weight: 0 softly minimises exposure/quantity, 1 is standard, 2 increases importance. Never an exclusion or dose change.",
+                                    "multipleOf": 0.000001,
+                                    "description": "Targets and preferences describe the desired outcome. Weights describe its importance when comparing choices. Weights accept decimals from 0 to 2: zero removes that ranking component, one applies the normal penalty, and two doubles it. Changing a weight never changes the agreed target amount. Numerical preferences remain advisory. Safety penalties and factual advice remain active independently. Up to six decimal places.",
                                     "type": "number"
                                   },
                                   {
@@ -2748,9 +2760,9 @@
                       "type": "string"
                     },
                     "amount": {
-                      "exclusiveMinimum": 0,
+                      "minimum": 0,
                       "maximum": 1000000000000000,
-                      "description": "Positive quantity in this field’s stated units. Nutrient quantities also use the documented dose precision.",
+                      "description": "Positive amount fits the agreed target. Zero with positive importance softly minimises exposure on the stated basis using a reviewed comparison scale; it does not remove current intake. Reviewed zero scales: Vitamin D3 25 mcg (1000 IU), Selenium 50 mcg; other ingredients return an explicit missing-scale error. These scales are not dose recommendations. Weight zero ignores fitting; amount:null removes on refinement.",
                       "type": "number"
                     },
                     "unit": {
@@ -3084,7 +3096,8 @@
                               {
                                 "minimum": 0,
                                 "maximum": 2,
-                                "description": "Effective intent weight: 0 softly minimises exposure/quantity, 1 is standard, 2 increases importance. Never an exclusion or dose change.",
+                                "multipleOf": 0.000001,
+                                "description": "Targets and preferences describe the desired outcome. Weights describe its importance when comparing choices. Weights accept decimals from 0 to 2: zero removes that ranking component, one applies the normal penalty, and two doubles it. Changing a weight never changes the agreed target amount. Numerical preferences remain advisory. Safety penalties and factual advice remain active independently. Up to six decimal places.",
                                 "type": "number"
                               },
                               {
@@ -3097,7 +3110,8 @@
                               {
                                 "minimum": 0,
                                 "maximum": 2,
-                                "description": "Effective intent weight: 0 softly minimises exposure/quantity, 1 is standard, 2 increases importance. Never an exclusion or dose change.",
+                                "multipleOf": 0.000001,
+                                "description": "Targets and preferences describe the desired outcome. Weights describe its importance when comparing choices. Weights accept decimals from 0 to 2: zero removes that ranking component, one applies the normal penalty, and two doubles it. Changing a weight never changes the agreed target amount. Numerical preferences remain advisory. Safety penalties and factual advice remain active independently. Up to six decimal places.",
                                 "type": "number"
                               },
                               {
@@ -3110,7 +3124,8 @@
                               {
                                 "minimum": 0,
                                 "maximum": 2,
-                                "description": "Effective intent weight: 0 softly minimises exposure/quantity, 1 is standard, 2 increases importance. Never an exclusion or dose change.",
+                                "multipleOf": 0.000001,
+                                "description": "Targets and preferences describe the desired outcome. Weights describe its importance when comparing choices. Weights accept decimals from 0 to 2: zero removes that ranking component, one applies the normal penalty, and two doubles it. Changing a weight never changes the agreed target amount. Numerical preferences remain advisory. Safety penalties and factual advice remain active independently. Up to six decimal places.",
                                 "type": "number"
                               },
                               {
@@ -3123,7 +3138,8 @@
                               {
                                 "minimum": 0,
                                 "maximum": 2,
-                                "description": "Effective intent weight: 0 softly minimises exposure/quantity, 1 is standard, 2 increases importance. Never an exclusion or dose change.",
+                                "multipleOf": 0.000001,
+                                "description": "Targets and preferences describe the desired outcome. Weights describe its importance when comparing choices. Weights accept decimals from 0 to 2: zero removes that ranking component, one applies the normal penalty, and two doubles it. Changing a weight never changes the agreed target amount. Numerical preferences remain advisory. Safety penalties and factual advice remain active independently. Up to six decimal places.",
                                 "type": "number"
                               },
                               {
@@ -3140,7 +3156,8 @@
                                   {
                                     "minimum": 0,
                                     "maximum": 2,
-                                    "description": "Effective intent weight: 0 softly minimises exposure/quantity, 1 is standard, 2 increases importance. Never an exclusion or dose change.",
+                                    "multipleOf": 0.000001,
+                                    "description": "Targets and preferences describe the desired outcome. Weights describe its importance when comparing choices. Weights accept decimals from 0 to 2: zero removes that ranking component, one applies the normal penalty, and two doubles it. Changing a weight never changes the agreed target amount. Numerical preferences remain advisory. Safety penalties and factual advice remain active independently. Up to six decimal places.",
                                     "type": "number"
                                   },
                                   {
@@ -3549,9 +3566,9 @@
                         "amount": {
                           "anyOf": [
                             {
-                              "exclusiveMinimum": 0,
+                              "minimum": 0,
                               "maximum": 1000000000000000,
-                              "description": "Positive quantity in this field’s stated units. Nutrient quantities also use the documented dose precision.",
+                              "description": "Positive amount fits the agreed target. Zero with positive importance softly minimises exposure on the stated basis using a reviewed comparison scale; it does not remove current intake. Reviewed zero scales: Vitamin D3 25 mcg (1000 IU), Selenium 50 mcg; other ingredients return an explicit missing-scale error. These scales are not dose recommendations. Weight zero ignores fitting; amount:null removes on refinement.",
                               "type": "number"
                             },
                             {
@@ -3636,9 +3653,9 @@
                           "type": "string"
                         },
                         "amount": {
-                          "exclusiveMinimum": 0,
+                          "minimum": 0,
                           "maximum": 1000000000000000,
-                          "description": "Positive quantity in this field’s stated units. Nutrient quantities also use the documented dose precision.",
+                          "description": "Positive amount fits the agreed target. Zero with positive importance softly minimises exposure on the stated basis using a reviewed comparison scale; it does not remove current intake. Reviewed zero scales: Vitamin D3 25 mcg (1000 IU), Selenium 50 mcg; other ingredients return an explicit missing-scale error. These scales are not dose recommendations. Weight zero ignores fitting; amount:null removes on refinement.",
                           "type": "number"
                         },
                         "unit": {
@@ -4117,7 +4134,8 @@
                           {
                             "minimum": 0,
                             "maximum": 2,
-                            "description": "Effective intent weight: 0 softly minimises exposure/quantity, 1 is standard, 2 increases importance. Never an exclusion or dose change.",
+                            "multipleOf": 0.000001,
+                            "description": "Targets and preferences describe the desired outcome. Weights describe its importance when comparing choices. Weights accept decimals from 0 to 2: zero removes that ranking component, one applies the normal penalty, and two doubles it. Changing a weight never changes the agreed target amount. Numerical preferences remain advisory. Safety penalties and factual advice remain active independently. Up to six decimal places.",
                             "type": "number"
                           },
                           {
@@ -4130,7 +4148,8 @@
                           {
                             "minimum": 0,
                             "maximum": 2,
-                            "description": "Effective intent weight: 0 softly minimises exposure/quantity, 1 is standard, 2 increases importance. Never an exclusion or dose change.",
+                            "multipleOf": 0.000001,
+                            "description": "Targets and preferences describe the desired outcome. Weights describe its importance when comparing choices. Weights accept decimals from 0 to 2: zero removes that ranking component, one applies the normal penalty, and two doubles it. Changing a weight never changes the agreed target amount. Numerical preferences remain advisory. Safety penalties and factual advice remain active independently. Up to six decimal places.",
                             "type": "number"
                           },
                           {
@@ -4143,7 +4162,8 @@
                           {
                             "minimum": 0,
                             "maximum": 2,
-                            "description": "Effective intent weight: 0 softly minimises exposure/quantity, 1 is standard, 2 increases importance. Never an exclusion or dose change.",
+                            "multipleOf": 0.000001,
+                            "description": "Targets and preferences describe the desired outcome. Weights describe its importance when comparing choices. Weights accept decimals from 0 to 2: zero removes that ranking component, one applies the normal penalty, and two doubles it. Changing a weight never changes the agreed target amount. Numerical preferences remain advisory. Safety penalties and factual advice remain active independently. Up to six decimal places.",
                             "type": "number"
                           },
                           {
@@ -4156,7 +4176,8 @@
                           {
                             "minimum": 0,
                             "maximum": 2,
-                            "description": "Effective intent weight: 0 softly minimises exposure/quantity, 1 is standard, 2 increases importance. Never an exclusion or dose change.",
+                            "multipleOf": 0.000001,
+                            "description": "Targets and preferences describe the desired outcome. Weights describe its importance when comparing choices. Weights accept decimals from 0 to 2: zero removes that ranking component, one applies the normal penalty, and two doubles it. Changing a weight never changes the agreed target amount. Numerical preferences remain advisory. Safety penalties and factual advice remain active independently. Up to six decimal places.",
                             "type": "number"
                           },
                           {
@@ -4173,7 +4194,8 @@
                               {
                                 "minimum": 0,
                                 "maximum": 2,
-                                "description": "Effective intent weight: 0 softly minimises exposure/quantity, 1 is standard, 2 increases importance. Never an exclusion or dose change.",
+                                "multipleOf": 0.000001,
+                                "description": "Targets and preferences describe the desired outcome. Weights describe its importance when comparing choices. Weights accept decimals from 0 to 2: zero removes that ranking component, one applies the normal penalty, and two doubles it. Changing a weight never changes the agreed target amount. Numerical preferences remain advisory. Safety penalties and factual advice remain active independently. Up to six decimal places.",
                                 "type": "number"
                               },
                               {
@@ -4586,9 +4608,9 @@
                       "type": "string"
                     },
                     "amount": {
-                      "exclusiveMinimum": 0,
+                      "minimum": 0,
                       "maximum": 1000000000000000,
-                      "description": "Positive quantity in this field’s stated units. Nutrient quantities also use the documented dose precision.",
+                      "description": "Positive amount fits the agreed target. Zero with positive importance softly minimises exposure on the stated basis using a reviewed comparison scale; it does not remove current intake. Reviewed zero scales: Vitamin D3 25 mcg (1000 IU), Selenium 50 mcg; other ingredients return an explicit missing-scale error. These scales are not dose recommendations. Weight zero ignores fitting; amount:null removes on refinement.",
                       "type": "number"
                     },
                     "unit": {
@@ -4684,9 +4706,9 @@
                         "amount": {
                           "anyOf": [
                             {
-                              "exclusiveMinimum": 0,
+                              "minimum": 0,
                               "maximum": 1000000000000000,
-                              "description": "Positive quantity in this field’s stated units. Nutrient quantities also use the documented dose precision.",
+                              "description": "Positive amount fits the agreed target. Zero with positive importance softly minimises exposure on the stated basis using a reviewed comparison scale; it does not remove current intake. Reviewed zero scales: Vitamin D3 25 mcg (1000 IU), Selenium 50 mcg; other ingredients return an explicit missing-scale error. These scales are not dose recommendations. Weight zero ignores fitting; amount:null removes on refinement.",
                               "type": "number"
                             },
                             {
@@ -4771,9 +4793,9 @@
                           "type": "string"
                         },
                         "amount": {
-                          "exclusiveMinimum": 0,
+                          "minimum": 0,
                           "maximum": 1000000000000000,
-                          "description": "Positive quantity in this field’s stated units. Nutrient quantities also use the documented dose precision.",
+                          "description": "Positive amount fits the agreed target. Zero with positive importance softly minimises exposure on the stated basis using a reviewed comparison scale; it does not remove current intake. Reviewed zero scales: Vitamin D3 25 mcg (1000 IU), Selenium 50 mcg; other ingredients return an explicit missing-scale error. These scales are not dose recommendations. Weight zero ignores fitting; amount:null removes on refinement.",
                           "type": "number"
                         },
                         "unit": {
@@ -8374,13 +8396,13 @@
   "title": "MattaNutra",
   "resources": [
     {
-      "uri": "mattanutra://contract/9.0.0/client-guide",
+      "uri": "mattanutra://contract/10.0.0/client-guide",
       "name": "MattaNutra conversational guide",
       "mimeType": "text/markdown",
       "description": "Flat conversational workflow, weight meanings, refinements and recovery."
     },
     {
-      "uri": "mattanutra://contract/9.0.0/schema",
+      "uri": "mattanutra://contract/10.0.0/schema",
       "name": "MattaNutra contract",
       "mimeType": "application/schema+json",
       "description": "The same input and response contracts used by tool cards and runtime validation."

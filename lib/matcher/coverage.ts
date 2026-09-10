@@ -15,13 +15,15 @@ export function coverageSummary(request: CanonicalRequest, exposure: Exposure): 
     const total = known + newUnits;
     const unknown = Boolean(request.unknownIntakeSubjectIds?.some(id => id === subjectId || id === '*') ||
       exposure.unknownSubjectIds?.includes(subjectId) || current.some(row => row.certainty === 'unknown'));
+    const uncertain = unknown || current.some(row => !intakeIsKnown(row)) || Boolean(request.estimatedIntakeSubjectIds?.some(id => id === subjectId || id === '*'));
+    const zeroMet = target.requested.units === BigInt(0) && total === BigInt(0) && !uncertain;
     const amount = (units: bigint) => amountFromScaled({ ...target.requested, units }, target.requestedUnit, target.name) ?? 0;
     const gap = target.requested.units > total ? target.requested.units - total : BigInt(0);
     const excess = total > target.requested.units ? total - target.requested.units : BigInt(0);
     return { subjectId, name: target.name, unit: target.requestedUnit, target: target.requestedAmount, importance: target.importance,
-      basis: targetBasis(target), knownCurrent: amount(known), estimatedCurrent: amount(estimated), unknown,
+      basis: targetBasis(target), knownCurrent: amount(known), estimatedCurrent: amount(estimated), unknown: target.requested.units === BigInt(0) ? uncertain : unknown,
       newContribution: amount(newUnits), quantifiedTotal: amount(total + estimated), knownTotal: amount(total),
-      remainingGap: amount(gap), excess: amount(excess), fullyMet: target.requested.units > 0 && total >= target.requested.units,
-      coveragePercent: target.requested.units > 0 ? Number((total < target.requested.units ? total : target.requested.units) * BigInt(10000) / target.requested.units) / 100 : 0 };
+      remainingGap: amount(gap), excess: amount(excess), fullyMet: zeroMet || (target.requested.units > 0 && total >= target.requested.units),
+      coveragePercent: target.requested.units > 0 ? Number((total < target.requested.units ? total : target.requested.units) * BigInt(10000) / target.requested.units) / 100 : zeroMet ? 100 : 0 };
   });
 }

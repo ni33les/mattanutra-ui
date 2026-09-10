@@ -191,7 +191,12 @@ export function presentDecision(result: PlanResult, planHandle: string, revision
     choices: options.map(option => {
       const ingredients = choiceIngredients(result, option), requested = ingredients.filter(row => row.requested !== null);
       const coverageComplete = requested.every(row => typeof row.existing === "number" && row.supplied !== null);
-      const coverage = requested.length ? 100 * requested.reduce((n, row) => n + Math.min(1, ((typeof row.existing === "number" ? row.existing : row.existing?.minimum ?? 0) + (row.supplied ?? row.suppliedAtLeast ?? 0)) / row.requested!), 0) / requested.length : 0;
+      const coverage = requested.length ? 100 * requested.reduce((n, row) => {
+        const quantified = (typeof row.existing === "number" ? row.existing : row.existing?.minimum ?? 0) + (row.supplied ?? row.suppliedAtLeast ?? 0);
+        // Zero goals contribute a binary known-zero result; unknown never becomes verified zero.
+        const contribution = row.requested === 0 ? Number(typeof row.existing === "number" && row.supplied !== null && quantified === 0) : Math.min(1, quantified / row.requested!);
+        return n + contribution;
+      }, 0) / requested.length : 0;
       const pills = option.basket.map(row => { const count = administrationDailyPills(row.administration); return count === null ? null : count * row.servingsPerDay; });
       const knownPills = pills.reduce<number>((n, count) => n + (count ?? 0), 0), pillsKnown = pills.every(n => n !== null);
       const complete = option.basket.every(row => !row.incompleteCommercialFacts);

@@ -9,7 +9,7 @@ export type SchemaIssue = Readonly<{
   permittedLimit?: number | string | readonly unknown[];
   actual?: number | string;
 }>;
-const ajv = new Ajv({ allErrors: true, strict: true, strictRequired: false, allowUnionTypes: true, coerceTypes: false, useDefaults: false, removeAdditional: false, validateFormats: false });
+const ajv = new Ajv({ multipleOfPrecision: 8, allErrors: true, strict: true, strictRequired: false, allowUnionTypes: true, coerceTypes: false, useDefaults: false, removeAdditional: false, validateFormats: false });
 const validators = new WeakMap<object, ValidateFunction>();
 function validator(schema: JsonSchema) {
   let compiled = validators.get(schema);
@@ -40,6 +40,7 @@ function issueFrom(error: ErrorObject, data: unknown): SchemaIssue {
     case "minLength": return { ...base, reasonCode: "too_short", message: `${path} must contain at least ${error.params.limit} characters.`, permittedLimit: error.params.limit, actual: typeof value === "string" ? [...value].length : undefined };
     case "maxItems": case "minItems": return { ...base, reasonCode: error.keyword === "maxItems" ? "too_many_items" : "too_few_items", message: `${path} must contain ${error.keyword === "maxItems" ? "at most" : "at least"} ${error.params.limit} items.`, permittedLimit: error.params.limit, actual: Array.isArray(value) ? value.length : undefined };
     case "minimum": case "maximum": case "exclusiveMinimum": case "exclusiveMaximum": return { ...base, reasonCode: "out_of_range", message: `${path} must be ${error.params.comparison} ${error.params.limit}.`, permittedLimit: error.params.limit, actual: typeof value === "number" ? value : undefined };
+    case "multipleOf": return { ...base, reasonCode: "out_of_range", message: `${path} supports at most six decimal places.`, permittedLimit: error.params.multipleOf };
     case "type": return { ...base, reasonCode: "invalid_type", message: `${path} must be ${error.params.type}.`, permittedLimit: error.params.type };
     case "enum": case "const": return { ...base, reasonCode: path.endsWith("unit") ? "unsupported_unit" : "invalid_enum", message: `${path} must use a documented value.`, permittedLimit: error.params.allowedValues ?? String(error.params.allowedValue) };
     case "uniqueItems": return { ...base, reasonCode: "duplicate_supplement", message: `${path} must contain unique items.` };

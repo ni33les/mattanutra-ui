@@ -130,14 +130,6 @@ export function scorePracticalPenalties(request: Pick<CanonicalRequest, "currenc
     uncertainty: multiply(fromDecimal(0.25), uncertain),
     preferences: sum(exactPreferences)
   };
-  if (request.scoring) {
-    // Below-one controls blend the existing component with a monotonic actual-quantity objective.
-    const blend = (weight: number, quantity: Rational, scale: number) => multiply(multiply(fromDecimal(0.05), positive(subtract(fromDecimal(1), fromDecimal(weight)))), divide(quantity, fromDecimal(scale)));
-    exactComponents.pills = add(exactComponents.pills, blend(m.pills, pills, 3));
-    exactComponents.products = add(exactComponents.products, blend(m.products, products, 1));
-    exactComponents.price = add(exactComponents.price, blend(m.price, price, 100000));
-    exactComponents.servings = add(exactComponents.servings, blend(m.servings, sum(actual.servings.map(fromDecimal)), 1));
-  }
   const total = sum(Object.values(exactComponents));
   return { profile, total: toNumber(total), exact: serialize(total), complete: missing.size === 0,
     components: Object.fromEntries(Object.entries(exactComponents).map(([k, v]) => [k, toNumber(v)])) as PracticalPenaltyScore["components"], preferences, missingComponents: [...missing].sort() };

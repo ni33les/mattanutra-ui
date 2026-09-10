@@ -38,5 +38,5 @@ export async function runCurrentProtocolPack() {
     const {result,transcript}=await captureMcpTranscript(()=>documentedRun(locale,discovery));
     cases.push({id:`SPLAN-DOC-${locale}-${discovery}`,result:"PASS",evidence:{acceptance:normalizePublishedClientResult(result,"https://fixture.example/api/mcp"),mcpTranscript:normalizePublishedClientResult(transcript,"https://fixture.example/api/mcp")}});
   }
-  return {contractVersion:"9.0.0",cases,totalCases:cases.length,passedCases:cases.length};
+  return {contractVersion:"10.0.0",cases,totalCases:cases.length,passedCases:cases.length};
 }

@@ -17,6 +17,12 @@ assert.ok(!slice || (mode === "test" && ["efficiency", "practical", "simple-plan
 const definition = MCP_PACKAGES[packageId], MCP721_BASE = definition.base;
 assert.ok(["test", "validate"].includes(mode));
 const inventory = JSON.parse(readFileSync(`${definition.directory}/impact.json`, "utf8"));
+const maintainedFiles = inventory.files;
+if (inventory.releaseFiles) {
+  assert.ok(inventory.releaseFiles.length > 0 && new Set(inventory.releaseFiles).size === inventory.releaseFiles.length);
+  for (const file of inventory.releaseFiles) assert.ok(maintainedFiles.some(row => row.file === file), `Unreviewed release test ${file}`);
+  inventory.files = maintainedFiles.filter(row => inventory.releaseFiles.includes(row.file));
+}
 if (slice) inventory.files = inventory.files.filter(row => row.slice === slice);
 assert.equal(inventory.releaseBase, MCP721_BASE);
 if (args.length === 1 && args[0] === "--list") { console.log(JSON.stringify(inventory, null, 2)); process.exit(0); }
@@ -26,7 +32,7 @@ const git = (...args) => execFileSync("git", args, { encoding: "utf8" }).trim();
 const commit = git("rev-parse", "HEAD"), files = inventory.files.map(row => row.file);
 assert.equal(new Set(files).size, files.length); assert.ok(files.length > 0);
 const discovered = readdirSync(definition.directory, { recursive: true }).filter(file => file.endsWith(".test.ts")).map(file => `${definition.directory}/${file}`);
-for (const file of discovered.filter(file => !slice || files.includes(file))) assert.ok(files.includes(file), `Undeclared package test ${file}`);
+for (const file of discovered.filter(file => !slice || files.includes(file))) assert.ok(maintainedFiles.some(row => row.file === file), `Undeclared package test ${file}`);
 for (const file of (slice ? [] : git("diff", "--name-only", "--diff-filter=ACMR", MCP721_BASE, "--", "test").split("\n").filter(file => file.endsWith(".test.ts")))) assert.ok(files.includes(file) || (["discovery", "practical"].includes(packageId) && inventory.regressionFiles.includes(file)), `Changed test omitted ${file}`);
 for (const row of inventory.files) {
   assert.ok(row.reason.length > 20 && row.expectedCases > 0 && existsSync(row.file));

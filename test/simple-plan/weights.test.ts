@@ -11,28 +11,28 @@ test('SPLAN-WGT-01/07 effective pill weight applies once, independent of old imp
   const input = weighted({ pills: 2 }, { maxDailyPills: 3, preferenceImportance: { maxDailyPills: 'strong' } });
   assert.equal(scorePracticalPenalties(input, actual).preferences.maxDailyPills.penalty, 169 / 18);
 });
-test('SPLAN-WGT-08 ingredient zero minimises newly supplied exposure instead of ignoring it', () => {
+test('SPLAN-WGT-08 ingredient zero ignores fitting while retaining the requested target', () => {
   const scores = [0, 50, 100].map(n => overallMatchingScore(weighted({ nutrients: { a: 0 } }), exposure(n), actual).overallPenalty);
-  assert.equal(scores[1] - scores[0], 0.5); assert.equal(scores[2] - scores[0], 1);
+  assert.equal(scores[1] - scores[0], 0); assert.equal(scores[2] - scores[0], 0);
 });
-test('SPLAN-WGT-03/10 below-one avoidance blends independently with symmetric fitting', () => {
+test('SPLAN-WGT-03/10 fractional importance scales symmetric fitting without avoidance', () => {
   const low = overallMatchingScore(weighted({ nutrients: { a: 0.25 } }), exposure(0), actual);
   const high = overallMatchingScore(weighted({ nutrients: { a: 0.25 } }), exposure(100), actual);
   // Compare the exact rational delta; subtracting two display floats introduces rounding.
   const h = high.overallExact, l = low.overallExact;
-  assert.equal(2n * (BigInt(h.numerator) * BigInt(l.denominator) - BigInt(l.numerator) * BigInt(h.denominator)), BigInt(h.denominator) * BigInt(l.denominator));
+  assert.equal(4n * (BigInt(l.numerator) * BigInt(h.denominator) - BigInt(h.numerator) * BigInt(l.denominator)), BigInt(h.denominator) * BigInt(l.denominator));
   assert.equal(overallMatchingScore(weighted({ nutrients: { a: 2 } }), exposure(50), actual).dosePenalty, 0.5);
 });
 test('SPLAN-WGT-03 fixed safety excess survives zero ingredient fitting weight', () => {
   const input = weighted({ nutrients: { a: 0 } }, { safetyCeilings: [{ subjectId: 'a', name: 'A', maxAmount: 120, maxUnit: 'mg' }] });
   const difference = overallMatchingScore(input, exposure(150), actual).overallPenalty - overallMatchingScore(input, exposure(100), actual).overallPenalty;
-  assert.equal(difference, 1); // 50/100 avoidance + 2*(150-120)/120.
+  assert.equal(difference, 0.5); // Only 2*(150-120)/120; fitting is disabled.
 });
-test('SPLAN-WGT-10 zero pill weight still rewards less actual quantity below preference', () => {
+test('SPLAN-WGT-10 zero pill weight removes the quantity preference from ranking', () => {
   const input = weighted({ pills: 0 }, { maxDailyPills: 20 });
   const more = scorePracticalPenalties(input, actual).total;
   const less = scorePracticalPenalties(input, { ...actual, dailyPills: 1, pillLowerBound: 1 }).total;
-  assert.ok(more > less); assert.ok(Math.abs((more - less) - 0.25) < 1e-12);
+  assert.equal(more, less);
 });
 test('SPLAN-WGT-09 presets are bounded explicit assignments', () => {
   const profile = resolvePracticalProfile({ ...request(), scoring: { profile: 'fewest_pills', weights: {} } });

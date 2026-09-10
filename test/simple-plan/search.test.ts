@@ -12,10 +12,10 @@ const admin = { route: 'oral', physicalUnit: 'tablet', unitsPerServing: 10, dose
 const shelf = catalog([product('interior', { a: 125 }, 10000, { administration: admin, dailyPillsPerServing: 10, pillCountKnown: true })]);
 const input = (weight: number) => ({ ...request({ maxDailyPills: 5 }), scoring: { profile: 'balanced', weights: { pills: weight } } }) as CanonicalRequest;
 test('SPLAN-WGT-06/07 independent finite oracle agrees on weighted interior quantities and retained dose alternative', () => {
-  for (const weight of [0, 0.5, 1, 2]) {
+  for (const weight of [0, 0.543, 1, 2]) {
     const candidates = Array.from({ length: 31 }, (_, ticks) => {
       const q = ticks / 10, pills = ticks;
-      return { q, score: Math.abs(125 * q - 100) / 100 + weight * Math.max(0, pills - 5) ** 2 / 100 + Math.max(0, 1 - weight) * pills / 60 + (ticks ? 0.055 : 0) + Math.max(0, q - 1) ** 2 / 20 };
+      return { q, score: Math.abs(125 * q - 100) / 100 + weight * Math.max(0, pills - 5) ** 2 / 100 + (ticks ? 0.055 : 0) + Math.max(0, q - 1) ** 2 / 20 };
     }).sort((a, b) => a.score - b.score);
     assert.equal(candidates.length, 31);
     const result = match(input(weight), shelf); assert.ok(result.selected?.overallScore);
@@ -39,4 +39,22 @@ test('SPLAN-WGT-12 ingredient priorities have no hidden core veto while categori
   const value = { ...request({ targets }), scoring: { profile: 'balanced', weights: { nutrients: { a: 0, b: 2 } } } } as CanonicalRequest;
   const result = match(value, products); assert.ok(result.selected?.productIds.includes('trade'));
   assert.ok(!match({ ...value, excludeProductIds: ['trade'] }, products).selected?.productIds.includes('trade'));
+});
+test('IMP-09/10 worker checkpoints reject different resolved importance before resuming calculations', async () => {
+  const { installGoldCatalogue, uninstallGoldCatalogue } = await import('../helpers/gold-catalogue.ts');
+  const { fixtureSnapshot } = await import('../../lib/agentic/catalogue/fixtures.ts');
+  const { normalizePlanRequest } = await import('../../lib/agentic/plan/normalize.ts');
+  const { loadAgenticConfig } = await import('../../lib/agentic/config.ts');
+  const { matchPlanChunk, planCheckpointInputIdentity } = await import('../../lib/agentic/plan/matching.ts');
+  installGoldCatalogue();
+  try {
+    const snapshot=fixtureSnapshot();
+    const value=await normalizePlanRequest({snapshot,config:loadAgenticConfig(),request:{locale:'en',destinationCountry:'TH',optimization:'balanced',profile:{},requirements:{maxDailyPills:3},
+      scoring:{profile:'balanced',weights:{pills:.543}},targets:[{name:'Vitamin D3',amount:2000,unit:'IU',basis:'supplemental'}]}});
+    assert.ok('state' in value); const input={snapshot,state:value.state};
+    const started=matchPlanChunk(input,{chunkBudget:1}); assert.equal(started.done,false);
+    const changed={...input,state:{...value.state,scoring:{profile:'balanced',weights:{pills:1}}}};
+    assert.notEqual(planCheckpointInputIdentity(input),planCheckpointInputIdentity(changed));
+    assert.throws(()=>matchPlanChunk(changed,{checkpoint:started.checkpoint,chunkBudget:1}),/identity changed/);
+  } finally { uninstallGoldCatalogue(); }
 });

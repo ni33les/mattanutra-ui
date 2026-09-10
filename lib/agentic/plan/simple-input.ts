@@ -1,5 +1,6 @@
 import { businessError, isAgenticErrorResult, type AgenticErrorResult } from "@/lib/agentic/contract/errors";
 import { resolveSupplement } from "@/lib/agentic/plan/normalize";
+import { zeroTargetScale } from "@/lib/matcher/zero-target-policy";
 import { convertAmount } from "@/lib/matcher/dose";
 import { patchScoring, type ScoringPatch } from "@/lib/matcher/scoring-policy";
 import { sha256Hex } from "@/lib/sha256";
@@ -58,6 +59,7 @@ export function prepareSimpleRequest(input: Row, snapshot: CatalogueSnapshot, pr
       if (converted === null) return failure(`${field}.unit`, "These units/forms cannot be converted without changing the physical target.");
       amount = converted;
     }
+    if (amount === 0 && !zeroTargetScale(known?.name ?? name, identity)) return failure(`${field}.amount`, "No reviewed zero-target normalization scale is available for this ingredient. Agree a positive target or use an explicit exclusion for categorical avoidance.");
     const next: PlanRequestTarget = { ...(old ?? {}), ingredientId: identity, name, amount, unit,
       basis: (row.basis ?? old?.basis ?? "total_daily") as PlanRequestTarget["basis"],
       ...(known ? { supplementId: known.supplementId } : {}), ...(row.acceptableRange ? { acceptableRange: row.acceptableRange as PlanRequestTarget["acceptableRange"] } : {}) };

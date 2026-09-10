@@ -1,6 +1,6 @@
 import { COVERAGE_SCALE } from "@/lib/matcher/config";
 import { isDoseError, minUnits, scaleAmount } from "@/lib/matcher/dose";
-import { knownTargetExposure, targetBasis } from "@/lib/matcher/target-basis";
+import { knownTargetExposure, targetBasis, intakeIsKnown } from "@/lib/matcher/target-basis";
 import type { CanonicalRequest, SearchState } from "@/lib/matcher/types";
 
 function isDeferredConditional(target: CanonicalRequest["targets"][number]) {
@@ -29,6 +29,15 @@ export function coverageUnits(
   return Number((capped * BigInt(COVERAGE_SCALE)) / requested);
 }
 
+/** Binary zero-goal coverage; never divide by zero or treat uncertain exposure as verified zero. */
+export function targetCoverageUnits(request: CanonicalRequest, target: CanonicalRequest["targets"][number], delivered: bigint) {
+  const known = knownTargetExposure(request, target, delivered);
+  if (target.requested.units !== BigInt(0)) return coverageUnits(known, target.requested.units);
+  const unknown = [...request.unknownIntakeSubjectIds ?? [], ...request.estimatedIntakeSubjectIds ?? []].some(id => id === '*' || id === target.subjectId) ||
+    [...request.currentSupplements, ...(targetBasis(target) === 'total_daily' ? request.dietaryIntake ?? [] : [])].some(row => row.subjectId === target.subjectId && !intakeIsKnown(row));
+  return !unknown && known === BigInt(0) ? COVERAGE_SCALE : 0;
+}
+
 export function aggregateCoverage(
   request: CanonicalRequest,
   delivered: ReadonlyMap<string, bigint>
@@ -42,10 +51,7 @@ export function aggregateCoverage(
   let total = 0;
 
   for (const target of targets) {
-    total += coverageUnits(
-      knownTargetExposure(request, target, delivered.get(target.subjectId) ?? BigInt(0)),
-      target.requested.units
-    );
+    total += targetCoverageUnits(request, target, delivered.get(target.subjectId) ?? BigInt(0));
   }
 
   return Math.round(total / targets.length);

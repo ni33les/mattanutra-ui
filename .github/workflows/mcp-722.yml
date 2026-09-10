@@ -1,4 +1,4 @@
-name: MCP conversational v9 scoped checks
+name: MCP pure importance v10 scoped checks
 on:
   push:
     branches: [dev]

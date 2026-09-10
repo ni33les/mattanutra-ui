@@ -22,7 +22,7 @@ const rpc = async (method, params) => {
 };
 await mkdir(output, { recursive: true, mode: 0o700 });
 try {
-  await rpc('initialize', { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'documented-v9-client', version: '9.0.0' } });
+  await rpc('initialize', { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'documented-v10-client', version: '10.0.0' } });
   const result = await runConversationalJourney({ rpc, locale: arg('--locale', 'en'), discovery: arg('--discovery', 'tools_only'), key: arg('--run-key', randomUUID()), checkout: args.includes('--checkout') });
   await writeFile(resolve(output, 'result.json'), JSON.stringify(result, null, 2), { flag: 'wx', mode: 0o600 });
   console.log(JSON.stringify({ passed: true, output, readyMs: result.readyMs, measurements: result.measurements }));

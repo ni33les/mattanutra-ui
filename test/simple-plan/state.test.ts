@@ -45,7 +45,7 @@ test('SPLAN-COMPAT-02 queued retired work is terminally rejected before any matc
   const owner = `${app.scope.environment}:${app.scope.tenantScope}:${app.scope.principalScope ?? 'anon'}`;
   const op = await app.store.getPlanOperationByKey(owner, initial.idempotencyKey); assert.ok(op);
   const command = structuredClone(op.command), prepared = command.prepared as { processing: { contractVersion: string } };
-  prepared.processing.contractVersion = '8.0.0';
+  prepared.processing.contractVersion = '9.0.0';
   assert.equal(await app.store.transaction(tx => tx.updatePlanOperation({ ...op, command, version: op.version + 1 }, op.version)), true);
   const result = await runAdmittedPlanOperation({ store: app.store, config: app.config, operationId: op.id });
   assert.equal(result.ok, false); if (result.ok) throw new Error('Retired work unexpectedly executed');
