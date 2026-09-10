@@ -117,3 +117,33 @@ test('PRACTICAL-SEARCH-12 an optional improvement with unchanged required fit is
   assert.equal(result.selected.doseFit?.total, 0);
   assert.ok(result.selected.roles?.includes('closest_dose'));
 });
+
+test('PRACTICAL-SEARCH-13 resident continuation ignores target display order without changing attempts or returned choices', async () => {
+  const { loadFrozenAnnaInput, reconstructAnnaSnapshot } = await import('../../lib/matcher/experiments/frozen-corpus.ts');
+  const { normalizePlanRequest } = await import('../../lib/agentic/plan/normalize.ts');
+  const { loadAgenticConfig } = await import('../../lib/agentic/config.ts');
+  const { toCanonicalRequest, toMatcherProduct } = await import('../../lib/agentic/plan/matching.ts');
+  const { setMatcherSafetyCeilings, resetMatcherSafetyCeilings } = await import('../../lib/matcher/safety-ceilings.ts');
+  const frozen = reconstructAnnaSnapshot(await loadFrozenAnnaInput('dev'));
+  setMatcherSafetyCeilings(frozen.ceilings);
+  try {
+    const normalized = await normalizePlanRequest({ config: loadAgenticConfig(), snapshot: frozen.snapshot, request: {
+      locale: 'en', destinationCountry: 'TH', optimization: 'lowest_cost', profile: { ageYears: 52, lifeStage: 'adult', sex: 'male' },
+      requirements: {}, conditionCodes: ['atrial_fibrillation'], medicationCodes: ['apixaban'], targets: [
+        { name: 'Creatine', amount: 3, unit: 'g', importance: 'core' },
+        { name: 'Magnesium', amount: 150, unit: 'mg', importance: 'optional' },
+        { name: 'Vitamin D3', amount: 1000, unit: 'IU', importance: 'conditional', prerequisite: { status: 'unsatisfied', reasonCode: 'customer_target_confirmation', nextAction: 'Confirm provisional target' } }
+      ]
+    } });
+    assert.ok('state' in normalized);
+    const input = toCanonicalRequest(normalized.state); assert.ok(!('error' in input));
+    const shelf = { ...frozen.snapshot, products: frozen.snapshot.products.map(toMatcherProduct) };
+    const finish = (ordered: typeof input) => {
+      const cursor = createMatchCursor(ordered, shelf, DEFAULT_MATCHER_CONFIG);
+      while (!cursor.done) advanceMatchCursor(cursor, ordered, 4000);
+      assert.equal(matchCursorAttempts(cursor), 8000);
+      return match(ordered, shelf, DEFAULT_MATCHER_CONFIG, undefined, undefined, cursor);
+    };
+    assert.deepEqual(finish({ ...input, targets: [...input.targets].reverse() }), finish(input));
+  } finally { resetMatcherSafetyCeilings(); }
+});

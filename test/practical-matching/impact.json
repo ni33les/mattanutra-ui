@@ -16,7 +16,7 @@
     {
       "file": "test/practical-matching/search.test.ts",
       "slice": "search",
-      "expectedCases": 12,
+      "expectedCases": 13,
       "reason": "Shared search retention, supported interior quantities, profile identities and checkpoint equivalence."
     },
     {
@@ -69,12 +69,15 @@
     "test/practical-matching/fixtures/manifest.json",
     "test/practical-matching/fixtures/reported-web-plan.json",
     "test/practical-matching/fixtures/reported-client-context.json",
-    "test/service-efficiency/lock-register.json"
+    "test/service-efficiency/lock-register.json",
+    "test/fixtures/matcher-experiments/manifest.json",
+    "test/fixtures/matcher-experiments/anna-dev.json"
   ],
   "regressionFiles": [
     "test/agentic-catalogue-publish-v5.integration.test.ts",
     "test/agentic-catalogue-publish-v5.test.ts",
     "test/agentic-contract-v4.test.ts",
+    "test/agentic-cv-fix-pack.test.ts",
     "test/agentic-cv-impl-pack.test.ts",
     "test/agentic-cv-r2-pack.test.ts",
     "test/agentic-cv-r3-pack.test.ts",
