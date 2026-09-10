@@ -48,7 +48,7 @@ if (["efficiency", "simple-plan"].includes(packageId) && mode === "validate") {
   stages.push({ label: "isolated-schema", passed: true });
 }
 const events = [], batches = [];
-if (packageId === "practical" && mode === "validate") await prepareCompiledBuild();
+if (["practical", "simple-plan"].includes(packageId) && mode === "validate") await prepareCompiledBuild();
 if (packageId === "practical" && mode === "validate") {
   assert.ok(process.env.TEST_DB_URL, "Complete maintained matching requires isolated PostgreSQL");
   const report = await runBatch("complete-mcp-regression", ["scripts/run-matcher-test-suite.mjs"], { ...safe,
@@ -107,9 +107,9 @@ if (mode === "validate") {
       deploymentBases:identity.deploymentBases, lockRegisterSha256:identity.lockRegisterSha256});
     stages.push({label:"lock-register-verification", passed:true});
   }
-  if (packageId !== "practical") await prepareCompiledBuild();
+  if (!["practical", "simple-plan"].includes(packageId)) await prepareCompiledBuild();
   if (packageId === "simple-plan") {
-    await command("documented-journeys-paired", ["--experimental-strip-types", "--import", "./test/helpers/offline-network.mjs", "--import", "./scripts/register-ts-path-loader.mjs", "scripts/simple-plan-comparison.ts", output]);
+    await command("documented-journeys-paired", ["--experimental-strip-types", "--import", "./test/helpers/offline-network.mjs", "--import", "./scripts/register-ts-path-loader.mjs", "scripts/simple-plan-comparison.ts", output], { ...safe, NODE_TEST_CONTEXT: "isolated-comparison" });
     const { verifyPracticalLocks } = await import("./practical-matching/comparison.mjs");
     const control = resolve(output, "../simple-plan-control-" + commit.slice(0, 12));
     if (!existsSync(control)) git("worktree", "add", "--detach", control, MCP721_BASE);
