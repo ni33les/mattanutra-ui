@@ -38,8 +38,8 @@ describe("v5 complete conversational plan mutations and immutable purchase", () 
     assert.match(plan.compactDecision!.why, durationCopy);
     assert.equal(plan.reasonKey, "plan.matching.targets_already_covered");
     assert.equal(plan.matchingDiagnostics?.reasonCode, "targets_already_covered");
-    assert.equal(recommended.reasonCode, "closest_dose");
-    assert.equal(recommended.reasonKey, "plan.option.closest_dose");
+    assert.equal(recommended.reasonCode, "best_match");
+    assert.equal(recommended.reasonKey, "plan.option.best_match");
   });
   for (const locale of ["en", "th", "zh-CN"]) it(`makes the empty default and selectable purchase trade-off clear in every concise view (${locale})`, async () => {
     const runtime = runtimeFor(), snapshot = sampleValueSnapshot(), target = snapshot.supplements.find(row => /vitamin d/i.test(row.name))!;

@@ -171,7 +171,7 @@ describe("matcher web adapter coverage mapping", () => {
     assert.doesNotMatch(source, /productCoveragePercent:\s*coverage/);
     assert.match(
       source,
-      /selectorMode:\s*input\.stackPreference === "compact" \? "agentic" : "web_single"/
+      /selectorMode:\s*"web_single"/
     );
     const candidates = await readFile("lib/matcher/candidates.ts", "utf8");
     assert.doesNotMatch(candidates, /MAX_DAILY_UNITS\s*=\s*3/);
@@ -179,11 +179,9 @@ describe("matcher web adapter coverage mapping", () => {
     assert.match(config, /WEB_MATCHER_CONFIG/);
     assert.match(config, /WEB_COMPACT_MATCHER_CONFIG/);
     assert.match(config, /searchDeadlineMs: 400/);
-    assert.match(config, /initialBeamWidth: 48/);
-    assert.match(config, /maxBeamWidth: 64/);
-    assert.match(config, /sellerGroupLimit: 48/);
+    assert.match(config, /WEB_COMPACT_MATCHER_CONFIG: MatcherConfig = WEB_MATCHER_CONFIG/);
     const adapter = await readFile("lib/matcher/adapters/web.ts", "utf8");
-    assert.match(adapter, /WEB_COMPACT_MATCHER_CONFIG/);
+    assert.doesNotMatch(adapter, /WEB_COMPACT_MATCHER_CONFIG/);
     assert.doesNotMatch(candidates, /wanted\.includes\(name\)/);
     assert.doesNotMatch(candidates, /name\.includes\(wanted\)/);
     assert.doesNotMatch(
@@ -398,11 +396,11 @@ describe("matcher web adapter coverage mapping", () => {
         (item) => item.id === "supplement:vitamin-b12"
       )?.coveragePercent ?? 0;
 
-    assert.equal(b12, 100);
-    const selected = result.recommendations[0];
-    assert.ok(selected);
-    assert.equal(selected.servingMultiplier, 50);
-    assert.equal(selected.servingMultiplier * 10, 500,
+    assert.equal(b12, 0, "The practical recommendation does not require a 50-serving routine");
+    const selected = result.diagnostics.matching!.options.find(option => option.roles?.includes("closest_dose"));
+    assert.ok(selected); assert.equal(selected.coveragePercent, 100);
+    assert.equal(selected.dailyServings[0], 50);
+    assert.equal(selected.dailyServings[0] * 10, 500,
       "Only the labelled 10 mcg of B12 per serving contributes to the 500 mcg target; the 7500 mcg B1 does not");
   });
 
@@ -691,13 +689,9 @@ describe("matcher web adapter coverage mapping", () => {
       )?.coveragePercent,
       100
     );
-    assert.equal(d3.recommendations[0]?.servingMultiplier, 10);
-    assert.equal(
-      [...d3.diagnostics.matchedNeeds, ...d3.diagnostics.unmatchedNeeds].find(
-        (item) => item.id === "supplement:vitamin-d3"
-      )?.coveragePercent,
-      100
-    );
+    const exactD3 = d3.diagnostics.matching!.options.find(option => option.roles?.includes("closest_dose"));
+    assert.ok(exactD3); assert.equal(exactD3.dailyServings[0], 10); assert.equal(exactD3.coveragePercent, 100);
+    assert.equal(exactD3.purchaseEligible, true);
     assert.equal(magnesium.recommendations[0]?.servingMultiplier, 1);
     assert.equal(
       magnesium.recommendations[0]?.product.id,

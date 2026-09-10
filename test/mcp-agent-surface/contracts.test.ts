@@ -43,7 +43,7 @@ test("AG72-CARD-01 seven short descriptors and an honest overview support resour
       assert.match(text, /finite/i); assert.match(text, /TH/);
       assert.match(text, /checkout.ready/i); assert.match(text, /targets met|coverage.*complete/i);
       assert.match(text, /medical approval/i); assert.match(text, /accepted inputs/i);
-      assert.match(text, /do not guarantee.*interaction/i);
+      assert.match(text, /not interaction coverage/i);
       assert.match(text, /host.*lists/i); assert.match(text, /templates/i);
       assert.match(text, /returned pollAfterSeconds/i); assert.match(text, /evidence/);
       assert.ok(text.length < 2200, "Overview must remain one screen");

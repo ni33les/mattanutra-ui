@@ -7,7 +7,7 @@ import { canonicalizeTargets } from "../../lib/matcher/canonicalizer.ts";
 import { DEFAULT_MATCHER_CONFIG } from "../../lib/matcher/config.ts";
 import { match } from "../../lib/matcher/index.ts";
 import { scoreState, selectOptions } from "../../lib/matcher/selector.ts";
-import { product, request, catalog } from "../matcher/flexible-v5-fixtures.ts";
+import { product, request, catalog, closestDoseOption } from "../matcher/flexible-v5-fixtures.ts";
 import { equivalentSellerOffers } from "../../lib/matcher/seller-offers.ts";
 import { seedState, tryAddVariant } from "../../lib/matcher/search.ts";
 
@@ -28,10 +28,11 @@ function finish(cursor: ReturnType<typeof createSearchCursor>, r: ReturnType<typ
   }
   return cursor;
 }
-function best(cursor: ReturnType<typeof createSearchCursor>, r: ReturnType<typeof request>) {
+function best(cursor: ReturnType<typeof createSearchCursor>, r: ReturnType<typeof request>, closest = false) {
   const result = searchCursorResult(cursor, r);
   const baskets = result.complete.map(state => scoreState({ groups: result.groups, state, sellerId: "seller", request: r })).filter(row => row !== null);
-  return selectOptions({ baskets, request: r }).selected;
+  const options = selectOptions({ baskets, request: r });
+  return closest ? closestDoseOption(options) : options.selected;
 }
 
 test("AXR-SRCH-01 checkpoint round trips preserve every completed expansion and final candidate order", () => {
@@ -46,11 +47,11 @@ test("AXR-SRCH-01 checkpoint round trips preserve every completed expansion and 
 test("AXR-SRCH-02 preserve the independently exact 32-product complement across sparse supply and ordering", () => {
   const { r, c } = fixture();
   const full = finish(createSearchCursor(compileGroups(r, c), r, DEFAULT_MATCHER_CONFIG), r);
-  const chosen = best(full, r); assert.ok(chosen);
+  const chosen = best(full, r, true); assert.ok(chosen);
   assert.deepEqual(chosen.productIds, ["00-low", "zz-complement"]);
   assert.equal(chosen.doseFit?.total, Math.abs(1 - (10 + 90) / 100) + Math.abs(1 - (1 + 99) / 100));
   const reversed = finish(createSearchCursor(compileGroups(r, { ...c, products: [...c.products].reverse() }), r, DEFAULT_MATCHER_CONFIG), r);
-  assert.deepEqual(best(reversed, r), chosen);
+  assert.deepEqual(best(reversed, r, true), chosen);
 });
 
 test("AXR-SRCH-03 equal-dose retailer choices keep complete eligible offers and the lower quote", () => {
@@ -86,7 +87,7 @@ test("AXR-SRCH-04 expansion resumes the existing cursor and retains the standard
   assert.equal(standard.expansionAttempts, previousAttempts);
   const expanded = finish(standard, r, 511);
   assert.ok(expanded.expansionAttempts <= 64000);
-  assert.ok(best(expanded, r)!.doseFit!.total <= incumbent.doseFit!.total);
+  assert.ok(best(expanded, r)!.overallScore!.overallPenalty <= incumbent.overallScore!.overallPenalty);
   assert.throws(() => extendSearchCursor(expanded, 7999), /budget/);
 });
 

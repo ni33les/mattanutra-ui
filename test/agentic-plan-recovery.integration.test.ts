@@ -94,14 +94,14 @@ describe("MCP plan recovery across PostgreSQL processes", { timeout: 45_000 }, (
       await Promise.all([left.waitFor("ready"), right.waitFor("ready")]);
       left.child.send("go"); right.child.send("go");
       const [a, b] = await Promise.all([left.waitFor("result"), right.waitFor("result")]);
-      assert.equal(a.result?.status, "ready", JSON.stringify(a));
+      assert.equal(a.result?.status, "no_purchase", JSON.stringify(a));
       assert.equal(a.result?.revision, 1);
       assert.deepEqual(b.result, a.result);
       assert.equal((await left.exited).code, 0);
       assert.equal((await right.exited).code, 0);
       assert.deepEqual(await store.listPlanIdsByPrincipal(principal), ids);
       const ready = await store.getPlanRevision(ids[0]!, 1);
-      assert.equal(ready?.status, "ready");
+      assert.equal(ready?.status, "no_purchase");
       assert.equal((ready?.result as PlanResult).pendingInput, undefined);
       const receipt = await store.getIdempotency("plan", `dev:mattanutra:${principal}`, key);
       assert.deepEqual(JSON.parse(receipt!.responseJson), a.result);

@@ -40,7 +40,7 @@ test("PAY-TRANSPORT-02 operation/view matrix rejects unsupported fields and requ
   ]) assert.ok(check(input).length > 0);
 });
 
-test("PAY-TRANSPORT-03 saved 7.0 decisions remain selectable and checkoutable without a contract refresh", async () => {
+test("PAY-TRANSPORT-03 saved 7.0 decisions refresh before new selection while frozen checkout recovers unchanged", async () => {
   await installRealCatalogue("dev");
   const app = runtime("payload-v70"), key = "payload-v70-create-01";
   const plan = await rpc(app, "plan", { operation: "create", idempotencyKey: key, request: profile("A6"), responseView: "full" });
@@ -49,10 +49,24 @@ test("PAY-TRANSPORT-03 saved 7.0 decisions remain selectable and checkoutable wi
   const revision = await app.store.getPlanRevision(operation.planId, Number(plan.revision)); assert.ok(revision);
   await app.store.updatePlanRevision({ ...revision, result: { ...(revision.result as object), contractVersion: "7.0.0" } });
   const selected = await rpc(app, "plan", { operation: "select", planHandle: plan.planHandle, expectedRevision: plan.revision, optionId: plan.optionId, idempotencyKey: "payload-v70-select-01", responseView: "conversation" });
-  assert.equal(selected.ok, true); assert.notEqual(selected.refreshRequired, true);
-  const checkout = await rpc(app, "execute", { planHandle: selected.planHandle, expectedRevision: selected.revision, idempotencyKey: "payload-v70-checkout-01" });
+  assert.equal(selected.ok, false); assert.equal(selected.error.reasonCode, "contract_refresh_required");
+  const observed = await rpc(app, "plan", { operation: "get", planHandle: plan.planHandle, responseView: "full" });
+  assert.equal(observed.refreshRequired, true);
+  const refreshed = await rpc(app, "plan", { operation: "revise", planHandle: plan.planHandle, expectedRevision: plan.revision,
+    idempotencyKey: "payload-v70-refresh-01", requestPatch: {}, responseView: "full" });
+  assert.equal(refreshed.ok, true); assert.notEqual(refreshed.refreshRequired, true);
+  assert.equal(((await app.store.getPlanRevision(operation.planId, Number(plan.revision)))?.result as { contractVersion: string }).contractVersion, "7.0.0");
+  const confirmed = await rpc(app, "plan", { operation: "select", planHandle: refreshed.planHandle, expectedRevision: refreshed.revision,
+    optionId: refreshed.optionId, idempotencyKey: "payload-v70-current-select-01", responseView: "full" });
+  assert.equal(confirmed.ok, true);
+  const checkout = await rpc(app, "execute", { planHandle: confirmed.planHandle, expectedRevision: confirmed.revision, idempotencyKey: "payload-v70-checkout-01" });
   assert.equal(checkout.ok, true);
   assert.deepEqual(checkout.frozenPlan.items.map(item => [item.productId,item.servingsPerDay,item.quantity,item.lineTotalMinor]), plan.basket.map(item => [item.productId,item.servingsPerDay,item.quantity,item.lineTotalMinor]));
+  const frozenRevision = await app.store.getPlanRevision(operation.planId, Number(confirmed.revision)); assert.ok(frozenRevision);
+  await app.store.updatePlanRevision({ ...frozenRevision, result: { ...(frozenRevision.result as object), contractVersion: "7.0.0" } });
+  const recovered = await rpc(app, "execute", { planHandle: confirmed.planHandle, expectedRevision: confirmed.revision, idempotencyKey: "payload-v70-checkout-recover" });
+  assert.equal(recovered.ok, true); assert.equal(recovered.orderHandle, checkout.orderHandle);
+  assert.deepEqual(recovered.frozenPlan, checkout.frozenPlan);
 });
 
 test("PAY-TRANSPORT-04 covered targets finish naturally and above-limit findings remain visible and selectable", async () => {

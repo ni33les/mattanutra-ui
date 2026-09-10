@@ -1,3 +1,4 @@
+import { closestDoseOption } from "./matcher/flexible-v5-fixtures.ts";
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { FIXTURE_SUPPLEMENTS, fixtureSnapshot } from "../lib/agentic/catalogue/fixtures.ts";
@@ -298,8 +299,8 @@ describe("Phase 6 bounded evidence fields", () => {
       ]
     });
     const matched = matchPlan({ snapshot, state });
-    assert.ok(matched.selected);
-    const b12Row = matched.selected.coverage.find((row) => row.name === "Vitamin B12");
+    assert.ok(closestDoseOption(matched));
+    const b12Row = closestDoseOption(matched).coverage.find((row) => row.name === "Vitamin B12");
     assert.ok(b12Row);
     assert.equal(b12Row.coveragePercent, 2.88);
     assert.equal(b12Row.requestedAmount, 250);
@@ -319,7 +320,7 @@ describe("Phase 6 bounded evidence fields", () => {
       ),
       true
     );
-    const line = matched.selected.basket.find((item) =>
+    const line = closestDoseOption(matched).basket.find((item) =>
       /50\+/.test(item.productName)
     );
     assert.ok(line);

@@ -47,7 +47,7 @@ it('V5-PUBLISH-PG-01: matching publishes without waiting for catalogue writers a
     const {createAgenticRuntime}=await import('../lib/agentic/runtime.ts');
     const status=await readPlanStatus(createAgenticRuntime({config,store,scope}),admitted.planHandle);
     assert.ok(status.ok && status.refreshRequired);assert.equal(status.status,'needs_input');
-    const saved=await store.getPlanRevision(operation.planId,1);assert.equal(saved?.status,'ready');
+    const saved=await store.getPlanRevision(operation.planId,1);assert.equal(saved?.status,'no_purchase');
     assert.equal((await store.getPlanReadState(operation.planId))?.projection?.catalogueRevision,Number(epoch.revision));
     const [counts]=await sql`select count(*)::integer as revisions from agentic_plan_revisions where plan_id=${operation.planId}::uuid`;
     assert.equal(counts!.revisions,1);

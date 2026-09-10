@@ -102,7 +102,27 @@
       "slice": "journeys",
       "database": false,
       "reason": "All changed views through multilingual documented clients using omitted plan views; preserve frozen business decisions, order recovery and baseline prices.",
-      "expectedCases": 18,
+      "expectedCases": 6,
+      "cases": [
+        "PAY-AX-01"
+      ]
+    },
+    {
+      "file": "test/mcp-payload/journeys-th.test.ts",
+      "slice": "journeys",
+      "database": false,
+      "reason": "All changed views through multilingual documented clients using omitted plan views; preserve frozen business decisions, order recovery and baseline prices.",
+      "expectedCases": 6,
+      "cases": [
+        "PAY-AX-01"
+      ]
+    },
+    {
+      "file": "test/mcp-payload/journeys-zh.test.ts",
+      "slice": "journeys",
+      "database": false,
+      "reason": "All changed views through multilingual documented clients using omitted plan views; preserve frozen business decisions, order recovery and baseline prices.",
+      "expectedCases": 6,
       "cases": [
         "PAY-AX-01"
       ]

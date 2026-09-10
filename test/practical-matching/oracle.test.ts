@@ -18,7 +18,7 @@ function oracle(items: Item[], preferred: number, importance: 'normal' | 'strong
     const count = amounts.filter(n => n > 0).length;
     const servingPenalty = amounts.reduce((n, q) => n + Math.max(0, q - 1) ** 2, 0) / 20;
     const overrun = Math.max(0, pills - preferred) / (preferred || 1);
-    const score = Math.abs(dose - 100) / 100 + (importance === 'strong' ? 1 : 1 / 4) * overrun ** 2 + pills / 60 + count / 20 + price / (objective === 'lowest_cost' ? 500000 : 2000000) + servingPenalty;
+    const score = Math.abs(dose - 100) / 100 + (importance === 'strong' ? 1 : 1 / 4) * overrun ** 2 + count / 20 + price / (objective === 'lowest_cost' ? 500000 : 2000000) + servingPenalty;
     baskets.push({ amounts, dose, pills, price, score, overrun });
   };
   visit([]); return baskets.sort((a, b) => a.score - b.score || Math.abs(a.dose - 100) - Math.abs(b.dose - 100) || a.pills - b.pills || a.price - b.price);
@@ -26,7 +26,7 @@ function oracle(items: Item[], preferred: number, importance: 'normal' | 'strong
 
 test('PRACTICAL-ORACLE-01 independent finite arithmetic agrees on a supported interior optimum', () => {
   const items = [{ id: 'interior', dose: 125, units: 10, price: 10000, quantities: Array.from({ length: 11 }, (_, i) => i / 10) }];
-  const expected = oracle(items, 5, 'strong', 'balanced')[0]; assert.deepEqual(expected.amounts, [0.6]);
+  const expected = oracle(items, 5, 'strong', 'balanced')[0]; assert.deepEqual(expected.amounts, [0.7]);
   const row = items[0], p = product(row.id, { a: row.dose }, row.price, { dailyPillsPerServing: row.units, pillCountKnown: true,
     administration: { route: 'oral', physicalUnit: 'tablet', unitsPerServing: row.units, doseIncrement: 1, packQuantity: 60,
       provenance: { status: 'verified', sourceUrl: 'https://example.test/independent-label', sourceText: 'Independent fixture: ten tablets per labelled serving.', verifiedAt: '2026-09-10' } } });
@@ -55,7 +55,7 @@ test('PRACTICAL-ORACLE-04 monthly pack discontinuities retain the independent us
   const price = 30000, budget = 30000, dose = 40, pack = 7;
   const pool = Array.from({ length: 101 }, (_, ticks) => {
     const q = ticks / 10, monthly = ticks ? Math.ceil(30 * ticks / (10 * pack)) * price : 0;
-    return { q, score: Math.abs(q * dose - 100) / 100 + (ticks ? 0.05 + price / 2000000 : 0) + Math.max(0, q - 1) ** 2 / 20 + (Math.max(0, monthly - budget) / budget) ** 2 };
+    return { q, score: Math.abs(q * dose - 100) / 100 + (ticks ? 0.05 : 0) + Math.max(0, q - 1) ** 2 / 20 + (Math.max(0, monthly - budget) / budget) ** 2 };
   }).sort((a, b) => a.score - b.score);
   assert.equal(pool.length, 101); assert.equal(pool[0].q, 0.2);
   const powder = product('monthly', { a: dose }, price, { dailyPillsPerServing: 0, pillCountKnown: true,

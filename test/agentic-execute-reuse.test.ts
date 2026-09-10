@@ -35,6 +35,21 @@ async function call(runtime: AgenticRuntime, name: string, args: unknown) {
   return response.result.structuredContent as Record<string, unknown>;
 }
 
+// Checkout invariants start from an explicitly selected returned purchase choice.
+// Practical scoring may correctly recommend no new products for these frozen doses.
+async function purchasePlan(runtime: AgenticRuntime, args: Record<string, unknown>) {
+  const created = await call(runtime, "plan", args);
+  assert.equal(created.ok, true);
+  const choices = created.options as Array<{ optionId: string; purchaseEligible?: boolean; basket?: unknown[]; roles?: string[] }>;
+  const option = choices.find(row => row.purchaseEligible && row.basket?.length && row.roles?.includes("closest_dose"))
+    ?? choices.find(row => row.purchaseEligible && row.basket?.length);
+  assert.ok(option, "Frozen checkout fixture must retain an eligible purchase choice");
+  const selected = await call(runtime, "plan", { operation: "select", planHandle: created.planHandle,
+    expectedRevision: created.revision, optionId: option.optionId, idempotencyKey: `${String(args.idempotencyKey)}-select` });
+  assert.equal(selected.ok, true); assert.equal(selected.status, "ready");
+  return selected;
+}
+
 beforeEach(() => {
   installGoldCatalogue();
 });
@@ -46,7 +61,7 @@ afterEach(() => {
 
 describe("execute key reuses one unpaid order", () => {
   async function legacyPlan(runtime: AgenticRuntime, key: string, executeFirst = false) {
-    const plan = await call(runtime, "plan", { operation: "create", idempotencyKey: `${key}-create`, request: {
+    const plan = await purchasePlan(runtime, { operation: "create", idempotencyKey: `${key}-create`, request: {
       destinationCountry: "TH", locale: "en", optimization: "balanced", profile: { ageYears: 38, lifeStage: "adult" },
       requirements: {}, targets: [{ amount: 500, name: "Vitamin C", unit: "mg" }]
     } });
@@ -85,7 +100,7 @@ describe("execute key reuses one unpaid order", () => {
 
   it("returns the same orderHandle for two execute keys on one plan revision", async () => {
     const runtime = runtimeFor();
-    const plan = await call(runtime, "plan", {
+    const plan = await purchasePlan(runtime, {
       idempotencyKey: "exec-reuse-plan-0000001",
       request: {
         destinationCountry: "TH",
@@ -129,7 +144,7 @@ describe("execute key reuses one unpaid order", () => {
 
   it("replays execute with the live payment state after pay", async () => {
     const runtime = runtimeFor();
-    const plan = await call(runtime, "plan", {
+    const plan = await purchasePlan(runtime, {
       idempotencyKey: "exec-replay-plan-0000001",
       request: {
         destinationCountry: "TH",
@@ -172,7 +187,7 @@ describe("execute key reuses one unpaid order", () => {
 
   it("does not mint a second chargeable order after pay", async () => {
     const runtime = runtimeFor();
-    const plan = await call(runtime, "plan", {
+    const plan = await purchasePlan(runtime, {
       idempotencyKey: "exec-dup-plan-0000000001",
       request: {
         destinationCountry: "TH",

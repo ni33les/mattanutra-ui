@@ -45,18 +45,20 @@ it('V5-CV-STORE-02: snapshot publication is nonlocking while stale selection ret
         scope: { environment: 'dev', tenantScope: 'mattanutra', principalScope: `cv-fence-${epoch}` } });
       const current = await within(() => completedPlanTool({ ...runtime, now: runtime.now!, payload }));
       assert.equal(current.ok, true); if (!current.ok) throw new Error('Missing completed fixture');
-      assert.equal(current.status, 'ready'); assert.equal(current.revision, 1);
+      assert.equal(current.status, 'no_purchase'); assert.equal(current.revision, 1);
       const status = await readPlanStatus(runtime, current.planHandle);
       assert.equal(status.ok, true); if (!status.ok) throw new Error('Missing status');
       assert.equal(status.refreshRequired, epoch !== 41);
-      assert.equal(status.status, epoch === 41 ? 'ready' : 'needs_input');
-      const selection = { operation: 'select' as const, idempotencyKey: `cv-select-${epoch}-0001`, planHandle: current.planHandle, expectedRevision: 1, optionId: current.optionId! };
+      assert.equal(status.status, epoch === 41 ? 'no_purchase' : 'needs_input');
+      const purchase = current.options?.find(option => option.purchaseEligible && option.basket.length > 0);
+      assert.ok(purchase, 'A valid above-target purchase must remain selectable');
+      const selection = { operation: 'select' as const, idempotencyKey: `cv-select-${epoch}-0001`, planHandle: current.planHandle, expectedRevision: 1, optionId: purchase.optionId };
       const admission = await planTool({ ...runtime, now: runtime.now!, payload: selection }); assert.equal(admission.ok, true);
       const op = await store.getPlanOperationByKey(`dev:mattanutra:${runtime.scope.principalScope}`, selection.idempotencyKey); assert.ok(op);
       const selected = await within(() => runAdmittedPlanOperation({ store, config, operationId: op.id }));
       assert.equal(selected.ok, epoch === 41);
       if (!selected.ok) assert.equal(selected.error.reasonCode, 'availability_changed');
-      const saved = await store.getPlanRevision(op.planId, 1); assert.equal(saved?.status, 'ready', 'A stale selection cannot change the saved result');
+      const saved = await store.getPlanRevision(op.planId, 1); assert.equal(saved?.status, 'no_purchase', 'A stale selection cannot change the saved result');
     }
   } finally { uninstallGoldCatalogue(); }
 });

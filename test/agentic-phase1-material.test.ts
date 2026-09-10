@@ -1,3 +1,4 @@
+import { closestDoseOption } from "./matcher/flexible-v5-fixtures.ts";
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { match } from "../lib/matcher/index.ts";
@@ -40,7 +41,7 @@ describe("Phase 1 material contribution", () => {
     assert.deepEqual(result.selected?.productIds, ["G-C-500"]);
   });
 
-  it("retains the lower-price labelled carrier alongside the dedicated D3 recommendation", () => {
+  it("retains dedicated D3 beside the lower-price equal-pill practical recommendation", () => {
     const result = match(
       qaRequest({
         optimization: "balanced",
@@ -64,16 +65,18 @@ describe("Phase 1 material contribution", () => {
         })
       ])
     );
-    assert.deepEqual(result.selected?.productIds, ["G-D3-2000"]);
-    assert.ok(result.alternatives.some(option => option.productIds.join() === "G-BETA-GLUCAN" && option.priceMinor === 8000));
+    assert.deepEqual(closestDoseOption(result).productIds, ["G-D3-2000"]);
+    assert.deepEqual(result.selected?.productIds, ["G-BETA-GLUCAN"]);
+    assert.ok([result.selected, ...result.alternatives].some(option => option?.productIds.join() === "G-BETA-GLUCAN" && option.priceMinor === 8000));
     assert.equal(result.selected?.doseFit?.total, 0);
   });
 
   it("keeps official combo plus the cheaper algae pack", () => {
     const result = match(qaRequest({ optimization: "fewest_pills" }), QA_GOLD_CATALOG);
-    assert.deepEqual(result.selected?.productIds, ["G-BASE-COMBO", "G-O3-ALGAE-500"]);
-    assert.equal(result.selected?.priceMinor, 61000);
-    assert.equal(result.selected?.doseFit?.total, 0);
-    assert.equal(result.selected?.coveredCount, 5);
+    const exact = closestDoseOption(result);
+    assert.deepEqual(exact?.productIds, ["G-BASE-COMBO", "G-O3-ALGAE-500"]);
+    assert.equal(exact?.priceMinor, 61000);
+    assert.equal(exact?.doseFit?.total, 0);
+    assert.equal(exact?.coveredCount, 5);
   });
 });

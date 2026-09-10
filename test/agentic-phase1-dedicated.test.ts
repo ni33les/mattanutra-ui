@@ -1,3 +1,4 @@
+import { closestDoseOption } from "./matcher/flexible-v5-fixtures.ts";
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { match } from "../lib/matcher/index.ts";
@@ -12,7 +13,7 @@ function catalog(products: ReturnType<typeof qaProduct>[]) {
 }
 
 describe("Phase 1 dedicated D3 and B12 preference", () => {
-  it("P3 uses verified single-nutrient facts at equal dose fit and retains the cheaper incidental choice", () => {
+  it("P3 retains verified dedicated dose fit while the equal-pill cheaper carrier wins the practical profile", () => {
     const dedicated = qaProduct({
       facts: [{ amount: 2000, key: "d3" }],
       id: "G-D3-2000",
@@ -36,11 +37,17 @@ describe("Phase 1 dedicated D3 and B12 preference", () => {
       }),
       catalog([carrier, dedicated])
     );
-    assert.deepEqual(result.selected?.productIds, ["G-D3-2000"]);
+    const dedicatedChoice = closestDoseOption(result);
+    assert.deepEqual(dedicatedChoice.productIds, ["G-D3-2000"]);
+    assert.equal(dedicatedChoice.doseFit?.total, 0);
+    assert.equal(dedicatedChoice.dailyPills, 1);
+    assert.equal(dedicatedChoice.priceMinor, 16000);
+    assert.deepEqual(result.selected?.productIds, ["G-BETA-GLUCAN"]);
+    assert.equal(result.selected?.priceMinor, 8000);
     assert.equal(result.selected?.doseFit?.total, 0);
     assert.equal(result.selected?.dailyPills, 1);
-    assert.equal(result.selected?.priceMinor, 16000);
-    assert.ok(result.alternatives.some(option => option.productIds.length === 1 && option.productIds[0] === "G-BETA-GLUCAN" && option.priceMinor === 8000));
+    assert.ok(result.selected.overallScore!.overallPenalty < dedicatedChoice.overallScore!.overallPenalty);
+
   });
 
   it("does not drop a covering dedicated B12 SKU for a weak incidental multi", () => {

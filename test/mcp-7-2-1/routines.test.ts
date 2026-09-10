@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { match } from "../../lib/matcher/index.ts";
 import { canonicalizeTargets } from "../../lib/matcher/canonicalizer.ts";
-import { request, product, catalog } from "../matcher/flexible-v5-fixtures.ts";
+import { request, product, catalog, closestDoseOption } from "../matcher/flexible-v5-fixtures.ts";
 import { finiteCatalogueOracle } from "../../lib/matcher/qa/oracle.ts";
 
 function inputs() {
@@ -24,7 +24,9 @@ test("M721-ROUTINE-01 equal-dose dedicated D3 beats ten incidental tablets while
   assert.deepEqual(result.selected?.productIds, ["dedicated-d3"]);
   assert.equal(result.selected.dailyPills, 2);
   const cheaper = result.alternatives.find(row => row.roles?.includes("lower_cost"));
-  assert.deepEqual(cheaper?.productIds, ["incidental-d3"]); assert.equal(cheaper?.dailyPills, 10);
+  assert.deepEqual(cheaper?.productIds, ["incidental-d3"]); assert.equal(cheaper?.dailyPills, 1);
+  const proposed = match({ ...req, productDoses: [{ productId: "incidental-d3", servingsPerDay: 10 }] }, catalog([incidental, dedicated]));
+  assert.equal(proposed.selected?.dailyPills, 10); assert.equal(proposed.selected?.doseFit?.total, 0); assert.equal(proposed.selected?.purchaseEligible, true);
   assert.equal(cheaper?.purchaseEligible, true); assert.equal(cheaper?.safety.requiresAck, false);
   assert.ok(result.searchSummary!.expansionAttempts <= 8000);
   const reordered = match(req, catalog([dedicated, incidental]));
@@ -48,10 +50,13 @@ test("M721-ROUTINE-02 unknown pills cannot win as zero, and better dose fit stil
   const unknown = { ...make("unknown", 2000, 10), administration: null, pillCountKnown: false, dailyPillsPerServing: 0 };
   const exact = make("exact", 200, 100);
   const first = match(req, catalog([unknown, exact]));
-  assert.deepEqual(first.selected?.productIds, ["exact"]);
-  assert.ok(first.alternatives.some(row => row.productIds.includes("unknown") && row.pillCountKnown === false));
+  assert.deepEqual(closestDoseOption(first)?.productIds, ["exact"]);
+  assert.equal(first.selected?.pillCountKnown, false); assert.equal(first.selected?.overallScore?.components.uncertainty, 0.25);
+  assert.ok(first.selected?.overallScore?.missingComponents.includes("dailyPills"));
+  assert.ok([first.selected!, ...first.alternatives].some(row => row.productIds.includes("unknown") && row.pillCountKnown === false));
   const partial = make("partial", 1900, 1000);
   const second = match(req, catalog([exact, partial]));
-  assert.deepEqual(second.selected?.productIds, ["exact"]);
-  assert.ok(second.alternatives.some(row => row.productIds.includes("partial")), "A useful easier partial routine must survive option reduction");
+  assert.deepEqual(closestDoseOption(second)?.productIds, ["exact"]);
+  assert.deepEqual(second.selected?.productIds, ["partial"]);
+  assert.ok([second.selected!, ...second.alternatives].some(row => row.productIds.includes("partial")), "A useful easier partial routine must survive option reduction");
 });

@@ -89,7 +89,7 @@ describe("Slice 4 Pareto relevance burden and labels", () => {
     const full = matchPlan({ snapshot, state: intentState(snapshot) });
     const options = optionsOf(full);
     assert.equal(options.length, 3);
-    assert.deepEqual(options.flatMap(item => item.roles ?? []), ["closest_dose", "lower_cost", "simpler"]);
+    assert.deepEqual(options.flatMap(item => item.roles ?? []), ["best_match", "closest_dose", "lower_cost", "simpler"]);
     const signatures = new Set(options.map(oracleOptionSignature));
     assert.equal(signatures.size, options.length);
     assert.equal(oracleHasDominatedPair(options), false);
@@ -108,7 +108,7 @@ describe("Slice 4 Pareto relevance burden and labels", () => {
     });
     const lone = optionsOf(creatineOnly);
     assert.equal(lone.length, 1);
-    assert.deepEqual(lone[0]!.roles, ["closest_dose", "lower_cost", "simpler"]);
+    assert.deepEqual(lone[0]!.roles, ["best_match", "closest_dose", "lower_cost", "simpler"]);
     assert.equal(oracleLabelRoles(lone).noDistinctAlternative, true);
     assert.equal(publishedReason(lone[0]!, lone), "no_distinct_alternative");
   });

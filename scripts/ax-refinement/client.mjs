@@ -8,7 +8,7 @@ export async function refinementJourney({ rpc, request, discovery = "tools_only"
   const transcript = [];
   const tools = (await rpc("tools/list", {})).tools;
   const first = (await rpc("tools/call", { name: "info", arguments: { locale: request.locale } })).structuredContent;
-  assert.equal(first.contractVersion, "7.2.4");
+  assert.equal(first.contractVersion, "8.0.0");
   let contract;
   if (discovery === "resources") {
     const resources = (await rpc("resources/list", {})).resources;

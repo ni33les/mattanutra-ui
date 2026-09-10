@@ -1,3 +1,4 @@
+import { closestDoseOption } from "./matcher/flexible-v5-fixtures.ts";
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
@@ -163,17 +164,17 @@ describe("Phase 4 source preservation under contract 7", () => {
       qaRequest({ optimization: "fewest_pills" }),
       QA_GOLD_CATALOG
     );
-    assert.deepEqual(result.selected?.productIds, [
+    assert.deepEqual(closestDoseOption(result)?.productIds, [
       "G-BASE-COMBO",
       "G-O3-ALGAE-500"
     ]);
-    assert.equal(result.selected?.dailyPills, 4);
+    assert.equal(closestDoseOption(result)?.dailyPills, 4);
     assert.equal(
       impliedOmegaPreference("any", "any", ["Omega-3"]),
       "any"
     );
-    assert.equal(result.selected?.priceMinor, 61000);
-    assert.equal(result.selected?.doseFit?.total, 0);
-    assert.equal(result.selected?.coveredCount, 5);
+    assert.equal(closestDoseOption(result)?.priceMinor, 61000);
+    assert.equal(closestDoseOption(result)?.doseFit?.total, 0);
+    assert.equal(closestDoseOption(result)?.coveredCount, 5);
   });
 });

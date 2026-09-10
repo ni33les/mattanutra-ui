@@ -93,7 +93,7 @@ describe("MCP interrupted plan recovery", { timeout: 15_000 }, () => {
       assert.deepEqual((pending.result as PlanResult).pendingInput?.request, input);
       const resumed = await call(runtime, args);
       assert.equal(resumed.ok, true, JSON.stringify(resumed));
-      assert.equal(resumed.status, "ready");
+      assert.equal(resumed.status, "no_purchase");
       assert.equal(resumed.revision, 1);
       assert.equal(resumed.pendingInput, undefined);
       assert.deepEqual(await call(runtime, args), resumed);
@@ -115,7 +115,7 @@ describe("MCP interrupted plan recovery", { timeout: 15_000 }, () => {
     assert.equal(pending.status, "processing", "GET cannot execute admitted work");
     await execute(runtime, args.idempotencyKey);
     const resumed = await call(runtime, { operation: "get", planHandle });
-    assert.equal(resumed.status, "ready", JSON.stringify(resumed));
+    assert.equal(resumed.status, "no_purchase", JSON.stringify(resumed));
     assert.equal((await runtime.store.getIdempotency("plan", owner, args.idempotencyKey))?.requestHash, receipt.requestHash);
     assert.deepEqual(await call(runtime, args), resumed);
   });
@@ -135,7 +135,7 @@ describe("MCP interrupted plan recovery", { timeout: 15_000 }, () => {
     assert.deepEqual((await operation(runtime, args.idempotencyKey)).command.payload.request, request, "Durable original input survives old processing-row omissions");
     const changed = await call(runtime, create(args.idempotencyKey, { ...request, targets: [{ ...request.targets[0]!, amount: 2000 }] }));
     assert.equal(changed.error?.reasonCode, "idempotency_conflict");
-    assert.equal((await call(runtime, args)).status, "ready");
+    assert.equal((await call(runtime, args)).status, "no_purchase");
   });
 
   it("uses the replacement input when explicitly revising an interrupted plan", async () => {
@@ -180,7 +180,7 @@ describe("MCP interrupted plan recovery", { timeout: 15_000 }, () => {
       assert.equal((await call(runtime, { operation: "get", planHandle: admitted.planHandle }, false)).status, "processing");
       gate.resolve(); await worker;
       const left = await call(runtime, args), right = await call(runtime, args);
-      assert.equal(left.status, "ready"); assert.deepEqual(right, left); assert.equal(matchEntries, 1);
+      assert.equal(left.status, "no_purchase"); assert.deepEqual(right, left); assert.equal(matchEntries, 1);
       assert.equal((await operation(runtime, args.idempotencyKey)).id, owner.id);
     } finally { gate.resolve(); await worker; }
   });

@@ -154,16 +154,20 @@ function penalty(option: StackOption) {
 }
 
 export function oracleLabelRoles(options: readonly StackOption[]) {
-  const cost = (option: StackOption) => option.basket.reduce((total, row) => total + row.unitPriceMinor * row.servingsPerDay, 0);
-  const requestedObjective = [...options].sort((a, b) => penalty(a) - penalty(b) || cost(a) - cost(b) ||
-    a.dailyPills - b.dailyPills || a.basket.length - b.basket.length || oracleOptionSignature(a).localeCompare(oracleOptionSignature(b)))[0] ?? null;
-  // This finite fixture has complete first-order prices and physical burden.
-  // Derive objectives from those facts, never from the advertised role fields.
-  const eligible = options.filter(option => option.basket.length > 0 && option.purchaseEligible !== false);
   const firstOrderGoods = (option: StackOption) => option.basket.reduce((sum, row) => sum + row.unitPriceMinor * row.quantity, 0);
-  const compareFit = (a: StackOption, b: StackOption) => penalty(a) - penalty(b) || cost(a) - cost(b) || oracleOptionSignature(a).localeCompare(oracleOptionSignature(b));
-  const lowerCost = [...eligible].sort((a, b) => firstOrderGoods(a) - firstOrderGoods(b) || compareFit(a, b))[0];
-  const simpler = [...eligible].sort((a, b) => a.basket.length - b.basket.length || a.dailyPills - b.dailyPills || compareFit(a, b))[0];
+  // These fixtures explicitly request lowest_cost, with no numerical preferences
+  // and verified administration. Recalculate its launch policy from basket facts.
+  const practical = (option: StackOption) => penalty(option) + option.dailyPills / 60 + option.basket.length / 20 +
+    firstOrderGoods(option) / 500000 + option.basket.reduce((sum, row) => sum + Math.max(0, row.servingsPerDay - 1) ** 2 / 20, 0);
+  const stable = (a: StackOption, b: StackOption) => a.dailyPills - b.dailyPills || a.basket.length - b.basket.length ||
+    firstOrderGoods(a) - firstOrderGoods(b) || oracleOptionSignature(a).localeCompare(oracleOptionSignature(b));
+  const compareFit = (a: StackOption, b: StackOption) => penalty(a) - penalty(b) || stable(a, b);
+  const comparePractical = (a: StackOption, b: StackOption) => practical(a) - practical(b) || compareFit(a, b);
+  const requestedObjective = [...options].sort(comparePractical)[0] ?? null;
+  const closest = [...options].sort(compareFit)[0];
+  const eligible = options.filter(option => option.basket.length > 0 && option.purchaseEligible !== false);
+  const lowerCost = [...eligible].sort((a, b) => firstOrderGoods(a) - firstOrderGoods(b) || comparePractical(a, b))[0];
+  const simpler = [...eligible].sort((a, b) => a.basket.length - b.basket.length || a.dailyPills - b.dailyPills || comparePractical(a, b))[0];
   const concerns = (option: StackOption) => option.coverage.reduce((sum, row) =>
     sum + Math.max(0, (row.currentAmount + row.deliveredAmount - row.requestedAmount) / row.requestedAmount), 0) +
     (option.doseFit?.perLimit ?? []).reduce((sum, row) => sum + Math.max(0, row.conservativeExposure / row.limit - 1), 0);
@@ -171,7 +175,7 @@ export function oracleLabelRoles(options: readonly StackOption[]) {
     requestedObjective.coverage.every(reference => (option.coverage.find(row => row.supplementId === reference.supplementId)?.coveragePercent ?? 0) >= reference.coveragePercent)) : undefined;
   const fallback = requestedObjective?.basket.length === 0 ? [...eligible].sort(compareFit)[0] : undefined;
   const rolesByOptionId = new Map<string, string[]>();
-  for (const [option, role] of [[requestedObjective, "closest_dose"], [lowerCost, "lower_cost"], [simpler, "simpler"], [fewerConcerns, "fewer_concerns"], [fallback, "purchase_fallback"]] as const) {
+  for (const [option, role] of [[requestedObjective, "best_match"], [closest, "closest_dose"], [lowerCost, "lower_cost"], [simpler, "simpler"], [fewerConcerns, "fewer_concerns"], [fallback, "purchase_fallback"]] as const) {
     if (option) rolesByOptionId.set(option.optionId, [...(rolesByOptionId.get(option.optionId) ?? []), role]);
   }
   const byOptionId = new Map(options.map(option => [option.optionId,

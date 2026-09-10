@@ -1,3 +1,4 @@
+import { closestDoseOption } from "./matcher/flexible-v5-fixtures.ts";
 import assert from "node:assert/strict";
 import { compileGroups } from "../lib/matcher/candidates.ts";
 import { describe, it } from "node:test";
@@ -41,11 +42,11 @@ describe("Phase 2 compactness ranking", () => {
       }),
       catalog
     );
-    assert.ok(result.selected);
-    assert.equal(result.selected.productIds.includes("G-D3-DUP-200"), true);
+    assert.ok(closestDoseOption(result));
+    assert.equal(closestDoseOption(result).productIds.includes("G-D3-DUP-200"), true);
     const d3 = qaTarget("d3", 2000);
-    const units = result.selected.coverageBySubject.get(d3.subjectId) ?? 0;
-    const variant = result.selected.variantIds.find((id) =>
+    const units = closestDoseOption(result).coverageBySubject.get(d3.subjectId) ?? 0;
+    const variant = closestDoseOption(result).variantIds.find((id) =>
       id.includes("G-D3-DUP-200:x")
     );
     const servings = Number(variant?.match(/:x(\d+)$/)?.[1] || 1);
@@ -100,17 +101,17 @@ describe("Phase 2 compactness ranking", () => {
       }),
       catalog
     );
-    assert.ok(result.selected);
-    assert.equal(result.selected.productIds.includes("G-D3-500"), true);
-    const variant = result.selected.variantIds.find((id) =>
+    assert.ok(closestDoseOption(result));
+    assert.equal(closestDoseOption(result).productIds.includes("G-D3-500"), true);
+    const variant = closestDoseOption(result).variantIds.find((id) =>
       id.includes("G-D3-500:x")
     );
     assert.ok(variant);
     assert.equal(variant, "seller_th:G-D3-500:x4");
-    assert.equal(result.selected.doseFit?.total, 0);
-    assert.equal(result.selected.priceMinor, 12000);
-    assert.equal(result.selected.dailyPills, 4);
-    const simpler = result.alternatives.find(option => option.roles?.includes("simpler"));
+    assert.equal(closestDoseOption(result).doseFit?.total, 0);
+    assert.equal(closestDoseOption(result).priceMinor, 12000);
+    assert.equal(closestDoseOption(result).dailyPills, 4);
+    const simpler = [result.selected, ...result.alternatives].find(option => option?.roles?.includes("simpler"));
     assert.deepEqual(simpler?.variantIds, ["seller_th:G-D3-500:x1"]);
     assert.equal(simpler?.doseFit?.total, 0.75);
     assert.equal(simpler?.purchaseEligible, true);
@@ -138,11 +139,11 @@ describe("Phase 2 compactness ranking", () => {
 
   it("M-01 remains combo plus the cheaper algae pack at 4 pills", () => {
     const result = match(qaRequest({ optimization: "fewest_pills" }), QA_GOLD_CATALOG);
-    assert.deepEqual(result.selected?.productIds, ["G-BASE-COMBO", "G-O3-ALGAE-500"]);
-    assert.equal(result.selected?.dailyPills, 4);
-    assert.equal(result.selected?.priceMinor, 61000);
-    assert.equal(result.selected?.doseFit?.total, 0);
-    assert.equal(result.selected?.coveredCount, 5);
+    assert.deepEqual(closestDoseOption(result)?.productIds, ["G-BASE-COMBO", "G-O3-ALGAE-500"]);
+    assert.equal(closestDoseOption(result)?.dailyPills, 4);
+    assert.equal(closestDoseOption(result)?.priceMinor, 61000);
+    assert.equal(closestDoseOption(result)?.doseFit?.total, 0);
+    assert.equal(closestDoseOption(result)?.coveredCount, 5);
   });
 
   it("keeps dedicated C and fish oil in an official-shaped request when a 50+ multi exists", () => {
@@ -329,12 +330,12 @@ describe("Phase 2 compactness ranking", () => {
       ]
     };
     const result = match(qaRequest({ optimization: "fewest_pills" }), catalog);
-    assert.ok(result.selected);
-    assert.equal(result.selected.productIds.includes("G-JOINT-D3"), true);
-    assert.equal(result.selected.productIds.includes("G-MEGA-B"), true);
+    assert.ok(closestDoseOption(result));
+    assert.equal(closestDoseOption(result).productIds.includes("G-JOINT-D3"), true);
+    assert.equal(closestDoseOption(result).productIds.includes("G-MEGA-B"), true);
     const d3 = qaTarget("d3", 2000);
     assert.equal(
-      Math.round((result.selected.coverageBySubject.get(d3.subjectId) ?? 0) / 100) >= 90,
+      Math.round((closestDoseOption(result).coverageBySubject.get(d3.subjectId) ?? 0) / 100) >= 90,
       true
     );
   });
@@ -398,13 +399,13 @@ describe("Phase 2 compactness ranking", () => {
       ]
     };
     const result = match(qaRequest({ optimization: "fewest_pills" }), catalog);
-    assert.ok(result.selected);
-    assert.equal(result.selected.productIds.includes("G-JOINT-D3"), true);
-    assert.equal(result.selected.productIds.includes("G-BIO-CAL-D3"), true);
-    assert.equal(result.selected.productIds.includes("G-MEGA-B"), true);
+    assert.ok(closestDoseOption(result));
+    assert.equal(closestDoseOption(result).productIds.includes("G-JOINT-D3"), true);
+    assert.equal(closestDoseOption(result).productIds.includes("G-BIO-CAL-D3"), true);
+    assert.equal(closestDoseOption(result).productIds.includes("G-MEGA-B"), true);
     const d3 = qaTarget("d3", 2000);
     assert.equal(
-      Math.round((result.selected.coverageBySubject.get(d3.subjectId) ?? 0) / 100) >= 90,
+      Math.round((closestDoseOption(result).coverageBySubject.get(d3.subjectId) ?? 0) / 100) >= 90,
       true
     );
   });
@@ -472,10 +473,10 @@ describe("Phase 2 compactness ranking", () => {
       catalog
     );
     const unrestricted = match(qaRequest({ optimization: "fewest_pills" }), catalog);
-    assert.deepEqual(result.selected?.variantIds, unrestricted.selected?.variantIds);
-    assert.equal(result.selected?.doseFit?.total, unrestricted.selected?.doseFit?.total);
-    assert.ok(result.selected!.dailyPills > 6);
-    assert.equal(result.selected!.priceMinor, result.selected!.productIds.reduce((sum, id) => sum + catalog.products.find(product => product.productId === id)!.unitPriceMinor, 0));
+    assert.deepEqual(closestDoseOption(result)?.variantIds, closestDoseOption(unrestricted)?.variantIds);
+    assert.equal(closestDoseOption(result)?.doseFit?.total, closestDoseOption(unrestricted)?.doseFit?.total);
+    assert.ok(closestDoseOption(result)!.dailyPills > 6);
+    assert.equal(closestDoseOption(result)!.priceMinor, closestDoseOption(result)!.productIds.reduce((sum, id) => sum + catalog.products.find(product => product.productId === id)!.unitPriceMinor, 0));
     assert.equal(result.lossCertificates?.some(item => item.rejection_class === "hard_constraint" || item.conflicting_rule_id === "max_pills") ?? false, false);
   });
 
@@ -546,10 +547,10 @@ describe("Phase 2 compactness ranking", () => {
       qaRequest({ maxPriceMinor: 80_000, optimization: "fewest_pills" }),
       catalog
     );
-    assert.deepEqual(result.selected?.variantIds, unconstrained.selected?.variantIds);
-    assert.equal(result.selected?.doseFit?.total, unconstrained.selected?.doseFit?.total);
-    assert.ok(result.selected!.priceMinor > 80_000);
-    assert.equal(result.selected!.priceMinor, result.selected!.productIds.reduce((sum, id) => sum + catalog.products.find(product => product.productId === id)!.unitPriceMinor, 0));
+    assert.deepEqual(closestDoseOption(result)?.variantIds, closestDoseOption(unconstrained)?.variantIds);
+    assert.equal(closestDoseOption(result)?.doseFit?.total, closestDoseOption(unconstrained)?.doseFit?.total);
+    assert.ok(closestDoseOption(result)!.priceMinor > 80_000);
+    assert.equal(closestDoseOption(result)!.priceMinor, closestDoseOption(result)!.productIds.reduce((sum, id) => sum + catalog.products.find(product => product.productId === id)!.unitPriceMinor, 0));
     assert.equal(result.lossCertificates?.some(item => item.rejection_class === "hard_constraint" || item.conflicting_rule_id === "budget") ?? false, false);
   });
 
@@ -605,18 +606,18 @@ describe("Phase 2 compactness ranking", () => {
       qaRequest({ optimization: "fewest_pills" }),
       catalog
     );
-    assert.ok(fewest.selected);
-    assert.equal(fewest.selected.productIds.includes("G-D3-400"), true);
-    assert.equal(fewest.selected.productIds.includes("G-JOINT-D3-C"), false);
-    assert.equal(fewest.selected.productIds.includes("G-O3-FISH-1000"), true);
-    assert.equal(fewest.selected.productIds.includes("G-MAG-200"), true);
-    assert.equal(fewest.selected.productIds.includes("G-C-500"), true);
+    assert.ok(closestDoseOption(fewest));
+    assert.equal(closestDoseOption(fewest).productIds.includes("G-D3-400"), true);
+    assert.equal(closestDoseOption(fewest).productIds.includes("G-JOINT-D3-C"), false);
+    assert.equal(closestDoseOption(fewest).productIds.includes("G-O3-FISH-1000"), true);
+    assert.equal(closestDoseOption(fewest).productIds.includes("G-MAG-200"), true);
+    assert.equal(closestDoseOption(fewest).productIds.includes("G-C-500"), true);
     const d3 = qaTarget("d3", 2000);
-    assert.equal(fewest.selected.coverageBySubject.get(d3.subjectId), 10000);
-    assert.ok(fewest.selected.variantIds.includes("seller_th:G-D3-400:x5"));
-    assert.equal(fewest.selected.doseFit?.total, 1, "the unavailable B12 target stays in dose loss");
-    assert.equal(fewest.selected.priceMinor, 64000);
-    assert.equal(fewest.selected.dailyPills, 9);
+    assert.equal(closestDoseOption(fewest).coverageBySubject.get(d3.subjectId), 10000);
+    assert.ok(closestDoseOption(fewest).variantIds.includes("seller_th:G-D3-400:x5"));
+    assert.equal(closestDoseOption(fewest).doseFit?.total, 1, "the unavailable B12 target stays in dose loss");
+    assert.equal(closestDoseOption(fewest).priceMinor, 64000);
+    assert.equal(closestDoseOption(fewest).dailyPills, 9);
     assert.equal(
       fewest.rejected.some(
         (item) =>
@@ -654,8 +655,8 @@ describe("Phase 2 compactness ranking", () => {
       }),
       catalog
     );
-    assert.ok(result.selected);
-    assert.equal(result.selected.productIds.includes("G-D3-400"), true);
+    assert.ok(closestDoseOption(result));
+    assert.equal(closestDoseOption(result).productIds.includes("G-D3-400"), true);
     assert.equal(
       result.rejected.some(
         (item) => item.productId === "G-D3-400" && item.reason === "incidental_only"
@@ -795,22 +796,22 @@ describe("Phase 2 compactness ranking", () => {
       }),
       catalog
     );
-    assert.ok(fewest.selected);
-    assert.equal(fewest.selected.productIds.includes("G-MAG-200"), false);
-    assert.equal(fewest.selected.productIds.includes("G-C-500"), true);
-    assert.equal(fewest.selected.productIds.includes("G-O3-FISH-1000"), true);
-    assert.equal(fewest.selected.productIds.includes("G-50PLUS"), true);
-    assert.equal(fewest.selected.doseFit?.total, 1.39);
-    const jointCount = fewest.selected.productIds.filter((id) =>
+    assert.ok(closestDoseOption(fewest));
+    assert.equal(closestDoseOption(fewest).productIds.includes("G-MAG-200"), false);
+    assert.equal(closestDoseOption(fewest).productIds.includes("G-C-500"), true);
+    assert.equal(closestDoseOption(fewest).productIds.includes("G-O3-FISH-1000"), true);
+    assert.equal(closestDoseOption(fewest).productIds.includes("G-50PLUS"), true);
+    assert.equal(closestDoseOption(fewest).doseFit?.total, 1.39);
+    const jointCount = closestDoseOption(fewest).productIds.filter((id) =>
       id.startsWith("G-JOINT-D3-")
     ).length;
     assert.equal(jointCount <= 1, true);
     const d3Target = qaTarget("d3", 2000);
     const d3Percent = Math.round(
-      (fewest.selected.coverageBySubject.get(d3Target.subjectId) ?? 0) / 100
+      (closestDoseOption(fewest).coverageBySubject.get(d3Target.subjectId) ?? 0) / 100
     );
     assert.equal(d3Percent, 100);
-    assert.equal(fewest.selected.doseFit?.perTarget.find((row) => row.subjectId === "sup_d3")?.exposure, 2000);
+    assert.equal(closestDoseOption(fewest).doseFit?.perTarget.find((row) => row.subjectId === "sup_d3")?.exposure, 2000);
   });
 
   it("keeps an incidental UL concern advisory and includes its twice-weighted penalty", () => {
@@ -979,13 +980,13 @@ describe("Phase 2 compactness ranking", () => {
       }),
       catalog
     );
-    assert.ok(result.selected);
-    assert.deepEqual(result.selected.variantIds, ["seller_th:G-B12-30:x8"]);
-    assert.equal(result.selected.doseFit?.total, (250 - 8 * 30) / 250);
-    assert.equal(result.selected.priceMinor, 6000);
-    assert.equal(result.selected.dailyPills, 8);
-    assert.equal(result.selected.coverageBySubject.get(qaTarget("b12", 250).subjectId), 9600);
-    const simpler = result.alternatives.find(option => option.roles?.includes("simpler"));
+    assert.ok(closestDoseOption(result));
+    assert.deepEqual(closestDoseOption(result).variantIds, ["seller_th:G-B12-30:x8"]);
+    assert.equal(closestDoseOption(result).doseFit?.total, (250 - 8 * 30) / 250);
+    assert.equal(closestDoseOption(result).priceMinor, 6000);
+    assert.equal(closestDoseOption(result).dailyPills, 8);
+    assert.equal(closestDoseOption(result).coverageBySubject.get(qaTarget("b12", 250).subjectId), 9600);
+    const simpler = [result.selected, ...result.alternatives].find(option => option?.roles?.includes("simpler"));
     assert.deepEqual(simpler?.variantIds, ["seller_th:G-B12-ZINC-UL:x1"]);
     assert.equal(simpler?.doseFit?.total, 2 * (50 - 40) / 40);
     assert.equal(simpler?.priceMinor, 9000);
@@ -1053,9 +1054,9 @@ describe("Phase 2 compactness ranking", () => {
       qaRequest({ optimization: "balanced" }),
       catalog
     );
-    assert.ok(fewest.selected);
-    assert.ok(balanced.selected);
-    for (const option of [fewest.selected, balanced.selected]) {
+    assert.ok(closestDoseOption(fewest));
+    assert.ok(closestDoseOption(balanced));
+    for (const option of [closestDoseOption(fewest), closestDoseOption(balanced)]) {
       assert.deepEqual([...option.productIds].sort(), ["G-JOINT-D3-C", "G-MAG-D3", "G-O3-FISH-1000"]);
       assert.ok(option.variantIds.includes("seller_th:G-JOINT-D3-C:x5"));
       // B12 is unavailable, C is 310/500, and D3 is 2100/2000.
@@ -1065,7 +1066,7 @@ describe("Phase 2 compactness ranking", () => {
       assert.equal(option.dailyPills, 13);
       assert.ok(option.doseFit!.total < 1 + (750 - 500) / 500, "less loss than the dedicated Mg/C basket");
     }
-    const simpler = fewest.alternatives.find(option => option.roles?.includes("simpler"));
+    const simpler = [fewest.selected, ...fewest.alternatives].find(option => option?.roles?.includes("simpler"));
     assert.deepEqual(simpler?.variantIds, ["seller_th:G-MAG-D3:x1"]);
     assert.equal(simpler?.dailyPills, 1);
     assert.equal(simpler?.purchaseEligible, true);
@@ -1167,22 +1168,22 @@ describe("Phase 2 compactness ranking", () => {
       ]
     };
     const result = match(qaRequest({ optimization: "fewest_pills" }), catalog);
-    assert.ok(result.selected);
-    assert.equal(result.selected.productIds.includes("G-MAG-200"), true);
-    assert.equal(result.selected.productIds.includes("G-O3-FISH-1000"), true);
-    assert.equal(result.selected.productIds.includes("G-C-500"), true);
-    assert.equal(result.selected.productIds.includes("G-CALCIUM-D3-200"), true);
-    assert.equal(result.selected.productIds.includes("G-MEGA-B-50"), true);
-    assert.equal(result.selected.productIds.includes("G-JOINT-D3"), false);
-    assert.equal(result.selected.productIds.includes("G-MULTI-50PLUS"), false);
-    assert.equal(result.selected.doseFit?.total, 0);
-    assert.ok(result.selected.variantIds.includes("seller_th:G-CALCIUM-D3-200:x10"));
-    assert.ok(result.selected.variantIds.includes("seller_th:G-MEGA-B-50:x5"));
-    assert.equal(result.selected.priceMinor, 79200);
-    assert.equal(result.selected.dailyPills, 19);
+    assert.ok(closestDoseOption(result));
+    assert.equal(closestDoseOption(result).productIds.includes("G-MAG-200"), true);
+    assert.equal(closestDoseOption(result).productIds.includes("G-O3-FISH-1000"), true);
+    assert.equal(closestDoseOption(result).productIds.includes("G-C-500"), true);
+    assert.equal(closestDoseOption(result).productIds.includes("G-CALCIUM-D3-200"), true);
+    assert.equal(closestDoseOption(result).productIds.includes("G-MEGA-B-50"), true);
+    assert.equal(closestDoseOption(result).productIds.includes("G-JOINT-D3"), false);
+    assert.equal(closestDoseOption(result).productIds.includes("G-MULTI-50PLUS"), false);
+    assert.equal(closestDoseOption(result).doseFit?.total, 0);
+    assert.ok(closestDoseOption(result).variantIds.includes("seller_th:G-CALCIUM-D3-200:x10"));
+    assert.ok(closestDoseOption(result).variantIds.includes("seller_th:G-MEGA-B-50:x5"));
+    assert.equal(closestDoseOption(result).priceMinor, 79200);
+    assert.equal(closestDoseOption(result).dailyPills, 19);
     const d3 = qaTarget("d3", 2000);
     assert.equal(
-      result.selected.coverageBySubject.get(d3.subjectId),
+      closestDoseOption(result).coverageBySubject.get(d3.subjectId),
       10000
     );
   });

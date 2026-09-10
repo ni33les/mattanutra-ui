@@ -94,14 +94,14 @@ describe("MCP reliability: atomic plan and checkout commands", () => {
   it("keeps the previous revision readable after an invalid edit", async () => {
     const runtime = createAgenticRuntime();
     const created = await call(runtime, { operation: "create", idempotencyKey: "review-invalid-create", request });
-    assert.equal(created.status, "ready");
+    assert.equal(created.status, "no_purchase");
     const invalid = await call(runtime, { operation: "revise", idempotencyKey: "review-invalid-revise", planHandle: created.planHandle,
       expectedRevision: created.revision, request: { ...request, targets: [{ name: "Magnesium", amount: 100, unit: "IU" }] } });
     assert.equal(invalid.error.reasonCode, "unsupported_unit");
     const read = await call(runtime, { operation: "get", planHandle: created.planHandle });
     assert.equal(read.ok, true);
     assert.equal(read.revision, created.revision);
-    assert.equal(read.status, "ready");
+    assert.equal(read.status, "no_purchase");
   });
 
   it("can edit a stored plan after losing all process-local pins", async () => {
@@ -151,7 +151,12 @@ describe("MCP reliability: atomic plan and checkout commands", () => {
     let orders = 0;
     const insert = runtime.store.insertOrder;
     runtime.store.insertOrder = async order => { orders++; await insert(order); };
-    const plan = await call(runtime, { operation: "create", idempotencyKey: "review-orders-create", request });
+    const created = await call(runtime, { operation: "create", idempotencyKey: "review-orders-create", request });
+    const option = created.options.find((row: { purchaseEligible?: boolean; basket: unknown[] }) => row.purchaseEligible && row.basket.length);
+    assert.ok(option, "A purchase choice must survive practical no-purchase recommendation");
+    const plan = await call(runtime, { operation: "select", planHandle: created.planHandle, expectedRevision: created.revision,
+      optionId: option.optionId, idempotencyKey: "review-orders-select" });
+    assert.equal(plan.status, "ready");
     const [a, b] = await Promise.all([1, 2].map(n => import(new URL("../lib/agentic/commerce/execute.ts?replica=" + n, import.meta.url).href)));
     const input = { ...runtime, now: new Date().toISOString(), planHandle: plan.planHandle, expectedRevision: plan.revision };
     const results = await Promise.all([

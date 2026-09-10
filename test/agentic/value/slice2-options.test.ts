@@ -76,7 +76,7 @@ describe("Slice 2 value options and current supplements", () => {
     );
 
     assert.equal(options.length, 3);
-    assert.deepEqual(options.flatMap(item => item.roles ?? []), ["closest_dose", "lower_cost", "simpler"]);
+    assert.deepEqual(options.flatMap(item => item.roles ?? []), ["best_match", "closest_dose", "lower_cost", "simpler"]);
     assert.ok(options.every(item => item.purchaseEligible === true));
     assert.equal(options.filter((item) => item.recommended).length, 1);
     const core = options.find((item) => item.roles?.includes("closest_dose"));

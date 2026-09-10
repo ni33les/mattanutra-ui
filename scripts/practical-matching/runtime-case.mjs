@@ -27,9 +27,10 @@ if (caseId === 'reported-web') {
     administration: { route: 'oral', physicalUnit: 'tablet', unitsPerServing: units, doseIncrement: 1, packQuantity: 60,
       provenance: { status: 'verified', sourceUrl: 'https://example.test/controlled-label', sourceText: 'Frozen labelled tablet quantities.', verifiedAt: '2026-09-10' } } });
   const targets = canonicalizeTargets({ targets: [{ subjectId: 'a', name: 'A', amount: 100, unit: 'mg', basis: 'supplemental' }] }).targets;
-  assert.ok(['normal', 'strong', 'fewest_pills'].includes(caseId));
-  calculate = () => match(request({ targets, maxDailyPills: 3, preferenceImportance: { maxDailyPills: caseId === 'strong' ? 'strong' : 'normal' },
-    optimization: caseId === 'fewest_pills' ? 'fewest_pills' : 'balanced' }), catalog([make('sixteen', 100, 16), make('manageable', 80, 3)]));
+  assert.ok(['normal', 'strong', 'fewest_pills', 'importance-normal', 'importance-strong'].includes(caseId));
+  const importanceCase = caseId.startsWith('importance-');
+  calculate = () => match(request({ targets, maxDailyPills: importanceCase ? 5 : 3, preferenceImportance: { maxDailyPills: caseId.endsWith('strong') ? 'strong' : 'normal' },
+    optimization: caseId === 'fewest_pills' ? 'fewest_pills' : 'balanced' }), catalog(importanceCase ? [make('importance-interior', 125, 10)] : [make('sixteen', 100, 16), make('manageable', 80, 3)]));
 }
 const cpu = process.cpuUsage(), started = performance.now();
 const semantic = calculate();

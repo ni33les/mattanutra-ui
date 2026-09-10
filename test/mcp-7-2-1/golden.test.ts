@@ -34,12 +34,12 @@ test("M721-GOLD-01 frozen DEV D3 admits and reads conversation below 30 KB withi
   }
   const final = await call({ operation: "get", planHandle: value.planHandle });
   const elapsedMs = performance.now() - started;
-  assert.equal(final.value.status, "ready"); assert.equal(final.value.responseView, "conversation");
+  assert.equal(final.value.status, "no_purchase"); assert.equal(final.value.responseView, "conversation");
   assert.ok(elapsedMs < 15_000, `Standard D3 took ${elapsedMs}ms`);
   assert.ok(Buffer.byteLength(JSON.stringify(final.value), "utf8") < 30_000);
   assert.equal((final.result.content as unknown[]).length, 1);
   const full = (await call({ operation: "get", planHandle: value.planHandle, responseView: "full" })).value as unknown as PlanSuccessWire;
-  const selected = full.options!.find(row => row.optionId === full.optionId)!; assert.ok(selected?.purchaseEligible);
+  const selected = full.options!.find(row => row.roles?.includes("closest_dose"))!; assert.ok(selected?.purchaseEligible);
   assert.equal(selected.doseFit!.total, 0);
   assert.equal(selected.basket!.length, 1); assert.equal(selected.basket![0].servingsPerDay, 2);
   assert.equal(selected.stackSummary.totalDailyPills, null, "Historical frozen D3 administration stays unknown");

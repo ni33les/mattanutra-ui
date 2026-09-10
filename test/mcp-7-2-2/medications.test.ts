@@ -24,6 +24,6 @@ test("test_listed_medication_without_row_is_unassessed_not_cleared", async () =>
 test("test_info_does_not_claim_interaction_coverage", async () => {
   const response = await handleLightweightJsonRpc(runtime("med-info").config, { id: 1, method: "tools/call", params: { name: "info", arguments: {} } });
   const value = response!.result!.structuredContent as Record<string, unknown>;
-  assert.match(String(value.clientInstructions), /accepted inputs.*do not guarantee.*interaction/i);
+  assert.match(String(value.clientInstructions), /accepted inputs.*not interaction coverage/i);
   assert.doesNotMatch(String(value.description), /assess(?:es)? apixaban|clear(?:s|ed)? interactions/i);
 });

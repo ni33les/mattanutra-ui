@@ -558,12 +558,22 @@ describe("agentic P1 pack fixes", () => {
       medicationCodes: ["apixaban"], currentSupplements: [],
       targets: [{ amount: 2000, name: "Vitamin D3", unit: "IU" }]
     };
-    const result = await call(runtime, "plan", {
+    let result = await call(runtime, "plan", {
       idempotencyKey: "p1-over-budget-0000001",
       request
     });
     assert.equal(result.ok, true);
-    assert.equal(result.status, "ready");
+    assert.equal(result.status, "no_purchase");
+    const selectPurchase = async (plan: Record<string, unknown>) => {
+      const options = plan.options as Array<{ optionId: string; roles?: string[]; purchaseEligible?: boolean; basket: unknown[] }>;
+      const option = options.find(row => row.purchaseEligible && row.basket.length && row.roles?.includes("closest_dose"));
+      assert.ok(option, "The original exact-dose purchase remains available above the budget preference");
+      const selected = await call(runtime, "plan", { operation: "select", planHandle: plan.planHandle,
+        expectedRevision: plan.revision, optionId: option.optionId, idempotencyKey: `p1-over-budget-select-${String(plan.revision)}-01` });
+      assert.equal(selected.ok, true); assert.equal(selected.status, "ready");
+      return selected;
+    };
+    result = await selectPurchase(result);
     assert.deepEqual(result.questions ?? [], []);
     assert.ok(Array.isArray(result.basket) && result.basket.length === 1);
     assert.equal(result.basket.reduce((sum, item) => sum + Number(item.lineTotalMinor), 0), 39000);
@@ -574,7 +584,7 @@ describe("agentic P1 pack fixes", () => {
       operation: "revise", expectedRevision: result.revision, planHandle: result.planHandle,
       idempotencyKey: "p1-over-budget-locale-01", requestPatch: { locale: "th" }
     });
-    assert.equal(unrelated.status, "ready");
+    assert.equal(unrelated.status, "ready", "Locale refinement preserves the explicitly selected purchase");
     const purchased = (items: unknown) => (items as Array<Record<string, unknown>>).map(item => ({ productId: item.productId, servingsPerDay: item.servingsPerDay, lineTotalMinor: item.lineTotalMinor }));
     assert.deepEqual(purchased(unrelated.basket), purchased(result.basket));
     const [planId] = await runtime.store.listPlanIdsByPrincipal("tester");

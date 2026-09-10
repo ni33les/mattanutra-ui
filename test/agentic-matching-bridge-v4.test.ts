@@ -48,9 +48,9 @@ describe("v4 matching bridge financial and coverage consistency", () => {
   });
   it("compares complete option cash schedules including both deliveries", () => {
     const result = options(); assert.ok(result.selected); assert.equal(result.alternatives.length, 1);
-    assert.equal(result.selected.economics?.cash90DayMinor, 43000);
-    assert.equal(result.alternatives[0]!.economics?.cash90DayMinor, 40000);
-    assert.equal(result.alternatives[0]!.tradeOff?.cash90DayDeltaMinor, -3000);
+    assert.equal(result.selected.economics?.cash90DayMinor, 40000);
+    assert.equal(result.alternatives[0]!.economics?.cash90DayMinor, 43000);
+    assert.equal(result.alternatives[0]!.tradeOff?.cash90DayDeltaMinor, 3000);
   });
   it("surfaces an increase above known continued intake as advisory reference evidence", () => {
     const mag = snapshot.supplements[1]!;

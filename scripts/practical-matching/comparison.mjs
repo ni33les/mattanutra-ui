@@ -5,7 +5,7 @@ import { resolve } from 'node:path';
 import { createHash } from 'node:crypto';
 import { scanLockSites, verifyLockSites } from '../service-efficiency/lock-register.mjs';
 const hash = value => createHash('sha256').update(JSON.stringify(value)).digest('hex');
-export const PRACTICAL_COMPARISON_CASES = ['reported-web', 'normal', 'strong', 'fewest_pills'];
+export const PRACTICAL_COMPARISON_CASES = ['reported-web', 'normal', 'strong', 'fewest_pills', 'importance-normal', 'importance-strong'];
 export function verifyRepeatedComparison(rows, cases, sourceCommit) {
   assert.ok(cases.length); assert.equal(rows.length, cases.length * 2);
   for (const id of cases) {
@@ -66,6 +66,9 @@ export async function runPracticalComparison(output, env, releaseBase) {
   assert.ok(real.candidate.overallPenalty != null && real.candidate.products.length > 0);
   assert.ok(real.candidate.pillLowerBound < 16, 'Reported strong web routine must improve verified burden');
   assert.ok(real.candidate.labelledServings.every(q => Number.isFinite(q) && q < 625), 'Serving burden cannot be evaded');
+  const importance = report.comparison.filter(row => row.caseId.startsWith('importance-'));
+  assert.equal(importance[0].candidate.dailyPills, 8); assert.equal(importance[1].candidate.dailyPills, 7);
+  assert.equal(importance[0].control.dailyPills, 8); assert.equal(importance[1].control.dailyPills, 8);
   writeFileSync(resolve(output, 'comparison.json'), JSON.stringify(report, null, 2), { flag: 'wx' });
   return report;
 }

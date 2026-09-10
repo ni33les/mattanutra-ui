@@ -33,8 +33,8 @@ test('PRACTICAL-SEARCH-02 weighted price objective changes selection without cha
 test('PRACTICAL-SEARCH-03 supported interior quantity is explored within the same budget', () => {
   const input = request({ maxDailyPills: 5, preferenceImportance: { maxDailyPills: 'strong' } });
   const result = match(input, catalog([tablet('interior', 125, 10)]));
-  assert.ok(result.selected); assert.equal(result.selected.variantDoses?.[0].dailyUnits, 0.6);
-  assert.equal(result.selected.dailyPills, 6); assert.equal(result.selected.doseFit?.total, 0.25);
+  assert.ok(result.selected); assert.equal(result.selected.variantDoses?.[0].dailyUnits, 0.7);
+  assert.equal(result.selected.dailyPills, 7); assert.equal(result.selected.doseFit?.total, 0.125);
   assert.ok(result.searchSummary.expansionAttempts <= 8000);
 });
 
@@ -75,7 +75,7 @@ test('PRACTICAL-SEARCH-08 checkpointing every attempt preserves quantity search 
     assert.ok(previous <= 8000); cursor = structuredClone(cursor);
   }
   const resumed = match(input, shelf, DEFAULT_MATCHER_CONFIG, undefined, undefined, cursor), direct = match(input, shelf);
-  assert.deepEqual(resumed, direct); assert.equal(resumed.selected?.variantDoses?.[0].dailyUnits, 0.6);
+  assert.deepEqual(resumed, direct); assert.equal(resumed.selected?.variantDoses?.[0].dailyUnits, 0.7);
 });
 
 test('PRACTICAL-SEARCH-09 nonterminating serving fractions keep exact burdens and monthly pack rounding', () => {
@@ -84,7 +84,7 @@ test('PRACTICAL-SEARCH-09 nonterminating serving fractions keep exact burdens an
   const result = match(request({ pricePreferenceBasis: 'monthly_30_days', maxPriceMinor: 50000, productDoses: [{ productId: 'thirds', servingsPerDay: 5 / 3 }] }), shelf);
   assert.ok(result.selected?.overallScore);
   assert.equal(result.selected.dailyPills, 5); assert.equal(result.selected.overallScore.preferences.maxPriceMinor.actual, 30000);
-  assert.deepEqual(result.selected.overallScore.overallExact, { numerator: '289', denominator: '1800' });
+  assert.deepEqual(result.selected.overallScore.overallExact, { numerator: '7', denominator: '45' });
 });
 
 test('PRACTICAL-SEARCH-10 an empty practical winner does not claim the closest dose fit', () => {
@@ -103,8 +103,8 @@ test('PRACTICAL-SEARCH-11 stronger pill importance changes the routine and still
   const strong = match(request({ maxDailyPills: 5, preferenceImportance: { maxDailyPills: 'strong' } }), shelf);
   assert.equal(normal.selected?.dailyPills, 8);
   assert.equal(normal.selected?.doseFit?.total, 0);
-  assert.equal(strong.selected?.dailyPills, 6);
-  assert.equal(strong.selected?.doseFit?.total, 0.25);
+  assert.equal(strong.selected?.dailyPills, 7);
+  assert.equal(strong.selected?.doseFit?.total, 0.125);
   assert.ok(strong.selected!.dailyPills > 5, 'A modest overrun remains legitimate when its dose benefit wins');
   assert.equal(strong.selected?.purchaseEligible, true);
 });

@@ -10,13 +10,13 @@
     {
       "file": "test/practical-matching/scoring.test.ts",
       "slice": "scoring",
-      "expectedCases": 10,
+      "expectedCases": 11,
       "reason": "Exact shared penalties, advisory importance and unknown measurements with preserved raw dose scoring."
     },
     {
       "file": "test/practical-matching/search.test.ts",
       "slice": "search",
-      "expectedCases": 9,
+      "expectedCases": 12,
       "reason": "Shared search retention, supported interior quantities, profile identities and checkpoint equivalence."
     },
     {
@@ -28,13 +28,13 @@
     {
       "file": "test/practical-matching/adapters.test.ts",
       "slice": "adapters",
-      "expectedCases": 7,
+      "expectedCases": 9,
       "reason": "MCP and web profile resolution, monthly budgets, patches and detail output."
     },
     {
       "file": "test/practical-matching/presentation.test.ts",
       "slice": "presentation",
-      "expectedCases": 7,
+      "expectedCases": 8,
       "reason": "Selected medical cautions, collapsed details and honest routine totals in three locales."
     },
     {
@@ -59,7 +59,7 @@
     {
       "file": "test/practical-matching/release.test.ts",
       "slice": "release",
-      "expectedCases": 3,
+      "expectedCases": 4,
       "reason": "Existing runner and deployment paths bind full maintained regression, semantic evidence and lock inventory."
     }
   ],
@@ -72,14 +72,37 @@
     "test/service-efficiency/lock-register.json"
   ],
   "regressionFiles": [
+    "test/agentic-catalogue-publish-v5.integration.test.ts",
     "test/agentic-catalogue-publish-v5.test.ts",
     "test/agentic-contract-v4.test.ts",
     "test/agentic-cv-impl-pack.test.ts",
     "test/agentic-cv-r2-pack.test.ts",
     "test/agentic-cv-r3-pack.test.ts",
     "test/agentic-cv-r4-pack.test.ts",
+    "test/agentic-cv-snapshot-store.test.ts",
+    "test/agentic-execute-reuse.test.ts",
     "test/agentic-flexible-v5-contract.test.ts",
+    "test/agentic-flexible-v5-journey.test.ts",
+    "test/agentic-matching-bridge-v4.test.ts",
+    "test/agentic-p1.test.ts",
+    "test/agentic-phase1-dedicated.test.ts",
+    "test/agentic-phase1-material.test.ts",
+    "test/agentic-phase2-compact-rank.test.ts",
+    "test/agentic-phase3-pills.test.ts",
+    "test/agentic-phase4-algae.test.ts",
+    "test/agentic-phase6-retention.test.ts",
+    "test/agentic-phase6.test.ts",
+    "test/agentic-plan-recovery.integration.test.ts",
+    "test/agentic-plan-recovery.test.ts",
+    "test/agentic-reliability.test.ts",
+    "test/agentic/value/slice2-options.test.ts",
+    "test/agentic/value/slice4-opt.test.ts",
     "test/ax-refinement/contract.test.ts",
+    "test/ax-refinement/deployment.test.ts",
+    "test/ax-refinement/retention.test.ts",
+    "test/ax-refinement/search.test.ts",
+    "test/matcher-v5-web.test.ts",
+    "test/matcher-web-adapter.test.ts",
     "test/matcher/advisory-dose-fit.test.ts",
     "test/matcher/advisory-v6-preferences.test.ts",
     "test/matcher/flexible-v5-coordinated-repair.test.ts",
@@ -93,12 +116,25 @@
     "test/matcher/phase2.test.ts",
     "test/matcher/phase3.test.ts",
     "test/matcher/qa-gold.test.ts",
+    "test/mcp-7-2-1/golden.test.ts",
+    "test/mcp-7-2-1/routines.test.ts",
+    "test/mcp-7-2-2/golden.test.ts",
+    "test/mcp-7-2-2/medications.test.ts",
     "test/mcp-agent-surface/contracts.test.ts",
     "test/mcp-discovery/discovery.test.ts",
     "test/mcp-payload/discovery.test.ts",
+    "test/mcp-payload/journeys-th.test.ts",
+    "test/mcp-payload/journeys-zh.test.ts",
+    "test/mcp-payload/journeys.test.ts",
+    "test/mcp-payload/postgres.integration.test.ts",
+    "test/mcp-payload/transport.test.ts",
     "test/retail-checkout-catalogue-v5.integration.test.ts",
     "test/retail-checkout-catalogue-v5.test.ts",
-    "test/service-efficiency/lock-register.test.ts"
+    "test/service-efficiency/atomic-checkout.integration.test.ts",
+    "test/service-efficiency/checkout-preparation.test.ts",
+    "test/service-efficiency/duplicate-admission.test.ts",
+    "test/service-efficiency/lock-register.test.ts",
+    "test/web-advisory-matching.test.ts"
   ],
   "browser": [
     {

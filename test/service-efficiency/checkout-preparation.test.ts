@@ -13,7 +13,10 @@ afterEach(uninstallGoldCatalogue);
 async function fixture(name: string) {
   installGoldCatalogue(); replaceCatalogueSnapshot({...fixtureSnapshot(),runtimeRevision:11});
     setMatcherSafetyCeilings(matcherSafetyCeilings(), { runtimeRevision: 11, fingerprint: catalogueRecordFingerprint(matcherSafetyCeilings()) });
-  const app=runtime(name), plan=await rpcWithTaskExecutor(app,"plan",{operation:"create",idempotencyKey:name,request,responseView:"full"});
+  const app=runtime(name), created=await rpcWithTaskExecutor(app,"plan",{operation:"create",idempotencyKey:name,request,responseView:"full"});
+  const option=created.options.find(row=>row.purchaseEligible && row.basket.length && row.roles?.includes("closest_dose"));
+  assert.ok(option, "Checkout contention fixtures require an explicit eligible purchase");
+  const plan=await rpcWithTaskExecutor(app,"plan",{operation:"select",planHandle:created.planHandle,expectedRevision:created.revision,optionId:option.optionId,idempotencyKey:name+"-select",responseView:"full"});
   assert.equal(plan.status,"ready");
   return {app,call:{...app,now:app.now!,expectedRevision:Number(plan.revision),planHandle:String(plan.planHandle),idempotencyKey:name+"-execute"}};
 }

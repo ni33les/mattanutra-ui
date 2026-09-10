@@ -1,3 +1,4 @@
+import { closestDoseOption } from "./matcher/flexible-v5-fixtures.ts";
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
@@ -77,14 +78,14 @@ describe("Phase 6 B12 retention, K2 copy, and latency split", () => {
       }),
       catalog([G_B12_60, G_MULTI_WEAK_B12, G_D3, G_O3, G_MAG])
     );
-    assert.ok(isolated.selected);
-    assert.equal(isolated.selected.productIds.includes("G-B12-60"), true);
+    assert.ok(closestDoseOption(isolated));
+    assert.equal(closestDoseOption(isolated).productIds.includes("G-B12-60"), true);
     const coverage = Math.round(
-      (isolated.selected.coverageBySubject.get(b12.subjectId) ?? 0) / 100
+      (closestDoseOption(isolated).coverageBySubject.get(b12.subjectId) ?? 0) / 100
     );
     assert.equal(coverage, 100);
-    assert.equal(isolated.selected.doseFit?.total, 0.264);
-    assert.equal(isolated.selected.doseFit?.perTarget[0]?.exposure, 316);
+    assert.equal(closestDoseOption(isolated).doseFit?.total, 0.264);
+    assert.equal(closestDoseOption(isolated).doseFit?.perTarget[0]?.exposure, 316);
 
     const combined = match(
       qaRequest({

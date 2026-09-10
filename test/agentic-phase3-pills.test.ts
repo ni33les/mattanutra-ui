@@ -1,3 +1,4 @@
+import { closestDoseOption } from "./matcher/flexible-v5-fixtures.ts";
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { match } from "../lib/matcher/index.ts";
@@ -256,15 +257,15 @@ describe("Phase 3 fewest_pills ranking", () => {
       qaRequest({ optimization: "fewest_pills" }),
       QA_GOLD_CATALOG
     );
-    assert.ok(result.selected);
-    assert.deepEqual(result.selected.productIds, [
+    assert.ok(closestDoseOption(result));
+    assert.deepEqual(closestDoseOption(result).productIds, [
       "G-BASE-COMBO",
       "G-O3-ALGAE-500"
     ]);
-    assert.equal(result.selected.dailyPills, 4);
-    assert.equal(result.selected?.priceMinor, 61000);
-    assert.equal(result.selected?.doseFit?.total, 0);
-    assert.equal(result.selected?.coveredCount, 5);
+    assert.equal(closestDoseOption(result).dailyPills, 4);
+    assert.equal(closestDoseOption(result)?.priceMinor, 61000);
+    assert.equal(closestDoseOption(result)?.doseFit?.total, 0);
+    assert.equal(closestDoseOption(result)?.coveredCount, 5);
   });
 
   it("among stacks covering the same targets, fewer pills beat more pills", () => {
@@ -497,20 +498,20 @@ describe("Phase 3 fewest_pills ranking", () => {
         })
       ])
     );
-    assert.ok(result.selected);
-    assert.equal(result.selected.productIds.includes("prd_magnesium"), false);
-    assert.equal(result.selected.productIds.includes("prd_magnesium_d3"), true);
-    assert.equal(result.selected.doseFit?.total, ((2000 - (4 * 200 + 400)) * 250 + (250 - 2 * 100) * 2000) / (2000 * 250));
-    assert.ok(result.selected.variantIds.includes("seller_th:prd_bio_calcium_d3:x4"));
-    assert.ok(result.selected.variantIds.includes("seller_th:prd_mega_b:x2"));
-    assert.equal(result.selected.priceMinor, 227000);
-    assert.equal(result.selected.dailyPills, 21);
-    assert.equal(result.selected.doseFit?.weightedLimit, 0, "2400mg calcium stays below the 2500mg reference");
-    const simpler = result.alternatives.find(option => option.roles?.includes("simpler"));
+    assert.ok(closestDoseOption(result));
+    assert.equal(closestDoseOption(result).productIds.includes("prd_magnesium"), false);
+    assert.equal(closestDoseOption(result).productIds.includes("prd_magnesium_d3"), true);
+    assert.equal(closestDoseOption(result).doseFit?.total, ((2000 - (4 * 200 + 400)) * 250 + (250 - 2 * 100) * 2000) / (2000 * 250));
+    assert.ok(closestDoseOption(result).variantIds.includes("seller_th:prd_bio_calcium_d3:x4"));
+    assert.ok(closestDoseOption(result).variantIds.includes("seller_th:prd_mega_b:x2"));
+    assert.equal(closestDoseOption(result).priceMinor, 227000);
+    assert.equal(closestDoseOption(result).dailyPills, 21);
+    assert.equal(closestDoseOption(result).doseFit?.weightedLimit, 0, "2400mg calcium stays below the 2500mg reference");
+    const simpler = [result.selected, ...result.alternatives].find(option => option?.roles?.includes("simpler"));
     assert.deepEqual(simpler?.variantIds, ["seller_th:prd_magnesium_d3:x1"]);
     assert.equal(simpler?.purchaseEligible, true);
     assert.equal(simpler?.dailyPills, 1);
-    assert.equal(result.selected.productIds.includes("prd_mega_b"), true);
-    assert.equal(result.selected.productIds.includes("prd_vistra_omega"), true);
+    assert.equal(closestDoseOption(result).productIds.includes("prd_mega_b"), true);
+    assert.equal(closestDoseOption(result).productIds.includes("prd_vistra_omega"), true);
   });
 });

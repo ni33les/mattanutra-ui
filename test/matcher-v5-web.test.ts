@@ -22,15 +22,19 @@ test("WEB5-01 compact and balanced have no imposed product count or target-three
  }
 });
 test("WEB5-02 explicit zero and one preferences do not hide complete eight-product choices", () => {
- assert.equal(recommendWithMatcher({ needs, candidates: names.map(n => candidate(n)), maxProducts: 0 }).recommendations.length, 8);
- assert.equal(recommendWithMatcher({ needs, candidates: names.map(n => candidate(n)), maxProducts: 1 }).recommendations.length, 8);
+ for (const maxProducts of [0, 1]) {
+  const result = recommendWithMatcher({ needs, candidates: names.map(n => candidate(n)), maxProducts });
+  const exact = result.diagnostics.matching!.options.find(option => option.roles?.includes("closest_dose"));
+  assert.ok(exact); assert.equal(exact.productIds.length, 8); assert.equal(exact.coveragePercent, 100); assert.equal(exact.purchaseEligible, true);
+  assert.ok(result.recommendations.length < 8, "Numerical preferences influence the recommendation without excluding the eight-product choice");
+ }
 });
 test("WEB5-03 legacy entry point uses shared advisory matcher without capping at six", () => {
  assert.equal(recommendProductStackV2({ needs, candidates: names.map(n => candidate(n)) }).recommendations.length, 8);
 });
 test("WEB5-04 supported quantities above three and below one survive web projection", () => {
  const four = recommendWithMatcher({ needs: [needs[0]], candidates: [candidate(names[0], 25)] });
- assert.equal(four.recommendations[0]?.servingMultiplier, 4);
+ assert.equal(four.diagnostics.matching!.options.find(option => option.roles?.includes("closest_dose"))?.dailyServings[0], 4);
  const double = candidate(names[0], 200);
  const half = recommendWithMatcher({ needs: [needs[0]], candidates: [{ ...double, administration: { ...double.administration!, unitsPerServing: 2 } }] });
  assert.equal(half.recommendations[0]?.servingMultiplier, 0.5);
@@ -48,7 +52,7 @@ test("WEB6-01 preferences disclose count, pills and goods deltas without hiding 
  const result = recommendWithMatcher({ needs, candidates: names.map(n => candidate(n)), maxProducts: 2, budgetAmount: 2, clientContext: { pillLimit: "2", currentSupplements: "none" } });
  const matching = result.diagnostics.matching!;
  assert.equal(matching.operationalStatus, "ready");
- const selected = matching.options.find(option => option.optionId === matching.selectedOptionId)!;
+ const selected = matching.options.find(option => option.roles?.includes("closest_dose"))!;
  assert.equal(selected.productIds.length, 8);
  assert.equal(selected.doseFit?.total, 0);
  assert.equal(selected.purchaseEligible, true);
@@ -56,7 +60,7 @@ test("WEB6-01 preferences disclose count, pills and goods deltas without hiding 
   ["product_count", 2, 8, 6, true], ["daily_pills", 2, 8, 6, true], ["first_order_goods_price", 200, 800, 600, true]
  ]);
  const unknown = recommendWithMatcher({ needs: [needs[0]], candidates: [{ ...candidate(names[0]), administration: null }], clientContext: { pillLimit: "1" } });
- const option = unknown.diagnostics.matching!.options[0]!;
+ const option = unknown.diagnostics.matching!.options.find(option => option.purchaseEligible)!;
  assert.equal(option.purchaseEligible, true);
  assert.equal(option.dailyPills, null);
  const pills = option.preferences!.find(row => row.kind === "daily_pills")!;

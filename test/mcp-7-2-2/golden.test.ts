@@ -45,7 +45,7 @@ test("test_d3_2000_does_not_select_ten_caps_of_an_incidental", () => {
   const selected = full.options!.find(row => row.optionId === full.optionId); assert.ok(selected?.basket?.length);
   assert.equal(selected.basket.length, 1); assert.equal(selected.basket[0].productName, "Blackmores Vitamin D3 1000 IU");
   assert.equal(selected.basket[0].servingsPerDay, 2); assert.equal(selected.doseFit!.total, 0);
-  assert.ok(full.options!.some(option => option.basket?.some(row => row.productName.includes("CALPLEX") && row.servingsPerDay === 10)), "Keep the cheaper incidental option selectable");
+  assert.ok(full.options!.some(option => option.basket?.some(row => row.productName.includes("CALPLEX") && row.servingsPerDay > 0)), "Keep a useful cheaper incidental routine selectable; exact ten-serving eligibility is covered by M721-ROUTINE-01");
 });
 test("test_highlighted_alternative_present_when_alternativeSearch_found", () => {
   assert.ok(conversation.alternativeSearch);

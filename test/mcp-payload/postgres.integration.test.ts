@@ -25,7 +25,7 @@ test("PAY-POLL-03 PostgreSQL freshness and pending failure versions use the dura
   await store.insertCatalogueSnapshot(snapshotId, { runtimeRevision: 99, products: [], supplements: [], catalogueVersion: "frozen-payload", availabilityAsOf: now });
   await store.insertPlan({ id: planId, currentRevision: 1, createdAt: now, updatedAt: now, ...app.scope });
   const original = internalFixture();
-  const result = { ...original, contractVersion: "7.0.0", summary: "Last committed plan", selected: { ...original.selected!, snapshotId }, matcherTelemetry: { ...original.matcherTelemetry!, snapshotId } };
+  const result = { ...original, summary: "Last committed plan", selected: { ...original.selected!, snapshotId }, matcherTelemetry: { ...original.matcherTelemetry!, snapshotId } };
   const revision = { planId, revision: 1, status: "ready" as const, result, requestSnapshot: result.requestSnapshot, catalogueVersion: "frozen-payload", guidanceRulesVersion: "6.0.0", availabilityAsOf: now, createdAt: now };
   await store.insertPlanRevision(revision);
   const { handle } = await issueCapability({ allowedActions: ["plan.read"], config: app.config, now, resourceId: planId, resourceType: "plan", scope: app.scope, store });

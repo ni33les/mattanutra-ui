@@ -93,11 +93,13 @@ describe("web advisory matching boundaries", () => {
     try {
       const result = recommendWithMatcher({ needs: [need("a")], candidates: [product("small", { a: 10 })],
         clientContext: { ageYears: 40, lifestage: "adult", continuedIntake: [{ subjectId: "a", name: "a", dailyAmount: 50, minimumDailyAmount: 0, maximumDailyAmount: 100, unit: "mg", sourceId: "continued" }], estimatedIntakeSubjectIds: ["a"] } });
-      const advice = result.diagnostics.matching?.options[0]?.advice.find(row => row.code === "reference_limit_exceeded");
+      const closest = result.diagnostics.matching?.options.find(option => option.roles?.includes("closest_dose"));
+      assert.ok(closest, "The original dose-fit estimate remains an exposed purchase choice");
+      const advice = closest.advice.find(row => row.code === "reference_limit_exceeded");
       assert.ok(advice, JSON.stringify(result.diagnostics.matching));
       assert.equal(advice.amountRange?.maximum, 120);
       assert.equal(advice.referenceLimit?.amount, 100);
-      assert.ok((result.diagnostics.matching?.options[0]?.doseFit?.perTarget[0]?.conservativeExposure ?? Infinity) < 100);
+      assert.ok((closest.doseFit?.perTarget[0]?.conservativeExposure ?? Infinity) < 100);
     } finally { resetMatcherSafetyCeilings(); }
   });
   it("keeps dose-fit ahead of price when the worker selects between retailers", async () => {
