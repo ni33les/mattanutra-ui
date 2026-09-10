@@ -42,7 +42,7 @@ export function prepareSimpleRequest(input: Row, snapshot: CatalogueSnapshot, pr
     const sourceAlias = name?.normalize("NFKC").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim() === "algae omega 3";
     const resolveName = sourceAlias && merged.requirements.omega3SourcePreference === "algae_only" ? "Omega-3" : name;
     const found = unresolved ? null : resolveSupplement(snapshot, { name: resolveName, supplementId: id }, `${field}.${id ? "ingredientId" : "name"}`);
-    if (isAgenticErrorResult(found) && id) return failure(`${field}.ingredientId`, "Use a returned or published ingredient ID.");
+    if (isAgenticErrorResult(found) && id) return found.error.reasonCode === "incompatible_identity" ? found : failure(`${field}.ingredientId`, "Use a returned or published ingredient ID.");
     const known = found && !isAgenticErrorResult(found) ? found : null;
     name ??= known?.name;
     if (!name) return failure(`${field}.name`, "A new target requires a name or published ingredient ID.");
