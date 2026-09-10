@@ -34,3 +34,22 @@ test("M721-ADVICE-03 explicit missing-reference rule classification does not cha
   assert.equal(adviceKind({ code: "dose_review_required", ruleId: "ul:total:d3" }), "dose_review");
   assert.equal(adviceKind({ code: "medication_interaction" }), "interaction");
 });
+
+test('SPLAN-ADV-04 live D3 product finding is emitted once per choice while all 19 ingredients remain addressable', () => {
+  const result = internalFixture(), first = result.selected!.basket[0];
+  const facts = Array.from({ length: 19 }, (_, index) => ({ supplementId: `sup_label_${index}`, name: `Label ingredient ${index}`, amount: null, unit: 'mg' as const, confidence: 'low' as const, mappingStatus: 'unverified' as const }));
+  const finding = { kind: 'product_data', code: 'product_data_unverified', severity: 'high', supplementIds: facts.slice(0, 10).map(row => row.supplementId),
+    productIds: [first.productId], ruleId: 'labels:unverified', rulesVersion: 'frozen', exposure: null, threshold: null,
+    uncertainty: 'Some product quantities or label facts are unverified. Treat reported amounts as provisional; missing physical units, pill counts and supply duration remain unknown. Conflicting nutrient mappings do not establish coverage. Review the label evidence before relying on these amounts.' } as unknown as SafetyGuidance;
+  const selected = { ...result.selected!, basket: [{ ...first, labelledFacts: facts }], safety: { ...result.selected!.safety, guidance: [finding, finding] } };
+  for (const locale of ['en', 'th', 'zh-CN']) {
+    const decision = presentDecision({ ...result, selected, alternatives: [], requestSnapshot: { ...result.requestSnapshot, locale } }, 'cap_live_d3_payload_regression', 1);
+    assert.ok('choices' in decision); const choice = decision.choices[0];
+    for (const fact of facts) assert.ok(choice.ingredients.some(row => row.ingredientId === fact.supplementId && row.supplied === null));
+    const attached = choice.ingredients.flatMap(row => (row.advice ?? []).filter(advice => advice.kind === 'product_data').map(advice => ({ row, advice })));
+    assert.equal(attached.length, 1, 'One scoped source fact must not be cloned onto every ingredient');
+    const affected = new Set([attached[0].row.ingredientId, ...(attached[0].advice.relatedIngredientIds ?? [])]);
+    for (const fact of facts) assert.ok(affected.has(fact.supplementId), 'Every affected ingredient remains linked to the finding');
+    assert.ok(Buffer.byteLength(JSON.stringify(decision)) < 20000);
+  }
+});
