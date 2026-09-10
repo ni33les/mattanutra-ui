@@ -32,6 +32,19 @@ export const handleCompletedFullJsonRpc: typeof dispatchJsonRpc = async (runtime
   return invoke();
 };
 
+/** Current flat-protocol test client. Work is driven by the separate durable
+ * executor; a handle-only read never starts work. No input or output translation. */
+export const handleCompletedJsonRpc: typeof dispatchJsonRpc = async (runtime, body) => {
+  const invoke = () => recordMcpCall(body, () => dispatchJsonRpc(runtime, body));
+  const admitted = await invoke();
+  const result = admitted?.result?.structuredContent as Record<string, unknown> | undefined;
+  const args = body?.params?.arguments as Record<string, unknown> | undefined;
+  if (runtime.matchPort || canonicalPublicToolName(String(body?.params?.name)) !== "plan" ||
+    typeof args?.idempotencyKey !== "string" || result?.status !== "processing") return admitted;
+  await executeAdmitted(runtime, args.idempotencyKey);
+  return invoke();
+};
+
 /** The direct-service version retains every admission and replay in evidence. */
 export const completedPlanTool: typeof admitPlan = async input => {
   const invoke=() => recordMcpCall({method:"plan",payload:input.payload},()=>admitPlan(input));
