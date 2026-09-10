@@ -54,7 +54,7 @@ export function decisionOptions(result: PlanResult) {
   if (!options.length && (result.requestSnapshot.originalRequest?.targets ?? result.requestSnapshot.targets).length) {
     options.push({ optionId: "empty", basket: [], coverage: result.coverage, coveragePercent: 0, dailyPills: 0,
       totalPriceMinor: 0, purchaseEligible: false, roles: ["best_match"], reason: result.summary,
-      matcherVersion: result.matcherTelemetry.matcherVersion, snapshotId: result.matcherTelemetry.snapshotId });
+      matcherVersion: result.matcherTelemetry.matcherVersion, snapshotId: result.matcherTelemetry.snapshotId ?? "unknown" });
   }
   return options;
 }
