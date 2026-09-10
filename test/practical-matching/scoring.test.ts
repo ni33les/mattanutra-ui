@@ -101,3 +101,19 @@ test('PRACTICAL-SCORE-10 missing pack prices are unavailable without inventing a
   assert.ok(score.missingComponents.includes('maxPriceMinor'));
   assert.equal(score.components.uncertainty,0, 'The approved 0.25 term applies to unverified administration, not an extra invented monetary weight');
 });
+
+test('PRACTICAL-SCORE-11 numerical preferences replace their fallback objectives without removing serving or uncertainty penalties', async () => {
+  const { scorePracticalPenalties } = await scoring();
+  const input = request({ maxDailyPills: 3, maxProductCount: 2, maxPriceMinor: 10000 });
+  const actual = actuals({ dailyPills: 6, pillLowerBound: 6, servings: [2], uncertainProductCount: 1 });
+  const score = scorePracticalPenalties(input, actual);
+  assert.equal(score.components.pills, 0);
+  assert.equal(score.components.products, 0);
+  assert.equal(score.components.price, 0);
+  assert.equal(score.preferences.maxDailyPills.penalty, 0.25);
+  assert.equal(score.components.servings, 0.05);
+  assert.equal(score.components.uncertainty, 0.25);
+  const cleared = scorePracticalPenalties({ ...input, maxDailyPills: null }, actual);
+  assert.equal(cleared.preferences.maxDailyPills.penalty, 0);
+  assert.equal(cleared.components.pills, 0.1);
+});
