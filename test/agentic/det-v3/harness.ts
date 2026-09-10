@@ -4,7 +4,7 @@ import {
   endDeterministicIdsForTests
 } from "../../../lib/agentic/capabilities.ts";
 import { loadAgenticConfig } from "../../../lib/agentic/config.ts";
-import { handleCompletedFullJsonRpc as handleJsonRpc } from "../../helpers/completed-mcp-client.ts";
+import { handleCompletedJsonRpc as handleJsonRpc } from "../../helpers/completed-mcp-client.ts";
 import {
   createAgenticRuntime,
   setAgenticRuntimeForTests,

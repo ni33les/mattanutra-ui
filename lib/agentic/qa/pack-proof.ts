@@ -5,7 +5,7 @@ import { AGENTIC_SCHEMA_CHECKSUM, engineeringInfo, infoTool } from "@/lib/agenti
 import { handleJsonRpc } from "@/lib/agentic/mcp/dispatcher";
 import { completedQaPlan as planTool } from "@/lib/agentic/qa/plan-client";
 import { executeTool } from "@/lib/agentic/commerce/execute";
-import { orderTool } from "@/lib/agentic/commerce/order";
+import { readOrderForQa } from "@/lib/agentic/qa/order-read";
 import { feedbackTool } from "@/lib/agentic/feedback";
 import { isAgenticErrorResult } from "@/lib/agentic/contract/errors";
 import { issueCapability, resolveCapability } from "@/lib/agentic/capabilities";
@@ -717,7 +717,7 @@ export async function packProof(runtime: AgenticRuntime) {
   checks.push(check("D10-02", latency.passed, latency.plan));
   checks.push(check("D10-05", latency.passed, latency.plan));
   checks.push(check("D10-06", info.pollAfterSeconds >= 3, { pollAfterSeconds: info.pollAfterSeconds }));
-  const reread = await orderTool({
+  const reread = await readOrderForQa({
     config: runtime.config,
     now,
     orderHandle: isAgenticErrorResult(executed) ? "missing".padEnd(32, "x") : executed.orderHandle,

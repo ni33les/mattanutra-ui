@@ -11,7 +11,7 @@ import {
   driveFulfilmentFixture,
   drivePaymentFixture
 } from "@/lib/agentic/commerce/fixture-driver";
-import { orderTool } from "@/lib/agentic/commerce/order";
+import { readOrderForQa } from "@/lib/agentic/qa/order-read";
 import { contributionFromFrozen, publicContribution } from "@/lib/agentic/funnel/events";
 import {
   funnelAttribution,
@@ -212,7 +212,7 @@ export async function simulatePayment(input: Readonly<{
     await processOmsOutbox({ now: clock.now, store: input.store });
   }
 
-  return orderTool({
+  return readOrderForQa({
     config: input.config,
     now: clock.now,
     orderHandle: input.orderHandle,
@@ -242,7 +242,7 @@ export async function simulateFulfilment(input: Readonly<{
     return driven;
   }
 
-  return orderTool({
+  return readOrderForQa({
     config: input.config,
     now: clock.now,
     orderHandle: input.orderHandle,

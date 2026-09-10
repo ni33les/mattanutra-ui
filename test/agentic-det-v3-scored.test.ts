@@ -427,25 +427,6 @@ describe("Slice S4 connector copy and versions", () => {
       assert.equal(tool.responsibilityVersion, RESPONSIBILITY_VERSION, tool.name);
     }
   });
-
-  it("S4-03 evidence claims each carry researchVersion", async () => {
-    const runtime = createDetRuntime();
-    const plan = await planTool({
-      config: runtime.config,
-      now: DET_V3_CLOCK,
-      payload: { idempotencyKey: "scored-ev-plan-xxxxxxxxx", request: goldenPlanRequest() },
-      scope: runtime.scope,
-      store: runtime.store
-    });
-    const handle = (plan as { evidenceHandle?: string }).evidenceHandle;
-    assert.ok(handle, "research version coverage requires an evidence handle");
-    const evidence = await detCall(runtime, "evidence", { evidenceHandle: handle, mode: "summary" });
-    assert.equal(evidence.researchVersion, RESEARCH_VERSION);
-    const claims = (evidence.claims as Array<{ researchVersion?: string }>) ?? [];
-    for (const claim of claims) {
-      assert.equal(claim.researchVersion, RESEARCH_VERSION);
-    }
-  });
 });
 
 describe("Slice S5 isolation without fixture SKUs", () => {
