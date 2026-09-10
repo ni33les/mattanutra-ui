@@ -38,3 +38,21 @@ test('SPLAN-WGT-09 presets are bounded explicit assignments', () => {
   const profile = resolvePracticalProfile({ ...request(), scoring: { profile: 'fewest_pills', weights: {} } });
   assert.deepEqual(profile.multipliers, { pills: 2, products: 1.5, price: 1, servings: 2 });
 });
+test('SPLAN-WGT-11 uncertainty selects the complete weighted worst endpoint anew; independent safety survives zero', async () => {
+  const { canonicalizeCurrents } = await import('../../lib/matcher/canonicalizer.ts');
+  const { weightedDoseFitScore, doseFitScore } = await import('../../lib/matcher/dose-fit.ts');
+  const dietary = canonicalizeCurrents([{ name: 'A', subjectId: 'a', dailyAmount: 0, unit: 'mg', sourceId: 'food', certainty: 'estimated' }]);
+  assert.ok(Array.isArray(dietary));
+  const base = request();
+  const input = { ...base, targets: base.targets.map(row => ({ ...row, basis: 'total_daily' })),
+    dietaryIntake: dietary.map(row => ({ ...row, minimumDailyAmount: 0, maximumDailyAmount: 160 })),
+    safetyCeilings: [{ subjectId: 'a', name: 'A', maxAmount: 150, maxUnit: 'mg', sourceScope: 'total' }],
+    scoring: { profile: 'balanced', weights: { nutrients: { a: 0 } } } };
+  assert.equal(doseFitScore(input, exposure(0)).total, 1); // low endpoint: 100% shortfall
+  assert.equal(weightedDoseFitScore(input, exposure(0)).total, 2 / 15); // high endpoint: 2 * 10/150
+  for (const weight of [1, 2]) {
+    const known = { ...base, scoring: { profile: weight === 1 ? 'balanced' : 'best_coverage', weights: {} },
+      safetyCeilings: [{ subjectId: 'a', name: 'A', maxAmount: 120, maxUnit: 'mg' }] };
+    assert.equal(weightedDoseFitScore(known, exposure(150)).total, weight * .5 + .5);
+  }
+});
