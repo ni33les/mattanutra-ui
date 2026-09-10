@@ -11,6 +11,7 @@ assert.ok(process.env.TEST_DB_URL, 'Browser checks require isolated PostgreSQL')
 for (const locale of ['en', 'th', 'zh-CN']) test(`WEB-JOURNEY-BROWSER-01 ${locale} HealthScore and reveal share the actual nutrient count`, async ({ page }) => {
   const directory = await mkdtemp(join(tmpdir(), 'web-counts-'));
   try {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
     const output = join(directory, 'fixture.json');
     await execute(process.execPath, ['--experimental-strip-types', '--import', './scripts/register-ts-path-loader.mjs', 'scripts/seed-browser-fixtures.ts', output, JSON.stringify({ scenario: 'practical_advice', locale })], { env: process.env, timeout: 60_000, maxBuffer: 1024 * 1024 });
     const fixture = JSON.parse(await readFile(output, 'utf8'));
