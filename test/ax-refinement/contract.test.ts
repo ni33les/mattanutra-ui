@@ -9,7 +9,7 @@ import { CLIENT_GUIDE_URI, CONTRACT_SCHEMA_URI, readContractResource, CLIENT_EXA
 import { runtime, rpc } from "./helpers.ts";
 
 test("AXR-SPEC-01 contract 7.2 publishes seven tools while preserving legacy request acceptance and historical v4–v7.1 resources", () => {
-  assert.equal(AGENTIC_CONTRACT_VERSION, "7.2.4");
+  assert.equal(AGENTIC_CONTRACT_VERSION, "8.0.0");
   assert.equal(GUIDANCE_RULES_VERSION, "6.0.0", "Clinical reference rules were not changed by this package");
   const old = JSON.parse(readFileSync(new URL("../../contract/mcp/6.0.0/tools.json", import.meta.url), "utf8"));
   assert.deepEqual([...AGENTIC_PUBLIC_TOOLS], ["info", "plan", "execute", "order", "support", "feedback", "evidence"]);
@@ -26,7 +26,7 @@ test("AXR-SPEC-01 contract 7.2 publishes seven tools while preserving legacy req
     assert.ok(resource, `${version}/${suffix} remains accessible`);
     assert.ok(resource.contents[0]!.text.includes(version));
   }
-  assert.ok(CLIENT_GUIDE_URI.includes("7.2.4")); assert.ok(CONTRACT_SCHEMA_URI.includes("7.2.4"));
+  assert.ok(CLIENT_GUIDE_URI.includes("8.0.0")); assert.ok(CONTRACT_SCHEMA_URI.includes("8.0.0"));
 });
 
 for (const locale of ["en", "th", "zh-CN"]) test(`AXR-SPEC-02 ${locale} tools-only info and native resources provide the same executable conversational contract`, async () => {

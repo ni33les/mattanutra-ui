@@ -1,3 +1,4 @@
+import { AGENTIC_CONTRACT_VERSION } from "../../lib/agentic/config.ts";
 import { readFileSync } from "node:fs";
 import assert from "node:assert/strict";
 import type { PlanSuccessWire } from "../../lib/agentic/contract/outputs.ts";
@@ -19,7 +20,7 @@ export function internalFixture(): PlanResult {
   const selected = options.find(option => option.optionId === wire.optionId); assert.ok(selected?.basket.length);
   return { status: "ready", summary: wire.summary, selected, alternatives: options.filter(option => option !== selected),
     basket: selected.basket, coverage: selected.coverage, safetyGuidance: [], questions: [], changeSummary: [], unmetRequirements: [],
-    requestSnapshot: aug25PlanState(), contractVersion: "7.2.4", matcherTelemetry: { snapshotId: "presentation-fixture", matcherVersion: "unchanged" }
+    requestSnapshot: aug25PlanState(), contractVersion: AGENTIC_CONTRACT_VERSION, matcherTelemetry: { snapshotId: "presentation-fixture", matcherVersion: "unchanged" }
   } as unknown as PlanResult;
 }
 export async function storedFixture(result: PlanResult) {

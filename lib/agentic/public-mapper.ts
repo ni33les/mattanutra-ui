@@ -56,7 +56,7 @@ function compactPublic(
     if (key === "snapshotId") {
       continue;
     }
-    if (key === "administration" || key === "labelledFacts" || key === "originalRequest" || key === "preferenceAssessment" || key === "matchingDiagnostics" || key === "matchingExplanation") { out[key] = nested; continue; }
+    if (key === "administration" || key === "labelledFacts" || key === "originalRequest" || key === "preferenceAssessment" || key === "overallScore" || key === "matchingDiagnostics" || key === "matchingExplanation") { out[key] = nested; continue; }
     if (nested == null) {
       if (nested === null && ["highlightedAlternativeOptionId", "administration", "pills", "dailyPills", "pillsPerServing", "totalDailyPills", "pillDelta", "dailyPillsDelta", "dailyCostMinor", "supplyDays", "totalExposureAmount", "supplementId", "exposure", "threshold", "nextReplenishmentDay", "cash30DayMinor", "cash90DayMinor", "cash90DayDeltaMinor"].includes(key)) out[key] = null;
       continue;

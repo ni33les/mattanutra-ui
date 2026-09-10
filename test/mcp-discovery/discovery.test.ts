@@ -1,3 +1,4 @@
+import { CURRENT_CONTRACT_SCHEMA_CHECKSUM } from "../helpers/current-contract-lock.ts";
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { readFileSync, existsSync } from "node:fs";
@@ -61,7 +62,7 @@ test("DISC-MCP-05 descriptions lead with purpose and keep operation instructions
 });
 test("DISC-MCP-06 info uses the exact approved English description", async () => { const info = await call("tools/call"); assert.equal(info.serviceName, "MattaNutra"); assert.equal(info.description, golden().infoDescription); });
 test("DISC-MCP-07 existing info identity and capability fields remain intact", async () => {
-  const info = await call("tools/call"); assert.equal(info.contractVersion, "7.2.4"); assert.equal(info.schemaChecksum, "b90da9cf4b6b9e8f7cf4f49b8420be5751af5ed17e99b1a874c39ee0bcb985a1");
+  const info = await call("tools/call"); assert.equal(info.contractVersion, "8.0.0"); assert.equal(info.schemaChecksum, CURRENT_CONTRACT_SCHEMA_CHECKSUM);
   for (const key of ["buildId", "valuePropositionId", "wellnessBoundary", "responsibilityVersion", "researchVersion"]) assert.ok(info[key]);
   assert.deepEqual(info.supportedLocales, locales); assert.deepEqual((info.supportedCountries as {countryCode:string}[]).map(row => row.countryCode), ["TH"]);
 });
@@ -75,9 +76,9 @@ test("DISC-MCP-09 client guide starts with invocation and retains the existing w
   assert.equal(text.split("\n\n")[1], golden().initialization);
   for (const term of [/requestPatch/, /idempotency/, /checkout/, /knownResultVersion/, /unknown/i]) assert.match(text, term);
 });
-test("DISC-MCP-10 complete tool input and output schemas are unchanged", () => {
-  assert.equal(computeSchemaChecksum(), "b90da9cf4b6b9e8f7cf4f49b8420be5751af5ed17e99b1a874c39ee0bcb985a1");
-  const snapshot = read("contract/mcp/7.2.4/schema.json"); for (const tool of toolList()) assert.deepEqual({inputSchema:tool.inputSchema,outputSchema:tool.outputSchema}, snapshot.tools[tool.name]);
+test("DISC-MCP-10 complete tool input and output schemas match the reviewed active contract", () => {
+  assert.equal(computeSchemaChecksum(), CURRENT_CONTRACT_SCHEMA_CHECKSUM);
+  const snapshot = read("contract/mcp/8.0.0/schema.json"); for (const tool of toolList()) assert.deepEqual({inputSchema:tool.inputSchema,outputSchema:tool.outputSchema}, snapshot.tools[tool.name]);
 });
 test("DISC-I18N-01 info description matches the requested approved locale", async () => { for (const locale of locales) assert.equal((await call("tools/call", {}, "dev", locale)).description, golden(locale).infoDescription); });
 test("DISC-I18N-02 generated locale positioning preserves reviewed invocation and boundaries", () => {
@@ -109,7 +110,7 @@ test("DISC-TRUTH-02 ready and purchase eligibility never mean medical approval",
 test("DISC-TRUTH-03 accepted medication codes are not claimed as assessed interactions", async () => { const info=await call("tools/call"); const text=String(info.clientInstructions); assert.match(text,/accepted inputs/); assert.match(text,/unassessed, never cleared/); assert.match(text,/advice.kind=interaction/); });
 test("DISC-TRUTH-04 published market stays Thailand and catalogue gaps remain visible", async () => { const info=await call("tools/call"); assert.deepEqual((info.supportedCountries as {countryCode:string}[]).map(row=>row.countryCode),["TH"]); assert.match(String(info.clientInstructions),/finite catalogue/); assert.match(String(info.clientInstructions),/gaps are real/); });
 test("DISC-TRUTH-05 installed verification rejects missing titles and stale positioning", () => {
-  const published={contractVersion:"7.2.4",schemaChecksum:computeSchemaChecksum(),tools:toolList(),connector:adapter()};
+  const published={contractVersion:"8.0.0",schemaChecksum:computeSchemaChecksum(),tools:toolList(),connector:adapter()};
   const evidence={...structuredClone(published),source:"installed_connector",connectorId:"dev-live-export",environment:"dev",observedAt:"2026-09-09T00:00:00Z"};
   assert.equal(validateInstalledConnectorProjection(evidence,published).passed,true);
   const stale=structuredClone(evidence); delete (stale.tools[0] as {title?:string}).title;

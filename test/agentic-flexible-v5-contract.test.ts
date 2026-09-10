@@ -29,8 +29,8 @@ describe("v5 conversational contract", () => {
     for (const args of [{ operation: "create", request: proposed, idempotencyKey: "v5-contract-create-01", searchEffort: "expanded" }, { operation: "revise", requestPatch: { requirements: { productDoses: [] } }, searchEffort: "expanded", idempotencyKey: "v5-contract-revise-01", expectedRevision: 1, planHandle: "cap_replace_with_real_returned_handle" }]) assert.deepEqual(validateToolIssues(AGENTIC_INPUT_SCHEMAS.plan, args), []);
     assert.ok(validateToolIssues(PLAN_REQUEST, { ...request, requirements: { productDoses: [{ productId: "prd_returned", servingsPerDay: 0 }] } }).length);
   });
-  it("publishes v7 while preserving complete historical v4–v6 resources", () => {
-    assert.equal(AGENTIC_CONTRACT_VERSION, "7.2.4"); assert.equal(CLIENT_GUIDE_URI, `mattanutra://contract/${AGENTIC_CONTRACT_VERSION}/client-guide`);
+  it("publishes v8 while preserving complete historical v4–v7 resources", () => {
+    assert.equal(AGENTIC_CONTRACT_VERSION, "8.0.0"); assert.equal(CLIENT_GUIDE_URI, `mattanutra://contract/${AGENTIC_CONTRACT_VERSION}/client-guide`);
     const old = readContractResource("mattanutra://contract/4.0.0/schema"); assert.ok(old);
     assert.equal(JSON.parse(old.contents[0].text).contractVersion, "4.0.0");
     const v5 = readContractResource("mattanutra://contract/5.0.0/schema"); assert.ok(v5);

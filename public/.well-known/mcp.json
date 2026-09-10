@@ -15315,27 +15315,27 @@
   "resources": [
     {
       "uri": "mattanutra://contract/8.0.0/client-guide",
-      "name": "MattaNutra v7.2.4 client guide",
+      "name": "MattaNutra v8.0.0 client guide",
       "mimeType": "text/markdown",
       "description": "Workflow, complete operation semantics, advice and payment recovery examples."
     },
     {
       "uri": "mattanutra://contract/8.0.0/schema",
-      "name": "MattaNutra v7.2.4 complete contract",
+      "name": "MattaNutra v8.0.0 complete contract",
       "mimeType": "application/schema+json",
       "description": "Input and response contracts for all seven public tools and individual plan operations."
     },
     {
       "uri": "mattanutra://contract/7.2.4/client-guide",
-      "name": "MattaNutra v7.2.4 client guide",
+      "name": "MattaNutra v7.2.4 client-guide",
       "mimeType": "text/markdown",
-      "description": "Workflow, complete operation semantics, advice and payment recovery examples."
+      "description": "Historical 7.2.4 contract, preserved unchanged."
     },
     {
       "uri": "mattanutra://contract/7.2.4/schema",
-      "name": "MattaNutra v7.2.4 complete contract",
+      "name": "MattaNutra v7.2.4 schema",
       "mimeType": "application/schema+json",
-      "description": "Input and response contracts for all seven public tools and individual plan operations."
+      "description": "Historical 7.2.4 contract, preserved unchanged."
     },
     {
       "uri": "mattanutra://contract/4.0.0/client-guide",

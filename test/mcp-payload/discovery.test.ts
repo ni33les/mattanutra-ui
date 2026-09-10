@@ -7,12 +7,17 @@ import { toolList, handleLightweightJsonRpc } from "../../lib/agentic/mcp/rpc.ts
 import { loadAgenticConfig } from "../../lib/agentic/config.ts";
 import { baseline, bytes } from "./fixtures.ts";
 
-test("PAY-SCHEMA-01 discovery preserves self-contained 7.2.4 schemas with bounded positioning overhead", () => {
+test("PAY-SCHEMA-01 discovery preserves self-contained current schemas with bounded positioning overhead", () => {
   const original = JSON.parse(gunzipSync(readFileSync("test/mcp-discovery/baseline-tools.json.gz")).toString("utf8")) as ReturnType<typeof toolList>;
   const tools = toolList();
+  const reviewed = JSON.parse(readFileSync("contract/mcp/8.0.0/tools.json", "utf8")).tools as ReturnType<typeof toolList>;
   assert.deepEqual(tools.map(row => row.name), ["info", "plan", "execute", "order", "support", "feedback", "evidence"]);
-  for (const tool of tools) { const prior=original.find(row=>row.name===tool.name)!; assert.ok(prior); assert.deepEqual(tool.inputSchema,prior.inputSchema); assert.deepEqual(tool.outputSchema,prior.outputSchema); }
-  assert.ok(bytes(tools) <= bytes(original) + 2000, `Positioning added ${bytes(tools)-bytes(original)} bytes`);
+  for (const tool of tools) { const prior=reviewed.find(row=>row.name===tool.name)!; assert.ok(prior); assert.deepEqual(tool.inputSchema,prior.inputSchema); assert.deepEqual(tool.outputSchema,prior.outputSchema); }
+  // Historical payload remains evidence. Allow only the reviewed v8 schema
+  // delta; descriptor overhead retains the original 2 KB budget.
+  const schemas = (rows: typeof tools) => rows.map(({inputSchema,outputSchema}) => ({inputSchema,outputSchema}));
+  const schemaDelta = bytes(schemas(reviewed)) - bytes(schemas(original));
+  assert.ok(bytes(tools) <= bytes(original) + schemaDelta + 2000, `Unreviewed descriptor growth: ${bytes(tools)-bytes(original)-schemaDelta} bytes`);
   const ajv = new Ajv({ strict: false, validateFormats: false });
   for (const tool of tools) { ajv.compile(tool.inputSchema); ajv.compile(tool.outputSchema); }
   for (const locale of ["en", "th", "zh-CN"]) {
