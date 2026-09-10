@@ -1,3 +1,5 @@
+import { optionalTargetAmountsAreCoherent } from "./helpers/optional-target-amounts.ts";
+import { VALUE_ROLE_REQUEST } from "./agentic/value/pack-scenario.ts";
 import { hasContextAssessment } from "./helpers/context-assessment.ts";
 import { withRecordedMcpEvidence } from "./helpers/mcp-evidence.ts";
 import assert from "node:assert/strict";
@@ -330,7 +332,7 @@ async function runReg01(session: PlanSession, runIndex: number): Promise<R2CaseR
     assertTrue("REG-01.creatine", creatine?.importance === "core" && creatine?.status === "covered"),
     assertTrue(
       "REG-01.mag",
-      !mag || mag.status === "optional_omitted" || mag.status === "covered" || mag.status === "already_covered"
+      optionalTargetAmountsAreCoherent(mag, VALUE_ROLE_REQUEST.magnesium.amount)
     ),
     assertEq("REG-01.d3", "conditional_deferred", d3?.status),
     assertTrue("REG-01.role", recommended.role === "minimum_core" || Boolean(plan.optionId)),
