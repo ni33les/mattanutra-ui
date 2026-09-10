@@ -8295,15 +8295,9 @@
                               "type": "object",
                               "properties": {
                                 "kind": {
-                                  "type": "string",
-                                  "enum": [
-                                    "dose_review",
-                                    "interaction",
-                                    "overlap",
-                                    "incomplete_information",
-                                    "product_data",
-                                    "other"
-                                  ]
+                                  "description": "Advice reports only quantified exposure above MattaNutra recommended limits. Equal, below-limit and unknown exposure produce no advice. Medication/condition codes are accepted inputs, not interaction coverage. Absence of advice is not medical clearance. Limits remain advisory, including at weight zero.",
+                                  "const": "dose_review",
+                                  "type": "string"
                                 },
                                 "severity": {
                                   "type": "string",

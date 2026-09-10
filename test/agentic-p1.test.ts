@@ -737,7 +737,7 @@ describe("agentic P1 pack fixes", () => {
         assert.equal(text.includes("Checkout ready"), false);
         assert.match(text, /paid|completed|confirmed/i);
     });
-    it("preserves explicit uncertainty and serious condition advice in a purchasable plan", async () => {
+    it("preserves internal condition findings with limit-only public advice and purchasable plans", async () => {
         const runtime = runtimeFor();
         const plan = await call(runtime, "plan", {
             idempotencyKey: "p1-d410-blocked-00001",
@@ -764,7 +764,9 @@ describe("agentic P1 pack fixes", () => {
             exposure?: unknown;
         }>).some(item => item.exposure === null));
         assert.equal(encoded.includes("rulesVersion"), false, "Sources are retrieved through narrow evidence, not cloned into the decision");
-        assert.ok((plan.choices as Array<{ingredients: Array<{advice?: unknown[]}>}>).some(choice => choice.ingredients.some(row => row.advice?.length)));
+        for (const finding of (plan.choices as Array<{ingredients: Array<{advice?: Array<{kind:string;exposure:number;reference:number}>}>}>).flatMap(choice => choice.ingredients.flatMap(row => row.advice ?? []))) {
+            assert.equal(finding.kind, "dose_review"); assert.ok(finding.exposure > finding.reference && finding.reference > 0);
+        }
         const guidance = (await storedFields(runtime, plan)).safetyGuidance as Array<{
             ruleId: string;
             rulesVersion: string;

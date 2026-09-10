@@ -1,8 +1,9 @@
 import { Type, type Static } from "@sinclair/typebox";
+import { LIMIT_ADVICE_POLICY } from "@/lib/agentic/presentation/limit-advice";
 import { object as o, optional as p, nullable as n, enumeration as e } from "@/lib/agentic/contract/schemas";
 const str = Type.String(), num = Type.Number(), money = Type.Number({ minimum: 0, description: "Major currency units; exact minor-unit money is rounded only for presentation." });
 const id = Type.String({ minLength: 1 }), list = <T extends import("@sinclair/typebox").TSchema>(row: T) => Type.Array(row);
-export const INGREDIENT_ADVICE_SCHEMA = o({ kind: e(["dose_review", "interaction", "overlap", "incomplete_information", "product_data", "other"] as const),
+export const INGREDIENT_ADVICE_SCHEMA = o({ kind: Type.Literal("dose_review", { description: LIMIT_ADVICE_POLICY }),
   severity: e(["low", "medium", "high"] as const), message: Type.String({ maxLength: 240 }),
   exposure: p(n(num)), reference: p(n(num)), referenceScope: p(e(["total", "supplemental"] as const)),
   source: p(str), uncertainty: p(str), relatedIngredientIds: p(list(id)) });

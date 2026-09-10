@@ -4,7 +4,7 @@ import { test } from "node:test";
 import { readFileSync, existsSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { handleLightweightJsonRpc, toolList } from "../../lib/agentic/mcp/rpc.ts";
-import { loadAgenticConfig, type AgenticEnvironment } from "../../lib/agentic/config.ts";
+import { AGENTIC_CONTRACT_VERSION, loadAgenticConfig, type AgenticEnvironment } from "../../lib/agentic/config.ts";
 import { computeSchemaChecksum } from "../../lib/agentic/release-manifest.ts";
 import { testSourceHygiene } from "../../scripts/test-execution-proof.mjs";
 import { validateInstalledConnectorProjection } from "../../scripts/validate-installed-connector-projection.mjs";
@@ -56,7 +56,7 @@ test("DISC-MCP-04 every native tool has the approved title", async () => { const
 test("DISC-MCP-05 descriptions lead with purpose and keep operation instructions", async () => {
   const result = await call("tools/list"); const tools = result.tools as {name:string;description:string}[];
   for (const tool of tools) assert.ok(tool.description.startsWith(golden().purposes[tool.name]), tool.name);
-  const plan = tools.find(tool => tool.name === "plan")!; assert.ok(plan); for (const term of [/planHandle/, /response|conversation/, /same key/, /unassessed/, /exclusions/, /expectedRevision|current revision|revision/]) assert.match(plan.description, term);
+  const plan = tools.find(tool => tool.name === "plan")!; assert.ok(plan); for (const term of [/planHandle/, /response|conversation/, /same key/, /not medical clearance/, /exclusions/, /expectedRevision|current revision|revision/]) assert.match(plan.description, term);
   assert.match(tools.find(tool => tool.name === "execute")!.description, /confirm/i);
   assert.match(tools.find(tool => tool.name === "feedback")!.description, /consentConfirmed=true/);
 });
@@ -78,7 +78,7 @@ test("DISC-MCP-09 client guide starts with invocation and retains the existing w
 });
 test("DISC-MCP-10 complete tool input and output schemas match the reviewed active contract", () => {
   assert.equal(computeSchemaChecksum(), CURRENT_CONTRACT_SCHEMA_CHECKSUM);
-  const snapshot = read("contract/mcp/9.0.0/schema.json"); for (const tool of toolList()) assert.deepEqual({inputSchema:tool.inputSchema,outputSchema:tool.outputSchema}, snapshot.tools[tool.name]);
+  const snapshot = read(`contract/mcp/${AGENTIC_CONTRACT_VERSION}/schema.json`); for (const tool of toolList()) assert.deepEqual({inputSchema:tool.inputSchema,outputSchema:tool.outputSchema}, snapshot.tools[tool.name]);
 });
 test("DISC-I18N-01 info description matches the requested approved locale", async () => { for (const locale of locales) assert.equal((await call("tools/call", {}, "dev", locale)).description, golden(locale).infoDescription); });
 test("DISC-I18N-02 generated locale positioning preserves reviewed invocation and boundaries", () => {
@@ -107,7 +107,7 @@ test("DISC-DET-05 package tests have no skipped focused or empty cases", () => {
 });
 test("DISC-TRUTH-01 positioning promises balancing rather than guaranteed optimality", () => { noGuarantees(adapter()); assert.match(adapter().shortDescription ?? "", /balanc/i); });
 test("DISC-TRUTH-02 ready and purchase eligibility never mean medical approval", async () => { const info=await call("tools/call"); assert.match(String(info.clientInstructions), /checkout-ready, not targets met or medical approval/); });
-test("DISC-TRUTH-03 accepted medication codes are not claimed as assessed interactions", async () => { const info=await call("tools/call"); const text=String(info.clientInstructions); assert.match(text,/Medication\/condition inputs/); assert.match(text,/remain unassessed/); assert.match(text,/Ingredient advice remains visible/); });
+test("DISC-TRUTH-03 accepted medication codes are not claimed as assessed interactions", async () => { const info=await call("tools/call"); const text=String(info.clientInstructions); assert.match(text,/Medication\/condition codes are accepted inputs, not interaction coverage/); assert.match(text,/only quantified exposure above MattaNutra recommended limits/); assert.match(text,/Absence of advice is not medical clearance/); });
 test("DISC-TRUTH-04 published market stays Thailand and catalogue gaps remain visible", async () => { const info=await call("tools/call"); assert.deepEqual((info.supportedCountries as {countryCode:string}[]).map(row=>row.countryCode),["TH"]); assert.match(String(info.clientInstructions),/finite catalogue/); assert.match(String(info.clientInstructions),/real gaps/); });
 test("DISC-TRUTH-05 installed verification rejects missing titles and stale positioning", () => {
   const published={contractVersion:"9.0.0",schemaChecksum:computeSchemaChecksum(),tools:toolList(),connector:adapter()};

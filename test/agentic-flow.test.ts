@@ -46,7 +46,7 @@ function runtimeFor(principal: string | null = null): AgenticRuntime {
     });
 }
 function routine(value: Record<string, unknown>) {
-    const choices = value.choices as Array<{optionId: string; roles: string[]; products: Array<{name: string}>; ingredients: Array<{advice?: Array<{kind:string;severity:string}>}>}>;
+    const choices = value.choices as Array<{optionId: string; roles: string[]; products: Array<{name: string}>; ingredients: Array<{advice?: Array<{kind:string;severity:string;exposure:number;reference:number}>}>}>;
     assert.ok(choices?.length, JSON.stringify(value));
     const result = choices.find(row => row.products.length && row.roles.includes("closest_dose")) ?? choices.find(row => row.products.length); assert.ok(result); return result;
 }
@@ -217,7 +217,7 @@ describe("agentic DEV flow", () => {
             reasonCode: string;
         }).reasonCode, "not_found");
     });
-    it("keeps CKD magnesium advice visible while allowing confirmed checkout", async () => {
+    it("retains CKD context and confirmed checkout with only measured limit-excess advice", async () => {
         const runtime = runtimeFor();
         let created = await call(runtime, "plan", {
             idempotencyKey: "ckd-magnesium-000001",
@@ -229,7 +229,13 @@ describe("agentic DEV flow", () => {
             })
         });
         assert.equal(created.status, "ready");
-        assert.ok(routine(created).ingredients.flatMap(row => row.advice ?? []).length > 0);
+        const cap = await resolveCapability({ action: "plan.read", config: runtime.config, handle: String(created.planHandle), now: new Date().toISOString(), resourceType: "plan", scope: runtime.scope, store: runtime.store });
+        assert.ok(cap);
+        const stored = await runtime.store.getPlanRevision(cap.resourceId, Number(created.revision));
+        assert.ok(stored?.requestSnapshot.conditionCodes.includes("ckd"));
+        for (const finding of routine(created).ingredients.flatMap(row => row.advice ?? [])) {
+            assert.equal(finding.kind, "dose_review"); assert.ok(finding.exposure > finding.reference && finding.reference > 0);
+        }
         created = await select(runtime, created, "flow-ckd-select-01");
         const executed = await call(runtime, "execute", {
             expectedRevision: created.revision,
@@ -238,7 +244,7 @@ describe("agentic DEV flow", () => {
         });
         assert.equal(executed.ok, true, JSON.stringify(executed));
         assert.ok(executed.orderHandle);
-        assert.ok(routine(created).ingredients.flatMap(row => row.advice ?? []).some(item => item.severity === "high"));
+        assert.equal(created.status, "ready");
     });
     it("selects algae omega-3 under a plant-based constraint", async () => {
         const runtime = runtimeFor();

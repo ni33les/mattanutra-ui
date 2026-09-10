@@ -1,0 +1,19 @@
+{
+  "releaseBase": "552e3b456b8939c214dd0036666dd61a408c40cc",
+  "scope": "MCP recommended-limit advice projection and matching publication; no scoring or web changes",
+  "groups": [
+    {
+      "name": "projection",
+      "files": ["test/simple-plan/advice.test.ts", "test/simple-plan/limit-advice.test.ts", "test/simple-plan/retained-public-invariants.test.ts", "test/simple-plan/response.test.ts", "test/simple-plan/facts.test.ts", "test/simple-plan/publication.test.ts", "test/simple-plan/hosted.test.ts"],
+      "reason": "Changed advice, uncertainty and deduplication, preserved ingredient facts and lifecycle, emitted schemas and generated descriptions"
+    },
+    {
+      "name": "consumers",
+      "files": ["test/simple-plan/commerce-evidence.test.ts", "test/agentic-flow.test.ts", "test/agentic-p1.test.ts", "test/mcp-discovery/discovery.test.ts", "test/mcp-7-2-2/medications.test.ts"],
+      "pattern": "SPLAN-EVID-01|CKD context|internal condition findings|DISC-MCP-(0[1259]|10)|DISC-TRUTH-03|DISC-DET-04|test_info_does_not_claim_interaction_coverage",
+      "reason": "Only directly affected evidence, CKD checkout, native discovery and honest interaction-coverage assertions; unrelated cases are not selected"
+    }
+  ],
+  "expectationChanges": "test/simple-plan/expectation-changes.md",
+  "requirements": ["strictly greater than positive applicable limit", "no unquantified or upper-estimate-only breaches", "one concise localized message", "no other advice or summary warning", "preserve internal findings, facts, sources and checkout", "no new locks, schema fields or tools"]
+}

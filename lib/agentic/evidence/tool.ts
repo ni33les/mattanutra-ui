@@ -1,3 +1,4 @@
+import { recommendedLimitFindings, recommendedLimitMessage } from "@/lib/agentic/presentation/limit-advice";
 import { businessError, isAgenticErrorResult } from "@/lib/agentic/contract/errors";
 import { readPlanPresentation } from "@/lib/agentic/presentation/plan-read";
 import { decisionOptions, decisionOptionId, presentDecision } from "@/lib/agentic/presentation/decision";
@@ -21,9 +22,9 @@ export async function evidenceTool(input: Pick<AgenticRuntime, "config" | "now" 
   const products = product ? [product] : option.basket.filter(row => ingredient!.productIds.includes(row.productId));
   const facts = products.flatMap(row => (row.labelledFacts ?? []).filter(fact => !ingredient || fact.supplementId === ingredient.ingredientId || fact.name.toLowerCase() === ingredient.name.toLowerCase())
     .map(fact => ({ productId: row.productId, ...fact })));
-  const findings = (option.safety?.guidance ?? []).filter(row => product ? row.productIds.includes(product.productId) : row.supplementIds.includes(ingredient!.ingredientId) || row.nutrientName?.toLowerCase() === ingredient!.name.toLowerCase());
+  const findings = recommendedLimitFindings(option).filter(row => product ? row.productIds.includes(product.productId) : row.supplementIds.includes(ingredient!.ingredientId) || row.nutrientName?.toLowerCase() === ingredient!.name.toLowerCase());
   return { ok: true as const, planHandle: input.planHandle, revision: input.expectedRevision, optionId: input.optionId,
     ...(product ? { productId: product.productId, administration: product.administration ?? null } : { ingredientId: input.ingredientId }), facts,
-    findings: findings.map(row => ({ ruleId: row.ruleId, ruleVersion: row.rulesVersion, message: row.message, exposure: row.exposure,
+    findings: findings.map(row => ({ ruleId: row.ruleId, ruleVersion: row.rulesVersion, message: recommendedLimitMessage(row.threshold!, row.unit!, saved.result.requestSnapshot.locale), exposure: row.exposure,
       reference: row.threshold, unit: row.unit, scope: row.sourceScope, source: row.authorityUrl ?? null, evidence: [...(row.evidence ?? [])], uncertainty: row.uncertainty ?? null })) };
 }

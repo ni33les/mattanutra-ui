@@ -1,8 +1,7 @@
 import { isUuid, publicSupplementId } from "@/lib/agentic/contract/ids";
 import { sha256Hex } from "@/lib/sha256";
 import { convertAmount } from "@/lib/matcher/dose";
-import { formatNutrientAmount } from "@/lib/agentic/presentation/amount";
-import { adviceKind } from "@/lib/agentic/value/advice-kind";
+import { recommendedLimitFindings, recommendedLimitMessage } from "@/lib/agentic/presentation/limit-advice";
 import { patchScoring } from "@/lib/matcher/scoring-policy";
 import { administrationDailyPills, verifiedAdministration } from "@/lib/product-administration";
 import type { SimplePlanDecision } from "@/lib/agentic/contract/decision-schema";
@@ -11,26 +10,17 @@ import type { MatcherUnit } from "@/lib/matcher/types";
 
 const COPY = {
   en: { processing: "Matching your targets. Wait before checking this plan again.", failed: "Matching did not finish. Retry this refinement with scoring:{} and a new idempotency key.",
-    ready: "Review the recommended routine and its ingredient advice, then confirm your choice.", selected: "Your choice is selected. Confirm the routine and ingredient advice before checkout.",
+    ready: "Review the recommended routine, then confirm your choice.", selected: "Your choice is selected. Confirm the routine before checkout.",
     review: "No purchase is recommended; review the available choices and remaining gaps.", none: "No new supplement purchase is needed for these targets.", noTargets: "No targets remain, so no purchase is recommended.",
-    stale: "Product facts changed. Refresh with scoring:{} before choosing a routine.", question: "Answer the question that affects your next choice.",
-    unknown: "Some reported health context has not been assessed; absence of an interaction finding is not clearance.",
-    missing: "No verified applicable reference is available; exposure cannot be described as below a limit.", product: "Composition or administration information is unverified or incomplete. Quantities remain uncertain.",
-    interaction: "A possible interaction needs review. Read the supporting source before deciding.", overlap: "Several products contribute this ingredient. Review the combined daily exposure.", dose: "Review daily exposure against the applicable reference.", other: "Review this ingredient finding and its supporting source." },
+    stale: "Product facts changed. Refresh with scoring:{} before choosing a routine.", question: "Answer the question that affects your next choice." },
   th: { processing: "กำลังจับคู่ตามเป้าหมาย โปรดรอก่อนตรวจสอบแผนอีกครั้ง", failed: "การจับคู่ยังไม่เสร็จ ลองส่ง scoring:{} พร้อมคีย์ idempotency ใหม่",
-    ready: "ตรวจสอบชุดที่แนะนำและคำแนะนำของส่วนประกอบ ก่อนยืนยันตัวเลือก", selected: "เลือกชุดแล้ว โปรดยืนยันกิจวัตรและคำแนะนำของส่วนประกอบก่อนชำระเงิน",
+    ready: "ตรวจสอบชุดที่แนะนำก่อนยืนยันตัวเลือก", selected: "เลือกชุดแล้ว โปรดยืนยันกิจวัตรก่อนชำระเงิน",
     review: "ยังไม่แนะนำให้ซื้อ โปรดตรวจสอบตัวเลือกและส่วนที่ยังขาด", none: "เป้าหมายเหล่านี้ไม่จำเป็นต้องซื้ออาหารเสริมเพิ่ม", noTargets: "ไม่มีเป้าหมายเหลืออยู่ จึงไม่แนะนำให้ซื้อ",
-    stale: "ข้อมูลผลิตภัณฑ์เปลี่ยนแล้ว ส่ง scoring:{} เพื่อปรับข้อมูลก่อนเลือก", question: "ตอบคำถามที่มีผลต่อตัวเลือกถัดไป",
-    unknown: "ข้อมูลสุขภาพที่แจ้งบางส่วนยังไม่ได้รับการประเมิน การไม่พบข้อค้นพบเรื่องปฏิกิริยาระหว่างกันไม่ใช่การรับรอง",
-    missing: "ไม่มีค่าอ้างอิงที่ใช้ได้และผ่านการยืนยัน จึงไม่อาจกล่าวว่าปริมาณต่ำกว่าขีดอ้างอิง", product: "ข้อมูลส่วนประกอบหรือวิธีใช้ยังไม่ครบหรือยังไม่ยืนยัน ปริมาณยังมีความไม่แน่นอน",
-    interaction: "ควรทบทวนปฏิกิริยาที่อาจเกิดขึ้น อ่านแหล่งข้อมูลก่อนตัดสินใจ", overlap: "หลายผลิตภัณฑ์ให้ส่วนประกอบนี้ โปรดทบทวนปริมาณรวมต่อวัน", dose: "ทบทวนปริมาณต่อวันเทียบกับค่าอ้างอิงที่เกี่ยวข้อง", other: "ทบทวนข้อค้นพบเกี่ยวกับส่วนประกอบนี้และแหล่งข้อมูล" },
+    stale: "ข้อมูลผลิตภัณฑ์เปลี่ยนแล้ว ส่ง scoring:{} เพื่อปรับข้อมูลก่อนเลือก", question: "ตอบคำถามที่มีผลต่อตัวเลือกถัดไป" },
   "zh-CN": { processing: "正在匹配目标，请稍后再查询此计划。", failed: "匹配未完成。请使用 scoring:{} 和新的幂等键重试。",
-    ready: "查看推荐组合及成分建议，然后确认选择。", selected: "已选择组合。结账前请确认日常用量和成分建议。",
+    ready: "查看推荐组合，然后确认选择。", selected: "已选择组合。结账前请确认日常用量。",
     review: "目前不建议购买；请查看可选组合及尚未满足的目标。", none: "这些目标目前无需购买新的补充剂。", noTargets: "已无目标，因此不建议购买。",
-    stale: "产品信息已变化。选择前请用 scoring:{} 刷新。", question: "请回答会影响下一步选择的问题。",
-    unknown: "部分已报告的健康背景尚未评估；没有相互作用提示并不表示已获确认。",
-    missing: "缺少经过核实且适用的参考值，无法声称摄入量低于限值。", product: "成分或服用信息未经核实或不完整，用量仍有不确定性。",
-    interaction: "可能存在相互作用，请在决定前查阅支持来源。", overlap: "多个产品含有此成分，请查看每日合计摄入量。", dose: "请根据适用参考值查看每日摄入量。", other: "请查看此成分的提示及支持来源。" }
+    stale: "产品信息已变化。选择前请用 scoring:{} 刷新。", question: "请回答会影响下一步选择的问题。" }
 } as const;
 const copy = (locale?: string) => COPY[locale === "th" ? "th" : locale === "zh-CN" || locale === "zh" ? "zh-CN" : "en"];
 export function processingDecision(planHandle: string, revision: number, locale?: string, pollAfterSeconds = 3): SimplePlanDecision {
@@ -64,25 +54,13 @@ function converted(amount: number | null | undefined, from: string | null | unde
   if (amount == null || !from || !to) return null;
   return convertAmount({ amount, fromUnit: from, toUnit: to as MatcherUnit, subjectId: id, subjectName: name });
 }
-function adviceIdentity(row: SafetyGuidance) {
-  return JSON.stringify([row.code, row.ruleId, row.rulesVersion, row.sourceScope, row.exposure, row.threshold, row.unit,
-    row.authorityUrl, row.uncertainty, row.productIds.slice().sort(), row.supplementIds.slice().sort()]);
-}
-function adviceRows(findings: readonly SafetyGuidance[], ingredient: Ingredient, locale: string): NonNullable<Ingredient["advice"]> {
-  const seen = new Set<string>(), text = copy(locale);
-  return findings.flatMap(row => {
-    const key = adviceIdentity(row);
-    if (seen.has(key)) return []; seen.add(key);
-    const kind = adviceKind(row), measured = row.threshold != null && row.threshold > 0;
-    const exposure = converted(row.exposure, row.unit, ingredient.unit, ingredient.name, ingredient.ingredientId);
-    const reference = measured ? converted(row.threshold, row.unit, ingredient.unit, ingredient.name, ingredient.ingredientId) : null;
-    const message = kind === "incomplete_information" ? text.missing : kind === "product_data" ? text.product : kind === "interaction" ? text.interaction : kind === "overlap" ? text.overlap : kind === "dose_review" ? text.dose : text.other;
-    const amounts = exposure !== null && reference !== null ? ` ${formatNutrientAmount(exposure, ingredient.unit, ingredient.requested)} / ${formatNutrientAmount(reference, ingredient.unit, ingredient.requested)} ${ingredient.unit}.` : "";
-    return [{ kind, severity: kind === "incomplete_information" ? "low" as const : row.severity === "info" ? "low" as const : "high" as const,
-      message: message + amounts, ...(row.exposure !== null ? { exposure } : {}), ...(kind === "dose_review" || kind === "incomplete_information" ? { reference } : {}),
-      ...(row.sourceScope ? { referenceScope: row.sourceScope } : {}), ...(row.authorityUrl ? { source: row.authorityUrl } : {}),
-      ...(row.uncertainty ? { uncertainty: row.uncertainty } : {}), ...(row.supplementIds.length > 1 ? { relatedIngredientIds: row.supplementIds.filter(id => id !== ingredient.ingredientId) } : {}) }];
-  });
+function ingredientLimitAdvice(row: SafetyGuidance, ingredient: Ingredient, locale: string): NonNullable<Ingredient["advice"]>[number] | null {
+  const exposure = converted(row.exposure, row.unit, ingredient.unit, ingredient.name, ingredient.ingredientId);
+  const reference = converted(row.threshold, row.unit, ingredient.unit, ingredient.name, ingredient.ingredientId);
+  if (exposure == null || reference == null || !Number.isFinite(exposure) || !Number.isFinite(reference) || exposure <= reference || !ingredient.unit) return null;
+  return { kind: "dose_review", severity: "high", message: recommendedLimitMessage(reference, ingredient.unit, locale, ingredient.requested),
+    exposure, reference, ...(row.sourceScope ? { referenceScope: row.sourceScope } : {}),
+    ...(row.authorityUrl ? { source: row.authorityUrl } : {}), ...(row.uncertainty === "lower_bound" ? { uncertainty: "lower_bound" } : {}) };
 }
 function choiceIngredients(result: PlanResult, option: StackOption): Ingredient[] {
   const state = result.requestSnapshot, targets = state.originalRequest?.targets ?? state.targets;
@@ -133,7 +111,7 @@ function choiceIngredients(result: PlanResult, option: StackOption): Ingredient[
       if (fact.amount === null || fact.mappingStatus !== "verified" || fact.confidence !== "high" || !contributions.some(item => identity(item) === id)) unknown.add(id);
     }
   }
-  const guidance = option.safety?.guidance ?? [];
+  const guidance = recommendedLimitFindings(option);
   for (const row of rows.values()) {
     const amount = quantified.get(row.ingredientId) ?? 0;
     row.supplied = unknown.has(row.ingredientId) ? null : amount;
@@ -147,14 +125,14 @@ function choiceIngredients(result: PlanResult, option: StackOption): Ingredient[
   // ingredients instead of cloning the same body on every label constituent.
   const emitted = new Set<string>();
   for (const finding of guidance) {
-    const key = adviceIdentity(finding);
-    if (emitted.has(key)) continue;
     const affected = [...rows.values()].filter(row => finding.supplementIds.includes(row.ingredientId) ||
-      finding.nutrientName?.toLowerCase() === row.name.toLowerCase() ||
-      (adviceKind(finding) === "product_data" && finding.productIds.some(id => row.productIds.includes(id))));
+      finding.nutrientName?.toLowerCase() === row.name.toLowerCase());
     const anchor = affected[0]; if (!anchor) continue;
+    const advice = ingredientLimitAdvice(finding, anchor, state.locale);
+    if (!advice) continue;
+    const key = JSON.stringify([anchor.ingredientId, advice.exposure, advice.reference, advice.referenceScope]);
+    if (emitted.has(key)) continue;
     emitted.add(key);
-    const advice = adviceRows([finding], anchor, state.locale)[0];
     const related = [...new Set([...affected.map(row => row.ingredientId), ...finding.supplementIds])].filter(id => id !== anchor.ingredientId);
     if (related.length) advice.relatedIngredientIds = related;
     (anchor.advice ??= []).push(advice);
@@ -180,9 +158,7 @@ export function presentDecision(result: PlanResult, planHandle: string, revision
   const refresh = Boolean(result.refreshRequired), questions = result.questions ?? [];
   const status = refresh || questions.length || (!(pinned ?? recommended)?.basket.length && !noPurchase) ? "needs_input" : noPurchase ? "no_purchase" : "ready";
   const nextAction = refresh ? "change_request" : questions.length ? "answer_questions" : noPurchase && !alreadyCovered ? purchaseAvailable ? "review_options" : "change_request" : noPurchase ? result.horizon?.nextReplenishmentDay && result.horizon?.nextReplenishmentDay > 0 ? "replenish_later" : "no_purchase" : pinned?.basket.length ? "execute" : recommended?.basket.length ? "confirm_with_user" : "review_options";
-  let summary: string = refresh ? text.stale : questions.length ? text.question : noTargets ? text.noTargets : noPurchase ? alreadyCovered ? text.none : text.review : pinned ? text.selected : recommended?.basket.length ? text.ready : text.review;
-  const unassessed = state.medicationCodes.some(code => !(result.selected?.safety?.assessedMedicationCodes ?? []).includes(code)) || state.conditionCodes.some(code => !(result.selected?.safety?.assessedConditionCodes ?? []).includes(code));
-  if (unassessed) summary += ` ${text.unknown}`;
+  const summary: string = refresh ? text.stale : questions.length ? text.question : noTargets ? text.noTargets : noPurchase ? alreadyCovered ? text.none : text.review : pinned ? text.selected : recommended?.basket.length ? text.ready : text.review;
   return { ok: true, planHandle, revision, status, summary, scoring: state.scoring ?? patchScoring(undefined), currency: state.currency,
     recommendedOptionId: !noPurchase && recommended?.basket.length ? decisionOptionId(planHandle, revision, recommended) : null,
     selectedOptionId: pinned ? decisionOptionId(planHandle, revision, pinned) : null, nextAction,

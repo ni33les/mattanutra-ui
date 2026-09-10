@@ -1,13 +1,14 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { AGENTIC_CONTRACT_VERSION } from "../../lib/agentic/config.ts";
 
-// Historical pack manifests remain immutable. Active regressions exercise the
-// reviewed 9.0.0 contract snapshot; a runtime-only schema edit must still fail.
-const snapshot = JSON.parse(readFileSync(new URL("../../contract/mcp/9.0.0/tools.json", import.meta.url), "utf8")) as {
+// Read the published snapshot, not the runtime checksum: runtime-only schema
+// changes must still fail without republishing the supported contract.
+const snapshot = JSON.parse(readFileSync(new URL(`../../contract/mcp/${AGENTIC_CONTRACT_VERSION}/tools.json`, import.meta.url), "utf8")) as {
   contractVersion: string;
   schemaChecksum: string;
 };
-assert.equal(snapshot.contractVersion, "9.0.0");
+assert.equal(snapshot.contractVersion, AGENTIC_CONTRACT_VERSION);
 assert.match(snapshot.schemaChecksum, /^[0-9a-f]{64}$/);
 
 export const CURRENT_CONTRACT_SCHEMA_CHECKSUM = snapshot.schemaChecksum;

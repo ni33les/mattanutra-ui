@@ -1,4 +1,5 @@
 import { importanceInstructions } from "@/lib/agentic/contract/importance";
+import { LIMIT_ADVICE_POLICY } from "@/lib/agentic/presentation/limit-advice";
 import { positioning, environmentWarning } from "@/lib/agentic/discovery/positioning";
 import type { AgenticEnvironment } from "@/lib/agentic/config";
 export const SERVICE_SCOPE = "MattaNutra matches agreed nutrient targets to a finite product catalogue in Thailand (THB); incidental nutrients may leave gaps. Wellness guidance, not diagnosis or pharmacy services.";
@@ -8,7 +9,7 @@ Call plan with flat targets/context and idempotencyKey to create. Then send only
 Refine changed fields with planHandle, expectedRevision and idempotencyKey. Targets upsert by ingredientId; amount changes dose, amount:null removes. Context merges; supplied arrays replace; [] clears exclusions/proposals; numeric null clears a preference.
 profile means customer context. scoring.profile selects a preset; ${importanceInstructions()} Up to six decimal places. Omission preserves; individual null resets; weights:null clears; preset changes reset overrides. A weight is not a dose or categorical exclusion.
 Review each choice's summary, ingredients and products. recommendedOptionId is advice; selectedOptionId is null until selection. After customer choice send selectedOptionId with revision/key, read its advice, confirm, then execute. Selection, answers and refinements are separate calls.
-Health findings and numeric preferences never veto purchase; exclusions, diet and physical quantities bind. Ready means checkout-ready, not targets met or medical approval. Medication/condition inputs without assessed findings remain unassessed. Ingredient advice remains visible at weight zero.
+Health findings and numeric preferences never veto purchase; exclusions, diet and physical quantities bind. Ready means checkout-ready, not targets met or medical approval. ${LIMIT_ADVICE_POLICY}
 Retry a lost response with the same key/input. Read current revision after conflicts. scoring:{} with revision/new key recovers failed/stale work; unchanged successful input is a no-op. Finish naturally at no_purchase; order recovers/tracks payment and fulfilment.
 Tools: info, plan, execute, order, support, feedback, evidence. Use host-listed names. info is optional; client_guide provides templates and plan_schema returns this same unified schema. Examples are protocol templates, not recommended regimens.`;
 export function agentCard(environment: AgenticEnvironment = "dev", locale?: string) { return [positioning(locale).initialization, environmentWarning(environment, locale), OVERVIEW_CARD, locale && locale !== "en" ? importanceInstructions(locale) : ""].filter(Boolean).join("\n"); }

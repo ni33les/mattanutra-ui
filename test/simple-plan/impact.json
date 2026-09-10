@@ -411,6 +411,12 @@
       "expectedCases": 2,
       "reason": "Pure importance and explicit zero-target arithmetic, precision, scale provenance and shared search outcomes",
       "slice": "weights"
+    },
+    {
+      "file": "test/simple-plan/limit-advice.test.ts",
+      "expectedCases": 5,
+      "reason": "MCP advice reports only strictly exceeded MattaNutra recommended limits with honest uncertainty and aligned publication",
+      "slice": "responses"
     }
   ],
   "inputs": [
