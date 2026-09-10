@@ -279,6 +279,7 @@ export type ProductGroup = Readonly<{
 
 export type SearchState = Readonly<{
   routineServings?: readonly number[];
+  servingBurden?: import("@/lib/matcher/rational").Rational;
   uncertainAdministrationCount?: number;
   monthlyPriceMinor?: number | null;
   monthlyPriceLowerBound?: number;

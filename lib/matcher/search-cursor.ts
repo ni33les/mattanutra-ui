@@ -13,7 +13,7 @@ import type { CanonicalRequest, DoseVariant, MatcherConfig, ProductGroup, Search
 type ExactFrame = { state: SearchState; variantIds: string[] | null; position: number };
 type ExactVector = (number | bigint)[];
 type ArchivedState = [number, number, number, number, boolean, number[], ExactVector, ExactVector, string[],
-  [number[], number, number | null, number]?];
+  [number[], number, number | null, number, { num: bigint; den: bigint }?]?];
 type QuantitySearch = { key: string; ids: string[]; low: bigint; high: bigint; steps: number; left?: OverallMatchingScore | null };
 type RepairJob = { leader: SearchState; removal: number; base: SearchState | null; retained: string[]; build: number; group: number; variant: number; variants: string[] | null; stage: "prepare" | "build" | "add" | "done" };
 export type SearchCursor = {
@@ -58,7 +58,7 @@ function restoreState(cursor: SearchCursor, packed: ArchivedState): SearchState 
       if (!group) throw new Error("Archive lost a selected product");
       return group.productId;
     }), exposure, delivered: packed[7] === packed[6] ? exposure : unpackedExposure(cursor, packed[7]), unknownProductIds: packed[8],
-    ...(packed[9] ? { routineServings: packed[9][0], uncertainAdministrationCount: packed[9][1], monthlyPriceMinor: packed[9][2], monthlyPriceLowerBound: packed[9][3] } : {}) };
+    ...(packed[9] ? { routineServings: packed[9][0], uncertainAdministrationCount: packed[9][1], monthlyPriceMinor: packed[9][2], monthlyPriceLowerBound: packed[9][3], servingBurden: packed[9][4] } : {}) };
 }
 export function* archivedSearchStates(cursor: SearchCursor) {
   for (const packed of cursor.archive.values()) yield restoreState(cursor, packed);
@@ -71,7 +71,7 @@ function remember(cursor: SearchCursor, state: SearchState) {
     cursor.archive.set(key, [state.nextGroupIndex, state.price, state.pills, state.count, state.pillCountKnown !== false,
       ids, exposure,
       state.delivered === state.exposure ? exposure : packedExposure(cursor, state.delivered), [...(state.unknownProductIds ?? [])],
-      [[...(state.routineServings ?? [])], state.uncertainAdministrationCount ?? state.count, state.monthlyPriceMinor ?? null, state.monthlyPriceLowerBound ?? 0]]);
+      [[...(state.routineServings ?? [])], state.uncertainAdministrationCount ?? state.count, state.monthlyPriceMinor ?? null, state.monthlyPriceLowerBound ?? 0, state.servingBurden]]);
     cursor.unreviewed.push(state);
   }
   return key;

@@ -51,7 +51,7 @@ export function resolvePracticalProfile(request: ProfileRequest): Profile {
 export type PracticalActuals = Readonly<{
   dailyPills: number | null; pillLowerBound: number; productCount: number;
   priceMinor: number | null; priceLowerBound?: number; currency: string;
-  servings: readonly number[]; uncertainProductCount: number;
+  servings: readonly number[]; servingBurdenExact?: Rational; uncertainProductCount: number;
   monthlyPriceMinor?: number | null; monthlyPriceLowerBound?: number;
 }>;
 export type PreferencePenalty = Readonly<{
@@ -119,7 +119,7 @@ export function scorePracticalPenalties(request: Pick<CanonicalRequest, "currenc
     pills: multiply(fromDecimal(0.05 * m.pills), divide(pills, fromDecimal(3))),
     products: multiply(fromDecimal(0.05 * m.products), products),
     price: multiply(fromDecimal(0.05 * m.price), divide(price, fromDecimal(100000))),
-    servings: multiply(fromDecimal(0.05 * m.servings), sum(actual.servings.map((n, i) => square(positive(subtract(measurement(n, `servings[${i}]`), fromDecimal(1))))))),
+    servings: multiply(fromDecimal(0.05 * m.servings), actual.servingBurdenExact ?? sum(actual.servings.map((n, i) => square(positive(subtract(measurement(n, `servings[${i}]`), fromDecimal(1))))))),
     uncertainty: multiply(fromDecimal(0.25), add(uncertain, fromDecimal(Number(actual.priceMinor === null) + Number(request.maxPriceMinor != null && preferencePrice === null && profile.pricePreferenceBasis === "monthly_30_days")))),
     preferences: sum(exactPreferences)
   };
@@ -141,7 +141,7 @@ export function searchStateScore(request: CanonicalRequest, state: SearchState):
   if (!result) {
     result = overallMatchingScore(request, state.exposure, { dailyPills: state.pillCountKnown === false ? null : state.pills,
       pillLowerBound: state.pills, productCount: state.count, priceMinor: state.price, currency: request.currency,
-      servings: state.routineServings ?? [], uncertainProductCount: state.uncertainAdministrationCount ?? state.count,
+      servings: state.routineServings ?? [], servingBurdenExact: state.servingBurden, uncertainProductCount: state.uncertainAdministrationCount ?? state.count,
       monthlyPriceMinor: state.monthlyPriceMinor, monthlyPriceLowerBound: state.monthlyPriceLowerBound }); cache.set(state, result);
   }
   return result;
@@ -157,10 +157,10 @@ export function administrationBasisKnown(product: MatcherProduct) {
 }
 
 /** Thirty-day packs use the verified physical pack basis and round packs up, never a title number. */
-export function monthlyGoodsPrice(product: MatcherProduct, servings: number): number | null {
+export function monthlyGoodsPrice(product: MatcherProduct, servings: number, ratio?: Rational): number | null {
   const administration = verifiedAdministration(product.administration);
   if (!administrationBasisKnown(product) || !administration?.packQuantity || !administration.unitsPerServing) return null;
-  const packs = divide(multiply(multiply(fromDecimal(servings), fromDecimal(30)), fromDecimal(administration.unitsPerServing)), fromDecimal(administration.packQuantity));
+  const packs = divide(multiply(multiply(ratio ?? fromDecimal(servings), fromDecimal(30)), fromDecimal(administration.unitsPerServing)), fromDecimal(administration.packQuantity));
   const count = (packs.num + packs.den - BigInt(1)) / packs.den;
   const price = count * BigInt(product.unitPriceMinor);
   return price <= BigInt(Number.MAX_SAFE_INTEGER) ? Number(price) : null;

@@ -1,3 +1,4 @@
+import { add, fromDecimal, multiply, positive, subtract, ZERO } from "@/lib/matcher/rational";
 import { targetDoseTicks } from "@/lib/matcher/target-basis";
 import { servingIncrement } from "@/lib/matcher/serving-grid";
 import { comparePillCounts } from "@/lib/matcher/pill-burden";
@@ -47,7 +48,7 @@ export function seedState(request: CanonicalRequest): SearchState {
   }
 
   return {
-    routineServings: [], uncertainAdministrationCount: 0, monthlyPriceMinor: 0, monthlyPriceLowerBound: 0,
+    routineServings: [], servingBurden: ZERO, uncertainAdministrationCount: 0, monthlyPriceMinor: 0, monthlyPriceLowerBound: 0,
     count: 0,
     delivered: new Map(exposure),
     exposure,
@@ -88,7 +89,8 @@ export function tryAddVariant(
   // Checkout acquires one pack per selected product. Daily servings affect
   // depletion and replenishment, not the number of packs in this order.
   const price = state.price + group.product.unitPriceMinor;
-  const monthly = monthlyGoodsPrice(group.product, variant.dailyUnits);
+  const excessServings = positive(subtract(variant.dailyUnitsRatio ?? fromDecimal(variant.dailyUnits), fromDecimal(1)));
+  const monthly = monthlyGoodsPrice(group.product, variant.dailyUnits, variant.dailyUnitsRatio);
 
   const delivered = cloneMap(state.delivered);
   const exposure = cloneMap(state.exposure);
@@ -114,6 +116,7 @@ export function tryAddVariant(
 
   return {
     routineServings: [...(state.routineServings ?? []), variant.dailyUnits],
+    servingBurden: add(state.servingBurden ?? ZERO, multiply(excessServings, excessServings)),
     uncertainAdministrationCount: (state.uncertainAdministrationCount ?? state.count) + Number(!administrationBasisKnown(group.product)),
     monthlyPriceMinor: state.monthlyPriceMinor === null || monthly === null ? null : (state.monthlyPriceMinor ?? 0) + monthly,
     monthlyPriceLowerBound: (state.monthlyPriceLowerBound ?? 0) + (monthly ?? 0),
