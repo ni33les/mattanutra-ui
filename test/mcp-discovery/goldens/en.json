@@ -21,12 +21,12 @@
     "evidence": "Review research evidence"
   },
   "purposes": {
-    "info": "Understand when to use MattaNutra, its country and wellness boundaries, and retrieve the client guide or operation schema.",
+    "info": "Understand when to use MattaNutra, its country and wellness boundaries, and retrieve the client guide or flat plan schema.",
     "plan": "Match agreed nutrient targets and customer context to real Thailand products; compare and refine returned baskets.",
     "execute": "After customer confirmation, freeze the selected plan revision and create or recover checkout.",
-    "order": "Read payment, fulfilment, frozen-order and recovery state for an existing order.",
+    "order": "Read concise payment, fulfilment and recovery state for an existing order.",
     "support": "Open or continue an order-support case.",
     "feedback": "Submit optional consented feedback without changing the plan or checkout.",
-    "evidence": "Read research claims and sources attached to a returned plan."
+    "evidence": "Read facts and advisory sources for one returned ingredient or product in a current choice."
   }
 }

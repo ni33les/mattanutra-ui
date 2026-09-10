@@ -27,7 +27,7 @@ async function call(method: string, args: Record<string, unknown> = {}, environm
   return method === "tools/call" ? result.result.structuredContent as Record<string, unknown> : result.result;
 }
 const sha = (value: unknown) => createHash("sha256").update(JSON.stringify(value)).digest("hex");
-const operationalRules = [/finite/, /THB/, /conversation.*default|defaults to conversation/, /Unknown.*(?:zero|unknown)/, /same key/, /exclusions/, /checkout.ready/];
+const operationalRules = [/finite/, /THB/, /flat targets/, /unknown.*zero/, /same key/, /exclusions/, /checkout.ready/];
 function noGuarantees(value: unknown) {
   assert.doesNotMatch(JSON.stringify(value), /(?:guarantees?|always achieves?) (?:the )?(?:lowest|fewest|complete coverage|medical suitability)/i);
 }
@@ -56,13 +56,13 @@ test("DISC-MCP-04 every native tool has the approved title", async () => { const
 test("DISC-MCP-05 descriptions lead with purpose and keep operation instructions", async () => {
   const result = await call("tools/list"); const tools = result.tools as {name:string;description:string}[];
   for (const tool of tools) assert.ok(tool.description.startsWith(golden().purposes[tool.name]), tool.name);
-  const plan = tools.find(tool => tool.name === "plan")!; assert.ok(plan); for (const term of [/knownResultVersion/, /response|conversation/, /same key/, /unassessed/, /exclusions/, /expectedRevision|current revision|revision/]) assert.match(plan.description, term);
+  const plan = tools.find(tool => tool.name === "plan")!; assert.ok(plan); for (const term of [/planHandle/, /response|conversation/, /same key/, /unassessed/, /exclusions/, /expectedRevision|current revision|revision/]) assert.match(plan.description, term);
   assert.match(tools.find(tool => tool.name === "execute")!.description, /confirm/i);
   assert.match(tools.find(tool => tool.name === "feedback")!.description, /consentConfirmed=true/);
 });
 test("DISC-MCP-06 info uses the exact approved English description", async () => { const info = await call("tools/call"); assert.equal(info.serviceName, "MattaNutra"); assert.equal(info.description, golden().infoDescription); });
 test("DISC-MCP-07 existing info identity and capability fields remain intact", async () => {
-  const info = await call("tools/call"); assert.equal(info.contractVersion, "8.0.0"); assert.equal(info.schemaChecksum, CURRENT_CONTRACT_SCHEMA_CHECKSUM);
+  const info = await call("tools/call"); assert.equal(info.contractVersion, "9.0.0"); assert.equal(info.schemaChecksum, CURRENT_CONTRACT_SCHEMA_CHECKSUM);
   for (const key of ["buildId", "valuePropositionId", "wellnessBoundary", "responsibilityVersion", "researchVersion"]) assert.ok(info[key]);
   assert.deepEqual(info.supportedLocales, locales); assert.deepEqual((info.supportedCountries as {countryCode:string}[]).map(row => row.countryCode), ["TH"]);
 });
@@ -74,11 +74,11 @@ test("DISC-MCP-08 environment warning follows the purpose in initialization and 
 test("DISC-MCP-09 client guide starts with invocation and retains the existing workflow", async () => {
   const text = String((await call("tools/call", {view:"client_guide"})).clientGuideText);
   assert.equal(text.split("\n\n")[1], golden().initialization);
-  for (const term of [/requestPatch/, /idempotency/, /checkout/, /knownResultVersion/, /unknown/i]) assert.match(text, term);
+  for (const term of [/scoring/, /idempotency/, /checkout/, /planHandle/, /unknown/i]) assert.match(text, term);
 });
 test("DISC-MCP-10 complete tool input and output schemas match the reviewed active contract", () => {
   assert.equal(computeSchemaChecksum(), CURRENT_CONTRACT_SCHEMA_CHECKSUM);
-  const snapshot = read("contract/mcp/8.0.0/schema.json"); for (const tool of toolList()) assert.deepEqual({inputSchema:tool.inputSchema,outputSchema:tool.outputSchema}, snapshot.tools[tool.name]);
+  const snapshot = read("contract/mcp/9.0.0/schema.json"); for (const tool of toolList()) assert.deepEqual({inputSchema:tool.inputSchema,outputSchema:tool.outputSchema}, snapshot.tools[tool.name]);
 });
 test("DISC-I18N-01 info description matches the requested approved locale", async () => { for (const locale of locales) assert.equal((await call("tools/call", {}, "dev", locale)).description, golden(locale).infoDescription); });
 test("DISC-I18N-02 generated locale positioning preserves reviewed invocation and boundaries", () => {
@@ -98,7 +98,7 @@ test("DISC-DET-02 tools list order copy schemas and annotations are deterministi
 test("DISC-DET-03 info capabilities and positioning are deterministic per locale", async () => { for (const locale of locales) assert.deepEqual(await call("tools/call", {}, "dev", locale), await call("tools/call", {}, "dev", locale)); });
 test("DISC-DET-04 generated manifests bind the versioned positioning content", () => {
   const published = adapter(); assert.ok(existsSync("lib/agentic/discovery/positioning.ts")); assert.match(published.positioningChecksum, /^[a-f0-9]{64}$/);
-  assert.equal(published.positioningChecksum, sha(published.locales)); assert.match(published.discoveryVersion, /positioning/);
+  assert.equal(published.positioningChecksum, sha(published.locales)); assert.match(published.discoveryVersion, /conversational/);
   for (const provider of ["anthropic", "xai"]) assert.deepEqual(read(`lib/agentic/adapters/${provider}.json`), published);
 });
 test("DISC-DET-05 package tests have no skipped focused or empty cases", () => {
@@ -107,10 +107,10 @@ test("DISC-DET-05 package tests have no skipped focused or empty cases", () => {
 });
 test("DISC-TRUTH-01 positioning promises balancing rather than guaranteed optimality", () => { noGuarantees(adapter()); assert.match(adapter().shortDescription ?? "", /balanc/i); });
 test("DISC-TRUTH-02 ready and purchase eligibility never mean medical approval", async () => { const info=await call("tools/call"); assert.match(String(info.clientInstructions), /checkout-ready, not targets met or medical approval/); });
-test("DISC-TRUTH-03 accepted medication codes are not claimed as assessed interactions", async () => { const info=await call("tools/call"); const text=String(info.clientInstructions); assert.match(text,/accepted inputs/); assert.match(text,/unassessed, never cleared/); assert.match(text,/advice.kind=interaction/); });
-test("DISC-TRUTH-04 published market stays Thailand and catalogue gaps remain visible", async () => { const info=await call("tools/call"); assert.deepEqual((info.supportedCountries as {countryCode:string}[]).map(row=>row.countryCode),["TH"]); assert.match(String(info.clientInstructions),/finite catalogue/); assert.match(String(info.clientInstructions),/gaps are real/); });
+test("DISC-TRUTH-03 accepted medication codes are not claimed as assessed interactions", async () => { const info=await call("tools/call"); const text=String(info.clientInstructions); assert.match(text,/Medication\/condition inputs/); assert.match(text,/remain unassessed/); assert.match(text,/Ingredient advice remains visible/); });
+test("DISC-TRUTH-04 published market stays Thailand and catalogue gaps remain visible", async () => { const info=await call("tools/call"); assert.deepEqual((info.supportedCountries as {countryCode:string}[]).map(row=>row.countryCode),["TH"]); assert.match(String(info.clientInstructions),/finite catalogue/); assert.match(String(info.clientInstructions),/real gaps/); });
 test("DISC-TRUTH-05 installed verification rejects missing titles and stale positioning", () => {
-  const published={contractVersion:"8.0.0",schemaChecksum:computeSchemaChecksum(),tools:toolList(),connector:adapter()};
+  const published={contractVersion:"9.0.0",schemaChecksum:computeSchemaChecksum(),tools:toolList(),connector:adapter()};
   const evidence={...structuredClone(published),source:"installed_connector",connectorId:"dev-live-export",environment:"dev",observedAt:"2026-09-09T00:00:00Z"};
   assert.equal(validateInstalledConnectorProjection(evidence,published).passed,true);
   const stale=structuredClone(evidence); delete (stale.tools[0] as {title?:string}).title;
