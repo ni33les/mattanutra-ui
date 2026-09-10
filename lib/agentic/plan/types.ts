@@ -54,6 +54,7 @@ export type CurrentSupplement = Readonly<{
 }>;
 
 export type PlanRequirements = Readonly<{
+  preferenceImportance?: import("@/lib/matcher/types").PreferenceImportanceMap;
   allowedForms?: readonly string[];
   dietaryPreference?: "any" | "plant_based" | "vegan";
   excludeSupplementIds?: readonly string[];
@@ -646,6 +647,7 @@ export type CanonicalPlanStamp = Readonly<{
 }>;
 
 export type StackOption = Readonly<{
+  overallScore?: import("@/lib/matcher/practical-scoring").OverallMatchingScore;
   doseFit?: import("@/lib/matcher/types").DoseFitScore;
   basket: readonly BasketItem[];
   burden?: BurdenLedger;

@@ -1,12 +1,13 @@
 import { agenticMessage, negotiateLocale } from "@/lib/agentic/i18n";
 
 export type NumericPreferences = Readonly<{
+  pricePreferenceBasis?: "first_order" | "monthly_30_days";
   maxProductCount?: number | null;
   maxDailyPills?: number | null;
   maxPriceMinor?: number | null;
 }>;
 export type PreferenceAssessment = Readonly<{
-  kind: "product_count" | "daily_pills" | "first_order_goods_price";
+  kind: "product_count" | "daily_pills" | "first_order_goods_price" | "monthly_goods_price";
   preferred: number | null;
   actual: number | null;
   actualLowerBound?: number;
@@ -42,13 +43,15 @@ export function assessPreferences(preferences: NumericPreferences, actual: Reado
   dailyPills: number | null;
   dailyPillsLowerBound?: number;
   firstOrderGoodsPriceMinor: number | null;
+  monthlyGoodsPriceMinor?: number | null;
   currency: string;
 }>, localeInput?: string): PreferenceAssessment[] {
   const locale = negotiateLocale(localeInput);
   return ([
     { kind: "product_count", preferred: preferences.maxProductCount, actual: actual.productCount, unit: "products" },
     { kind: "daily_pills", preferred: preferences.maxDailyPills, actual: actual.dailyPills, unit: "pills/day" },
-    { kind: "first_order_goods_price", preferred: preferences.maxPriceMinor, actual: actual.firstOrderGoodsPriceMinor, unit: `${actual.currency}_minor` }
+    { kind: preferences.pricePreferenceBasis === "monthly_30_days" ? "monthly_goods_price" : "first_order_goods_price", preferred: preferences.maxPriceMinor,
+      actual: preferences.pricePreferenceBasis === "monthly_30_days" ? actual.monthlyGoodsPriceMinor ?? null : actual.firstOrderGoodsPriceMinor, unit: `${actual.currency}_minor` }
   ] as const).map(row => {
     const preferred = row.preferred ?? null;
     const amount = row.actual != null && Number.isFinite(row.actual) ? row.actual : null;

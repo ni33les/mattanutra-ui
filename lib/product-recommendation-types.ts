@@ -144,6 +144,7 @@ export type ProductRecommendationDiagnostics = Readonly<{
       priceMinor: number;
       dailyPills: number | null;
       doseFit: import("@/lib/matcher/types").DoseFitScore | null;
+      overallScore?: import("@/lib/matcher/practical-scoring").OverallMatchingScore;
       advice: readonly import("@/lib/formulation-types").WebHealthAdvice[];
       recommendations: readonly ProductRecommendationSelection[];
     }>[];

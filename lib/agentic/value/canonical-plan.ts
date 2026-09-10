@@ -8,7 +8,7 @@ import { amountFromScaled, scaleAmount } from "@/lib/matcher/dose";
 import type { MatcherUnit } from "@/lib/matcher/types";
 
 export const CUSTOMER_VALUE_PACK_VERSION = "dev-customer-value-v4.0";
-export const CANONICAL_PLAN_VERSION = "cv-4.0";
+export const CANONICAL_PLAN_VERSION = "cv-5.0";
 
 function canonicalContributors(
   items: readonly Readonly<{
@@ -184,6 +184,7 @@ function canonicalSafetyRow(row: Readonly<{
 
 function canonicalOptionValue(option: StackOption) {
   return {
+    overallScore: option.overallScore ?? null,
     burden: {
       administrations: option.burden?.administrations ?? 0,
       pills: option.burden?.pills ?? 0,

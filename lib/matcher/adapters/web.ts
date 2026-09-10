@@ -408,6 +408,8 @@ export function recommendWithMatcher(
 
   const dietary =
     input.clientContext?.preferredForm === "vegan" ? "vegan" : "any";
+  const monthlyBudget = ({ u1000: 1000, "1000-2500": 2500, "2500-5000": 5000, low: 1000, mid: 2500, good: 5000 } as Record<string, number>)[input.clientContext?.budgetPreference ?? ""] ?? null;
+  const monthlyBasis = input.budgetAmount == null && monthlyBudget !== null;
   const request = {
     acceptedGapSubjectIds: [],
     allowedForms: null,
@@ -423,8 +425,10 @@ export function recommendWithMatcher(
     estimatedIntakeSubjectIds: input.clientContext?.estimatedIntakeSubjectIds ?? [],
     leftovers: targets.leftovers,
     maxDailyPills: /^\d+(?:-\d+)?$/.test(input.clientContext?.pillLimit ?? "") ? Number(input.clientContext!.pillLimit!.split("-").at(-1)) : null,
+    preferenceImportance: /^\d+(?:-\d+)?$/.test(input.clientContext?.pillLimit ?? "") ? { maxDailyPills: "strong" as const } : undefined,
+    ...(monthlyBasis ? { pricePreferenceBasis: "monthly_30_days" as const } : {}),
     maxPriceMinor:
-      input.budgetAmount != null ? Math.round(input.budgetAmount * 100) : null,
+      input.budgetAmount != null ? Math.round(input.budgetAmount * 100) : monthlyBudget == null ? null : monthlyBudget * 100,
     maxProductCount: input.maxProducts ?? null,
     productDoses: input.productDoses ?? [],
     searchEffort: input.searchEffort ?? "standard",
@@ -435,7 +439,7 @@ export function recommendWithMatcher(
       targets.targets.map((item) => item.name)
     ),
     optimization:
-      input.stackPreference === "compact" ? "fewest_pills" : "best_coverage",
+      input.stackPreference === "compact" ? "fewest_pills" : "balanced",
     profile: {
       ageYears: input.clientContext?.ageYears ?? 38,
       lifeStage: matcherLifeStage(input.clientContext?.lifestage),
@@ -605,7 +609,9 @@ export function recommendWithMatcher(
     });
     return {
       preferences: assessPreferences(request, { productCount: basket.productCount, dailyPills,
-        dailyPillsLowerBound: verifiedPillLowerBound((basket.variantDoses ?? []).map(dose => ({ dailyPills: dose.dailyPills, pillCountKnown: byId.has(dose.productId) && toMatcherProduct(byId.get(dose.productId)!).pillCountKnown !== false }))), firstOrderGoodsPriceMinor: completePrice ? basket.priceMinor : null, currency: request.currency }),
+        dailyPillsLowerBound: verifiedPillLowerBound((basket.variantDoses ?? []).map(dose => ({ dailyPills: dose.dailyPills, pillCountKnown: byId.has(dose.productId) && toMatcherProduct(byId.get(dose.productId)!).pillCountKnown !== false }))), firstOrderGoodsPriceMinor: completePrice ? basket.priceMinor : null,
+        monthlyGoodsPriceMinor: monthlyBasis ? basket.overallScore?.preferences.maxPriceMinor.actual ?? null : undefined, currency: request.currency }),
+      overallScore: basket.overallScore,
       roles: basket.roles, purchaseEligible: basket.productIds.length > 0,
       optionId: `webopt_${sha256Hex([...basket.variantIds].sort().join("|")).slice(0, 20)}`,
       productIds: [...basket.productIds], dailyServings: basket.productIds.map(id => servingMultiplierFromBasket(id, basket)),

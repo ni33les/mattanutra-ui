@@ -23,6 +23,7 @@ import { COVERED_THRESHOLD } from "@/lib/matcher/config";
 import { displayCoveragePercent } from "@/lib/marketing-coverage";
 import { amountFromScaled, convertAmount } from "@/lib/matcher/dose";
 import { knownLimitProfile } from "@/lib/matcher/dose-fit";
+import { resolvePracticalProfile } from "@/lib/matcher/practical-scoring";
 import { intakeCertaintyFor } from "@/lib/agentic/plan/intake-certainty";
 import { factSupportsQuantifiedExposure } from "@/lib/matcher/fact-provenance";
 import {
@@ -115,6 +116,7 @@ function matchPlanCacheKey(
   hash.update("\0");
   hash.update(GUIDANCE_RULES_VERSION);
   hash.update(MATCHER_VERSION);
+  hash.update(resolvePracticalProfile({ optimization: state.optimization, preferenceImportance: state.requirements.preferenceImportance }).hash);
   hash.update("\0");
   hash.update(JSON.stringify(state.acceptedGaps));
   hash.update("\0");
@@ -219,6 +221,7 @@ export function toCanonicalRequest(
     excludeSubjectIds: state.requirements.excludeSupplementIds ?? [],
     leftovers: targets.leftovers,
     maxDailyPills: state.requirements.maxDailyPills ?? null,
+    preferenceImportance: state.requirements.preferenceImportance,
     maxPriceMinor: state.requirements.maxPriceMinor ?? null,
     maxProductCount: state.requirements.maxProductCount ?? DEFAULT_MAX_PRODUCT_COUNT,
     productDoses: state.requirements.productDoses ?? [],
@@ -866,6 +869,7 @@ function toStackOption(
     coverage,
     coveragePercent: requestedTargetCoverage(coverage).coveragePercent,
     doseFit: basket.doseFit,
+    overallScore: basket.overallScore,
     dailyPills: basket.dailyPills,
     deferredTargetIds,
     economics,

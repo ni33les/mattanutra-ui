@@ -1,3 +1,4 @@
+import { compareOverallScores } from "@/lib/matcher/practical-scoring";
 import { hasHealthScoreAiCopy } from "@/lib/assessment-store";
 import { validateLeadEmail } from "@/lib/email-validation";
 import { analyzeFoodGapSupportDeterministically } from "@/lib/food-gap-support";
@@ -192,6 +193,9 @@ function selectedRetailerMatchingOption(option: RetailerRecommendationOption) {
 }
 
 function compareRetailerDoseFit(left: RetailerRecommendationOption, right: RetailerRecommendationOption) {
+  const practicalA = selectedRetailerMatchingOption(left)?.overallScore;
+  const practicalB = selectedRetailerMatchingOption(right)?.overallScore;
+  if (practicalA && practicalB) return compareOverallScores(practicalA, practicalB);
   const a = selectedRetailerMatchingOption(left)?.doseFit;
   const b = selectedRetailerMatchingOption(right)?.doseFit;
   return a && b ? compareDoseFit(a, b) : a ? -1 : b ? 1 : 0;

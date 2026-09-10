@@ -608,6 +608,14 @@ const MESSAGES: Record<string, Record<(typeof AGENTIC_LOCALES)[number], string>>
     th: "ปริมาณใกล้เคียงเป้าหมายที่สุดในตัวเลือกที่ประเมิน",
     "zh-CN": "在已评估选项中，剂量最接近目标"
   },
+  "plan.option.best_match": {
+    en: "Best overall match for the chosen dose, routine and price preferences",
+    th: "ตัวเลือกโดยรวมที่เหมาะกับเป้าหมายปริมาณ รูปแบบการรับประทาน และราคาที่ต้องการ",
+    "zh-CN": "综合剂量、每日服用负担和价格偏好的最佳匹配"
+  },
+  "plan.preference.monthly_goods_price": {
+    en: "30-day supplement goods budget", th: "งบผลิตภัณฑ์เสริมอาหารสำหรับ 30 วัน", "zh-CN": "30天补充剂商品预算"
+  },
   "plan.option.lowest_cost": {
     en: "Lower cost",
     th: "ค่าใช้จ่ายต่ำกว่า",

@@ -22,7 +22,7 @@ export function planResponseView(explicit: View | undefined, pin?: string, curre
       message: `Use a valid contract version no newer than ${current}, or omit the header.` });
   }
   if (explicit) return explicit;
-  const compatibilityWindow = active[0] === 7 && active[1] === 2;
+  const compatibilityWindow = (active[0] === 7 && active[1] === 2) || active[0] === 8;
   const olderPin = requested && (requested[0] < 7 || (requested[0] === 7 && requested[1] < 2));
   return compatibilityWindow && olderPin ? "full" : "conversation";
 }

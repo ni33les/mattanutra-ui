@@ -402,6 +402,9 @@ function optionReasonFields(
       message: agenticMessage(negotiated, "plan.option.no_distinct_alternative")
     };
   }
+  if (option.roles?.includes("best_match")) {
+    return { code: "best_match" as const, key: "plan.option.best_match", message: agenticMessage(negotiated, "plan.option.best_match") };
+  }
   if (option.roles?.includes("closest_dose")) {
     return {
       code: "closest_dose" as const,
@@ -731,6 +734,7 @@ export function publicOption(
     coveragePercent: option.coveragePercent,
     coverageSummary: { coveragePercent: counts.coveragePercent, fullyMetCount: counts.coveredCount, requestedCount: counts.requestedCount },
     ...(option.doseFit ? { doseFit: option.doseFit } : {}),
+    ...(option.overallScore ? { overallScore: option.overallScore } : {}),
     coverage: option.coverage.map(row => publicCoverage(row, locale)),
     basket: option.basket.map(item => publicBasketItem(item, locale)),
     ...(option.safety ? { advice: option.safety.guidance.map(item => publicSafetyGuidance(item, "not_required", option.coverage.find(row => row.supplementId === item.supplementIds[0])?.requestedAmount)) } : {}),

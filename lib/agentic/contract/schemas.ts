@@ -26,6 +26,11 @@ export const PROFILE_SCHEMA = object({
 export const DEFAULT_MAX_PRODUCT_COUNT = null;
 export const SEARCH_EFFORT_SCHEMA = { ...enumeration(["standard", "expanded"] as const), default: "standard", description: "Deterministic search budget: standard 8000 expansion attempts; expanded 64000. Expanded includes the standard incumbent. A revise omission preserves prior effort. Repeating identical inputs reuses work; after expanded exhaustion refine the request." };
 export const REQUIREMENTS_SCHEMA = Type.Object({
+  preferenceImportance: optional(object({
+    maxDailyPills: optional({ ...enumeration(["flexible", "normal", "strong"] as const), default: "normal" }),
+    maxProductCount: optional({ ...enumeration(["flexible", "normal", "strong"] as const), default: "normal" }),
+    maxPriceMinor: optional({ ...enumeration(["flexible", "normal", "strong"] as const), default: "normal" })
+  }, "Preference penalty multipliers: flexible=0.25, normal=1, strong=4. Insistence increases a penalty, never an eligibility or purchase limit. Create/replacement omission means normal; patch omission preserves; normal resets. Clearing the numerical preference disables its overrun term.")),
   allowedForms: optional(Type.Array(enumeration(["capsule", "softgel", "tablet", "powder", "liquid", "gummy", "sachet", "other"] as const), { uniqueItems: true, maxItems: 8 })),
   dietaryPreference: optional(enumeration(["any", "plant_based", "vegan"] as const)),
   excludeProductIds: optional({ ...productIds, description: "Exclude only these products. Does not remove requested nutrients. [] clears this exclusion." }),
@@ -69,7 +74,7 @@ export const PLAN_REQUEST = object({
   baseline: optional(object({ items: optional(Type.Array(object({ daysRemaining: optional(Type.Number({ minimum: 0, maximum: 36500 })), dailyServings: optional(Type.Number({ exclusiveMinimum: 0, maximum: 1000, description: "Actual catalogue servings per day for this comparison basket. Omission makes equivalent-coverage savings unavailable; quantity remains packs purchased." })), productId, quantity: positiveAmount }), { maxItems: 100 })), type: enumeration(["current_basket", "separate_direct_products"] as const) })),
   destinationCountry: Type.String({ pattern: "^[A-Z]{2}$", description: "Deliverable ISO country from info.supportedCountries." }),
   locale: Type.String({ minLength: 2, maxLength: 35, description: "BCP 47 locale; supported locales are advertised by info. Unsupported locales fall back to English." }),
-  optimization: { ...enumeration(["balanced", "best_coverage", "lowest_cost", "fewest_pills"] as const), description: "Closest dose fit remains the default recommendation. This preference chooses commercial tie-breaks and disclosed trade-offs; it never changes agreed targets or eliminates above-preference options." },
+  optimization: { ...enumeration(["balanced", "best_coverage", "lowest_cost", "fewest_pills"] as const), description: "Shared penalty profile: balanced balances dose, routine and price; best_coverage reduces practical weights to 0.25; lowest_cost multiplies price penalties by 4; fewest_pills multiplies pill/serving penalties by 4 and product penalties by 2. These are weighted trade-offs, not absolute extrema or purchase limits. The recommended best_match and closest_dose alternative may differ; agreed targets and eligibility remain unchanged." },
   profile: PROFILE_SCHEMA, requirements: REQUIREMENTS_SCHEMA,
   safetyAcknowledgement: optional(PLAN_SAFETY_ACK),
   targets: Type.Array(TARGET_SCHEMA, { minItems: 1, maxItems: 30, description: "Agreed targets: name, amount, and unit. Optional importance defaults to required." })

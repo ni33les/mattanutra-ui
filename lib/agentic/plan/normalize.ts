@@ -8,6 +8,7 @@ import type { AgenticConfig } from "@/lib/agentic/config";
 import { scaleAmount, isDoseError, convertAmount } from "@/lib/matcher/dose";
 import type { MatcherUnit } from "@/lib/matcher/types";
 import { DEFAULT_TARGET_BASIS } from "@/lib/agentic/contract/schemas";
+import { resolvePracticalProfile } from "@/lib/matcher/practical-scoring";
 import { resolvedNutrientFormName } from "@/lib/nutrient-identity";
 import type {
   AcceptedGap,
@@ -413,6 +414,7 @@ export function applyPlanAnswers(
 
 export function planRematchFingerprint(state: CanonicalPlanState) {
   return JSON.stringify({
+    scoringProfileHash: resolvePracticalProfile({ optimization: state.optimization, preferenceImportance: state.requirements.preferenceImportance }).hash,
     ageYears: state.profile.ageYears,
     conditionCodes: state.conditionCodes,
     currency: state.currency,

@@ -33,7 +33,7 @@ export function projectPlan(plan: PlanSuccessWire, input: PlanViewInput): PlanSu
         ...(sections.includes("products") ? pick(option, ["basket"]) : {}),
         ...(sections.includes("coverage") ? pick(option, ["coverage"]) : {}),
         ...(sections.includes("advice") ? pick(option, ["advice"]) : {}),
-        ...(sections.includes("score") ? pick(option, ["doseFit"]) : {}),
+        ...(sections.includes("score") ? pick(option, ["doseFit", "overallScore"]) : {}),
         ...(sections.includes("economics") ? pick(option, ["economics"]) : {}) })) };
   }
   const selectedOptionId = plan.optionId ?? plan.compactDecision?.optionId ?? null;
