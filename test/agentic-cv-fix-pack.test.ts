@@ -29,7 +29,8 @@ import {
   runWithCatalogueSnapshot
 } from "../lib/agentic/catalogue/snapshot.ts";
 import { catalogueSnapshotId } from "../lib/agentic/catalogue/freeze.ts";
-import { matcherSafetyCeilings, safetyCeilingFor } from "../lib/matcher/safety-ceilings.ts";
+import { captureMatcherSafetySnapshot, matcherSafetyCeilings, safetyCeilingFor } from "../lib/matcher/safety-ceilings.ts";
+import { runWithMatcherSafetySnapshot } from "../lib/matcher/safety-ceilings-server.ts";
 import { canonicalHash } from "../lib/agentic/value/canonical.ts";
 import {
   freezeLiveThailandCatalogue,
@@ -282,10 +283,18 @@ export function canonicalCvFixReport(report: CvFixPackReport) {
   });
 }
 
-export async function runCvFixPack(frozenInput?: ValueCatalogueFreeze): Promise<CvFixPackReport> {
+export async function runCvFixPack(
+  frozenInput?: ValueCatalogueFreeze,
+  frozenReferences?: ReturnType<typeof captureMatcherSafetySnapshot>
+): Promise<CvFixPackReport> {
+  const freeze = frozenInput ?? await freezeLiveThailandCatalogue("TH");
+  const references = frozenReferences ?? captureMatcherSafetySnapshot(freeze.snapshot.runtimeRevision);
+  return runWithMatcherSafetySnapshot(references, () => runCvFixPackRecorded(freeze));
+}
+
+async function runCvFixPackRecorded(freeze: ValueCatalogueFreeze): Promise<CvFixPackReport> {
   const previous = null;
   setAgenticRuntimeForTests(previous);
-  const freeze = frozenInput ?? await freezeLiveThailandCatalogue("TH");
   const snapshotId = isUsableLiveFreeze(freeze) ? catalogueSnapshotId(freeze.snapshot) : "";
 
   try {

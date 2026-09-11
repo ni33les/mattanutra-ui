@@ -9,9 +9,21 @@ import { runAdmittedPlanOperation } from '../../lib/agentic/plan/service.ts';
 import { resetMatchPlanCache } from '../../lib/agentic/plan/matching.ts';
 import { installGoldCatalogue, uninstallGoldCatalogue } from '../helpers/gold-catalogue.ts';
 
+import { fixtureSnapshot } from '../../lib/agentic/catalogue/fixtures.ts';
+import { runWithCatalogueSnapshot } from '../../lib/agentic/catalogue/snapshot.ts';
+import { captureMatcherSafetySnapshot } from '../../lib/matcher/safety-ceilings.ts';
+import { runWithMatcherSafetySnapshot } from '../../lib/matcher/safety-ceilings-server.ts';
+import { createSnapshotMemoryStore } from '../agentic/value/snapshot-store.ts';
+import { canonicalHash } from '../../lib/agentic/value/canonical.ts';
+
 // The harness controls the executor. The imported client sees public RPC only.
 export async function documentedRun(locale: string, discovery: string, checkout = false) {
-  installGoldCatalogue(); resetMatchPlanCache(); const app = createAgenticRuntime({ config: { ...loadAgenticConfig(), siteUrl: "https://fixture.example" } });
+  installGoldCatalogue(); resetMatchPlanCache();
+  const snapshot = { ...fixtureSnapshot(), runtimeRevision: 0 };
+  const captured = captureMatcherSafetySnapshot();
+  const references = { ...captured, identity: { runtimeRevision: 0, fingerprint: canonicalHash(captured.ceilings) } };
+  return runWithCatalogueSnapshot(snapshot, () => runWithMatcherSafetySnapshot(references, async () => {
+  const app = createAgenticRuntime({ config: { ...loadAgenticConfig(), siteUrl: "https://fixture.example" }, store: createSnapshotMemoryStore(snapshot) });
   const pending = new Set<string>(); const owner = `${app.scope.environment}:${app.scope.tenantScope}:${app.scope.principalScope ?? 'anon'}`;
   try {
     return await runConversationalJourney({ locale, discovery, checkout, key: `docs-${locale}-${discovery}`,
@@ -30,6 +42,7 @@ export async function documentedRun(locale: string, discovery: string, checkout 
       }
     });
   } finally { uninstallGoldCatalogue(); resetMatchPlanCache(); }
+  }));
 }
 
 /** Reuses the published client; the manual broader report cannot execute retired wire suites. */

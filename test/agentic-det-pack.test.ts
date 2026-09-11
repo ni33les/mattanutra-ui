@@ -6,12 +6,9 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
-import nextEnv from "@next/env";
 import { AGENTIC_POLL_AFTER_SECONDS } from "../lib/agentic/config.ts";
 import { loadAgenticConfig } from "../lib/agentic/config.ts";
-import { catalogueSnapshotId, freezeCatalogueSnapshot } from "../lib/agentic/catalogue/freeze.ts";
-import { loadLiveRetailSnapshot } from "../lib/agentic/catalogue/live.ts";
-import { refreshAdminSafetyCeilings } from "../lib/agentic/catalogue/load-safety-ceilings.ts";
+import { catalogueSnapshotId } from "../lib/agentic/catalogue/freeze.ts";
 import {
   replaceCatalogueSnapshot
 } from "../lib/agentic/catalogue/snapshot.ts";
@@ -31,7 +28,6 @@ import type {
 import { COVERED_THRESHOLD } from "../lib/matcher/config.ts";
 import {
   catalogBandRuleId,
-  matcherSafetyCeilings,
   safetyCeilingFor,
   setMatcherSafetyCeilings
 } from "../lib/matcher/safety-ceilings.ts";
@@ -45,6 +41,7 @@ const C_ID = "sup_a34da45efcf05dbd8a0e7d4f9fc7b71c";
 
 export type DetPackCatalog = Readonly<{
   ceilings: readonly SafetyCeiling[];
+  references?: ReturnType<typeof captureMatcherSafetySnapshot>;
   freezePeer?: DetPackCatalog;
   snapshot: CatalogueSnapshot;
 }>;
@@ -413,18 +410,12 @@ export async function pinWithoutRematch(snapshot: CatalogueSnapshot, store = cre
 }
 
 export async function loadDetCatalog(): Promise<DetPackCatalog> {
-  if (process.env.NODE_TEST_CONTEXT) {
-    const { snapshot, references } = capturedMatcherCatalogue();
-    setMatcherSafetyCeilings(references.ceilings, { runtimeRevision: references.runtimeRevision, fingerprint: references.fingerprint });
-    return { snapshot, ceilings: references.ceilings };
-  }
-  nextEnv.loadEnvConfig(process.cwd());
-  const snapshot = freezeCatalogueSnapshot(await loadLiveRetailSnapshot("TH"));
-  await refreshAdminSafetyCeilings();
-  return {
-    ceilings: matcherSafetyCeilings(),
-    snapshot
-  };
+  // This arithmetic corpus is captured evidence in both Node tests and the CLI.
+  // Switching to a database catalogue changes its nutrient IDs and invalidates
+  // the independent expectations instead of testing the same matcher twice.
+  const { snapshot, references } = capturedMatcherCatalogue();
+  setMatcherSafetyCeilings(references.ceilings, { runtimeRevision: references.runtimeRevision, fingerprint: references.fingerprint });
+  return { snapshot, ceilings: references.ceilings, references: captureMatcherSafetySnapshot(snapshot.runtimeRevision) };
 }
 
 export function canonicalDetReport(report: DetPackReport) {
@@ -434,7 +425,8 @@ export function canonicalDetReport(report: DetPackReport) {
 }
 
 export async function runDetPack(input: DetPackCatalog): Promise<DetPackReport> {
-  const { result, transcript } = await captureMcpTranscript(() => runDetPackRecorded(input));
+  const work = () => captureMcpTranscript(() => runDetPackRecorded(input));
+  const { result, transcript } = await (input.references ? runWithMatcherSafetySnapshot(input.references, work) : work());
   return { ...result, mcpTranscript: transcript };
 }
 

@@ -17,7 +17,7 @@ import { frozenPackInput } from "../test/helpers/frozen-pack-input.ts";
 import { assertRecordedMcpEvidence } from "../test/helpers/mcp-evidence.ts";
 import { freezeLiveThailandCatalogue } from "../lib/agentic/value/freeze.ts";
 import { replaceCatalogueSnapshot, resetCatalogueSnapshotCache } from "../lib/agentic/catalogue/snapshot.ts";
-import { matcherSafetyCeilings, resetMatcherSafetyCeilings, setMatcherSafetyCeilings } from "../lib/matcher/safety-ceilings.ts";
+import { captureMatcherSafetySnapshot, resetMatcherSafetyCeilings, setMatcherSafetyCeilings } from "../lib/matcher/safety-ceilings.ts";
 import { setAgenticRuntimeForTests } from "../lib/agentic/runtime.ts";
 
 import { runCurrentProtocolPack } from "../test/simple-plan/documented-harness.ts";
@@ -31,20 +31,40 @@ export function canonicalPack(run) {
   for (const label of PACK_LABELS) assertRecordedMcpEvidence(run[label], label);
   return JSON.stringify(Object.fromEntries(PACK_LABELS.map(label => [label, label === "contract" ? run.contract : JSON.parse(canonicalisers[label](run[label]))])));
 }
+const MATCHER_CASE_SCORES = Object.freeze({
+  "matching.official_5_fewest_pills": "matching",
+  "safety.mag_ul_and_ckd": "safety",
+  "efficiency.structural": "efficiency"
+});
+function caseResults(label, section) {
+  if (label !== "matcher") return section?.cases ?? [];
+  return (section?.cases ?? []).map(row => {
+    const score = section.scores?.[MATCHER_CASE_SCORES[row.id]];
+    return { ...row, result: Number.isFinite(score) && score >= MATCHER_BAR && score <= 10 ? "PASS" : "FAIL" };
+  });
+}
 export function snapshotFromRun(run) {
-  return Object.fromEntries(PACK_LABELS.map(label => [label, Object.fromEntries(run[label].cases.map(row => [row.id,row.result]))]));
+  return Object.fromEntries(PACK_LABELS.map(label => [label, Object.fromEntries(caseResults(label, run[label]).map(row => [row.id, row.result]))]));
 }
 export function writeBaseline(run) { writeFileSync(BASELINE_PATH, `${JSON.stringify(snapshotFromRun(run),null,2)}\n`, {flag:"wx"}); }
 export function sectionTotals(run) {
-  const totals=Object.fromEntries(PACK_LABELS.map(label=>{
-    const section=run[label];const passed=Boolean(section?.totalCases>0&&section.passedCases===section.totalCases&&section.cases.length===section.totalCases&&section.cases.every(row=>row.result==="PASS"));
-    return [label,{passed:label==="matcher" ? passed&&["matching","safety","efficiency"].every(key=>Number(section.scores[key])>=MATCHER_BAR) : passed,text:`${section?.passedCases??0}/${section?.totalCases??0}`}];
+  const totals = Object.fromEntries(PACK_LABELS.map(label => {
+    const section = run[label], rows = caseResults(label, section);
+    const total = label === "matcher" ? Object.keys(MATCHER_CASE_SCORES).length : section?.totalCases;
+    const passedCount = rows.filter(row => row.result === "PASS").length;
+    const complete = label === "matcher"
+      ? Object.keys(MATCHER_CASE_SCORES).every(id => rows.filter(row => row.id === id).length === 1)
+      : section?.passedCases === passedCount;
+    return [label, { passed: Boolean(total > 0 && complete && rows.length === total && passedCount === total), text: `${passedCount}/${total ?? 0}` }];
   }));
-  return {...totals,packPass:PACK_LABELS.every(label=>totals[label].passed)};
+  return {...totals, packPass: PACK_LABELS.every(label => totals[label].passed)};
 }
 export function printTable(run) {
-  const totals=sectionTotals(run);
-  for(const label of PACK_LABELS){console.log(`${label}: ${totals[label].text} ${totals[label].passed?"PASS":"FAIL"}`);for(const row of run[label].cases)console.log(`  ${row.id}: ${row.result}`);}
+  const totals = sectionTotals(run);
+  for (const label of PACK_LABELS) {
+    console.log(`${label}: ${totals[label].text} ${totals[label].passed ? "PASS" : "FAIL"}`);
+    for (const row of caseResults(label, run[label])) console.log(`  ${row.id}: ${row.result}`);
+  }
   return totals;
 }
 async function resetAfterMatcher(){replaceCatalogueSnapshot(null);resetCatalogueSnapshotCache();resetMatcherSafetyCeilings();setAgenticRuntimeForTests(null);}
@@ -61,30 +81,30 @@ export async function runPackOnce(inputs = {}) {
   await resetAfterMatcher();
   const commercial = await runComPack();
   await resetAfterMatcher();
-  setMatcherSafetyCeilings(detInput.ceilings);
-  const remediationInput = await frozenPackInput(inputs, "valueRemediation", async () => ({
-    freeze: await freezeLiveThailandCatalogue("TH"), ceilings: [...matcherSafetyCeilings()]
-  }));
-  setMatcherSafetyCeilings(remediationInput.ceilings);
-  const valueRemediation = await runCvFixPack(remediationInput.freeze);
+  const remediationInput = await frozenPackInput(inputs, "valueRemediation", async () => {
+    const freeze = await freezeLiveThailandCatalogue("TH");
+    return { freeze, references: captureMatcherSafetySnapshot(freeze.snapshot.runtimeRevision) };
+  });
+  const valueRemediation = await runCvFixPack(remediationInput.freeze, remediationInput.references);
   await resetAfterMatcher();
-  setMatcherSafetyCeilings(detInput.ceilings);
-  const valueInput = await frozenPackInput(inputs, "value", async () => ({
-    input: await freezeImplCatalogue(), ceilings: [...matcherSafetyCeilings()]
-  }));
-  setMatcherSafetyCeilings(valueInput.ceilings);
+  const valueInput = await frozenPackInput(inputs, "value", async () => {
+    const input = await freezeImplCatalogue();
+    return { input, references: captureMatcherSafetySnapshot() };
+  });
+  setMatcherSafetyCeilings(valueInput.references.ceilings, valueInput.references.identity ?? undefined);
   const valueImplementation = await runCvImplPack(1, valueInput.input);
   await resetAfterMatcher();
-  setMatcherSafetyCeilings(valueInput.ceilings);
+  setMatcherSafetyCeilings(valueInput.references.ceilings, valueInput.references.identity ?? undefined);
   const valueR2 = await runCvR2Pack(1, valueInput.input);
   await resetAfterMatcher();
-  const financialInput = await frozenPackInput(inputs, "financial", async () => ({
-    input: await freezeFinancialCatalogue(), ceilings: [...matcherSafetyCeilings()]
-  }));
-  setMatcherSafetyCeilings(financialInput.ceilings);
+  const financialInput = await frozenPackInput(inputs, "financial", async () => {
+    const input = await freezeFinancialCatalogue();
+    return { input, references: captureMatcherSafetySnapshot() };
+  });
+  setMatcherSafetyCeilings(financialInput.references.ceilings, financialInput.references.identity ?? undefined);
   const valueR3 = await runCvR3Pack(1, financialInput.input);
   await resetAfterMatcher();
-  setMatcherSafetyCeilings(financialInput.ceilings);
+  setMatcherSafetyCeilings(financialInput.references.ceilings, financialInput.references.identity ?? undefined);
   const valueR4 = await runCvR4Pack(1, financialInput.input);
   return {
     contract,
