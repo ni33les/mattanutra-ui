@@ -73,3 +73,13 @@ test('NOID-05 checkout before confirmation explains the current protocol instead
   assert.match(body.error.message,/confirm.*recommendation/i);
   assert.doesNotMatch(body.error.message,/select.*option/i);
 });
+
+test('NOID-06 confirmed-copy and checkout instructions agree in every locale', async () => {
+  const summaries: Record<string,string> = { en: 'Your routine is confirmed. Continue to checkout.', th: 'ยืนยันชุดแล้ว ดำเนินการชำระเงินได้', 'zh-CN': '已确认组合，可以继续结账。' };
+  for (const locale of ['en','th','zh-CN']) {
+    const app = runtime(), created = await plan(app, { ...create(), locale, idempotencyKey: `noid-copy-${locale}` });
+    const confirmed = await plan(app, { planHandle: created.planHandle, expectedRevision: created.revision, idempotencyKey: `noid-copy-confirm-${locale}` });
+    assert.equal(confirmed.nextAction, 'execute');
+    assert.equal(confirmed.summary, summaries[locale]);
+  }
+});
