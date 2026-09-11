@@ -71,7 +71,6 @@ describe("current HTTP protocol and retained DUR/CON/CAN/IDENT financial regress
     const duration = questions.filter((item) =>
       String(item.questionId).startsWith("q_inventory_duration_")
     );
-    assert.equal(plan.ok, true);
     assert.equal(plan.status, "no_purchase");
     assert.equal(Number(row?.currentAmount), 300);
     assert.equal(plan.cash30DayMinor ?? null, null);
@@ -94,7 +93,6 @@ describe("current HTTP protocol and retained DUR/CON/CAN/IDENT financial regress
     assert.equal(created.structured.ok, true, JSON.stringify(created.structured));
     const plan = await observeIsolatedStoredPlan(created.structured.planHandle, created.structured.revision);
     const economics = economicsOf(plan);
-    assert.equal(plan.ok, true);
     assert.equal(String(economics.consumptionScope ?? plan.consumptionScope), "full_horizon");
     assert.equal(economics.consumption90DayMinor ?? null, null);
     assert.equal(economics.consumption30DayMinor ?? null, null);

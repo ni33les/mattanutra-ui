@@ -341,6 +341,10 @@
       "reason": "Affected confirmation protocol, private candidate field consumers, or publication and commerce regression coverage; retain scoring, prices and payment invariants."
     },
     {
+      "file": "test/matcher-fixture-prerequisites.test.ts",
+      "reason": "Reject incomplete isolated catalogue and retail commerce prerequisites before HTTP acceptance."
+    },
+    {
       "file": "test/matcher-prd-gates.test.ts",
       "reason": "Full-inventory hygiene disallows bare early-return guards; explicit failure preserves all canonicalization, scoring and safety assertions."
     },

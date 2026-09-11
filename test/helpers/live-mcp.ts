@@ -142,12 +142,14 @@ export async function observeIsolatedStoredPlan(handle: unknown, revision: unkno
   const { createRuntimeStore } = await import("../../lib/agentic/store/postgres.ts");
   const { hashCapability } = await import("../../lib/agentic/capabilities.ts");
   const { loadAgenticConfig } = await import("../../lib/agentic/config.ts");
+  const { publicPlanFields } = await import("../../lib/agentic/public-mapper.ts");
   const store = createRuntimeStore();
   const capability = await store.getCapabilityByHash(hashCapability(loadAgenticConfig().capabilitySecret, handle as string));
   assert.ok(capability, "Returned handle must identify a stored plan");
   const saved = await store.getPlanRevision(capability.resourceId, revision as number);
   assert.ok(saved, "Terminal public revision must be stored");
-  return saved.result as unknown as Record<string, unknown>;
+  // Retained financial/canonical projection, not the public conversational DTO.
+  return publicPlanFields(saved.result) as unknown as Record<string, unknown>;
 }
 
 export function magCurrentRequest(

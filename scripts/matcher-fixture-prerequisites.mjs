@@ -12,17 +12,27 @@ export function validateMatcherFixtureCounts(counts) {
   return Object.fromEntries(fields.map(field => [field, counts[field]]));
 }
 
+export function validateMatcherFixtureRelations(relations) {
+  const required = ["retail_checkout_payments", "retail_customer_orders"];
+  for (const name of required) assert.equal(relations[name], true, `Missing maintained MCP commerce prerequisite: ${name}`);
+  return Object.fromEntries(required.map(name => [name, true]));
+}
+
 export async function checkMatcherFixtureDatabase(env) {
   isolatedValidationEnvironment(env);
   const sql = postgres(env.TEST_DB_URL, { max: 1, prepare: false });
   try {
+    const [relations] = await sql`select
+      to_regclass('public.retail_checkout_payments') is not null as retail_checkout_payments,
+      to_regclass('public.retail_customer_orders') is not null as retail_customer_orders`;
+    validateMatcherFixtureRelations(relations);
     const [row] = await sql`select
       (select count(*)::integer from public.products) as products,
       (select count(*)::integer from public.product_facts) as "productFacts",
       (select count(*)::integer from public.supplements) as supplements,
       (select count(*)::integer from public.retail_sellable_products) as "retailListings",
       (select count(*)::integer from public.supplement_safety_limits) as "safetyReferences"`;
-    return { version: 1, passed: true, counts: validateMatcherFixtureCounts(row) };
+    return { version: 1, passed: true, counts: validateMatcherFixtureCounts(row), relations };
   } finally { await sql.end(); }
 }
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
