@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { CalculatingWait } from "@/components/chat-questionnaire/calculating-wait";
 import { getWelcomeCopy } from "@/components/chat-questionnaire/questionnaire-welcome";
 import type { Locale } from "@/lib/i18n";
@@ -24,6 +24,11 @@ export function QuestionnaireCalculating({ locale, status, onSeeResults, canOpen
   const [delivery, setDelivery] = useState<HealthScoreDeliveryReceipt | null>(null);
   const [emailError, setEmailError] = useState("");
   const [emailBusy, setEmailBusy] = useState(false);
+  const [emailDelayElapsed, setEmailDelayElapsed] = useState(false);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setEmailDelayElapsed(true), 120_000);
+    return () => window.clearTimeout(timer);
+  }, []);
   const requested = delivery && ["waiting", "queued", "sending"].includes(delivery.status);
   const sent = delivery?.status === "sent";
   const isReady = status === "ready", isBuilding = status === "building";
@@ -52,7 +57,7 @@ export function QuestionnaireCalculating({ locale, status, onSeeResults, canOpen
         {onRetryCapture ? <button type="button" className="mn-quiz-calc__ready-btn" data-testid="retry-capture" onClick={onRetryCapture}>{copy.calcRetryCapture}</button> : null}
         {onRetryAnalysis ? <button type="button" className="mn-quiz-calc__ready-btn" data-testid="retry-analysis" onClick={onRetryAnalysis}>{copy.calcRetryAnalysis}</button> : null}
       </div> : null}
-      {!isReady && !onRetryCapture && !requested && !sent ? <form className="mn-quiz-calc__email-stack" data-testid="calc-emailbox"
+      {emailDelayElapsed && !isReady && !onRetryCapture && !requested && !sent ? <form className="mn-quiz-calc__email-stack" data-testid="calc-emailbox"
         onSubmit={event => { event.preventDefault(); void submitEmail(); }}>
         <input type="email" inputMode="email" autoComplete="email" required placeholder={copy.calcEmailPlaceholder} value={email} disabled={emailBusy}
           onChange={event => setEmail(event.target.value)} aria-label={copy.calcEmailPlaceholder} />

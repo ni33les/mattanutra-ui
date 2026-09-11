@@ -4,10 +4,11 @@ import { randomUUID } from "node:crypto";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import assert from "node:assert/strict";
 import { expect, test, type Page } from "../helpers/offline-browser";
 const execute = promisify(execFile);
 const databaseUrl = process.env.TEST_DB_URL;
-test.skip(!databaseUrl, "Requires the isolated PostgreSQL funnel fixture database and matching app server");
+assert.ok(databaseUrl, "Requires the isolated PostgreSQL funnel fixture database and matching app server");
 // Fixture process startup is outside the product's 90-second foreground wait.
 // Keep each fixture bounded while allowing the complete multi-stage journey.
 test.setTimeout(240_000);
@@ -63,6 +64,7 @@ test("fresh browser resumes server answers; unrelated drafts and previous contac
 });
 
 test("capture failure, persistence failure, reload and analysis retry remain separate", async ({ page }) => {
+  await page.clock.install();
   let captures = 0;
   await page.route("**/api/assessment", route => {
     if (route.request().method() !== "POST") return route.continue();
@@ -73,9 +75,7 @@ test("capture failure, persistence failure, reload and analysis retry remain sep
   await page.getByTestId("dev-fill-questionnaire").click();
   await expect(page.getByTestId("retry-capture")).toBeVisible();
   await expect(page.getByTestId("retry-analysis")).toHaveCount(0);
-  await page.locator('[data-testid="calc-emailbox"] input').fill("sink@funnel-fixture.test");
-  await page.locator('[data-testid="calc-emailbox"] button').click();
-  await expect(page.getByTestId("calc-fallback").getByRole("alert")).toBeVisible();
+  await expect(page.getByTestId("calc-emailbox")).toHaveCount(0);
   const capturedResponse = page.waitForResponse(r => /\/api\/assessment$/.test(r.url()) && r.status() === 200);
   await page.getByTestId("retry-capture").click();
   const captured = await (await capturedResponse).json();
@@ -83,14 +83,17 @@ test("capture failure, persistence failure, reload and analysis retry remain sep
   await expect.poll(() => page.evaluate(() => Object.keys(localStorage).some(k => k.startsWith("mn-questionnaire:v1:") && JSON.parse(localStorage.getItem(k)!).captured))).toBe(true);
   await page.reload();
   await expect(page.getByTestId("questionnaire-calculating")).toBeVisible();
-  await page.route("**/journey?locale=*", route => route.fulfill({ json: { copyReady: false, copyFailed: true } }));
+  await page.route("**/journey?locale=*", route => route.fulfill({ json: { copyReady: false, copyFailed: true, healthScorePageFailed: true, readyForHealthScore: false } }));
   await expect(page.getByTestId("retry-analysis")).toBeVisible();
   await expect(page.getByTestId("retry-capture")).toHaveCount(0);
   expect(captures).toBe(2);
+  await expect(page.getByTestId("calc-emailbox")).toHaveCount(0);
+  await page.clock.fastForward(120_000);
+  await expect(page.getByTestId("calc-emailbox")).toBeVisible();
   await page.route("**/healthscore-delivery", route => route.fulfill({ status: 500, json: { message: "fixture delivery persistence failure" } }));
   await page.locator('[data-testid="calc-emailbox"] input').fill("sink@funnel-fixture.test");
   await page.locator('[data-testid="calc-emailbox"] button').click();
-  await expect(page.getByTestId("calc-fallback").getByRole("alert")).toContainText("fixture delivery persistence failure");
+  await expect(page.getByTestId("questionnaire-calculating").getByRole("alert")).toContainText("fixture delivery persistence failure");
   await page.unroute("**/healthscore-delivery");
   await page.locator('[data-testid="calc-emailbox"] button').click();
   await expect(page.getByTestId("calc-emailbox")).toHaveCount(0);
@@ -99,7 +102,7 @@ test("capture failure, persistence failure, reload and analysis retry remain sep
   await page.getByTestId("retry-analysis").click();
   expect(captures).toBe(2);
   await expect(page).toHaveURL(new RegExp(`healthscore\\?plan=${captured.planId}`));
-  await expect(page.getByTestId("reveal-hero-name")).toBeVisible();
+  await expect(page.locator(".mn-healthscore-v7")).toBeVisible();
 });
 
 for (const locale of ["en", "th", "zh-CN"] as const) {
