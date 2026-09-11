@@ -17,3 +17,9 @@ test('SPLAN-DOC-03 semantic normalization preserves recommendation facts and bus
   assert.deepEqual(normalizePublishedClientResult(a), normalizePublishedClientResult(b));
   b.choices[0].products[0].quantity = 3; assert.notDeepEqual(normalizePublishedClientResult(a), normalizePublishedClientResult(b));
 });
+test('SPLAN-DOC-04 paired evidence treats readiness stopwatch values as latency, preserving prices and URL destinations', () => {
+  const a = { readyMs: 10, checkoutUrl: 'https://fixture.example/en/basket/checkout', products: [{productId:'sku',lineTotal:100}] };
+  assert.deepEqual(normalizePublishedClientResult(a), normalizePublishedClientResult({...a,readyMs:20}));
+  assert.notDeepEqual(normalizePublishedClientResult(a), normalizePublishedClientResult({...a,checkoutUrl:'https://wrong.example/en/basket/checkout'}));
+  assert.notDeepEqual(normalizePublishedClientResult(a), normalizePublishedClientResult({...a,products:[{productId:'sku',lineTotal:101}]}));
+});
