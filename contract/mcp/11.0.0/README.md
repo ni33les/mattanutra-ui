@@ -15,7 +15,7 @@ Tools: info, plan, execute, order, support, feedback. Use host-listed names. inf
 
 Targets and preferences describe the desired outcome. Weights describe its importance when comparing possible routines. Weights accept decimals from 0 to 2: zero removes that ranking component, one applies the normal penalty, and two doubles it. Changing a weight never changes the agreed target amount. Numerical preferences remain advisory. Safety penalties and factual advice remain active independently. A target amount of zero with a positive weight expresses soft minimisation. A weight of zero means that objective does not influence ranking. Use an exclusion only when the customer requires categorical avoidance. Cost weight: scoring.weights.price (0 to 2) controls first-order goods cost in THB, delivery excluded. 0 ignores the cost penalty; 1 is normal; 2 doubles it. With requirements.maxPriceMinor, it weights budget-overrun penalties instead. Omission preserves; null resets to the preset.
 
-Illustrative amounts are protocol examples, not personal dose recommendations. Answer using the actual questionId and choice corresponding to the customer’s answer. Replace placeholder identifiers with returned values; each new mutation needs a new idempotencyKey and current expectedRevision. Retry a lost response with exactly the same key and input. Handle-only calls poll existing work at pollAfterSeconds; stop at a terminal result.
+Illustrative amounts are protocol examples, not personal dose recommendations. Answer using the actual questionId and choice corresponding to the customer’s answer. Replace placeholder identifiers with returned values; each new mutation needs a new idempotencyKey and current expectedRevision. Retry a lost response with exactly the same key and input. Handle-only calls poll existing work at pollAfterSeconds; stop at a terminal result. Space automated requests at least one second apart and respect longer pollAfterSeconds or Retry-After delays. After a rate-limit response, retry only with the same idempotency key and unchanged payload when the call is a mutation; reads keep the same handle.
 
 Use one flat plan call repeatedly. Omit unchanged fields. Start with best_match by omitting scoring; it uses the existing balanced coefficients, all initially one. balanced remains an accepted input alias and is returned as best_match. Adjust weights conversationally to get one recommendation per round. Selection, answers and refinements must be separate calls. profile is reported customer context; scoring.profile is a preset of effective weights. Nothing requires exact diet labels or demographics merely to explore.
 
@@ -365,8 +365,8 @@ execute
 ```json
 {
   "planHandle": "cap_replace_with_returned_plan_handle",
-  "expectedRevision": 1,
-  "idempotencyKey": "example-change-key-0001"
+  "expectedRevision": 2,
+  "idempotencyKey": "example-checkout-key-0001"
 }
 ```
 

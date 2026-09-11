@@ -3110,8 +3110,8 @@
       "tool": "execute",
       "arguments": {
         "planHandle": "cap_replace_with_returned_plan_handle",
-        "expectedRevision": 1,
-        "idempotencyKey": "example-change-key-0001"
+        "expectedRevision": 2,
+        "idempotencyKey": "example-checkout-key-0001"
       }
     },
     {

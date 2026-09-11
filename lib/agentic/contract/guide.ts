@@ -31,11 +31,11 @@ export const CLIENT_EXAMPLES = [
   { name: "recover-failed-or-stale-work", tool: "plan", arguments: { ...controls, scoring: {} } },
   { name: "answer-current-question", tool: "plan", arguments: { ...controls, answers: [{ questionId: "returned_question", choice: "returned_choice" }] } },
   { name: "confirm-recommendation", tool: "plan", arguments: { ...controls } },
-  { name: "confirmed-checkout", tool: "execute", arguments: { ...controls } },
+  { name: "confirmed-checkout", tool: "execute", arguments: { ...controls, expectedRevision: 2, idempotencyKey: "example-checkout-key-0001" } },
   { name: "recover-or-track-order", tool: "order", arguments: { orderHandle: "cap_replace_with_returned_order_handle" } }
 ] as const;
 export function publicContractBundle() { return { contractVersion: AGENTIC_CONTRACT_VERSION, planSchema: PLAN_INPUT_SCHEMA, examples: CLIENT_EXAMPLES, tools: AGENTIC_CONTRACT_REGISTRY }; }
-const RULES = `Illustrative amounts are protocol examples, not personal dose recommendations. Answer using the actual questionId and choice corresponding to the customer’s answer. Replace placeholder identifiers with returned values; each new mutation needs a new idempotencyKey and current expectedRevision. Retry a lost response with exactly the same key and input. Handle-only calls poll existing work at pollAfterSeconds; stop at a terminal result.
+const RULES = `Illustrative amounts are protocol examples, not personal dose recommendations. Answer using the actual questionId and choice corresponding to the customer’s answer. Replace placeholder identifiers with returned values; each new mutation needs a new idempotencyKey and current expectedRevision. Retry a lost response with exactly the same key and input. Handle-only calls poll existing work at pollAfterSeconds; stop at a terminal result. Space automated requests at least one second apart and respect longer pollAfterSeconds or Retry-After delays. After a rate-limit response, retry only with the same idempotency key and unchanged payload when the call is a mutation; reads keep the same handle.
 
 Use one flat plan call repeatedly. Omit unchanged fields. Start with best_match by omitting scoring; it uses the existing balanced coefficients, all initially one. balanced remains an accepted input alias and is returned as best_match. Adjust weights conversationally to get one recommendation per round. Selection, answers and refinements must be separate calls. profile is reported customer context; scoring.profile is a preset of effective weights. Nothing requires exact diet labels or demographics merely to explore.
 
