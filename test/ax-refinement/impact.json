@@ -106,12 +106,20 @@
     {
       "id": "AXR-REG-01",
       "slice": "journeys",
-      "file": "test/ax-refinement/journeys.test.ts"
+      "file": "test/ax-refinement/journeys.test.ts",
+      "additionalFiles": [
+        "test/ax-refinement/journeys-th.test.ts",
+        "test/ax-refinement/journeys-zh.test.ts"
+      ]
     },
     {
       "id": "AXR-REG-02",
       "slice": "journeys",
-      "file": "test/ax-refinement/journeys.test.ts"
+      "file": "test/ax-refinement/journeys.test.ts",
+      "additionalFiles": [
+        "test/ax-refinement/journeys-th.test.ts",
+        "test/ax-refinement/journeys-zh.test.ts"
+      ]
     },
     {
       "id": "AXR-REG-03",
@@ -367,6 +375,18 @@
       "slice": "reliability",
       "reason": "Real expanded workers and PostgreSQL exercise transient checkpoint rollback, charged lost attempts, refreshed clocks and same-key publication.",
       "database": true
+    },
+    {
+      "file": "test/ax-refinement/journeys-th.test.ts",
+      "slice": "journeys",
+      "reason": "Preserve six original locale journeys with their 90-second case deadline in a bounded per-locale file.",
+      "database": false
+    },
+    {
+      "file": "test/ax-refinement/journeys-zh.test.ts",
+      "slice": "journeys",
+      "reason": "Preserve six original locale journeys with their 90-second case deadline in a bounded per-locale file.",
+      "database": false
     }
   ]
 }

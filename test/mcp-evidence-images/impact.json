@@ -293,6 +293,14 @@
       "reason": "Maintained MCP replay exposed retired request/response expectations; preserve underlying domain, ownership, lifecycle, financial or discovery assertions through the current protocol."
     },
     {
+      "file": "test/ax-refinement/journeys-th.test.ts",
+      "reason": "Preserve every original locale journey and per-case deadline while keeping each serial file below the unchanged 600-second container ceiling."
+    },
+    {
+      "file": "test/ax-refinement/journeys-zh.test.ts",
+      "reason": "Preserve every original locale journey and per-case deadline while keeping each serial file below the unchanged 600-second container ceiling."
+    },
+    {
       "file": "test/ax-refinement/journeys.test.ts",
       "reason": "Maintained MCP replay exposed retired request/response expectations; preserve underlying domain, ownership, lifecycle, financial or discovery assertions through the current protocol."
     },
