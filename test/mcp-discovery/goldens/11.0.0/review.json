@@ -34,6 +34,12 @@
       "source": "User evidence-removal and recorded product image brief",
       "reviewer": "Codex",
       "reviewMethod": "Review of the English, Thai and Chinese delta: remove evidence title and purpose only. Every retained tool and all routing, wellness and country boundaries remain byte-for-byte equal to the preserved v10 goldens. No human translation approval claimed."
+    },
+    {
+      "date": "2026-09-11",
+      "source": "User-approved direct checkout and service-feedback guidance",
+      "reviewer": "Codex",
+      "reviewMethod": "Reviewed title/purpose changes remove the separate confirmation step; execute directly creates checkout for the current basket. Optional service feedback retains customer consent. No routing, pricing or safety claims changed."
     }
   ]
 }

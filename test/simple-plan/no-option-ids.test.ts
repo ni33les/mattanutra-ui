@@ -13,29 +13,23 @@ test('NOID-01 every public schema and discovery surface removes redundant option
   for (const value of [AGENTIC_TOOL_SCHEMAS, AGENTIC_OUTPUT_SCHEMAS, toolList(), AGENT_CARD, CLIENT_EXAMPLES,
     ...['en','th','zh-CN'].map(locale => clientGuideMarkdown(locale, 'dev'))]) assert.doesNotMatch(JSON.stringify(value), retiredId);
   const confirm = { planHandle: 'cap_returned_plan_handle_000000001', expectedRevision: 1, idempotencyKey: 'confirm-current-recommendation' };
-  assert.deepEqual(validateToolIssues(AGENTIC_TOOL_SCHEMAS.plan, confirm), []);
+  assert.ok(validateToolIssues(AGENTIC_TOOL_SCHEMAS.plan, confirm).length);
   assert.ok(validateToolIssues(AGENTIC_TOOL_SCHEMAS.plan, { ...confirm, selectedOptionId: 'opt_retired' }).some(issue => issue.reasonCode === 'unexpected_property'));
 });
 
-test('NOID-02 a handle/revision confirms the single returned routine without another match; replay precedes stale revision', async t => {
-  const app = runtime();
-  const created = await plan(app, create()); assert.equal(created.status, 'ready');
-  assert.equal(created.nextAction, 'confirm_with_user'); assert.equal(created.choices.length, 1);
+test('NOID-02 direct checkout preserves the recommendation and replays after a later refinement', async () => {
+  const app = runtime(), created = await plan(app, create());
+  assert.equal(created.status, 'ready'); assert.equal(created.nextAction, 'execute');
   assert.doesNotMatch(JSON.stringify(created), retiredId);
-  const checkpoints: unknown[] = [];
-  const update = app.store.updatePlanOperation.bind(app.store);
-  t.mock.method(app.store, 'updatePlanOperation', async (...args: Parameters<typeof update>) => { checkpoints.push(args[0].checkpoint); return update(...args); });
-  const confirm = { planHandle: created.planHandle, expectedRevision: created.revision, idempotencyKey: 'noid-confirm-current' };
-  const confirmed = await plan(app, confirm); assert.equal(confirmed.revision, created.revision + 1); assert.equal(confirmed.nextAction, 'execute');
-  assert.deepEqual(confirmed.choices[0].products, created.choices[0].products);
-  assert.deepEqual(confirmed.choices[0].ingredients, created.choices[0].ingredients);
-  assert.deepEqual(await plan(app, confirm), confirmed);
-  const stale = (await rpc(app, 'plan', { ...confirm, idempotencyKey: 'noid-stale-confirm' }))!.result!.structuredContent as { ok: boolean; error: { reasonCode: string } };
-  assert.equal(stale.ok, false); assert.equal(stale.error.reasonCode, 'stale_revision');
-  assert.deepEqual(await plan(app, { planHandle: created.planHandle }), confirmed);
-  assert.ok(checkpoints.length > 0);
-  assert.ok(checkpoints.every(value => !value || !((value as { search?: unknown }).search)), "Confirmation must not run search or create a search checkpoint");
-  assert.deepEqual(validateToolIssues(AGENTIC_OUTPUT_SCHEMAS.plan, confirmed), []);
+  const args = { planHandle: created.planHandle, expectedRevision: created.revision, idempotencyKey: 'noid-direct-checkout' };
+  const opened = (await rpc(app, 'execute', args))!.result!.structuredContent as {ok:boolean;frozenPlan:unknown};
+  assert.equal(opened.ok, true, JSON.stringify(opened));
+  const refined = await plan(app, { ...args, idempotencyKey: 'noid-next-refinement', scoring: { weights: { pills: 2 } } });
+  assert.equal(refined.revision, created.revision + 1);
+  assert.deepEqual((await rpc(app, 'execute', args))!.result!.structuredContent, opened);
+  const stale = (await rpc(app, 'execute', { ...args, idempotencyKey: 'noid-stale-checkout' }))!.result!.structuredContent as {ok:boolean;error:{reasonCode:string}};
+  assert.equal(stale.ok, false); assert.equal(stale.error.reasonCode, 'revision_conflict');
+  assert.deepEqual(validateToolIssues(AGENTIC_OUTPUT_SCHEMAS.plan, refined), []);
 });
 
 test('NOID-03 generated cards, downloadable schemas and hosted projections publish the exact current protocol', () => {
@@ -61,26 +55,23 @@ test('NOID-04 public descriptions do not promise retired response ledgers or evi
     const guide = clientGuideMarkdown(locale,'dev');
     assert.doesNotMatch(guide, /call evidence|evidence tool|selectedCandidateKey|selectedOptionId/i);
     assert.match(guide, /scoring.weights.price/);
-    assert.match(guide, /send only planHandle, expectedRevision and a new idempotencyKey to plan/);
+    assert.match(guide, /call execute directly/);
   }
 });
 
-test('NOID-05 checkout before confirmation explains the current protocol instead of asking for an option', async () => {
+test('NOID-05 checkout accepts the current recommendation without an extra confirmation', async () => {
   const app = runtime(), created = await plan(app, create());
   const reply = await rpc(app, 'execute', { planHandle: created.planHandle, expectedRevision: created.revision, idempotencyKey: 'noid-before-confirmation' });
-  const body = reply!.result!.structuredContent as {ok:boolean;error:{reasonCode:string;message:string}};
-  assert.equal(body.ok,false); assert.equal(body.error.reasonCode,'plan_not_ready');
-  assert.match(body.error.message,/confirm.*recommendation/i);
-  assert.doesNotMatch(body.error.message,/select.*option/i);
+  const body = reply!.result!.structuredContent as {ok:boolean;paymentStatus:string};
+  assert.equal(body.ok,true,JSON.stringify(body)); assert.equal(body.paymentStatus,'unpaid');
 });
 
-test('NOID-06 confirmed-copy and checkout instructions agree in every locale', async () => {
-  const summaries: Record<string,string> = { en: 'Your routine is confirmed. Continue to checkout.', th: 'ยืนยันชุดแล้ว ดำเนินการชำระเงินได้', 'zh-CN': '已确认组合，可以继续结账。' };
+test('NOID-06 checkout-ready copy does not assert prior confirmation in any locale', async () => {
+  const summaries: Record<string,string> = { en: 'Your recommended routine is ready. Proceed to checkout or adjust the weights.', th: 'ชุดที่แนะนำพร้อมแล้ว ไปชำระเงินหรือปรับน้ำหนักความสำคัญได้', 'zh-CN': '推荐组合已准备好，可以结账或调整权重。' };
   for (const locale of ['en','th','zh-CN']) {
-    const app = runtime(), created = await plan(app, { ...create(), locale, idempotencyKey: `noid-confirmed-copy-create-${locale}` });
-    const confirmed = await plan(app, { planHandle: created.planHandle, expectedRevision: created.revision, idempotencyKey: `noid-copy-confirm-${locale}` });
-    assert.equal(confirmed.nextAction, 'execute');
-    assert.equal(confirmed.summary, summaries[locale]);
+    const app = runtime(), created = await plan(app, { ...create(), locale, idempotencyKey: `noid-ready-copy-create-${locale}` });
+    assert.equal(created.nextAction, 'execute'); assert.equal(created.revision, 1);
+    assert.equal(created.summary, summaries[locale]);
   }
 });
 
@@ -91,35 +82,22 @@ test('NOID-07 execute discovery distinguishes a new checkout from replaying a lo
   assert.match(description, /returned.*revision/);
 });
 
-test('NOID-08 checkout template advances the confirmed revision and uses a distinct mutation key', () => {
-  const confirm = CLIENT_EXAMPLES.find(row => row.name === 'confirm-recommendation')!.arguments;
-  const checkout = CLIENT_EXAMPLES.find(row => row.name === 'confirmed-checkout')!.arguments;
-  assert.equal(checkout.planHandle, confirm.planHandle);
-  assert.equal(checkout.expectedRevision, confirm.expectedRevision + 1, 'Confirmation returns a new revision for checkout');
-  assert.notEqual(checkout.idempotencyKey, confirm.idempotencyKey, 'Checkout is a new mutation, not a replay of confirmation');
+test('NOID-08 checkout template uses the current revision without a confirmation template', () => {
+  assert.equal(CLIENT_EXAMPLES.some(row => row.name === 'confirm-recommendation'), false);
+  const checkout = CLIENT_EXAMPLES.find(row => row.name === 'create-checkout')!.arguments;
+  assert.equal(checkout.expectedRevision, 1);
+  assert.ok(checkout.idempotencyKey.length >= 16);
 });
 
-test('NOID-09 queued confirmation reports a plan update, then checkout readiness without a new search', async () => {
-  const summaries: Record<string, string> = {
-    en: 'Updating your plan. Wait before checking again.',
-    th: 'กำลังอัปเดตแผน โปรดรอก่อนตรวจสอบอีกครั้ง',
-    'zh-CN': '正在更新计划，请稍后再查询。'
-  };
+test('NOID-09 removed confirmation calls create no queued work in every locale', async () => {
   for (const locale of ['en', 'th', 'zh-CN']) {
     const app = runtime();
-    const created = await plan(app, { ...create(), locale, idempotencyKey: `noid-queued-create-${locale}` });
-    const args = { planHandle: created.planHandle, expectedRevision: created.revision, idempotencyKey: `noid-queued-confirm-${locale}` };
-    const admitted = (await rpc(app, 'plan', args))!.result!.structuredContent as { status: string; summary: string; nextAction: string };
-    assert.equal(admitted.status, 'processing');
-    assert.equal(admitted.nextAction, 'poll_plan');
-    assert.equal(admitted.summary, summaries[locale]);
-    const confirmed = await plan(app, args);
-    assert.equal(confirmed.nextAction, 'execute');
-    assert.deepEqual(confirmed.choices, created.choices);
+    const created = await plan(app, { ...create(), locale, idempotencyKey: `noid-no-confirm-create-${locale}` });
+    const args = { planHandle: created.planHandle, expectedRevision: created.revision, idempotencyKey: `noid-no-confirm-${locale}` };
+    const result = (await rpc(app, 'plan', args))!.result!.structuredContent as {ok:boolean};
+    assert.equal(result.ok, false);
     const owner = `${app.scope.environment}:${app.scope.tenantScope}:${app.scope.principalScope ?? 'anon'}`;
-    const operation = await app.store.getPlanOperationByKey(owner, args.idempotencyKey);
-    assert.ok(operation);
-    assert.equal(operation.status, 'complete');
-    assert.equal(operation.checkpoint, null, 'Confirmation must not create a search checkpoint');
+    assert.equal(await app.store.getPlanOperationByKey(owner, args.idempotencyKey), null);
+    assert.deepEqual(await plan(app, { planHandle: created.planHandle }), created);
   }
 });

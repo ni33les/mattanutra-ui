@@ -30,7 +30,7 @@ test('AE-06 AE-07 AE-08 AX2-01 AX2-02 unassessed context adds no unsolicited war
   const app=createAgenticRuntime();
   const created=await call(app,'plan',{...request,medicationCodes:['warfarin'],conditionCodes:['diabetes']});assert.equal(created.ok,true);
   assert.doesNotMatch(String(created.summary),/not been assessed|cleared|medically approved/i);assert.doesNotMatch(JSON.stringify(created),/checkoutUrl|paymentIntent|orderHandle|feedbackInvitation|acknowledge_safety/);
-  assert.ok(!('selectedCandidateKey' in created));assert.equal(created.nextAction,'confirm_with_user');
+  assert.ok(!('selectedCandidateKey' in created));assert.equal(created.nextAction,'execute');
   assert.deepEqual(await call(app,'plan',{planHandle:created.planHandle}),created);
 });
 test('AE-09 AX4-06 AX6-03 quantified exposure remains 1104 without unsolicited interaction or missing-reference advice',()=>{
@@ -43,7 +43,7 @@ test('AE-09 AX4-06 AX6-03 quantified exposure remains 1104 without unsolicited i
     assert.ok('choices'in decision);const row=decision.choices[0].ingredients.find(row=>row.ingredientId==='sup_omega');assert.ok(row);
     assert.equal(row.supplied,1104);assert.deepEqual(row.advice??[],[]);
     assert.equal(selected.safety.guidance[0].exposure,1104);assert.equal(selected.safety.guidance[1].threshold,null);
-    assert.equal(decision.nextAction,'confirm_with_user');for(const advice of row.advice??[])assert.ok(advice.message.length<=240);
+    assert.equal(decision.nextAction,'execute');for(const advice of row.advice??[])assert.ok(advice.message.length<=240);
   }
 });
 test('B-SECURITY-01 shared-store principal isolation protects plan, internal fact lookup and feedback with valid returned handles',async()=>{

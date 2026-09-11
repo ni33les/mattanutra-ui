@@ -279,7 +279,7 @@ describe("Current flat contract and retained intake, advice and commerce invaria
         const runtime = makeRuntime();
         const created = await call(runtime, "plan", { idempotencyKey: "v4-seven-tools-plan01", ...request });
         assert.equal(created.status, "ready");
-        const selected=await call(runtime,"plan",{planHandle:created.planHandle,expectedRevision:created.revision,idempotencyKey:"v4-seven-tools-select01"});
+        const selected=await call(runtime,"plan",{ planHandle:created.planHandle });
         await call(runtime,"feedback",{planHandle:selected.planHandle,expectedRevision:selected.revision,idempotencyKey:"v4-seven-tools-feed01",consentConfirmed:true,rating:4});
         const checkout = await call(runtime, "execute", { planHandle: created.planHandle, expectedRevision: selected.revision, idempotencyKey: "v4-seven-tools-exec01" });
         assert.equal(checkout.ok, true, JSON.stringify(checkout));

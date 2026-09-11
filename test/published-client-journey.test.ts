@@ -93,9 +93,9 @@ it("V5-CLIENT-11 failed reloads never reapply a stale patch or use a guessed rev
   }
 });
 
-it("V5-CLIENT-12 the documented client exercises stale selection and preserves returned identity", () => {
+it("V5-CLIENT-12 the documented client exercises stale refinement and direct checkout replay", () => {
   const client = readFileSync("scripts/published-client-journey.mjs", "utf8");
-  assert.match(client, /stale_revision/); assert.match(client, /const selection = \{ planHandle: plan.planHandle, expectedRevision: plan.revision, idempotencyKey:/);
-  assert.match(client, /assert.deepEqual\(await call\("plan", selection\), plan\)/);
+  assert.match(client, /stale_revision/); assert.match(client, /const args = \{ planHandle: plan.planHandle, expectedRevision: plan.revision, idempotencyKey:/);
+  assert.match(client, /assert.deepEqual\(await call\("execute", args\), order\)/);
   assert.match(client, /product.quantity \* Math.round\(product.unitPrice/);
 });

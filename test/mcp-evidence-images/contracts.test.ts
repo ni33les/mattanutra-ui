@@ -46,7 +46,7 @@ test('EV-03 pinned product versions, composition and internal catalogue validati
   }
   assert.equal(JSON.stringify(frozen),before);
 });
-test('EV-04 / IMG-01 / IMG-03 / IMG-05 / AX-01 real-product create, refine, select and read retain facts, images and delivery equality',async t=>{
+test('EV-04 / IMG-01 / IMG-03 / IMG-05 / AX-01 real-product create, refine and read retain facts, images and delivery equality',async t=>{
   const app=runtime();let imageRequests=0;t.mock.method(globalThis,'fetch',async()=>{imageRequests++;throw Error('No outbound image/manufacturer validation is allowed');});
   const first=await plan(app,create());assert.equal(first.status,'ready');assert.equal(first.revision,1);
   function check(value:typeof first,index:number){const fixture=manifest.fixtures[index];assert.equal(value.choices.length,1);const products=value.choices[0].products;assert.equal(products.length,1);
@@ -57,7 +57,7 @@ test('EV-04 / IMG-01 / IMG-03 / IMG-05 / AX-01 real-product create, refine, sele
   }
   check(first,0);
   const revised=await plan(app,{planHandle:first.planHandle,expectedRevision:1,idempotencyKey:'ev-images-refine',requirements:requirements(1)});assert.equal(revised.revision,2);check(revised,1);
-  const selected=await plan(app,{planHandle:first.planHandle,expectedRevision:2,idempotencyKey:'ev-images-select'});assert.equal(selected.revision,3);check(selected,1);
+  const selected=revised;assert.equal(selected.revision,2);check(selected,1);
   const read=await withServiceMeasurements(async()=>{const read=await plan(app,{planHandle:first.planHandle});assert.equal(serviceMeasurements()['db.statements']?.total??0,0,'Stored image delivery must not add database metadata queries');return read;});
   assert.deepEqual(read,selected);assert.equal(read.nextAction,'execute');
   const structured=toolResult(read,false,'plan','structured'),text=toolResult(read,false,'plan','text');

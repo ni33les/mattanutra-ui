@@ -40,8 +40,7 @@ async function create(dailyServings: number) {
     const choices = created.choices as Array<{ candidateKey: string; products: Array<{ servingsPerDay: number }>; roles: string[] }>;
     const option = choices.find(row => row.products.length === 1 && row.products[0]!.servingsPerDay === dailyServings);
     assert.ok(option, "Exact requested bottle quantity remains an eligible returned choice");
-    const plan = await call(runtime, "plan", { planHandle: created.planHandle, expectedRevision: created.revision,
-         idempotencyKey: `pack-quote-select-${dailyServings}` });
+    const plan = await call(runtime, "plan", { planHandle: created.planHandle });
     assert.equal(plan.status, "ready");
     const capability = await resolveCapability({ action: "plan.read", config: runtime.config, handle: String(plan.planHandle),
         now: new Date().toISOString(), resourceType: "plan", scope: runtime.scope, store: runtime.store });

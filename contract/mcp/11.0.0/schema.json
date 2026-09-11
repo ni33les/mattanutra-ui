@@ -1823,31 +1823,6 @@
           "idempotencyKey",
           "answers"
         ]
-      },
-      {
-        "additionalProperties": false,
-        "type": "object",
-        "properties": {
-          "planHandle": {
-            "minLength": 32,
-            "maxLength": 4096,
-            "type": "string"
-          },
-          "expectedRevision": {
-            "minimum": 1,
-            "type": "integer"
-          },
-          "idempotencyKey": {
-            "minLength": 16,
-            "maxLength": 128,
-            "type": "string"
-          }
-        },
-        "required": [
-          "planHandle",
-          "expectedRevision",
-          "idempotencyKey"
-        ]
       }
     ],
     "type": "object",
@@ -3097,21 +3072,25 @@
       }
     },
     {
-      "name": "confirm-recommendation",
-      "tool": "plan",
-      "arguments": {
-        "planHandle": "cap_replace_with_returned_plan_handle",
-        "expectedRevision": 1,
-        "idempotencyKey": "example-change-key-0001"
-      }
-    },
-    {
-      "name": "confirmed-checkout",
+      "name": "create-checkout",
       "tool": "execute",
       "arguments": {
         "planHandle": "cap_replace_with_returned_plan_handle",
-        "expectedRevision": 2,
+        "expectedRevision": 1,
         "idempotencyKey": "example-checkout-key-0001"
+      }
+    },
+    {
+      "name": "service-feedback-after-consent",
+      "tool": "feedback",
+      "arguments": {
+        "planHandle": "cap_replace_with_returned_plan_handle",
+        "expectedRevision": 1,
+        "idempotencyKey": "example-feedback-key-0001",
+        "consentConfirmed": true,
+        "points": [
+          "Agent observation: the returned recovery action was clear."
+        ]
       }
     },
     {
@@ -3216,10 +3195,10 @@
                               "type": "object",
                               "properties": {
                                 "locale": {
-                                  "$ref": "#/$defs/s45"
+                                  "$ref": "#/$defs/s44"
                                 },
                                 "destinationCountry": {
-                                  "$ref": "#/$defs/s52"
+                                  "$ref": "#/$defs/s51"
                                 },
                                 "profile": {
                                   "$ref": "#/$defs/s2"
@@ -3231,28 +3210,28 @@
                                   "$ref": "#/$defs/s1"
                                 },
                                 "searchEffort": {
-                                  "$ref": "#/$defs/s55"
+                                  "$ref": "#/$defs/s54"
                                 },
                                 "medicationCodes": {
-                                  "$ref": "#/$defs/s41"
+                                  "$ref": "#/$defs/s40"
                                 },
                                 "conditionCodes": {
-                                  "$ref": "#/$defs/s42"
+                                  "$ref": "#/$defs/s41"
                                 },
                                 "currentSupplements": {
-                                  "$ref": "#/$defs/s39"
+                                  "$ref": "#/$defs/s38"
                                 },
                                 "intake": {
-                                  "$ref": "#/$defs/s30"
+                                  "$ref": "#/$defs/s29"
                                 },
                                 "baseline": {
                                   "$ref": "#/$defs/s11"
                                 },
                                 "costHorizonsDays": {
-                                  "$ref": "#/$defs/s43"
+                                  "$ref": "#/$defs/s42"
                                 },
                                 "targets": {
-                                  "$ref": "#/$defs/s44"
+                                  "$ref": "#/$defs/s43"
                                 },
                                 "idempotencyKey": {
                                   "minLength": 16,
@@ -3286,10 +3265,10 @@
                               "type": "object",
                               "properties": {
                                 "locale": {
-                                  "$ref": "#/$defs/s45"
+                                  "$ref": "#/$defs/s44"
                                 },
                                 "destinationCountry": {
-                                  "$ref": "#/$defs/s52"
+                                  "$ref": "#/$defs/s51"
                                 },
                                 "profile": {
                                   "$ref": "#/$defs/s2"
@@ -3301,28 +3280,28 @@
                                   "$ref": "#/$defs/s1"
                                 },
                                 "searchEffort": {
-                                  "$ref": "#/$defs/s55"
+                                  "$ref": "#/$defs/s54"
                                 },
                                 "medicationCodes": {
-                                  "$ref": "#/$defs/s41"
+                                  "$ref": "#/$defs/s40"
                                 },
                                 "conditionCodes": {
-                                  "$ref": "#/$defs/s42"
+                                  "$ref": "#/$defs/s41"
                                 },
                                 "currentSupplements": {
-                                  "$ref": "#/$defs/s39"
+                                  "$ref": "#/$defs/s38"
                                 },
                                 "intake": {
-                                  "$ref": "#/$defs/s30"
+                                  "$ref": "#/$defs/s29"
                                 },
                                 "baseline": {
                                   "$ref": "#/$defs/s11"
                                 },
                                 "costHorizonsDays": {
-                                  "$ref": "#/$defs/s43"
+                                  "$ref": "#/$defs/s42"
                                 },
                                 "targets": {
-                                  "$ref": "#/$defs/s32"
+                                  "$ref": "#/$defs/s31"
                                 },
                                 "planHandle": {
                                   "minLength": 32,
@@ -3431,7 +3410,7 @@
                                   "type": "string"
                                 },
                                 "answers": {
-                                  "$ref": "#/$defs/s40"
+                                  "$ref": "#/$defs/s39"
                                 }
                               },
                               "required": [
@@ -3440,18 +3419,15 @@
                                 "idempotencyKey",
                                 "answers"
                               ]
-                            },
-                            {
-                              "$ref": "#/$defs/s14"
                             }
                           ],
                           "type": "object",
                           "properties": {
                             "locale": {
-                              "$ref": "#/$defs/s45"
+                              "$ref": "#/$defs/s44"
                             },
                             "destinationCountry": {
-                              "$ref": "#/$defs/s52"
+                              "$ref": "#/$defs/s51"
                             },
                             "profile": {
                               "$ref": "#/$defs/s2"
@@ -3463,33 +3439,33 @@
                               "$ref": "#/$defs/s1"
                             },
                             "searchEffort": {
-                              "$ref": "#/$defs/s55"
+                              "$ref": "#/$defs/s54"
                             },
                             "medicationCodes": {
-                              "$ref": "#/$defs/s41"
+                              "$ref": "#/$defs/s40"
                             },
                             "conditionCodes": {
-                              "$ref": "#/$defs/s42"
+                              "$ref": "#/$defs/s41"
                             },
                             "currentSupplements": {
-                              "$ref": "#/$defs/s39"
+                              "$ref": "#/$defs/s38"
                             },
                             "intake": {
-                              "$ref": "#/$defs/s30"
+                              "$ref": "#/$defs/s29"
                             },
                             "baseline": {
                               "$ref": "#/$defs/s11"
                             },
                             "costHorizonsDays": {
-                              "$ref": "#/$defs/s43"
+                              "$ref": "#/$defs/s42"
                             },
                             "targets": {
                               "anyOf": [
                                 {
-                                  "$ref": "#/$defs/s44"
+                                  "$ref": "#/$defs/s43"
                                 },
                                 {
-                                  "$ref": "#/$defs/s32"
+                                  "$ref": "#/$defs/s31"
                                 }
                               ]
                             },
@@ -3508,7 +3484,7 @@
                               "type": "integer"
                             },
                             "answers": {
-                              "$ref": "#/$defs/s40"
+                              "$ref": "#/$defs/s39"
                             }
                           },
                           "required": [],
@@ -3533,7 +3509,29 @@
                           "type": "string"
                         },
                         "arguments": {
-                          "$ref": "#/$defs/s14"
+                          "additionalProperties": false,
+                          "type": "object",
+                          "properties": {
+                            "planHandle": {
+                              "minLength": 32,
+                              "maxLength": 4096,
+                              "type": "string"
+                            },
+                            "expectedRevision": {
+                              "minimum": 1,
+                              "type": "integer"
+                            },
+                            "idempotencyKey": {
+                              "minLength": 16,
+                              "maxLength": 128,
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "planHandle",
+                            "expectedRevision",
+                            "idempotencyKey"
+                          ]
                         }
                       },
                       "required": [
@@ -4007,24 +4005,24 @@
           }
         ],
         "$defs": {
-          "s45": {
+          "s44": {
             "minLength": 2,
             "maxLength": 35,
             "description": "BCP 47 locale; supported locales are advertised by info. Unsupported locales fall back to English.",
             "type": "string"
           },
-          "s52": {
+          "s51": {
             "pattern": "^[A-Z]{2}$",
             "description": "Deliverable ISO country from info.supportedCountries.",
             "type": "string"
           },
-          "s50": {
+          "s49": {
             "minimum": 0,
             "maximum": 120,
             "description": "Reported age. Omit when unknown; scoring defaults are not health evidence.",
             "type": "integer"
           },
-          "s38": {
+          "s37": {
             "maxItems": 30,
             "uniqueItems": true,
             "type": "array",
@@ -4039,10 +4037,10 @@
             "type": "object",
             "properties": {
               "ageYears": {
-                "$ref": "#/$defs/s50"
+                "$ref": "#/$defs/s49"
               },
               "goals": {
-                "$ref": "#/$defs/s38"
+                "$ref": "#/$defs/s37"
               },
               "lifeStage": {
                 "type": "string",
@@ -4063,7 +4061,7 @@
               }
             }
           },
-          "s54": {
+          "s53": {
             "type": "string",
             "enum": [
               "capsule",
@@ -4076,15 +4074,15 @@
               "other"
             ]
           },
-          "s57": {
+          "s56": {
             "uniqueItems": true,
             "maxItems": 8,
             "type": "array",
             "items": {
-              "$ref": "#/$defs/s54"
+              "$ref": "#/$defs/s53"
             }
           },
-          "s34": {
+          "s33": {
             "maxItems": 100,
             "uniqueItems": true,
             "type": "array",
@@ -4095,7 +4093,7 @@
             },
             "description": "Exclude only these products. Does not remove requested nutrients. [] clears this exclusion."
           },
-          "s36": {
+          "s35": {
             "maxItems": 100,
             "uniqueItems": true,
             "type": "array",
@@ -4106,11 +4104,27 @@
             },
             "description": "Exclude products containing these nutrient concepts, not particular product IDs. [] clears this exclusion."
           },
-          "s46": {
+          "s45": {
             "minimum": 0,
             "maximum": 1000,
             "description": "Preferred daily pill count; unknown counts remain unknown.",
             "type": "number"
+          },
+          "s17": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/s45"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "s46": {
+            "minimum": 0,
+            "maximum": 1000000000000,
+            "description": "Preferred first-order goods price in destination currency minor units; delivery quoted separately.",
+            "type": "integer"
           },
           "s18": {
             "anyOf": [
@@ -4122,23 +4136,7 @@
               }
             ]
           },
-          "s47": {
-            "minimum": 0,
-            "maximum": 1000000000000,
-            "description": "Preferred first-order goods price in destination currency minor units; delivery quoted separately.",
-            "type": "integer"
-          },
-          "s19": {
-            "anyOf": [
-              {
-                "$ref": "#/$defs/s47"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "s23": {
+          "s22": {
             "anyOf": [
               {
                 "minimum": 0,
@@ -4152,13 +4150,13 @@
             "default": null,
             "description": "Preferred distinct new products; there is no system minimum or maximum basket count."
           },
-          "s27": {
+          "s26": {
             "exclusiveMinimum": 0,
             "maximum": 1000000000000000,
             "description": "Positive quantity in this field’s stated units. Nutrient quantities also use the documented dose precision.",
             "type": "number"
           },
-          "s15": {
+          "s14": {
             "additionalProperties": false,
             "type": "object",
             "properties": {
@@ -4168,7 +4166,7 @@
                 "type": "string"
               },
               "servingsPerDay": {
-                "$ref": "#/$defs/s27"
+                "$ref": "#/$defs/s26"
               }
             },
             "required": [
@@ -4176,16 +4174,16 @@
               "servingsPerDay"
             ]
           },
-          "s33": {
+          "s32": {
             "maxItems": 100,
             "uniqueItems": true,
             "description": "Fix returned products at these daily labelled servings; other products remain optimisable. Use administration metadata for measurable quantities. [] clears proposals. Revision evaluates, never purchases. Exclusion/physical conflicts return field errors; numeric and health findings are advice.",
             "type": "array",
             "items": {
-              "$ref": "#/$defs/s15"
+              "$ref": "#/$defs/s14"
             }
           },
-          "s35": {
+          "s34": {
             "maxItems": 100,
             "uniqueItems": true,
             "type": "array",
@@ -4195,7 +4193,7 @@
               "type": "string"
             }
           },
-          "s37": {
+          "s36": {
             "maxItems": 100,
             "uniqueItems": true,
             "type": "array",
@@ -4211,7 +4209,7 @@
             "type": "object",
             "properties": {
               "allowedForms": {
-                "$ref": "#/$defs/s57"
+                "$ref": "#/$defs/s56"
               },
               "dietaryPreference": {
                 "type": "string",
@@ -4222,22 +4220,22 @@
                 ]
               },
               "excludeProductIds": {
-                "$ref": "#/$defs/s34"
+                "$ref": "#/$defs/s33"
               },
               "excludeSupplementIds": {
-                "$ref": "#/$defs/s36"
+                "$ref": "#/$defs/s35"
               },
               "maxDailyPills": {
-                "$ref": "#/$defs/s18"
+                "$ref": "#/$defs/s17"
               },
               "maxPriceMinor": {
-                "$ref": "#/$defs/s19"
+                "$ref": "#/$defs/s18"
               },
               "maxProductCount": {
-                "$ref": "#/$defs/s23"
+                "$ref": "#/$defs/s22"
               },
               "productDoses": {
-                "$ref": "#/$defs/s33"
+                "$ref": "#/$defs/s32"
               },
               "omega3SourcePreference": {
                 "type": "string",
@@ -4248,14 +4246,14 @@
                 ]
               },
               "retainProductIds": {
-                "$ref": "#/$defs/s35"
+                "$ref": "#/$defs/s34"
               },
               "retainSupplementIds": {
-                "$ref": "#/$defs/s37"
+                "$ref": "#/$defs/s36"
               }
             }
           },
-          "s53": {
+          "s52": {
             "type": "string",
             "enum": [
               "best_match",
@@ -4266,27 +4264,27 @@
             ],
             "default": "best_match"
           },
-          "s51": {
+          "s50": {
             "minimum": 0,
             "maximum": 2,
             "multipleOf": 0.000001,
             "description": "Targets and preferences describe the desired outcome. Weights describe its importance when comparing possible routines. Weights accept decimals from 0 to 2: zero removes that ranking component, one applies the normal penalty, and two doubles it. Changing a weight never changes the agreed target amount. Numerical preferences remain advisory. Safety penalties and factual advice remain active independently. Up to six decimal places.",
             "type": "number"
           },
-          "s22": {
+          "s21": {
             "anyOf": [
               {
-                "$ref": "#/$defs/s51"
+                "$ref": "#/$defs/s50"
               },
               {
                 "type": "null"
               }
             ]
           },
-          "s21": {
+          "s20": {
             "anyOf": [
               {
-                "$ref": "#/$defs/s51"
+                "$ref": "#/$defs/s50"
               },
               {
                 "type": "null"
@@ -4294,12 +4292,12 @@
             ],
             "description": "Cost weight: scoring.weights.price (0 to 2) controls first-order goods cost in THB, delivery excluded. 0 ignores the cost penalty; 1 is normal; 2 doubles it. With requirements.maxPriceMinor, it weights budget-overrun penalties instead. Omission preserves; null resets to the preset."
           },
-          "s25": {
+          "s24": {
             "description": "Returned or published ingredient IDs only. Omission preserves; individual null resets to the preset.",
             "type": "object",
             "patternProperties": {
               "^[A-Za-z][A-Za-z0-9_-]{0,127}$": {
-                "$ref": "#/$defs/s22"
+                "$ref": "#/$defs/s21"
               }
             }
           },
@@ -4308,23 +4306,23 @@
             "type": "object",
             "properties": {
               "pills": {
-                "$ref": "#/$defs/s22"
-              },
-              "products": {
-                "$ref": "#/$defs/s22"
-              },
-              "price": {
                 "$ref": "#/$defs/s21"
               },
+              "products": {
+                "$ref": "#/$defs/s21"
+              },
+              "price": {
+                "$ref": "#/$defs/s20"
+              },
               "servings": {
-                "$ref": "#/$defs/s22"
+                "$ref": "#/$defs/s21"
               },
               "nutrients": {
-                "$ref": "#/$defs/s25"
+                "$ref": "#/$defs/s24"
               }
             }
           },
-          "s17": {
+          "s16": {
             "anyOf": [
               {
                 "$ref": "#/$defs/s13"
@@ -4340,14 +4338,14 @@
             "type": "object",
             "properties": {
               "profile": {
-                "$ref": "#/$defs/s53"
+                "$ref": "#/$defs/s52"
               },
               "weights": {
-                "$ref": "#/$defs/s17"
+                "$ref": "#/$defs/s16"
               }
             }
           },
-          "s55": {
+          "s54": {
             "type": "string",
             "enum": [
               "standard",
@@ -4356,7 +4354,7 @@
             "default": "standard",
             "description": "Deterministic search budget: standard 8000 expansion attempts; expanded 64000. Expanded includes the standard incumbent. A revise omission preserves prior effort. Repeating identical inputs reuses work; after expanded exhaustion refine the request."
           },
-          "s41": {
+          "s40": {
             "maxItems": 50,
             "uniqueItems": true,
             "type": "array",
@@ -4367,7 +4365,7 @@
             },
             "description": "Medication codes from info.medicationCodes; omission means unknown, not confirmed none."
           },
-          "s42": {
+          "s41": {
             "maxItems": 50,
             "uniqueItems": true,
             "type": "array",
@@ -4378,13 +4376,13 @@
             },
             "description": "Reported condition codes from info.conditionCodes; accepted inputs do not establish assessed interaction coverage."
           },
-          "s48": {
+          "s47": {
             "minimum": 0,
             "maximum": 1000000000000000,
             "description": "Daily amount in the accompanying unit; zero must be explicitly reported.",
             "type": "number"
           },
-          "s29": {
+          "s28": {
             "exclusiveMinimum": 0,
             "maximum": 36500,
             "description": "Positive remaining days of retained inventory. Omit when unknown. If none remains, remove this retained inventory entry and revise the intended request.",
@@ -4395,10 +4393,10 @@
             "type": "object",
             "properties": {
               "dailyAmount": {
-                "$ref": "#/$defs/s48"
+                "$ref": "#/$defs/s47"
               },
               "daysRemaining": {
-                "$ref": "#/$defs/s29"
+                "$ref": "#/$defs/s28"
               },
               "name": {
                 "minLength": 1,
@@ -4434,7 +4432,7 @@
               "unit"
             ]
           },
-          "s39": {
+          "s38": {
             "maxItems": 50,
             "description": "Quantified continued supplements. Omission means unknown; [] explicitly reports none. A (productId, nutrient) pair may occur only once across this field and current-source intake observations.",
             "type": "array",
@@ -4442,7 +4440,7 @@
               "$ref": "#/$defs/s4"
             }
           },
-          "s28": {
+          "s27": {
             "exclusiveMinimum": 0,
             "maximum": 36500,
             "description": "Current-supplement observations only: positive remaining days of retained stock. Omit unknown duration. Invalid for diet observations.",
@@ -4453,7 +4451,7 @@
             "type": "object",
             "properties": {
               "daysRemaining": {
-                "$ref": "#/$defs/s28"
+                "$ref": "#/$defs/s27"
               },
               "source": {
                 "type": "string",
@@ -4492,7 +4490,7 @@
                 "type": "string"
               },
               "amount": {
-                "$ref": "#/$defs/s48"
+                "$ref": "#/$defs/s47"
               },
               "unit": {
                 "type": "string",
@@ -4519,7 +4517,7 @@
             "type": "object",
             "properties": {
               "daysRemaining": {
-                "$ref": "#/$defs/s28"
+                "$ref": "#/$defs/s27"
               },
               "source": {
                 "type": "string",
@@ -4558,13 +4556,13 @@
                 "type": "string"
               },
               "amount": {
-                "$ref": "#/$defs/s48"
+                "$ref": "#/$defs/s47"
               },
               "minimum": {
-                "$ref": "#/$defs/s48"
+                "$ref": "#/$defs/s47"
               },
               "maximum": {
-                "$ref": "#/$defs/s48"
+                "$ref": "#/$defs/s47"
               },
               "unit": {
                 "type": "string",
@@ -4589,7 +4587,7 @@
             "type": "object",
             "properties": {
               "daysRemaining": {
-                "$ref": "#/$defs/s28"
+                "$ref": "#/$defs/s27"
               },
               "source": {
                 "type": "string",
@@ -4633,7 +4631,7 @@
               "certainty"
             ]
           },
-          "s24": {
+          "s23": {
             "description": "Reported daily intake. Missing quantities are unknown, never zero. Broad dietary descriptions are accepted without labels or portion sizes.",
             "anyOf": [
               {
@@ -4647,15 +4645,15 @@
               }
             ]
           },
-          "s30": {
+          "s29": {
             "maxItems": 100,
             "description": "Reported observations. Omission or [] does not establish zero dietary intake. An explicitly reported known amount of 0 is required to establish zero for a nutrient.",
             "type": "array",
             "items": {
-              "$ref": "#/$defs/s24"
+              "$ref": "#/$defs/s23"
             }
           },
-          "s26": {
+          "s25": {
             "exclusiveMinimum": 0,
             "maximum": 1000,
             "description": "Actual catalogue servings per day for this comparison basket. Omission makes equivalent-coverage savings unavailable; quantity remains packs purchased.",
@@ -4671,7 +4669,7 @@
                 "type": "number"
               },
               "dailyServings": {
-                "$ref": "#/$defs/s26"
+                "$ref": "#/$defs/s25"
               },
               "productId": {
                 "pattern": "^prd_[A-Za-z0-9_-]+$",
@@ -4679,7 +4677,7 @@
                 "type": "string"
               },
               "quantity": {
-                "$ref": "#/$defs/s27"
+                "$ref": "#/$defs/s26"
               }
             },
             "required": [
@@ -4687,7 +4685,7 @@
               "quantity"
             ]
           },
-          "s31": {
+          "s30": {
             "maxItems": 100,
             "type": "array",
             "items": {
@@ -4699,7 +4697,7 @@
             "type": "object",
             "properties": {
               "items": {
-                "$ref": "#/$defs/s31"
+                "$ref": "#/$defs/s30"
               },
               "type": {
                 "type": "string",
@@ -4713,7 +4711,7 @@
               "type"
             ]
           },
-          "s43": {
+          "s42": {
             "minItems": 1,
             "maxItems": 2,
             "uniqueItems": true,
@@ -4731,13 +4729,13 @@
               ]
             }
           },
-          "s49": {
+          "s48": {
             "minimum": 0,
             "maximum": 1000000000000000,
             "description": "Positive amount fits the agreed target. Zero with positive importance softly minimises exposure on the stated basis using a reviewed comparison scale; it does not remove current intake. Reviewed zero scales: Vitamin D3 25 mcg (1000 IU), Selenium 50 mcg; other ingredients return an explicit missing-scale error. These scales are not dose recommendations. Weight zero ignores fitting; amount:null removes on refinement.",
             "type": "number"
           },
-          "s56": {
+          "s55": {
             "type": "string",
             "enum": [
               "total_daily",
@@ -4751,10 +4749,10 @@
             "type": "object",
             "properties": {
               "maximum": {
-                "$ref": "#/$defs/s27"
+                "$ref": "#/$defs/s26"
               },
               "minimum": {
-                "$ref": "#/$defs/s27"
+                "$ref": "#/$defs/s26"
               },
               "unit": {
                 "type": "string",
@@ -4791,7 +4789,7 @@
                 "type": "string"
               },
               "amount": {
-                "$ref": "#/$defs/s49"
+                "$ref": "#/$defs/s48"
               },
               "unit": {
                 "type": "string",
@@ -4806,7 +4804,7 @@
                 ]
               },
               "basis": {
-                "$ref": "#/$defs/s56"
+                "$ref": "#/$defs/s55"
               },
               "acceptableRange": {
                 "$ref": "#/$defs/s12"
@@ -4829,7 +4827,7 @@
               }
             ]
           },
-          "s44": {
+          "s43": {
             "minItems": 1,
             "maxItems": 30,
             "type": "array",
@@ -4837,10 +4835,10 @@
               "$ref": "#/$defs/s10"
             }
           },
-          "s20": {
+          "s19": {
             "anyOf": [
               {
-                "$ref": "#/$defs/s49"
+                "$ref": "#/$defs/s48"
               },
               {
                 "type": "null"
@@ -4858,7 +4856,7 @@
                 "type": "string"
               },
               "amount": {
-                "$ref": "#/$defs/s20"
+                "$ref": "#/$defs/s19"
               },
               "unit": {
                 "type": "string",
@@ -4873,7 +4871,7 @@
                 ]
               },
               "basis": {
-                "$ref": "#/$defs/s56"
+                "$ref": "#/$defs/s55"
               },
               "acceptableRange": {
                 "$ref": "#/$defs/s12"
@@ -4883,7 +4881,7 @@
               "ingredientId"
             ]
           },
-          "s16": {
+          "s15": {
             "anyOf": [
               {
                 "$ref": "#/$defs/s9"
@@ -4893,11 +4891,11 @@
               }
             ]
           },
-          "s32": {
+          "s31": {
             "maxItems": 100,
             "type": "array",
             "items": {
-              "$ref": "#/$defs/s16"
+              "$ref": "#/$defs/s15"
             }
           },
           "s3": {
@@ -4920,7 +4918,7 @@
               "questionId"
             ]
           },
-          "s40": {
+          "s39": {
             "maxItems": 50,
             "uniqueItems": true,
             "type": "array",
@@ -4928,31 +4926,6 @@
               "$ref": "#/$defs/s3"
             },
             "minItems": 1
-          },
-          "s14": {
-            "additionalProperties": false,
-            "type": "object",
-            "properties": {
-              "planHandle": {
-                "minLength": 32,
-                "maxLength": 4096,
-                "type": "string"
-              },
-              "expectedRevision": {
-                "minimum": 1,
-                "type": "integer"
-              },
-              "idempotencyKey": {
-                "minLength": 16,
-                "maxLength": 128,
-                "type": "string"
-              }
-            },
-            "required": [
-              "planHandle",
-              "expectedRevision",
-              "idempotencyKey"
-            ]
           }
         }
       }
@@ -6781,31 +6754,6 @@
               "idempotencyKey",
               "answers"
             ]
-          },
-          {
-            "additionalProperties": false,
-            "type": "object",
-            "properties": {
-              "planHandle": {
-                "minLength": 32,
-                "maxLength": 4096,
-                "type": "string"
-              },
-              "expectedRevision": {
-                "minimum": 1,
-                "type": "integer"
-              },
-              "idempotencyKey": {
-                "minLength": 16,
-                "maxLength": 128,
-                "type": "string"
-              }
-            },
-            "required": [
-              "planHandle",
-              "expectedRevision",
-              "idempotencyKey"
-            ]
           }
         ],
         "type": "object",
@@ -8364,7 +8312,6 @@
               "nextAction": {
                 "type": "string",
                 "enum": [
-                  "confirm_with_user",
                   "execute",
                   "answer_questions",
                   "change_request",

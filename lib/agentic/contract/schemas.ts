@@ -115,8 +115,7 @@ export const PLAN_BRANCH_SCHEMAS = {
   create: object({ ...contextFields, targets: Type.Array(targetCreate, { minItems: 1, maxItems: 30 }), idempotencyKey: key }),
   get: object({ planHandle: handle }),
   revise: { ...object({ ...refinement.properties, ...controls }), anyOf: PLAN_REFINEMENT_FIELDS.map(field => ({ required: [field] })) },
-  answer: object({ ...controls, answers: { ...PLAN_ANSWERS, minItems: 1 } }),
-  select: object(controls)
+  answer: object({ ...controls, answers: { ...PLAN_ANSWERS, minItems: 1 } })
 } as const;
 export const PLAN_INPUT_SCHEMA = visibleOperationVariants(Type.Union(Object.values(PLAN_BRANCH_SCHEMAS)));
 export const PLAN_ADVERTISED_SCHEMA = PLAN_INPUT_SCHEMA;

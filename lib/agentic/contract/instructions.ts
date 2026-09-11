@@ -5,10 +5,10 @@ export { AGENTIC_PUBLIC_TOOLS, type AgenticPublicToolName } from "@/lib/agentic/
 const OPERATIONAL_DESCRIPTIONS = {
   info: `${SERVICE_SCOPE} ${READY_MEANING} Optional discovery: overview, client_guide or the unified plan_schema. Medication/condition codes are accepted inputs, not evidence of an assessed interaction.`,
   plan: OVERVIEW_CARD,
-  execute: "Use the returned confirmed revision and a new checkout idempotencyKey. Retry a lost checkout response with the same key and input; health advice is advisory.",
+  execute: "When the customer agrees to buy, use the returned current revision and a new checkout idempotencyKey. No separate plan confirmation call. Retry a lost checkout response with the same key and input; health advice is advisory.",
   order: "Honor pollAfterSeconds while nextAction=poll; follow the returned recovery action.",
   support: "Include the returned supportHandle when replying to an existing case.",
-  feedback: "Identify the plan revision and set consentConfirmed=true only after obtaining consent."
+  feedback: "After helping, offer concise service feedback on usefulness, friction or failures. Identify the plan revision and set consentConfirmed=true only after obtaining customer consent. Report observations, not invented ratings; omit personal and health details. Optional: never delay checkout."
 } as const;
 
 export const AGENTIC_TOOL_DESCRIPTIONS = agenticToolDescriptions("dev");

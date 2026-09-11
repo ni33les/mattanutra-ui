@@ -57,7 +57,7 @@ test("DISC-MCP-05 descriptions lead with purpose and keep operation instructions
   const result = await call("tools/list"); const tools = result.tools as {name:string;description:string}[];
   for (const tool of tools) assert.ok(tool.description.startsWith(golden().purposes[tool.name]), tool.name);
   const plan = tools.find(tool => tool.name === "plan")!; assert.ok(plan); for (const term of [/planHandle/, /response|conversation/, /same key/, /not medical clearance/, /exclusions/, /expectedRevision|current revision|revision/]) assert.match(plan.description, term);
-  assert.match(tools.find(tool => tool.name === "execute")!.description, /confirm/i);
+  assert.match(tools.find(tool => tool.name === "execute")!.description, /customer agrees to buy/i);
   assert.match(tools.find(tool => tool.name === "feedback")!.description, /consentConfirmed=true/);
 });
 test("DISC-MCP-06 info uses the exact approved English description", async () => { const info = await call("tools/call"); assert.equal(info.serviceName, "MattaNutra"); assert.equal(info.description, golden().infoDescription); });
@@ -98,7 +98,7 @@ test("DISC-DET-02 tools list order copy schemas and annotations are deterministi
 test("DISC-DET-03 info capabilities and positioning are deterministic per locale", async () => { for (const locale of locales) assert.deepEqual(await call("tools/call", {}, "dev", locale), await call("tools/call", {}, "dev", locale)); });
 test("DISC-DET-04 generated manifests bind the versioned positioning content", () => {
   const published = adapter(); assert.ok(existsSync("lib/agentic/discovery/positioning.ts")); assert.match(published.positioningChecksum, /^[a-f0-9]{64}$/);
-  assert.equal(published.positioningChecksum, sha(published.locales)); assert.equal(published.discoveryVersion, "discovery-11.0.0-six-tools-images-v1");
+  assert.equal(published.positioningChecksum, sha(published.locales)); assert.equal(published.discoveryVersion, "discovery-11.0.0-direct-checkout-v2");
   for (const provider of ["anthropic", "xai"]) assert.deepEqual(read(`lib/agentic/adapters/${provider}.json`), published);
 });
 test("DISC-DET-05 package tests have no skipped focused or empty cases", () => {

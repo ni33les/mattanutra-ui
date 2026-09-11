@@ -21,7 +21,7 @@ test('MCP-SINGLE-01 each round exposes only the current recommendation, preservi
   assert.ok('choices' in response); assert.equal(response.choices.length, 1);
   assert.deepEqual(response.choices[0].products.map(row => row.productId), result.selected!.basket.map(row => row.productId));
   assert.ok(!("candidateKey" in response.choices[0]));
-  assert.ok(!("selectedCandidateKey" in response)); assert.equal(response.nextAction, 'confirm_with_user');
+  assert.ok(!("selectedCandidateKey" in response)); assert.equal(response.nextAction, 'execute');
   assert.deepEqual(result, original);
   const refined = presentDecision({ ...result, selected: result.alternatives[0], alternatives: [result.selected!] }, 'cap_single_recommendation', 2);
   assert.ok('choices' in refined); assert.equal(refined.choices.length, 1);

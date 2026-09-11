@@ -8,16 +8,17 @@ Thailand (TH) only; prices in THB, delivery separate; finite catalogue, real gap
 Call plan with flat targets/context and idempotencyKey to create. Then send only planHandle to read/poll; wait pollAfterSeconds while processing and stop polling at a terminal result. No matching occurs in polls.
 Refine changed fields with planHandle, expectedRevision and idempotencyKey. Targets upsert by ingredientId; amount changes dose, amount:null removes. Context merges; supplied arrays replace; [] clears exclusions/proposals; numeric null clears a preference.
 profile means customer context. Start with scoring.profile=best_match (the default), then adjust weights from the conversation. Targets and preferences describe the desired outcome. Weights describe its importance when comparing possible routines. Weights accept decimals from 0 to 2: zero removes that ranking component, one applies the normal penalty, and two doubles it. Changing a weight never changes the agreed target amount. Numerical preferences remain advisory. Safety penalties and factual advice remain active independently. A target amount of zero with a positive weight expresses soft minimisation. A weight of zero means that objective does not influence ranking. Use an exclusion only when the customer requires categorical avoidance. Cost weight: scoring.weights.price (0 to 2) controls first-order goods cost in THB, delivery excluded. 0 ignores the cost penalty; 1 is normal; 2 doubles it. With requirements.maxPriceMinor, it weights budget-overrun penalties instead. Omission preserves; null resets to the preset. Up to six decimal places. Omission preserves; individual null resets; weights:null clears; preset changes reset overrides. A weight is not a dose or categorical exclusion.
-Return one recommendation per round, never an options menu. Review its summary, ingredients and products; refine weights for a different routine. After the customer confirms, send only planHandle, expectedRevision and a new idempotencyKey to plan. This confirms that revision without rematching and returns the new revision with nextAction=execute; use that revision for execute. Selection, answers and refinements are separate calls.
+Return one recommendation per round, never an options menu. Review its summary, ingredients and products; refine weights for a different routine. When the customer agrees to buy, call execute directly with planHandle, the returned expectedRevision and a new idempotencyKey. No separate confirmation call or rematching is needed. Answers and refinements are separate calls.
 Health findings and numeric preferences never veto purchase; exclusions, diet and physical quantities bind. Ready means checkout-ready, not targets met or medical approval. Advice reports only quantified exposure above MattaNutra recommended limits. Equal, below-limit and unknown exposure produce no advice. Medication/condition codes are accepted inputs, not interaction coverage. Absence of advice is not medical clearance. Limits remain advisory, including at weight zero.
 Retry a lost response with the same key/input. Read current revision after conflicts. scoring:{} with revision/new key recovers failed/stale work; unchanged successful input is a no-op. Finish naturally at no_purchase; order recovers/tracks payment and fulfilment.
+After helping, offer concise service feedback through feedback: report observed usefulness, confusing behaviour or failures, with customer consent and no personal or health details. Feedback is optional and never delays checkout.
 Tools: info, plan, execute, order, support, feedback. Use host-listed names. info is optional; client_guide provides templates and plan_schema returns this same unified schema. Examples are protocol templates, not recommended regimens.
 
 Targets and preferences describe the desired outcome. Weights describe its importance when comparing possible routines. Weights accept decimals from 0 to 2: zero removes that ranking component, one applies the normal penalty, and two doubles it. Changing a weight never changes the agreed target amount. Numerical preferences remain advisory. Safety penalties and factual advice remain active independently. A target amount of zero with a positive weight expresses soft minimisation. A weight of zero means that objective does not influence ranking. Use an exclusion only when the customer requires categorical avoidance. Cost weight: scoring.weights.price (0 to 2) controls first-order goods cost in THB, delivery excluded. 0 ignores the cost penalty; 1 is normal; 2 doubles it. With requirements.maxPriceMinor, it weights budget-overrun penalties instead. Omission preserves; null resets to the preset.
 
 Illustrative amounts are protocol examples, not personal dose recommendations. Answer using the actual questionId and choice corresponding to the customer’s answer. Replace placeholder identifiers with returned values; each new mutation needs a new idempotencyKey and current expectedRevision. Retry a lost response with exactly the same key and input. Handle-only calls poll existing work at pollAfterSeconds; stop at a terminal result. Space automated requests at least one second apart and respect longer pollAfterSeconds or Retry-After delays. After a rate-limit response, retry only with the same idempotency key and unchanged payload when the call is a mutation; reads keep the same handle.
 
-Use one flat plan call repeatedly. Omit unchanged fields. Start with best_match by omitting scoring; it uses the existing balanced coefficients, all initially one. balanced remains an accepted input alias and is returned as best_match. Adjust weights conversationally to get one recommendation per round. Selection, answers and refinements must be separate calls. profile is reported customer context; scoring.profile is a preset of effective weights. Nothing requires exact diet labels or demographics merely to explore.
+Use one flat plan call repeatedly. Omit unchanged fields. Start with best_match by omitting scoring; it uses the existing balanced coefficients, all initially one. balanced remains an accepted input alias and is returned as best_match. Adjust weights conversationally to get one recommendation per round. Answers and refinements must be separate calls; execute opens checkout for the current recommendation. profile is reported customer context; scoring.profile is a preset of effective weights. Nothing requires exact diet labels or demographics merely to explore.
 
 Targets and preferences describe the desired outcome. Weights describe its importance when comparing possible routines. Weights accept decimals from 0 to 2: zero removes that ranking component, one applies the normal penalty, and two doubles it. Changing a weight never changes the agreed target amount. Numerical preferences remain advisory. Safety penalties and factual advice remain active independently. A target amount of zero with a positive weight expresses soft minimisation. A weight of zero means that objective does not influence ranking. Use an exclusion only when the customer requires categorical avoidance. Cost weight: scoring.weights.price (0 to 2) controls first-order goods cost in THB, delivery excluded. 0 ignores the cost penalty; 1 is normal; 2 doubles it. With requirements.maxPriceMinor, it weights budget-overrun penalties instead. Omission preserves; null resets to the preset. Up to six decimal places (for example 0.543). Overrides replace preset values; they are never multiplied by the preset. Ask “How important is this preference?” rather than requiring coefficients from the person. A nutrient weight without a target does not create a hidden fitting or avoidance objective; add an explicit target first. Independently existing continued-dose terms may still apply.
 
@@ -25,7 +26,7 @@ Zero-target comparison scales: Vitamin D3 25 mcg (1000 IU); Selenium 50 mcg. The
 
 Result delivery: clients that consume structuredContent receive one structured decision plus brief text. Verified text-only clients send X-MattaNutra-Result-Content: text to receive complete JSON text instead. X-MattaNutra-Result-Content: structured explicitly confirms structured support. Do not concatenate both representations.
 
-Nested context merges. Supplied medication, condition and intake arrays replace only that array. Missing intake is unknown on create and preserved on refinement; clearing observations never reports known zero. Numeric max* preferences are advisory: omission preserves; null clears; zero is a real preference, never a purchase veto. Advice reports only quantified exposure above MattaNutra recommended limits. Equal, below-limit and unknown exposure produce no advice. Medication/condition codes are accepted inputs, not interaction coverage. Absence of advice is not medical clearance. Limits remain advisory, including at weight zero. maxPriceMinor uses THB minor units for first-order goods; 50000 is THB500, delivery separate. Exclusion and productDoses arrays replace; [] clears. Physically supported productDoses are evaluated before selection, never bought directly.
+Nested context merges. Supplied medication, condition and intake arrays replace only that array. Missing intake is unknown on create and preserved on refinement; clearing observations never reports known zero. Numeric max* preferences are advisory: omission preserves; null clears; zero is a real preference, never a purchase veto. Advice reports only quantified exposure above MattaNutra recommended limits. Equal, below-limit and unknown exposure produce no advice. Medication/condition codes are accepted inputs, not interaction coverage. Absence of advice is not medical clearance. Limits remain advisory, including at weight zero. maxPriceMinor uses THB minor units for first-order goods; 50000 is THB500, delivery separate. Exclusion and productDoses arrays replace; [] clears. Physically supported productDoses are evaluated by plan; execute opens checkout only after the customer agrees.
 
 Targets upsert by ingredientId. New rows require amount/unit and a name or published ingredient ID. Existing rows preserve omitted values; amount-only uses the saved unit, unit-only converts physical amount. amount:null removes that target and its explicit weight; targets:[] changes nothing. Removing all targets means no purchase is recommended. Unsupported requested targets keep IDs and gaps. Algae Omega-3 resolves only with explicit algae_only in requirements.omega3SourcePreference; Source preferences are preserved; omitted or conflicting choices are never inferred from its name. Vitamin K2 aliases resolve while nutrient forms and units remain distinct. Duplicate aliases resolving to one identity are invalid.
 
@@ -33,7 +34,7 @@ scoring.weights patches overrides; null clears all overrides; {} preserves. Indi
 
 Explain the routine and any returned limit-excess advice. Keep other health-review commentary out of the plan response. supplied is new-product contribution; requested:null marks an incidental ingredient. total_daily includes applicable diet and supplements; supplemental includes continued and new supplements only. Unknown diet remains unknown. All requested targets count in coverage, including unsupported or weight-zero targets. When pillCount is null, pillCountAtLeast is a verified lower bound: say “at least …; total unknown”. Unknown quantities and prices remain unknown; first-order savings are not recurring savings.
 
-The existing choices envelope contains only the current recommendation, never alternative baskets. With no targets it may be empty; a no-purchase recommendation retains any requested ingredients and gaps. Adjust scoring.weights with the current revision and a new key to receive a revised recommendation; do not ask the customer to choose from a menu. After the customer agrees, send only planHandle, expectedRevision and a new idempotencyKey to plan. This confirms the current recommendation without matching again and advances the revision. Use the returned revision when executing checkout. A handle-only read never confirms, and scoring:{} remains a recovery/refinement call. Confirm the selected routine and its ingredient advice with the customer before execute. plan never orders or charges. Finish naturally at no_purchase, or replenish_later when known. order reports verified payment and fulfilment state and recovery links. Each returned product includes its recorded imageUrl (absolute HTTPS), or null when no image is recorded. Keep that URL with its product; do not invent an image or fetch images to make a plan decision. Unknown tool calls return JSON-RPC -32601 (Unknown tool: <name>) without tool data or mutation.
+The existing choices envelope contains only the current recommendation, never alternative baskets. With no targets it may be empty; a no-purchase recommendation retains any requested ingredients and gaps. Adjust scoring.weights with the current revision and a new key to receive a revised recommendation; do not ask the customer to choose from a menu. When the customer agrees to buy, call execute directly with planHandle, the current expectedRevision and a new idempotencyKey. It saves the exact basket and creates or recovers checkout without rematching or advancing the plan revision. There is no separate plan confirmation call. A handle-only read does not order anything; scoring:{} remains a recovery/refinement call. Discuss the routine and its ingredient advice before purchase. plan never orders or charges. Finish naturally at no_purchase, or replenish_later when known. order reports verified payment and fulfilment state and recovery links. Each returned product includes its recorded imageUrl (absolute HTTPS), or null when no image is recorded. Keep that URL with its product; do not invent an image or fetch images to make a plan decision. After helping, offer concise service feedback through feedback: report your observed usefulness, confusing behaviour or failures, clearly distinguishing agent observations from customer comments. Obtain customer consent before setting consentConfirmed=true. Omit personal and health details; do not invent a rating. Feedback is optional and never delays checkout. Unknown tool calls return JSON-RPC -32601 (Unknown tool: <name>) without tool data or mutation.
 
 Presets (effective assignments):
 
@@ -346,27 +347,31 @@ plan
 }
 ```
 
-### confirm-recommendation
-
-plan
-
-```json
-{
-  "planHandle": "cap_replace_with_returned_plan_handle",
-  "expectedRevision": 1,
-  "idempotencyKey": "example-change-key-0001"
-}
-```
-
-### confirmed-checkout
+### create-checkout
 
 execute
 
 ```json
 {
   "planHandle": "cap_replace_with_returned_plan_handle",
-  "expectedRevision": 2,
+  "expectedRevision": 1,
   "idempotencyKey": "example-checkout-key-0001"
+}
+```
+
+### service-feedback-after-consent
+
+feedback
+
+```json
+{
+  "planHandle": "cap_replace_with_returned_plan_handle",
+  "expectedRevision": 1,
+  "idempotencyKey": "example-feedback-key-0001",
+  "consentConfirmed": true,
+  "points": [
+    "Agent observation: the returned recovery action was clear."
+  ]
 }
 ```
 

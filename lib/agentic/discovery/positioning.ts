@@ -30,18 +30,18 @@ export const POSITIONING: Readonly<Record<Locale, Positioning>> = {
     "titles": {
       "info": "Discover MattaNutra",
       "plan": "Build or refine a supplement basket",
-      "execute": "Open confirmed checkout",
+      "execute": "Open checkout",
       "order": "Track payment and delivery",
       "support": "Get order help",
-      "feedback": "Send plan feedback"
+      "feedback": "Send service feedback"
     },
     "purposes": {
       "info": "Understand when to use MattaNutra, its country and wellness boundaries, and retrieve the client guide or flat plan schema.",
       "plan": "Return one recommendation for agreed targets and context; start with best_match and refine weights conversationally.",
-      "execute": "After customer confirmation, freeze the selected plan revision and create or recover checkout.",
+      "execute": "When the customer agrees to buy, create or recover checkout directly for the current recommended basket.",
       "order": "Read concise payment, fulfilment and recovery state for an existing order.",
       "support": "Open or continue an order-support case.",
-      "feedback": "Submit optional consented feedback without changing the plan or checkout."
+      "feedback": "Offer optional service feedback on usefulness, friction or failures, with customer consent and without changing the plan or checkout."
     }
   },
   "th": {
@@ -60,18 +60,18 @@ export const POSITIONING: Readonly<Record<Locale, Positioning>> = {
     "titles": {
       "info": "รู้จัก MattaNutra",
       "plan": "สร้างหรือปรับชุดอาหารเสริม",
-      "execute": "เปิดหน้าชำระเงินที่ยืนยันแล้ว",
+      "execute": "เปิดหน้าชำระเงิน",
       "order": "ติดตามการชำระเงินและการจัดส่ง",
       "support": "ขอความช่วยเหลือเกี่ยวกับคำสั่งซื้อ",
-      "feedback": "ส่งความคิดเห็นเกี่ยวกับแผน"
+      "feedback": "ส่งความคิดเห็นเกี่ยวกับบริการ"
     },
     "purposes": {
       "info": "ทำความเข้าใจว่าเมื่อใดควรใช้ MattaNutra ประเทศที่รองรับ และขอบเขตคำแนะนำด้านสุขภาวะ พร้อมเรียกดูคู่มือเอเจนต์หรือสคีมาแผนแบบเดียว",
       "plan": "ส่งคืนชุดที่แนะนำเพียงชุดเดียวตามเป้าหมายและข้อมูลผู้ใช้ เริ่มด้วย best_match และปรับน้ำหนักความสำคัญตามบทสนทนา",
-      "execute": "หลังลูกค้ายืนยัน ให้ตรึงรายการของแผนฉบับที่เลือก แล้วสร้างหรือเรียกคืนหน้าชำระเงิน",
+      "execute": "เมื่อลูกค้าตกลงซื้อ ให้สร้างหรือเรียกคืนหน้าชำระเงินสำหรับชุดที่แนะนำปัจจุบันได้โดยตรง",
       "order": "อ่านสถานะการชำระเงิน การดำเนินการจัดส่งและการกู้คืนสำหรับคำสั่งซื้อที่มีอยู่",
       "support": "เปิดหรือติดตามเรื่องขอความช่วยเหลือเกี่ยวกับคำสั่งซื้อ",
-      "feedback": "ส่งความคิดเห็นโดยสมัครใจและได้รับความยินยอม โดยไม่เปลี่ยนแผนหรือการชำระเงิน"
+      "feedback": "เสนอส่งความคิดเห็นเกี่ยวกับประโยชน์ ปัญหาการใช้งาน หรือข้อผิดพลาดของบริการโดยสมัครใจ หลังได้รับความยินยอมจากลูกค้า โดยไม่เปลี่ยนแผนหรือการชำระเงิน"
     }
   },
   "zh-CN": {
@@ -90,18 +90,18 @@ export const POSITIONING: Readonly<Record<Locale, Positioning>> = {
     "titles": {
       "info": "了解 MattaNutra",
       "plan": "建立或调整补充剂组合",
-      "execute": "打开已确认的结账页面",
+      "execute": "打开结账页面",
       "order": "跟踪付款与配送",
       "support": "获取订单帮助",
-      "feedback": "提交方案反馈"
+      "feedback": "提交服务反馈"
     },
     "purposes": {
       "info": "了解何时使用 MattaNutra、支持的国家和健康指导边界，并获取智能体指南或统一方案输入模式。",
       "plan": "根据商定目标和用户背景每轮返回一个推荐方案；默认 best_match，通过对话调整权重。",
-      "execute": "用户确认后，冻结所选方案版本，并创建或恢复结账。",
+      "execute": "用户同意购买后，直接为当前推荐组合创建或恢复结账。",
       "order": "读取现有订单简明的付款、履约及恢复状态。",
       "support": "发起或继续订单支持请求。",
-      "feedback": "在获得同意后提交可选反馈，不改变方案或结账。"
+      "feedback": "征得用户同意后，可反馈服务的实用性、使用障碍或故障，不改变方案或结账。"
     }
   }
 };

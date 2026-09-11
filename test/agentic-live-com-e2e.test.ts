@@ -46,10 +46,7 @@ describe("live DEV commercial end to end", () => {
       false
     );
 
-    const confirmed = await liveCall(LIVE_PUBLIC, "plan", {
-      planHandle: plan.structured.planHandle, expectedRevision: plan.structured.revision,
-      idempotencyKey: stamp("com-confirm")
-    });
+    const confirmed = await liveCall(LIVE_PUBLIC, "plan", { planHandle: plan.structured.planHandle });
     assert.equal(confirmed.structured.nextAction, "execute");
     assert.deepEqual(confirmed.structured.choices, plan.structured.choices);
     const executed = await liveCall(LIVE_PUBLIC, "execute", {

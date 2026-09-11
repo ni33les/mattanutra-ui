@@ -51,7 +51,7 @@ async function storedFields(runtime:AgenticRuntime,plan:Record<string,unknown>){
     const row=await runtime.store.getPlanRevision(cap.resourceId,Number(plan.revision));assert.ok(row);return publicPlanFields(row.result as PlanResult);
 }
 function option(plan:Record<string,unknown>){const choices=plan.choices as Array<{candidateKey:string;roles:string[];products:unknown[]}>;assert.ok(choices?.length,JSON.stringify(plan));const row=choices.find(row=>row.products.length&&row.roles.includes("closest_dose"))??choices.find(row=>row.products.length);assert.ok(row);return row;}
-async function purchase(runtime:AgenticRuntime,created:Record<string,unknown>,key:string){if(created.nextAction==='execute')return created;const selected=await call(runtime,"plan",{planHandle:created.planHandle,expectedRevision:created.revision,idempotencyKey:key});assert.equal(selected.ok,true,JSON.stringify(selected));return selected;}
+async function purchase(runtime:AgenticRuntime,created:Record<string,unknown>){if(created.nextAction==='execute')return created;const selected=await call(runtime,"plan",{ planHandle:created.planHandle });assert.equal(selected.ok,true,JSON.stringify(selected));return selected;}
 beforeEach(() => {
     installGoldCatalogue();
 });
@@ -462,7 +462,7 @@ describe("agentic P1 pack fixes", () => {
             }
         });
         assert.equal(created.status, "ready");
-        created = await purchase(runtime, created, `select-${String(created.planHandle).slice(-20)}`);
+        created = await purchase(runtime, created);
         const executed = await call(runtime, "execute", {
             expectedRevision: created.revision,
             idempotencyKey: "p1-payable-exec-000001",
@@ -543,7 +543,7 @@ describe("agentic P1 pack fixes", () => {
         });
         assert.equal(result.ok, true);
         assert.equal(result.status, "no_purchase");
-        const selectPurchase = (plan: Record<string, unknown>) => purchase(runtime, plan, `p1-over-budget-select-${String(plan.revision)}-01`);
+        const selectPurchase = (plan: Record<string, unknown>) => purchase(runtime, plan);
         result = await call(runtime, "plan", { planHandle: result.planHandle, expectedRevision: result.revision,
           idempotencyKey: "p1-over-budget-propose-01", requirements: { productDoses: [{ productId: "prd_b1111111111111111111111111111111", servingsPerDay: 1 }] } });
         assert.equal(result.ok, true); result = await selectPurchase(result);
@@ -559,7 +559,7 @@ describe("agentic P1 pack fixes", () => {
             idempotencyKey: "p1-over-budget-locale-01",
             ...{ locale: "th" }
         });
-        assert.equal(unrelated.nextAction, 'confirm_with_user', "Refinement invalidates selection while retaining the recommendation");
+        assert.equal(unrelated.nextAction, 'execute', "Refinement invalidates selection while retaining the recommendation");
         const purchased = (items: unknown) => (items as Array<Record<string, unknown>>).map(item => ({ productId: item.productId, servingsPerDay: item.servingsPerDay, lineTotalMinor: item.lineTotalMinor }));
         assert.ok((unrelated.choices as Array<{products: unknown[]}>).some(choice => choice.products.length === 1), JSON.stringify(unrelated));
         const [planId] = await runtime.store.listPlanIdsByPrincipal("tester");
@@ -614,11 +614,7 @@ describe("agentic P1 pack fixes", () => {
         });
         assert.equal(created.status, "ready");
         assert.ok(option(created).products.length);
-        const selected = await call(runtime, "plan", {
-            expectedRevision: created.revision,
-            idempotencyKey: "p1-select-option-pick-01",
-            planHandle: created.planHandle
-        });
+        const selected = await call(runtime, "plan", { planHandle: created.planHandle });
         assert.equal(selected.ok, true);
         assert.equal(selected.status, "ready");
         const leftover = ((selected.questions as Array<{
@@ -704,7 +700,7 @@ describe("agentic P1 pack fixes", () => {
                 targets: [{ amount: 2000, name: "Vitamin D3", unit: "IU" }]
             }
         });
-        created = await purchase(runtime, created, `select-${String(created.planHandle).slice(-20)}`);
+        created = await purchase(runtime, created);
         const executed = await call(runtime, "execute", {
             expectedRevision: created.revision,
             idempotencyKey: "p1-paid-text-exec-0001",
@@ -1110,7 +1106,7 @@ describe("agentic P1 pack fixes", () => {
                 targets: [{ amount: 2000, name: "Vitamin D3", unit: "IU" }]
             }
         });
-        expirePlan = await purchase(runtime, expirePlan, `select-${String(expirePlan.planHandle).slice(-20)}`);
+        expirePlan = await purchase(runtime, expirePlan);
         const expireExec = await call(runtime, "execute", {
             expectedRevision: expirePlan.revision,
             idempotencyKey: "p1-expire-exec-000001",
@@ -1138,7 +1134,7 @@ describe("agentic P1 pack fixes", () => {
                 targets: [{ amount: 2000, name: "Vitamin D3", unit: "IU" }]
             }
         });
-        cancelPlan = await purchase(runtime, cancelPlan, `select-${String(cancelPlan.planHandle).slice(-20)}`);
+        cancelPlan = await purchase(runtime, cancelPlan);
         const cancelExec = await call(runtime, "execute", {
             expectedRevision: cancelPlan.revision,
             idempotencyKey: "p1-cancel-exec-000001",
@@ -1325,7 +1321,7 @@ describe("agentic P1 pack fixes", () => {
                 targets: [{ amount: 2000, name: "Vitamin D3", unit: "IU" }]
             }
         });
-        plan = await purchase(runtime, plan, `select-${String(plan.planHandle).slice(-20)}`);
+        plan = await purchase(runtime, plan);
         const executed = await call(runtime, "execute", {
             expectedRevision: plan.revision,
             idempotencyKey: "p1-d709-exec-0000001",
@@ -1445,13 +1441,13 @@ describe("agentic P1 pack fixes", () => {
                 targets: [{ amount: 2000, name: "Vitamin D3", unit: "IU" }]
             }
         });
-        plan = await purchase(runtime, plan, `select-${String(plan.planHandle).slice(-20)}`);
+        plan = await purchase(runtime, plan);
         const first = await call(runtime, "execute", {
             expectedRevision: plan.revision,
             idempotencyKey: "p1-d1010-exec-a-0001",
             planHandle: plan.planHandle
         });
-        plan = await purchase(runtime, plan, `select-${String(plan.planHandle).slice(-20)}`);
+        plan = await purchase(runtime, plan);
         const second = await call(runtime, "execute", {
             expectedRevision: plan.revision,
             idempotencyKey: "p1-d1010-exec-b-0001",

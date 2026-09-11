@@ -53,7 +53,7 @@ function branch(schema: JsonSchema, data: unknown): JsonSchema {
     if (!("planHandle" in data)) return PLAN_BRANCH_SCHEMAS.create;
     if ("answers" in data) return PLAN_BRANCH_SCHEMAS.answer;
     if (Object.keys(data).length === 1) return PLAN_BRANCH_SCHEMAS.get;
-    return Object.keys(data).every(key => ["planHandle", "expectedRevision", "idempotencyKey"].includes(key)) ? PLAN_BRANCH_SCHEMAS.select : PLAN_BRANCH_SCHEMAS.revise;
+    return PLAN_BRANCH_SCHEMAS.revise;
   }
   if (record(data) && typeof data.ok === "boolean" && Array.isArray(schema.anyOf)) {
     const selected = schema.anyOf.find((option: JsonSchema) => record(option.properties) && record(option.properties.ok) && option.properties.ok.const === data.ok &&
@@ -81,6 +81,9 @@ function matchingUnionBranch(schema: JsonSchema, error: ErrorObject, data: unkno
   return true;
 }
 export function validateToolIssues(schema: JsonSchema, value: unknown): SchemaIssue[] {
+  if (schema === PLAN_INPUT_SCHEMA && record(value) && typeof value.planHandle === "string" && Object.keys(value).length > 1 && Object.keys(value).every(key => ["planHandle", "expectedRevision", "idempotencyKey"].includes(key))) {
+    return [{ fieldPath: "request", reasonCode: "required", message: "Supply changed fields or answers to plan. To open checkout, call execute with planHandle, expectedRevision and idempotencyKey." }];
+  }
   const selected = branch(schema, value);
   const check = validator(selected);
   if (check(value)) return [];

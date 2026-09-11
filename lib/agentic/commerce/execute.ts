@@ -537,11 +537,10 @@ async function executeFresh(
     }
 
     if (!planContractCompatible(result.contractVersion)) return businessError({ reasonCode: "not_found", message: "Not found.", fieldPath: "planHandle" });
-    if (result.requestSnapshot.scoring && !result.requestSnapshot.pinnedCandidateKey) return businessError({ reasonCode: "plan_not_ready", fieldPath: "planHandle", message: "Confirm the current recommendation with planHandle, expectedRevision and a new idempotencyKey before checkout." });
     if (revision.status !== "ready" || !snapshot) return executeError(locale, "plan_not_ready");
 
     const selected = result.selected;
-    if (selected?.snapshotId && selected.snapshotId !== catalogueSnapshotId(snapshot)) return businessError({ fieldPath: "expectedRevision", reasonCode: "availability_changed", message: "Catalogue facts changed after this plan was evaluated. Refresh with scoring:{} and the current revision, then review and select before checkout.", nextActions: ["refresh_plan"] });
+    if (selected?.snapshotId && selected.snapshotId !== catalogueSnapshotId(snapshot)) return businessError({ fieldPath: "expectedRevision", reasonCode: "availability_changed", message: "Catalogue facts changed after this plan was evaluated. Refresh with scoring:{} and the current revision, then review before checkout.", nextActions: ["refresh_plan"] });
     const unavailable = Boolean(
       selected?.basket.some((item) => {
         const product = snapshot.products.find((row) => row.productId === item.productId);

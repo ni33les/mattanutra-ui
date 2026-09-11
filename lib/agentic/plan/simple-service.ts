@@ -2,7 +2,8 @@ import { resolveMarket } from "@/lib/agentic/catalogue/market";
 import type { AgenticRuntime } from "@/lib/agentic/runtime";
 import { businessError, isAgenticErrorResult } from "@/lib/agentic/contract/errors";
 import { readPlanState, readPlanPresentation } from "@/lib/agentic/presentation/plan-read";
-import { processingDecision, failedDecision, presentDecision, decisionOptions } from "@/lib/agentic/presentation/decision";
+import { processingDecision, failedDecision, presentDecision } from "@/lib/agentic/presentation/decision";
+import { catalogueSnapshotId } from "@/lib/agentic/catalogue/freeze";
 import { ensureCatalogueSnapshot } from "@/lib/agentic/catalogue/snapshot";
 import { prepareSimpleRequest } from "@/lib/agentic/plan/simple-input";
 import { canonicalRequestHash } from "@/lib/agentic/idempotency";
@@ -13,7 +14,7 @@ import { AGENTIC_CONTRACT_VERSION } from "@/lib/agentic/config";
 export async function simplePlanTool(runtime: AgenticRuntime, params: Record<string, unknown>) {
   const now = runtime.now ?? new Date().toISOString();
   const handle = typeof params.planHandle === "string" ? params.planHandle : undefined;
-  const kind = !handle ? "create" : "answers" in params ? "answer" : Object.keys(params).length === 1 ? "get" : Object.keys(params).every(key => ["planHandle", "expectedRevision", "idempotencyKey"].includes(key)) ? "select" : "revise";
+  const kind = !handle ? "create" : "answers" in params ? "answer" : Object.keys(params).length === 1 ? "get" : "revise";
   const state = handle ? await readPlanState(runtime, handle) : null;
   if (isAgenticErrorResult(state)) return state;
   if (kind === "get" && state) {
@@ -49,15 +50,10 @@ export async function simplePlanTool(runtime: AgenticRuntime, params: Record<str
     if (isAgenticErrorResult(request)) return request;
     Object.assign(payload, { request, searchEffort: params.searchEffort ?? prior?.result.requestSnapshot.searchEffort ?? "standard" });
     const original = prior?.result.originalRequest ?? prior?.result.requestSnapshot.originalRequest;
-    if (prior && !prior.refreshRequired && (!state?.operation || state.operation.status === "complete") && original && canonicalRequestHash(request) === canonicalRequestHash(original) && payload.searchEffort === prior.result.requestSnapshot.searchEffort) {
+    if (prior && !prior.refreshRequired && (prior.result.selected?.snapshotId ?? prior.result.matcherTelemetry.snapshotId) === catalogueSnapshotId(snapshot) && (!state?.operation || state.operation.status === "complete") && original && canonicalRequestHash(request) === canonicalRequestHash(original) && payload.searchEffort === prior.result.requestSnapshot.searchEffort) {
       const committed = await commitPlanNoop({ ...runtime, now, payload }, prior.result, prior.plan.id, handle!, prior.revision.revision);
       return isAgenticErrorResult(committed) ? committed : presentDecision(prior.result, handle!, prior.revision.revision);
     }
-  }
-  if (kind === "select" && prior) {
-    const option = decisionOptions(prior.result)[0];
-    if (!option || !option.basket.length || option.purchaseEligible === false) return businessError({ reasonCode: "not_found", fieldPath: "planHandle", message: "This revision has no purchasable recommendation to confirm." });
-    Object.assign(payload, { selectCandidateKey: option.candidateKey });
   }
   if (kind === "answer") Object.assign(payload, { answers: params.answers });
   const completed = await planTool({ ...runtime, now, payload });

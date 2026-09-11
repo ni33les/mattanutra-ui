@@ -1,0 +1,133 @@
+{
+  "releaseBase": "48fb0364ce236f99690ca84b595a6b87f6b71774",
+  "scope": "Direct MCP checkout, removed confirmation admission and aligned consented service-feedback guidance. Shared matcher and web unchanged.",
+  "files": [
+    {
+      "file": "test/agentic-contract-v4.test.ts",
+      "reason": "Affected public protocol, generated publication, checkout fixture, ownership/payment recovery or directly affected presentation and validation."
+    },
+    {
+      "file": "test/agentic-execute-reuse.test.ts",
+      "reason": "Affected public protocol, generated publication, checkout fixture, ownership/payment recovery or directly affected presentation and validation."
+    },
+    {
+      "file": "test/agentic-flexible-v5-journey.test.ts",
+      "reason": "Affected public protocol, generated publication, checkout fixture, ownership/payment recovery or directly affected presentation and validation."
+    },
+    {
+      "file": "test/agentic-flow.test.ts",
+      "reason": "Affected public protocol, generated publication, checkout fixture, ownership/payment recovery or directly affected presentation and validation."
+    },
+    {
+      "file": "test/agentic-p1.test.ts",
+      "reason": "Affected public protocol, generated publication, checkout fixture, ownership/payment recovery or directly affected presentation and validation."
+    },
+    {
+      "file": "test/agentic-purchased-pack-quote.test.ts",
+      "reason": "Affected public protocol, generated publication, checkout fixture, ownership/payment recovery or directly affected presentation and validation."
+    },
+    {
+      "file": "test/agentic-qa-pack.test.ts",
+      "reason": "Affected public protocol, generated publication, checkout fixture, ownership/payment recovery or directly affected presentation and validation."
+    },
+    {
+      "file": "test/agentic-reliability.test.ts",
+      "reason": "Affected public protocol, generated publication, checkout fixture, ownership/payment recovery or directly affected presentation and validation."
+    },
+    {
+      "file": "test/mcp-discovery/discovery.test.ts",
+      "reason": "Affected public protocol, generated publication, checkout fixture, ownership/payment recovery or directly affected presentation and validation."
+    },
+    {
+      "file": "test/mcp-evidence-images/contracts.test.ts",
+      "reason": "Affected public protocol, generated publication, checkout fixture, ownership/payment recovery or directly affected presentation and validation."
+    },
+    {
+      "file": "test/published-client-journey.test.ts",
+      "reason": "Affected public protocol, generated publication, checkout fixture, ownership/payment recovery or directly affected presentation and validation."
+    },
+    {
+      "file": "test/service-efficiency/checkout-preparation.test.ts",
+      "reason": "Affected public protocol, generated publication, checkout fixture, ownership/payment recovery or directly affected presentation and validation."
+    },
+    {
+      "file": "test/service-efficiency/duplicate-admission.test.ts",
+      "reason": "Affected public protocol, generated publication, checkout fixture, ownership/payment recovery or directly affected presentation and validation."
+    },
+    {
+      "file": "test/simple-plan/advice.test.ts",
+      "reason": "Affected public protocol, generated publication, checkout fixture, ownership/payment recovery or directly affected presentation and validation."
+    },
+    {
+      "file": "test/simple-plan/commerce-evidence.test.ts",
+      "reason": "Affected public protocol, generated publication, checkout fixture, ownership/payment recovery or directly affected presentation and validation."
+    },
+    {
+      "file": "test/simple-plan/direct-checkout.test.ts",
+      "reason": "Affected public protocol, generated publication, checkout fixture, ownership/payment recovery or directly affected presentation and validation."
+    },
+    {
+      "file": "test/simple-plan/documented.test.ts",
+      "reason": "Affected public protocol, generated publication, checkout fixture, ownership/payment recovery or directly affected presentation and validation."
+    },
+    {
+      "file": "test/simple-plan/facts.test.ts",
+      "reason": "Affected public protocol, generated publication, checkout fixture, ownership/payment recovery or directly affected presentation and validation."
+    },
+    {
+      "file": "test/simple-plan/hosted.test.ts",
+      "reason": "Affected public protocol, generated publication, checkout fixture, ownership/payment recovery or directly affected presentation and validation."
+    },
+    {
+      "file": "test/simple-plan/hygiene.test.ts",
+      "reason": "Affected public protocol, generated publication, checkout fixture, ownership/payment recovery or directly affected presentation and validation."
+    },
+    {
+      "file": "test/simple-plan/journey.test.ts",
+      "reason": "Affected public protocol, generated publication, checkout fixture, ownership/payment recovery or directly affected presentation and validation."
+    },
+    {
+      "file": "test/simple-plan/no-option-ids.test.ts",
+      "reason": "Affected public protocol, generated publication, checkout fixture, ownership/payment recovery or directly affected presentation and validation."
+    },
+    {
+      "file": "test/simple-plan/publication.test.ts",
+      "reason": "Affected public protocol, generated publication, checkout fixture, ownership/payment recovery or directly affected presentation and validation."
+    },
+    {
+      "file": "test/simple-plan/refinement.test.ts",
+      "reason": "Affected public protocol, generated publication, checkout fixture, ownership/payment recovery or directly affected presentation and validation."
+    },
+    {
+      "file": "test/simple-plan/requests.test.ts",
+      "reason": "Affected public protocol, generated publication, checkout fixture, ownership/payment recovery or directly affected presentation and validation."
+    },
+    {
+      "file": "test/simple-plan/response.test.ts",
+      "reason": "Affected public protocol, generated publication, checkout fixture, ownership/payment recovery or directly affected presentation and validation."
+    },
+    {
+      "file": "test/simple-plan/retained-public-invariants.test.ts",
+      "reason": "Affected public protocol, generated publication, checkout fixture, ownership/payment recovery or directly affected presentation and validation."
+    },
+    {
+      "file": "test/simple-plan/single-recommendation.test.ts",
+      "reason": "Affected public protocol, generated publication, checkout fixture, ownership/payment recovery or directly affected presentation and validation."
+    },
+    {
+      "file": "test/simple-plan/state.test.ts",
+      "reason": "Affected public protocol, generated publication, checkout fixture, ownership/payment recovery or directly affected presentation and validation."
+    },
+    {
+      "file": "test/simple-plan/transport.test.ts",
+      "reason": "Affected public protocol, generated publication, checkout fixture, ownership/payment recovery or directly affected presentation and validation."
+    }
+  ],
+  "databaseFiles": [
+    "test/service-efficiency/atomic-checkout.integration.test.ts"
+  ],
+  "liveFiles": [
+    "test/agentic-live-com-e2e.test.ts"
+  ],
+  "expectationChanges": "test/simple-plan/expectation-changes.md"
+}

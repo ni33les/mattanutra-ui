@@ -77,3 +77,7 @@ SPLAN-ADV-01/03, SPLAN-ADV-04, AE-06/07/08, AE-09 and DISC-TRUTH-03 now assert t
 
 - The existing cost weight remains `scoring.weights.price`; no alias, new field or ranking change. Its field description, card and guide now explicitly describe first-order THB goods cost excluding delivery, 0–2 importance, the advisory-budget overrun basis, omission and null resets. A copyable price-only refinement uses current handle/revision/idempotency controls.
 - MCP-COST-01/02 reproduce missing cost-specific discovery before implementation; MCP-COST-03/04 preserve existing independently calculated price/budget penalties and sparse-update behavior. Existing fixture prices, safety penalties, one-recommendation output and other assertions are unchanged.
+
+## Direct checkout — 11 September 2026
+
+User-approved simplification: plan create/read/refine/answer remain; bare handle/revision/key no longer confirms or creates a plan task. Execute accepts the current ready recommendation and freezes it under existing revision/idempotency protections. Ready decisions return execute, with customer agreement in the conversation. NOID-01–09, SPLAN-REQ-02, SPLAN-STATE-04/05 and documented-client cases now assert this behaviour; historical evidence stays in git and outside the checkout. DIRECT-01–03 initially failed on the pre-change source. Optional service-feedback guidance uses the existing consent requirement. No fields, locks or matching work added.

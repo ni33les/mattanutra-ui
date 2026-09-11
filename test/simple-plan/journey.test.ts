@@ -25,18 +25,16 @@ async function finish(app: App, args: Record<string, unknown>) {
 }
 const initial = { locale: 'en', destinationCountry: 'TH', idempotencyKey: 'simple-journey-initial', targets: [{ name: 'Vitamin D3', amount: 2000, unit: 'IU', basis: 'supplemental' }] };
 
-test('SPLAN-STATE-04/05 completed selection advances revision without rematching; refinement clears selection; stale-key replay wins', async () => {
+test('SPLAN-STATE-04/05 refinement advances revision; read and no-op preserve it; stale-key replay wins', async () => {
   const app = createAgenticRuntime(); const first = await finish(app, initial);
-  assert.equal(first.status, 'ready'); assert.equal(first.nextAction, 'confirm_with_user'); assert.ok(!('selectedCandidateKey' in first));
-  assert.equal(first.scoring.profile, 'best_match');
-  const select = { planHandle: first.planHandle, expectedRevision: first.revision, idempotencyKey: 'simple-journey-select' };
-  const selected = await finish(app, select);
-  assert.equal(selected.revision, first.revision + 1); assert.equal(selected.nextAction, 'execute');
-  assert.deepEqual(selected.choices.map((x: { products: unknown }) => x.products), first.choices.map((x: { products: unknown }) => x.products));
-  assert.deepEqual(await call(app, select), selected);
-  assert.equal(first.choices.length, 1); assert.equal(selected.choices.length, 1);
-  const refined = await finish(app, { planHandle: first.planHandle, expectedRevision: selected.revision, idempotencyKey: 'simple-journey-refine', scoring: { weights: { pills: 2 } } });
-  assert.equal(refined.choices.length, 1); assert.equal(refined.nextAction, 'confirm_with_user'); assert.equal(refined.scoring.weights.pills, 2);
+  assert.equal(first.status, 'ready'); assert.equal(first.nextAction, 'execute'); assert.ok(!('selectedCandidateKey' in first));
+  assert.equal(first.scoring.profile, 'best_match'); assert.equal(first.choices.length, 1);
+  const edit = { planHandle: first.planHandle, expectedRevision: first.revision, idempotencyKey: 'simple-journey-refine', scoring: { weights: { pills: 2 } } };
+  const refined = await finish(app, edit);
+  assert.equal(refined.revision, first.revision + 1); assert.equal(refined.nextAction, 'execute');
+  assert.equal(refined.choices.length, 1); assert.equal(refined.scoring.weights.pills, 2);
+  assert.deepEqual(await call(app, edit), refined);
+  assert.deepEqual(await call(app, { planHandle: first.planHandle }), refined);
   const noop = await finish(app, { planHandle: first.planHandle, expectedRevision: refined.revision, idempotencyKey: 'simple-journey-noop', scoring: {} });
   assert.equal(noop.revision, refined.revision);
 });

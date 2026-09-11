@@ -27,7 +27,7 @@ test("LOCK-DUP-02 concurrent checkout preparation is independent and atomic writ
   const created=await rpcWithTaskExecutor(app,"plan",{idempotencyKey:"lock-checkout-plan",...publicRequest({...request, requirements:{productDoses:[{productId:"prd_b1111111111111111111111111111111",servingsPerDay:1}]}})});
   const option=(created.choices as {products: unknown[]}[])[0];
   assert.ok(option?.products.length, "Duplicate checkout must exercise a real eligible purchase");
-  const plan=await rpcWithTaskExecutor(app,"plan",{planHandle:created.planHandle,expectedRevision:created.revision,idempotencyKey:"lock-checkout-select"});
+  const plan=await rpcWithTaskExecutor(app,"plan",{ planHandle:created.planHandle });
   assert.equal(plan.status,"ready",JSON.stringify(plan));
   let release!:()=>void, first!:()=>void, entered=0, beforeRelease=0;
   const gate=new Promise<void>(resolve=>{release=resolve;});const ready=new Promise<void>(resolve=>{first=resolve;});

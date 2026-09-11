@@ -22,7 +22,7 @@ test('SPLAN-ADV-01/03 PAY-VIEW-03 ingredient advice keeps only distinct exceeded
       targets: [{ supplementId: 'sup_d3', name: 'Vitamin D3', amount: 2000, unit: 'IU', basis: 'supplemental' }] } }, 'cap_advice_current_fixture_handle', 1);
     assert.ok('choices' in decision); const row = decision.choices[0].ingredients.find(row => row.ingredientId === 'sup_d3'); assert.ok(row?.advice);
     assert.equal(row.advice.length, 2); assert.ok(row.advice.every(row => row.kind === 'dose_review'));
-    assert.deepEqual(row.advice.map(row => row.reference), [4000, 3200]); assert.equal(decision.nextAction, 'confirm_with_user');
+    assert.deepEqual(row.advice.map(row => row.reference), [4000, 3200]); assert.equal(decision.nextAction, 'execute');
     for (const finding of row.advice) { assert.ok([...finding.message].length <= 240); assert.doesNotMatch(finding.message, /\d\.\d{8}/); }
     assert.match(row.advice[0].message, locale === 'th' ? /[ก-๙]/ : locale === 'zh-CN' ? /[\u4e00-\u9fff]/ : /exceeds the MattaNutra recommended limit/);
   }

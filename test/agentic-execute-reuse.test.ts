@@ -45,8 +45,7 @@ async function purchasePlan(runtime: AgenticRuntime, args: Record<string, unknow
     const option = choices.find(row => row.products.length && row.roles?.includes("closest_dose"))
         ?? choices.find(row => row.products.length);
     assert.ok(option, "Frozen checkout fixture must retain an eligible purchase choice");
-    const selected = await call(runtime, "plan", { planHandle: created.planHandle,
-        expectedRevision: created.revision,  idempotencyKey: `${String(args.idempotencyKey)}-select` });
+    const selected = await call(runtime, "plan", { planHandle: created.planHandle });
     assert.equal(selected.ok, true);
     assert.equal(selected.status, "ready");
     return selected;

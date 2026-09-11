@@ -1,7 +1,7 @@
 {
   "contractVersion": "11.0.0",
   "name": "mattanutra_dev",
-  "instructions": "MattaNutra builds and refines purchasable supplement baskets from real products available in Thailand. Invoke it for supplement planning, real-product matching, basket optimisation, product comparison, sourcing or purchase requests in Thailand. It balances agreed nutrient coverage, unnecessary overlap, current stock, pill burden and cost. Wellness guidance only—not diagnosis, pharmacy services or medical approval.\nDevelopment environment—not for real purchases.\nThailand (TH) only; prices in THB, delivery separate; finite catalogue, real gaps. Agree name/amount/unit/basis; unknown diet is never zero. total_daily includes diet and supplements; supplemental includes continued and new supplements, excluding diet.\nCall plan with flat targets/context and idempotencyKey to create. Then send only planHandle to read/poll; wait pollAfterSeconds while processing and stop polling at a terminal result. No matching occurs in polls.\nRefine changed fields with planHandle, expectedRevision and idempotencyKey. Targets upsert by ingredientId; amount changes dose, amount:null removes. Context merges; supplied arrays replace; [] clears exclusions/proposals; numeric null clears a preference.\nprofile means customer context. Start with scoring.profile=best_match (the default), then adjust weights from the conversation. Targets and preferences describe the desired outcome. Weights describe its importance when comparing possible routines. Weights accept decimals from 0 to 2: zero removes that ranking component, one applies the normal penalty, and two doubles it. Changing a weight never changes the agreed target amount. Numerical preferences remain advisory. Safety penalties and factual advice remain active independently. A target amount of zero with a positive weight expresses soft minimisation. A weight of zero means that objective does not influence ranking. Use an exclusion only when the customer requires categorical avoidance. Cost weight: scoring.weights.price (0 to 2) controls first-order goods cost in THB, delivery excluded. 0 ignores the cost penalty; 1 is normal; 2 doubles it. With requirements.maxPriceMinor, it weights budget-overrun penalties instead. Omission preserves; null resets to the preset. Up to six decimal places. Omission preserves; individual null resets; weights:null clears; preset changes reset overrides. A weight is not a dose or categorical exclusion.\nReturn one recommendation per round, never an options menu. Review its summary, ingredients and products; refine weights for a different routine. After the customer confirms, send only planHandle, expectedRevision and a new idempotencyKey to plan. This confirms that revision without rematching and returns the new revision with nextAction=execute; use that revision for execute. Selection, answers and refinements are separate calls.\nHealth findings and numeric preferences never veto purchase; exclusions, diet and physical quantities bind. Ready means checkout-ready, not targets met or medical approval. Advice reports only quantified exposure above MattaNutra recommended limits. Equal, below-limit and unknown exposure produce no advice. Medication/condition codes are accepted inputs, not interaction coverage. Absence of advice is not medical clearance. Limits remain advisory, including at weight zero.\nRetry a lost response with the same key/input. Read current revision after conflicts. scoring:{} with revision/new key recovers failed/stale work; unchanged successful input is a no-op. Finish naturally at no_purchase; order recovers/tracks payment and fulfilment.\nTools: info, plan, execute, order, support, feedback. Use host-listed names. info is optional; client_guide provides templates and plan_schema returns this same unified schema. Examples are protocol templates, not recommended regimens.\nTools: info, plan, execute, order, support, feedback. Use the exact names exposed by the host; hosts may wrap native names.",
+  "instructions": "MattaNutra builds and refines purchasable supplement baskets from real products available in Thailand. Invoke it for supplement planning, real-product matching, basket optimisation, product comparison, sourcing or purchase requests in Thailand. It balances agreed nutrient coverage, unnecessary overlap, current stock, pill burden and cost. Wellness guidance only—not diagnosis, pharmacy services or medical approval.\nDevelopment environment—not for real purchases.\nThailand (TH) only; prices in THB, delivery separate; finite catalogue, real gaps. Agree name/amount/unit/basis; unknown diet is never zero. total_daily includes diet and supplements; supplemental includes continued and new supplements, excluding diet.\nCall plan with flat targets/context and idempotencyKey to create. Then send only planHandle to read/poll; wait pollAfterSeconds while processing and stop polling at a terminal result. No matching occurs in polls.\nRefine changed fields with planHandle, expectedRevision and idempotencyKey. Targets upsert by ingredientId; amount changes dose, amount:null removes. Context merges; supplied arrays replace; [] clears exclusions/proposals; numeric null clears a preference.\nprofile means customer context. Start with scoring.profile=best_match (the default), then adjust weights from the conversation. Targets and preferences describe the desired outcome. Weights describe its importance when comparing possible routines. Weights accept decimals from 0 to 2: zero removes that ranking component, one applies the normal penalty, and two doubles it. Changing a weight never changes the agreed target amount. Numerical preferences remain advisory. Safety penalties and factual advice remain active independently. A target amount of zero with a positive weight expresses soft minimisation. A weight of zero means that objective does not influence ranking. Use an exclusion only when the customer requires categorical avoidance. Cost weight: scoring.weights.price (0 to 2) controls first-order goods cost in THB, delivery excluded. 0 ignores the cost penalty; 1 is normal; 2 doubles it. With requirements.maxPriceMinor, it weights budget-overrun penalties instead. Omission preserves; null resets to the preset. Up to six decimal places. Omission preserves; individual null resets; weights:null clears; preset changes reset overrides. A weight is not a dose or categorical exclusion.\nReturn one recommendation per round, never an options menu. Review its summary, ingredients and products; refine weights for a different routine. When the customer agrees to buy, call execute directly with planHandle, the returned expectedRevision and a new idempotencyKey. No separate confirmation call or rematching is needed. Answers and refinements are separate calls.\nHealth findings and numeric preferences never veto purchase; exclusions, diet and physical quantities bind. Ready means checkout-ready, not targets met or medical approval. Advice reports only quantified exposure above MattaNutra recommended limits. Equal, below-limit and unknown exposure produce no advice. Medication/condition codes are accepted inputs, not interaction coverage. Absence of advice is not medical clearance. Limits remain advisory, including at weight zero.\nRetry a lost response with the same key/input. Read current revision after conflicts. scoring:{} with revision/new key recovers failed/stale work; unchanged successful input is a no-op. Finish naturally at no_purchase; order recovers/tracks payment and fulfilment.\nAfter helping, offer concise service feedback through feedback: report observed usefulness, confusing behaviour or failures, with customer consent and no personal or health details. Feedback is optional and never delays checkout.\nTools: info, plan, execute, order, support, feedback. Use host-listed names. info is optional; client_guide provides templates and plan_schema returns this same unified schema. Examples are protocol templates, not recommended regimens.\nTools: info, plan, execute, order, support, feedback. Use the exact names exposed by the host; hosts may wrap native names.",
   "description": "Builds and refines a purchasable supplement basket from real Thailand products, balancing nutrient coverage, overlap, current stock, pill burden and cost.\nDevelopment environment—not for real purchases.",
   "shortDescription": "Builds and refines a purchasable supplement basket from real Thailand products, balancing nutrient coverage, overlap, current stock, pill burden and cost.",
   "longDescription": "Use MattaNutra when someone wants help planning, comparing, sourcing or buying supplements in Thailand. It turns agreed nutrient targets, health context, dietary constraints and current supplements into a purchasable basket of real products. Each round returns one recommendation, starting with best_match. The agent adjusts weights conversationally to refine it, reduce unnecessary overlap, balance nutrient coverage, current stock, pill burden and cost, refine quantities or exclusions, open checkout and track the order. MattaNutra provides wellness guidance and product matching—not diagnosis, pharmacy services or medical approval.",
@@ -40,18 +40,18 @@
       "titles": {
         "info": "Discover MattaNutra",
         "plan": "Build or refine a supplement basket",
-        "execute": "Open confirmed checkout",
+        "execute": "Open checkout",
         "order": "Track payment and delivery",
         "support": "Get order help",
-        "feedback": "Send plan feedback"
+        "feedback": "Send service feedback"
       },
       "purposes": {
         "info": "Understand when to use MattaNutra, its country and wellness boundaries, and retrieve the client guide or flat plan schema.",
         "plan": "Return one recommendation for agreed targets and context; start with best_match and refine weights conversationally.",
-        "execute": "After customer confirmation, freeze the selected plan revision and create or recover checkout.",
+        "execute": "When the customer agrees to buy, create or recover checkout directly for the current recommended basket.",
         "order": "Read concise payment, fulfilment and recovery state for an existing order.",
         "support": "Open or continue an order-support case.",
-        "feedback": "Submit optional consented feedback without changing the plan or checkout."
+        "feedback": "Offer optional service feedback on usefulness, friction or failures, with customer consent and without changing the plan or checkout."
       }
     },
     "th": {
@@ -70,18 +70,18 @@
       "titles": {
         "info": "รู้จัก MattaNutra",
         "plan": "สร้างหรือปรับชุดอาหารเสริม",
-        "execute": "เปิดหน้าชำระเงินที่ยืนยันแล้ว",
+        "execute": "เปิดหน้าชำระเงิน",
         "order": "ติดตามการชำระเงินและการจัดส่ง",
         "support": "ขอความช่วยเหลือเกี่ยวกับคำสั่งซื้อ",
-        "feedback": "ส่งความคิดเห็นเกี่ยวกับแผน"
+        "feedback": "ส่งความคิดเห็นเกี่ยวกับบริการ"
       },
       "purposes": {
         "info": "ทำความเข้าใจว่าเมื่อใดควรใช้ MattaNutra ประเทศที่รองรับ และขอบเขตคำแนะนำด้านสุขภาวะ พร้อมเรียกดูคู่มือเอเจนต์หรือสคีมาแผนแบบเดียว",
         "plan": "ส่งคืนชุดที่แนะนำเพียงชุดเดียวตามเป้าหมายและข้อมูลผู้ใช้ เริ่มด้วย best_match และปรับน้ำหนักความสำคัญตามบทสนทนา",
-        "execute": "หลังลูกค้ายืนยัน ให้ตรึงรายการของแผนฉบับที่เลือก แล้วสร้างหรือเรียกคืนหน้าชำระเงิน",
+        "execute": "เมื่อลูกค้าตกลงซื้อ ให้สร้างหรือเรียกคืนหน้าชำระเงินสำหรับชุดที่แนะนำปัจจุบันได้โดยตรง",
         "order": "อ่านสถานะการชำระเงิน การดำเนินการจัดส่งและการกู้คืนสำหรับคำสั่งซื้อที่มีอยู่",
         "support": "เปิดหรือติดตามเรื่องขอความช่วยเหลือเกี่ยวกับคำสั่งซื้อ",
-        "feedback": "ส่งความคิดเห็นโดยสมัครใจและได้รับความยินยอม โดยไม่เปลี่ยนแผนหรือการชำระเงิน"
+        "feedback": "เสนอส่งความคิดเห็นเกี่ยวกับประโยชน์ ปัญหาการใช้งาน หรือข้อผิดพลาดของบริการโดยสมัครใจ หลังได้รับความยินยอมจากลูกค้า โดยไม่เปลี่ยนแผนหรือการชำระเงิน"
       }
     },
     "zh-CN": {
@@ -100,24 +100,24 @@
       "titles": {
         "info": "了解 MattaNutra",
         "plan": "建立或调整补充剂组合",
-        "execute": "打开已确认的结账页面",
+        "execute": "打开结账页面",
         "order": "跟踪付款与配送",
         "support": "获取订单帮助",
-        "feedback": "提交方案反馈"
+        "feedback": "提交服务反馈"
       },
       "purposes": {
         "info": "了解何时使用 MattaNutra、支持的国家和健康指导边界，并获取智能体指南或统一方案输入模式。",
         "plan": "根据商定目标和用户背景每轮返回一个推荐方案；默认 best_match，通过对话调整权重。",
-        "execute": "用户确认后，冻结所选方案版本，并创建或恢复结账。",
+        "execute": "用户同意购买后，直接为当前推荐组合创建或恢复结账。",
         "order": "读取现有订单简明的付款、履约及恢复状态。",
         "support": "发起或继续订单支持请求。",
-        "feedback": "在获得同意后提交可选反馈，不改变方案或结账。"
+        "feedback": "征得用户同意后，可反馈服务的实用性、使用障碍或故障，不改变方案或结账。"
       }
     }
   },
-  "discoveryVersion": "discovery-11.0.0-six-tools-images-v1",
-  "positioningChecksum": "76f4c10dedc2771533454d1951c789612a314a4229d7626ba07fbd579c7864b9",
-  "schemaChecksum": "28057cfd3492fefcba5aad38473b2c0a6f0ae187fcb0e20deb03b0acab58ee8c",
+  "discoveryVersion": "discovery-11.0.0-direct-checkout-v2",
+  "positioningChecksum": "0b13fbb6210b5a4c62f7753ba383a35c8509dceb18693f8f4651566c01266396",
+  "schemaChecksum": "9d7ffc4611063f5cb412883768aba1e166546373ab83f3466229182b30433ed7",
   "server_url": "/api/mcp",
   "tools": [
     {
@@ -215,10 +215,10 @@
                               "type": "object",
                               "properties": {
                                 "locale": {
-                                  "$ref": "#/$defs/s45"
+                                  "$ref": "#/$defs/s44"
                                 },
                                 "destinationCountry": {
-                                  "$ref": "#/$defs/s52"
+                                  "$ref": "#/$defs/s51"
                                 },
                                 "profile": {
                                   "$ref": "#/$defs/s2"
@@ -230,28 +230,28 @@
                                   "$ref": "#/$defs/s1"
                                 },
                                 "searchEffort": {
-                                  "$ref": "#/$defs/s55"
+                                  "$ref": "#/$defs/s54"
                                 },
                                 "medicationCodes": {
-                                  "$ref": "#/$defs/s41"
+                                  "$ref": "#/$defs/s40"
                                 },
                                 "conditionCodes": {
-                                  "$ref": "#/$defs/s42"
+                                  "$ref": "#/$defs/s41"
                                 },
                                 "currentSupplements": {
-                                  "$ref": "#/$defs/s39"
+                                  "$ref": "#/$defs/s38"
                                 },
                                 "intake": {
-                                  "$ref": "#/$defs/s30"
+                                  "$ref": "#/$defs/s29"
                                 },
                                 "baseline": {
                                   "$ref": "#/$defs/s11"
                                 },
                                 "costHorizonsDays": {
-                                  "$ref": "#/$defs/s43"
+                                  "$ref": "#/$defs/s42"
                                 },
                                 "targets": {
-                                  "$ref": "#/$defs/s44"
+                                  "$ref": "#/$defs/s43"
                                 },
                                 "idempotencyKey": {
                                   "minLength": 16,
@@ -285,10 +285,10 @@
                               "type": "object",
                               "properties": {
                                 "locale": {
-                                  "$ref": "#/$defs/s45"
+                                  "$ref": "#/$defs/s44"
                                 },
                                 "destinationCountry": {
-                                  "$ref": "#/$defs/s52"
+                                  "$ref": "#/$defs/s51"
                                 },
                                 "profile": {
                                   "$ref": "#/$defs/s2"
@@ -300,28 +300,28 @@
                                   "$ref": "#/$defs/s1"
                                 },
                                 "searchEffort": {
-                                  "$ref": "#/$defs/s55"
+                                  "$ref": "#/$defs/s54"
                                 },
                                 "medicationCodes": {
-                                  "$ref": "#/$defs/s41"
+                                  "$ref": "#/$defs/s40"
                                 },
                                 "conditionCodes": {
-                                  "$ref": "#/$defs/s42"
+                                  "$ref": "#/$defs/s41"
                                 },
                                 "currentSupplements": {
-                                  "$ref": "#/$defs/s39"
+                                  "$ref": "#/$defs/s38"
                                 },
                                 "intake": {
-                                  "$ref": "#/$defs/s30"
+                                  "$ref": "#/$defs/s29"
                                 },
                                 "baseline": {
                                   "$ref": "#/$defs/s11"
                                 },
                                 "costHorizonsDays": {
-                                  "$ref": "#/$defs/s43"
+                                  "$ref": "#/$defs/s42"
                                 },
                                 "targets": {
-                                  "$ref": "#/$defs/s32"
+                                  "$ref": "#/$defs/s31"
                                 },
                                 "planHandle": {
                                   "minLength": 32,
@@ -430,7 +430,7 @@
                                   "type": "string"
                                 },
                                 "answers": {
-                                  "$ref": "#/$defs/s40"
+                                  "$ref": "#/$defs/s39"
                                 }
                               },
                               "required": [
@@ -439,18 +439,15 @@
                                 "idempotencyKey",
                                 "answers"
                               ]
-                            },
-                            {
-                              "$ref": "#/$defs/s14"
                             }
                           ],
                           "type": "object",
                           "properties": {
                             "locale": {
-                              "$ref": "#/$defs/s45"
+                              "$ref": "#/$defs/s44"
                             },
                             "destinationCountry": {
-                              "$ref": "#/$defs/s52"
+                              "$ref": "#/$defs/s51"
                             },
                             "profile": {
                               "$ref": "#/$defs/s2"
@@ -462,33 +459,33 @@
                               "$ref": "#/$defs/s1"
                             },
                             "searchEffort": {
-                              "$ref": "#/$defs/s55"
+                              "$ref": "#/$defs/s54"
                             },
                             "medicationCodes": {
-                              "$ref": "#/$defs/s41"
+                              "$ref": "#/$defs/s40"
                             },
                             "conditionCodes": {
-                              "$ref": "#/$defs/s42"
+                              "$ref": "#/$defs/s41"
                             },
                             "currentSupplements": {
-                              "$ref": "#/$defs/s39"
+                              "$ref": "#/$defs/s38"
                             },
                             "intake": {
-                              "$ref": "#/$defs/s30"
+                              "$ref": "#/$defs/s29"
                             },
                             "baseline": {
                               "$ref": "#/$defs/s11"
                             },
                             "costHorizonsDays": {
-                              "$ref": "#/$defs/s43"
+                              "$ref": "#/$defs/s42"
                             },
                             "targets": {
                               "anyOf": [
                                 {
-                                  "$ref": "#/$defs/s44"
+                                  "$ref": "#/$defs/s43"
                                 },
                                 {
-                                  "$ref": "#/$defs/s32"
+                                  "$ref": "#/$defs/s31"
                                 }
                               ]
                             },
@@ -507,7 +504,7 @@
                               "type": "integer"
                             },
                             "answers": {
-                              "$ref": "#/$defs/s40"
+                              "$ref": "#/$defs/s39"
                             }
                           },
                           "required": [],
@@ -532,7 +529,29 @@
                           "type": "string"
                         },
                         "arguments": {
-                          "$ref": "#/$defs/s14"
+                          "additionalProperties": false,
+                          "type": "object",
+                          "properties": {
+                            "planHandle": {
+                              "minLength": 32,
+                              "maxLength": 4096,
+                              "type": "string"
+                            },
+                            "expectedRevision": {
+                              "minimum": 1,
+                              "type": "integer"
+                            },
+                            "idempotencyKey": {
+                              "minLength": 16,
+                              "maxLength": 128,
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "planHandle",
+                            "expectedRevision",
+                            "idempotencyKey"
+                          ]
                         }
                       },
                       "required": [
@@ -1006,24 +1025,24 @@
           }
         ],
         "$defs": {
-          "s45": {
+          "s44": {
             "minLength": 2,
             "maxLength": 35,
             "description": "BCP 47 locale; supported locales are advertised by info. Unsupported locales fall back to English.",
             "type": "string"
           },
-          "s52": {
+          "s51": {
             "pattern": "^[A-Z]{2}$",
             "description": "Deliverable ISO country from info.supportedCountries.",
             "type": "string"
           },
-          "s50": {
+          "s49": {
             "minimum": 0,
             "maximum": 120,
             "description": "Reported age. Omit when unknown; scoring defaults are not health evidence.",
             "type": "integer"
           },
-          "s38": {
+          "s37": {
             "maxItems": 30,
             "uniqueItems": true,
             "type": "array",
@@ -1038,10 +1057,10 @@
             "type": "object",
             "properties": {
               "ageYears": {
-                "$ref": "#/$defs/s50"
+                "$ref": "#/$defs/s49"
               },
               "goals": {
-                "$ref": "#/$defs/s38"
+                "$ref": "#/$defs/s37"
               },
               "lifeStage": {
                 "type": "string",
@@ -1062,7 +1081,7 @@
               }
             }
           },
-          "s54": {
+          "s53": {
             "type": "string",
             "enum": [
               "capsule",
@@ -1075,15 +1094,15 @@
               "other"
             ]
           },
-          "s57": {
+          "s56": {
             "uniqueItems": true,
             "maxItems": 8,
             "type": "array",
             "items": {
-              "$ref": "#/$defs/s54"
+              "$ref": "#/$defs/s53"
             }
           },
-          "s34": {
+          "s33": {
             "maxItems": 100,
             "uniqueItems": true,
             "type": "array",
@@ -1094,7 +1113,7 @@
             },
             "description": "Exclude only these products. Does not remove requested nutrients. [] clears this exclusion."
           },
-          "s36": {
+          "s35": {
             "maxItems": 100,
             "uniqueItems": true,
             "type": "array",
@@ -1105,11 +1124,27 @@
             },
             "description": "Exclude products containing these nutrient concepts, not particular product IDs. [] clears this exclusion."
           },
-          "s46": {
+          "s45": {
             "minimum": 0,
             "maximum": 1000,
             "description": "Preferred daily pill count; unknown counts remain unknown.",
             "type": "number"
+          },
+          "s17": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/s45"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "s46": {
+            "minimum": 0,
+            "maximum": 1000000000000,
+            "description": "Preferred first-order goods price in destination currency minor units; delivery quoted separately.",
+            "type": "integer"
           },
           "s18": {
             "anyOf": [
@@ -1121,23 +1156,7 @@
               }
             ]
           },
-          "s47": {
-            "minimum": 0,
-            "maximum": 1000000000000,
-            "description": "Preferred first-order goods price in destination currency minor units; delivery quoted separately.",
-            "type": "integer"
-          },
-          "s19": {
-            "anyOf": [
-              {
-                "$ref": "#/$defs/s47"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "s23": {
+          "s22": {
             "anyOf": [
               {
                 "minimum": 0,
@@ -1151,13 +1170,13 @@
             "default": null,
             "description": "Preferred distinct new products; there is no system minimum or maximum basket count."
           },
-          "s27": {
+          "s26": {
             "exclusiveMinimum": 0,
             "maximum": 1000000000000000,
             "description": "Positive quantity in this field’s stated units. Nutrient quantities also use the documented dose precision.",
             "type": "number"
           },
-          "s15": {
+          "s14": {
             "additionalProperties": false,
             "type": "object",
             "properties": {
@@ -1167,7 +1186,7 @@
                 "type": "string"
               },
               "servingsPerDay": {
-                "$ref": "#/$defs/s27"
+                "$ref": "#/$defs/s26"
               }
             },
             "required": [
@@ -1175,16 +1194,16 @@
               "servingsPerDay"
             ]
           },
-          "s33": {
+          "s32": {
             "maxItems": 100,
             "uniqueItems": true,
             "description": "Fix returned products at these daily labelled servings; other products remain optimisable. Use administration metadata for measurable quantities. [] clears proposals. Revision evaluates, never purchases. Exclusion/physical conflicts return field errors; numeric and health findings are advice.",
             "type": "array",
             "items": {
-              "$ref": "#/$defs/s15"
+              "$ref": "#/$defs/s14"
             }
           },
-          "s35": {
+          "s34": {
             "maxItems": 100,
             "uniqueItems": true,
             "type": "array",
@@ -1194,7 +1213,7 @@
               "type": "string"
             }
           },
-          "s37": {
+          "s36": {
             "maxItems": 100,
             "uniqueItems": true,
             "type": "array",
@@ -1210,7 +1229,7 @@
             "type": "object",
             "properties": {
               "allowedForms": {
-                "$ref": "#/$defs/s57"
+                "$ref": "#/$defs/s56"
               },
               "dietaryPreference": {
                 "type": "string",
@@ -1221,22 +1240,22 @@
                 ]
               },
               "excludeProductIds": {
-                "$ref": "#/$defs/s34"
+                "$ref": "#/$defs/s33"
               },
               "excludeSupplementIds": {
-                "$ref": "#/$defs/s36"
+                "$ref": "#/$defs/s35"
               },
               "maxDailyPills": {
-                "$ref": "#/$defs/s18"
+                "$ref": "#/$defs/s17"
               },
               "maxPriceMinor": {
-                "$ref": "#/$defs/s19"
+                "$ref": "#/$defs/s18"
               },
               "maxProductCount": {
-                "$ref": "#/$defs/s23"
+                "$ref": "#/$defs/s22"
               },
               "productDoses": {
-                "$ref": "#/$defs/s33"
+                "$ref": "#/$defs/s32"
               },
               "omega3SourcePreference": {
                 "type": "string",
@@ -1247,14 +1266,14 @@
                 ]
               },
               "retainProductIds": {
-                "$ref": "#/$defs/s35"
+                "$ref": "#/$defs/s34"
               },
               "retainSupplementIds": {
-                "$ref": "#/$defs/s37"
+                "$ref": "#/$defs/s36"
               }
             }
           },
-          "s53": {
+          "s52": {
             "type": "string",
             "enum": [
               "best_match",
@@ -1265,27 +1284,27 @@
             ],
             "default": "best_match"
           },
-          "s51": {
+          "s50": {
             "minimum": 0,
             "maximum": 2,
             "multipleOf": 0.000001,
             "description": "Targets and preferences describe the desired outcome. Weights describe its importance when comparing possible routines. Weights accept decimals from 0 to 2: zero removes that ranking component, one applies the normal penalty, and two doubles it. Changing a weight never changes the agreed target amount. Numerical preferences remain advisory. Safety penalties and factual advice remain active independently. Up to six decimal places.",
             "type": "number"
           },
-          "s22": {
+          "s21": {
             "anyOf": [
               {
-                "$ref": "#/$defs/s51"
+                "$ref": "#/$defs/s50"
               },
               {
                 "type": "null"
               }
             ]
           },
-          "s21": {
+          "s20": {
             "anyOf": [
               {
-                "$ref": "#/$defs/s51"
+                "$ref": "#/$defs/s50"
               },
               {
                 "type": "null"
@@ -1293,12 +1312,12 @@
             ],
             "description": "Cost weight: scoring.weights.price (0 to 2) controls first-order goods cost in THB, delivery excluded. 0 ignores the cost penalty; 1 is normal; 2 doubles it. With requirements.maxPriceMinor, it weights budget-overrun penalties instead. Omission preserves; null resets to the preset."
           },
-          "s25": {
+          "s24": {
             "description": "Returned or published ingredient IDs only. Omission preserves; individual null resets to the preset.",
             "type": "object",
             "patternProperties": {
               "^[A-Za-z][A-Za-z0-9_-]{0,127}$": {
-                "$ref": "#/$defs/s22"
+                "$ref": "#/$defs/s21"
               }
             }
           },
@@ -1307,23 +1326,23 @@
             "type": "object",
             "properties": {
               "pills": {
-                "$ref": "#/$defs/s22"
-              },
-              "products": {
-                "$ref": "#/$defs/s22"
-              },
-              "price": {
                 "$ref": "#/$defs/s21"
               },
+              "products": {
+                "$ref": "#/$defs/s21"
+              },
+              "price": {
+                "$ref": "#/$defs/s20"
+              },
               "servings": {
-                "$ref": "#/$defs/s22"
+                "$ref": "#/$defs/s21"
               },
               "nutrients": {
-                "$ref": "#/$defs/s25"
+                "$ref": "#/$defs/s24"
               }
             }
           },
-          "s17": {
+          "s16": {
             "anyOf": [
               {
                 "$ref": "#/$defs/s13"
@@ -1339,14 +1358,14 @@
             "type": "object",
             "properties": {
               "profile": {
-                "$ref": "#/$defs/s53"
+                "$ref": "#/$defs/s52"
               },
               "weights": {
-                "$ref": "#/$defs/s17"
+                "$ref": "#/$defs/s16"
               }
             }
           },
-          "s55": {
+          "s54": {
             "type": "string",
             "enum": [
               "standard",
@@ -1355,7 +1374,7 @@
             "default": "standard",
             "description": "Deterministic search budget: standard 8000 expansion attempts; expanded 64000. Expanded includes the standard incumbent. A revise omission preserves prior effort. Repeating identical inputs reuses work; after expanded exhaustion refine the request."
           },
-          "s41": {
+          "s40": {
             "maxItems": 50,
             "uniqueItems": true,
             "type": "array",
@@ -1366,7 +1385,7 @@
             },
             "description": "Medication codes from info.medicationCodes; omission means unknown, not confirmed none."
           },
-          "s42": {
+          "s41": {
             "maxItems": 50,
             "uniqueItems": true,
             "type": "array",
@@ -1377,13 +1396,13 @@
             },
             "description": "Reported condition codes from info.conditionCodes; accepted inputs do not establish assessed interaction coverage."
           },
-          "s48": {
+          "s47": {
             "minimum": 0,
             "maximum": 1000000000000000,
             "description": "Daily amount in the accompanying unit; zero must be explicitly reported.",
             "type": "number"
           },
-          "s29": {
+          "s28": {
             "exclusiveMinimum": 0,
             "maximum": 36500,
             "description": "Positive remaining days of retained inventory. Omit when unknown. If none remains, remove this retained inventory entry and revise the intended request.",
@@ -1394,10 +1413,10 @@
             "type": "object",
             "properties": {
               "dailyAmount": {
-                "$ref": "#/$defs/s48"
+                "$ref": "#/$defs/s47"
               },
               "daysRemaining": {
-                "$ref": "#/$defs/s29"
+                "$ref": "#/$defs/s28"
               },
               "name": {
                 "minLength": 1,
@@ -1433,7 +1452,7 @@
               "unit"
             ]
           },
-          "s39": {
+          "s38": {
             "maxItems": 50,
             "description": "Quantified continued supplements. Omission means unknown; [] explicitly reports none. A (productId, nutrient) pair may occur only once across this field and current-source intake observations.",
             "type": "array",
@@ -1441,7 +1460,7 @@
               "$ref": "#/$defs/s4"
             }
           },
-          "s28": {
+          "s27": {
             "exclusiveMinimum": 0,
             "maximum": 36500,
             "description": "Current-supplement observations only: positive remaining days of retained stock. Omit unknown duration. Invalid for diet observations.",
@@ -1452,7 +1471,7 @@
             "type": "object",
             "properties": {
               "daysRemaining": {
-                "$ref": "#/$defs/s28"
+                "$ref": "#/$defs/s27"
               },
               "source": {
                 "type": "string",
@@ -1491,7 +1510,7 @@
                 "type": "string"
               },
               "amount": {
-                "$ref": "#/$defs/s48"
+                "$ref": "#/$defs/s47"
               },
               "unit": {
                 "type": "string",
@@ -1518,7 +1537,7 @@
             "type": "object",
             "properties": {
               "daysRemaining": {
-                "$ref": "#/$defs/s28"
+                "$ref": "#/$defs/s27"
               },
               "source": {
                 "type": "string",
@@ -1557,13 +1576,13 @@
                 "type": "string"
               },
               "amount": {
-                "$ref": "#/$defs/s48"
+                "$ref": "#/$defs/s47"
               },
               "minimum": {
-                "$ref": "#/$defs/s48"
+                "$ref": "#/$defs/s47"
               },
               "maximum": {
-                "$ref": "#/$defs/s48"
+                "$ref": "#/$defs/s47"
               },
               "unit": {
                 "type": "string",
@@ -1588,7 +1607,7 @@
             "type": "object",
             "properties": {
               "daysRemaining": {
-                "$ref": "#/$defs/s28"
+                "$ref": "#/$defs/s27"
               },
               "source": {
                 "type": "string",
@@ -1632,7 +1651,7 @@
               "certainty"
             ]
           },
-          "s24": {
+          "s23": {
             "description": "Reported daily intake. Missing quantities are unknown, never zero. Broad dietary descriptions are accepted without labels or portion sizes.",
             "anyOf": [
               {
@@ -1646,15 +1665,15 @@
               }
             ]
           },
-          "s30": {
+          "s29": {
             "maxItems": 100,
             "description": "Reported observations. Omission or [] does not establish zero dietary intake. An explicitly reported known amount of 0 is required to establish zero for a nutrient.",
             "type": "array",
             "items": {
-              "$ref": "#/$defs/s24"
+              "$ref": "#/$defs/s23"
             }
           },
-          "s26": {
+          "s25": {
             "exclusiveMinimum": 0,
             "maximum": 1000,
             "description": "Actual catalogue servings per day for this comparison basket. Omission makes equivalent-coverage savings unavailable; quantity remains packs purchased.",
@@ -1670,7 +1689,7 @@
                 "type": "number"
               },
               "dailyServings": {
-                "$ref": "#/$defs/s26"
+                "$ref": "#/$defs/s25"
               },
               "productId": {
                 "pattern": "^prd_[A-Za-z0-9_-]+$",
@@ -1678,7 +1697,7 @@
                 "type": "string"
               },
               "quantity": {
-                "$ref": "#/$defs/s27"
+                "$ref": "#/$defs/s26"
               }
             },
             "required": [
@@ -1686,7 +1705,7 @@
               "quantity"
             ]
           },
-          "s31": {
+          "s30": {
             "maxItems": 100,
             "type": "array",
             "items": {
@@ -1698,7 +1717,7 @@
             "type": "object",
             "properties": {
               "items": {
-                "$ref": "#/$defs/s31"
+                "$ref": "#/$defs/s30"
               },
               "type": {
                 "type": "string",
@@ -1712,7 +1731,7 @@
               "type"
             ]
           },
-          "s43": {
+          "s42": {
             "minItems": 1,
             "maxItems": 2,
             "uniqueItems": true,
@@ -1730,13 +1749,13 @@
               ]
             }
           },
-          "s49": {
+          "s48": {
             "minimum": 0,
             "maximum": 1000000000000000,
             "description": "Positive amount fits the agreed target. Zero with positive importance softly minimises exposure on the stated basis using a reviewed comparison scale; it does not remove current intake. Reviewed zero scales: Vitamin D3 25 mcg (1000 IU), Selenium 50 mcg; other ingredients return an explicit missing-scale error. These scales are not dose recommendations. Weight zero ignores fitting; amount:null removes on refinement.",
             "type": "number"
           },
-          "s56": {
+          "s55": {
             "type": "string",
             "enum": [
               "total_daily",
@@ -1750,10 +1769,10 @@
             "type": "object",
             "properties": {
               "maximum": {
-                "$ref": "#/$defs/s27"
+                "$ref": "#/$defs/s26"
               },
               "minimum": {
-                "$ref": "#/$defs/s27"
+                "$ref": "#/$defs/s26"
               },
               "unit": {
                 "type": "string",
@@ -1790,7 +1809,7 @@
                 "type": "string"
               },
               "amount": {
-                "$ref": "#/$defs/s49"
+                "$ref": "#/$defs/s48"
               },
               "unit": {
                 "type": "string",
@@ -1805,7 +1824,7 @@
                 ]
               },
               "basis": {
-                "$ref": "#/$defs/s56"
+                "$ref": "#/$defs/s55"
               },
               "acceptableRange": {
                 "$ref": "#/$defs/s12"
@@ -1828,7 +1847,7 @@
               }
             ]
           },
-          "s44": {
+          "s43": {
             "minItems": 1,
             "maxItems": 30,
             "type": "array",
@@ -1836,10 +1855,10 @@
               "$ref": "#/$defs/s10"
             }
           },
-          "s20": {
+          "s19": {
             "anyOf": [
               {
-                "$ref": "#/$defs/s49"
+                "$ref": "#/$defs/s48"
               },
               {
                 "type": "null"
@@ -1857,7 +1876,7 @@
                 "type": "string"
               },
               "amount": {
-                "$ref": "#/$defs/s20"
+                "$ref": "#/$defs/s19"
               },
               "unit": {
                 "type": "string",
@@ -1872,7 +1891,7 @@
                 ]
               },
               "basis": {
-                "$ref": "#/$defs/s56"
+                "$ref": "#/$defs/s55"
               },
               "acceptableRange": {
                 "$ref": "#/$defs/s12"
@@ -1882,7 +1901,7 @@
               "ingredientId"
             ]
           },
-          "s16": {
+          "s15": {
             "anyOf": [
               {
                 "$ref": "#/$defs/s9"
@@ -1892,11 +1911,11 @@
               }
             ]
           },
-          "s32": {
+          "s31": {
             "maxItems": 100,
             "type": "array",
             "items": {
-              "$ref": "#/$defs/s16"
+              "$ref": "#/$defs/s15"
             }
           },
           "s3": {
@@ -1919,7 +1938,7 @@
               "questionId"
             ]
           },
-          "s40": {
+          "s39": {
             "maxItems": 50,
             "uniqueItems": true,
             "type": "array",
@@ -1927,31 +1946,6 @@
               "$ref": "#/$defs/s3"
             },
             "minItems": 1
-          },
-          "s14": {
-            "additionalProperties": false,
-            "type": "object",
-            "properties": {
-              "planHandle": {
-                "minLength": 32,
-                "maxLength": 4096,
-                "type": "string"
-              },
-              "expectedRevision": {
-                "minimum": 1,
-                "type": "integer"
-              },
-              "idempotencyKey": {
-                "minLength": 16,
-                "maxLength": 128,
-                "type": "string"
-              }
-            },
-            "required": [
-              "planHandle",
-              "expectedRevision",
-              "idempotencyKey"
-            ]
           }
         }
       },
@@ -1966,7 +1960,7 @@
     },
     {
       "title": "Build or refine a supplement basket",
-      "description": "Return one recommendation for agreed targets and context; start with best_match and refine weights conversationally. Thailand (TH) only; prices in THB, delivery separate; finite catalogue, real gaps. Agree name/amount/unit/basis; unknown diet is never zero. total_daily includes diet and supplements; supplemental includes continued and new supplements, excluding diet.\nCall plan with flat targets/context and idempotencyKey to create. Then send only planHandle to read/poll; wait pollAfterSeconds while processing and stop polling at a terminal result. No matching occurs in polls.\nRefine changed fields with planHandle, expectedRevision and idempotencyKey. Targets upsert by ingredientId; amount changes dose, amount:null removes. Context merges; supplied arrays replace; [] clears exclusions/proposals; numeric null clears a preference.\nprofile means customer context. Start with scoring.profile=best_match (the default), then adjust weights from the conversation. Targets and preferences describe the desired outcome. Weights describe its importance when comparing possible routines. Weights accept decimals from 0 to 2: zero removes that ranking component, one applies the normal penalty, and two doubles it. Changing a weight never changes the agreed target amount. Numerical preferences remain advisory. Safety penalties and factual advice remain active independently. A target amount of zero with a positive weight expresses soft minimisation. A weight of zero means that objective does not influence ranking. Use an exclusion only when the customer requires categorical avoidance. Cost weight: scoring.weights.price (0 to 2) controls first-order goods cost in THB, delivery excluded. 0 ignores the cost penalty; 1 is normal; 2 doubles it. With requirements.maxPriceMinor, it weights budget-overrun penalties instead. Omission preserves; null resets to the preset. Up to six decimal places. Omission preserves; individual null resets; weights:null clears; preset changes reset overrides. A weight is not a dose or categorical exclusion.\nReturn one recommendation per round, never an options menu. Review its summary, ingredients and products; refine weights for a different routine. After the customer confirms, send only planHandle, expectedRevision and a new idempotencyKey to plan. This confirms that revision without rematching and returns the new revision with nextAction=execute; use that revision for execute. Selection, answers and refinements are separate calls.\nHealth findings and numeric preferences never veto purchase; exclusions, diet and physical quantities bind. Ready means checkout-ready, not targets met or medical approval. Advice reports only quantified exposure above MattaNutra recommended limits. Equal, below-limit and unknown exposure produce no advice. Medication/condition codes are accepted inputs, not interaction coverage. Absence of advice is not medical clearance. Limits remain advisory, including at weight zero.\nRetry a lost response with the same key/input. Read current revision after conflicts. scoring:{} with revision/new key recovers failed/stale work; unchanged successful input is a no-op. Finish naturally at no_purchase; order recovers/tracks payment and fulfilment.\nTools: info, plan, execute, order, support, feedback. Use host-listed names. info is optional; client_guide provides templates and plan_schema returns this same unified schema. Examples are protocol templates, not recommended regimens.",
+      "description": "Return one recommendation for agreed targets and context; start with best_match and refine weights conversationally. Thailand (TH) only; prices in THB, delivery separate; finite catalogue, real gaps. Agree name/amount/unit/basis; unknown diet is never zero. total_daily includes diet and supplements; supplemental includes continued and new supplements, excluding diet.\nCall plan with flat targets/context and idempotencyKey to create. Then send only planHandle to read/poll; wait pollAfterSeconds while processing and stop polling at a terminal result. No matching occurs in polls.\nRefine changed fields with planHandle, expectedRevision and idempotencyKey. Targets upsert by ingredientId; amount changes dose, amount:null removes. Context merges; supplied arrays replace; [] clears exclusions/proposals; numeric null clears a preference.\nprofile means customer context. Start with scoring.profile=best_match (the default), then adjust weights from the conversation. Targets and preferences describe the desired outcome. Weights describe its importance when comparing possible routines. Weights accept decimals from 0 to 2: zero removes that ranking component, one applies the normal penalty, and two doubles it. Changing a weight never changes the agreed target amount. Numerical preferences remain advisory. Safety penalties and factual advice remain active independently. A target amount of zero with a positive weight expresses soft minimisation. A weight of zero means that objective does not influence ranking. Use an exclusion only when the customer requires categorical avoidance. Cost weight: scoring.weights.price (0 to 2) controls first-order goods cost in THB, delivery excluded. 0 ignores the cost penalty; 1 is normal; 2 doubles it. With requirements.maxPriceMinor, it weights budget-overrun penalties instead. Omission preserves; null resets to the preset. Up to six decimal places. Omission preserves; individual null resets; weights:null clears; preset changes reset overrides. A weight is not a dose or categorical exclusion.\nReturn one recommendation per round, never an options menu. Review its summary, ingredients and products; refine weights for a different routine. When the customer agrees to buy, call execute directly with planHandle, the returned expectedRevision and a new idempotencyKey. No separate confirmation call or rematching is needed. Answers and refinements are separate calls.\nHealth findings and numeric preferences never veto purchase; exclusions, diet and physical quantities bind. Ready means checkout-ready, not targets met or medical approval. Advice reports only quantified exposure above MattaNutra recommended limits. Equal, below-limit and unknown exposure produce no advice. Medication/condition codes are accepted inputs, not interaction coverage. Absence of advice is not medical clearance. Limits remain advisory, including at weight zero.\nRetry a lost response with the same key/input. Read current revision after conflicts. scoring:{} with revision/new key recovers failed/stale work; unchanged successful input is a no-op. Finish naturally at no_purchase; order recovers/tracks payment and fulfilment.\nAfter helping, offer concise service feedback through feedback: report observed usefulness, confusing behaviour or failures, with customer consent and no personal or health details. Feedback is optional and never delays checkout.\nTools: info, plan, execute, order, support, feedback. Use host-listed names. info is optional; client_guide provides templates and plan_schema returns this same unified schema. Examples are protocol templates, not recommended regimens.",
       "inputSchema": {
         "anyOf": [
           {
@@ -3790,31 +3784,6 @@
               "idempotencyKey",
               "answers"
             ]
-          },
-          {
-            "additionalProperties": false,
-            "type": "object",
-            "properties": {
-              "planHandle": {
-                "minLength": 32,
-                "maxLength": 4096,
-                "type": "string"
-              },
-              "expectedRevision": {
-                "minimum": 1,
-                "type": "integer"
-              },
-              "idempotencyKey": {
-                "minLength": 16,
-                "maxLength": 128,
-                "type": "string"
-              }
-            },
-            "required": [
-              "planHandle",
-              "expectedRevision",
-              "idempotencyKey"
-            ]
           }
         ],
         "type": "object",
@@ -5373,7 +5342,6 @@
               "nextAction": {
                 "type": "string",
                 "enum": [
-                  "confirm_with_user",
                   "execute",
                   "answer_questions",
                   "change_request",
@@ -5652,8 +5620,8 @@
       "responsibilityVersion": "responsibility-4.0.0"
     },
     {
-      "title": "Open confirmed checkout",
-      "description": "After customer confirmation, freeze the selected plan revision and create or recover checkout. Use the returned confirmed revision and a new checkout idempotencyKey. Retry a lost checkout response with the same key and input; health advice is advisory.",
+      "title": "Open checkout",
+      "description": "When the customer agrees to buy, create or recover checkout directly for the current recommended basket. When the customer agrees to buy, use the returned current revision and a new checkout idempotencyKey. No separate plan confirmation call. Retry a lost checkout response with the same key and input; health advice is advisory.",
       "inputSchema": {
         "additionalProperties": false,
         "type": "object",
@@ -7392,8 +7360,8 @@
       "responsibilityVersion": "responsibility-4.0.0"
     },
     {
-      "title": "Send plan feedback",
-      "description": "Submit optional consented feedback without changing the plan or checkout. Identify the plan revision and set consentConfirmed=true only after obtaining consent.",
+      "title": "Send service feedback",
+      "description": "Offer optional service feedback on usefulness, friction or failures, with customer consent and without changing the plan or checkout. After helping, offer concise service feedback on usefulness, friction or failures. Identify the plan revision and set consentConfirmed=true only after obtaining customer consent. Report observations, not invented ratings; omit personal and health details. Optional: never delay checkout.",
       "inputSchema": {
         "additionalProperties": false,
         "type": "object",

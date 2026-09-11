@@ -50,8 +50,8 @@ function routine(value: Record<string, unknown>) {
     assert.ok(choices?.length, JSON.stringify(value));
     const result = choices.find(row => row.products.length && row.roles.includes("closest_dose")) ?? choices.find(row => row.products.length); assert.ok(result); return result;
 }
-async function select(runtime: AgenticRuntime, created: Record<string,unknown>, key: string) {
-    const selected = await call(runtime, "plan", {planHandle:created.planHandle,expectedRevision:created.revision,idempotencyKey:key});
+async function select(runtime: AgenticRuntime, created: Record<string,unknown>) {
+    const selected = await call(runtime, "plan", { planHandle:created.planHandle });
     assert.equal(selected.ok,true,JSON.stringify(selected));return selected;
 }
 async function call(runtime: AgenticRuntime, name: string, args: unknown, id = 1) {
@@ -107,7 +107,7 @@ describe("agentic DEV flow", () => {
         assert.equal(created.ok, true);
         assert.equal(created.status, "ready");
         assert.ok(routine(created).products.length >= 4);
-        assert.equal(created.nextAction, 'confirm_with_user');
+        assert.equal(created.nextAction, 'execute');
         assert.equal(typeof created.planHandle, "string");
         assert.ok(String(created.planHandle).length >= 32);
         const replay = await call(runtime, "plan", {
@@ -124,7 +124,7 @@ describe("agentic DEV flow", () => {
         assert.equal((conflict.error as {
             reasonCode: string;
         }).reasonCode, "idempotency_conflict");
-        created = await select(runtime, created, "flow-j1-select-01");
+        created = await select(runtime, created);
         const executed = await call(runtime, "execute", {
             expectedRevision: created.revision,
             idempotencyKey: "execute-j1-wellness-01",
@@ -236,7 +236,7 @@ describe("agentic DEV flow", () => {
         for (const finding of routine(created).ingredients.flatMap(row => row.advice ?? [])) {
             assert.equal(finding.kind, "dose_review"); assert.ok(finding.exposure > finding.reference && finding.reference > 0);
         }
-        created = await select(runtime, created, "flow-ckd-select-01");
+        created = await select(runtime, created);
         const executed = await call(runtime, "execute", {
             expectedRevision: created.revision,
             idempotencyKey: "ckd-execute-00000001",

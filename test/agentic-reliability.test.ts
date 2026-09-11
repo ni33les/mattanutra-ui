@@ -149,7 +149,7 @@ describe("MCP reliability: atomic plan and checkout commands", () => {
         const created = await call(runtime, { idempotencyKey: "review-orders-create", ...request, requirements: { productDoses: [{ productId: "prd_b1111111111111111111111111111111", servingsPerDay: 1 }] } });
         const option = (created.choices as Array<{ candidateKey: string; products: unknown[] }>).find(row => row.products.length);
         assert.ok(option, "A purchase choice must survive practical no-purchase recommendation");
-        const plan = await call(runtime, { planHandle: created.planHandle, expectedRevision: created.revision,  idempotencyKey: "review-orders-select" });
+        const plan = await call(runtime, { planHandle: created.planHandle });
         assert.equal(plan.status, "ready");
         const [a, b] = await Promise.all([1, 2].map(n => import(new URL("../lib/agentic/commerce/execute.ts?replica=" + n, import.meta.url).href)));
         const input = { ...runtime, now: new Date().toISOString(), planHandle: plan.planHandle, expectedRevision: plan.revision };

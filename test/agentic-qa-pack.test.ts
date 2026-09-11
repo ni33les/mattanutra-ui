@@ -110,7 +110,7 @@ describe("Repository MattaNutra Agentic QA coverage", () => {
         assert.deepEqual(stored.originalRequest?.targets.map(({name,amount,unit})=>({name,amount,unit})),eightTargets());
         assert.ok(stored.requestSnapshot.acceptedGaps.some(row=>row.supplementId===iron.supplementId));
         const option=choices(patched).find(row=>row.products.length);assert.ok(option);
-        const selected=await call(runtime,"plan",{planHandle:patched.planHandle,expectedRevision:patched.revision,idempotencyKey:"qa-a2-select-0000001"});
+        const selected=await call(runtime,"plan",{ planHandle:patched.planHandle });
         assert.equal(selected.ok,true);assert.deepEqual(choices(selected).map(row=>row.products),choices(patched).map(row=>row.products));
     });
     it("A3 recommendation stays stable until targets change", async () => {
@@ -152,7 +152,7 @@ describe("Repository MattaNutra Agentic QA coverage", () => {
             expectedRevision: 99,
             idempotencyKey: "qa-a4-stale-00000001",
             planHandle: created.planHandle
-        });
+        , scoring: {} });
         assert.equal(stale.ok, false);
         assert.equal((stale.error as {
             reasonCode: string;

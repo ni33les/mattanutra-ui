@@ -432,9 +432,15 @@
     },
     {
       "file": "test/simple-plan/no-option-ids.test.ts",
-      "reason": "Current MCP identifier-free confirmation, publication and checkout instruction regressions.",
-      "expectedCases": 8,
+      "reason": "Identifier-free direct checkout, removed confirmation, publication alignment and frozen recovery.",
+      "expectedCases": 9,
       "slice": "requests"
+    },
+    {
+      "file": "test/simple-plan/direct-checkout.test.ts",
+      "expectedCases": 5,
+      "slice": "requests",
+      "reason": "Direct checkout without confirmation revision, no queued plan work and generated service-feedback protocol"
     }
   ],
   "inputs": [
@@ -480,6 +486,8 @@
     "test/simple-plan/version.test.ts",
     "test/simple-plan/weights.test.ts",
     "test/simple-plan/importance.test.ts",
-    "test/simple-plan/zero-scales.test.ts"
+    "test/simple-plan/zero-scales.test.ts",
+    "test/simple-plan/direct-checkout.test.ts",
+    "test/simple-plan/no-option-ids.test.ts"
   ]
 }

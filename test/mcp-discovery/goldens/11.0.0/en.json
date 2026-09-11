@@ -14,17 +14,17 @@
   "titles": {
     "info": "Discover MattaNutra",
     "plan": "Build or refine a supplement basket",
-    "execute": "Open confirmed checkout",
+    "execute": "Open checkout",
     "order": "Track payment and delivery",
     "support": "Get order help",
-    "feedback": "Send plan feedback"
+    "feedback": "Send service feedback"
   },
   "purposes": {
     "info": "Understand when to use MattaNutra, its country and wellness boundaries, and retrieve the client guide or flat plan schema.",
     "plan": "Return one recommendation for agreed targets and context; start with best_match and refine weights conversationally.",
-    "execute": "After customer confirmation, freeze the selected plan revision and create or recover checkout.",
+    "execute": "When the customer agrees to buy, create or recover checkout directly for the current recommended basket.",
     "order": "Read concise payment, fulfilment and recovery state for an existing order.",
     "support": "Open or continue an order-support case.",
-    "feedback": "Submit optional consented feedback without changing the plan or checkout."
+    "feedback": "Offer optional service feedback on usefulness, friction or failures, with customer consent and without changing the plan or checkout."
   }
 }
