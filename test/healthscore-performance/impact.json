@@ -1,15 +1,34 @@
 {
-  "releaseBase": "b2bba18e1855b9a0230250ae6ee487a7c7df8459",
-  "scope": "AI prompt size, reusable prefixes, response structures and HealthScore copy reasoning; no UI, scoring, readiness, database, matcher or commerce changes",
+  "releaseBase": "81c96c811c335decd8b9d7bcfac965737adefcfe",
+  "scope": "Formula prefix cache routing and concise ingredient prose; shared transport compatibility and unchanged HealthScore callers. No UI, scoring, readiness, database, matcher, commerce, or live reasoning changes.",
   "files": [
-    { "file": "test/healthscore-performance/prompts.test.ts", "expectedCases": 11, "reason": "Captured production AI requests, exact frozen input facts, per-locale copy, structural retry prevention, semantic retries and unrelated transport compatibility" },
-    { "file": "test/health-score-analysis.test.ts", "expectedCases": 16, "reason": "Existing complete-copy, numeric, length, field, locale and historical-cache validation assertions" },
-    { "file": "test/grok-task-config.test.ts", "expectedCases": 5, "reason": "Measured HealthScore reasoning default and preservation of other AI-task defaults" }
+    {
+      "file": "test/healthscore-performance/prompts.test.ts",
+      "expectedCases": 11,
+      "reason": "Captured production AI requests, exact frozen input facts, per-locale copy, structural retry prevention, semantic retries and unrelated transport compatibility"
+    },
+    {
+      "file": "test/health-score-analysis.test.ts",
+      "expectedCases": 16,
+      "reason": "Existing complete-copy, numeric, length, field, locale and historical-cache validation assertions"
+    },
+    {
+      "file": "test/grok-task-config.test.ts",
+      "expectedCases": 5,
+      "reason": "Measured HealthScore reasoning default and preservation of other AI-task defaults"
+    },
+    {
+      "file": "test/healthscore-performance/formula-cache.test.ts",
+      "expectedCases": 7,
+      "reason": "Immutable message isolation, provider routing identity, retry preservation, unrelated caller compatibility and distinct prose roles in three locales"
+    }
   ],
   "expectationChanges": [
     "HealthScore prompt identity v8-single-display-locale -> v9-compact-structured; cached historical responses and their validators remain supported.",
     "HealthScore copy reasoning medium -> low after bounded English/Thai/Chinese provider probes; explicit environment overrides remain supported.",
     "New AI responses use strict JSON schemas; unrelated callers retain JSON-object mode. Existing semantic validators and bounded retries are unchanged.",
-    "Formula prompt v1 -> v2-compact-structured; all input facts and requested outputs retained, supplement.en instruction corrected to the existing plain-string contract."
-  ]
+    "Formula prompt v1 -> v2-compact-structured; all input facts and requested outputs retained, supplement.en instruction corrected to the existing plain-string contract.",
+    "Formula prompt v2 -> v3-cached-concise: two compact user messages preserve all facts; three ingredient prose fields have distinct concise roles. No fields or cautions removed. Medium formula reasoning remains the default."
+  ],
+  "previousReleaseBase": "b2bba18e1855b9a0230250ae6ee487a7c7df8459"
 }
