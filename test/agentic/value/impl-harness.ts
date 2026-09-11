@@ -48,6 +48,8 @@ export type PlanSession = Readonly<{
   store: AgenticStore;
 }>;
 
+const frozenReferences = new WeakMap<ValueCatalogueFreeze, ReturnType<typeof captureMatcherSafetySnapshot>>();
+
 export function supplementByName(freeze: ValueCatalogueFreeze, name: string) {
   const needle = name.toLowerCase();
   return freeze.snapshot.supplements.find((item) => item.name.toLowerCase().includes(needle));
@@ -177,12 +179,14 @@ export async function freezeImplCatalogue() {
       productCount: snapshot.products.length, retailerId: "retailer_th_delight", snapshot,
       supplementCount: snapshot.supplements.length
     };
-    return { freeze, live: true, snapshotId: catalogueSnapshotId(snapshot), usable: isUsableLiveFreeze(freeze) };
+    frozenReferences.set(freeze, captureMatcherSafetySnapshot());
+    return { freeze, live: isLiveRetailFreeze(freeze), snapshotId: catalogueSnapshotId(snapshot), usable: isUsableLiveFreeze(freeze) };
   }
   // Freeze reference inputs before the first run, including cases preceding
   // the financial fixture. A later fixture must not silently initialise them.
   await refreshAdminSafetyCeilings();
   const freeze = await freezeLiveThailandCatalogue("TH");
+  frozenReferences.set(freeze, captureMatcherSafetySnapshot());
   return {
     freeze,
     live: isLiveRetailFreeze(freeze),
@@ -209,21 +213,26 @@ export async function freezeFinancialCatalogue() {
     snapshot,
     supplementCount: snapshot.supplements.length
   };
+  frozenReferences.set(freeze, captureMatcherSafetySnapshot());
   return { freeze, live: false, snapshotId: catalogueSnapshotId(snapshot), usable: true };
 }
 
 export async function withFinancialSession<T>(session: PlanSession, work: (fixture: PlanSession) => Promise<T>) {
   const previous = installedCatalogueSnapshot();
-  const fixture = openSession((await freezeFinancialCatalogue()).freeze);
+  const references = captureMatcherSafetySnapshot();
   try {
+    const fixture = openSession((await freezeFinancialCatalogue()).freeze);
     return await work(fixture);
   } finally {
     replaceCatalogueSnapshot(previous ?? session.freeze.snapshot);
+    setMatcherSafetyCeilings(references.ceilings, references.identity);
     setAgenticRuntimeForTests(session.runtime);
   }
 }
 
 export function openSession(freeze: ValueCatalogueFreeze): PlanSession {
+  const references = frozenReferences.get(freeze);
+  if (references) setMatcherSafetyCeilings(references.ceilings, references.identity);
   replaceCatalogueSnapshot(freeze.snapshot);
   pinCatalogueSnapshot(freeze.snapshot, GUIDANCE_RULES_VERSION);
   const store = createSnapshotMemoryStore(freeze.snapshot);
