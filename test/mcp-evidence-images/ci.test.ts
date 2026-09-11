@@ -22,6 +22,15 @@ test('QA-CI-03 CI accommodates both measured full passes without enlarging reque
 test('QA-CI-04 fresh CI bootstrap includes the payment schema required by support',()=>{
   assert.match(readFileSync('scripts/prepare-matcher-test-db.mjs','utf8'),/'apply-retail-checkout-schema'/);
 });
+test('QA-CI-05 actual workflow environment passes the unchanged database isolation guard',async()=>{
+  const {isolatedDatabasePreflight}=await import('../../scripts/run-full-test-suite.mjs');
+  const block=readFileSync('.github/workflows/mcp-722.yml','utf8').match(/    env:\n([\s\S]*?)    steps:/)?.[1];
+  assert.ok(block,'The workflow must declare its isolated environment');
+  const env=Object.fromEntries([...block.matchAll(/^\s{6}(\w+):\s+(.+)$/gm)].map(row=>[row[1],row[2].replace(/^"|"$/g,'')]));
+  assert.equal(env.DB_URL,env.TEST_DB_URL);
+  assert.equal(env.DB_WORKER_URL,env.TEST_DB_URL);
+  assert.deepEqual(isolatedDatabasePreflight(env),[]);
+});
 test('QA-CI-02 isolated reference fixtures retain captured amounts, scope and confidence',async()=>{
   const {frozenReferenceRows}=await import('../../scripts/seed-matcher-reference-fixtures.mjs');
   const frozen=JSON.parse(gunzipSync(readFileSync('test/fixtures/mcp-evidence-images/dev-20260911.json.gz')).toString());
