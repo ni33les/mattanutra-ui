@@ -71,3 +71,32 @@ test("MCP-INFRA-03 independent isolated clients do not consume one another's req
     if (previous === undefined) delete process.env.TRUST_PROXY; else process.env.TRUST_PROXY = previous;
   }
 });
+
+test("FULL-CYCLE-06 full application execution starts a durable worker and releases it before controlled database cases", async () => {
+  const full = await import("../scripts/run-full-test-suite.mjs");
+  const run = (full as unknown as { runNodePair: (options: Record<string, unknown>) => Promise<unknown[]> }).runNodePair;
+  assert.equal(typeof run, "function");
+  const evidence = mkdtempSync(join(tmpdir(), "full-worker-isolation-"));
+  const events: string[] = [];
+  let active = false;
+  try {
+    const results = await run({ common: { MCP_URL: "http://127.0.0.1:3100/api/mcp" }, evidence, args: [],
+      unitLabel: "node-application", postgresLabel: "node-postgres", httpLabel: "full-http",
+      files: ["unit.test.ts", "client.test.ts", "ownership.integration.test.ts"], integration: ["ownership.integration.test.ts"],
+      start: async () => { active = true; events.push("start"); return { identity: { origin: "http://127.0.0.1:12345" }, stop: async () => { active = false; events.push("stop"); } }; },
+      batch: async (label: string, files: string[], env: Record<string, string>) => {
+        events.push(label);
+        if (label === "node-postgres") {
+          assert.equal(active, false);assert.deepEqual(files, ["ownership.integration.test.ts"]);
+          assert.equal(env.MCP_URL, "http://127.0.0.1:3100/api/mcp");
+        } else {
+          assert.equal(active, true);assert.deepEqual(files, ["unit.test.ts", "client.test.ts"]);
+          assert.equal(env.MCP_URL, "http://127.0.0.1:12345/api/mcp");
+        }
+        return { passed: true };
+      }
+    });
+    assert.equal(results.length, 2);
+    assert.deepEqual(events, ["start", "node-application", "stop", "node-postgres"]);
+  } finally { rmSync(evidence, { recursive: true, force: true }); }
+});
