@@ -50,7 +50,7 @@ test("LOCK-RETAIN-21 dependency writes preserve acyclicity and foreign keys with
   const writer=sql.begin(async tx=>{await tx`insert into public.task_dependencies(task_id,depends_on_task_id) values(${ids[0]}::uuid,${ids[1]}::uuid)`;ready.release();await release.promise;});await ready.promise;
   try {
     assert.equal((await sql`select id from public.tasks where id=any(${ids}::uuid[])`).length,2);
-    await assert.rejects(sql`insert into public.task_dependencies(task_id,depends_on_task_id) values(${ids[1]}::uuid,${ids[0]}::uuid)`,{code:"55P03"});
+    await assert.rejects(sql`insert into public.task_dependencies(task_id,depends_on_task_id) values(${ids[1]}::uuid,${ids[0]}::uuid)`,{code:"40001",message:"Concurrent task dependency change; retry the transaction"});
     await assert.rejects(sql`delete from public.tasks where id=${ids[1]}::uuid`,{code:"55P03"});
     release.release();await writer;
     await assert.rejects(sql`insert into public.task_dependencies(task_id,depends_on_task_id) values(${ids[1]}::uuid,${ids[0]}::uuid)`,{code:"23514"});

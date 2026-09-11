@@ -27,3 +27,5 @@ The deployment path accepts only DEV, the reviewed active deployment base (or th
 Rollback may retain the deferred catalogue identity trigger. To roll back graph-scoped locking, restore the previous dependency trigger before removing application retry handling. No customer, payment, catalogue or reference records are rewritten by this migration.
 
 Deployment passes `--matching-lock-build /absolute/validated/.next` alongside the attestation. It stages and verifies those bytes while DEV remains available, then stops the platform and its child workers before replacing the dependency guard. This prevents mixed old/global and new/graph guard execution. The previous compiled build is retained beside the proof before restart.
+
+`LOCK-RETAIN-21` now expects immediate dependency-conflict `40001` instead of waiting for `55P03`. Its foreign-key blocking and post-commit cycle rejection assertions remain unchanged. The shared transaction helper separately proves bounded rollback/replay and after-commit isolation.
