@@ -62,3 +62,20 @@ test('QA-CI-07 customer-value cases retain captured product prices, pack unknown
 test('QA-CI-08 fresh payment setup applies the maintained locale constraints and accounting accounts',()=>{
   assert.match(readFileSync('scripts/prepare-matcher-test-db.mjs','utf8'),/'apply-payment-schema'/);
 });
+
+test('QA-CI-09 nested financial fixtures restore the parent captured references',async()=>{
+  const {freezeImplCatalogue,openSession,withFinancialSession,closeSession}=await import('../agentic/value/impl-harness.ts');
+  const {captureMatcherSafetySnapshot}=await import('../../lib/matcher/safety-ceilings.ts');
+  const frozen=await freezeImplCatalogue();const session=openSession(frozen.freeze);
+  const before=hash(captureMatcherSafetySnapshot());
+  try {await withFinancialSession(session,async()=>{});assert.equal(hash(captureMatcherSafetySnapshot()),before);}
+  finally {closeSession();}
+});
+test('QA-CI-10 reopening a frozen catalogue restores its reference inputs after another case',async()=>{
+  const {freezeImplCatalogue,openSession,closeSession}=await import('../agentic/value/impl-harness.ts');
+  const {captureMatcherSafetySnapshot,setMatcherSafetyCeilings}=await import('../../lib/matcher/safety-ceilings.ts');
+  const frozen=await freezeImplCatalogue();const before=hash(captureMatcherSafetySnapshot());
+  setMatcherSafetyCeilings([]);
+  try {openSession(frozen.freeze);assert.equal(hash(captureMatcherSafetySnapshot()),before);}
+  finally {closeSession();}
+});
