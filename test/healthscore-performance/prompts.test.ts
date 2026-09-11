@@ -71,7 +71,11 @@ for (const locale of ["en", "th", "zh-CN"] as const) test(`HS-PERF-04 ${locale}:
   assert.deepEqual(fixture.input.healthScore, original, "Deterministic score remains unchanged");
   const request = requests[0], content = request.messages[1].content, prompt = JSON.parse(content);
   const baseline = JSON.parse(readFileSync(new URL("./baseline-prompts.json", import.meta.url), "utf8"))[locale];
-  assert.deepEqual(prompt, JSON.parse(baseline));
+  const originalPrompt = JSON.parse(baseline);
+  const { instructions: originalInstructions, ...originalFacts } = originalPrompt;
+  const { instructions, ...facts } = prompt;
+  assert.deepEqual(facts, originalFacts);
+  assert.deepEqual(instructions.slice(0, -2), originalInstructions.slice(0, -1));
   assert.equal(content, JSON.stringify(prompt));
   assert.ok(content.indexOf('"contract":') < content.indexOf('"assessment":'));
   const schema = request.response_format.json_schema?.schema;
@@ -106,4 +110,14 @@ test("HS-PERF-07: unrelated AI callers retain their existing JSON-object transpo
   const requests = capture(t, [{}]);
   await callGrokChatCompletion({ apiKey: "offline", model: "unchanged", messages: [], timeoutMs: 1000 });
   assert.deepEqual(requests[0].response_format, { type: "json_object" });
+});
+
+test("HS-PERF-08: first HealthScore request explains the validator's per-field restrictions", async t => {
+  const fixture = healthFixture();
+  const requests = capture(t, [fixture.response]);
+  await analyzeHealthScoreAdviceWithUsage(fixture.input);
+  const instructions = JSON.parse(requests[0].messages[1].content).instructions.join(" ");
+  assert.match(instructions, /same field's copySeed/);
+  assert.match(instructions, /0\.5x.*1\.5x/);
+  assert.doesNotMatch(instructions, /unless they appear in deterministicContent\.locked or copySeeds/);
 });
