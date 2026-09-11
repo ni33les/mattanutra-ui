@@ -40,6 +40,8 @@ describe("task lifecycle transactions on PostgreSQL", () => {
         await sql`delete from public.agents where id = ${agentId}`;
         await sql`delete from public.organisations where id = ${organisationId}`;
       });
+      assert.equal((await getSql()!`select to_regclass('public.lock_review_task_results') as relation`)[0].relation, null,
+        "FULL-CYCLE-11 task transaction fixtures must restore the original schema after cleanup");
     } finally { await closeSqlPool(); }
   });
 
