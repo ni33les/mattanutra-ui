@@ -66,6 +66,36 @@
     {
       "file": "scripts/published-client-journey.mjs",
       "change": "Six-tool discovery, current version and image-field validity replace removed evidence call; full commerce and state steps preserved."
+    },
+    {
+      "files": [
+        "test/ax-refinement/contract.test.ts",
+        "test/agentic-flexible-v5-contract.test.ts",
+        "test/agentic-v6-conversation.test.ts",
+        "test/agentic-contract-v4.test.ts",
+        "test/mcp-discovery/discovery.test.ts"
+      ],
+      "change": "Current-publication checks still pinned v9 before this work; align them with v11. Historical rejection fixtures stay unchanged."
+    },
+    {
+      "caseIds": [
+        "AXR-SPEC-02"
+      ],
+      "change": "Configure independent AJV with the existing production decimal precision setting; 0.543 is a valid six-decimal multiple. Preserve all example and output schema checks."
+    },
+    {
+      "caseIds": [
+        "ANNA-AX-01"
+      ],
+      "change": "Assert the current user-approved limit-only public advice policy. Retain ANNA-AX-04 exact 20 percent boundary checks for the internal preference assessment."
+    },
+    {
+      "caseIds": [
+        "DISC-I18N-02",
+        "DISC-I18N-04",
+        "DISC-DET-04"
+      ],
+      "change": "Add independently versioned v11 locale goldens removing only evidence title/purpose; preserve the prior files and all remaining wording. Assert new discovery identity."
     }
   ],
   "casesRemoved": 0,

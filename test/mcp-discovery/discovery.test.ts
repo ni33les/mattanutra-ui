@@ -13,7 +13,7 @@ const names = ["info", "plan", "execute", "order", "support", "feedback"];
 const locales = ["en", "th", "zh-CN"];
 const environments: AgenticEnvironment[] = ["dev", "uat", "prd"];
 const read = (path: string) => JSON.parse(readFileSync(path, "utf8"));
-const golden = (locale = "en") => read(`test/mcp-discovery/goldens/${locale}.json`);
+const golden = (locale = "en") => read(`test/mcp-discovery/goldens/11.0.0/${locale}.json`);
 const fixture = { conditionCodes: ["atrial_fibrillation"], medicationCodes: ["apixaban"], supportedCountries: [{ countryCode: "TH", countryName: "Thailand", currency: "THB" }] };
 const adapter = () => read("lib/agentic/adapters/openai.json");
 const captured = process.env.MCP_DISCOVERY_CAPTURE ? read(process.env.MCP_DISCOVERY_CAPTURE) : null;
@@ -90,7 +90,7 @@ test("DISC-I18N-03 localized titles and purpose retain native names and wire con
   }
 });
 test("DISC-I18N-04 independently versioned locale goldens have a semantic review record", () => {
-  const review = read("test/mcp-discovery/goldens/review.json"); assert.deepEqual(review.locales, locales); assert.ok(review.reviewer && review.reviewMethod && review.checks.length >= 8);
+  const review = read("test/mcp-discovery/goldens/11.0.0/review.json"); assert.deepEqual(review.locales, locales); assert.ok(review.reviewer && review.reviewMethod && review.checks.length >= 8);
   for (const locale of locales) { const copy=golden(locale); assert.ok(copy.initialization && copy.unsupportedUseGuidance && copy.infoDescription); assert.deepEqual(Object.keys(copy.titles), names); }
 });
 test("DISC-DET-01 independent initializations have identical canonical metadata", async () => { assert.deepEqual(await call("initialize"), await call("initialize")); });
@@ -98,7 +98,7 @@ test("DISC-DET-02 tools list order copy schemas and annotations are deterministi
 test("DISC-DET-03 info capabilities and positioning are deterministic per locale", async () => { for (const locale of locales) assert.deepEqual(await call("tools/call", {}, "dev", locale), await call("tools/call", {}, "dev", locale)); });
 test("DISC-DET-04 generated manifests bind the versioned positioning content", () => {
   const published = adapter(); assert.ok(existsSync("lib/agentic/discovery/positioning.ts")); assert.match(published.positioningChecksum, /^[a-f0-9]{64}$/);
-  assert.equal(published.positioningChecksum, sha(published.locales)); assert.match(published.discoveryVersion, /single-recommendation/);
+  assert.equal(published.positioningChecksum, sha(published.locales)); assert.equal(published.discoveryVersion, "discovery-11.0.0-six-tools-images-v1");
   for (const provider of ["anthropic", "xai"]) assert.deepEqual(read(`lib/agentic/adapters/${provider}.json`), published);
 });
 test("DISC-DET-05 package tests have no skipped focused or empty cases", () => {
@@ -110,7 +110,7 @@ test("DISC-TRUTH-02 ready and purchase eligibility never mean medical approval",
 test("DISC-TRUTH-03 accepted medication codes are not claimed as assessed interactions", async () => { const info=await call("tools/call"); const text=String(info.clientInstructions); assert.match(text,/Medication\/condition codes are accepted inputs, not interaction coverage/); assert.match(text,/only quantified exposure above MattaNutra recommended limits/); assert.match(text,/Absence of advice is not medical clearance/); });
 test("DISC-TRUTH-04 published market stays Thailand and catalogue gaps remain visible", async () => { const info=await call("tools/call"); assert.deepEqual((info.supportedCountries as {countryCode:string}[]).map(row=>row.countryCode),["TH"]); assert.match(String(info.clientInstructions),/finite catalogue/); assert.match(String(info.clientInstructions),/real gaps/); });
 test("DISC-TRUTH-05 installed verification rejects missing titles and stale positioning", () => {
-  const published={contractVersion:"9.0.0",schemaChecksum:computeSchemaChecksum(),tools:toolList(),connector:adapter()};
+  const published={contractVersion:"11.0.0",schemaChecksum:computeSchemaChecksum(),tools:toolList(),connector:adapter()};
   const evidence={...structuredClone(published),source:"installed_connector",connectorId:"dev-live-export",environment:"dev",observedAt:"2026-09-09T00:00:00Z"};
   assert.equal(validateInstalledConnectorProjection(evidence,published).passed,true);
   const stale=structuredClone(evidence); delete (stale.tools[0] as {title?:string}).title;

@@ -9,13 +9,13 @@ import { AGENTIC_OUTPUT_SCHEMAS } from "../lib/agentic/contract/outputs.ts";
 import { infoTool } from "../lib/agentic/info.ts";
 import { loadAgenticConfig } from "../lib/agentic/config.ts";
 
-describe("v9 conversational discovery and advisory preferences", () => {
+describe("current conversational discovery and advisory preferences", () => {
   it("ANNA-AX-01: existing locale-only discovery explains basis and links to five executable operation templates", () => {
     const value = clientDiscovery("en");
     assert.match(value.clientInstructions, /total_daily/);
     assert.match(value.clientInstructions, /supplemental/);
     assert.match(value.clientInstructions, /never veto/i);
-    assert.match(clientGuideMarkdown("en"), /20%/);
+    assert.match(clientGuideMarkdown("en"), /only quantified exposure above MattaNutra recommended limits/);
     assert.ok(CLIENT_EXAMPLES.some(example => example.arguments.targets?.some(target => target.basis === "supplemental")));
     assert.equal(value.clientExamples.length, 2);
     assert.ok(clientGuideMarkdown("en").includes("select"));
@@ -24,7 +24,7 @@ describe("v9 conversational discovery and advisory preferences", () => {
   });
   it("ANNA-AX-02: retired resources return ordinary not-found; only current publication remains", () => {
     assert.equal(readContractResource("mattanutra://contract/5.0.0/schema"), null);
-    assert.ok(readContractResource("mattanutra://contract/9.0.0/schema"));
+    assert.ok(readContractResource("mattanutra://contract/11.0.0/schema"));
   });
   it("ANNA-AX-03: all retained numeric preference names publish advisory semantics and zero/null remain valid", () => {
     for (const name of ["maxProductCount", "maxDailyPills", "maxPriceMinor"]) {

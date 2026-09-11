@@ -131,6 +131,14 @@
     {
       "file": "test/matcher/safety.test.ts",
       "reason": "Full-inventory hygiene disallows bare early-return guards; explicit failure preserves all canonicalization, scoring and safety assertions."
+    },
+    {
+      "file": "test/agentic-flexible-v5-contract.test.ts",
+      "reason": "Current publication assertions must use the current version; preserve all advisory, exclusion, patch and schema checks."
+    },
+    {
+      "file": "test/agentic-v6-conversation.test.ts",
+      "reason": "Current publication assertions must use the current version; preserve all advisory, exclusion, patch and schema checks."
     }
   ],
   "runnerConsumers": [

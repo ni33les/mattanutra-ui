@@ -1,3 +1,4 @@
+import { AGENTIC_CONTRACT_VERSION } from "../lib/agentic/config.ts";
 import { fixtureSnapshot } from "../lib/agentic/catalogue/fixtures.ts";
 import { publicPlanFields } from "../lib/agentic/public-mapper.ts";
 import assert from "node:assert/strict";
@@ -140,7 +141,7 @@ describe("Current flat contract and retained intake, advice and commerce invaria
         assert.equal(description[0].actual, 1001);
         assert.equal(issues.some(issue => issue.reasonCode === "required"), false, JSON.stringify(issues));
     });
-    it("publishes all seven output schemas and both connector resources", async () => {
+    it("publishes all six output schemas and both connector resources", async () => {
         const runtime = makeRuntime();
         const listed = await handleJsonRpc(runtime, { id: 1, method: "tools/list" });
         assert.equal((listed?.result?.tools as unknown[]).length, 6);
@@ -151,7 +152,7 @@ describe("Current flat contract and retained intake, advice and commerce invaria
         }>;
         assert.equal(publishedResources.length, 2);
         assert.equal(new Set(publishedResources.map(resource => resource.uri)).size, 2);
-        for (const version of ["9.0.0"])
+        for (const version of [AGENTIC_CONTRACT_VERSION])
             for (const suffix of ["client-guide", "schema"])
                 assert.ok(publishedResources.some(resource => resource.uri === `mattanutra://contract/${version}/${suffix}`));
         for (const uri of [CLIENT_GUIDE_URI, CONTRACT_SCHEMA_URI]) {
@@ -274,7 +275,7 @@ describe("Current flat contract and retained intake, advice and commerce invaria
         const wrongIdentity = await call(runtime, "plan", { idempotencyKey: "v4-specific-epa-0002", ...{ ...request, targets: [{ name: "EPA", ingredientId: omega.supplementId, amount: 100, unit: "mg" }] } });
         assert.equal(wrongIdentity.error.reasonCode, "incompatible_identity");
     });
-    it("validates a complete documented checkout and all seven response contracts", async () => {
+    it("validates a complete documented checkout and all six response contracts", async () => {
         const runtime = makeRuntime();
         const created = await call(runtime, "plan", { idempotencyKey: "v4-seven-tools-plan01", ...request });
         assert.equal(created.status, "ready");
