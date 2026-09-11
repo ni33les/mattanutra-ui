@@ -21,6 +21,7 @@ export type GrokChatCompletionInput = Readonly<{
   maxTokens?: number;
   purpose?: string;
   reasoningEffort?: string;
+  responseSchema?: Readonly<{ name: string; strict: boolean; schema: Readonly<Record<string, unknown>> }>;
   temperature?: number;
   timeoutMs?: number;
 }>;
@@ -79,6 +80,7 @@ export async function callGrokChatCompletion({
   model,
   purpose = "request",
   reasoningEffort,
+  responseSchema,
   temperature,
   timeoutMs = DEFAULT_TIMEOUT_MS
 }: GrokChatCompletionInput) {
@@ -92,7 +94,9 @@ export async function callGrokChatCompletion({
         model,
         ...(typeof maxTokens === "number" ? { max_tokens: maxTokens } : {}),
         ...(reasoningEffort ? { reasoning_effort: reasoningEffort } : {}),
-        response_format: { type: "json_object" },
+        response_format: responseSchema
+          ? { type: "json_schema", json_schema: responseSchema }
+          : { type: "json_object" },
         stream: false,
         ...(typeof temperature === "number" ? { temperature } : {})
       }),

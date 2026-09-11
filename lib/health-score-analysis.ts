@@ -21,6 +21,7 @@ import {
   grokTaskReasoningDefault
 } from "@/lib/grok-task-config";
 import type { Locale } from "@/lib/i18n";
+import { healthScoreResponseSchema } from "@/lib/ai-generation-schema";
 
 export { validateHealthScoreAiResponse };
 
@@ -38,7 +39,7 @@ export type HealthScoreAdviceAnalysis = Readonly<{
 const DEFAULT_HEALTHSCORE_COPY_MODEL = DEFAULT_GROK_MODEL;
 const DEFAULT_HEALTHSCORE_REASONING_EFFORT =
   grokTaskReasoningDefault("healthScoreCopy");
-const DEFAULT_PROMPT_VERSION = "v8-single-display-locale";
+const DEFAULT_PROMPT_VERSION = "v9-compact-structured";
 const CACHE_TYPE = "healthscore_page_copy";
 const CACHE_TTL_DAYS = 7;
 const MAX_ATTEMPTS = 2;
@@ -93,8 +94,7 @@ function userPrompt({
 }>) {
   const pageContent = healthScore.pageContent;
 
-  return JSON.stringify(
-    {
+  const prompt = {
       assessment: compactAssessmentForAdvice(answers),
       contract: {
         pageCopy: {
@@ -144,10 +144,9 @@ function userPrompt({
       outputLocaleMode: "single_display_locale",
       personalizationSignals: buildPersonalizationSignals(answers, healthScore),
       requestedDisplayLocale: locale
-    },
-    null,
-    2
-  );
+    };
+  const { contract, instructions, ...context } = prompt;
+  return JSON.stringify({ contract, instructions, ...context });
 }
 
 const answerLabels: Record<string, Record<string, string>> = {
@@ -459,12 +458,14 @@ async function callGrok({
   apiKey,
   messages,
   model,
-  reasoningEffort
+  reasoningEffort,
+  responseSchema
 }: Readonly<{
   apiKey: string;
   messages: Array<{ content: string; role: "assistant" | "system" | "user" }>;
   model: string;
   reasoningEffort?: string;
+  responseSchema: ReturnType<typeof healthScoreResponseSchema>;
 }>) {
   return callGovernedGrokChatCompletion({
     apiKey,
@@ -476,6 +477,7 @@ async function callGrok({
     messages,
     model,
     purpose: "HealthScore request",
+    responseSchema,
     reasoningEffort: reasoningEffort ?? "low",
     temperature: 0.2,
     timeoutMs: REQUEST_TIMEOUT_MS
@@ -743,6 +745,7 @@ export async function analyzeHealthScoreAdviceWithUsage({
     { content: userPrompt({ answers, healthScore, locale }), role: "user" }
   ];
   let lastErrors: string[] = [];
+  const responseSchema = healthScoreResponseSchema(healthScore);
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
     try {
@@ -750,7 +753,8 @@ export async function analyzeHealthScoreAdviceWithUsage({
         apiKey: config.apiKey,
         messages,
         model: config.model,
-        reasoningEffort: config.reasoningEffort
+        reasoningEffort: config.reasoningEffort,
+        responseSchema
       });
       const content = completion.choices?.[0]?.message?.content;
       const validation = validateHealthScoreAiResponse({

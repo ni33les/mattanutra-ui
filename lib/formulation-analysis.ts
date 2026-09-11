@@ -19,6 +19,7 @@ import {
   getRequiredXaiApiKey
 } from "@/lib/grok-client";
 import { grokTaskReasoningDefault } from "@/lib/grok-task-config";
+import { FORMULATION_RESPONSE_SCHEMA } from "@/lib/ai-generation-schema";
 
 type AnalysisAuditEvent = {
   eventType: string;
@@ -52,7 +53,7 @@ type AnalysisResult = Readonly<{
 
 const DEFAULT_FORMULATION_REASONING_EFFORT =
   grokTaskReasoningDefault("formulation");
-const DEFAULT_PROMPT_VERSION = "v1";
+const DEFAULT_PROMPT_VERSION = "v2-compact-structured";
 const MAX_ATTEMPTS = 3;
 const MAX_RESPONSE_TOKENS = 8_000;
 const REQUEST_TIMEOUT_MS = 360_000;
@@ -190,8 +191,7 @@ function userPrompt({
   | "previousFormulation"
   | "planId"
 >) {
-  return JSON.stringify(
-    {
+  const prompt = {
       assessment: answers,
       assessmentSafetyContext: buildAssessmentSafetyContext(answers),
       currentPlanContext: {
@@ -281,7 +281,7 @@ function userPrompt({
         "Use canonicalSupplementCatalogue safetyFlags and safetyNotes before recommending a supplement. Advisory concerns include pregnancy_caution or hormone_caution with pregnancy, breastfeeding, or trying-to-conceive context; bleeding_risk or medication_interaction with blood-thinner/anticoagulant context; kidney_caution with active kidney issues; and liver_caution with active liver issues.",
         "Do not treat stale raw medication classes as active when assessmentSafetyContext.medications.answer is not yes. Medication and condition flags must become clear advisory cautions. They must not exclude an ingredient, reduce its target, or require an acknowledgement.",
         "Use canonical aliases only to recognize equivalent ingredients; do not output aliases when a canonical name exists.",
-        "When a listed canonical supplement fits, set supplement.en exactly to its name. If a useful supplement is not in canonicalSupplementCatalogue, still include it using a plain English ingredient name and set status=review so it can be checked.",
+        "When a listed canonical supplement fits, set supplement exactly to its name as a plain string. If a useful supplement is not in canonicalSupplementCatalogue, still include it using a plain English ingredient name and set status=review so it can be checked.",
         "Do not output manufacturer product names, brand names, raw material concentrations, or label-strength text such as 100000 IU/g as supplement names.",
         "Never reintroduce supplements the client explicitly asked to remove or avoid.",
         "Use previousSupplementGuidance only as context; this response must be a fresh full version, not a patch.",
@@ -303,10 +303,11 @@ function userPrompt({
       outputLocaleMode: "single_display_locale",
       plan,
       planId
-    },
-    null,
-    2
-  );
+    };
+  // A reusable prefix must precede the first customer-dependent byte. Preserve
+  // all catalogue/safety facts and all customer context; omit only indentation.
+  const { canonicalSupplementCatalogue, contract, instructions, ...context } = prompt;
+  return JSON.stringify({ canonicalSupplementCatalogue, contract, instructions, ...context });
 }
 
 function retryPrompt(errors: string[]) {
@@ -350,6 +351,7 @@ async function callGrok({
     messages,
     model,
     purpose: "formulation request",
+    responseSchema: FORMULATION_RESPONSE_SCHEMA,
     reasoningEffort: reasoningEffort ?? "low",
     temperature: 0.2,
     timeoutMs: REQUEST_TIMEOUT_MS
