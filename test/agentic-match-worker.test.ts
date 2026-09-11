@@ -42,7 +42,7 @@ describe("MCP matcher worker pool", () => {
   it("FULL-CYCLE-13 preparation cannot succeed after the matching pool is closed", async () => {
     const pool = new MatchWorkerPool(1);
     await pool.close();
-    await assert.rejects(pool.prepare(), /closed/);
+    await assert.rejects(pool.prepare(), MatcherUnavailableError);
   });
 
   it("ANNA-REF-WORKER-01 rejects a reference epoch that differs from the product snapshot", async () => {

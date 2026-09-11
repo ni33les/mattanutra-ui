@@ -18,22 +18,35 @@ export type MatchJob = MatchInput & {
 type MatchValue = MatchResult | PlanMatchChunk | ResidentPlanMatchChunk;
 export type MatchCommand = MatchJob | (Omit<MatchJob, "chunk"> & { protocol: typeof MATCH_WORKER_PROTOCOL; kind: "session-start"; sessionId: string; chunk: ResidentChunkOptions })
   | { protocol: typeof MATCH_WORKER_PROTOCOL; kind: "session-continue"; sessionId: string; expectedAttempts: number; chunkBudget: number; lostAttempts?: number }
-  | { protocol: typeof MATCH_WORKER_PROTOCOL; kind: "session-release"; sessionId: string };
-export type MatchReply = { result: ReferenceJobCompletion<MatchValue>; error?: never } | { error: string; result?: never };
+  | { protocol: typeof MATCH_WORKER_PROTOCOL; kind: "session-release"; sessionId: string }
+  | { protocol: typeof MATCH_WORKER_PROTOCOL; kind: "prepare" };
+type MatchCompletion = ReferenceJobCompletion<MatchValue> | { prepared: true };
+export type MatchReply = { result: MatchCompletion; error?: never } | { error: string; result?: never };
 
 export { ThreadPoolUnavailableError as MatcherUnavailableError } from "@/lib/thread-pool";
 
 export class MatchWorkerPool {
-  private readonly pool: ThreadPool<MatchCommand, ReferenceJobCompletion<MatchValue>>;
+  private readonly pool: ThreadPool<MatchCommand, MatchCompletion>;
+  private readonly capacity: number;
   private readonly sessions = new Map<string, { input: MatchInput; referenceIdentity: ReferenceJobIdentity; idleTimer?: ReturnType<typeof setTimeout> }>();
   private readonly idleSessionMs: number;
   constructor(capacity = 2, queueLimit = 16, idleSessionMs = 60_000) {
     if (!Number.isSafeInteger(idleSessionMs) || idleSessionMs <= 0) throw new Error("idleSessionMs must be a positive safe integer");
     this.idleSessionMs = idleSessionMs;
+    this.capacity = capacity;
     // Keep the path explicit so Next.js can trace the worker entry point.
-    this.pool = new ThreadPool<MatchCommand, ReferenceJobCompletion<MatchValue>>(() => new Worker(resolve(process.cwd(), "workers/mcp-matcher.ts"), {
+    this.pool = new ThreadPool<MatchCommand, MatchCompletion>(() => new Worker(resolve(process.cwd(), "workers/mcp-matcher.ts"), {
       execArgv: ["--experimental-strip-types", "--import", resolve(process.cwd(), "scripts/register-ts-path-loader.mjs")]
     }), capacity, queueLimit);
+  }
+
+  /** Load each existing thread's modules before registering execution capacity.
+   * No catalogue, request, database access or search attempt is involved. */
+  async prepare() {
+    await Promise.all(Array.from({ length: this.capacity }, async () => {
+      const result = await this.pool.run({ protocol: MATCH_WORKER_PROTOCOL, kind: "prepare" });
+      if (!("prepared" in result) || result.prepared !== true) throw new Error("Matching worker did not prepare");
+    }));
   }
 
   private dispatch(input: MatchInput, signal?: AbortSignal, timeoutMs = 15_000, chunk?: MatchJob["chunk"], beforeStart?: () => Promise<unknown>) {
@@ -42,7 +55,10 @@ export class MatchWorkerPool {
       input.snapshot.products.length > 0 && input.snapshot.products.every(product => product.source === "fixture")); }
     catch (error) { return Promise.reject(error); }
     return this.pool.run({...input, ...(chunk ? { chunk } : {}), referenceIdentity, ceilings: matcherSafetyCeilings(), safetyUnavailable: matcherSafetyCeilingsUnavailable()}, signal, timeoutMs, { beforeStart })
-      .then(reply => checkedReferenceCompletion(reply, referenceIdentity));
+      .then(reply => {
+        if ("prepared" in reply) throw new Error("Unexpected matcher preparation response");
+        return checkedReferenceCompletion(reply, referenceIdentity);
+      });
   }
   async run(input: MatchInput, signal?: AbortSignal, timeoutMs = 15_000): Promise<MatchResult> {
     const value = await this.dispatch(input, signal, timeoutMs);
@@ -70,6 +86,7 @@ export class MatchWorkerPool {
     try {
       const result = await this.pool.run(command, signal, 15_000, { affinity: sessionId, beforeStart,
         ...(!reuse && checkpoint && typeof checkpoint.cursor !== "string" ? { transferList: [checkpoint.cursor.buffer as ArrayBuffer] } : {}) });
+      if ("prepared" in result) throw new Error("Unexpected matcher preparation response");
       const value = checkedReferenceCompletion(result, referenceIdentity);
       if (!("done" in value) || !(value.checkpoint.cursor instanceof Uint8Array)) throw new Error("Missing binary session checkpoint");
       if (value.done) this.closeResidentSession(sessionId);
@@ -91,6 +108,8 @@ export class MatchWorkerPool {
   close() { for (const sessionId of this.sessions.keys()) this.closeResidentSession(sessionId); return this.pool.close(); }
 }
 const pool = new MatchWorkerPool();
+
+export function preparePlanMatchWorkers() { return pool.prepare(); }
 
 export function matchPlanInWorker(input: MatchInput) {
   return pool.run(input, requestLifetime()?.signal);

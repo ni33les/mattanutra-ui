@@ -42,6 +42,14 @@ export type TaskExecutionRuntime = Readonly<{
   signal?: AbortSignal;
 }>;
 
+/** Preparation is startup work, before the worker advertises task capacity. */
+export async function prepareTaskExecution(taskTypes: readonly string[]) {
+  if (!taskTypes.includes("match_agentic_plan")) return;
+  await Promise.all([import("@/lib/agentic/plan/service"), import("@/lib/agentic/store/postgres")]);
+  const { preparePlanMatchWorkers } = await import("@/lib/agentic/plan/match-worker-pool");
+  await preparePlanMatchWorkers();
+}
+
 const catalogueOptimizationJobChunkSize = 4;
 
 function analysisErrorMessage(error: unknown) {

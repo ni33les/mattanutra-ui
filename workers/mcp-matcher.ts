@@ -15,6 +15,7 @@ const sessions = new Map<string, Resident>();
 function release(id: string) { sessions.delete(id); }
 parentPort.on("message", (job: MatchCommand) => {
   if ("kind" in job && job.protocol !== MATCH_WORKER_PROTOCOL) { parentPort!.postMessage({ error: "worker_protocol_mismatch" }); return; }
+  if ("kind" in job && job.kind === "prepare") { parentPort!.postMessage({ result: { prepared: true } }); return; }
   if ("kind" in job && job.kind === "session-release") { release(job.sessionId); return; }
   let reply: MatchReply;
   try {
@@ -43,7 +44,7 @@ parentPort.on("message", (job: MatchCommand) => {
     if ("sessionId" in job) release(job.sessionId);
     reply = { error: error instanceof Error && /checkpoint/i.test(error.message) ? "checkpoint_mismatch" : "match_failed" };
   }
-  const value = reply.result?.value;
+  const value = reply.result && "value" in reply.result ? reply.result.value : undefined;
   const buffer = value && "done" in value && value.checkpoint.cursor instanceof Uint8Array ? value.checkpoint.cursor.buffer as ArrayBuffer : null;
   parentPort!.postMessage({ ...reply, metrics: takeWorkerMeasurements() }, buffer ? [buffer] : []);
 });

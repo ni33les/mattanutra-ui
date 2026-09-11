@@ -3,7 +3,7 @@ import { createPeriodicTask } from "./periodic-task.ts";
 import { randomUUID } from "node:crypto";
 import { hostname } from "node:os";
 import nextEnv from "@next/env";
-import { executeTaskWorkItem } from "../lib/task-execution.ts";
+import { executeTaskWorkItem, prepareTaskExecution } from "../lib/task-execution.ts";
 import { startServiceMeasurementReporting } from "../lib/service-metrics.ts";
 import { SYSTEM_AGENTS, type SystemAgentKey } from "../lib/system-agents.ts";
 import {
@@ -778,6 +778,8 @@ async function shutdown() {
 
 async function runWorker(mode: WorkerMode) {
   startServiceMeasurementReporting(value => console.info("[service-efficiency:worker]", JSON.stringify(value)));
+  const modes = workerProfileModesForRun(mode);
+  await prepareTaskExecution(modes.flatMap(profileMode => runtimeWorkerProfileForMode(profileMode)?.taskTypes ?? []));
   try {
     const wake = await startWorkerWakeServer();
     workerWakeUrl = wake.url;
@@ -789,7 +791,6 @@ async function runWorker(mode: WorkerMode) {
     );
   }
 
-  const modes = workerProfileModesForRun(mode);
   const peekConfig = modes
     .flatMap((profileMode) => {
       try {
