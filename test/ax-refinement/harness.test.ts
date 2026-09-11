@@ -46,3 +46,19 @@ test("AXR-REG-03 scoped override retains six exact profiles and independently id
   assert.equal(manifest.originalCatalogueContentHash, null);
   assert.equal(manifest.originalReportStatus, "ORIGINAL_DATA_UNAVAILABLE");
 });
+
+test("AXR-HYG-03 all eighteen locale journeys fit their file budget without changing the per-journey deadline", () => {
+  const impact = JSON.parse(readFileSync(new URL("./impact.json", import.meta.url), "utf8"));
+  const groups = [["journeys.test.ts", "en"], ["journeys-th.test.ts", "th"], ["journeys-zh.test.ts", "zh-CN"]];
+  for (const [file, locale] of groups) {
+    assert.ok(impact.files.some((row: { file: string }) => row.file === `test/ax-refinement/${file}`), `Missing locale group ${file}`);
+    const source = readFileSync(new URL(file, import.meta.url), "utf8");
+    assert.ok(source.includes(`const locale = "${locale}"`), `${file} must register exactly its declared locale`);
+    assert.match(source, /for \(const profile of profiles\)/);
+    assert.match(source, /timeout: 90000/);
+    assert.equal(source.includes('for (const locale'), false);
+  }
+  const profiles = JSON.parse(readFileSync(new URL("../fixtures/ax-refinement/six-profiles.json", import.meta.url), "utf8"));
+  assert.equal(profiles.length * groups.length, 18);
+  assert.ok(profiles.length * 90000 < 600000, "Each file must fit all individual journey deadlines inside the unchanged file limit");
+});
