@@ -350,8 +350,6 @@ describe("questionnaire v14 UX on v6 schema", () => {
     const started = startQuestionnaire(
       createInitialState({ locale: "en", channel: "web" })
     );
-    // botMessage should carry emoji when present on the turn
-    const { botMessage } = { botMessage: null as null };
     // Spot-check via definition + UI wiring only; engine attaches emoji on bot logs
     const engine = readFileSync(join(root, "lib/questionnaire/engine.ts"), "utf8");
     assert.match(engine, /emoji:\s*turn\.emoji/);

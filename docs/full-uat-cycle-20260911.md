@@ -25,3 +25,5 @@ Final execution counts and deployment identities will be recorded after the comp
 `EFF-WAKE-07–08` failed before the worker fix (commit `13b85848`). Wake routing now excludes retired builds and another replica’s loopback address, and makes bounded fallback attempts after a refused nudge. The 19 affected wake/consistency cases pass without adding locks.
 
 `AXR-REG-01/02` preserved journeys still requested the removed `confirm-recommendation` template. Their stale-revision check now uses the published unchanged-refinement template; current successful recovery preserves revision and remains directly checkout-ready. The historical Thai RED journeys are retained in the baseline log.
+
+`FULL-CYCLE-06` ensures the full runner shares the existing worker-isolation utility; HTTP work has an executor and PostgreSQL ownership fixtures run after it stops. `FULL-CYCLE-07` separates polling frequency and transport measurements from business equality while retaining raw transcripts, per-response payload limits, mutations, revisions, attempts, prices and every changed state. Both have committed RED evidence and focused GREEN results.

@@ -1,5 +1,6 @@
 /** Normalize only declared run identities and clocks; preserve business values and identity relationships. */
 export const CLIENT_NORMALIZATION = Object.freeze({
+  journeyDiagnostics: "Repeated identical read-only processing polls and measured payload bytes are excluded only from journey equality; original observations and per-response size gates remain in evidence.",
   discarded: ["readyMs", "latencyMs", "ackMs", "catalogueMs", "matchMs", "searchMs", "serializeMs"],
   opaqueIdentityFields: ["planHandle", "orderHandle", "evidenceHandle", "supportHandle", "orderReference", "caseReference", "messageId", "correlationId", "idempotencyKey", "runKey"],
   eventIdentities: "Only UUID-backed order:, payment: and fulfilment: event IDs; ordinals preserve repeated and distinct events.",
@@ -72,4 +73,23 @@ export function normalizePublishedClientResult(input, endpoint) {
     return key === "text" ? reference(value) : value;
   }
   return semantic(input);
+}
+
+/** Keep raw observations/byte measurements in evidence; compare their business states independently of polling frequency. */
+export function publishedJourneySemantics(input, endpoint) {
+  const normalized = normalizePublishedClientResult(input, endpoint);
+  if (!Array.isArray(normalized.result?.observations)) return normalized;
+  const result = { ...normalized.result };
+  delete result.measurements;
+  const lastPlans = new Map();
+  result.observations = result.observations.filter(row => {
+    if (row.tool !== "plan") return true;
+    const handle = row.result?.planHandle;
+    const prior = lastPlans.get(handle);
+    const readOnly = Object.keys(row.arguments ?? {}).length === 1 && row.arguments.planHandle === handle;
+    const duplicateWait = readOnly && row.result.status === "processing" && JSON.stringify(row.result) === prior;
+    lastPlans.set(handle, JSON.stringify(row.result));
+    return !duplicateWait;
+  });
+  return { ...normalized, result };
 }

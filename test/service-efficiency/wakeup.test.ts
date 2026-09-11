@@ -66,8 +66,8 @@ test("EFF-WAKE-06 one task wakes one registered worker; distinct tasks distribut
 });
 
 test("EFF-WAKE-07 rollout wakeups ignore retired builds and another replica's loopback address", async () => {
-  const module = await import("../../lib/worker-wake.ts");
-  const eligible = (module as unknown as { eligibleWorkerWakeUrls: (rows: unknown[], identity: { host: string; buildId: string }) => string[] }).eligibleWorkerWakeUrls;
+  const api = await import("../../lib/worker-wake.ts");
+  const eligible = (api as unknown as { eligibleWorkerWakeUrls: (rows: unknown[], identity: { host: string; buildId: string }) => string[] }).eligibleWorkerWakeUrls;
   assert.equal(typeof eligible, "function");
   const buildId = "a".repeat(40);
   const targets = [
@@ -83,8 +83,8 @@ test("EFF-WAKE-07 rollout wakeups ignore retired builds and another replica's lo
 });
 
 test("EFF-WAKE-08 a refused local wake falls through to a reachable current worker without duplicate delivery", async () => {
-  const module = await import("../../lib/worker-wake.ts");
-  const deliver = (module as unknown as { deliverWorkerWake: (urls: string[], signal: TaskQueueSignal, ping: (url: string, signal: TaskQueueSignal) => Promise<void>) => Promise<void> }).deliverWorkerWake;
+  const api = await import("../../lib/worker-wake.ts");
+  const deliver = (api as unknown as { deliverWorkerWake: (urls: string[], signal: TaskQueueSignal, ping: (url: string, signal: TaskQueueSignal) => Promise<void>) => Promise<void> }).deliverWorkerWake;
   assert.equal(typeof deliver, "function");
   const signal = { taskType: "match_agentic_plan", taskId: "one" };
   const calls: string[] = [];

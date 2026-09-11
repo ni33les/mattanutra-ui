@@ -102,8 +102,8 @@ it("V5-CLIENT-05 acceptance retains option roles, eligibility, physical quantiti
 });
 
 it("FULL-CYCLE-07 documented equality ignores polling frequency but preserves every changed business state", async () => {
-  const module = await import("../scripts/published-client-semantics.mjs");
-  const canonical = (module as unknown as { publishedJourneySemantics: (input: unknown, endpoint: string) => unknown }).publishedJourneySemantics;
+  const api = await import("../scripts/published-client-semantics.mjs");
+  const canonical = (api as unknown as { publishedJourneySemantics: (input: unknown, endpoint: string) => unknown }).publishedJourneySemantics;
   assert.equal(typeof canonical, "function");
   const processing = { ok: true, planHandle: "cap_one", revision: 1, status: "processing", nextAction: "poll_plan", pollAfterSeconds: 3 };
   const create = { tool: "plan", arguments: { idempotencyKey: "create-one", targets: [{ name: "D3", amount: 2000 }] }, result: processing };

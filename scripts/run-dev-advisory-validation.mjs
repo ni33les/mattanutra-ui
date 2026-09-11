@@ -187,7 +187,7 @@ async function main() {
       if (paid.order?.paymentStatus !== "paid" || paid.order?.fulfilment?.status !== "delivered" || paid.order?.nextAction !== "none") throw new Error("Public tracking did not confirm the fixture payment and delivery.");
     }
     const comparisons = VALIDATION_CLIENT_DISCOVERY.flatMap(discovery => VALIDATION_CLIENT_LOCALES.flatMap(locale => ["", "-paid"].map(suffix => ({ locale, discovery, phase: suffix || "checkout", identical: readFileSync(join(evidence, `client-a-${locale}${discovery === "tools_only" ? "-tools" : ""}${suffix}/semantic.json`), "utf8") === readFileSync(join(evidence, `client-b-${locale}${discovery === "tools_only" ? "-tools" : ""}${suffix}/semantic.json`), "utf8") }))));
-    writeJson(join(evidence, "client-comparison.json"), { passed: comparisons.every(item => item.identical), comparisons, normalization: "Only declared identities/clocks/latency fields; complete intermediate transcripts are compared." });
+    writeJson(join(evidence, "client-comparison.json"), { passed: comparisons.every(item => item.identical), comparisons, normalization: "Declared identities/clocks/latency, repeated identical read-only processing polls and diagnostic byte measurements only; all changed states and business values are compared. Raw transcripts and size assertions are retained." });
     steps.push({ label: "documented-client-non-latency-equality", passed: comparisons.every(item => item.identical) });
     for (const [name, path] of [["full-suite-results", "full-suite/results.json"], ["matcher-results", "matcher/results.json"]]) {
       const results = JSON.parse(readFileSync(join(evidence, path), "utf8"));

@@ -5,7 +5,7 @@ import { mkdir, writeFile, readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { runConversationalJourney, publishedClientReceipt, resumePublishedOrder } from './published-client-journey.mjs';
 import { publicMcpClientEndpoint } from './mcp-test-target.mjs';
-import { normalizePublishedClientResult } from './published-client-semantics.mjs';
+import { publishedJourneySemantics } from './published-client-semantics.mjs';
 import { createPacedRequest } from './published-client-pacing.mjs';
 const args = process.argv.slice(2);
 const arg = (name, fallback) => args.includes(name) ? args[args.indexOf(name) + 1] : fallback;
@@ -32,7 +32,7 @@ try {
     : await runConversationalJourney({ rpc, locale, discovery, key: arg('--run-key', randomUUID()), checkout: args.includes('--checkout') });
   const receipt = resume ? result : args.includes('--checkout') ? publishedClientReceipt({ endpoint: endpoint.href, result }) : null;
   if (receipt) await writeFile(resolve(output, 'receipt.json'), JSON.stringify(receipt, null, 2), { flag: 'wx', mode: 0o600 });
-  await writeFile(resolve(output, 'semantic.json'), JSON.stringify(normalizePublishedClientResult({ receipt, result }, endpoint.href), null, 2), { flag: 'wx', mode: 0o600 });
+  await writeFile(resolve(output, 'semantic.json'), JSON.stringify(publishedJourneySemantics({ receipt, result }, endpoint.href), null, 2), { flag: 'wx', mode: 0o600 });
   await writeFile(resolve(output, 'result.json'), JSON.stringify(result, null, 2), { flag: 'wx', mode: 0o600 });
   console.log(JSON.stringify({ passed: true, output, readyMs: result.readyMs, measurements: result.measurements }));
 } finally { await writeFile(resolve(output, 'transcript.json'), JSON.stringify(transcript, null, 2), { flag: 'wx', mode: 0o600 }); }
