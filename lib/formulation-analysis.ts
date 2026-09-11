@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import type { AssessmentPlan } from "@/lib/assessment-snapshot";
 import type { CanonicalSupplementOption } from "@/lib/canonical-supplements";
 import { type Locale } from "@/lib/i18n";
@@ -53,7 +54,7 @@ type AnalysisResult = Readonly<{
 
 const DEFAULT_FORMULATION_REASONING_EFFORT =
   grokTaskReasoningDefault("formulation");
-const DEFAULT_PROMPT_VERSION = "v2-compact-structured";
+const DEFAULT_PROMPT_VERSION = "v3-cached-concise";
 const MAX_ATTEMPTS = 3;
 const MAX_RESPONSE_TOKENS = 8_000;
 const REQUEST_TIMEOUT_MS = 360_000;
@@ -169,7 +170,7 @@ function systemPrompt(promptVersion: string) {
   ].join("\n");
 }
 
-function userPrompt({
+function userMessages({
   answers,
   canonicalSupplements,
   chatMessages,
@@ -223,11 +224,11 @@ function userPrompt({
               "Foundation | Foundation add-on | Add separately | Targeted | Review",
             dailyDose: "short daily dose string in the requested display locale, e.g. 200 mg/day",
             decision:
-              "one sentence explaining the final dose/status decision in the requested display locale",
+              "one short sentence explaining only the dose/status choice in the requested display locale",
             effectivenessRank:
               "integer starting at 1; 1 is the most effective/highest-impact suggestion for this person",
             id: "stable kebab-case identifier",
-            rationale: "one sentence explaining the wellness benefit in the requested display locale",
+            rationale: "one short phrase naming the wellness benefit in the requested display locale",
             cautions: [
               {
                 body: "specific caution tied to the assessment context in the requested display locale",
@@ -240,7 +241,7 @@ function userPrompt({
             status: "covered | add | review",
             supplement: "supplement name in the requested display locale",
             whyThisIsForYou:
-              "one concise paragraph explaining why this ingredient is for this specific person, combining ingredient role, assessment fit, goals, signals, dose context, and safety context in the requested display locale"
+              "one short sentence linking the ingredient to this person's supplied assessment facts in the requested display locale"
           }
         ],
         cautions: [
@@ -290,7 +291,8 @@ function userPrompt({
         "Set effectivenessRank as a unique integer from 1 to the number of items, where 1 is the most effective/highest-impact supplement suggestion for this person's assessment.",
         "Order supplementBreakdown by effectivenessRank ascending.",
         "supplement, dailyDose, rationale, whyThisIsForYou, and decision must each be plain strings in the requested display locale.",
-        "Write whyThisIsForYou as one customer-facing paragraph for the drawer heading 'Why this is for you'. Write decision as the practical dose/status decision.",
+        "Do not repeat the same explanation across rationale, decision, and whyThisIsForYou. Aim for 8, 16, and 24 English words respectively, or similarly concise Thai/Chinese; retain meaning, not padding.",
+        "Never shorten away a distinct caution, uncertainty, interaction or assessment fact. Keep the complete safety explanation in its linked caution.",
         "Keep dailyDose machine-readable: start with one numeric amount and one unit, using mg/day, mcg/day, g/day, or IU/day whenever possible.",
         "Avoid capsule counts, serving sizes, proprietary-blend doses, vague ranges, or multiple units in dailyDose. If an agreed target exists, preserve it. Clearly identify proposed estimates and missing information; never infer a deficiency from diet repetition or treat unknown intake as zero.",
         "Write user-facing fields naturally in the requested display locale, not transliterated English unless the ingredient name is normally used that way.",
@@ -304,10 +306,13 @@ function userPrompt({
       plan,
       planId
     };
-  // A reusable prefix must precede the first customer-dependent byte. Preserve
-  // all catalogue/safety facts and all customer context; omit only indentation.
+  // Complete the immutable message before introducing customer context. The
+  // provider can reuse this prefix across requests without caching our results.
   const { canonicalSupplementCatalogue, contract, instructions, ...context } = prompt;
-  return JSON.stringify({ canonicalSupplementCatalogue, contract, instructions, ...context });
+  return [
+    JSON.stringify({ canonicalSupplementCatalogue, contract, instructions }),
+    JSON.stringify(context)
+  ].map(content => ({ content, role: "user" as const }));
 }
 
 function retryPrompt(errors: string[]) {
@@ -334,11 +339,13 @@ async function callGrok({
   apiKey,
   messages,
   model,
+  promptCacheKey,
   reasoningEffort
 }: Readonly<{
   apiKey: string;
   messages: Array<{ content: string; role: "assistant" | "system" | "user" }>;
   model: string;
+  promptCacheKey: string;
   reasoningEffort?: string;
 }>) {
   return callGovernedGrokChatCompletion({
@@ -350,6 +357,7 @@ async function callGrok({
     maxTokens: MAX_RESPONSE_TOKENS,
     messages,
     model,
+    promptCacheKey,
     purpose: "formulation request",
     responseSchema: FORMULATION_RESPONSE_SCHEMA,
     reasoningEffort: reasoningEffort ?? "low",
@@ -740,11 +748,17 @@ export async function analyzeFormulationWithGrok(
     role: "assistant" | "system" | "user";
   }> = [
     { content: systemPrompt(config.promptVersion), role: "system" },
-    {
-      content: userPrompt(input),
-      role: "user"
-    }
+    ...userMessages(input)
   ];
+  // This is provider prefix routing, not an answer cache or conversation state.
+  // Only immutable instructions/facts/configuration enter the opaque header;
+  // private answers, plan handles, feedback and previous results never do.
+  const promptCacheKey = `mn-formula-${createHash("sha256").update(JSON.stringify({
+    messages: messages.slice(0, 2),
+    model: config.model,
+    reasoningEffort: config.reasoningEffort,
+    schema: FORMULATION_RESPONSE_SCHEMA
+  })).digest("hex")}`;
   let lastErrors: string[] = [];
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
@@ -764,6 +778,7 @@ export async function analyzeFormulationWithGrok(
         apiKey: config.apiKey,
         messages,
         model: config.model,
+        promptCacheKey,
         reasoningEffort: config.reasoningEffort
       });
       const content = completion.choices?.[0]?.message?.content;

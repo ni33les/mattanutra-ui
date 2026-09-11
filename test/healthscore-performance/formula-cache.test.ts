@@ -12,7 +12,7 @@ function capture(t: TestContext, responses: unknown[] = [formulaResponse]) {
   process.env.XAI_API_KEY = "offline";
   t.after(() => keys.forEach((key, i) => { if (saved[i] === undefined) delete process.env[key]; else process.env[key] = saved[i]; }));
   const requests: Request[] = [];
-  t.mock.method(globalThis, "fetch", async (_url, init) => {
+  t.mock.method(globalThis, "fetch", async (_url: Parameters<typeof fetch>[0], init?: RequestInit) => {
     assert.ok(init?.signal, "The provider request retains its deadline");
     requests.push({ headers: new Headers(init.headers), body: JSON.parse(String(init.body)) });
     return Response.json({ choices: [{ message: { content: JSON.stringify(responses[Math.min(requests.length - 1, responses.length - 1)]) } }] });
@@ -62,7 +62,8 @@ test("HS-CACHE-03: validation retry retains routing identity, safety fields and 
   assert.ok(requests[0].headers.get("x-grok-conv-id"));
   assert.equal(requests[0].headers.get("x-grok-conv-id"), requests[1].headers.get("x-grok-conv-id"));
   assert.deepEqual(requests[0].body.messages, requests[1].body.messages.slice(0, 3));
-  assert.equal(result.formulation.cautions[0].body.en, valid.cautions[0].body);
+  assert.ok(result.formulation.cautions?.length);
+  assert.equal(result.formulation.cautions[0].body, valid.cautions[0].body);
   assert.deepEqual(result.formulation.cautions[0].relatedAnswerKeys, ["medTypes"]);
 });
 
@@ -73,7 +74,8 @@ test("HS-CACHE-04: unrelated requests do not acquire provider routing headers", 
 });
 
 for (const locale of ["en", "th", "zh-CN"] as const) test(`HS-CACHE-05 ${locale}: distinct short prose roles retain all output fields and medium reasoning`, async t => {
-  const requests = capture(t);
+  const response = { ...formulaResponse, supplementBreakdown: formulaResponse.supplementBreakdown.map(item => ({ ...item, cautions: [{ id: "intake-unknown", severity: "info", title: "Intake", body: "Existing intake is unknown.", relatedAnswerKeys: ["supplements"] }] })) };
+  const requests = capture(t, [response]);
   const result = await analyzeFormulationWithGrok({ ...formulaInput, locale });
   const prompt = JSON.parse(requests[0].body.messages[1].content);
   assert.match(prompt.instructions.join(" "), /Do not repeat the same explanation across rationale, decision, and whyThisIsForYou/);

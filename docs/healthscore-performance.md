@@ -37,6 +37,6 @@ The impact manifest selects 32 cases in three files. The runner reuses existing 
 
 The provider schema mechanism and reasoning settings are documented by [xAI structured outputs](https://docs.x.ai/developers/model-capabilities/text/structured-outputs) and [xAI reasoning](https://docs.x.ai/developers/model-capabilities/text/reasoning). Application validation remains authoritative.
 
-## Deployment configuration
+## First-pass deployment configuration (historical)
 
-Implementation is on `dev`; this work does not deploy it. DEV currently explicitly overrides `HEALTHSCORE_REASONING_EFFORT=medium`. When deploying, set that override to `low` and `FORMULATION_PROMPT_VERSION=v2-compact-structured` (or remove those overrides to use the new defaults), then restart the application/workers. Leave UAT/PRD unchanged. Rollback can restore the prior settings without changing stored results.
+This first pass was subsequently deployed to DEV as `81c96c81`, with `HEALTHSCORE_REASONING_EFFORT=low` and `FORMULATION_PROMPT_VERSION=v2-compact-structured`. Application and external workers were restarted and verified. UAT/PRD were unchanged. Rollback can restore the prior settings without changing stored results. The next, undeployed pass is documented in [Formula generation follow-up](formula-cache-performance.md).

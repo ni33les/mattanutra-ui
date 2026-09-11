@@ -16,7 +16,7 @@ function capture(t: TestContext, responses: unknown[]) {
   process.env.XAI_API_KEY = "offline-test-key";
   t.after(() => { if (previous === undefined) delete process.env.XAI_API_KEY; else process.env.XAI_API_KEY = previous; });
   const requests: Request[] = [];
-  t.mock.method(globalThis, "fetch", async (_url, init) => {
+  t.mock.method(globalThis, "fetch", async (_url: Parameters<typeof fetch>[0], init?: RequestInit) => {
     assert.ok(init?.signal, "Provider deadlines remain attached");
     requests.push(JSON.parse(String(init.body)));
     return Response.json({ choices: [{ message: { content: JSON.stringify(responses[Math.min(requests.length - 1, responses.length - 1)]) } }] });
@@ -27,14 +27,21 @@ function capture(t: TestContext, responses: unknown[]) {
 test("HS-PERF-01: formula prompt preserves every fact with compact JSON", async t => {
   const requests = capture(t, [formulaResponse]);
   await analyzeFormulationWithGrok(formulaInput);
-  const content = requests[0].messages[1].content;
+  const contents = requests[0].messages.slice(1).map(m => m.content);
   const baseline = JSON.parse(readFileSync(new URL("./baseline-prompts.json", import.meta.url), "utf8")).formula;
-  const prompt = JSON.parse(content);
-  for (const key of ["assessment", "assessmentSafetyContext", "canonicalSupplementCatalogue", "currentPlanContext", "contract", "locale", "plan", "planId"]) {
-    assert.deepEqual(prompt[key], JSON.parse(baseline)[key], key);
+  const prompt = Object.assign({}, ...contents.map(content => JSON.parse(content)));
+  const original = JSON.parse(baseline);
+  // These are authored prose instructions, not input facts. Their new distinct
+  // roles are asserted by HS-CACHE-05; the rest of the contract stays identical.
+  for (const key of ["rationale", "decision", "whyThisIsForYou"]) {
+    original.contract.supplementBreakdown[0][key] = prompt.contract.supplementBreakdown[0][key];
   }
-  assert.equal(content, JSON.stringify(prompt), "No JSON indentation tokens");
-  assert.ok(content.length < baseline.length * 0.9, `${content.length} versus ${baseline.length}`);
+  for (const key of ["assessment", "assessmentSafetyContext", "canonicalSupplementCatalogue", "currentPlanContext", "contract", "locale", "plan", "planId"]) {
+    assert.deepEqual(prompt[key], original[key], key);
+  }
+  for (const content of contents) assert.equal(content, JSON.stringify(JSON.parse(content)), "No JSON indentation tokens");
+  const length = contents.reduce((sum, content) => sum + content.length, 0);
+  assert.ok(length < baseline.length * 0.9, `${length} versus ${baseline.length}`);
 });
 
 test("HS-PERF-02: different customers share the full immutable formula prefix", async t => {
@@ -42,10 +49,9 @@ test("HS-PERF-02: different customers share the full immutable formula prefix", 
   await analyzeFormulationWithGrok(formulaInput);
   await analyzeFormulationWithGrok({ ...formulaInput, answers: { ...answers, age: "46-55" } });
   const [a, b] = requests.map(r => r.messages[1].content);
-  const end = a.indexOf('"assessment":');
-  assert.ok(end > 3000, "Catalogue and instructions must precede customer data");
-  assert.equal(a.slice(0, end), b.slice(0, end));
-  assert.notEqual(a.slice(end), b.slice(end));
+  assert.ok(a.length > 3000, "Catalogue and instructions must precede customer data");
+  assert.equal(a, b);
+  assert.notEqual(requests[0].messages[2].content, requests[1].messages[2].content);
 });
 
 test("HS-PERF-03: formula request has a strict provider schema and consistent names", async t => {
@@ -66,7 +72,8 @@ for (const locale of ["en", "th", "zh-CN"] as const) test(`HS-PERF-04 ${locale}:
   const requests = capture(t, [fixture.response]);
   const result = await analyzeHealthScoreAdviceWithUsage(fixture.input);
   assert.equal(requests.length, 1);
-  assert.ok(result.aiCopy?.heroBody?.[locale]);
+  assert.ok(result.aiCopy?.heroBody && typeof result.aiCopy.heroBody !== "string");
+  assert.ok(result.aiCopy.heroBody[locale]);
   assert.deepEqual(fixture.input.healthScore, original, "Deterministic score remains unchanged");
   const request = requests[0], content = request.messages[1].content, prompt = JSON.parse(content);
   const baseline = JSON.parse(readFileSync(new URL("./baseline-prompts.json", import.meta.url), "utf8"))[locale];
@@ -91,7 +98,8 @@ test("HS-PERF-05: shape constraints never replace content validation", async t =
   const requests = capture(t, [invalid, fixture.response]);
   const result = await analyzeHealthScoreAdviceWithUsage(fixture.input);
   assert.equal(requests.length, 2);
-  assert.ok(result.aiCopy?.heroBody?.en);
+  assert.ok(result.aiCopy?.heroBody && typeof result.aiCopy.heroBody !== "string");
+  assert.ok(result.aiCopy.heroBody.en);
   assert.match(requests[1].messages.at(-1)!.content, /Validation errors/);
 });
 
@@ -126,7 +134,7 @@ test("HS-PERF-10: compact refinement retains prior formula, feedback and chat co
   const input = { ...formulaInput, previousFormulation: formulaResponse, planFeedback: [],
     chatMessages: [{ id: "message-1", status: "ready" as const, body: "Keep my medication context", createdAt: "2026-09-11T00:00:00Z", role: "user" as const }] };
   await analyzeFormulationWithGrok(input);
-  const prompt = JSON.parse(requests[0].messages[1].content);
+  const prompt = Object.assign({}, ...requests[0].messages.slice(1).map(m => JSON.parse(m.content)));
   assert.deepEqual(prompt.assessment, answers);
   assert.deepEqual(prompt.currentPlanContext, {
     previousSupplementGuidance: formulaResponse, planFeedback: [],

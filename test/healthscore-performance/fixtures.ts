@@ -23,7 +23,7 @@ export const formulaResponse = {
   supplementBreakdown: [{ id: "vitamin-d3", category: "Foundation", supplement: "Vitamin D3",
     dailyDose: "25 mcg/day", decision: "Review total intake.", effectivenessRank: 1,
     rationale: "Supports your stated goals.", whyThisIsForYou: "Your outdoor routine informs this proposal.",
-    status: "add", cautions: [] }],
+    status: "add" as const, cautions: [] }],
   cautions: [],
   marketingPoints: ["Routine", "Context", "Clarity"].map((title, index) => ({
     id: `point-${index}`, title, body: "Your plan reflects the answers you supplied."

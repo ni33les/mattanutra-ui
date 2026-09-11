@@ -21,6 +21,8 @@ export type GrokChatCompletionInput = Readonly<{
   maxTokens?: number;
   purpose?: string;
   reasoningEffort?: string;
+  /** Opaque provider routing hint for reusable prompts, never a customer identifier. */
+  promptCacheKey?: string;
   responseSchema?: Readonly<{ name: string; strict: boolean; schema: Readonly<Record<string, unknown>> }>;
   temperature?: number;
   timeoutMs?: number;
@@ -80,6 +82,7 @@ export async function callGrokChatCompletion({
   model,
   purpose = "request",
   reasoningEffort,
+  promptCacheKey,
   responseSchema,
   temperature,
   timeoutMs = DEFAULT_TIMEOUT_MS
@@ -102,7 +105,8 @@ export async function callGrokChatCompletion({
       }),
       headers: {
         Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
+        ...(promptCacheKey ? { "x-grok-conv-id": promptCacheKey } : {})
       },
       method: "POST",
       signal: controller.signal
