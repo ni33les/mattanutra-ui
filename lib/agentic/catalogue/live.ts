@@ -581,21 +581,6 @@ export async function loadLiveRetailSnapshot(
   };
 }
 
-function loadingSnapshot(countryCode: string): CatalogueSnapshot {
-  const hit = liveCache().get(countryCode);
-
-  if (hit) {
-    return hit.snapshot;
-  }
-
-  return {
-    availabilityAsOf: new Date().toISOString(),
-    catalogueVersion: `retail-${countryCode}-loading`,
-    products: [],
-    supplements: []
-  };
-}
-
 function startLiveLoad(code: string): Promise<CatalogueSnapshot> {
   const existing = liveInflight().get(code);
 

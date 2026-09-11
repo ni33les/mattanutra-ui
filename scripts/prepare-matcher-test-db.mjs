@@ -14,7 +14,7 @@ try {
   assert.equal(row.n, 0, 'Bootstrap requires a fresh empty isolated database');
   await sql.unsafe(readFileSync('db-schema.sql', 'utf8'));
   const env = { ...process.env, NODE_ENV: 'test', MATTANUTRA_ENV: 'dev', DB_URL: url.href, DB_WORKER_URL: url.href, DB_ALLOW_DIRECT_CONNECTION: 'true' };
-  for (const script of ['apply-locale-schema', 'apply-product-administration-schema', 'apply-agentic-commerce-schema', 'apply-web-funnel-schema', 'apply-matcher-v5-runtime-schema', 'apply-service-efficiency-schema']) {
+  for (const script of ['apply-locale-schema', 'apply-product-administration-schema', 'apply-agentic-commerce-schema', 'apply-web-funnel-schema', 'apply-matcher-v5-runtime-schema', 'apply-service-efficiency-schema', 'apply-retail-checkout-schema']) {
     execFileSync(process.execPath, ['--experimental-strip-types', '--import', './scripts/register-ts-path-loader.mjs', `scripts/${script}.ts`], { env, stdio: 'inherit' });
   }
   await prepareLockFixtures(sql, url.href);

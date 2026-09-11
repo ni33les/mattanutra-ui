@@ -9,7 +9,8 @@ permissions:
 jobs:
   affected:
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    # Two complete maintained passes plus bootstrap/build; individual deadlines stay unchanged.
+    timeout-minutes: 180
     services:
       postgres:
         image: postgres:16

@@ -104,6 +104,10 @@ if (!sql) {
   throw new Error("Database is not configured");
 }
 
-await sql.unsafe(schemaSql);
+try {
+  await sql.unsafe(schemaSql);
+} finally {
+  await sql.end();
+}
 
 console.log("Retail checkout schema applied");
