@@ -8,6 +8,7 @@ import { matchPlan } from "../lib/agentic/plan/matching.ts";
 import { MatchWorkerPool, MatcherUnavailableError } from "../lib/agentic/plan/match-worker-pool.ts";
 import { captureReferenceJobIdentity, validateReferenceJobIdentity, checkedReferenceCompletion } from "../lib/agentic/catalogue/reference-job.ts";
 import { matcherSafetyCeilings, setMatcherSafetyCeilings } from "../lib/matcher/safety-ceilings.ts";
+import { serviceMeasurements, withServiceMeasurements } from "../lib/service-metrics.ts";
 
 beforeEach(installGoldCatalogue);
 afterEach(uninstallGoldCatalogue);
@@ -23,6 +24,27 @@ async function input() {
 }
 
 describe("MCP matcher worker pool", () => {
+  it("FULL-CYCLE-12 prepares every matching thread without a request, database snapshot or search attempts", async () => {
+    const pool = new MatchWorkerPool(2);
+    try {
+      await withServiceMeasurements(async () => {
+        await pool.prepare();
+        const measurements = serviceMeasurements();
+        assert.equal(measurements["worker.execute_ms"]?.count, 2);
+        assert.equal(measurements["db.statements"], undefined);
+        assert.equal(measurements["checkpoint.bytes"], undefined);
+      });
+      const job = await input();
+      assert.deepEqual(await pool.run(job), matchPlan(job));
+    } finally { await pool.close(); }
+  });
+
+  it("FULL-CYCLE-13 preparation cannot succeed after the matching pool is closed", async () => {
+    const pool = new MatchWorkerPool(1);
+    await pool.close();
+    await assert.rejects(pool.prepare(), /closed/);
+  });
+
   it("ANNA-REF-WORKER-01 rejects a reference epoch that differs from the product snapshot", async () => {
     const pool = new MatchWorkerPool(1);
     try {
