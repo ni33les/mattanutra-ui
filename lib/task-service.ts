@@ -3027,6 +3027,7 @@ export async function failTask(input: FailTaskInput) {
 
 export async function releaseReservedTaskToQueue(input: Readonly<{
   deferredOperationId?: string;
+  errorMessage?: string;
   reservationId: string;
   taskId: string;
   workerSessionId?: string | null;
@@ -3060,7 +3061,8 @@ export async function releaseReservedTaskToQueue(input: Readonly<{
       returning task_id
     )
     update public.tasks set
-      status = 'queued',
+      status = case when ${deferredOperationId}::uuid is null and attempts >= max_attempts then 'failed' else 'queued' end,
+      error_message = case when ${deferredOperationId}::uuid is null then ${input.errorMessage ?? 'Task preparation failed after reservation.'} else error_message end,
       attempts = case when ${deferredOperationId}::uuid is null then attempts else greatest(attempts-1,0) end,
       scheduled_for = case when ${deferredOperationId}::uuid is null then scheduled_for else
         greatest(now()+interval '1 second',coalesce((select least((op.record_json->>'leaseExpiresAt')::timestamptz,

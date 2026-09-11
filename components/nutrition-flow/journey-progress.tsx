@@ -19,7 +19,8 @@ type JourneyProgressProps = Readonly<{
 export function JourneyProgress({ initial, locale, planId }: JourneyProgressProps) {
   const router = useRouter();
   const support = getWelcomeCopy(locale);
-  const labels = support.formulaProgress;
+  const [current, setCurrent] = useState(initial);
+  const labels = current.formulationStatus === "ready" ? support.productProgress : support.formulaProgress;
   const [retryCount, setRetryCount] = useState(0);
   const [failed, setFailed] = useState(false);
 
@@ -36,7 +37,11 @@ export function JourneyProgress({ initial, locale, planId }: JourneyProgressProp
         headers: { "Content-Type": "application/json" }, body: JSON.stringify({ locale }) });
       const outcome = await pollFunnelStatus({
         subscriptionKey: assessmentPollKey(planId, locale),
-        read: async signal => (await fetchFunnelJson<NutritionJourneySnapshot>(`${root}?locale=${locale}`, { signal })).data,
+        read: async signal => {
+          const value = (await fetchFunnelJson<NutritionJourneySnapshot>(`${root}?locale=${locale}`, { signal })).data;
+          if (!controller.signal.aborted) setCurrent(value);
+          return value;
+        },
         ready: value => value.readyForReveal, failed: value => value.failed, signal: controller.signal
       });
       if (outcome.status === "ready") router.replace(nutritionRevealPath(locale, planId));

@@ -104,7 +104,16 @@
       "error": "We could not finish this step. Your completed work is saved.",
       "retry": "Try again"
     },
-    "calcCaptureFailed": "We could not save your assessment. Please retry."
+    "calcCaptureFailed": "We could not save your assessment. Please retry.",
+    "productProgress": {
+      "kicker": "Thank you",
+      "title": "Matching products to your formula",
+      "body": "Your formula is ready. MattaNutra is checking the product catalogue for it.",
+      "building": "Checking available products…",
+      "note": "Please keep this page open.",
+      "error": "We could not finish this step. Your completed work is saved.",
+      "retry": "Try again"
+    }
   },
   "th": {
     "badge": "HealthScore ส่วนบุคคลฟรีของคุณ",
@@ -211,7 +220,16 @@
       "error": "ขั้นตอนนี้ยังทำไม่สำเร็จ งานที่เสร็จแล้วถูกบันทึกไว้",
       "retry": "ลองอีกครั้ง"
     },
-    "calcCaptureFailed": "ยังบันทึกแบบประเมินของคุณไม่สำเร็จ กรุณาลองอีกครั้ง"
+    "calcCaptureFailed": "ยังบันทึกแบบประเมินของคุณไม่สำเร็จ กรุณาลองอีกครั้ง",
+    "productProgress": {
+      "kicker": "ขอบคุณค่ะ",
+      "title": "กำลังจับคู่สินค้ากับสูตรของคุณ",
+      "body": "สูตรของคุณพร้อมแล้ว MattaNutra กำลังตรวจสอบแค็ตตาล็อกสินค้าเพื่อจับคู่กับสูตรนี้",
+      "building": "กำลังตรวจสอบสินค้าที่มี…",
+      "note": "กรุณาเปิดหน้านี้ไว้นะคะ",
+      "error": "ขั้นตอนนี้ยังทำไม่สำเร็จ งานที่เสร็จแล้วถูกบันทึกไว้",
+      "retry": "ลองอีกครั้ง"
+    }
   },
   "zh": {
     "badge": "您的免费个人 HealthScore",
@@ -318,6 +336,15 @@
       "error": "这一步没能完成。已完成的部分已保存。",
       "retry": "再试一次"
     },
-    "calcCaptureFailed": "未能保存你的评估，请重试。"
+    "calcCaptureFailed": "未能保存你的评估，请重试。",
+    "productProgress": {
+      "kicker": "谢谢",
+      "title": "正在为你的配方匹配产品",
+      "body": "你的配方已准备好。MattaNutra 正在查看产品目录，为配方匹配产品。",
+      "building": "正在查看可用产品…",
+      "note": "请保持此页面打开。",
+      "error": "这一步没能完成。已完成的部分已保存。",
+      "retry": "再试一次"
+    }
   }
 }

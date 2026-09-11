@@ -673,7 +673,7 @@ export async function warmLiveRetailSnapshot(
   const hit = liveCache().get(code);
   const currentRevision = await getCatalogueRuntimeRevision();
 
-  if (hit && hit.snapshot.runtimeRevision === currentRevision && Date.now() - hit.at < LIVE_TTL_MS && hit.snapshot.products.length > 0) {
+  if (hit && hit.snapshot.runtimeRevision === currentRevision && Date.now() - hit.at < LIVE_TTL_MS) {
     return hit.snapshot;
   }
 
@@ -705,7 +705,7 @@ export function requireCachedLiveRetailSnapshot(
 
   const hit = liveCache().get(code);
 
-  if (hit && Date.now() - hit.at < LIVE_TTL_MS && hit.snapshot.products.length > 0) {
+  if (hit && Date.now() - hit.at < LIVE_TTL_MS) {
     return hit.snapshot;
   }
 

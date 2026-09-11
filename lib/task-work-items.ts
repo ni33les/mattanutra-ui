@@ -1875,9 +1875,8 @@ async function retailerCandidateSetsFromLiveSnapshot(
   await warmLiveRetailSnapshot(countryCode);
   const snapshot = requireCachedLiveRetailSnapshot(countryCode);
 
-  if (snapshot.products.length < 1 && !process.env.NODE_TEST_CONTEXT) {
-    throw new Error("Product matching catalogue is not ready");
-  }
+  // A successfully loaded empty market is a valid matching input.
+  // Cache loading failures are raised by the reader above, not inferred from size.
 
   const byRetailer = new Map<
     string,
