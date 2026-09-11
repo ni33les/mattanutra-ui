@@ -34,11 +34,13 @@ it('V5-BROWSER-PG-01 fixture provisioning and the real admin session lifecycle p
       return saved;
     };
     const first = await seed(output);
-    const [beforeRefresh] = await sql<Array<{ count: number }>>`select count(*)::int as count from public.organisations`;
+    const [beforeRefresh] = await sql<Array<{ count: number; epoch: string }>>`select count(*)::int as count,
+      (select revision::text from public.catalogue_runtime_revision where singleton=true) as epoch from public.organisations`;
     fixture = await seed(join(directory, 'refreshed-fixtures.json'));
-    const [afterRefresh] = await sql<Array<{ count: number }>>`select count(*)::int as count from public.organisations`;
+    const [afterRefresh] = await sql<Array<{ count: number; epoch: string }>>`select count(*)::int as count,
+      (select revision::text from public.catalogue_runtime_revision where singleton=true) as epoch from public.organisations`;
     assert.equal(fixture.ADMIN_E2E_TARGET_ORGANISATION_ID, first.ADMIN_E2E_TARGET_ORGANISATION_ID, 'Full-gate refresh must reuse the same guarded admin target');
-    assert.deepEqual(afterRefresh, beforeRefresh, 'Repeated seeding must not add a commercial organisation to the catalogue fingerprint');
+    assert.deepEqual(afterRefresh, beforeRefresh, 'Repeated seeding must not add a commercial organisation or stale earlier browser matches');
     const [run] = await sql<Array<{ catalogue_revision: string; current_revision: string; items: number }>>`
       select r.catalogue_revision::text,c.revision::text as current_revision,
         (select count(*)::int from public.product_recommendation_items i where i.run_id=r.id) as items
