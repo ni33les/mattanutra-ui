@@ -48,19 +48,27 @@ try {
       await tx`update public.tasks set status = 'completed' where id = ${task.id}::uuid`;
     });
     output = { ready: true };
-  } else if (input.action === "ready") {
+  } else if (input.action === "formula" || input.action === "ready") {
     const generation = (await loadGenerationInput(sql, input.planId, locale))!;
-    await insertFormulationVersion(sql, { planId: input.planId, generation, modelVersion: "browser-fixture", formulation: {
-      supplementBreakdown: input.empty ? [] : [{ id: "vitamin-d", category: "vitamin", dailyDose: { [locale]: "1000 IU" }, effectivenessRank: 1,
-        rationale: { [locale]: "Fixture rationale" }, status: "add", supplement: { [locale]: "Vitamin D" } }],
-      sectionStatuses: { supplements: "ready", foods: "ready" }, foodGuidance: []
-    } });
+    const [existing] = await sql`select version from public.formulations where plan_id=${input.planId}::uuid
+      and assessment_revision=${generation.revision} and generation_locale=${locale}
+      and generator_version=${FUNNEL_GENERATOR_VERSION} order by version desc limit 1`;
+    const formulaVersion = existing ? Number(existing.version) : await insertFormulationVersion(sql, {
+      planId: input.planId, generation, modelVersion: "browser-fixture", formulation: {
+        supplementBreakdown: input.empty ? [] : [{ id: "vitamin-d", category: "vitamin", dailyDose: { [locale]: "1000 IU" }, effectivenessRank: 1,
+          rationale: { [locale]: "Fixture rationale" }, status: "add", supplement: { [locale]: "Vitamin D" } }],
+        sectionStatuses: { supplements: "ready", foods: "ready" }, foodGuidance: []
+      }
+    });
+    await sql`update public.tasks set status='completed' where plan_id=${input.planId}::uuid and task_type='generate_supplement_guidance'`;
+    if (input.action === "ready") {
     await sql`insert into public.product_recommendation_runs (catalogue_revision, plan_id, assessment_revision, generation_locale, generator_version, selection_revision, diagnostics)
       values ((select revision from public.catalogue_runtime_revision where singleton=true), ${input.planId}::uuid, ${generation.revision}, ${locale}, ${FUNNEL_GENERATOR_VERSION},
         coalesce((select revision from public.assessment_product_preferences where plan_id = ${input.planId}::uuid), 0),
         '{"stackPreference":"balanced","matching":{"operationalStatus":"no_purchase","selectedCandidateKey":null,"options":[],"alternativeSearch":{"status":"not_needed","reason":"No purchase fixture"}}}')`;
     await sql`update public.tasks set status = 'completed' where plan_id = ${input.planId}::uuid and task_type in ('generate_supplement_guidance','generate_product_recommendations')`;
-    output = { ready: true };
+    }
+    output = { ready: true, formulaVersion };
   } else if (input.action === "fulfill") {
     const [payment] = input.paymentId ? [{ id: input.paymentId }] : await sql`select id from public.payments where plan_id = ${input.planId}::uuid and status in ('paid', 'bound') order by created_at desc limit 1`;
     assert.ok(payment);
@@ -68,6 +76,7 @@ try {
       rate: async () => ({ currency: "THB", fallbackUsed: false, fxRateId: null, provider: "fixture", source: "fixture", usdRate: 0.03 }) });
   } else if (input.action === "state") {
     const [row] = await sql`select a.answers, a.contact_email, a.input_revision, a.selected_plan,
+      (select count(*)::int from public.formulations f where f.plan_id=a.plan_id) as formulations,
       (select count(*)::int from public.payments p where p.plan_id = a.plan_id and status in ('paid','bound')) as payments,
       (select count(*)::int from public.finance_transactions f join public.payments p on f.source_ref = 'stripe:payment:' || p.id || ':nominal-revenue' where p.plan_id = a.plan_id) as revenues
       from public.assessments a where a.plan_id = ${input.planId}::uuid`;

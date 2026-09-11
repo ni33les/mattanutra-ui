@@ -180,6 +180,8 @@ for (const locale of ["en", "th", "zh-CN"] as const) {
     await page.goto(`/${locale}/nutrition/quiz`);
     const capture = await fill(page);
     await fixture({ action: "copy", locale, planId: capture.planId });
+    await expect(page.getByTestId("questionnaire-calculating")).toBeVisible();
+    const formula = await fixture({ action: "formula", locale, planId: capture.planId });
     await expect(page).toHaveURL(new RegExp(`healthscore\\?plan=${capture.planId}`), { timeout: 15_000 });
     await expect(page.getByTestId("reveal-hero-name")).toBeVisible();
     await page.goto(`/${locale}/nutrition/payment/checkout?plan=precision&planId=${capture.planId}&source=healthscore`);
@@ -193,10 +195,15 @@ for (const locale of ["en", "th", "zh-CN"] as const) {
     const responses = await Promise.all([0, 1].map(products => page.request.get(`/api/assessment/${capture.planId}/formulation?locale=${locale}&products=${products}`)));
     expect(responses.map(r => r.status())).toEqual([202, 202]);
     await fixture({ action: "fulfill", planId: capture.planId });
-    await fixture({ action: "ready", locale, planId: capture.planId });
+    const prepared = await Promise.all([0, 1].map(products => page.request.get(`/api/assessment/${capture.planId}/formulation?locale=${locale}&products=${products}`)));
+    expect(prepared.map(r => r.status())).toEqual([200, 200]);
+    expect((await prepared[0].json()).supplementBreakdown).toHaveLength(1);
+    expect((await prepared[1].json()).productRecommendations.status).toBe("pending");
+    const completed = await fixture({ action: "ready", locale, planId: capture.planId });
+    expect(completed.formulaVersion).toBe(formula.formulaVersion);
     await expect(page.locator(".mn-reveal-final")).toBeVisible({ timeout: 30_000 });
     const persisted = await fixture({ action: "state", planId: capture.planId });
-    expect(persisted.payments).toBe(1); expect(persisted.revenues).toBe(1);
+    expect(persisted.payments).toBe(1); expect(persisted.revenues).toBe(1); expect(persisted.formulations).toBe(1);
   });
   test(`prepaid reservation survives resume and language context in ${locale}`, async ({ page }) => {
     const paymentResponse = await page.request.post("/api/payments/mock-pay", { data: { locale, plan: "precision", sourceSurface: "landing", attemptId: randomUUID() } });

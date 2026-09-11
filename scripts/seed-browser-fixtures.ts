@@ -41,8 +41,17 @@ try {
   // Organisation writes advance catalogue identity. Provision every admin
   // dependency before compiling a recommendation, then reuse the target in E2E.
   const adminTargetId = await withDatabaseTransaction(sql, async tx => {
-    const [platform] = await tx`insert into public.organisations (slug, name, organisation_type, status) values ('mattanutra', 'MattaNutra', 'platform', 'active')
-      on conflict (lower(slug)) do update set status = 'active' returning id`;
+    const readPlatform = () => tx<Array<{ id: string; organisation_type: string; status: string }>>`
+      select id,organisation_type,status from public.organisations where lower(slug)='mattanutra'`;
+    let [platform] = await readPlatform();
+    if (!platform) {
+      await tx`insert into public.organisations (slug,name,organisation_type,status)
+        values ('mattanutra','MattaNutra','platform','active') on conflict (lower(slug)) do nothing`;
+      [platform] = await readPlatform();
+    }
+    assert.ok(platform, "Browser fixtures require the platform organisation");
+    assert.equal(platform.organisation_type, "platform");
+    assert.equal(platform.status, "active", "Browser fixtures cannot change existing platform eligibility");
     const [person] = await tx`insert into public.people (email, display_name, status, metadata) values ('browser-owner@example.test', 'Browser Fixture Owner', 'active', '{"source":"isolated_browser_fixture"}')
       on conflict (lower(email)) do update set status = 'active' returning id`;
     await tx`insert into public.organisation_memberships (organisation_id, person_id, role, status) values (${platform.id}::uuid, ${person.id}::uuid, 'platform_owner', 'active') on conflict do nothing`;
