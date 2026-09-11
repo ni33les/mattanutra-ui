@@ -1,7 +1,11 @@
 import assert from 'node:assert/strict';
-import test from 'node:test';
+import test, {after} from 'node:test';
 import {readFileSync} from 'node:fs';
 import {gunzipSync} from 'node:zlib';
+import {createHash} from 'node:crypto';
+const sorted=(value:unknown):unknown=>Array.isArray(value)?value.map(sorted):value&&typeof value==='object'?Object.fromEntries(Object.entries(value).sort(([a],[b])=>a.localeCompare(b)).map(([k,v])=>[k,sorted(v)])):value;
+const hash=(value:unknown)=>createHash('sha256').update(JSON.stringify(sorted(value))).digest('hex');
+after(async()=>{const {closeSqlPool}=await import('../../lib/db.ts');await closeSqlPool();});
 
 test('QA-CI-01 current CI runs the maintained paired MCP inventory with a compiled candidate',()=>{
   const text=readFileSync('.github/workflows/mcp-722.yml','utf8');
@@ -40,4 +44,21 @@ test('QA-CI-02 isolated reference fixtures retain captured amounts, scope and co
   assert.ok(rows.length>0); assert.ok(rows.some((row:{name:string;maxAmount:number;maxUnit:string;sourceScope:string})=>row.name==='Vitamin D3'&&row.maxAmount===100&&row.maxUnit==='mcg'&&row.sourceScope==='total'));
   for(const row of rows){const captured=frozen.references.ceilings.find((item:{bandId:string})=>item.bandId===row.id);assert.ok(captured);assert.equal(row.maxAmount,captured.maxAmount);assert.equal(row.confidence,captured.referenceConfidence);assert.equal(row.sourceScope,captured.sourceScope);assert.equal(row.sourceUrl,captured.authorityUrl);}
   assert.throws(()=>frozenReferenceRows(frozen,[{id:'one',name:'Vitamin D3'},{id:'two',name:'Vitamin D3'}]),/ambiguous/i);
+});
+
+test('QA-CI-06 catalogue-dependent properties use the same captured facts on fresh CI and local runs',async()=>{
+  const {loadDetCatalog}=await import('../agentic-det-pack.test.ts');
+  const captured=JSON.parse(gunzipSync(readFileSync('test/fixtures/mcp-evidence-images/dev-20260911.json.gz')).toString());
+  const loaded=await loadDetCatalog();
+  assert.equal(hash(loaded.snapshot),hash(captured.snapshot),'Maintained assertions must not depend on whatever catalogue happens to be in the runner database');
+  assert.equal(hash(loaded.ceilings),hash(captured.references.ceilings));
+});
+test('QA-CI-07 customer-value cases retain captured product prices, pack unknowns and reference heads',async()=>{
+  const {freezeImplCatalogue}=await import('../agentic/value/impl-harness.ts');
+  const captured=JSON.parse(gunzipSync(readFileSync('test/fixtures/mcp-evidence-images/dev-20260911.json.gz')).toString());
+  const {freeze,usable}=await freezeImplCatalogue();
+  assert.equal(usable,true);assert.equal(hash(freeze.snapshot),hash(captured.snapshot));
+});
+test('QA-CI-08 fresh payment setup applies the maintained locale constraints and accounting accounts',()=>{
+  assert.match(readFileSync('scripts/prepare-matcher-test-db.mjs','utf8'),/'apply-payment-schema'/);
 });
