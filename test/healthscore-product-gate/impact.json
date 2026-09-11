@@ -1,0 +1,11 @@
+{
+  "releaseBase":"6e4a37877037e3de59b5ee280017901eaac794ca",
+  "files":[
+    {"file":"test/healthscore-parallel/readiness.integration.test.ts","reason":"HealthScore waits for current advice and formula; pending/failed matching gates reveal independently"},
+    {"file":"test/healthscore-parallel/behaviour.test.ts","reason":"Existing client polling consumes the HealthScore-specific gate; formula failures remain actionable"},
+    {"file":"test/funnel-readiness.integration.test.ts","reason":"Shared projection preserves reveal, formulation API, payment, revision and locale behaviour"},
+    {"file":"test/service-efficiency/funnel-reads.integration.test.ts","reason":"Readiness remains nonlocking and lightweight"},
+    {"file":"test/healthscore-count/reuse.integration.test.ts","reason":"Completed formula reuse through retry and checkout remains intact"}
+  ],
+  "browser":[{"file":"test/e2e/healthscore-parallel.spec.ts","grep":"HS-PAR-BROWSER-01","expectedCases":3}]
+}

@@ -1,5 +1,7 @@
 # Approved restoration
 
+Update 2026-09-11: HealthScore now waits for complete advice and the current nutrient formula only. Product matching continues in parallel and gates reveal, not HealthScore. This supersedes the product-readiness portion of the original restoration below. HS-PAR-PG-01, HS-PAR-PG-04 and HS-PAR-BROWSER-01 cover pending/failed products independently, while retaining formula, advice, locale, revision and original-layout assertions. The completed-formula reuse fix is preserved.
+
 The user rejected the single-number HealthScore redesign. Restore the original evaluated / set-aside / shortlisted arrangement, labels and personalized narrative. CSS, fonts, colors, spacing, animation, imagery and section order remain those of the prior design. The current real formulation count supplies the third number, and the difference supplies the middle number. Unknown counts remain unknown in computation; the page stays behind its existing calculating view until advice and the full formula/product preparation are both ready.
 
 WEB-JOURNEY-BROWSER-01 now asserts three columns, their arithmetic, and the third count matching reveal. The old one-column expectation is intentionally retired. The model-reference factual correction and health arithmetic are preserved. No matcher/profile, catalogue, pricing or MCP changes belong to this restoration.

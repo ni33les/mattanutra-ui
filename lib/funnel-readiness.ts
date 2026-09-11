@@ -75,15 +75,12 @@ export async function getFunnelReadiness(planId: string, localeOption?: string |
   const locale = row.requested_locale as Locale;
   const copyReady = row.skip_healthscore === true || (row.copy_ready ?? hasHealthScoreAiCopy(row.health_score, locale));
   const copyFailed = !copyReady && ["failed", "cancelled", "completed"].includes(row.copy_status ?? "");
-  // Preparation is independent of payment/access: submission starts the full
-  // formula alongside advice, while reveal retains its existing access checks.
+  // HealthScore needs advice and the formula's ingredient count. Product
+  // matching continues independently and gates only reveal.
   const preparedFormula = row.prepared_formula_version != null;
-  const preparedProducts = preparedFormula && (Number(row.prepared_visible_count) === 0 ||
-    (row.product_version != null && ["completed", "partial"].includes(row.product_status)));
-  const readyForHealthScore = Boolean(copyReady && preparedFormula && preparedProducts);
+  const readyForHealthScore = Boolean(copyReady && preparedFormula);
   const healthScorePageFailed = !readyForHealthScore && (copyFailed ||
-    (!preparedFormula && ["failed", "cancelled", "completed"].includes(row.formula_status ?? "")) ||
-    (!preparedProducts && ["failed", "cancelled", "completed"].includes(row.product_task_status ?? "")));
+    (!preparedFormula && ["failed", "cancelled", "completed"].includes(row.formula_status ?? "")));
   const hasPaidPlan = Boolean(row.selected_plan || row.payment_status);
   const fulfillmentStatus = row.fulfillment_status ?? (row.selected_plan ? "complete" : "not_started");
   const fulfillmentPending = Boolean(row.payment_status && fulfillmentStatus !== "complete");
