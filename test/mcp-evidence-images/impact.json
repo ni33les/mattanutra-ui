@@ -139,6 +139,38 @@
     {
       "file": "test/agentic-v6-conversation.test.ts",
       "reason": "Current publication assertions must use the current version; preserve all advisory, exclusion, patch and schema checks."
+    },
+    {
+      "file": "test/agentic-copy-contract.test.ts",
+      "reason": "Maintain published flat protocol assertions and strict semantic evidence; reject masking changed business IDs."
+    },
+    {
+      "file": "test/agentic-cv-evidence-hygiene.test.ts",
+      "reason": "Maintain published flat protocol assertions and strict semantic evidence; reject masking changed business IDs."
+    },
+    {
+      "file": "test/published-client-semantics.test.ts",
+      "reason": "Maintain published flat protocol assertions and strict semantic evidence; reject masking changed business IDs."
+    },
+    {
+      "file": "test/agentic-cv-fix-pack.test.ts",
+      "reason": "Retain customer-value assertions while aligning current discovery and immutable matcher/reference identity expectations."
+    },
+    {
+      "file": "test/agentic-cv-impl-pack.test.ts",
+      "reason": "Retain customer-value assertions while aligning current discovery and immutable matcher/reference identity expectations."
+    },
+    {
+      "file": "test/agentic-cv-r2-pack.test.ts",
+      "reason": "Retain customer-value assertions while aligning current discovery and immutable matcher/reference identity expectations."
+    },
+    {
+      "file": "test/agentic-cv-r3-pack.test.ts",
+      "reason": "Retain customer-value assertions while aligning current discovery and immutable matcher/reference identity expectations."
+    },
+    {
+      "file": "test/agentic-cv-r4-pack.test.ts",
+      "reason": "Retain customer-value assertions while aligning current discovery and immutable matcher/reference identity expectations."
     }
   ],
   "runnerConsumers": [

@@ -1016,11 +1016,11 @@ async function runDevContract01(session: PlanSession, runIndex: number): Promise
   const names = listed.map((item) => item.name);
   const blob = planSchemaBlob();
   const assertions = [
-    assertEq("CONTRACT-01.names", "info,plan,execute,order,support,feedback,evidence", names.join()),
-    assertTrue("CONTRACT-01.ops", /"create"/.test(blob) && /"revise"/.test(blob) && /"answer"/.test(blob) && /"select"/.test(blob) && /"get"/.test(blob)),
-    assertTrue("CONTRACT-01.importance", blob.includes('"importance"')),
+    assertEq("CONTRACT-01.names", "info,plan,execute,order,support,feedback", names.join()),
+    assertTrue("CONTRACT-01.ops", AGENTIC_TOOL_SCHEMAS.plan.anyOf.length === 5 && ["targets", "planHandle", "answers", "selectedOptionId", "expectedRevision", "idempotencyKey"].every(field => blob.includes(JSON.stringify(field))) && !blob.includes('"operation"')),
+    assertTrue("CONTRACT-01.importance", !blob.includes('"importance"') && blob.includes('"weights"')),
     assertTrue("CONTRACT-01.range", blob.includes('"acceptableRange"')),
-    assertTrue("CONTRACT-01.prerequisite", blob.includes('"prerequisite"')),
+    assertTrue("CONTRACT-01.prerequisite", !blob.includes('"prerequisite"') && blob.includes('"basis"')),
     assertTrue("CONTRACT-01.daysRemaining", blob.includes('"daysRemaining"')),
     assertTrue("CONTRACT-01.horizons", blob.includes('"costHorizonsDays"')),
     assertTrue("CONTRACT-01.baseline", blob.includes('"baseline"')),
@@ -1053,7 +1053,7 @@ async function runDevContract02(session: PlanSession, runIndex: number): Promise
     ),
     assertEq("CONTRACT-02.info", infoChecksum, officialChecksum),
     assertEq("CONTRACT-02.list", listedHash, directHash),
-    assertEq("CONTRACT-02.names", 7, listedTools.length)
+    assertEq("CONTRACT-02.names", 6, listedTools.length)
   ];
   return conclude("DEV-CONTRACT-02", assertions, envelopeFor(session, { method: "tools/list" }, { officialChecksum }, assertions, runIndex));
 }
@@ -1064,7 +1064,7 @@ async function runDevContract03(session: PlanSession, runIndex: number): Promise
   const assertions = [
     assertTrue("CONTRACT-03.oneOf", !blob.includes('"oneOf"') && !blob.includes("$defs")),
     assertTrue("CONTRACT-03.notCatchAll", !/"additionalProperties":\s*true/.test(blob)),
-    assertTrue("CONTRACT-03.typed", blob.includes('"importance"') && blob.includes('"daysRemaining"')),
+    assertTrue("CONTRACT-03.typed", blob.includes('"weights"') && blob.includes('"daysRemaining"')),
     assertTrue("CONTRACT-03.blurb", description.length > 40 && !/generic object/i.test(description))
   ];
   return conclude("DEV-CONTRACT-03", assertions, envelopeFor(session, { schema: "plan" }, { length: blob.length }, assertions, runIndex));
@@ -1094,7 +1094,7 @@ async function runDevContract04(session: PlanSession, runIndex: number): Promise
       "CONTRACT-04.adapters",
       adapters.every(
         (item) =>
-          (item.tools ?? []).join() === "info,plan,execute,order,support,feedback,evidence" &&
+          (item.tools ?? []).join() === "info,plan,execute,order,support,feedback" &&
           item.schemaChecksum === AGENTIC_SCHEMA_CHECKSUM &&
           (item.description ?? "").length > 40
       )
@@ -1606,7 +1606,7 @@ describe("Customer value implementation pack v1.1", () => {
     );
     assert.equal(first.snapshotId, second.snapshotId);
     assert.equal(canonicalCvImplReport(first), canonicalCvImplReport(second), "CV implementation non-latency results diverged");
-    assert.equal(MATCHER_VERSION, "practical-matching-1");
+    assert.equal(MATCHER_VERSION, "importance-matching-2");
     assert.equal(CUSTOMER_VALUE_PACK_VERSION, "dev-customer-value-v4.0");
   });
 });

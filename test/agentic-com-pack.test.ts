@@ -371,13 +371,17 @@ async function com07() {
     const seeded = await seedPlanA(runtime);
     const executed = await executeReady(runtime, seeded, key("07-arith"));
     const order = await comCall(runtime, "order", { orderHandle: executed.orderHandle });
+    const stored = await orderRecord(runtime, String(executed.orderHandle));
+    assert.ok(stored);
     const ok =
       executed.ok === true &&
       arithmeticHolds(executed.frozenPlan) &&
-      arithmeticHolds(order.frozenOrder);
+      arithmeticHolds(stored?.frozenPlan) &&
+      order.currency === stored?.currency && order.totalPriceMinor === stored?.totalPriceMinor &&
+      !Object.hasOwn(order, "frozenOrder");
     return verdict("COM-07", ok, {
       executeMoney: moneyFromFrozen(executed.frozenPlan),
-      orderMoney: moneyFromFrozen(order.frozenOrder),
+      orderMoney: moneyFromFrozen(stored?.frozenPlan),
       shippingMinor: DEFAULT_SHIPPING_MINOR,
       taxMinor: DEFAULT_TAX_MINOR
     });
@@ -390,10 +394,12 @@ async function com08() {
     const executed = await executeReady(runtime, seeded, key("08-opt"));
     const order = await comCall(runtime, "order", { orderHandle: executed.orderHandle });
     const executeOption = selectedOptionOf(executed.frozenPlan);
-    const orderOption = selectedOptionOf(order.frozenOrder);
+    const stored = await orderRecord(runtime, String(executed.orderHandle));
+    assert.ok(stored);
+    const orderOption = selectedOptionOf(stored.frozenPlan);
     const money = moneyFromFrozen(executed.frozenPlan);
     const ok =
-      executed.ok === true &&
+      executed.ok === true && order.ok === true &&
       executeOption === COM_OPT_B_LOW &&
       orderOption === COM_OPT_B_LOW &&
       money.productIds.includes(COM_PRD_B12.productId) &&
@@ -419,7 +425,7 @@ async function com09() {
     const stored = await orderRecord(runtime, String(executed.orderHandle ?? ""));
     const ok =
       executed.ok === true &&
-      JSON.stringify(order.frozenOrder ?? executed.frozenPlan) &&
+      order.ok === true &&
       stored?.planRevision === 1 &&
       JSON.stringify(stored.frozenPlan) === before;
     return verdict("COM-09", ok, {
@@ -484,18 +490,18 @@ async function com12() {
       executed.ok === true &&
       order.orderStatus === "open" &&
       order.paymentStatus === "unpaid" &&
-      order.stateVersion === 1 &&
-      order.latestPaymentAttempt == null &&
-      order.retryable === true &&
+      stored?.stateVersion === 1 &&
+      stored?.latestPaymentAttempt == null &&
+      order.nextAction === "open_checkout" &&
       frozenOf(order.fulfilment).status === "not_started" &&
       stored?.fulfilmentStatus === "not_started";
     return verdict("COM-12", ok, {
       fulfilment: frozenOf(order.fulfilment).status ?? null,
-      latestPaymentAttempt: order.latestPaymentAttempt ?? null,
+      latestPaymentAttempt: stored?.latestPaymentAttempt ?? null,
       orderStatus: order.orderStatus ?? null,
       paymentStatus: order.paymentStatus ?? null,
-      retryable: order.retryable ?? null,
-      stateVersion: order.stateVersion ?? null
+      nextAction: order.nextAction ?? null,
+      stateVersion: stored?.stateVersion ?? null
     });
   });
 }
@@ -510,24 +516,24 @@ async function com13() {
     const counts = stored ? await redactedOrderCounts({ orderId: stored.id, runtime }) : null;
     const ok =
       order.ok === true &&
-      order.orderHandle === undefined &&
+      order.orderHandle === executed.orderHandle &&
       order.orderStatus === "open" &&
       order.paymentStatus === "unpaid" &&
-      order.stateVersion === 1 &&
-      order.latestPaymentAttempt === "declined" &&
-      order.retryable === true &&
+      stored?.stateVersion === 1 &&
+      stored?.latestPaymentAttempt === "declined" &&
+      order.nextAction === "open_checkout" &&
       counts?.paymentDeclinedCount === 1 &&
       counts.omsSubmitCount === 0 &&
       stored?.id === (await orderRecord(runtime, String(executed.orderHandle)))?.id;
     return verdict("COM-13", ok, {
-      latestPaymentAttempt: order.latestPaymentAttempt ?? null,
-      latestPaymentReason: order.latestPaymentReason ?? null,
+      latestPaymentAttempt: stored?.latestPaymentAttempt ?? null,
+      latestPaymentReason: stored?.latestPaymentReason ?? null,
       omsSubmitCount: counts?.omsSubmitCount ?? null,
       orderStatus: order.orderStatus ?? null,
       paymentDeclinedCount: counts?.paymentDeclinedCount ?? null,
       paymentStatus: order.paymentStatus ?? null,
       sameCheckout: order.checkoutUrl === executed.checkoutUrl,
-      stateVersion: order.stateVersion ?? null
+      stateVersion: stored?.stateVersion ?? null
     });
   });
 }
@@ -544,19 +550,19 @@ async function com14() {
     const ok =
       order.orderStatus === "completed" &&
       order.paymentStatus === "paid" &&
-      order.stateVersion === 2 &&
-      order.latestPaymentAttempt === "succeeded" &&
-      order.retryable === false &&
+      stored?.stateVersion === 2 &&
+      stored?.latestPaymentAttempt === "succeeded" &&
+      order.nextAction === "poll" &&
       counts?.paymentConfirmedCount === 1 &&
       stored?.id === (await orderRecord(runtime, String(executed.orderHandle)))?.id;
     return verdict("COM-14", ok, {
-      latestPaymentAttempt: order.latestPaymentAttempt ?? null,
+      latestPaymentAttempt: stored?.latestPaymentAttempt ?? null,
       orderReference: order.orderReference ?? null,
       orderStatus: order.orderStatus ?? null,
       paymentConfirmedCount: counts?.paymentConfirmedCount ?? null,
       paymentStatus: order.paymentStatus ?? null,
       sameHandle: true,
-      stateVersion: order.stateVersion ?? null
+      stateVersion: stored?.stateVersion ?? null
     });
   });
 }
@@ -572,7 +578,7 @@ async function com15() {
     const ok =
       order.orderStatus === "completed" &&
       order.paymentStatus === "paid" &&
-      order.stateVersion === 2 &&
+      stored?.stateVersion === 2 &&
       counts?.paymentConfirmedCount === 1 &&
       Boolean(order.receipt) &&
       (counts?.omsSubmitCount === 1 || counts?.omsChildOrderCount === 1);
@@ -582,7 +588,7 @@ async function com15() {
       paymentConfirmedCount: counts?.paymentConfirmedCount ?? null,
       paymentStatus: order.paymentStatus ?? null,
       receipt: Boolean(order.receipt),
-      stateVersion: order.stateVersion ?? null
+      stateVersion: stored?.stateVersion ?? null
     });
   });
 }
@@ -603,13 +609,13 @@ async function com16() {
     const ok =
       JSON.stringify(afterDecline) === JSON.stringify(declineDup) &&
       afterSuccess.paymentStatus === "paid" &&
-      afterSuccess.stateVersion === 2 &&
+      stored?.stateVersion === 2 &&
       counts?.paymentConfirmedCount === 1;
     return verdict("COM-16", ok, {
       declineStable: JSON.stringify(afterDecline) === JSON.stringify(declineDup),
       paymentConfirmedCount: counts?.paymentConfirmedCount ?? null,
       paymentStatus: afterSuccess.paymentStatus ?? null,
-      stateVersion: afterSuccess.stateVersion ?? null
+      stateVersion: stored?.stateVersion ?? null
     });
   });
 }
@@ -621,16 +627,18 @@ async function com17() {
     await pay(runtime, String(executed.orderHandle), "success");
     await pay(runtime, String(executed.orderHandle), "decline_insufficient_funds");
     const order = await comCall(runtime, "order", { orderHandle: executed.orderHandle });
+    const stored = await orderRecord(runtime, String(executed.orderHandle));
+    assert.ok(stored);
     const ok =
       order.paymentStatus === "paid" &&
       order.orderStatus === "completed" &&
-      order.stateVersion === 2 &&
-      order.latestPaymentAttempt !== "declined";
+      stored?.stateVersion === 2 &&
+      stored?.latestPaymentAttempt !== "declined";
     return verdict("COM-17", ok, {
-      latestPaymentAttempt: order.latestPaymentAttempt ?? null,
+      latestPaymentAttempt: stored?.latestPaymentAttempt ?? null,
       orderStatus: order.orderStatus ?? null,
       paymentStatus: order.paymentStatus ?? null,
-      stateVersion: order.stateVersion ?? null
+      stateVersion: stored?.stateVersion ?? null
     });
   });
 }
@@ -670,17 +678,21 @@ async function com19() {
     const seeded = await seedPlanA(runtime);
     const executed = await executeReady(runtime, seeded, key("19-poll"));
     const first = await comCall(runtime, "order", { orderHandle: executed.orderHandle });
+    const firstStored = await orderRecord(runtime, String(executed.orderHandle));
+    assert.ok(firstStored);
     const second = await comCall(runtime, "order", { orderHandle: executed.orderHandle });
+    const secondStored = await orderRecord(runtime, String(executed.orderHandle));
+    assert.ok(secondStored);
     const ok =
       first.ok === true &&
       second.ok === true &&
-      first.stateVersion === second.stateVersion &&
+      firstStored.stateVersion === secondStored.stateVersion &&
       first.orderStatus === second.orderStatus &&
       first.paymentStatus === second.paymentStatus &&
-      JSON.stringify(first.frozenOrder) === JSON.stringify(second.frozenOrder);
+      JSON.stringify(firstStored.frozenPlan) === JSON.stringify(secondStored.frozenPlan);
     return verdict("COM-19", ok, {
-      firstVersion: first.stateVersion ?? null,
-      secondVersion: second.stateVersion ?? null,
+      firstVersion: firstStored.stateVersion ?? null,
+      secondVersion: secondStored.stateVersion ?? null,
       stable: JSON.stringify(first) === JSON.stringify(second)
     });
   });
@@ -698,16 +710,16 @@ async function com20() {
       order.orderStatus === "completed" &&
       receipt.currency === "THB" &&
       typeof receipt.totalPriceMinor === "number" &&
-      order.retryable === false &&
+      !Object.hasOwn(order, "retryable") &&
       order.nextAction === "poll" &&
-      order.terminal === false &&
+      !Object.hasOwn(order, "terminal") &&
       Number(order.pollAfterSeconds) > 0 &&
       frozenOf(order.fulfilment).status != null;
     return verdict("COM-20", ok, {
       fulfilment: frozenOf(order.fulfilment).status ?? null,
       nextAction: order.nextAction ?? null,
       receipt,
-      retryable: order.retryable ?? null
+      pollAfterSeconds: order.pollAfterSeconds
     });
   });
 }
@@ -718,27 +730,33 @@ async function com21() {
     const executed = await executeReady(runtime, seeded, key("21-exp"));
     const later = withNow(runtime, COM_EXPIRED_NOW);
     const first = await comCall(later, "order", { orderHandle: executed.orderHandle });
+    const firstStored = await orderRecord(later, String(executed.orderHandle));
+    assert.ok(firstStored);
     const second = await comCall(later, "order", { orderHandle: executed.orderHandle });
+    const secondStored = await orderRecord(later, String(executed.orderHandle));
+    assert.ok(secondStored);
     await pay(later, String(executed.orderHandle), "success");
     const afterPay = await comCall(later, "order", { orderHandle: executed.orderHandle });
+    const afterPayStored = await orderRecord(later, String(executed.orderHandle));
+    assert.ok(afterPayStored);
     const ok =
       first.orderStatus === "expired" &&
       first.paymentStatus === "unpaid" &&
-      first.stateVersion === 2 &&
-      first.retryable === false &&
+      firstStored.stateVersion === 1 &&
+      first.nextAction === "none" &&
       second.orderStatus === "expired" &&
-      second.stateVersion === first.stateVersion &&
+      secondStored.stateVersion === firstStored.stateVersion &&
       afterPay.orderStatus === "completed" &&
       afterPay.paymentStatus === "paid" &&
       typeof afterPay.orderReference === "string" && afterPay.orderReference === first.orderReference &&
-      JSON.stringify(afterPay.frozenOrder) === JSON.stringify(first.frozenOrder);
+      JSON.stringify(afterPayStored.frozenPlan) === JSON.stringify(firstStored.frozenPlan);
     return verdict("COM-21", ok, {
       afterPayStatus: afterPay.orderStatus ?? null,
       afterPayPayment: afterPay.paymentStatus ?? null,
       firstStatus: first.orderStatus ?? null,
-      firstVersion: first.stateVersion ?? null,
-      retryable: first.retryable ?? null,
-      secondVersion: second.stateVersion ?? null
+      firstVersion: firstStored.stateVersion ?? null,
+      nextAction: first.nextAction ?? null,
+      secondVersion: secondStored.stateVersion ?? null
     });
   });
 }
@@ -1333,15 +1351,17 @@ async function com39() {
     await pay(runtime, String(executed.orderHandle), "refund");
     const order = await comCall(runtime, "order", { orderHandle: executed.orderHandle });
     const receipt = frozenOf(order.receipt);
+    const stored = await orderRecord(runtime, String(executed.orderHandle));
+    assert.ok(stored);
     const ok =
       (order.paymentStatus === "refunded" || order.orderStatus === "cancelled") &&
       (receipt.currency === "THB" || order.paymentStatus === "refunded") &&
-      selectedOptionOf(order.frozenOrder) === selectedOptionOf(executed.frozenPlan);
+      selectedOptionOf(stored?.frozenPlan) === selectedOptionOf(executed.frozenPlan);
     return verdict("COM-39", ok, {
       orderStatus: order.orderStatus ?? null,
       paymentStatus: order.paymentStatus ?? null,
       receipt,
-      selectedOptionId: selectedOptionOf(order.frozenOrder)
+      selectedOptionId: selectedOptionOf(stored?.frozenPlan)
     });
   });
 }
@@ -1474,7 +1494,7 @@ async function com44() {
       omsChildOrderCount: counts?.omsChildOrderCount ?? null,
       paymentConfirmedCount: counts?.paymentConfirmedCount ?? null,
       paymentStatus: order.paymentStatus ?? null,
-      selectedOptionId: selectedOptionOf(order.frozenOrder)
+      selectedOptionId: selectedOptionOf(stored?.frozenPlan)
     });
   });
 }
@@ -1500,13 +1520,13 @@ async function com45() {
       declined.orderStatus === "open" &&
       paid.orderReference === executed.orderReference &&
       paid.paymentStatus === "paid" &&
-      selectedOptionOf(paid.frozenOrder) === COM_OPT_B_LOW &&
+      selectedOptionOf(stored?.frozenPlan) === COM_OPT_B_LOW &&
       frozenOf(paid.fulfilment).status === "delivered";
     return verdict("COM-45", ok, {
       declinedStatus: declined.orderStatus ?? null,
       paidStatus: paid.paymentStatus ?? null,
       sameReference: paid.orderReference === executed.orderReference,
-      selectedOptionId: selectedOptionOf(paid.frozenOrder)
+      selectedOptionId: selectedOptionOf(stored?.frozenPlan)
     });
   });
 }
@@ -1517,17 +1537,18 @@ async function com46() {
     const executed = await executeReady(runtime, seeded, key("46-ex"));
     await pay(runtime, String(executed.orderHandle), "three_ds_failed");
     const failed = await comCall(runtime, "order", { orderHandle: executed.orderHandle });
+    const stored = await orderRecord(runtime, String(executed.orderHandle));
+    assert.ok(stored);
     const explicit =
-      failed.retryable === true &&
-      (failed.nextAction === "open_checkout" || failed.latestPaymentAttempt === "declined");
-    const stuck = failed.paymentStatus === "processing" && failed.retryable === false;
+      failed.nextAction === "open_checkout" && stored.latestPaymentAttempt === "declined";
+    const stuck = failed.paymentStatus === "processing" && failed.nextAction !== "open_checkout";
     const ok = explicit && !stuck && failed.orderStatus === "open";
     return verdict("COM-46", ok, {
-      latestPaymentAttempt: failed.latestPaymentAttempt ?? null,
+      latestPaymentAttempt: stored.latestPaymentAttempt ?? null,
       nextAction: failed.nextAction ?? null,
       orderStatus: failed.orderStatus ?? null,
       paymentStatus: failed.paymentStatus ?? null,
-      retryable: failed.retryable ?? null
+      checkoutUrl: failed.checkoutUrl ?? null
     });
   });
 }
@@ -1605,7 +1626,7 @@ async function com49() {
     const retail = frozenOf(paid.retailCustomerOrder);
     const tracking = String(retail.trackingUrl ?? "");
     const orderSrc = readFileSync(
-      new URL("../lib/agentic/commerce/order.ts", import.meta.url),
+      new URL("../lib/agentic/commerce/retail-join.ts", import.meta.url),
       "utf8"
     );
     const checkoutSrc = readFileSync(
@@ -1624,7 +1645,7 @@ async function com49() {
       !isBareOrderTrackUrl(paid.successUrl) &&
       !isBareOrderTrackUrl(executed.successUrl) &&
       !executeSrc.includes("${input.config.siteUrl}/en/order/track`") &&
-      orderSrc.includes("order/track/${encodeURIComponent(settlement.orderNumber)}") &&
+      orderSrc.includes("order/track/${encodeURIComponent(row.order_number)}") &&
       checkoutSrc.includes("order/track/${encodeURIComponent(") &&
       specificWhenPresent &&
       notBareWhenPresent;

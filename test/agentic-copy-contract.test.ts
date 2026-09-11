@@ -60,6 +60,6 @@ describe("Slice A connector copy contract", () => {
     }
     assert.equal(new Set(descriptions).size, 1);
     assert.equal(descriptions[0], AGENTIC_TOOL_DESCRIPTIONS.info);
-    assert.match(descriptions[0], /Understand when to use MattaNutra.*Call first/);
+    assert.match(descriptions[0], /Understand when to use MattaNutra.*Optional discovery/s);
   });
 });

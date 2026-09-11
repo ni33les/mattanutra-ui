@@ -1074,11 +1074,11 @@ async function runContract01(session: PlanSession, runIndex: number): Promise<R2
   const names = toolList("dev").map((item) => item.name);
   const blob = planSchemaBlob();
   const assertions = [
-    assertEq("CONTRACT-01.names", "info,plan,execute,order,support,feedback,evidence", names.join()),
-    assertTrue("CONTRACT-01.ops", /"create"/.test(blob) && /"revise"/.test(blob) && /"answer"/.test(blob) && /"select"/.test(blob) && /"get"/.test(blob)),
-    assertTrue("CONTRACT-01.importance", blob.includes('"importance"')),
+    assertEq("CONTRACT-01.names", "info,plan,execute,order,support,feedback", names.join()),
+    assertTrue("CONTRACT-01.ops", AGENTIC_TOOL_SCHEMAS.plan.anyOf.length === 5 && ["targets", "planHandle", "answers", "selectedOptionId", "expectedRevision", "idempotencyKey"].every(field => blob.includes(JSON.stringify(field))) && !blob.includes('"operation"')),
+    assertTrue("CONTRACT-01.importance", !blob.includes('"importance"') && blob.includes('"weights"')),
     assertTrue("CONTRACT-01.range", blob.includes('"acceptableRange"')),
-    assertTrue("CONTRACT-01.prerequisite", blob.includes('"prerequisite"')),
+    assertTrue("CONTRACT-01.prerequisite", !blob.includes('"prerequisite"') && blob.includes('"basis"')),
     assertTrue("CONTRACT-01.daysRemaining", blob.includes('"daysRemaining"')),
     assertTrue("CONTRACT-01.horizons", blob.includes('"costHorizonsDays"')),
     assertTrue("CONTRACT-01.baseline", blob.includes('"baseline"'))
@@ -1110,7 +1110,7 @@ async function runContract02(session: PlanSession, runIndex: number): Promise<R2
     ),
     assertEq("CONTRACT-02.info", infoChecksum, officialChecksum),
     assertEq("CONTRACT-02.list", listedHash, directHash),
-    assertEq("CONTRACT-02.names", 7, listedTools.length)
+    assertEq("CONTRACT-02.names", 6, listedTools.length)
   ];
   return conclude("R2-CONTRACT-02", assertions, envelopeFor(session, { method: "tools/list" }, { officialChecksum }, assertions, runIndex));
 }
@@ -1413,7 +1413,7 @@ describe("Customer value implementation pack v1.2", () => {
     );
     assert.equal(first.snapshotId, second.snapshotId);
     assert.equal(canonicalR2Report(first), canonicalR2Report(second), "All non-latency request and response evidence must match across runs");
-    assert.equal(MATCHER_VERSION, "practical-matching-1");
+    assert.equal(MATCHER_VERSION, "importance-matching-2");
     assert.equal(CUSTOMER_VALUE_PACK_VERSION, "dev-customer-value-v4.0");
   });
 });

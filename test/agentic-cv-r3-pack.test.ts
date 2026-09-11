@@ -635,7 +635,7 @@ describe("Customer value implementation pack v1.3", () => {
     );
     assert.equal(first.snapshotId, second.snapshotId);
     assert.equal(canonicalR3Report(first), canonicalR3Report(second), "R3 non-latency results diverged");
-    assert.equal(MATCHER_VERSION, "practical-matching-1");
+    assert.equal(MATCHER_VERSION, "importance-matching-2");
     assert.equal(CUSTOMER_VALUE_PACK_VERSION, "dev-customer-value-v4.0");
   });
 });

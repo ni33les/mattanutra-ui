@@ -96,6 +96,54 @@
         "DISC-DET-04"
       ],
       "change": "Add independently versioned v11 locale goldens removing only evidence title/purpose; preserve the prior files and all remaining wording. Assert new discovery identity."
+    },
+    {
+      "files": [
+        "test/agentic-contract.test.ts",
+        "test/agentic-copy-contract.test.ts"
+      ],
+      "change": "Replace retired create-operation and mandatory-info wording checks with flat create/poll/refine and optional-discovery assertions. Preserve exact generated publication, schema, environment and consent checks."
+    },
+    {
+      "file": "scripts/published-client-semantics.mjs",
+      "caseIds": [
+        "COM paired support evidence",
+        "customer-value acceptance evidence"
+      ],
+      "change": "Narrow option identity normalization to actual revision-scoped opt_ plus 32 hex IDs. Stable and arbitrary option strings remain significant. No new ignored fields. Existing failed anti-masking assertions become green without changing historical evidence."
+    },
+    {
+      "file": "test/agentic-com-pack.test.ts",
+      "caseIds": [
+        "COM-07",
+        "COM-08",
+        "COM-09",
+        "COM-12",
+        "COM-13",
+        "COM-14",
+        "COM-15",
+        "COM-16",
+        "COM-17",
+        "COM-19",
+        "COM-20",
+        "COM-21",
+        "COM-39",
+        "COM-44",
+        "COM-45",
+        "COM-46",
+        "COM-49"
+      ],
+      "change": "Keep every COM-01\u201350 case and financial assertion. Assert removed frozen/version/payment-attempt details on separately read stored order records, while verifying compact public status, handle, totals, receipt and recovery action. Prove expiration reads leave stored revision at 1, with late payment still succeeding. Update tracking producer source path to its existing retail-join location. Preserve all fixture prices and raw MCP transcripts."
+    },
+    {
+      "files": [
+        "test/agentic-cv-fix-pack.test.ts",
+        "test/agentic-cv-impl-pack.test.ts",
+        "test/agentic-cv-r2-pack.test.ts",
+        "test/agentic-cv-r3-pack.test.ts",
+        "test/agentic-cv-r4-pack.test.ts"
+      ],
+      "change": "Keep historical case IDs and all matching, safety and monetary checks. Current discovery asserts six tools and five flat schema branches, with weights/basis replacing retired target importance/prerequisite inputs. Assert the unchanged deployed importance-matching-2 identity. FIX-08 looks up adult D3 in its supported total-intake scope, retaining unknown/reference-amount/source-scope checks."
     }
   ],
   "casesRemoved": 0,

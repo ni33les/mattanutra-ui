@@ -2,6 +2,7 @@
 export const CLIENT_NORMALIZATION = Object.freeze({
   discarded: ["latencyMs", "ackMs", "catalogueMs", "matchMs", "searchMs", "serializeMs"],
   opaqueIdentityFields: ["planHandle", "orderHandle", "optionId", "recommendedOptionId", "selectedOptionId", "evidenceHandle", "supportHandle", "orderReference", "caseReference", "messageId", "correlationId", "idempotencyKey", "runKey"],
+  optionIdentities: "Only revision-scoped opt_ plus 32 hexadecimal digits are generated. Stable option labels and other strings remain significant.",
   eventIdentities: "Only UUID-backed order:, payment: and fulfilment: event IDs; ordinals preserve repeated and distinct events.",
   supportMessageIdentities: "UUID-backed thread[].id values in support payloads containing caseReference and supportHandle share the messageId mapping; message references and distinct thread entries remain distinguishable.",
   identityMapping: "Consistent first-occurrence ordinals preserve equality and distinctness within each identity type. Exact registered references in prose and URLs share those mappings.",
@@ -30,7 +31,7 @@ export function normalizePublishedClientResult(input, endpoint) {
     return { parsed: false, value };
   }
   function identityType(value, key, supportIdentity) {
-    if (["optionId", "recommendedOptionId", "selectedOptionId"].includes(key)) return "optionId";
+    if (["optionId", "recommendedOptionId", "selectedOptionId"].includes(key)) return /^opt_[0-9a-f]{32}$/.test(value) ? "optionId" : undefined;
     if (CLIENT_NORMALIZATION.opaqueIdentityFields.includes(key)) return key;
     if (key === "id" && supportIdentity && uuidId.test(value)) return "messageId";
     if (key === "id" && eventId.test(value)) return `${value.split(":")[0]}EventId`;

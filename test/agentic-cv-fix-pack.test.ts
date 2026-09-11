@@ -701,7 +701,7 @@ export async function runCvFixPack(frozenInput?: ValueCatalogueFreeze): Promise<
         const intent = schemaHasIntent(planSchema);
         const officialChecksum = computeSchemaChecksum();
         const failed: string[] = [];
-        if (names.join() !== "info,plan,execute,order,support,feedback,evidence") {
+        if (names.join() !== "info,plan,execute,order,support,feedback") {
           failed.push("FIX-06.A1");
         }
         if (
@@ -806,6 +806,7 @@ export async function runCvFixPack(frozenInput?: ValueCatalogueFreeze): Promise<
         const plan = await createPlan(freeze, primaryRequest(freeze));
         const d3 = coverageOf(plan).find((row) => /vitamin d/i.test(String(row.name)));
         const ceiling = safetyCeilingFor(matcherSafetyCeilings(), {
+          sourceScope: "total", // The supported adult D3 reference is a total-intake limit.
           conditionCodes: ["atrial_fibrillation"],
           name: String(d3?.name ?? "Vitamin D3"),
           profile: { ageYears: 52, lifeStage: "adult" },

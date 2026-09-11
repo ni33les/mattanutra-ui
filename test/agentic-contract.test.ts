@@ -54,7 +54,7 @@ describe(`agentic MCP contract ${AGENTIC_CONTRACT_VERSION}`, () => {
     assert.match(planRequest, /info\.medicationCodes/);
     assert.match(planRequest, /info\.conditionCodes/);
     assert.match(planRequest, /excludeSupplementIds/);
-    assert.match(planRequest, /name, amount, and unit/);
+    for (const field of ["name", "amount", "unit"]) assert.ok(Object.hasOwn(PLAN_INPUT_SCHEMA.anyOf[0].properties.targets.items.properties, field));
   });
 
   it("keeps the checked-in contract snapshot in sync", () => {
@@ -103,8 +103,8 @@ describe(`agentic MCP contract ${AGENTIC_CONTRACT_VERSION}`, () => {
 
     const result = rpcResult(response);
     assert.equal(result.instructions, AGENTIC_SERVER_INSTRUCTIONS);
-    assert.match(String(result.instructions), /plan\(create\).*confirm.*execute/s);
-    assert.match(String(result.instructions), /conversation.*default/i);
+    assert.match(String(result.instructions), /flat targets.*create.*confirm.*execute/s);
+    assert.match(String(result.instructions), /default.*adjust weights from the conversation/i);
     assert.equal(/D1-01 through D10-10/.test(String(result.instructions)), false);
     assert.equal(/\/api\/mcp\/qa/.test(String(result.instructions)), false);
     assert.equal(/dev-mcp-qa-token/.test(String(result.instructions)), false);
@@ -133,8 +133,8 @@ describe(`agentic MCP contract ${AGENTIC_CONTRACT_VERSION}`, () => {
     });
     const result = rpcResult(response);
     assert.equal(result.instructions, AGENTIC_UAT_SERVER_INSTRUCTIONS);
-    assert.match(String(result.instructions), /poll the existing handle/i);
-    assert.match(String(result.instructions), /poll order/);
+    assert.match(String(result.instructions), /only planHandle to read\/poll/i);
+    assert.match(String(result.instructions), /order recovers\/tracks payment and fulfilment/);
     assert.match(String(result.instructions), /test payments only/);
     assert.match(AGENTIC_TOOL_DESCRIPTIONS.feedback, /optional feedback.*consentConfirmed=true/);
     assert.equal(String(result.instructions).includes("dev-mcp-qa-token"), false);
@@ -166,8 +166,8 @@ describe(`agentic MCP contract ${AGENTIC_CONTRACT_VERSION}`, () => {
     });
     const result = rpcResult(response);
     assert.equal(result.instructions, AGENTIC_PRD_SERVER_INSTRUCTIONS);
-    assert.match(String(result.instructions), /poll the existing handle/i);
-    assert.match(String(result.instructions), /poll order/);
+    assert.match(String(result.instructions), /only planHandle to read\/poll/i);
+    assert.match(String(result.instructions), /order recovers\/tracks payment and fulfilment/);
     assert.equal(String(result.instructions).includes("Stripe Test Mode"), false);
     assert.equal(String(result.instructions).includes("4242"), false);
     assert.equal(String(result.instructions).includes("dev-mcp-qa-token"), false);
