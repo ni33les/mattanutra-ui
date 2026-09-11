@@ -67,3 +67,32 @@ test("LOCK-PREP-04 formulation and food advice are prepared before publication a
     assert.ok(reads.length>0);
   }
 });
+
+test("LOCK-BOUNDARY-PUBLISH-01 run and product lines publish together without a second protected round trip", async () => {
+  const productTask = task("generate_product_recommendations");
+  const reference = { runtimeRevision: 99, fingerprint: "a".repeat(64) };
+  Object.assign(productTask.payload, { catalogueRevision: 99, safetyReferenceIdentity: reference });
+  const payload = { catalogueRevision: 99, safetyReferenceIdentity: reference,
+    recommendations: [{ product: { id: "e1dc61db-170f-4e17-806d-b2597208ea20", title: "Fixture", priceAmount: 123.45, currency: "THB", platform: "manual" },
+      rank: 1, score: 9, productCoveragePercent: 75, stackContributionPercent: 75, servingMultiplier: 2, coveredNeeds: [], why: "Frozen advice", url: "https://fixture.invalid", unknownAtRecommendation: false }],
+    stackCoveragePercent: 75, diagnostics: { stackPreference: "balanced", trace: {} } };
+  const statements: string[] = [];
+  let runId = "";
+  const sql = Object.assign(async (parts: TemplateStringsArray) => {
+    const query = parts.join("?"); statements.push(query);
+    if (query.includes("from public.assessments")) return [{ input_revision: 1, input_hash: "frozen" }];
+    if (/insert into public.product_recommendation_runs/.test(query)) return [{ id: runId }];
+    if (query.includes("to_regclass")) return [{ table_name: "public.product_recommendation_decisions" }];
+    return [];
+  }, { json: (value: unknown) => value }) as unknown as TaskServiceDb;
+  const prepared = await completion.prepareTaskCompletionResult({ task: productTask, resultPayload: payload, sql });
+  assert.ok(prepared.products?.selected); runId = prepared.products.selected.runId;
+  statements.length = 0;
+  const result = await completion.applyTaskCompletionResult({ task: productTask, taskId: productTask.id, resultPayload: payload, preparedResult: prepared, sql, afterCommit: () => {} }) as { recommendationRunId: string };
+  assert.equal(result.recommendationRunId, runId);
+  const storage = statements.filter(q => /insert into public.product_recommendation_(runs|items)/.test(q));
+  assert.equal(storage.length, 1);
+  assert.match(storage[0], /insert into public.product_recommendation_runs[\s\S]*insert into public.product_recommendation_items/);
+  assert.equal(JSON.parse(prepared.products.selected.itemsJson)[0].price_amount, 123.45);
+  assert.equal(statements.filter(q => q.includes("to_regclass")).length, 0, "Schema discovery belongs before publication");
+});
