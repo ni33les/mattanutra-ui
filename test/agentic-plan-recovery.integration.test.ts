@@ -80,7 +80,7 @@ describe("MCP plan recovery across PostgreSQL processes", { timeout: 45_000 }, (
       const pending = await store.getPlanRevision(ids[0]!, 1);
       assert.equal(pending?.status, "processing");
       assert.equal((pending?.result as PlanResult).pendingInput?.request.targets[0]?.name, "Vitamin D3");
-      assert.equal((pending?.result as PlanResult).pendingInput?.request.targets[0]?.supplementId, undefined);
+      assert.equal((pending?.result as PlanResult).pendingInput?.request.targets[0]?.supplementId, "sup_11111111111111111111111111111111");
       interrupted.child.kill("SIGKILL");
       assert.equal((await interrupted.exited).signal, "SIGKILL");
       const operation = await store.getActivePlanOperation(ids[0]!); assert.ok(operation);
@@ -104,7 +104,10 @@ describe("MCP plan recovery across PostgreSQL processes", { timeout: 45_000 }, (
       assert.equal(ready?.status, "no_purchase");
       assert.equal((ready?.result as PlanResult).pendingInput, undefined);
       const receipt = await store.getIdempotency("plan", `dev:mattanutra:${principal}`, key);
-      assert.deepEqual(JSON.parse(receipt!.responseJson), a.result);
+      assert.ok(receipt);
+      const terminal = await store.getPlanOperation(operation.id);
+      assert.equal(terminal?.status, "complete");
+      assert.deepEqual(JSON.parse(receipt.responseJson), JSON.parse(JSON.stringify(terminal!.response)), "Durable operation and receipt retain the same complete result; both public retries above return the same single decision");
       const [counts] = await getSql()!`select
         (select count(*)::int from public.agentic_plan_revisions where plan_id = ${ids[0]}::uuid) as revisions,
         (select count(*)::int from public.agentic_orders where plan_id = ${ids[0]}::uuid) as orders`;

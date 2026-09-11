@@ -50,13 +50,16 @@ describe("web advisory matching boundaries", () => {
     try {
       const result = recommendWithMatcher({ needs: [need("a")], candidates: [product("combo", { a: 100, b: 5 })],
         clientContext: { continuedIntake: [{ subjectId: "b", name: "b", dailyAmount: 10, unit: "mg", sourceId: "reported-b" }], unknownIntakeSubjectIds: [] } });
-      const advice = result.diagnostics.matching?.options[0]?.advice.find(row => row.code === "continued_dose_increased");
+      const basket = result.diagnostics.matching?.options.find(row => row.productIds.length === 1 && row.productIds[0] === "combo");
+      assert.ok(basket, "The original combo must remain available with its continued-dose advice");
+      assert.deepEqual(basket.dailyServings, [1]);
+      const advice = basket.advice.find(row => row.code === "continued_dose_increased");
       assert.equal(advice?.severity, "info");
       assert.equal(advice?.amount, 15);
       assert.deepEqual(advice?.referenceDose, { amount: 10, unit: "mg", basis: "continued_dose" });
       assert.equal(advice?.referenceLimit, null);
       assert.equal(result.clientNeeds.some(row => row.displayName === "b"), false);
-      assert.equal(result.diagnostics.matching?.options[0]?.doseFit?.total, 0.5);
+      assert.equal(basket.doseFit?.total, 0.5);
       assert.match(typeof advice?.message === "string" ? advice.message : advice?.message.en ?? "", /not a medical limit or an agreed target/);
     } finally { resetMatcherSafetyCeilings(); }
   });

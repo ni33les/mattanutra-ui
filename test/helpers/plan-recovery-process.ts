@@ -47,12 +47,10 @@ try {
   });
   const request = {
     id: 1, method: "tools/call", params: { name: "plan", arguments: {
-      operation: "create", idempotencyKey, responseView: "full",
-      request: {
-        destinationCountry: "TH", locale: "en", optimization: "balanced",
+      idempotencyKey,
+        destinationCountry: "TH", locale: "en", scoring: { profile: "best_match" },
         profile: { ageYears: 38, lifeStage: "adult", sex: "male" }, requirements: {},
         targets: [{ name: "Vitamin D3", amount: 1000, unit: "IU" }]
-      }
     } }
   };
   let response = await handleJsonRpc(runtime, request);

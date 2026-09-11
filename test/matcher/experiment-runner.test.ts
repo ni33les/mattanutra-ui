@@ -30,7 +30,8 @@ describe("focused experiment runner", () => {
       'test("x", () => {});',
       'test("x", () => { if (!rows.length) return; assert.ok(rows[0]); });'
     ]) assert.ok(experimentHygiene(source, "fixture.test.ts").length > 0, source);
-    assert.deepEqual(experimentHygiene('test("x", () => { assert.ok(!("error" in input)); if ("error" in input) return; assert.ok(input.value); });', "fixture.test.ts"), []);
+    assert.ok(experimentHygiene('test("x", () => { assert.ok(!("error" in input)); if ("error" in input) return; assert.ok(input.value); });', "fixture.test.ts").length > 0, "Acceptance rejects early-return guards even after an assertion");
+    assert.deepEqual(experimentHygiene('test("x", () => { assert.ok(!("error" in input)); assert.ok(input.value); });', "fixture.test.ts"), []);
     assert.deepEqual(experimentHygiene('test("x", () => { assert.equal("test.only", "test.only"); });', "fixture.test.ts"), []);
   });
   it("requires actual successful cases for every selected file and rejects unexpected results", () => {

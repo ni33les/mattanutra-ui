@@ -28,14 +28,16 @@ describe("live plan latency vantage ownership", () => {
     for (let index = 0; index < 10; index += 1) {
       const pub = await liveCall(LIVE_PUBLIC, "plan", {
         idempotencyKey: stamp(`lat-pub-${index}`),
-        request: magCurrentRequest(300, 90)
+        ...magCurrentRequest(300, 90)
       });
       const origin = await liveCall(LIVE_ORIGIN, "plan", {
         idempotencyKey: stamp(`lat-origin-${index}`),
-        request: magCurrentRequest(300, 90)
+        ...magCurrentRequest(300, 90)
       });
       assert.equal(pub.status, 200);
       assert.equal(origin.status, 200);
+      assert.equal(pub.structured.ok, true, JSON.stringify(pub.structured));
+      assert.equal(origin.structured.ok, true, JSON.stringify(origin.structured));
       publicSamples.push(pub.ms);
       originSamples.push(origin.ms);
     }

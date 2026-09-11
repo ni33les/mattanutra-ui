@@ -1,3 +1,4 @@
+import { publicRequest } from "../ax-refinement/helpers.ts";
 import assert from "node:assert/strict";
 import { afterEach, test } from "node:test";
 import { installGoldCatalogue, uninstallGoldCatalogue } from "../helpers/gold-catalogue.ts";
@@ -17,16 +18,16 @@ test("LOCK-DUP-01 duplicate plan admission reaches its database boundary without
   const work=[planTool({...app,now:app.now!,payload}),planTool({...app,now:app.now!,payload})];
   try {await ready;await new Promise(resolve=>setImmediate(resolve));beforeRelease=entered;}
   finally {release();setPlanClaimLatchForTests(key,null);}
-  const results=await Promise.all(work);assert.equal(beforeRelease,2);assert.ok(results.every(result=>result.ok));assert.deepEqual(results[0],results[1]);
+  const results=await Promise.all(work);assert.equal(beforeRelease,2);assert.ok(results.every(result=>result.ok));assert.deepEqual(JSON.parse(JSON.stringify(results[0])),JSON.parse(JSON.stringify(results[1])));
   assert.equal((await app.store.listPlanIdsByPrincipal(app.scope.principalScope!)).length,1);
 });
 
 test("LOCK-DUP-02 concurrent checkout preparation is independent and atomic writes return one frozen order", async () => {
   installGoldCatalogue(); const app=runtime("lock-checkout-duplicates");
-  const created=await rpcWithTaskExecutor(app,"plan",{operation:"create",idempotencyKey:"lock-checkout-plan",request,responseView:"full"});
-  const option=created.options.find(row=>row.purchaseEligible && row.basket.length && row.roles?.includes("closest_dose"));
-  assert.ok(option, "Duplicate checkout must exercise a real eligible purchase");
-  const plan=await rpcWithTaskExecutor(app,"plan",{operation:"select",planHandle:created.planHandle,expectedRevision:created.revision,candidateKey:option.candidateKey,idempotencyKey:"lock-checkout-select",responseView:"full"});
+  const created=await rpcWithTaskExecutor(app,"plan",{idempotencyKey:"lock-checkout-plan",...publicRequest({...request, requirements:{productDoses:[{productId:"prd_b1111111111111111111111111111111",servingsPerDay:1}]}})});
+  const option=(created.choices as {products: unknown[]}[])[0];
+  assert.ok(option?.products.length, "Duplicate checkout must exercise a real eligible purchase");
+  const plan=await rpcWithTaskExecutor(app,"plan",{planHandle:created.planHandle,expectedRevision:created.revision,idempotencyKey:"lock-checkout-select"});
   assert.equal(plan.status,"ready",JSON.stringify(plan));
   let release!:()=>void, first!:()=>void, entered=0, beforeRelease=0;
   const gate=new Promise<void>(resolve=>{release=resolve;});const ready=new Promise<void>(resolve=>{first=resolve;});
@@ -35,5 +36,5 @@ test("LOCK-DUP-02 concurrent checkout preparation is independent and atomic writ
   const work=[executeTool(input),executeTool(input)];
   try {await ready;await new Promise(resolve=>setImmediate(resolve));beforeRelease=entered;}
   finally {release();}
-  const results=await Promise.all(work);assert.equal(beforeRelease,2);assert.ok(results.every(result=>result.ok),JSON.stringify(results));assert.deepEqual(results[0],results[1]);
+  const results=await Promise.all(work);assert.equal(beforeRelease,2);assert.ok(results.every(result=>result.ok),JSON.stringify(results));assert.deepEqual(JSON.parse(JSON.stringify(results[0])),JSON.parse(JSON.stringify(results[1])));
 });

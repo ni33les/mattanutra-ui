@@ -30,7 +30,7 @@ function rpcResult(response: JsonRpcResponse | null) {
 }
 
 describe(`agentic MCP contract ${AGENTIC_CONTRACT_VERSION}`, () => {
-  it("exposes the installed-connector public tools", () => {
+  it("publishes the current tool contract for connector exporters", () => {
     assert.deepEqual([...AGENTIC_PUBLIC_TOOLS], [
       "info",
       "plan",
@@ -136,7 +136,7 @@ describe(`agentic MCP contract ${AGENTIC_CONTRACT_VERSION}`, () => {
     assert.match(String(result.instructions), /only planHandle to read\/poll/i);
     assert.match(String(result.instructions), /order recovers\/tracks payment and fulfilment/);
     assert.match(String(result.instructions), /test payments only/);
-    assert.match(AGENTIC_TOOL_DESCRIPTIONS.feedback, /optional feedback.*consentConfirmed=true/);
+    assert.match(AGENTIC_TOOL_DESCRIPTIONS.feedback, /optional[^.]*feedback.*consentConfirmed=true/);
     assert.equal(String(result.instructions).includes("dev-mcp-qa-token"), false);
     assert.equal(String(result.instructions).includes("scenario=decline_insufficient_funds"), false);
     const listed = await handleJsonRpc(runtime, { id: 2, method: "tools/list" });

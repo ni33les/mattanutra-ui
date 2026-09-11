@@ -33,7 +33,7 @@ describe("Phase 5 discovery copy", () => {
     }
   });
 
-  it("replays a processing plan when polled with the same key and planHandle", async () => {
+  it("replays identical processing input and rejects reusing its key for confirmation", async () => {
     const store = createMemoryStore();
     const created = {
       idempotencyKey: "r4-poll-contract-01",
@@ -67,17 +67,19 @@ describe("Phase 5 discovery copy", () => {
       },
       store
     });
-    assert.equal(poll.kind, "replay");
-    if (poll.kind === "replay") {
-      assert.equal((poll.response as { status: string }).status, "processing");
+    assert.equal(poll.kind, "conflict", "Adding a handle and revision changes mutation identity");
+    const replay = await beginIdempotency({ key: created.idempotencyKey, now: "2026-08-25T00:00:05.000Z", operation: "plan", ownerScope: "dev:test:anon", payload: created, store });
+    assert.equal(replay.kind, "replay");
+    if (replay.kind === "replay") {
+      assert.equal((replay.response as { status: string }).status, "processing");
       assert.equal(
-        (poll.response as { planHandle: string }).planHandle,
+        (replay.response as { planHandle: string }).planHandle,
         processing.planHandle
       );
     }
   });
 
-  it("replays a completed match when polled with the same key and planHandle", async () => {
+  it("replays identical completed input and rejects reusing its key for confirmation", async () => {
     const store = createMemoryStore();
     const created = {
       idempotencyKey: "r4-poll-contract-02",
@@ -111,9 +113,11 @@ describe("Phase 5 discovery copy", () => {
       },
       store
     });
-    assert.equal(poll.kind, "replay");
-    if (poll.kind === "replay") {
-      assert.equal((poll.response as { status: string }).status, "needs_input");
+    assert.equal(poll.kind, "conflict", "Adding a handle and revision changes mutation identity");
+    const replay = await beginIdempotency({ key: created.idempotencyKey, now: "2026-08-25T00:00:05.000Z", operation: "plan", ownerScope: "dev:test:anon", payload: created, store });
+    assert.equal(replay.kind, "replay");
+    if (replay.kind === "replay") {
+      assert.equal((replay.response as { status: string }).status, "needs_input");
     }
   });
 

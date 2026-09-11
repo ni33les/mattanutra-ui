@@ -16,7 +16,7 @@ import { createMockPaymentAdapter } from "../../../lib/agentic/commerce/payment.
 import { installGoldCatalogue, uninstallGoldCatalogue } from "../../helpers/gold-catalogue.ts";
 import { completedPlanTool as planTool } from "../../helpers/completed-mcp-client.ts";
 import { executeTool } from "../../../lib/agentic/commerce/execute.ts";
-import { orderTool } from "../../../lib/agentic/commerce/order.ts";
+import { readOrderForQa as orderTool } from "../../../lib/agentic/qa/order-read.ts";
 import { goldenPlanRequest } from "../../../lib/agentic/qa/proofs.ts";
 import {
   captureDurableFunnelState,

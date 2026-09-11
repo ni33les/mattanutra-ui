@@ -4,8 +4,9 @@ import {
   LIVE_ORIGIN,
   LIVE_PUBLIC,
   LIVE_QA,
-  liveCompletedFullCall as liveCall,
+  liveCompletedCall as liveCall,
   magCurrentRequest,
+  observeIsolatedStoredPlan,
   stamp
 } from "./helpers/live-mcp.ts";
 
@@ -41,7 +42,7 @@ function scheduleBucket(plan: Record<string, unknown>, horizon: number) {
   return asRecord(asRecord(plan.orderSchedule)[String(horizon)]);
 }
 
-describe("live v4 DUR/CON/CAN/IDENT regression", () => {
+describe("current HTTP protocol and retained DUR/CON/CAN/IDENT financial regression", () => {
   it("LIVE-IDENT public origin and QA share one build and schema checksum", async () => {
     const pub = await liveCall(LIVE_PUBLIC, "info", { locale: "en" });
     const origin = await liveCall(LIVE_ORIGIN, "info", { locale: "en" });
@@ -61,9 +62,10 @@ describe("live v4 DUR/CON/CAN/IDENT regression", () => {
   it("LIVE-DUR-01 missing daysRemaining does not invent horizon coverage or zero cash", async () => {
     const created = await liveCall(LIVE_PUBLIC, "plan", {
       idempotencyKey: stamp("dur01"),
-      request: magCurrentRequest(300)
+      ...magCurrentRequest(300)
     });
-    const plan = created.structured;
+    assert.equal(created.structured.ok, true, JSON.stringify(created.structured));
+    const plan = await observeIsolatedStoredPlan(created.structured.planHandle, created.structured.revision);
     const row = magCoverage(plan);
     const questions = Array.isArray(plan.questions) ? plan.questions.map(asRecord) : [];
     const duration = questions.filter((item) =>
@@ -87,9 +89,10 @@ describe("live v4 DUR/CON/CAN/IDENT regression", () => {
   it("LIVE-CON-01 unknown acquisition keeps full_horizon and null consumption", async () => {
     const created = await liveCall(LIVE_PUBLIC, "plan", {
       idempotencyKey: stamp("con01"),
-      request: magCurrentRequest(300, 30)
+      ...magCurrentRequest(300, 30)
     });
-    const plan = created.structured;
+    assert.equal(created.structured.ok, true, JSON.stringify(created.structured));
+    const plan = await observeIsolatedStoredPlan(created.structured.planHandle, created.structured.revision);
     const economics = economicsOf(plan);
     assert.equal(plan.ok, true);
     assert.equal(String(economics.consumptionScope ?? plan.consumptionScope), "full_horizon");
@@ -107,36 +110,41 @@ describe("live v4 DUR/CON/CAN/IDENT regression", () => {
     const highKey = stamp("can-high");
     const low = await liveCall(LIVE_PUBLIC, "plan", {
       idempotencyKey: lowKey,
-      request: magCurrentRequest(300, 90)
+      ...magCurrentRequest(300, 90)
     });
     const high = await liveCall(LIVE_PUBLIC, "plan", {
       idempotencyKey: highKey,
-      request: magCurrentRequest(349, 90)
+      ...magCurrentRequest(349, 90)
     });
     const lowReplay = await liveCall(LIVE_PUBLIC, "plan", {
       idempotencyKey: lowKey,
-      request: magCurrentRequest(300, 90)
+      ...magCurrentRequest(300, 90)
     });
     const a349 = high;
     const a350 = await liveCall(LIVE_PUBLIC, "plan", {
       idempotencyKey: stamp("can-350"),
-      request: magCurrentRequest(350, 90)
+      ...magCurrentRequest(350, 90)
     });
     const a351 = await liveCall(LIVE_PUBLIC, "plan", {
       idempotencyKey: stamp("can-351"),
-      request: magCurrentRequest(351, 90)
+      ...magCurrentRequest(351, 90)
     });
+    const stored = new Map<Record<string, unknown>,Record<string, unknown>>();
+    for (const response of [low, high, lowReplay, a350, a351]) {
+      assert.equal(response.structured.ok, true, JSON.stringify(response.structured));
+      stored.set(response.structured, await observeIsolatedStoredPlan(response.structured.planHandle, response.structured.revision));
+    }
     const hash = (plan: Record<string, unknown>) => String(asRecord(plan.canonical).hash ?? "");
-    assert.equal(Number(magCoverage(low.structured)?.currentAmount), 300);
-    assert.equal(Number(magCoverage(high.structured)?.currentAmount), 349);
-    assert.notEqual(hash(low.structured), hash(high.structured));
-    assert.equal(hash(low.structured), hash(lowReplay.structured));
-    assert.equal(magSafetyAction(a349.structured), "clear");
-    assert.equal(magSafetyAction(a350.structured), "review");
-    assert.equal(magSafetyAction(a351.structured), "review");
-    assert.notEqual(a351.structured.status, "blocked");
+    assert.equal(Number(magCoverage(stored.get(low.structured)!)?.currentAmount), 300);
+    assert.equal(Number(magCoverage(stored.get(high.structured)!)?.currentAmount), 349);
+    assert.notEqual(hash(stored.get(low.structured)!), hash(stored.get(high.structured)!));
+    assert.equal(hash(stored.get(low.structured)!), hash(stored.get(lowReplay.structured)!));
+    assert.equal(magSafetyAction(stored.get(a349.structured)!), "clear");
+    assert.equal(magSafetyAction(stored.get(a350.structured)!), "review");
+    assert.equal(magSafetyAction(stored.get(a351.structured)!), "review");
+    assert.notEqual(stored.get(a351.structured)!.status, "blocked");
     assert.equal(
-      new Set([hash(a349.structured), hash(a350.structured), hash(a351.structured)]).size,
+      new Set([hash(stored.get(a349.structured)!), hash(stored.get(a350.structured)!), hash(stored.get(a351.structured)!)]).size,
       3
     );
   });

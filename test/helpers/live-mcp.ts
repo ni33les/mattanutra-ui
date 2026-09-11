@@ -118,23 +118,36 @@ export function liveCall(
   );
 }
 
-/** A completed-journey client: explicit full data, ordinary status polling,
- * and a final full GET. Only the external worker performs calculation. */
-export async function liveCompletedFullCall(url: string, name: string, args: Record<string, unknown>, extraHeaders: Record<string, string> = {}) {
+/** Current public client: flat requests and handle-only polling. The external
+ * task worker performs matching. No private field or retired-response adapter. */
+export async function liveCompletedCall(url: string, name: string, args: Record<string, unknown>, extraHeaders: Record<string, string> = {}) {
   if (!/(^|[._])plan$/.test(name)) return liveCall(url, name, args, extraHeaders);
   const started = Date.now();
-  let result = await liveCall(url, name, { responseView: "full", ...args }, extraHeaders);
+  let result = await liveCall(url, name, args, extraHeaders);
   const handle = result.structured.planHandle;
   while (result.structured.ok === true && result.structured.status === "processing") {
     assert.ok(typeof handle === "string", "Processing requires a returned plan handle");
     assert.ok(Date.now() - started < 175_000, "Matching exceeded its published overall deadline");
     await delay(Math.max(1, Number(result.structured.pollAfterSeconds) || 1) * 1000);
-    result = await liveCall(url, name, { operation: "get", planHandle: handle, responseView: "status" }, extraHeaders);
-  }
-  if (result.structured.responseView === "status" && result.structured.ok === true) {
-    result = await liveCall(url, name, { operation: "get", planHandle: handle, responseView: args.responseView ?? "full" }, extraHeaders);
+    result = await liveCall(url, name, { planHandle: handle }, extraHeaders);
   }
   return { ...result, ms: Date.now() - started };
+}
+
+/** Test-harness observation of retained financial internals, separate from the
+ * HTTP client. Never runs against a live customer database. */
+export async function observeIsolatedStoredPlan(handle: unknown, revision: unknown) {
+  assert.equal(target.isolatedCandidate, true, "Internal ledger evidence requires an isolated candidate");
+  assert.equal(typeof handle, "string"); assert.equal(typeof revision, "number");
+  const { createRuntimeStore } = await import("../../lib/agentic/store/postgres.ts");
+  const { hashCapability } = await import("../../lib/agentic/capabilities.ts");
+  const { loadAgenticConfig } = await import("../../lib/agentic/config.ts");
+  const store = createRuntimeStore();
+  const capability = await store.getCapabilityByHash(hashCapability(loadAgenticConfig().capabilitySecret, handle as string));
+  assert.ok(capability, "Returned handle must identify a stored plan");
+  const saved = await store.getPlanRevision(capability.resourceId, revision as number);
+  assert.ok(saved, "Terminal public revision must be stored");
+  return saved.result as unknown as Record<string, unknown>;
 }
 
 export function magCurrentRequest(
@@ -152,7 +165,7 @@ export function magCurrentRequest(
   return {
     destinationCountry: "TH",
     locale: "en",
-    optimization: "lowest_cost",
+    scoring: { profile: "lowest_cost" },
     profile: { ageYears: 52, lifeStage: "adult", sex: "male" },
     requirements: {},
     currentSupplements: [current],

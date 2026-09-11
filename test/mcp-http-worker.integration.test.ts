@@ -23,9 +23,9 @@ test("MCP-HTTP-WORKER-01 the isolated public client reaches ready through a sepa
       assert.equal(response.status,200);const body=await response.json();assert.ok(body.result?.structuredContent,JSON.stringify(body));return body.result.structuredContent;
     }
     const start=performance.now();
-    const admitted=await call({operation:"create",idempotencyKey:`mcp-http-worker-${Date.now()}`,request:{locale:"en",destinationCountry:"TH",optimization:"lowest_cost",profile:{ageYears:40,lifeStage:"adult"},requirements:{},targets:[{name:"Vitamin D3",amount:2000,unit:"IU"}]}});
-    let current=admitted;assert.equal(current.ok,true);
-    while(current.status==="processing" && performance.now()-start<15000) { await delay(1000);current=await call({operation:"get",planHandle:admitted.planHandle,responseView:"status"}); }
+    const admitted=await call({idempotencyKey:`mcp-http-worker-${Date.now()}`,locale:"en",destinationCountry:"TH",scoring:{profile:"lowest_cost"},profile:{ageYears:40,lifeStage:"adult"},requirements:{},targets:[{name:"Vitamin D3",amount:2000,unit:"IU"}]});
+    let current=admitted;assert.equal(current.ok,true,JSON.stringify(current));
+    while(current.status==="processing" && performance.now()-start<15000) { await delay(1000);current=await call({planHandle:admitted.planHandle}); }
     assert.ok(performance.now()-start<15000,"Standard D3 must complete within the existing 15-second condition");
     assert.equal(current.status,"ready",JSON.stringify(current));
     assert.ok(server.identity.worker?.workerSessionId,"Readiness requires a registered external execution owner");

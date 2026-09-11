@@ -29,19 +29,20 @@ test("PAY-POLL-03 PostgreSQL freshness and pending failure versions use the dura
   const revision = { planId, revision: 1, status: "ready" as const, result, requestSnapshot: result.requestSnapshot, catalogueVersion: "frozen-payload", guidanceRulesVersion: "6.0.0", availabilityAsOf: now, createdAt: now };
   await store.insertPlanRevision(revision);
   const { handle } = await issueCapability({ allowedActions: ["plan.read"], config: app.config, now, resourceId: planId, resourceType: "plan", scope: app.scope, store });
-  const args = { operation: "get", planHandle: handle, responseView: "status" };
-  const initial = await rpc(app, "plan", args); assert.equal(initial.ok, true); assert.equal(initial.refreshRequired, false, JSON.stringify(initial));
+  const args = { planHandle: handle };
+  const initial = await rpc(app, "plan", args); assert.equal(initial.ok, true); assert.equal(initial.refreshRequired ?? false, false, JSON.stringify(initial));
   await tx`update public.catalogue_runtime_revision set revision=100 where singleton=true`;
-  const stale = await rpc(app, "plan", { ...args, knownResultVersion: initial.resultVersion });
-  assert.equal(stale.ok, true); assert.equal(stale.unchanged, false); assert.equal(stale.refreshRequired, true);
+  const stale = await rpc(app, "plan", args);
+  assert.equal(stale.ok, true); assert.equal(stale.refreshRequired, true);
   const failed = { id: operationId, planId, ownerScope: "payload-postgres", key: "failed-refinement", requestHash: "frozen", expectedRevision: 1, revision: 2, taskId: randomUUID(), status: "failed", version: 2, leaseToken: null, leaseExpiresAt: null, createdAt: now, updatedAt: now, command: { payload: {}, prepared: {}, scope: app.scope }, checkpoint: null, catalogueIdentity: null, referenceIdentity: null, response: null, error: businessError({ reasonCode: "temporarily_unavailable", message: "Isolated dependency failure" }) };
   await tx`insert into public.agentic_plan_operations(id,plan_id,owner_scope,idempotency_key,status,version,record_json,created_at,updated_at) values (${operationId},${planId},${failed.ownerScope},${failed.key},'failed',2,${tx.json(failed)},${now},${now})`;
-  const polls = await Promise.all([rpc(app, "plan", { ...args, knownResultVersion: stale.resultVersion }), rpc(app, "plan", { ...args, knownResultVersion: stale.resultVersion })]);
-  for (const poll of polls) { assert.equal(poll.ok, true); assert.equal(poll.unchanged, false); assert.equal(poll.operationStatus, "failed"); assert.equal(poll.error.message, "Isolated dependency failure"); }
-  assert.equal(polls[0].resultVersion, polls[1].resultVersion);
+  const polls = await Promise.all([rpc(app, "plan", args), rpc(app, "plan", args)]);
+  for (const poll of polls) { assert.equal(poll.ok, true); assert.equal(poll.status, "failed"); assert.equal(poll.nextAction, "change_request"); assert.match(String(poll.summary), /scoring/); }
+  assert.deepEqual(polls[0], polls[1]);
+  assert.equal((await store.getPlanOperation(operationId))?.error?.error.message, "Isolated dependency failure");
   assert.deepEqual((await store.getPlanRevision(planId, 1))?.result, result);
   const unauthorized = runtime("postgres-other-owner", store);
-  assert.equal((await rpc(unauthorized, "plan", { ...args, knownResultVersion: polls[0].resultVersion })).ok, false);
+  assert.equal((await rpc(unauthorized, "plan", args)).ok, false);
   throw rollback;
   }), error => { if (error !== rollback) throw error; return true; });
 });

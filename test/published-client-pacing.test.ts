@@ -52,7 +52,7 @@ it("ANNA-CLIENT-PACE-03 clears the earlier public window in bounded waits before
 it("ANNA-CLIENT-PACE-04 the public client uses paced RPC and guide teaches rate-limit recovery", () => {
   const client = readFileSync("scripts/run-published-mcp-client.mjs", "utf8");
   assert.match(client, /rpc = createPacedRequest\(/);
-  assert.match(client, /check\(response\.ok && body && !body\.error/);
+  assert.match(client, /if \(!response\.ok \|\| body\.error\) throw/);
   const guide = readFileSync("lib/agentic/contract/guide.ts", "utf8");
   assert.match(guide, /at least one second/);
   assert.match(guide, /Retry-After/);

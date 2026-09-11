@@ -1,3 +1,4 @@
+import { publicRequest } from "../ax-refinement/helpers.ts";
 import assert from "node:assert/strict";
 import {randomUUID} from "node:crypto";
 import {after,test} from "node:test";
@@ -30,7 +31,7 @@ test("LOCK-ATOMIC-01 simultaneous real database admission returns one durable pl
   try {
     for(let i=0;i<100&&entered<2;i++)await new Promise(resolve=>setTimeout(resolve,5));
     assert.equal(entered,2);release();const results=await Promise.all(calls);
-    assert.ok(results.every(row=>row.ok),JSON.stringify(results));assert.deepEqual(results[0],results[1]);
+    assert.ok(results.every(row=>row.ok),JSON.stringify(results));assert.deepEqual(JSON.parse(JSON.stringify(results[0])),JSON.parse(JSON.stringify(results[1])));
     const plans=await app.store.listPlanIdsByPrincipal(app.scope.principalScope!);assert.equal(plans.length,1);
     const rows=await sql`select status,record_json->>'taskId' as task from agentic_plan_operations where plan_id=${plans[0]}::uuid`;
     assert.equal(rows.length,1);assert.ok(rows[0].task);
@@ -41,10 +42,10 @@ test("LOCK-ATOMIC-01 simultaneous real database admission returns one durable pl
 
 test("LOCK-ATOMIC-02 simultaneous checkout owns one frozen order and stale catalogue cannot replace it",{timeout:15000},async()=>{
   const app=await fixture();
-  const created=await rpcWithTaskExecutor(app,"plan",{operation:"create",idempotencyKey:"atomic-checkout-plan",request,responseView:"full"});
-  const option=created.options.find(row=>row.purchaseEligible && row.basket.length && row.roles?.includes("closest_dose"));
-  assert.ok(option, "Atomic checkout requires an explicitly selected purchase");
-  const plan=await rpcWithTaskExecutor(app,"plan",{operation:"select",planHandle:created.planHandle,expectedRevision:created.revision,candidateKey:option.candidateKey,idempotencyKey:"atomic-checkout-select",responseView:"full"});
+  const created=await rpcWithTaskExecutor(app,"plan",{idempotencyKey:"atomic-checkout-plan",...publicRequest({...request, requirements:{productDoses:[{productId:"prd_b1111111111111111111111111111111",servingsPerDay:1}]}})});
+  const option=(created.choices as {products: unknown[]}[])[0];
+  assert.ok(option?.products.length, "Atomic checkout requires an explicitly selected purchase");
+  const plan=await rpcWithTaskExecutor(app,"plan",{planHandle:created.planHandle,expectedRevision:created.revision,idempotencyKey:"atomic-checkout-select"});
   assert.equal(plan.status,"ready",JSON.stringify(plan));
   let release!:()=>void,entered=0;const gate=new Promise<void>(resolve=>{release=resolve;});
   setExecuteFreshGateForTests(gate);setExecuteFreshEnteredForTests(()=>{entered++;});
@@ -53,7 +54,7 @@ test("LOCK-ATOMIC-02 simultaneous checkout owns one frozen order and stale catal
   try {
     for(let i=0;i<100&&entered<2;i++)await new Promise(resolve=>setTimeout(resolve,5));
     assert.equal(entered,2);release();const results=await Promise.all(calls);
-    assert.ok(results.every(row=>row.ok),JSON.stringify(results));assert.deepEqual(results[0],results[1]);
+    assert.ok(results.every(row=>row.ok),JSON.stringify(results));assert.deepEqual(JSON.parse(JSON.stringify(results[0])),JSON.parse(JSON.stringify(results[1])));
     const plans=await app.store.listPlanIdsByPrincipal(app.scope.principalScope!);assert.equal(plans.length,1);
     const orders=await sql`select * from agentic_orders where plan_id=${plans[0]}::uuid`;assert.equal(orders.length,1);
     const rollback=new Error("rollback catalogue fixture");
@@ -61,7 +62,7 @@ test("LOCK-ATOMIC-02 simultaneous checkout owns one frozen order and stale catal
       await tx`update catalogue_runtime_revision set revision=revision+1 where singleton`;
       const txStore=createPostgresStore(tx, true);
       const recovered=await executeTool({...call,store:txStore,idempotencyKey:"atomic-checkout-recovery"});
-      assert.deepEqual(recovered,results[0]);
+      assert.deepEqual(JSON.parse(JSON.stringify(recovered)),JSON.parse(JSON.stringify(results[0])));
       assert.deepEqual((await tx`select * from agentic_orders where plan_id=${plans[0]}::uuid`)[0],orders[0]);
       throw rollback;
     }),error=>error===rollback);

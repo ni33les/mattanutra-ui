@@ -1,3 +1,5 @@
+import { prepareSimpleRequest } from "../../lib/agentic/plan/simple-input.ts";
+import { publicRequest } from "../ax-refinement/helpers.ts";
 import assert from "node:assert/strict";
 import { afterEach, test } from "node:test";
 import * as references from "../../lib/matcher/safety-ceilings.ts";
@@ -35,7 +37,7 @@ test("LOCK-SNAPSHOT-02 concurrent reference scopes keep their immutable facts af
 test("LOCK-SNAPSHOT-03 interrupted durable matching restores its catalogue and references after both change", { timeout: 30_000 }, async () => {
   const frozen = await installCatalogue(), app = runtime("immutable-restart");
   const previous = process.env.AX_REFINEMENT_REAL_WORKERS; process.env.AX_REFINEMENT_REAL_WORKERS = "1";
-  const normalized = await normalizePlanRequest({ config: app.config, snapshot: frozen.snapshot, request: goldens.d3 });
+  const normalized = await normalizePlanRequest({ config: app.config, snapshot: frozen.snapshot, request: prepareSimpleRequest(publicRequest(goldens.d3), frozen.snapshot) as typeof goldens.d3 });
   assert.ok("state" in normalized);
   const expected = matchPlan({ snapshot: frozen.snapshot, state: normalized.state });
   const transaction = app.store.transaction.bind(app.store);
@@ -52,7 +54,7 @@ test("LOCK-SNAPSHOT-03 interrupted durable matching restores its catalogue and r
   });
   app.store.transaction = work => transaction(tx => work(wrap(tx)));
   try {
-    const created = await rpc(app, "plan", { operation: "create", idempotencyKey: "immutable-restart-create", request: goldens.d3 });
+    const created = await rpc(app, "plan", { idempotencyKey: "immutable-restart-create", ...publicRequest(goldens.d3) });
     const op = await app.store.getPlanOperationByKey("dev:mattanutra:ax-refinement:immutable-restart", "immutable-restart-create"); assert.ok(op);
     const failed = await runAdmittedPlanOperation({ config: app.config, store: app.store, operationId: op.id });
     assert.equal(interrupt, false, "the real matcher must reach the interruption barrier");
@@ -70,14 +72,11 @@ test("LOCK-SNAPSHOT-03 interrupted durable matching restores its catalogue and r
     assert.equal(terminal?.referenceIdentity, String(frozen.provenance.reconstructedReferenceFingerprint));
     const read = app.store.getPlanReadState.bind(app.store);
     app.store.getPlanReadState = async (...args) => { const row = await read(...args); return row ? { ...row, catalogueRevision: frozen.snapshot.runtimeRevision! + 1 } : row; };
-    const status = await rpc(app, "plan", { operation: "get", planHandle: created.planHandle, responseView: "status" });
+    const status = await rpc(app, "plan", { planHandle: created.planHandle });
     assert.equal(status.refreshRequired, true); assert.equal(status.status, "needs_input");
-    for (const responseView of ["conversation", "full"] as const) {
-      const replay = await rpc(app, "plan", { operation: "create", idempotencyKey: "immutable-restart-create", request: goldens.d3, responseView });
-      assert.equal(replay.status, "needs_input", `same-key ${responseView} must not claim the stale receipt is checkout-ready`);
-      assert.equal(replay.refreshRequired, true);
-      assert.equal((replay.nextActions as string[])[0], "change_request");
-    }
+    const replay = await rpc(app, "plan", { idempotencyKey: "immutable-restart-create", ...publicRequest(goldens.d3) });
+    assert.equal(replay.status, "needs_input", "same-key replay must not claim stale checkout readiness");
+    assert.equal(replay.refreshRequired, true); assert.equal(replay.nextAction, "change_request");
     assert.equal(((await app.store.getPlanOperation(op.id))?.response as {status?:string})?.status, "ready", "presentation must preserve the immutable receipt");
   } finally { if (previous === undefined) delete process.env.AX_REFINEMENT_REAL_WORKERS; else process.env.AX_REFINEMENT_REAL_WORKERS = previous; }
 });

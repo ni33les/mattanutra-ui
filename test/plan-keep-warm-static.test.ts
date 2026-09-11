@@ -18,7 +18,8 @@ describe("plan keep-warm does not starve first-create A2", () => {
 
     assert.match(warm, /withLivePlanRequest/);
     assert.match(warm, /isLivePlanInFlight/);
-    assert.match(dispatcher, /withLivePlanRequest\(\(\) =>/);
+    assert.match(dispatcher, /simplePlanTool\(runtime, params\)/);
+    assert.doesNotMatch(dispatcher, /withLivePlanRequest|runAdmittedPlanOperation/, "HTTP admission does not start a competing matching executor");
     assert.doesNotMatch(
       warm.slice(warm.indexOf("export async function keepPlanPathWarm")),
       /warmAgenticCatalogue/

@@ -378,7 +378,7 @@ async function runDur02(session: PlanSession, runIndex: number): Promise<R4CaseR
     idempotencyKey: `r4-duration-refine-${runIndex}`,
     operation: "revise",
     planHandle: created.planHandle,
-    requestPatch
+    request: { ...request, ...requestPatch }
   };
   const answered = await callPlan(session, mutation);
   const replay = await callPlan(session, mutation);
@@ -433,7 +433,7 @@ async function runDur03(session: PlanSession, runIndex: number): Promise<R4CaseR
     idempotencyKey: `r4-duration-unknown-${runIndex}`,
     operation: "revise",
     planHandle: created.planHandle,
-    requestPatch
+    request: { ...request, ...requestPatch }
   };
   const answered = await callPlan(session, mutation);
   const replay = await callPlan(session, mutation);

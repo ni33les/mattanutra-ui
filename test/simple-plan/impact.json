@@ -433,7 +433,7 @@
     {
       "file": "test/simple-plan/no-option-ids.test.ts",
       "reason": "Current MCP identifier-free confirmation, publication and checkout instruction regressions.",
-      "expectedCases": 5,
+      "expectedCases": 8,
       "slice": "requests"
     }
   ],

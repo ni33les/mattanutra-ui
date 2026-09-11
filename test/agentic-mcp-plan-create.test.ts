@@ -12,27 +12,18 @@ import { installGoldCatalogue, uninstallGoldCatalogue } from "./helpers/gold-cat
 
 const REPORTER_IDEMPOTENCY_KEY = "prd-fresh-sleep-fitness-af-apixaban-th-20260831-03";
 
+// Preserve the original report's health context and targets through the current flat protocol.
 const REPORTER_PLAN_CREATE = {
-  operation: "create",
   idempotencyKey: REPORTER_IDEMPOTENCY_KEY,
-  request: {
-    destinationCountry: "TH",
-    locale: "en",
-    profile: {
-      ageYears: 52,
-      lifeStage: "adult",
-      sex: "male"
-    },
-    medicationCodes: ["apixaban"],
-    conditionCodes: ["atrial_fibrillation"],
-    targets: [
-      { name: "creatine monohydrate", amount: 3, unit: "g" },
-      { name: "magnesium", amount: 150, unit: "mg" },
-      { name: "vitamin D3", amount: 1000, unit: "IU" }
-    ],
-    optimization: "fewest_pills",
-    requirements: {}
-  }
+  destinationCountry: "TH", locale: "en",
+  profile: { ageYears: 52, lifeStage: "adult", sex: "male" },
+  medicationCodes: ["apixaban"], conditionCodes: ["atrial_fibrillation"],
+  targets: [
+    { name: "creatine monohydrate", amount: 3, unit: "g" },
+    { name: "magnesium", amount: 150, unit: "mg" },
+    { name: "vitamin D3", amount: 1000, unit: "IU" }
+  ],
+  scoring: { profile: "fewest_pills" }, requirements: {}
 } as const;
 
 function runtimeFor(store = createMemoryStore()): AgenticRuntime {
@@ -80,7 +71,7 @@ afterEach(() => {
 });
 
 describe("MCP plan create — PRD reporter payload", () => {
-  it("creates a plan from the exact PRD payload and replays the same idempotency key", async () => {
+  it("creates a plan from the reported PRD health context and replays the same idempotency key", async () => {
     const runtime = runtimeFor();
     const first = await call(runtime, "plan", REPORTER_PLAN_CREATE);
     const created = structured(first);
@@ -92,7 +83,6 @@ describe("MCP plan create — PRD reporter payload", () => {
     assert.ok(
       created.status === "ready" ||
         created.status === "needs_input" ||
-        created.status === "blocked" ||
         created.status === "processing"
     );
 
@@ -117,26 +107,19 @@ describe("MCP plan create — PRD reporter payload", () => {
     assert.equal("oneOf" in schema, false);
     assert.equal("$defs" in schema, false);
 
-    const createSchema = (schema.anyOf as Array<{properties: Record<string, Record<string, unknown>>}>).find(item => item.properties?.operation?.const === "create")!;
-    const properties = createSchema.properties;
-    const request = properties.request;
-    assert.equal(request.additionalProperties, false);
-    const requestProperties = request.properties as Record<string, Record<string, unknown>>;
+    assert.equal(schema.additionalProperties, false);
+    const requestProperties = schema.properties as Record<string, Record<string, unknown>>;
     assert.ok(requestProperties.medicationCodes);
     assert.ok(requestProperties.conditionCodes);
     const profile = requestProperties.profile.properties as Record<string, unknown>;
-    assert.ok(profile.ageYears);
-    assert.ok(profile.lifeStage);
-    assert.ok(profile.sex);
-    const optimization = requestProperties.optimization;
-    assert.deepEqual(optimization.enum, [
-      "balanced",
-      "best_coverage",
-      "lowest_cost",
-      "fewest_pills"
-    ]);
+    assert.ok(profile.ageYears); assert.ok(profile.lifeStage); assert.ok(profile.sex);
+    assert.equal(requestProperties.operation, undefined);
+    assert.equal(requestProperties.request, undefined);
+    assert.equal(requestProperties.optimization, undefined);
+    const scoring = requestProperties.scoring.properties as Record<string, Record<string, unknown>>;
+    assert.deepEqual(scoring.profile.enum, ["best_match", "balanced", "best_coverage", "fewest_pills", "lowest_cost"]);
     const targetProperties = (
-      requestProperties.targets.items as { properties: Record<string, unknown> }
+      (requestProperties.targets.anyOf as Array<{ items: { properties: Record<string, unknown> } }>)[0].items
     ).properties;
     assert.ok(targetProperties.name);
     assert.ok(targetProperties.amount);
@@ -148,83 +131,13 @@ describe("MCP plan create — PRD reporter payload", () => {
   it("rejects the reported alias fields with structured validation errors", async () => {
     const runtime = runtimeFor();
     const samples: Array<[Record<string, unknown>, string]> = [
-      [
-        {
-          ...REPORTER_PLAN_CREATE,
-          request: {
-            ...REPORTER_PLAN_CREATE.request,
-            profile: { age: 52, lifeStage: "adult", sex: "male" }
-          }
-        },
-        "request.profile.age"
-      ],
-      [
-        {
-          ...REPORTER_PLAN_CREATE,
-          request: {
-            ...REPORTER_PLAN_CREATE.request,
-            conditions: ["atrial_fibrillation"]
-          }
-        },
-        "request.conditions"
-      ],
-      [
-        {
-          ...REPORTER_PLAN_CREATE,
-          request: {
-            ...REPORTER_PLAN_CREATE.request,
-            medications: ["apixaban"]
-          }
-        },
-        "request.medications"
-      ],
-      [
-        {
-          ...REPORTER_PLAN_CREATE,
-          request: {
-            ...REPORTER_PLAN_CREATE.request,
-            targets: [
-              {
-                name: "magnesium",
-                amount: 150,
-                unit: "mg",
-                frequency: "daily"
-              }
-            ]
-          }
-        },
-        "request.targets[0].frequency"
-      ],
-      [
-        {
-          ...REPORTER_PLAN_CREATE,
-          request: {
-            ...REPORTER_PLAN_CREATE.request,
-            requirements: { fewestPills: true }
-          }
-        },
-        "request.requirements.fewestPills"
-      ],
-      [
-        {
-          ...REPORTER_PLAN_CREATE,
-          request: {
-            ...REPORTER_PLAN_CREATE.request,
-            requirements: { excludeIngredients: ["gelatin"] }
-          }
-        },
-        "request.requirements.excludeIngredients"
-      ],
-      [
-        {
-          ...REPORTER_PLAN_CREATE,
-          request: {
-            ...REPORTER_PLAN_CREATE.request,
-            requirements: { notes: "keep it simple" }
-          }
-        },
-        "request.requirements.notes"
-      ]
+      [{ ...REPORTER_PLAN_CREATE, profile: { age: 52, lifeStage: "adult", sex: "male" } }, "profile.age"],
+      [{ ...REPORTER_PLAN_CREATE, conditions: ["atrial_fibrillation"] }, "conditions"],
+      [{ ...REPORTER_PLAN_CREATE, medications: ["apixaban"] }, "medications"],
+      [{ ...REPORTER_PLAN_CREATE, targets: [{ name: "magnesium", amount: 150, unit: "mg", frequency: "daily" }] }, "targets[0].frequency"],
+      [{ ...REPORTER_PLAN_CREATE, requirements: { fewestPills: true } }, "requirements.fewestPills"],
+      [{ ...REPORTER_PLAN_CREATE, requirements: { excludeIngredients: ["gelatin"] } }, "requirements.excludeIngredients"],
+      [{ ...REPORTER_PLAN_CREATE, requirements: { notes: "keep it simple" } }, "requirements.notes"]
     ];
 
     for (const [args, fieldPath] of samples) {

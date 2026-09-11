@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { LIVE_PUBLIC, liveCompletedFullCall as liveCall, livePost, stamp } from "./helpers/live-mcp.ts";
+import { LIVE_PUBLIC, liveCompletedCall as liveCall, livePost, stamp } from "./helpers/live-mcp.ts";
 
 function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value)
@@ -27,27 +27,33 @@ describe("live DEV commercial end to end", () => {
 
     const plan = await liveCall(LIVE_PUBLIC, "plan", {
       idempotencyKey: stamp("com-plan"),
-      request: {
         destinationCountry: "TH",
         locale: "en",
-        optimization: "lowest_cost",
+        scoring: { profile: "lowest_cost" },
         profile: { ageYears: 38, lifeStage: "adult", sex: "male" },
         requirements: {},
         targets: [{ amount: 2000, name: "Vitamin D3", unit: "IU" }]
-      }
     });
     assert.equal(plan.structured.ok, true);
     assert.equal(plan.structured.status, "ready");
     assert.equal("orderHandle" in plan.structured, false);
-    const basket = Array.isArray(plan.structured.basket) ? plan.structured.basket : [];
+    const choices = plan.structured.choices as Array<{ products: unknown[] }>;
+    assert.equal(choices.length, 1);
+    const basket = choices[0].products;
     assert.ok(basket.length >= 1);
     assert.equal(
       basket.some((item) => asRecord(item).source === "fixture"),
       false
     );
 
+    const confirmed = await liveCall(LIVE_PUBLIC, "plan", {
+      planHandle: plan.structured.planHandle, expectedRevision: plan.structured.revision,
+      idempotencyKey: stamp("com-confirm")
+    });
+    assert.equal(confirmed.structured.nextAction, "execute");
+    assert.deepEqual(confirmed.structured.choices, plan.structured.choices);
     const executed = await liveCall(LIVE_PUBLIC, "execute", {
-      expectedRevision: plan.structured.revision,
+      expectedRevision: confirmed.structured.revision,
       idempotencyKey: stamp("com-exec"),
       planHandle: plan.structured.planHandle
     });

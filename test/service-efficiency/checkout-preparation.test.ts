@@ -1,3 +1,4 @@
+import { publicRequest } from "../ax-refinement/helpers.ts";
 import { matcherSafetyCeilings, setMatcherSafetyCeilings } from "../../lib/matcher/safety-ceilings.ts";
 import { catalogueRecordFingerprint } from "../../lib/catalogue-corrections.ts";
 import assert from "node:assert/strict";
@@ -13,10 +14,10 @@ afterEach(uninstallGoldCatalogue);
 async function fixture(name: string) {
   installGoldCatalogue(); replaceCatalogueSnapshot({...fixtureSnapshot(),runtimeRevision:11});
     setMatcherSafetyCeilings(matcherSafetyCeilings(), { runtimeRevision: 11, fingerprint: catalogueRecordFingerprint(matcherSafetyCeilings()) });
-  const app=runtime(name), created=await rpcWithTaskExecutor(app,"plan",{operation:"create",idempotencyKey:name,request,responseView:"full"});
-  const option=created.options.find(row=>row.purchaseEligible && row.basket.length && row.roles?.includes("closest_dose"));
-  assert.ok(option, "Checkout contention fixtures require an explicit eligible purchase");
-  const plan=await rpcWithTaskExecutor(app,"plan",{operation:"select",planHandle:created.planHandle,expectedRevision:created.revision,candidateKey:option.candidateKey,idempotencyKey:name+"-select",responseView:"full"});
+  const app=runtime(name), created=await rpcWithTaskExecutor(app,"plan",{idempotencyKey:name,...publicRequest({...request, requirements:{productDoses:[{productId:"prd_b1111111111111111111111111111111",servingsPerDay:1}]}})});
+  const option=(created.choices as {products: unknown[]}[])[0];
+  assert.ok(option?.products.length, "Checkout contention fixtures require an explicit eligible purchase");
+  const plan=await rpcWithTaskExecutor(app,"plan",{planHandle:created.planHandle,expectedRevision:created.revision,idempotencyKey:name+"-select"});
   assert.equal(plan.status,"ready");
   return {app,call:{...app,now:app.now!,expectedRevision:Number(plan.revision),planHandle:String(plan.planHandle),idempotencyKey:name+"-execute"}};
 }
@@ -37,5 +38,5 @@ test("LOCK-CHECKOUT-02 catalogue changes after preparation prevent new checkout 
   current=true;const created=await executeTool({...call,store});assert.equal(created.ok,true,JSON.stringify(created));
   current=false;const previous=fences;
   const recovered=await executeTool({...call,store,idempotencyKey:call.idempotencyKey+"-recover"});
-  assert.deepEqual(recovered,created);assert.equal(fences,previous,"existing orders preserve their frozen facts");
+  assert.deepEqual(JSON.parse(JSON.stringify(recovered)),JSON.parse(JSON.stringify(created)));assert.equal(fences,previous,"existing orders preserve their frozen facts");
 });

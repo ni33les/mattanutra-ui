@@ -5,6 +5,14 @@
   "scope": "Remove public evidence and option identifiers; align every MCP publication and runtime confirmation; preserve images, shared matching and frozen commerce.",
   "files": [
     {
+      "file": "test/agentic-advisory-v6-readiness.test.ts",
+      "reason": "Affected confirmation protocol, private candidate field consumers, or publication and commerce regression coverage; retain scoring, prices and payment invariants."
+    },
+    {
+      "file": "test/agentic-catalogue-cache-identity.test.ts",
+      "reason": "Affected confirmation protocol, private candidate field consumers, or publication and commerce regression coverage; retain scoring, prices and payment invariants."
+    },
+    {
       "file": "test/agentic-com-pack.test.ts",
       "reason": "Remove only the public evidence capability assertion; preserve retained-tool, ownership, revision, commerce and catalogue checks."
     },
@@ -17,139 +25,15 @@
       "reason": "Remove only the public evidence capability assertion; preserve retained-tool, ownership, revision, commerce and catalogue checks."
     },
     {
-      "file": "test/agentic-live-trust-copy.test.ts",
-      "reason": "Remove only the public evidence capability assertion; preserve retained-tool, ownership, revision, commerce and catalogue checks."
-    },
-    {
-      "file": "test/agentic-mcp-sale-states.test.ts",
-      "reason": "Remove only the public evidence capability assertion; preserve retained-tool, ownership, revision, commerce and catalogue checks."
-    },
-    {
-      "file": "test/agentic-mcp-transport-reliability.test.ts",
-      "reason": "Remove only the public evidence capability assertion; preserve retained-tool, ownership, revision, commerce and catalogue checks."
-    },
-    {
-      "file": "test/agentic-p1.test.ts",
-      "reason": "Remove only the public evidence capability assertion; preserve retained-tool, ownership, revision, commerce and catalogue checks."
-    },
-    {
-      "file": "test/ax-refinement/contract.test.ts",
-      "reason": "Remove only the public evidence capability assertion; preserve retained-tool, ownership, revision, commerce and catalogue checks."
-    },
-    {
-      "file": "test/consistency-r1-guards.test.ts",
-      "reason": "Remove only the public evidence capability assertion; preserve retained-tool, ownership, revision, commerce and catalogue checks."
-    },
-    {
-      "file": "test/consistency-r2-guards.test.ts",
-      "reason": "Remove only the public evidence capability assertion; preserve retained-tool, ownership, revision, commerce and catalogue checks."
-    },
-    {
-      "file": "test/consistency-r3-guards.test.ts",
-      "reason": "Remove only the public evidence capability assertion; preserve retained-tool, ownership, revision, commerce and catalogue checks."
-    },
-    {
-      "file": "test/consistency-r4-guards.test.ts",
-      "reason": "Remove only the public evidence capability assertion; preserve retained-tool, ownership, revision, commerce and catalogue checks."
-    },
-    {
-      "file": "test/consistency-r5-guards.test.ts",
-      "reason": "Remove only the public evidence capability assertion; preserve retained-tool, ownership, revision, commerce and catalogue checks."
-    },
-    {
-      "file": "test/mcp-7-2-2/locks.test.ts",
-      "reason": "Remove only the public evidence capability assertion; preserve retained-tool, ownership, revision, commerce and catalogue checks."
-    },
-    {
-      "file": "test/mcp-discovery/discovery.test.ts",
-      "reason": "Remove only the public evidence capability assertion; preserve retained-tool, ownership, revision, commerce and catalogue checks."
-    },
-    {
-      "file": "test/mcp-evidence-images/contracts.test.ts",
-      "reason": "Freeze real catalogue image associations and removal red-to-green contracts; independent state and semantic evidence for paired full-suite execution."
-    },
-    {
-      "file": "test/mcp-evidence-images/runner.test.ts",
-      "reason": "Freeze real catalogue image associations and removal red-to-green contracts; independent state and semantic evidence for paired full-suite execution."
-    },
-    {
-      "file": "test/practical-matching/adapters.test.ts",
-      "reason": "Remove only the public evidence capability assertion; preserve retained-tool, ownership, revision, commerce and catalogue checks."
-    },
-    {
-      "file": "test/simple-plan/commerce-evidence.test.ts",
-      "reason": "Remove only the public evidence capability assertion; preserve retained-tool, ownership, revision, commerce and catalogue checks."
-    },
-    {
-      "file": "test/simple-plan/hosted.test.ts",
-      "reason": "Remove only the public evidence capability assertion; preserve retained-tool, ownership, revision, commerce and catalogue checks."
-    },
-    {
-      "file": "test/simple-plan/limit-advice.test.ts",
-      "reason": "Remove only the public evidence capability assertion; preserve retained-tool, ownership, revision, commerce and catalogue checks."
-    },
-    {
-      "file": "test/simple-plan/publication.test.ts",
-      "reason": "Remove only the public evidence capability assertion; preserve retained-tool, ownership, revision, commerce and catalogue checks."
-    },
-    {
-      "file": "test/simple-plan/retained-public-invariants.test.ts",
-      "reason": "Remove only the public evidence capability assertion; preserve retained-tool, ownership, revision, commerce and catalogue checks."
-    },
-    {
-      "file": "test/simple-plan/single-recommendation.test.ts",
-      "reason": "Remove only the public evidence capability assertion; preserve retained-tool, ownership, revision, commerce and catalogue checks."
-    },
-    {
-      "file": "test/simple-plan/version.test.ts",
-      "reason": "Remove only the public evidence capability assertion; preserve retained-tool, ownership, revision, commerce and catalogue checks."
-    },
-    {
-      "file": "test/agentic-phase1-units.test.ts",
-      "reason": "Full-inventory hygiene disallows bare early-return guards; explicit failure preserves all canonicalization, scoring and safety assertions."
-    },
-    {
-      "file": "test/agentic-phase6.test.ts",
-      "reason": "Full-inventory hygiene disallows bare early-return guards; explicit failure preserves all canonicalization, scoring and safety assertions."
-    },
-    {
-      "file": "test/matcher-prd-gates.test.ts",
-      "reason": "Full-inventory hygiene disallows bare early-return guards; explicit failure preserves all canonicalization, scoring and safety assertions."
-    },
-    {
-      "file": "test/matcher/advisory-dose-fit.test.ts",
-      "reason": "Full-inventory hygiene disallows bare early-return guards; explicit failure preserves all canonicalization, scoring and safety assertions."
-    },
-    {
-      "file": "test/matcher/dose.test.ts",
-      "reason": "Full-inventory hygiene disallows bare early-return guards; explicit failure preserves all canonicalization, scoring and safety assertions."
-    },
-    {
-      "file": "test/matcher/qa-safety.test.ts",
-      "reason": "Full-inventory hygiene disallows bare early-return guards; explicit failure preserves all canonicalization, scoring and safety assertions."
-    },
-    {
-      "file": "test/matcher/safety.test.ts",
-      "reason": "Full-inventory hygiene disallows bare early-return guards; explicit failure preserves all canonicalization, scoring and safety assertions."
-    },
-    {
-      "file": "test/agentic-flexible-v5-contract.test.ts",
-      "reason": "Current publication assertions must use the current version; preserve all advisory, exclusion, patch and schema checks."
-    },
-    {
-      "file": "test/agentic-v6-conversation.test.ts",
-      "reason": "Current publication assertions must use the current version; preserve all advisory, exclusion, patch and schema checks."
-    },
-    {
       "file": "test/agentic-copy-contract.test.ts",
       "reason": "Maintain published flat protocol assertions and strict semantic evidence; reject masking changed business IDs."
     },
     {
-      "file": "test/agentic-cv-evidence-hygiene.test.ts",
-      "reason": "Maintain published flat protocol assertions and strict semantic evidence; reject masking changed business IDs."
+      "file": "test/agentic-coverage-equivalence.test.ts",
+      "reason": "Affected confirmation protocol, private candidate field consumers, or publication and commerce regression coverage; retain scoring, prices and payment invariants."
     },
     {
-      "file": "test/published-client-semantics.test.ts",
+      "file": "test/agentic-cv-evidence-hygiene.test.ts",
       "reason": "Maintain published flat protocol assertions and strict semantic evidence; reject masking changed business IDs."
     },
     {
@@ -173,24 +57,16 @@
       "reason": "Retain customer-value assertions while aligning current discovery and immutable matcher/reference identity expectations."
     },
     {
-      "file": "test/agentic-advisory-v6-readiness.test.ts",
-      "reason": "Affected confirmation protocol, private candidate field consumers, or publication and commerce regression coverage; retain scoring, prices and payment invariants."
-    },
-    {
-      "file": "test/agentic-catalogue-cache-identity.test.ts",
-      "reason": "Affected confirmation protocol, private candidate field consumers, or publication and commerce regression coverage; retain scoring, prices and payment invariants."
-    },
-    {
-      "file": "test/agentic-coverage-equivalence.test.ts",
-      "reason": "Affected confirmation protocol, private candidate field consumers, or publication and commerce regression coverage; retain scoring, prices and payment invariants."
-    },
-    {
       "file": "test/agentic-cv-snapshot-store.test.ts",
       "reason": "Affected confirmation protocol, private candidate field consumers, or publication and commerce regression coverage; retain scoring, prices and payment invariants."
     },
     {
       "file": "test/agentic-det-pack.test.ts",
       "reason": "Affected confirmation protocol, private candidate field consumers, or publication and commerce regression coverage; retain scoring, prices and payment invariants."
+    },
+    {
+      "file": "test/agentic-det-v3-remediation.test.ts",
+      "reason": "Maintained MCP replay exposed retired request/response expectations; preserve underlying domain, ownership, lifecycle, financial or discovery assertions through the current protocol."
     },
     {
       "file": "test/agentic-det-v3.test.ts",
@@ -203,6 +79,10 @@
     {
       "file": "test/agentic-flexible-v5-bridge.test.ts",
       "reason": "Affected confirmation protocol, private candidate field consumers, or publication and commerce regression coverage; retain scoring, prices and payment invariants."
+    },
+    {
+      "file": "test/agentic-flexible-v5-contract.test.ts",
+      "reason": "Current publication assertions must use the current version; preserve all advisory, exclusion, patch and schema checks."
     },
     {
       "file": "test/agentic-flexible-v5-conversation.test.ts",
@@ -225,6 +105,22 @@
       "reason": "Affected confirmation protocol, private candidate field consumers, or publication and commerce regression coverage; retain scoring, prices and payment invariants."
     },
     {
+      "file": "test/agentic-live-com-e2e.test.ts",
+      "reason": "Maintained MCP replay exposed retired request/response expectations; preserve underlying domain, ownership, lifecycle, financial or discovery assertions through the current protocol."
+    },
+    {
+      "file": "test/agentic-live-plan-vantage.test.ts",
+      "reason": "Maintained MCP replay exposed retired request/response expectations; preserve underlying domain, ownership, lifecycle, financial or discovery assertions through the current protocol."
+    },
+    {
+      "file": "test/agentic-live-r4-regression.test.ts",
+      "reason": "Maintained MCP replay exposed retired request/response expectations; preserve underlying domain, ownership, lifecycle, financial or discovery assertions through the current protocol."
+    },
+    {
+      "file": "test/agentic-live-trust-copy.test.ts",
+      "reason": "Remove only the public evidence capability assertion; preserve retained-tool, ownership, revision, commerce and catalogue checks."
+    },
+    {
       "file": "test/agentic-matching-bridge-v4.test.ts",
       "reason": "Affected confirmation protocol, private candidate field consumers, or publication and commerce regression coverage; retain scoring, prices and payment invariants."
     },
@@ -233,16 +129,36 @@
       "reason": "Affected confirmation protocol, private candidate field consumers, or publication and commerce regression coverage; retain scoring, prices and payment invariants."
     },
     {
+      "file": "test/agentic-mcp-plan-create.test.ts",
+      "reason": "Maintained MCP replay exposed retired request/response expectations; preserve underlying domain, ownership, lifecycle, financial or discovery assertions through the current protocol."
+    },
+    {
+      "file": "test/agentic-mcp-sale-states.test.ts",
+      "reason": "Remove only the public evidence capability assertion; preserve retained-tool, ownership, revision, commerce and catalogue checks."
+    },
+    {
       "file": "test/agentic-mcp-transcript-evidence.test.ts",
       "reason": "Affected confirmation protocol, private candidate field consumers, or publication and commerce regression coverage; retain scoring, prices and payment invariants."
+    },
+    {
+      "file": "test/agentic-mcp-transport-reliability.test.ts",
+      "reason": "Remove only the public evidence capability assertion; preserve retained-tool, ownership, revision, commerce and catalogue checks."
     },
     {
       "file": "test/agentic-operational-decision.test.ts",
       "reason": "Affected confirmation protocol, private candidate field consumers, or publication and commerce regression coverage; retain scoring, prices and payment invariants."
     },
     {
+      "file": "test/agentic-p1.test.ts",
+      "reason": "Remove only the public evidence capability assertion; preserve retained-tool, ownership, revision, commerce and catalogue checks."
+    },
+    {
       "file": "test/agentic-phase0-catalog-ul.test.ts",
       "reason": "Affected confirmation protocol, private candidate field consumers, or publication and commerce regression coverage; retain scoring, prices and payment invariants."
+    },
+    {
+      "file": "test/agentic-phase1-units.test.ts",
+      "reason": "Full-inventory hygiene disallows bare early-return guards; explicit failure preserves all canonicalization, scoring and safety assertions."
     },
     {
       "file": "test/agentic-phase2-named-safety.test.ts",
@@ -253,12 +169,32 @@
       "reason": "Affected confirmation protocol, private candidate field consumers, or publication and commerce regression coverage; retain scoring, prices and payment invariants."
     },
     {
+      "file": "test/agentic-phase4-algae.test.ts",
+      "reason": "Maintained MCP replay exposed retired request/response expectations; preserve underlying domain, ownership, lifecycle, financial or discovery assertions through the current protocol."
+    },
+    {
       "file": "test/agentic-phase4-catalogid.test.ts",
       "reason": "Affected confirmation protocol, private candidate field consumers, or publication and commerce regression coverage; retain scoring, prices and payment invariants."
     },
     {
+      "file": "test/agentic-phase5-copy.test.ts",
+      "reason": "Maintained MCP replay exposed retired request/response expectations; preserve underlying domain, ownership, lifecycle, financial or discovery assertions through the current protocol."
+    },
+    {
       "file": "test/agentic-phase5-demographic.test.ts",
       "reason": "Affected confirmation protocol, private candidate field consumers, or publication and commerce regression coverage; retain scoring, prices and payment invariants."
+    },
+    {
+      "file": "test/agentic-phase6-retention.test.ts",
+      "reason": "Maintained MCP replay exposed retired request/response expectations; preserve underlying domain, ownership, lifecycle, financial or discovery assertions through the current protocol."
+    },
+    {
+      "file": "test/agentic-phase6.test.ts",
+      "reason": "Full-inventory hygiene disallows bare early-return guards; explicit failure preserves all canonicalization, scoring and safety assertions."
+    },
+    {
+      "file": "test/agentic-plan-recovery.integration.test.ts",
+      "reason": "Preserve maintained current-protocol recovery, publication, continued-dose and commerce assertions identified in full-6 RED control."
     },
     {
       "file": "test/agentic-plan-status.test.ts",
@@ -285,8 +221,16 @@
       "reason": "Affected confirmation protocol, private candidate field consumers, or publication and commerce regression coverage; retain scoring, prices and payment invariants."
     },
     {
+      "file": "test/agentic-rm-mkt.test.ts",
+      "reason": "Maintained MCP replay exposed retired request/response expectations; preserve underlying domain, ownership, lifecycle, financial or discovery assertions through the current protocol."
+    },
+    {
       "file": "test/agentic-safety-parity-rca.test.ts",
       "reason": "Affected confirmation protocol, private candidate field consumers, or publication and commerce regression coverage; retain scoring, prices and payment invariants."
+    },
+    {
+      "file": "test/agentic-uat-com-callbacks.test.ts",
+      "reason": "Maintained MCP replay exposed retired request/response expectations; preserve underlying domain, ownership, lifecycle, financial or discovery assertions through the current protocol."
     },
     {
       "file": "test/agentic-uat-nl-v10.test.ts",
@@ -299,6 +243,10 @@
     {
       "file": "test/agentic-v18-locale.test.ts",
       "reason": "Affected confirmation protocol, private candidate field consumers, or publication and commerce regression coverage; retain scoring, prices and payment invariants."
+    },
+    {
+      "file": "test/agentic-v6-conversation.test.ts",
+      "reason": "Current publication assertions must use the current version; preserve all advisory, exclusion, patch and schema checks."
     },
     {
       "file": "test/agentic/v5-pill-certainty.test.ts",
@@ -337,6 +285,46 @@
       "reason": "Affected confirmation protocol, private candidate field consumers, or publication and commerce regression coverage; retain scoring, prices and payment invariants."
     },
     {
+      "file": "test/ax-refinement/contract.test.ts",
+      "reason": "Remove only the public evidence capability assertion; preserve retained-tool, ownership, revision, commerce and catalogue checks."
+    },
+    {
+      "file": "test/ax-refinement/deployment.test.ts",
+      "reason": "Maintained MCP replay exposed retired request/response expectations; preserve underlying domain, ownership, lifecycle, financial or discovery assertions through the current protocol."
+    },
+    {
+      "file": "test/ax-refinement/journeys.test.ts",
+      "reason": "Maintained MCP replay exposed retired request/response expectations; preserve underlying domain, ownership, lifecycle, financial or discovery assertions through the current protocol."
+    },
+    {
+      "file": "test/ax-refinement/polling.test.ts",
+      "reason": "Maintained MCP replay exposed retired request/response expectations; preserve underlying domain, ownership, lifecycle, financial or discovery assertions through the current protocol."
+    },
+    {
+      "file": "test/ax-refinement/reliability.test.ts",
+      "reason": "Maintained MCP replay exposed retired request/response expectations; preserve underlying domain, ownership, lifecycle, financial or discovery assertions through the current protocol."
+    },
+    {
+      "file": "test/consistency-r1-guards.test.ts",
+      "reason": "Remove only the public evidence capability assertion; preserve retained-tool, ownership, revision, commerce and catalogue checks."
+    },
+    {
+      "file": "test/consistency-r2-guards.test.ts",
+      "reason": "Remove only the public evidence capability assertion; preserve retained-tool, ownership, revision, commerce and catalogue checks."
+    },
+    {
+      "file": "test/consistency-r3-guards.test.ts",
+      "reason": "Remove only the public evidence capability assertion; preserve retained-tool, ownership, revision, commerce and catalogue checks."
+    },
+    {
+      "file": "test/consistency-r4-guards.test.ts",
+      "reason": "Remove only the public evidence capability assertion; preserve retained-tool, ownership, revision, commerce and catalogue checks."
+    },
+    {
+      "file": "test/consistency-r5-guards.test.ts",
+      "reason": "Remove only the public evidence capability assertion; preserve retained-tool, ownership, revision, commerce and catalogue checks."
+    },
+    {
       "file": "test/e2e/practical-matching.spec.ts",
       "reason": "Affected confirmation protocol, private candidate field consumers, or publication and commerce regression coverage; retain scoring, prices and payment invariants."
     },
@@ -353,6 +341,10 @@
       "reason": "Affected confirmation protocol, private candidate field consumers, or publication and commerce regression coverage; retain scoring, prices and payment invariants."
     },
     {
+      "file": "test/matcher-prd-gates.test.ts",
+      "reason": "Full-inventory hygiene disallows bare early-return guards; explicit failure preserves all canonicalization, scoring and safety assertions."
+    },
+    {
       "file": "test/matcher-v5-web.test.ts",
       "reason": "Affected confirmation protocol, private candidate field consumers, or publication and commerce regression coverage; retain scoring, prices and payment invariants."
     },
@@ -361,16 +353,88 @@
       "reason": "Affected confirmation protocol, private candidate field consumers, or publication and commerce regression coverage; retain scoring, prices and payment invariants."
     },
     {
+      "file": "test/matcher/advisory-dose-fit.test.ts",
+      "reason": "Full-inventory hygiene disallows bare early-return guards; explicit failure preserves all canonicalization, scoring and safety assertions."
+    },
+    {
+      "file": "test/matcher/dose.test.ts",
+      "reason": "Full-inventory hygiene disallows bare early-return guards; explicit failure preserves all canonicalization, scoring and safety assertions."
+    },
+    {
+      "file": "test/matcher/experiment-runner.test.ts",
+      "reason": "Preserve maintained current-protocol recovery, publication, continued-dose and commerce assertions identified in full-6 RED control."
+    },
+    {
       "file": "test/matcher/phase3.test.ts",
       "reason": "Affected confirmation protocol, private candidate field consumers, or publication and commerce regression coverage; retain scoring, prices and payment invariants."
+    },
+    {
+      "file": "test/matcher/qa-safety.test.ts",
+      "reason": "Full-inventory hygiene disallows bare early-return guards; explicit failure preserves all canonicalization, scoring and safety assertions."
+    },
+    {
+      "file": "test/matcher/safety.test.ts",
+      "reason": "Full-inventory hygiene disallows bare early-return guards; explicit failure preserves all canonicalization, scoring and safety assertions."
     },
     {
       "file": "test/matcher/stack-life-stage-ul-flows.test.ts",
       "reason": "Affected confirmation protocol, private candidate field consumers, or publication and commerce regression coverage; retain scoring, prices and payment invariants."
     },
     {
+      "file": "test/mcp-7-2-2/expanded.test.ts",
+      "reason": "Maintained MCP replay exposed retired request/response expectations; preserve underlying domain, ownership, lifecycle, financial or discovery assertions through the current protocol."
+    },
+    {
+      "file": "test/mcp-7-2-2/locks.test.ts",
+      "reason": "Remove only the public evidence capability assertion; preserve retained-tool, ownership, revision, commerce and catalogue checks."
+    },
+    {
+      "file": "test/mcp-7-2-3/dependency-errors.test.ts",
+      "reason": "Preserve maintained current-protocol recovery, publication, continued-dose and commerce assertions identified in full-6 RED control."
+    },
+    {
+      "file": "test/mcp-7-2-3/expanded.test.ts",
+      "reason": "Preserve maintained current-protocol recovery, publication, continued-dose and commerce assertions identified in full-6 RED control."
+    },
+    {
+      "file": "test/mcp-discovery/discovery.test.ts",
+      "reason": "Remove only the public evidence capability assertion; preserve retained-tool, ownership, revision, commerce and catalogue checks."
+    },
+    {
+      "file": "test/mcp-evidence-images/ci.test.ts",
+      "reason": "Current publication, identifier-free confirmation and complete maintained CI reference prerequisites."
+    },
+    {
+      "file": "test/mcp-evidence-images/contracts.test.ts",
+      "reason": "Freeze real catalogue image associations and removal red-to-green contracts; independent state and semantic evidence for paired full-suite execution."
+    },
+    {
+      "file": "test/mcp-evidence-images/runner.test.ts",
+      "reason": "Freeze real catalogue image associations and removal red-to-green contracts; independent state and semantic evidence for paired full-suite execution."
+    },
+    {
+      "file": "test/mcp-http-worker.integration.test.ts",
+      "reason": "Preserve maintained current-protocol recovery, publication, continued-dose and commerce assertions identified in full-6 RED control."
+    },
+    {
       "file": "test/mcp-payload/harness.test.ts",
       "reason": "Affected confirmation protocol, private candidate field consumers, or publication and commerce regression coverage; retain scoring, prices and payment invariants."
+    },
+    {
+      "file": "test/mcp-payload/postgres.integration.test.ts",
+      "reason": "Maintained MCP replay exposed retired request/response expectations; preserve underlying domain, ownership, lifecycle, financial or discovery assertions through the current protocol."
+    },
+    {
+      "file": "test/mcp-payload/refinement-handoff.test.ts",
+      "reason": "Maintained MCP replay exposed retired request/response expectations; preserve underlying domain, ownership, lifecycle, financial or discovery assertions through the current protocol."
+    },
+    {
+      "file": "test/plan-keep-warm-static.test.ts",
+      "reason": "Preserve maintained current-protocol recovery, publication, continued-dose and commerce assertions identified in full-6 RED control."
+    },
+    {
+      "file": "test/practical-matching/adapters.test.ts",
+      "reason": "Remove only the public evidence capability assertion; preserve retained-tool, ownership, revision, commerce and catalogue checks."
     },
     {
       "file": "test/practical-matching/checkout.integration.test.ts",
@@ -389,6 +453,14 @@
       "reason": "Affected confirmation protocol, private candidate field consumers, or publication and commerce regression coverage; retain scoring, prices and payment invariants."
     },
     {
+      "file": "test/published-client-pacing.test.ts",
+      "reason": "Preserve maintained current-protocol recovery, publication, continued-dose and commerce assertions identified in full-6 RED control."
+    },
+    {
+      "file": "test/published-client-semantics.test.ts",
+      "reason": "Maintain published flat protocol assertions and strict semantic evidence; reject masking changed business IDs."
+    },
+    {
       "file": "test/retail-checkout-catalogue-v5.integration.test.ts",
       "reason": "Affected confirmation protocol, private candidate field consumers, or publication and commerce regression coverage; retain scoring, prices and payment invariants."
     },
@@ -401,6 +473,10 @@
       "reason": "Affected confirmation protocol, private candidate field consumers, or publication and commerce regression coverage; retain scoring, prices and payment invariants."
     },
     {
+      "file": "test/service-efficiency/cancel-admission.integration.test.ts",
+      "reason": "Maintained MCP replay exposed retired request/response expectations; preserve underlying domain, ownership, lifecycle, financial or discovery assertions through the current protocol."
+    },
+    {
       "file": "test/service-efficiency/checkout-preparation.test.ts",
       "reason": "Affected confirmation protocol, private candidate field consumers, or publication and commerce regression coverage; retain scoring, prices and payment invariants."
     },
@@ -409,16 +485,40 @@
       "reason": "Affected confirmation protocol, private candidate field consumers, or publication and commerce regression coverage; retain scoring, prices and payment invariants."
     },
     {
+      "file": "test/service-efficiency/immutable-references.test.ts",
+      "reason": "Maintained MCP replay exposed retired request/response expectations; preserve underlying domain, ownership, lifecycle, financial or discovery assertions through the current protocol."
+    },
+    {
+      "file": "test/service-efficiency/ownership.test.ts",
+      "reason": "Maintained MCP replay exposed retired request/response expectations; preserve underlying domain, ownership, lifecycle, financial or discovery assertions through the current protocol."
+    },
+    {
+      "file": "test/simple-plan/commerce-evidence.test.ts",
+      "reason": "Remove only the public evidence capability assertion; preserve retained-tool, ownership, revision, commerce and catalogue checks."
+    },
+    {
       "file": "test/simple-plan/documented.test.ts",
       "reason": "Affected confirmation protocol, private candidate field consumers, or publication and commerce regression coverage; retain scoring, prices and payment invariants."
+    },
+    {
+      "file": "test/simple-plan/hosted.test.ts",
+      "reason": "Remove only the public evidence capability assertion; preserve retained-tool, ownership, revision, commerce and catalogue checks."
     },
     {
       "file": "test/simple-plan/journey.test.ts",
       "reason": "Affected confirmation protocol, private candidate field consumers, or publication and commerce regression coverage; retain scoring, prices and payment invariants."
     },
     {
+      "file": "test/simple-plan/limit-advice.test.ts",
+      "reason": "Remove only the public evidence capability assertion; preserve retained-tool, ownership, revision, commerce and catalogue checks."
+    },
+    {
       "file": "test/simple-plan/no-option-ids.test.ts",
       "reason": "Affected confirmation protocol, private candidate field consumers, or publication and commerce regression coverage; retain scoring, prices and payment invariants."
+    },
+    {
+      "file": "test/simple-plan/publication.test.ts",
+      "reason": "Remove only the public evidence capability assertion; preserve retained-tool, ownership, revision, commerce and catalogue checks."
     },
     {
       "file": "test/simple-plan/requests.test.ts",
@@ -433,12 +533,28 @@
       "reason": "Affected confirmation protocol, private candidate field consumers, or publication and commerce regression coverage; retain scoring, prices and payment invariants."
     },
     {
+      "file": "test/simple-plan/retained-public-invariants.test.ts",
+      "reason": "Remove only the public evidence capability assertion; preserve retained-tool, ownership, revision, commerce and catalogue checks."
+    },
+    {
+      "file": "test/simple-plan/single-recommendation.test.ts",
+      "reason": "Remove only the public evidence capability assertion; preserve retained-tool, ownership, revision, commerce and catalogue checks."
+    },
+    {
       "file": "test/simple-plan/state.test.ts",
       "reason": "Affected confirmation protocol, private candidate field consumers, or publication and commerce regression coverage; retain scoring, prices and payment invariants."
     },
     {
+      "file": "test/simple-plan/version.test.ts",
+      "reason": "Remove only the public evidence capability assertion; preserve retained-tool, ownership, revision, commerce and catalogue checks."
+    },
+    {
       "file": "test/task-transactions.integration.test.ts",
       "reason": "Affected confirmation protocol, private candidate field consumers, or publication and commerce regression coverage; retain scoring, prices and payment invariants."
+    },
+    {
+      "file": "test/web-advisory-matching.test.ts",
+      "reason": "Preserve maintained current-protocol recovery, publication, continued-dose and commerce assertions identified in full-6 RED control."
     },
     {
       "file": "test/web-advisory.integration.test.ts",
@@ -451,10 +567,6 @@
     {
       "file": "test/web-journey-fix/reported.test.ts",
       "reason": "Affected confirmation protocol, private candidate field consumers, or publication and commerce regression coverage; retain scoring, prices and payment invariants."
-    },
-    {
-      "file": "test/mcp-evidence-images/ci.test.ts",
-      "reason": "Current publication, identifier-free confirmation and complete maintained CI reference prerequisites."
     }
   ],
   "runnerConsumers": [

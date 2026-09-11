@@ -147,7 +147,6 @@
     }
   ],
   "casesRemoved": 0,
-  "newCases": 9,
   "historicalPacks": "No historical contract or frozen result rewritten.",
   "hygieneChanges": {
     "reason": "Replace redundant early-return type guards with explicit assertion failures. Existing preceding assertions and numerical expectations remain unchanged; no test may silently stop.",
@@ -206,5 +205,53 @@
     ],
     "retained": "Products, doses, original prices, commerce assertions and stored payment hashes. Private historical storage decoding is isolated in recommendation-storage.ts. Old MCP handles stay unsupported.",
     "commerceFixture": "Vitamin C commerce tests use the same frozen 1000 mg/25000-minor product as an explicit one-serving proposal, instead of selecting a hidden alternative."
-  }
+  },
+  "completePackMaintenance": {
+    "redEvidence": "full-6/node-matcher-a.log and node-matcher-a-events.jsonl (unchanged 00d51696 source); full-6/node-matcher-postgres-a.log",
+    "replacements": [
+      "Public callers send flat fields, handle-only polls and confirmation controls. Private plan service revisions send its supported full request, not an ignored requestPatch.",
+      "Historical numerical and medical context is preserved in explicitly exported current fixtures. Retired priority/prerequisite fields remain tested on the internal domain contract; MCP explicitly rejects them.",
+      "Financial history, replenishment schedules and acquisition accounting remain asserted through named private test observers. Public calls assert the concise published lifecycle. No fake response-mode adapter.",
+      "The original D3 39000-minor one-serving listing is explicitly proposed in contention/checkout fixtures instead of selecting a hidden closest-dose alternative. No fixture price changes.",
+      "Replay checks compare complete serialized JSON because undefined is not a JSON field. Products, quantities, prices, payment identities and frozen records remain compared.",
+      "Missing-days fixture explicitly declares its synthetic 30-capsule pack rather than inferring pack size from a title. The stock calculation is unchanged.",
+      "The six frozen AX personas use published single-recommendation refinement, returned ingredient/product IDs, explicit quantity/exclusion changes and handle/revision confirmation; historical transcripts remain untouched.",
+      "Retired L2/L3 response-view assertions become flat-create and handle-only schema parity checks; L1 still verifies honest service boundaries and now six tools.",
+      "Continued-dose advice is asserted on the same retained combo and exact one-serving quantity, not whichever basket the current practical default ranks first. Full 15 mg exposure, 10 mg reference and 0.5 loss remain exact.",
+      "PostgreSQL interruption fixtures use current flat creation and assert the resolved original D3 ID; the original request amount/name and atomic process-recovery assertions remain.",
+      "AXR-REL-01 refines pill importance through the published weight field instead of the retired target-name replacement; original nutrient names, doses and source/dietary constraints stay fixed across expanded exclusions.",
+      "Support semantic comparison accepts current structured/brief-text or complete JSON text, preserving complete content and generated-ID relationships without extra ignored fields.",
+      "The public HTTP client uses the existing pacing function and records rate-limit failures; it does not automatically retry failed acceptance operations.",
+      "Process-recovery tests compare the full persisted operation response with its idempotency receipt and independently compare both public replay decisions; private ledgers are not expected on the MCP wire.",
+      "AXR-REL-01 separates the existing 90-second per-request client deadline from the existing 175-second durable operation deadline. Admission and read latencies are asserted separately, and successful matching must complete within 175 seconds. A 185-second test-container bound accommodates reporting/cleanup. The old combined 90-second assertion cancelled a still-valid async operation; its RED evidence remains current-ax-reliability-final.log. No runtime timeout changed."
+    ],
+    "copyFixes": [
+      "info.conditionCodes vocabulary pointer",
+      "explicit algae-only alias and K2 form guidance",
+      "confirmed summary agrees with execute in all three locales",
+      "new checkout key versus same-input replay, without duplicate tool-purpose prose",
+      "Transient failures distinguish handle-only plan polling, other read retries and same-key mutation retries.",
+      "The checkout example uses the post-confirmation revision and a distinct key; all generated examples are regenerated."
+    ],
+    "testFirstCopyCommits": [
+      "3d7c0361",
+      "a05e07e2",
+      "a2059a43",
+      "be77b25b",
+      "cb1515c1"
+    ],
+    "meaningfulRed": [
+      "confirmed-copy-meaningful-red.log",
+      "checkout-card-red.log",
+      "flat-poll-recovery-red.log",
+      "flat-read-recovery-red.log",
+      "checkout-template-red.log"
+    ],
+    "invalidProbe": "confirmed-copy-red.log failed on a too-short fixture idempotency key; it is not claimed as product RED evidence.",
+    "scope": "No production matching, stock, catalogue/reference values, payment transitions or lock changes.",
+    "controlStatus": "Full Node-A and PostgreSQL-A executed; B interrupted after known RED outcomes. Not a complete or green acceptance run.",
+    "executionConditions": "Run functional matching checks without overlapping lint, builds or other matching packs. Prior timed-out/failed runs remain recorded; no service deadline was enlarged. The isolated concurrent expanded pair completed in 120097 ms with three passing cases."
+  },
+  "initialNewCases": 9,
+  "caseAccounting": "initialNewCases records the initial EV/IMG and independent-run additions only. Added confirmation, copy, CI and recovery cases are enumerated by the maintained inventory; final executed totals are authoritative and must be reported from paired results, not inferred from test declarations."
 }

@@ -1,3 +1,4 @@
+import { PLAN_REQUEST } from "../../../lib/agentic/contract/schemas.ts";
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
@@ -55,9 +56,12 @@ function intentPlanArgs() {
 }
 
 describe("Slice 1 target intent and conditional no-sale", () => {
-  it("VAL-01.A1 accepts importance, range and prerequisite without unexpected_property", () => {
-    const issue = validateToolInput(AGENTIC_INPUT_SCHEMAS.plan, intentPlanArgs());
+  it("VAL-01.A1 retains internal intent fields while public MCP uses explicit weights", () => {
+    const issue = validateToolInput(PLAN_REQUEST, intentPlanArgs().request);
     assert.equal(issue, null);
+    const { optimization, ...domain } = intentPlanArgs().request;
+    const publicIssue = validateToolInput(AGENTIC_INPUT_SCHEMAS.plan, { ...domain, scoring: { profile: optimization }, idempotencyKey: intentPlanArgs().idempotencyKey });
+    assert.ok(publicIssue); assert.match(publicIssue.fieldPath, /targets\[0\].importance/);
   });
 
   it("VAL-01 and VAL-03 keep core purchases ready while excluding an unsatisfied conditional target", () => {

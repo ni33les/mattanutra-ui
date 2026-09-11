@@ -1,3 +1,4 @@
+import { publicRequest } from "../ax-refinement/helpers.ts";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { after, test } from "node:test";
@@ -24,7 +25,7 @@ test("LOCK-ATTEMPTS-05 real durable cancellation after reservation commit spends
     return saved;
   };
   try {
-    await rpc(app,"plan",{operation:"create",idempotencyKey:"cancel-admission",request:goldens.d3});
+    await rpc(app,"plan",{idempotencyKey:"cancel-admission",...publicRequest(goldens.d3)});
     const op=await store.getPlanOperationByKey(`dev:mattanutra:${app.scope.principalScope}`,"cancel-admission");assert.ok(op);
     const result=await runAdmittedPlanOperation({store,config:app.config,operationId:op.id,signal:controller.signal});
     assert.equal(result.ok,false);assert.equal(cancelled,true);assert.equal(posts,0);

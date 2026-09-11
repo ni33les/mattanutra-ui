@@ -21,6 +21,17 @@ export function profile(id: string): PlanRequest {
   const row = profiles.find(item => item.id === id); assert.ok(row, `Missing profile ${id}`);
   return structuredClone(row.request);
 }
+/** Explicitly export a preserved domain fixture into today's flat request fields.
+ * This is fixture construction, not a compatibility path in the RPC client. */
+export function publicRequest(request: PlanRequest) {
+  const { optimization, scoring, targets, requirements, ...context } = request;
+  const preferences = Object.fromEntries(Object.entries(requirements).filter(([key]) => key !== "preferenceImportance"));
+  return { ...context, requirements: preferences,
+    targets: targets.map(target => Object.fromEntries(Object.entries(target).filter(([key]) => !["importance", "prerequisite", "supplementId"].includes(key)))),
+    scoring: scoring ?? { profile: optimization === "balanced" ? "best_match" : optimization } };
+}
+export function publicProfile(id: string) { return publicRequest(profile(id)); }
+
 export async function installRealCatalogue(environment: "dev" | "uat" = "uat") {
   resetQaPersistForTests(); resetServiceClock(); resetMatchPlanCache(); resetCataloguePins(); resetInfoCache();
   const frozen = reconstructAnnaSnapshot(await loadFrozenAnnaInput(environment));
@@ -51,7 +62,7 @@ export function barrier() {
 /** The external harness runs admitted tasks; polling itself remains read-only. */
 export async function rpcWithTaskExecutor(instance: ReturnType<typeof runtime>, tool: string, args: Record<string, unknown>) {
   const response = await rpc(instance, tool, args);
-  if (tool !== "plan" || args.operation === "get" || typeof args.idempotencyKey !== "string" || response.status !== "processing") return response;
+  if (tool !== "plan" || typeof args.idempotencyKey !== "string" || response.status !== "processing") return response;
   const scope = instance.scope;
   const operation = await instance.store.getPlanOperationByKey(`${scope.environment}:${scope.tenantScope}:${scope.principalScope ?? "anon"}`, args.idempotencyKey);
   assert.ok(operation, "Processing requires a durable admitted operation");

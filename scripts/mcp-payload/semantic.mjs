@@ -17,14 +17,16 @@ export function semanticJourney(value) {
   const message = original => identity(messages, original, /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/, "message");
   for (const outcome of copy.outcomes ?? []) for (const call of outcome.calls ?? []) {
     if (call.request?.params?.name !== "support") continue;
-    const result = call.response?.result, wire = result?.structuredContent;
+    const result = call.response?.result;
+    const text = result?.content?.filter(row => row.type === "text").at(-1);
+    const textValue = text && /^\s*[\[{]/.test(text.text) ? JSON.parse(text.text) : null;
+    const wire = result?.structuredContent ?? textValue;
     if (!wire?.caseReference) continue;
-    const text = result.content.filter(row => row.type === "text").at(-1);
-    assert.deepEqual(JSON.parse(text.text), wire, "Support text/structured representations differ");
+    if (result?.structuredContent && textValue) assert.deepEqual(textValue, wire, "Support text/structured representations differ");
     wire.caseReference = identity(cases, wire.caseReference, /^tkt_[a-f0-9]{12}$/, "case");
     wire.messageId = message(wire.messageId);
     for (const row of wire.thread) row.id = message(row.id);
-    text.text = JSON.stringify(canonical(wire));
+    if (textValue) text.text = JSON.stringify(canonical(wire));
   }
   return canonical(copy);
 }

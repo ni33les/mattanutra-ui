@@ -354,7 +354,8 @@ describe("UAT COM callback and fulfilment determinism", () => {
       store: runtime.store
     });
     assert.equal((view as { paymentStatus?: string }).paymentStatus, "paid");
-    assert.equal((view as { timeline?: string }).timeline, "delivered");
+    assert.equal((view as { fulfilment?: {status?: string} }).fulfilment?.status, "delivered");
+    assert.equal((view as {nextAction?:string}).nextAction, "none");
     const types = listFunnelEvents(order.planId).map((item) => item.eventType);
     assert.equal(types.filter((item) => item === "paid").length, 1);
     assert.equal(types.filter((item) => item === "dispatched").length, 1);

@@ -32,12 +32,12 @@ it("V5-CLIENT-02 request templates come from the connector and never mutate thei
   assert.throws(() => publishedExample(contract, "undocumented"), /missing published example/);
 });
 it("V5-CLIENT-03 the client confirms only the single returned recommendation", () => {
-  const closest = { candidateKey: "closest", roles: ["best_match"], products: [{ productId: "p" }] };
-  const cheaper = { candidateKey: "cheaper", roles: ["lower_cost"], products: [{ productId: "q" }] };
-  assert.equal(currentRecommendation({ recommendedCandidateKey: "closest", choices: [closest] }), closest);
-  assert.throws(() => currentRecommendation({ recommendedCandidateKey: "closest", choices: [closest, cheaper] }), /one current recommendation/);
-  assert.throws(() => currentRecommendation({ recommendedCandidateKey: "closest", choices: [{ ...closest, products: [] }] }), /No current purchasable recommendation/);
-  assert.throws(() => currentRecommendation({ recommendedCandidateKey: null, choices: [closest] }), /No current purchasable recommendation/);
+  const closest = { roles: ["best_match"], products: [{ productId: "p" }] };
+  const cheaper = { roles: ["lower_cost"], products: [{ productId: "q" }] };
+  assert.equal(currentRecommendation({ choices: [closest] }), closest);
+  assert.throws(() => currentRecommendation({ choices: [closest, cheaper] }), /one current recommendation/);
+  assert.throws(() => currentRecommendation({ choices: [{ ...closest, products: [] }] }), /No current purchasable recommendation/);
+  assert.throws(() => currentRecommendation({ choices: [] }), /one current recommendation/);
 });
 it("V5-CLIENT-04 documented client has no application, database, fixture-endpoint or private catalogue dependency", () => {
   const client = readFileSync("scripts/run-published-mcp-client.mjs", "utf8") + readFileSync("scripts/published-client-journey.mjs", "utf8");

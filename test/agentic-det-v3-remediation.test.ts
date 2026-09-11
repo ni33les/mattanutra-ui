@@ -366,10 +366,15 @@ describe("Slice 6 missing-days completion", () => {
     const snapshot = fixtureSnapshot();
     const currentProduct = snapshot.products.find(item => item.retailerSku === "TH-MG-300");
     assert.ok(currentProduct);
-    // Isolate the missing duration: this continued product and its pack are known.
+    // Isolate missing duration with an explicit verified synthetic pack basis.
+    // A number in the title alone must never establish pack quantity.
     replaceCatalogueSnapshot({ ...snapshot, products: snapshot.products.map(item =>
       item.productId === currentProduct.productId ? { ...item, candidate: { ...item.candidate,
-        title: `${item.candidate.title} 30 capsules` } } : item) });
+        title: `${item.candidate.title} 30 capsules`,
+        administration: { ...item.candidate.administration!, packQuantity: 30,
+          provenance: { ...item.candidate.administration!.provenance,
+            sourceText: "Synthetic missing-days fixture: one capsule per serving; 30 capsules per pack." } }
+      } } : item) });
     const request = {
       destinationCountry: "TH",
       locale: "en",
@@ -396,7 +401,7 @@ describe("Slice 6 missing-days completion", () => {
       now: CLOCK_09,
       payload: {
         operation: "revise",
-        requestPatch: { currentSupplements: request.currentSupplements.map(item => ({ ...item, daysRemaining: 7 })) },
+        request: { ...request, currentSupplements: request.currentSupplements.map(item => ({ ...item, daysRemaining: 7 })) },
         expectedRevision: (asked as { revision: number }).revision,
         idempotencyKey: "missing-ans-planxxxxxx",
         planHandle: (asked as { planHandle: string }).planHandle
@@ -406,7 +411,7 @@ describe("Slice 6 missing-days completion", () => {
     });
     assert.equal((answered as { status?: string }).status, "no_purchase", canonicalJson(answered));
     assert.equal((answered as { purchaseRequiredNow?: boolean }).purchaseRequiredNow, false);
-    assert.equal((answered as { scheduleComplete?: boolean }).scheduleComplete, true);
+    assert.equal((answered as { scheduleComplete?: boolean }).scheduleComplete, true, canonicalJson(answered));
     assert.equal((answered as { nextReplenishmentDay?: number }).nextReplenishmentDay, 7);
     const executed = await executeTool({
       config: runtime.config,
