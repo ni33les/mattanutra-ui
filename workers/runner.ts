@@ -318,7 +318,7 @@ async function runAgentLoop(
           runId: WORKER_RUN_ID,
           slotCount,
           slotIndex,
-          ...(workerWakeUrl ? { wakeUrl: workerWakeUrl } : {}),
+          ...(workerWakeUrl ? { wakeUrl: workerWakeUrl, wakeHost: hostname() } : {}),
         },
         workerVersion: workerVersion(),
       }),

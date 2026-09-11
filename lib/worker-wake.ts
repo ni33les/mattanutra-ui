@@ -1,3 +1,5 @@
+import { hostname } from "node:os";
+import { runtimeBuildIdentity } from "@/lib/runtime-build-identity";
 import { createLogger } from "@/lib/logger";
 import { getWorkerSql, getSql } from "@/lib/db";
 import type { TaskQueueSignal } from "@/lib/task-queue-signal";
@@ -21,32 +23,53 @@ async function sendRegisteredWorkerWakes(signal: TaskQueueSignal) {
     return;
   }
 
-  const rows = await sql<Array<{ wake_url: string }>>`
-    select distinct trim(both from metadata ->> 'wakeUrl') as wake_url
+  const buildId = runtimeBuildIdentity();
+  const rows = await sql<WorkerWakeTarget[]>`
+    select distinct trim(both from metadata ->> 'wakeUrl') as wake_url,
+      coalesce(nullif(metadata ->> 'wakeHost', ''), split_part(instance_id, ':', 1)) as wake_host,
+      worker_version
     from public.worker_sessions
     where status in ('idle', 'polling', 'working')
+      and worker_version = ${buildId}
       and last_seen_at > now() - interval '5 minutes'
       and coalesce(metadata ->> 'wakeUrl', '') <> ''
       and ${taskType} = any(task_types)
   `;
-  const urls = [
-    ...new Set(rows.map((row) => row.wake_url).filter((url) => url.length > 0))
-  ];
+  const urls = eligibleWorkerWakeUrls(rows, { host: hostname(), buildId });
+  if (!urls.length) return;
+  try { await deliverWorkerWake(urls, signal, pingWakeUrl); }
+  catch (error) { wakeLog.warn("worker_wake_failed", { taskType, message: error instanceof Error ? error.message : "unknown" }); }
+}
 
-  if (urls.length === 0) {
+type WorkerWakeTarget = { wake_url: string; wake_host: string; worker_version: string };
+
+/** Loopback addresses belong to one replica, even when registrations share a database. */
+export function eligibleWorkerWakeUrls(rows: WorkerWakeTarget[], identity: { host: string; buildId: string }): string[] {
+  return [...new Set(rows.filter(row => {
+    if (row.worker_version !== identity.buildId) return false;
+    try {
+      const url = new URL(row.wake_url);
+      if (!["http:", "https:"].includes(url.protocol)) return false;
+      const host = url.hostname.toLowerCase().replace(/\.$/, "");
+      const local = host === "localhost" || host === "[::1]" || /^127(?:\.\d{1,3}){3}$/.test(host);
+      return !local || row.wake_host.toLowerCase() === identity.host.toLowerCase();
+    } catch { return false; }
+  }).map(row => row.wake_url))];
+}
+
+/** One successful nudge per known task; bounded fallback covers a recently restarted process. */
+export async function deliverWorkerWake(urls: string[], signal: TaskQueueSignal, ping: (url: string, signal: TaskQueueSignal) => Promise<void>) {
+  if (!urls.length) return;
+  if (!signal.taskId) {
+    await Promise.allSettled(urls.map(url => ping(url, signal)));
     return;
   }
-
-  await Promise.allSettled(
-    chooseWorkerWakeUrls(urls, signal).map((url) =>
-      pingWakeUrl(url, signal).catch((error) => {
-        wakeLog.warn("worker_wake_failed", {
-          message: error instanceof Error ? error.message : "unknown",
-          url
-        });
-      })
-    )
-  );
+  const first = chooseWorkerWakeUrls(urls, signal)[0];
+  const attempts = [first, ...urls.filter(url => url !== first)].slice(0, 3);
+  for (const url of attempts) {
+    try { await ping(url, signal); return; } catch { /* Only delivery failure permits another nudge. */ }
+  }
+  throw new Error(`No reachable worker wake endpoint after ${attempts.length} attempts`);
 }
 
 async function pingWakeUrl(url: string, signal: TaskQueueSignal) {
