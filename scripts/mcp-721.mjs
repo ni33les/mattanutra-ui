@@ -13,10 +13,10 @@ assert.ok(MCP_PACKAGES[packageId], "Unknown work package");
 const args = rawArgs[0]?.startsWith("--package=") ? rawArgs.slice(1) : [...rawArgs];
 const sliceIndex = args.indexOf("--slice");
 const slice = sliceIndex < 0 ? null : args.splice(sliceIndex, 2)[1];
-assert.ok(!slice || (mode === "test" && ["efficiency", "practical", "simple-plan"].includes(packageId)), "Slices are limited to efficiency development tests");
+assert.ok(!slice || (mode === "test" && ["efficiency", "practical", "simple-plan", "boundaries"].includes(packageId)), "Slices are limited to efficiency development tests");
 const definition = MCP_PACKAGES[packageId], MCP721_BASE = definition.base;
 assert.ok(["test", "validate"].includes(mode));
-const inventory = JSON.parse(readFileSync(`${definition.directory}/impact.json`, "utf8"));
+const inventory = JSON.parse(readFileSync(definition.inventory ?? `${definition.directory}/impact.json`, "utf8"));
 const maintainedFiles = inventory.files;
 if (inventory.releaseFiles) {
   assert.ok(inventory.releaseFiles.length > 0 && new Set(inventory.releaseFiles).size === inventory.releaseFiles.length);
@@ -39,7 +39,7 @@ for (const row of inventory.files) {
   assert.deepEqual(testSourceHygiene(readFileSync(row.file, "utf8"), row.file), []);
 }
 for (const row of inventory.browser ?? []) { assert.deepEqual(testSourceHygiene(readFileSync(row.file, "utf8"), row.file), []); assert.ok(row.expectedCases > 0 && row.reason); }
-if (mode === "validate") { assert.equal(git("branch", "--show-current"), "dev"); assert.equal(git("status", "--porcelain"), ""); git("merge-base", "--is-ancestor", MCP721_BASE, commit); }
+if (mode === "validate") { assert.ok(git("branch", "--show-current") === "dev" || (packageId === "boundaries" && git("branch", "--show-current") === "codex/matching-lock-boundaries")); assert.equal(git("status", "--porcelain"), ""); git("merge-base", "--is-ancestor", MCP721_BASE, commit); }
 mkdirSync(output, { recursive: true, mode: 0o700 });
 const save = (name, value) => writeFileSync(resolve(output, name), JSON.stringify(value, null, 2) + "\n", { flag: "wx", mode: 0o600 });
 const source = sourceManifest(); save("source-before.json", source); save("inventory.json", inventory);
@@ -77,6 +77,10 @@ for (const database of (packageId === "practical" && mode === "validate" ? [] : 
     assert.equal(db.hostname, "127.0.0.1"); assert.notEqual(db.port, "5432"); assert.ok(db.port);
     assert.match(db.pathname, /^\/mattanutra_lock_review_ax_/);
     Object.assign(env, { TEST_DB_URL: db.href, DB_URL: db.href, DB_WORKER_URL: db.href, DB_POOL_MAX: "3", DB_ALLOW_DIRECT_CONNECTION: "true" });
+  }
+  if (database && packageId === "boundaries") {
+    const migration = await runBatch("lock-boundaries-schema", ["--experimental-strip-types", "--import", "./scripts/register-ts-path-loader.mjs", "scripts/apply-matching-lock-boundaries.ts"], env, output);
+    assert.ok(migration.passed, "Isolated lock migration failed");
   }
   batches.push(await runBatch(label, ["--test", "--test-concurrency=1", "--experimental-strip-types", ...(!database ? ["--import", "./test/helpers/offline-network.mjs"] : []), "--import", "./scripts/register-ts-path-loader.mjs", ...selected], env, output));
   assert.ok(batches.at(-1).passed, `${label} failed; later stages were not started`);

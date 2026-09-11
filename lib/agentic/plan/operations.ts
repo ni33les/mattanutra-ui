@@ -57,29 +57,31 @@ export async function admitPlanOperation(store: AgenticStore, input: Readonly<{
   expectedRevision: number; revision: number; prepared: Record<string, unknown>;
   scope: CapabilityScope; now: string; admittedAt?: string;
 }>): Promise<PlanOperationRecord> {
+  const identity = input.payload && typeof input.payload === "object" && "publicInput" in input.payload ? input.payload.publicInput : input.payload;
+  const requestHash = canonicalRequestHash(identity);
+  const record: PlanOperationRecord = {
+    id: nextTestUuid(), planId: input.planId, ownerScope: input.ownerScope, key: input.key,
+    requestHash, expectedRevision: input.expectedRevision, revision: input.revision,
+    taskId: nextTestUuid(), status: "queued", version: 1, leaseToken: null, leaseExpiresAt: null,
+    createdAt: input.now, updatedAt: input.now,
+    deadlineAt: new Date(Date.parse(input.admittedAt ?? input.now) + PLAN_OPERATION_TERMINAL_MS).toISOString(),
+    command: { payload: structuredClone(input.payload), prepared: structuredClone(input.prepared), scope: input.scope },
+    checkpoint: null, catalogueIdentity: null, referenceIdentity: null, response: null, error: null
+  };
+  const preparedJson = JSON.stringify(record);
   return store.transaction(async tx => {
     const plan = await tx.getPlanForUpdate(input.planId);
     if (!plan) throw new Error("plan_not_found");
     const existing = await tx.getPlanOperationByKey(input.ownerScope, input.key);
-    const identity = input.payload && typeof input.payload === "object" && "publicInput" in input.payload ? input.payload.publicInput : input.payload;
-    const requestHash = canonicalRequestHash(identity);
     if (existing) {
       if (existing.requestHash !== requestHash) throw new Error("idempotency_conflict");
       return existing;
     }
     if (plan.currentRevision !== input.expectedRevision) throw new Error("stale_revision");
-    if (await tx.getActivePlanOperation(input.planId)) throw new Error("stale_revision");
-    const id = nextTestUuid();
-    const record: PlanOperationRecord = {
-      id, planId: input.planId, ownerScope: input.ownerScope, key: input.key,
-      requestHash, expectedRevision: input.expectedRevision, revision: input.revision,
-      taskId: nextTestUuid(), status: "queued", version: 1, leaseToken: null, leaseExpiresAt: null,
-      createdAt: input.now, updatedAt: input.now,
-      deadlineAt: new Date(Date.parse(input.admittedAt ?? input.now) + PLAN_OPERATION_TERMINAL_MS).toISOString(),
-      command: { payload: structuredClone(input.payload), prepared: structuredClone(input.prepared), scope: input.scope },
-      checkpoint: null, catalogueIdentity: null, referenceIdentity: null, response: null, error: null
-    };
-    await tx.insertPlanOperation(record);
+    const pending = await tx.getActivePlanOperation(input.planId);
+    // Only explicit mutation admission retires expired ownership. Reads stay read-only.
+    if (pending && !await expirePlanOperation(tx, pending.id, input.now)) throw new Error("stale_revision");
+    await tx.insertPlanOperation(record, preparedJson);
     return record;
   });
 }

@@ -1297,7 +1297,7 @@ async function executePlanTool(input: Readonly<{
 
       if (!input.matchPort && payload.operation !== "get") {
         const pending = await store.getActivePlanOperation(plan.id);
-        if (pending) return businessError({ reasonCode: "stale_revision", currentRevision: plan.currentRevision,
+        if (pending && !await expirePlanOperation(store, pending.id, input.now)) return businessError({ reasonCode: "stale_revision", currentRevision: plan.currentRevision,
           nextActions: ["reload_plan"], message: "A refinement is still pending. Poll this plan before submitting another change." });
       }
       const current = await store.getPlanRevision(plan.id, plan.currentRevision);

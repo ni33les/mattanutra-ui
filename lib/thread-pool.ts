@@ -119,16 +119,16 @@ export class ThreadPool<Input, Result> {
     }
   }
   private async start(slot: Slot<Input, Result>, job: Job<Input, Result>) {
+    let releaseUnstarted: unknown;
     try {
+      // A real thread is assigned already. Database preparation must not occupy
+      // productive CPU capacity shared with independent matching pools.
+      releaseUnstarted = await job.options.beforeStart?.();
+      if (job.settled || slot.job !== job) return;
       const release = await matcherCpuAdmission.acquire(job.controller.signal);
-      if (job.settled) { release(); return; }
+      if (job.settled || slot.job !== job) { release(); return; }
       slot.releaseCpu = release;
       recordServiceMetric("worker.queue_ms", performance.now() - job.queuedAt);
-      const releaseUnstarted = await job.options.beforeStart?.();
-      if (job.settled || slot.job !== job) {
-        if (typeof releaseUnstarted === "function") await releaseUnstarted();
-        return;
-      }
       job.startTimer(); job.startedAt = performance.now(); job.posted = true;
       if (job.options.inputBytes !== undefined) recordServiceMetric("worker.input_bytes", job.options.inputBytes);
       if ((++inputSamples % 64) === 0) {
@@ -138,7 +138,14 @@ export class ThreadPool<Input, Result> {
       }
       slot.worker.postMessage(job.input, job.options.transferList);
     } catch (error) { this.cancel(job, error); }
+    finally {
+      if (!job.posted && typeof releaseUnstarted === "function") {
+        try { await releaseUnstarted(); }
+        catch { recordServiceMetric("worker.unstarted_cleanup_failures"); }
+      }
+    }
   }
+
   private spawn(): Slot<Input, Result> {
     const worker = this.createWorker(), slot: Slot<Input, Result> = { worker };
     this.slots.add(slot);

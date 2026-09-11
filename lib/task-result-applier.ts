@@ -2090,7 +2090,7 @@ export type PreparedTaskCompletionResult = Readonly<{
   food?: { value: FoodGuidanceBlueprint; json: string; locale: Locale; afterCommit: TaskAfterCommitEffect[] };
   healthScore?: { json: string; projection: ReturnType<typeof healthScoreReadProjection>; locale: Locale };
   products?: { variants: PreparedProductVariant[]; selected: PreparedProductVariant | undefined; discovery: ReturnType<typeof productDiscoveryPayload>;
-    discoveryNotes: string; configuredAdapters: number; countryCode: string; locale: Locale; legacyJson: string };
+    discoveryNotes: string; configuredAdapters: number; countryCode: string; locale: Locale; legacyJson: string; decisionTableAvailable: boolean };
 }>;
 
 /** Pure projection/serialization happens before the task service opens its publication transaction. */
@@ -2130,6 +2130,8 @@ export async function prepareTaskCompletionResult({ task, resultPayload, sql: sq
     const score = objectValue(resultPayload).healthScore;
     return score ? { healthScore: { json: JSON.stringify(toJsonValue(score)), projection: healthScoreReadProjection(score), locale } } : {};
   }
+  const db = sqlOverride ?? getSql();
+  const decisionTableAvailable = db ? Boolean((await db`select to_regclass('public.product_recommendation_decisions')::text as table_name`)[0]?.table_name) : false;
   const initial = productRecommendationPayload(resultPayload), discovery = productDiscoveryPayload(resultPayload);
   const stackPreference = normalizeProductStackPreference(initial.diagnostics?.stackPreference ?? payloadText(task.payload, "stackPreference"));
   let rawVariants = productRecommendationVariantPayloads(resultPayload);
@@ -2153,13 +2155,14 @@ export async function prepareTaskCompletionResult({ task, resultPayload, sql: sq
   const selected = variants.find(item => item.stackPreference === stackPreference) ?? variants.find(item => item.stackPreference === "balanced") ?? variants[0];
   const configured = discovery.diagnostics.filter(item => item.configured).length;
   const found = discovery.diagnostics.reduce((total, item) => total + item.resultCount, 0);
-  return { products: { variants, selected, discovery, locale, configuredAdapters: configured, countryCode: normalizeProductCountryCode(country) ?? defaultProductCountryCode,
+  return { products: { variants, selected, discovery, locale, decisionTableAvailable, configuredAdapters: configured, countryCode: normalizeProductCountryCode(country) ?? defaultProductCountryCode,
     discoveryNotes: !discovery.diagnostics.length ? "Matched against the approved curated product catalogue." : !configured ? "Product discovery adapters are not configured." : `Product discovery returned ${found} products.`,
     legacyJson: JSON.stringify(toJsonValue(selected?.result.recommendations.map(item => toRecommendedProduct(item, selected.result.stackCoveragePercent, selected.runId, locale)) ?? [])) } };
 }
 
 async function insertProductRecommendationResult({
   prepared,
+  decisionTableAvailable,
   countryCode,
   discoveryNotes,
   result,
@@ -2167,6 +2170,7 @@ async function insertProductRecommendationResult({
   task
 }: Readonly<{
   prepared: PreparedProductVariant;
+  decisionTableAvailable: boolean;
   countryCode: string;
   discoveryNotes: string;
   result: ProductRecommendationResult;
@@ -2174,7 +2178,7 @@ async function insertProductRecommendationResult({
   task: TaskRecord;
 }>) {
   const runRows = await sql<Array<{ id: string }>>`
-    insert into public.product_recommendation_runs (
+    with inserted_run as (insert into public.product_recommendation_runs (
       id,
       catalogue_revision, catalogue_fingerprint, search_effort,
       selection_revision, generation_locale, generator_version, assessment_revision,
@@ -2217,24 +2221,20 @@ async function insertProductRecommendationResult({
       now(),
       now()
     )
-    returning id::text
-  `;
-  const runId = runRows[0]?.id;
-
-  if (!runId) {
-    throw new Error("Product recommendation run was not created");
-  }
-
-  await sql`
+    returning id
+    ), inserted_items as (
     insert into public.product_recommendation_items (
       run_id, product_id, rank, score, product_coverage_percent, stack_contribution_percent,
       serving_multiplier, covered_needs, why, url_used, price_amount, currency, image_url, unknown_at_recommendation, created_at)
-    select ${runId}::uuid, item.*, now() from jsonb_to_recordset(${prepared.itemsJson}::text::jsonb) as item(
+    select inserted_run.id, item.*, now() from inserted_run cross join jsonb_to_recordset(${prepared.itemsJson}::text::jsonb) as item(
       product_id uuid, rank integer, score numeric, product_coverage_percent numeric, stack_contribution_percent numeric,
       serving_multiplier integer, covered_needs jsonb, why text, url_used text, price_amount numeric, currency text,
       image_url text, unknown_at_recommendation boolean)
-    on conflict (run_id, product_id) do nothing`;
-  await writeProductRecommendationDecisionRows(sql, { rows: prepared.decisions, preparedRowsJson: prepared.decisionsJson, runId, planId: task.planId, taskId: task.id });
+    on conflict (run_id, product_id) do nothing returning run_id
+    ) select id::text from inserted_run`;
+  const runId = runRows[0]?.id;
+  if (!runId) throw new Error("Product recommendation run was not created");
+  await writeProductRecommendationDecisionRows(sql, { tableAvailable: decisionTableAvailable, rows: prepared.decisions, preparedRowsJson: prepared.decisionsJson, runId, planId: task.planId, taskId: task.id });
 
   return runId;
 }
@@ -2286,6 +2286,7 @@ async function applyProductRecommendationsResult(
       variant.stackPreference,
       await insertProductRecommendationResult({
         prepared: variant,
+        decisionTableAvailable: prepared.decisionTableAvailable,
         countryCode,
         discoveryNotes,
         result: variant.result,

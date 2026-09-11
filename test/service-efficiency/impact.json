@@ -25,7 +25,7 @@
     {
       "file": "test/service-efficiency/transactions.test.ts",
       "slice": "transactions",
-      "expectedCases": 2,
+      "expectedCases": 4,
       "reason": "Shared transaction session, commit-only effects and rollback silence for task admission"
     },
     {
@@ -95,7 +95,7 @@
       "file": "test/task-transactions.integration.test.ts",
       "slice": "task-transactions",
       "database": true,
-      "expectedCases": 11,
+      "expectedCases": 14,
       "reason": "Task admission/rollback, reservation fencing, deferred matching ownership and exact replay through the existing worker completion boundary"
     },
     {
@@ -331,7 +331,7 @@
     {
       "file": "test/service-efficiency/result-preparation.test.ts",
       "slice": "result-preparation",
-      "expectedCases": 4,
+      "expectedCases": 5,
       "reason": "Audits 1/10/11: prepare immutable product rows, localized presentation and HealthScore hashes outside task/assessment publication locks"
     },
     {
@@ -450,6 +450,19 @@
       "slice": "browser-reference",
       "expectedCases": 1,
       "reason": "The shared web/admin matcher must compile and execute in a browser without importing Node async context; server reference isolation remains independently covered"
+    },
+    {
+      "file": "test/service-efficiency/lock-boundaries.test.ts",
+      "slice": "lock-boundaries",
+      "reason": "Admission preparation, expired refinement recovery and independent productive CPU admission",
+      "expectedCases": 3
+    },
+    {
+      "file": "test/service-efficiency/lock-boundaries.integration.test.ts",
+      "slice": "lock-boundaries",
+      "reason": "Committed catalogue identity and concurrent graph-specific cycle protection in isolated PostgreSQL",
+      "expectedCases": 5,
+      "database": true
     }
   ],
   "inputs": [

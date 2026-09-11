@@ -241,7 +241,7 @@ export type AgenticStore = {
   getFailedPlanOperation(planId: string, currentRevision: number): Promise<PlanOperationRecord | null>;
   getCompletedPlanOperation(planId: string, revision: number): Promise<PlanOperationRecord | null>;
   /** Insert operation and its framework task in the caller's transaction. */
-  insertPlanOperation(record: PlanOperationRecord): Promise<void>;
+  insertPlanOperation(record: PlanOperationRecord, preparedJson?: string): Promise<void>;
   updatePlanOperation(record: PlanOperationRecord, expectedVersion: number): Promise<boolean>;
   getCatalogueSnapshot(id: string): Promise<import("@/lib/agentic/catalogue/types").CatalogueSnapshot | null>;
   insertCatalogueSnapshot(id: string, snapshot: import("@/lib/agentic/catalogue/types").CatalogueSnapshot): Promise<void>;

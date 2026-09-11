@@ -59,34 +59,46 @@ export async function withDatabaseTransaction<T>(
   const timer = setTimeout(() => controller.abort(new Error("Database phase deadline exceeded")), timeoutMs);
   const signal = parent ? AbortSignal.any([parent.signal, controller.signal]) : controller.signal;
   const effects: Array<() => void> = [];
-  let stopWaiting: (() => void) | undefined;
   try {
-    signal.throwIfAborted();
-    const result = await new Promise<T>((resolve, reject) => {
-      let acquired = false;
-      stopWaiting = () => { if (!acquired) reject(signal.reason); };
-      signal.addEventListener("abort", stopWaiting, { once: true });
-      // postgres.js does not expose cancellation of a queued BEGIN. Stop waiting
-      // now; a late acquisition throws before work and rolls back. Observe its
-      // rejection so cleanup cannot become an unhandled background failure.
-      void withRequestLifetime({...parent, signal}, () => sql.begin(async tx => {
-        acquired = true;
+    for (let attempt = 0; ; attempt++) {
+      let stopWaiting: (() => void) | undefined;
+      try {
         signal.throwIfAborted();
-        const value = await transactionScope.run(tx as unknown as postgres.Sql, () =>
-          commitEffects.run(effects, () => work(tx as unknown as postgres.Sql))
-        );
+        const result = await new Promise<T>((resolve, reject) => {
+          let acquired = false;
+          stopWaiting = () => { if (!acquired) reject(signal.reason); };
+          signal.addEventListener("abort", stopWaiting, { once: true });
+          // A queued BEGIN cannot be cancelled by postgres.js. A late acquisition
+          // checks cancellation before touching rows, then rolls back.
+          void withRequestLifetime({ ...parent, signal }, () => sql.begin(async tx => {
+            acquired = true;
+            signal.throwIfAborted();
+            const value = await transactionScope.run(tx as unknown as postgres.Sql, () =>
+              commitEffects.run(effects, () => work(tx as unknown as postgres.Sql))
+            );
+            signal.throwIfAborted();
+            return value;
+          })).then(value => resolve(value as T), reject);
+        });
+        for (const effect of effects) {
+          try { effect(); } catch (error) {
+            dbLog.warn("database_commit_effect_failed", { message: error instanceof Error ? error.message : "unknown" });
+          }
+        }
+        return result;
+      } catch (error) {
+        // Only the scoped dependency trigger requests replay. The failed
+        // transaction has rolled back; its after-commit effects are discarded.
+        const failure = error as { code?: string; message?: string };
+        if (failure.code !== "40001" || !failure.message?.startsWith("Concurrent task dependency change;") || attempt >= 3) throw error;
+        effects.length = 0;
         signal.throwIfAborted();
-        return value;
-      })).then(value => resolve(value as T), reject);
-    });
-    for (const effect of effects) {
-      try { effect(); } catch (error) {
-        dbLog.warn("database_commit_effect_failed", {message: error instanceof Error ? error.message : "unknown"});
+        await new Promise(resolve => setTimeout(resolve, 10 * 2 ** attempt));
+      } finally {
+        if (stopWaiting) signal.removeEventListener("abort", stopWaiting);
       }
     }
-    return result;
   } finally {
-    if (stopWaiting) signal.removeEventListener("abort", stopWaiting);
     clearTimeout(timer);
   }
 }

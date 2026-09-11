@@ -162,7 +162,9 @@
     "test:practical-matching": "node scripts/mcp-721.mjs test --package=practical",
     "validate:dev:practical-matching": "node scripts/mcp-721.mjs validate --package=practical",
     "test:mcp:simple-plan": "node scripts/mcp-721.mjs test --package=simple-plan",
-    "validate:dev:mcp:simple-plan": "node scripts/mcp-721.mjs validate --package=simple-plan"
+    "validate:dev:mcp:simple-plan": "node scripts/mcp-721.mjs validate --package=simple-plan",
+    "test:matching-lock-boundaries": "node scripts/mcp-721.mjs test --package=boundaries",
+    "validate:dev:matching-lock-boundaries": "node scripts/mcp-721.mjs validate --package=boundaries"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1045.0",

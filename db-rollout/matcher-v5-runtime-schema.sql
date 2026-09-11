@@ -10,9 +10,29 @@ CREATE TABLE IF NOT EXISTS public.catalogue_runtime_revision (
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 INSERT INTO public.catalogue_runtime_revision (singleton) VALUES (true) ON CONFLICT DO NOTHING;
-CREATE OR REPLACE FUNCTION public.bump_catalogue_runtime_revision() RETURNS trigger LANGUAGE plpgsql AS $$
+-- Defer the shared catalogue fence until commit. The event is transaction-local
+-- by key and removed by its deferred trigger; it is never a growing work queue.
+CREATE TABLE IF NOT EXISTS public.catalogue_revision_commits (
+  transaction_id bigint PRIMARY KEY
+);
+CREATE OR REPLACE FUNCTION public.commit_catalogue_runtime_revision() RETURNS trigger
+LANGUAGE plpgsql AS $$
 BEGIN
-  UPDATE public.catalogue_runtime_revision SET revision=revision+1,updated_at=now() WHERE singleton=true;
+  UPDATE public.catalogue_runtime_revision SET revision=revision+1, updated_at=now() WHERE singleton=true;
+  DELETE FROM public.catalogue_revision_commits WHERE transaction_id=NEW.transaction_id;
+  RETURN NULL;
+END $$;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgrelid='public.catalogue_revision_commits'::regclass AND tgname='commit_catalogue_runtime_revision') THEN
+    CREATE CONSTRAINT TRIGGER commit_catalogue_runtime_revision
+      AFTER INSERT ON public.catalogue_revision_commits DEFERRABLE INITIALLY DEFERRED
+      FOR EACH ROW EXECUTE FUNCTION public.commit_catalogue_runtime_revision();
+  END IF;
+END $$;
+CREATE OR REPLACE FUNCTION public.bump_catalogue_runtime_revision() RETURNS trigger
+LANGUAGE plpgsql AS $$
+BEGIN
+  INSERT INTO public.catalogue_revision_commits(transaction_id) VALUES(txid_current()) ON CONFLICT DO NOTHING;
   RETURN NULL;
 END $$;
 DO $$ DECLARE table_name text; BEGIN

@@ -243,7 +243,7 @@ describe("database transaction boundaries", () => {
 
   it("keeps advisory locks limited to task dependency cycle protection", async () => {
     const source = await readFile("db-schema.sql", "utf8");
-    const advisoryLocks = source.match(/\bpg_advisory_xact_lock\s*\(/g) ?? [];
+    const advisoryLocks = source.match(/\bpg_(?:try_)?advisory_xact_lock\s*\(/g) ?? [];
 
     assert.equal(
       advisoryLocks.length,
@@ -252,7 +252,7 @@ describe("database transaction boundaries", () => {
     );
     assert.match(
       source,
-      /create or replace function public\.prevent_task_dependency_cycle\(\)[\s\S]*pg_advisory_xact_lock/,
+      /create or replace function public\.prevent_task_dependency_cycle\(\)[\s\S]*pg_try_advisory_xact_lock\(hashtextextended\('task-dependency:'/i,
       "the only advisory lock should guard task dependency cycle checks"
     );
 

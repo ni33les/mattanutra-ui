@@ -89,14 +89,10 @@ export async function refreshApprovedAdvisoryCaches(tx: postgres.TransactionSql,
     const [isolation] = await tx`show transaction_isolation`;
     if (isolation.transaction_isolation !== "serializable") throw new Error("Advisory cache refresh requires a serializable transaction");
   }
-  if (apply && prepared.entries.length) {
-    const [epoch] = await tx`select revision from public.catalogue_runtime_revision where singleton=true for update`;
-    if (Number(epoch?.revision) !== prepared.runtimeRevision) throw new Error("Catalogue changed since review; prepare again");
-  }
   const results: { productId: string; status: "pending" | "applied" | "already_applied" }[] = [];
   for (const row of prepared.entries) {
     const { entry } = row;
-    // Reject the product/epoch lock-order cycle instead of waiting on an ordinary writer.
+    // Mutate reviewed products in stable order; take the shared epoch fence last.
     if (apply) await tx`select id from public.products where id=${entry.productId}::uuid for update nowait`;
     const [same] = await tx`select id from public.products p where id=${entry.productId}::uuid
       and p is not distinct from jsonb_populate_record(null::public.products, ${row.beforeProductJson}::text::jsonb)`;
@@ -115,6 +111,12 @@ export async function refreshApprovedAdvisoryCaches(tx: postgres.TransactionSql,
         ${tx.json({ policy: manifest.policy, summary: "Refresh an already approved product's stale health-veto cache using current validated facts; preserve approval and all label facts." })})`;
     }
     results.push({ productId: entry.productId, status: apply ? "applied" : "pending" });
+  }
+  // The deferred epoch trigger publishes our increment at commit. Validate
+  // intervening committed changes only after all prepared product/audit writes.
+  if (apply && prepared.entries.length) {
+    const [epoch] = await tx`select revision from public.catalogue_runtime_revision where singleton=true for update`;
+    if (Number(epoch?.revision) !== prepared.runtimeRevision) throw new Error("Catalogue changed since review; prepare again");
   }
   return manifest.entries.map(entry=>results.find(row=>row.productId===entry.productId)!);
 }

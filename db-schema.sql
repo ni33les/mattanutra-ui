@@ -243,48 +243,54 @@ $$;
 -- Name: prevent_task_dependency_cycle(); Type: FUNCTION; Schema: public; Owner: -
 --
 
-create or replace function public.prevent_task_dependency_cycle() RETURNS trigger
-    LANGUAGE plpgsql
-    AS $$
-declare
-  previous_task_id uuid := null;
-  previous_depends_on_task_id uuid := null;
-begin
-  perform pg_advisory_xact_lock(1413563211, 1145393235);
-
-  if tg_op = 'UPDATE' then
-    previous_task_id := old.task_id;
-    previous_depends_on_task_id := old.depends_on_task_id;
-  end if;
-
-  if new.task_id = new.depends_on_task_id then
-    raise exception 'Task cannot depend on itself'
-      using errcode = '23514';
-  end if;
-
-  if exists (
-    with recursive dependency_path(task_id) as (
-      select new.depends_on_task_id
-      union
-      select task_dependencies.depends_on_task_id
-      from public.task_dependencies
-      inner join dependency_path
-        on dependency_path.task_id = task_dependencies.task_id
-      where previous_task_id is null
-        or task_dependencies.task_id <> previous_task_id
-        or task_dependencies.depends_on_task_id <> previous_depends_on_task_id
-    )
-    select 1
-    from dependency_path
-    where task_id = new.task_id
-  ) then
-    raise exception 'Task dependency cycle detected'
-      using errcode = '23514';
-  end if;
-
-  return new;
-end;
-$$;
+CREATE OR REPLACE FUNCTION public.prevent_task_dependency_cycle() RETURNS trigger
+LANGUAGE plpgsql AS $$
+DECLARE
+  nodes uuid[];
+  confirmed uuid[];
+  node_id uuid;
+BEGIN
+  IF NEW.task_id=NEW.depends_on_task_id THEN
+    RAISE EXCEPTION 'Task cannot depend on itself' USING ERRCODE='23514';
+  END IF;
+  IF TG_OP='UPDATE' AND NEW.task_id=OLD.task_id AND NEW.depends_on_task_id=OLD.depends_on_task_id THEN
+    RETURN NEW;
+  END IF;
+  IF TG_OP='INSERT' AND EXISTS(SELECT 1 FROM public.task_dependencies WHERE task_id=NEW.task_id AND depends_on_task_id=NEW.depends_on_task_id) THEN
+    RETURN NEW;
+  END IF;
+  LOOP
+    WITH RECURSIVE connected(id) AS (
+      SELECT unnest(ARRAY[NEW.task_id,NEW.depends_on_task_id])
+      UNION
+      SELECT CASE WHEN d.task_id=c.id THEN d.depends_on_task_id ELSE d.task_id END
+      FROM connected c JOIN public.task_dependencies d ON d.task_id=c.id OR d.depends_on_task_id=c.id
+    ) SELECT array_agg(id ORDER BY id) INTO nodes FROM connected;
+    FOREACH node_id IN ARRAY nodes LOOP
+      IF NOT pg_try_advisory_xact_lock(hashtextextended('task-dependency:'||node_id::text,0)) THEN
+        RAISE EXCEPTION 'Concurrent task dependency change; retry the transaction' USING ERRCODE='40001';
+      END IF;
+    END LOOP;
+    WITH RECURSIVE connected(id) AS (
+      SELECT unnest(ARRAY[NEW.task_id,NEW.depends_on_task_id])
+      UNION
+      SELECT CASE WHEN d.task_id=c.id THEN d.depends_on_task_id ELSE d.task_id END
+      FROM connected c JOIN public.task_dependencies d ON d.task_id=c.id OR d.depends_on_task_id=c.id
+    ) SELECT array_agg(id ORDER BY id) INTO confirmed FROM connected;
+    EXIT WHEN nodes=confirmed;
+  END LOOP;
+  IF EXISTS (
+    WITH RECURSIVE dependency_path(task_id) AS (
+      SELECT NEW.depends_on_task_id
+      UNION
+      SELECT d.depends_on_task_id FROM public.task_dependencies d JOIN dependency_path p ON d.task_id=p.task_id
+      WHERE TG_OP<>'UPDATE' OR d.task_id<>OLD.task_id OR d.depends_on_task_id<>OLD.depends_on_task_id
+    ) SELECT 1 FROM dependency_path WHERE task_id=NEW.task_id
+  ) THEN
+    RAISE EXCEPTION 'Task dependency cycle detected' USING ERRCODE='23514';
+  END IF;
+  RETURN NEW;
+END $$;
 
 
 --

@@ -9,6 +9,7 @@ import {validateUatResources} from "./service-efficiency/runtime-resources.mjs";
 
 export const MCP721_BASE = "22f3ce60f17158c68a251abe4070f582dd39253a";
 export const MCP_PACKAGES = {
+  "boundaries": { version: "11.0.0", directory: "test/service-efficiency", inventory: "test/service-efficiency/lock-boundaries-impact.json", base: "6fd7a63b062975ba3937e08a79286a24fe4de095", scope: "matching_lock_boundaries_and_shared_consumers" },
   "simple-plan": { version: "10.0.0", directory: "test/simple-plan", base: "afa47794825f523ccf5332c0f890fc2ddcc12162", scope: "pure_importance_v10_affected_behaviour" },
   practical: { version: "8.0.0", directory: "test/practical-matching", base: "ab102ab3930cbaea0594847152ac010bcae722ca", scope: "shared_practical_matching_and_affected_journeys" },
   "discovery": { version: "7.2.4", directory: "test/mcp-discovery", base: "41ed9fd07e8b9c8814d361eab33d72b27ac7c157", scope: "mcp_discoverability_and_maintained_regression" },
@@ -28,9 +29,9 @@ export function packageStages(packageId) {
 }
 export function mcp721Identity(sourceSha256, sourceCommit, packageId = "721") {
   const definition = MCP_PACKAGES[packageId]; assert.ok(definition, "Unknown work package");
-  const inventory = readFileSync(`${definition.directory}/impact.json`);
+  const inventory = readFileSync(definition.inventory ?? `${definition.directory}/impact.json`);
   const inputs = JSON.parse(inventory).inputs.map(file => ({ file, sha256: payloadHash(readFileSync(file)) }));
-  return { ...(packageId === "simple-plan" ? { deploymentBases: JSON.parse(inventory).deploymentBases, profileSha256: payloadHash(readFileSync("lib/matcher/scoring-policy.ts")), scalesSha256: payloadHash(readFileSync("lib/matcher/zero-target-policy.ts")) } : {}), ...(packageId === "practical" ? { deploymentBases: JSON.parse(inventory).deploymentBases, profileSha256: payloadHash(readFileSync("lib/matcher/practical-scoring.ts")), lockRegisterSha256: payloadHash(readFileSync("test/service-efficiency/lock-register.json")) } : {}), ...(packageId === "discovery" ? { deploymentBases: JSON.parse(inventory).deploymentBases,
+  return { ...(packageId === "boundaries" ? { deploymentBases: JSON.parse(inventory).deploymentBases, schemaSha256: payloadHash(readFileSync("db-rollout/matching-lock-boundaries.sql")) } : {}), ...(packageId === "simple-plan" ? { deploymentBases: JSON.parse(inventory).deploymentBases, profileSha256: payloadHash(readFileSync("lib/matcher/scoring-policy.ts")), scalesSha256: payloadHash(readFileSync("lib/matcher/zero-target-policy.ts")) } : {}), ...(packageId === "practical" ? { deploymentBases: JSON.parse(inventory).deploymentBases, profileSha256: payloadHash(readFileSync("lib/matcher/practical-scoring.ts")), lockRegisterSha256: payloadHash(readFileSync("test/service-efficiency/lock-register.json")) } : {}), ...(packageId === "discovery" ? { deploymentBases: JSON.parse(inventory).deploymentBases,
     positioningSha256: payloadHash(readFileSync("lib/agentic/discovery/positioning.ts")), connectorManifestSha256: payloadHash(readFileSync("lib/agentic/adapters/openai.json")) } : {}), ...(packageId === "efficiency" ? { deploymentBases: JSON.parse(inventory).deploymentBases,
     lockRegisterSha256: payloadHash(readFileSync("test/service-efficiency/lock-register.json")),
     schemaSha256: payloadHash(readFileSync("scripts/service-efficiency-schema.sql")), workerProtocolSha256: payloadHash(readFileSync("lib/agentic/plan/match-worker-protocol.ts")) } : {}), sourceSha256, sourceCommit, releaseBase: definition.base,

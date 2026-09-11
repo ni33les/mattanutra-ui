@@ -1,0 +1,507 @@
+{
+  "scope": "matching_lock_boundaries_and_shared_consumers",
+  "releaseBase": "6fd7a63b062975ba3937e08a79286a24fe4de095",
+  "testPolicy": "Scoped RED/GREEN and affected consumers only. No skipped, focused, todo, cancelled, retried or empty cases. Full application/MCP acceptance excluded.",
+  "files": [
+    {
+      "file": "test/service-efficiency/measurements.test.ts",
+      "slice": "measurements",
+      "expectedCases": 5,
+      "reason": "Concurrent request attribution, bounded aggregation and startup wiring in application and external worker processes"
+    },
+    {
+      "file": "test/service-efficiency/reads.test.ts",
+      "slice": "reads",
+      "expectedCases": 6,
+      "reason": "Lockless projection reads, unchanged versions, preserved expiry state and full conversation compatibility"
+    },
+    {
+      "file": "test/service-efficiency/reads.integration.test.ts",
+      "slice": "reads-pg",
+      "database": true,
+      "expectedCases": 6,
+      "reason": "Actual PostgreSQL locks retained for mutations, nonblocking status and two small SELECTs"
+    },
+    {
+      "file": "test/service-efficiency/transactions.test.ts",
+      "slice": "transactions",
+      "expectedCases": 4,
+      "reason": "Shared transaction session, commit-only effects and rollback silence for task admission"
+    },
+    {
+      "file": "test/service-efficiency/wakeup.test.ts",
+      "slice": "wakeup",
+      "expectedCases": 6,
+      "reason": "Lost task notification reproduction, bounded coalescing and single-consumer wakeups"
+    },
+    {
+      "file": "test/service-efficiency/operations.integration.test.ts",
+      "slice": "operations-pg",
+      "database": true,
+      "expectedCases": 4,
+      "reason": "Bounded atomic lease and checkpoint statements with preserved commands, cursor and stale-owner rejection"
+    },
+    {
+      "file": "test/service-efficiency/dispatch.test.ts",
+      "slice": "dispatch",
+      "expectedCases": 6,
+      "reason": "Pre-dispatch accounting, durable start acknowledgement, affine continuations and shared CPU capacity"
+    },
+    {
+      "file": "test/service-efficiency/ownership.test.ts",
+      "slice": "ownership",
+      "expectedCases": 1,
+      "reason": "HTTP admission persists work without starting another matching executor or owning a worker lease"
+    },
+    {
+      "file": "test/service-efficiency/sessions.test.ts",
+      "slice": "sessions",
+      "expectedCases": 4,
+      "reason": "Resident worker continuation, binary checkpoint restart and exact synchronous result/attempt parity"
+    },
+    {
+      "file": "test/service-efficiency/cache.test.ts",
+      "slice": "cache",
+      "expectedCases": 7,
+      "reason": "Byte-bounded immutable reuse, concurrent owner cancellation, checkpoint fencing and failed-computation isolation"
+    },
+    {
+      "file": "test/ax-refinement/recovery.integration.test.ts",
+      "slice": "recovery",
+      "database": true,
+      "expectedCases": 1,
+      "reason": "Preserve AXR-REL-03 exact lost-checkpoint accounting across binary durable sessions and reference observation changes"
+    },
+    {
+      "file": "test/ax-refinement/checkpoints.test.ts",
+      "slice": "checkpoints",
+      "expectedCases": 3,
+      "reason": "Preserve legacy checkpoint readers, restart equivalence and all prior identity/cache-isolation assertions"
+    },
+    {
+      "file": "test/service-efficiency/funnel.test.ts",
+      "slice": "funnel",
+      "expectedCases": 3,
+      "reason": "Single-consumption JSON bodies, shared page polling with independent cancellation, zero hidden-tab interval wakeups"
+    },
+    {
+      "file": "test/service-efficiency/funnel-reads.integration.test.ts",
+      "slice": "funnel-reads",
+      "database": true,
+      "expectedCases": 2,
+      "reason": "Read-only funnel status under held assessment writes, compact locale-specific advice gates and invalidated legacy projections"
+    },
+    {
+      "file": "test/task-transactions.integration.test.ts",
+      "slice": "task-transactions",
+      "database": true,
+      "expectedCases": 14,
+      "reason": "Task admission/rollback, reservation fencing, deferred matching ownership and exact replay through the existing worker completion boundary"
+    },
+    {
+      "file": "test/worker-boundary.test.ts",
+      "slice": "worker-boundary",
+      "expectedCases": 12,
+      "reason": "Preserve the external worker API boundary, real profile registrations and direct platform import restrictions"
+    },
+    {
+      "file": "test/funnel-polling.test.ts",
+      "slice": "funnel",
+      "database": false,
+      "expectedCases": 4,
+      "reason": "Existing header/body deadlines, transient retry, cancellation, hidden-tab and foreground recovery behaviour"
+    },
+    {
+      "file": "test/db-transactions.integration.test.ts",
+      "slice": "db-consumers",
+      "database": true,
+      "expectedCases": 6,
+      "reason": "Managed-pool transaction-local timeouts, shared transaction ownership and cancellation recovery"
+    },
+    {
+      "file": "test/assessment-capture.integration.test.ts",
+      "slice": "capture",
+      "database": true,
+      "expectedCases": 5,
+      "reason": "Capture idempotency, revision fencing, contact-only preservation and transactional generation scheduling"
+    },
+    {
+      "file": "test/web-payment-transitions.integration.test.ts",
+      "slice": "payments",
+      "database": true,
+      "expectedCases": 4,
+      "reason": "Atomic binding and conditional payment transitions preserve revenue, ownership and paid state"
+    },
+    {
+      "file": "test/web-payment-fulfillment.integration.test.ts",
+      "slice": "fulfillment",
+      "database": true,
+      "expectedCases": 4,
+      "reason": "Idempotent accounting and plan task publication remain atomic and recover after interruption"
+    },
+    {
+      "file": "test/healthscore-delivery.integration.test.ts",
+      "slice": "email",
+      "database": true,
+      "expectedCases": 4,
+      "reason": "Persisted advice readiness must preserve durable delivery, rejection, ambiguous acceptance and provider acknowledgement"
+    },
+    {
+      "file": "test/funnel-readiness.integration.test.ts",
+      "slice": "readiness",
+      "database": true,
+      "expectedCases": 6,
+      "reason": "Shared localized advice gates, pending formulation status, payment fulfillment and stale-generation rejection"
+    },
+    {
+      "file": "test/agentic-match-worker.test.ts",
+      "slice": "worker-consumers",
+      "database": false,
+      "expectedCases": 6,
+      "reason": "Shared ThreadPool retains reference validation, deterministic matching, cancellation and queue bounds"
+    },
+    {
+      "file": "test/product-matcher-worker.test.ts",
+      "slice": "worker-consumers",
+      "database": false,
+      "expectedCases": 3,
+      "reason": "Web matching uses shared CPU admission without changing outputs or cancellation and capacity behaviour"
+    },
+    {
+      "file": "test/consistency-r2-formulation-read.test.ts",
+      "slice": "funnel",
+      "database": false,
+      "expectedCases": 5,
+      "reason": "Preserve bounded formulation reads, revision polling and one full result fetch per changed version"
+    },
+    {
+      "file": "test/mcp-conversation-pack/status.test.ts",
+      "slice": "mcp-consumers",
+      "expectedCases": 2,
+      "reason": "Affected MCP read and durable executor compatibility: exact compact fields, ownership, localized guides and unchanged public contract"
+    },
+    {
+      "file": "test/mcp-conversation-pack/cards.test.ts",
+      "slice": "mcp-consumers",
+      "expectedCases": 3,
+      "reason": "Affected MCP read and durable executor compatibility: exact compact fields, ownership, localized guides and unchanged public contract"
+    },
+    {
+      "file": "test/mcp-agent-surface/contracts.test.ts",
+      "slice": "mcp-consumers",
+      "expectedCases": 3,
+      "reason": "Affected MCP read and durable executor compatibility: exact compact fields, ownership, localized guides and unchanged public contract"
+    },
+    {
+      "file": "test/mcp-payload/projection.test.ts",
+      "slice": "mcp-consumers",
+      "expectedCases": 4,
+      "reason": "Affected MCP read and durable executor compatibility: exact compact fields, ownership, localized guides and unchanged public contract"
+    },
+    {
+      "file": "test/mcp-payload/status.test.ts",
+      "slice": "mcp-consumers",
+      "expectedCases": 1,
+      "reason": "Affected MCP read and durable executor compatibility: exact compact fields, ownership, localized guides and unchanged public contract"
+    },
+    {
+      "file": "test/mcp-7-2-2/transport.test.ts",
+      "slice": "mcp-consumers",
+      "expectedCases": 2,
+      "reason": "Affected MCP read and durable executor compatibility: exact compact fields, ownership, localized guides and unchanged public contract"
+    },
+    {
+      "file": "test/mcp-agent-surface/views.test.ts",
+      "slice": "mcp-consumers",
+      "expectedCases": 9,
+      "reason": "Affected MCP read and durable executor compatibility: exact compact fields, ownership, localized guides and unchanged public contract"
+    },
+    {
+      "file": "test/mcp-payload/narrative.test.ts",
+      "slice": "mcp-consumers",
+      "expectedCases": 4,
+      "reason": "Affected MCP read and durable executor compatibility: exact compact fields, ownership, localized guides and unchanged public contract"
+    },
+    {
+      "file": "test/service-efficiency/harness.test.ts",
+      "slice": "harness",
+      "expectedCases": 6,
+      "reason": "Reject incomplete benchmark comparisons, changed semantics, missing browser evidence and unchanged-source proof gaps"
+    },
+    {
+      "file": "test/mcp-conversation-pack/deployment.test.ts",
+      "slice": "harness",
+      "expectedCases": 1,
+      "reason": "Shared attestation reader must preserve historical presentation-only release validation and rejection rules"
+    },
+    {
+      "file": "test/service-efficiency/durable-cache.test.ts",
+      "slice": "durable-cache",
+      "expectedCases": 1,
+      "reason": "Exercise real durable worker coalescing, independent capability ownership and warm completed-result reuse end to end"
+    },
+    {
+      "file": "test/service-efficiency/worker-identity.test.ts",
+      "slice": "identity",
+      "expectedCases": 4,
+      "reason": "Standalone UAT runtime identity must match its compiled application before worker admission"
+    },
+    {
+      "file": "test/service-efficiency/permit-removal.test.ts",
+      "slice": "permits",
+      "expectedCases": 3,
+      "reason": "Audits 22\u201325: remove artificial admission/worker/connection/database gates while preserving cancellation and deadlines"
+    },
+    {
+      "file": "test/agentic-catalogue-publish-v5.test.ts",
+      "slice": "snapshots",
+      "expectedCases": 1,
+      "reason": "V5-PUBLISH-01 revised catalogue-only policy: retain immutable completed result, stale presentation and terminal receipt"
+    },
+    {
+      "file": "test/agentic-catalogue-publish-v5.integration.test.ts",
+      "slice": "snapshots-pg",
+      "database": true,
+      "expectedCases": 1,
+      "reason": "V5-PUBLISH-PG-01: publication completes behind epoch writer while immutable result remains stale after writer commits"
+    },
+    {
+      "file": "test/service-efficiency/lock-register.test.ts",
+      "slice": "lock-register",
+      "expectedCases": 4,
+      "reason": "All 39 mechanisms have reviewed boundaries and tests; discover SQL locks and reject unregistered additions"
+    },
+    {
+      "file": "test/product-advisory-cache-refresh.integration.test.ts",
+      "slice": "catalogue-writer",
+      "expectedCases": 4,
+      "reason": "Direct verification of retained audited writer, pool, rate-limit and maintenance invariants",
+      "database": true
+    },
+    {
+      "file": "test/catalogue-admin-reference-concurrency.integration.test.ts",
+      "slice": "retained-locks",
+      "expectedCases": 2,
+      "reason": "Direct verification of retained audited writer, pool, rate-limit and maintenance invariants",
+      "database": true
+    },
+    {
+      "file": "test/db-pool-sizing.test.ts",
+      "slice": "retained-locks",
+      "expectedCases": 6,
+      "reason": "Direct verification of retained audited writer, pool, rate-limit and maintenance invariants"
+    },
+    {
+      "file": "test/rate-limit.test.ts",
+      "slice": "retained-locks",
+      "expectedCases": 7,
+      "reason": "Direct verification of retained audited writer, pool, rate-limit and maintenance invariants"
+    },
+    {
+      "file": "test/plan-keep-warm-static.test.ts",
+      "slice": "retained-locks",
+      "expectedCases": 1,
+      "reason": "Direct verification of retained audited writer, pool, rate-limit and maintenance invariants"
+    },
+    {
+      "file": "test/web-advisory.integration.test.ts",
+      "slice": "web-publication",
+      "database": true,
+      "expectedCases": 8,
+      "reason": "Web catalogue snapshot publication, preserved immutable reference identities, preferences/revision concurrency and explicit recovery without read maintenance"
+    },
+    {
+      "file": "test/service-efficiency/duplicate-admission.test.ts",
+      "slice": "duplicate-admission",
+      "expectedCases": 2,
+      "reason": "Audits 31/35: concurrent preparation without process Promise chains, one database-owned plan/checkout receipt"
+    },
+    {
+      "file": "test/service-efficiency/worker-capacity.test.ts",
+      "slice": "worker-capacity",
+      "expectedCases": 3,
+      "reason": "Audit 28: productive external matching concurrency follows shared CPU budget; unrelated worker concurrency retained"
+    },
+    {
+      "file": "test/service-efficiency/affinity.test.ts",
+      "slice": "affinity",
+      "expectedCases": 4,
+      "reason": "Audits 26/30: acknowledged resident cursor eviction prevents idle affinity stranding productive work; exact attempt/result recovery"
+    },
+    {
+      "file": "test/service-efficiency/result-preparation.test.ts",
+      "slice": "result-preparation",
+      "expectedCases": 5,
+      "reason": "Audits 1/10/11: prepare immutable product rows, localized presentation and HealthScore hashes outside task/assessment publication locks"
+    },
+    {
+      "file": "test/service-efficiency/decision-batch.integration.test.ts",
+      "slice": "decision-batch",
+      "database": true,
+      "expectedCases": 1,
+      "reason": "Audits 10/11: constant protected decision-write round trips with exact values and duplicate replay semantics"
+    },
+    {
+      "file": "test/recommendation-selection-projections.test.ts",
+      "slice": "decision-batch",
+      "expectedCases": 3,
+      "reason": "Affected supplement/product projections preserve coverage, quantities, decisions and rejected products"
+    },
+    {
+      "file": "test/service-efficiency/checkout-preparation.test.ts",
+      "slice": "checkout-preparation",
+      "expectedCases": 2,
+      "reason": "Audits 2/3/6/15: external payment preparation before locks, current commercial publication fence, unchanged frozen checkout recovery"
+    },
+    {
+      "file": "test/service-efficiency/pool-wait.integration.test.ts",
+      "slice": "pool-wait",
+      "database": true,
+      "expectedCases": 3,
+      "reason": "Audit 36: pool acquisition obeys cancellation/deadlines without late writes, effects or leaked permits"
+    },
+    {
+      "file": "test/service-efficiency/preference-reads.integration.test.ts",
+      "slice": "preference-reads",
+      "database": true,
+      "expectedCases": 1,
+      "reason": "Audit 15: ordinary preference reads and existing initialization avoid redundant row locks/no-op writes; mutations remain assessment-fenced"
+    },
+    {
+      "file": "test/service-efficiency/retained-claims.integration.test.ts",
+      "slice": "retained-claims",
+      "database": true,
+      "expectedCases": 4,
+      "reason": "Audits 19/20/21: actual outbox and scheduled-action disjoint claims, dependency cycle serialization, FK protection and nonblocking reads"
+    },
+    {
+      "file": "test/catalogue-safety-reference-integrity.integration.test.ts",
+      "slice": "reference-locks",
+      "database": true,
+      "expectedCases": 6,
+      "reason": "Audits 9/33: exact reference-head invariants, per-nutrient contention/retry and ordinary warm-cache invalidation"
+    },
+    {
+      "file": "test/service-efficiency/immutable-references.test.ts",
+      "slice": "immutable-references",
+      "expectedCases": 2,
+      "reason": "Audits 6/30/33: concurrent immutable reference scopes and real checkpoint restart after catalogue/reference changes, with explicit stale presentation"
+    },
+    {
+      "file": "test/transaction-boundary.test.ts",
+      "slice": "transaction-architecture",
+      "expectedCases": 16,
+      "reason": "Affected shared transaction and catalogue/plan store boundaries; replace superseded duplicate lock allowlists with the complete justified-site register"
+    },
+    {
+      "file": "test/service-efficiency/cancel-admission.integration.test.ts",
+      "slice": "cancel-admission",
+      "database": true,
+      "expectedCases": 1,
+      "reason": "Audits 1/26/30: actual durable cancellation between committed reservation and worker dispatch preserves zero attempts and a recoverable receipt"
+    },
+    {
+      "file": "test/service-efficiency/rollout.test.ts",
+      "slice": "rollout",
+      "expectedCases": 3,
+      "reason": "Both approved deployment bases, source/register proof, executable coverage for all 39 locks, and environment-specific worker identity configuration"
+    },
+    {
+      "file": "test/service-efficiency/read-coalescing.integration.test.ts",
+      "slice": "read-coalescing",
+      "expectedCases": 4,
+      "database": true,
+      "reason": "Audits 32-34/38: actual immutable catalogue/reference/market single-flight and maintenance exclusion cannot block ordinary readers"
+    },
+    {
+      "file": "test/periodic-task.test.ts",
+      "slice": "maintenance",
+      "expectedCases": 2,
+      "reason": "Audit 38: bounded periodic work coalesces and releases after failures without overlapping maintenance"
+    },
+    {
+      "file": "test/service-efficiency/atomic-checkout.integration.test.ts",
+      "slice": "atomic-checkout",
+      "expectedCases": 2,
+      "database": true,
+      "reason": "Actual concurrent PostgreSQL admission and checkout preserve one durable resource and immutable frozen recovery without process queues"
+    },
+    {
+      "file": "test/agentic-cv-speed-pack.test.ts",
+      "slice": "speed-consumer",
+      "expectedCases": 4,
+      "reason": "Existing directly affected admission and immutable-match cache assertions must use the durable worker owner and nonempty result evidence"
+    },
+    {
+      "file": "test/service-efficiency/resources.test.ts",
+      "slice": "runtime-resources",
+      "expectedCases": 1,
+      "reason": "Bound repeated matching comparisons to verified UAT-equivalent CPU/memory with no swap, OOM or silently unbounded runtime evidence"
+    },
+    {
+      "file": "test/service-efficiency/publication-storage.integration.test.ts",
+      "slice": "publication-storage",
+      "database": true,
+      "expectedCases": 2,
+      "reason": "Audits 1/3/5: serialized revision publication and small validation headers; order status changes never reserialize or rewrite immutable frozen baskets"
+    },
+    {
+      "file": "test/service-efficiency/reference-browser.test.ts",
+      "slice": "browser-reference",
+      "expectedCases": 1,
+      "reason": "The shared web/admin matcher must compile and execute in a browser without importing Node async context; server reference isolation remains independently covered"
+    },
+    {
+      "file": "test/service-efficiency/lock-boundaries.test.ts",
+      "slice": "lock-boundaries",
+      "reason": "Admission preparation, expired refinement recovery and independent productive CPU admission",
+      "expectedCases": 3
+    },
+    {
+      "file": "test/service-efficiency/lock-boundaries.integration.test.ts",
+      "slice": "lock-boundaries",
+      "reason": "Committed catalogue identity and concurrent graph-specific cycle protection in isolated PostgreSQL",
+      "expectedCases": 5,
+      "database": true
+    }
+  ],
+  "inputs": [
+    "test/mcp-conversation-pack/d3-fixture.json",
+    "test/fixtures/mcp-payload/baseline.json.gz",
+    "test/fixtures/mcp-payload/manifest.json",
+    "test/fixtures/ax-refinement/six-profiles.json",
+    "test/fixtures/ax-refinement/dev-corrections.json",
+    "test/fixtures/mcp-7-2-3/goldens.json",
+    "data/catalogue-corrections/mcp-7.2.2-dev.json",
+    "test/fixtures/matcher-experiments/manifest.json",
+    "test/fixtures/matcher-experiments/anna-dev.json",
+    "db-rollout/matching-lock-boundaries.sql",
+    "test/service-efficiency/lock-register.json"
+  ],
+  "browser": [],
+  "benchmarks": [],
+  "deploymentBases": {
+    "dev": "426ac2a7901f61519e77acdbab01c0d5ee9eddcc"
+  },
+  "releaseFiles": [
+    "test/service-efficiency/lock-boundaries.test.ts",
+    "test/service-efficiency/lock-boundaries.integration.test.ts",
+    "test/service-efficiency/dispatch.test.ts",
+    "test/service-efficiency/transactions.test.ts",
+    "test/service-efficiency/result-preparation.test.ts",
+    "test/service-efficiency/measurements.test.ts",
+    "test/service-efficiency/lock-register.test.ts",
+    "test/service-efficiency/operations.integration.test.ts",
+    "test/service-efficiency/reads.integration.test.ts",
+    "test/service-efficiency/atomic-checkout.integration.test.ts",
+    "test/service-efficiency/publication-storage.integration.test.ts",
+    "test/service-efficiency/cancel-admission.integration.test.ts",
+    "test/service-efficiency/retained-claims.integration.test.ts",
+    "test/service-efficiency/sessions.test.ts",
+    "test/service-efficiency/decision-batch.integration.test.ts",
+    "test/task-transactions.integration.test.ts",
+    "test/db-transactions.integration.test.ts",
+    "test/product-advisory-cache-refresh.integration.test.ts",
+    "test/transaction-boundary.test.ts"
+  ]
+}

@@ -4,7 +4,7 @@
   "uatBaseline": "84c39d9acff2fa380b0223be38650264ab1cc73d",
   "contract": "7.2.4",
   "scope": "39 audited mechanisms and shared consumers; no PRD deployment",
-  "lockOrder": "Plan then operation/order; task then assessment then preferences/payment/delivery; multiple rows in stable ID order. Catalogue writers prepare outside transactions; maintenance product acquisition uses NOWAIT to break the epoch/product writer cycle.",
+  "lockOrder": "Plan then operation/order; task then assessment/payment/delivery. Catalogue product writes in stable ID order precede the final epoch fence. Dependency advisory locks cover connected task graphs only; contention rolls back before bounded replay.",
   "timingPolicy": "Report acquisition latency and client-observed transaction duration separately. A lease lifetime is not a PostgreSQL row-lock hold time.",
   "mechanisms": [
     {
@@ -321,7 +321,7 @@
       "invariant": "Advances one global content revision after catalogue/reference changes. Reviewed advisory-cache refresh explicitly takes the same row first.",
       "acquisition": "Explicit mutation transaction or conditional write; ordinary reads never acquire this lock.",
       "permittedWork": "Prepare manifest, prior fingerprints, verification and audit JSON before locks; epoch fence then sorted product NOWAIT guards validate exact prior rows and write bounded cache/audit changes. Ordinary competing product writers can finish.",
-      "release": "From first epoch update/lock to end of the writer transaction; a whole correction batch can retain it.",
+      "release": "Deferred catalogue identity publication acquires the singleton writer lock at commit, after the catalogue mutations; rollback publishes nothing.",
       "callers": [
         "lib/catalogue-runtime-revision.ts",
         "lib/product-advisory-cache-refresh.ts",
@@ -685,12 +685,12 @@
     },
     {
       "number": 15,
-      "resource": "Assessment product-preference row — FOR UPDATE",
-      "disposition": "narrow",
+      "resource": "Former assessment product-preference row lock (removed)",
+      "disposition": "remove",
       "invariant": "Preserves exclusion/search-effort revision when replanning or applying generation output.",
       "acquisition": "Explicit mutation transaction or conditional write; ordinary reads never acquire this lock.",
       "permittedWork": "Revalidate ownership, revision and affected row identities; apply necessary writes only. Prepare, calculate, serialize, render and perform external effects outside the protected phase.",
-      "release": "Until owning assessment/completion transaction ends.",
+      "release": "No separate preference row lock; mutation writers reuse the assessment revision fence.",
       "callers": [
         "lib/assessment-product-preferences.ts",
         "lib/task-result-applier.ts"
@@ -1077,7 +1077,7 @@
       "disposition": "narrow",
       "invariant": "Bounds worker-thread search concurrency per process.",
       "acquisition": "Bounds worker-thread search concurrency per process.",
-      "permittedWork": "Only the bounded productive work or immutable coalescing described by this mechanism; never serialize unrelated ordinary reads.",
+      "permittedWork": "Thread assignment and cancellable durable preparation precede CPU admission. Productive capacity covers calculation and actual thread termination only.",
       "release": "Capacity released after computation ends; on cancellation after actual thread termination. Predispatch cancelled reservations are compensated. Acknowledged idle affinity may be evicted for queued work.",
       "callers": [
         "lib/agentic/plan/match-worker-pool.ts",
@@ -1313,7 +1313,7 @@
       "invariant": "Prevents a different revision being admitted while a plan operation is queued/running/retryable.",
       "acquisition": "Prevents a different revision being admitted while a plan operation is queued/running/retryable.",
       "permittedWork": "Admission and publication use durable row/uniqueness protection. Concurrent unique-key losers return the committed operation; HTTP never calculates. Worker ownership and revision are revalidated before required writes.",
-      "release": "Until terminal state, cancellation, or expiry persistence. The intended overall deadline is 175 seconds; expiry is enforced when work/polls run.",
+      "release": "Completion, cancellation, or expiry retirement during explicit mutation admission; ordinary reads never persist cleanup.",
       "callers": [
         "lib/agentic/plan/operations.ts",
         "lib/agentic/plan/service.ts"
@@ -2225,6 +2225,33 @@
         17
       ],
       "justification": "Payment-evidence repair revalidates the paid state before task creation; provider verification is outside the lock."
+    },
+    {
+      "file": "db-rollout/db-rollout.sql",
+      "owner": "public.prevent_task_dependency_cycle",
+      "key": "826f6c22adf32ee31ab3ffac237d3eee3d124f87473e9a785c533c2757aef475",
+      "statement": "FOREACH node_id IN ARRAY nodes LOOP IF NOT pg_try_advisory_xact_lock(hashtextextended('task-dependency:'||node_id::text,0)) THEN RAISE EXCEPTION 'Concurrent task dependency change",
+      "mechanisms": [
+        12
+      ]
+    },
+    {
+      "file": "db-rollout/matching-lock-boundaries.sql",
+      "owner": "public.prevent_task_dependency_cycle",
+      "key": "63e23f737d6696f2671f75a6e8a21002ff077a9dc3f4c41f6a16a01d4da1fa0e",
+      "statement": "FOREACH node_id IN ARRAY nodes LOOP IF NOT pg_try_advisory_xact_lock(hashtextextended('task-dependency:'||node_id::text,0)) THEN RAISE EXCEPTION 'Concurrent task dependency change",
+      "mechanisms": [
+        12
+      ]
+    },
+    {
+      "file": "db-schema.sql",
+      "owner": "public.prevent_task_dependency_cycle",
+      "key": "4b2a1247df4d3c4224255a67dbd4fdabb5342036e27f8c064080cc2f6f14ef6f",
+      "statement": "FOREACH node_id IN ARRAY nodes LOOP IF NOT pg_try_advisory_xact_lock(hashtextextended('task-dependency:'||node_id::text,0)) THEN RAISE EXCEPTION 'Concurrent task dependency change",
+      "mechanisms": [
+        12
+      ]
     }
   ]
 }

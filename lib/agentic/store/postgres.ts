@@ -139,10 +139,10 @@ export function createPostgresStore(inputSql: Sql, inTransaction = false): Agent
         order by created_at desc,id desc limit 1`;
       return row ? withoutOperationCursor(row.record_json) : null;
     },
-    async insertPlanOperation(record) {
+    async insertPlanOperation(record, preparedJson) {
       if (!inTransaction) throw new Error("Plan admission requires a transaction");
       await sql`insert into public.agentic_plan_operations(id,plan_id,owner_scope,idempotency_key,status,version,record_json,created_at,updated_at)
-        values(${record.id}::uuid,${record.planId}::uuid,${record.ownerScope},${record.key},${record.status},${record.version},${asJson(record)},${record.createdAt}::timestamptz,${record.updatedAt}::timestamptz)`;
+        values(${record.id}::uuid,${record.planId}::uuid,${record.ownerScope},${record.key},${record.status},${record.version},${preparedJson ?? JSON.stringify(record)}::text::jsonb,${record.createdAt}::timestamptz,${record.updatedAt}::timestamptz)`;
       const { createTask } = await import("@/lib/task-service");
       await createTask({ id: record.taskId, taskType: "match_agentic_plan", title: "Complete supplement matching",
         sourceEntityId: record.id, sourceEntityType: "agentic_plan_operation", payload: { operationId: record.id },

@@ -553,11 +553,12 @@ export async function writeProductRecommendationDecisionRows(
     planId?: string | null;
     rows: ProductDecisionProjection[];
     preparedRowsJson?: string;
+    tableAvailable?: boolean;
     runId: string;
     taskId?: string | null;
   }>
 ) {
-  if (!(await projectionTableExists(sql, "product_recommendation_decisions"))) {
+  if (!(input.tableAvailable ?? await projectionTableExists(sql, "product_recommendation_decisions"))) {
     return 0;
   }
 

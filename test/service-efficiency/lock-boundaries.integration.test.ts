@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { after, before, test } from "node:test";
 import postgres from "postgres";
+import { closeSqlPool } from "../../lib/db.ts";
 
 assert.ok(process.env.TEST_DB_URL, "Isolated PostgreSQL is mandatory");
 const url = new URL(process.env.TEST_DB_URL);
@@ -22,7 +23,7 @@ after(async () => {
     await sql`delete from task_dependencies where task_id=any(${ids}::uuid[])`;
     await sql`delete from tasks where id=any(${ids}::uuid[])`;
     await sql`drop table lock_boundary_catalogue`;
-  } finally { await sql.end(); }
+  } finally { await sql.end(); await closeSqlPool(); }
 });
 
 test("LOCK-BOUNDARY-PG-01 independent catalogue writes proceed while another writer prepares its transaction", { timeout: 5000 }, async () => {
@@ -72,4 +73,32 @@ test("LOCK-BOUNDARY-PG-04 concurrent edges cannot close a cycle through disjoint
     finish.release(); await held; await rejected;
     assert.equal((await sql`select count(*)::int as n from task_dependencies where task_id=${c} and depends_on_task_id=${d}`)[0].n, 0);
   } finally { finish.release(); await held; }
+});
+
+test("LOCK-BOUNDARY-PG-05 product publication reconciles runs, lines and decision facts in PostgreSQL", async () => {
+  const { prepareTaskCompletionResult, applyTaskCompletionResult } = await import("../../lib/task-result-applier.ts");
+  const { FUNNEL_GENERATOR_VERSION } = await import("../../lib/assessment-revisions.ts");
+  const rollback = new Error("Rollback publication fixture");
+  await assert.rejects(sql.begin(async tx => {
+    const planId = randomUUID();
+    await tx`insert into assessments(plan_id,locale,answers,input_revision,input_hash) values(${planId},'en','{}',1,'lock-boundary')`;
+    const [product] = await tx`select id,title from products order by id limit 1`;
+    assert.ok(product, "Controlled catalogue product is required");
+    const reference = { runtimeRevision: 99, fingerprint: "a".repeat(64) };
+    const task = { id: ids[0], planId, taskType: "generate_product_recommendations", payload: { catalogueRevision: 99, safetyReferenceIdentity: reference,
+      generation: { revision: 1, locale: "en", inputHash: "lock-boundary", generatorVersion: FUNNEL_GENERATOR_VERSION, answers: {} } } };
+    const payload = { catalogueRevision: 99, safetyReferenceIdentity: reference,
+      recommendations: [{ product: { id: product.id, title: product.title, priceAmount: 123.45, currency: "THB", platform: "manual" },
+        rank: 1, score: 9, productCoveragePercent: 75, stackContributionPercent: 75, servingMultiplier: 2, coveredNeeds: [], why: "Frozen advice", url: "https://fixture.invalid", unknownAtRecommendation: false }],
+      stackCoveragePercent: 75, diagnostics: { stackPreference: "balanced", trace: {} } };
+    const prepared = await prepareTaskCompletionResult({ task: task as never, resultPayload: payload, sql: tx as never });
+    assert.ok(prepared.products?.selected);
+    const result = await applyTaskCompletionResult({ task: task as never, taskId: task.id, resultPayload: payload, preparedResult: prepared, sql: tx as never, afterCommit: () => {} }) as { recommendationRunId: string };
+    const rows = await tx`select i.serving_multiplier,i.price_amount,d.is_current,d.reason from product_recommendation_items i
+      join product_recommendation_decisions d on d.run_id=i.run_id and d.product_id=i.product_id where i.run_id=${result.recommendationRunId}::uuid`;
+    assert.equal(rows.length, 1); assert.equal(rows[0].serving_multiplier, 2);
+    assert.equal(Number(rows[0].price_amount), 123.45); assert.equal(rows[0].is_current, true);
+    assert.equal(result.recommendationRunId, prepared.products.selected.runId);
+    throw rollback;
+  }), error => error === rollback);
 });
