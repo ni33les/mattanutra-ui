@@ -152,7 +152,7 @@ async function main() {
     await run("runtime-schema", process.execPath, [...TS, "scripts/verify-dev-runtime-schema.ts"]);
     await run("public-catalogue-fixtures", process.execPath, ["scripts/seed-matcher-public-fixtures.mjs", join(evidence, "public-catalogue-fixtures.json")]);
     await run("typecheck", process.execPath, ["node_modules/typescript/bin/tsc", "--noEmit"],
-      { ...env, NODE_OPTIONS: env.NODE_OPTIONS.replace("--max-old-space-size=2300", "--max-old-space-size=1500") }, false);
+      env, false);
     // Pass the complete release diff explicitly, including previously committed slices.
     await run("changed-lint", process.execPath, ["node_modules/eslint/bin/eslint.js", ...(releaseLint.files.length ? releaseLint.files : ["scripts/run-dev-advisory-validation.mjs"])], env, false);
     await run("production-build", process.execPath, ["node_modules/next/dist/bin/next", "build", "--webpack"], { ...env, NODE_ENV: "production", NODE_OPTIONS: "--max-old-space-size=2300", NEXT_BUILD_CPUS: "1", NEXT_BUILD_SKIP_TYPECHECK: "1" });
