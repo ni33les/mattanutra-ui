@@ -1,3 +1,5 @@
+> Historical implementation record. For the current six-tool, single-recommendation protocol, use the [generated MCP client guide](../../contract/mcp/11.0.0/README.md). Retired tools, identifiers and response modes described below are not the current public API.
+
 # MCP payload reduction: scoped TDD work package
 
 Planning baseline: `dev` at `41e1bdceeb6eaa0a8c7054ae57833fe2ed109764`, public contract 7.0.0, 8 September 2026. Historical planning status: proposed implementation; only read-only profiling had been performed. Implementation progress and intentional expectation changes are recorded in [mcp-payload-evidence.md](mcp-payload-evidence.md); the implementation release base follows the completed DB-pool change at `23b4e4cd`.

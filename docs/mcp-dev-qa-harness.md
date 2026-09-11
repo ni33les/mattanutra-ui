@@ -5,9 +5,11 @@ Authenticated, DEV-only fixture and observer for the v3.0 deterministic pack. Or
 - URL: `https://dev.mattanutra.com/api/mcp/qa`
 - DEV writes: no bearer and no audience header. ChatGPT can POST JSON to `/api/mcp/qa` as it does for GET preflight.
 - UAT/PRD: bearer token and `x-mattanutra-qa-audience: mattanutra-dev-qa`; empty token is not an open door.
-- Optional on public `/api/mcp` only: the same DEV audience header plus `x-mattanutra-qa-namespace` to bind clock and principal. Public `tools/list` stays seven names.
+- Optional on public `/api/mcp` only: the same DEV audience header plus `x-mattanutra-qa-namespace` to bind clock and principal. Public `tools/list` stays six names.
 
-Public `tools/list` stays `info`, `plan`, `execute`, `order`, `support`, `feedback`, `evidence`.
+Public `tools/list` stays `info`, `plan`, `execute`, `order`, `support`, and `feedback`.
+
+The public protocol is defined by the [generated MCP 11 guide](../contract/mcp/11.0.0/README.md). The QA-only `evidence` operation below is an internal test observer; it is not a public MCP tool.
 
 ## Preflight
 

@@ -1,3 +1,5 @@
+> Historical implementation record. For the current six-tool, single-recommendation protocol, use the [generated MCP client guide](../contract/mcp/11.0.0/README.md). Retired tools, identifiers and response modes described below are not the current public API.
+
 # MCP 7.2.1: scoped DEV release
 
 This package changes hosted discovery verification, optional response transport,

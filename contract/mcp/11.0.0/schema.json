@@ -343,7 +343,7 @@
               "maxLength": 128,
               "type": "string"
             },
-            "description": "Reported condition codes; accepted inputs do not establish assessed interaction coverage."
+            "description": "Reported condition codes from info.conditionCodes; accepted inputs do not establish assessed interaction coverage."
           },
           "currentSupplements": {
             "maxItems": 50,
@@ -1154,7 +1154,7 @@
               "maxLength": 128,
               "type": "string"
             },
-            "description": "Reported condition codes; accepted inputs do not establish assessed interaction coverage."
+            "description": "Reported condition codes from info.conditionCodes; accepted inputs do not establish assessed interaction coverage."
           },
           "currentSupplements": {
             "maxItems": 50,
@@ -2189,7 +2189,7 @@
           "maxLength": 128,
           "type": "string"
         },
-        "description": "Reported condition codes; accepted inputs do not establish assessed interaction coverage."
+        "description": "Reported condition codes from info.conditionCodes; accepted inputs do not establish assessed interaction coverage."
       },
       "currentSupplements": {
         "maxItems": 50,
@@ -4376,7 +4376,7 @@
               "maxLength": 128,
               "type": "string"
             },
-            "description": "Reported condition codes; accepted inputs do not establish assessed interaction coverage."
+            "description": "Reported condition codes from info.conditionCodes; accepted inputs do not establish assessed interaction coverage."
           },
           "s48": {
             "minimum": 0,
@@ -5301,7 +5301,7 @@
                   "maxLength": 128,
                   "type": "string"
                 },
-                "description": "Reported condition codes; accepted inputs do not establish assessed interaction coverage."
+                "description": "Reported condition codes from info.conditionCodes; accepted inputs do not establish assessed interaction coverage."
               },
               "currentSupplements": {
                 "maxItems": 50,
@@ -6112,7 +6112,7 @@
                   "maxLength": 128,
                   "type": "string"
                 },
-                "description": "Reported condition codes; accepted inputs do not establish assessed interaction coverage."
+                "description": "Reported condition codes from info.conditionCodes; accepted inputs do not establish assessed interaction coverage."
               },
               "currentSupplements": {
                 "maxItems": 50,
@@ -7147,7 +7147,7 @@
               "maxLength": 128,
               "type": "string"
             },
-            "description": "Reported condition codes; accepted inputs do not establish assessed interaction coverage."
+            "description": "Reported condition codes from info.conditionCodes; accepted inputs do not establish assessed interaction coverage."
           },
           "currentSupplements": {
             "maxItems": 50,

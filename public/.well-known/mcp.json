@@ -117,7 +117,7 @@
   },
   "discoveryVersion": "discovery-11.0.0-six-tools-images-v1",
   "positioningChecksum": "76f4c10dedc2771533454d1951c789612a314a4229d7626ba07fbd579c7864b9",
-  "schemaChecksum": "0c7e2d5a0228ccd0e7fd2e199a4df2ee5584d375d8c12f7cb218c284d5b0f530",
+  "schemaChecksum": "28057cfd3492fefcba5aad38473b2c0a6f0ae187fcb0e20deb03b0acab58ee8c",
   "server_url": "/api/mcp",
   "tools": [
     {
@@ -1375,7 +1375,7 @@
               "maxLength": 128,
               "type": "string"
             },
-            "description": "Reported condition codes; accepted inputs do not establish assessed interaction coverage."
+            "description": "Reported condition codes from info.conditionCodes; accepted inputs do not establish assessed interaction coverage."
           },
           "s48": {
             "minimum": 0,
@@ -2310,7 +2310,7 @@
                   "maxLength": 128,
                   "type": "string"
                 },
-                "description": "Reported condition codes; accepted inputs do not establish assessed interaction coverage."
+                "description": "Reported condition codes from info.conditionCodes; accepted inputs do not establish assessed interaction coverage."
               },
               "currentSupplements": {
                 "maxItems": 50,
@@ -3121,7 +3121,7 @@
                   "maxLength": 128,
                   "type": "string"
                 },
-                "description": "Reported condition codes; accepted inputs do not establish assessed interaction coverage."
+                "description": "Reported condition codes from info.conditionCodes; accepted inputs do not establish assessed interaction coverage."
               },
               "currentSupplements": {
                 "maxItems": 50,
@@ -4156,7 +4156,7 @@
               "maxLength": 128,
               "type": "string"
             },
-            "description": "Reported condition codes; accepted inputs do not establish assessed interaction coverage."
+            "description": "Reported condition codes from info.conditionCodes; accepted inputs do not establish assessed interaction coverage."
           },
           "currentSupplements": {
             "maxItems": 50,
@@ -5653,7 +5653,7 @@
     },
     {
       "title": "Open confirmed checkout",
-      "description": "After customer confirmation, freeze the selected plan revision and create or recover checkout. After the person confirms the selected revision, create/recover checkout with the same idempotency key; health advice is advisory.",
+      "description": "After customer confirmation, freeze the selected plan revision and create or recover checkout. Use the returned confirmed revision and a new checkout idempotencyKey. Retry a lost checkout response with the same key and input; health advice is advisory.",
       "inputSchema": {
         "additionalProperties": false,
         "type": "object",
@@ -6561,7 +6561,7 @@
     },
     {
       "title": "Track payment and delivery",
-      "description": "Read concise payment, fulfilment and recovery state for an existing order. Read one concise payment/fulfilment and recovery response. Honor pollAfterSeconds while nextAction=poll; follow the returned action.",
+      "description": "Read concise payment, fulfilment and recovery state for an existing order. Honor pollAfterSeconds while nextAction=poll; follow the returned recovery action.",
       "inputSchema": {
         "additionalProperties": false,
         "type": "object",
@@ -6967,7 +6967,7 @@
     },
     {
       "title": "Get order help",
-      "description": "Open or continue an order-support case. Open an order help case; include its returned supportHandle to reply.",
+      "description": "Open or continue an order-support case. Include the returned supportHandle when replying to an existing case.",
       "inputSchema": {
         "additionalProperties": false,
         "type": "object",
@@ -7393,7 +7393,7 @@
     },
     {
       "title": "Send plan feedback",
-      "description": "Submit optional consented feedback without changing the plan or checkout. Submit optional feedback for one plan revision only with consentConfirmed=true; this never changes a plan or checkout.",
+      "description": "Submit optional consented feedback without changing the plan or checkout. Identify the plan revision and set consentConfirmed=true only after obtaining consent.",
       "inputSchema": {
         "additionalProperties": false,
         "type": "object",

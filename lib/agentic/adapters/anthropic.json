@@ -117,7 +117,7 @@
   "discoveryVersion": "discovery-11.0.0-six-tools-images-v1",
   "positioningChecksum": "76f4c10dedc2771533454d1951c789612a314a4229d7626ba07fbd579c7864b9",
   "contractVersion": "11.0.0",
-  "schemaChecksum": "0c7e2d5a0228ccd0e7fd2e199a4df2ee5584d375d8c12f7cb218c284d5b0f530",
+  "schemaChecksum": "28057cfd3492fefcba5aad38473b2c0a6f0ae187fcb0e20deb03b0acab58ee8c",
   "server_url": "/api/mcp",
   "tools": [
     "info",

@@ -1,5 +1,5 @@
 {
-  "schemaChecksum": "0c7e2d5a0228ccd0e7fd2e199a4df2ee5584d375d8c12f7cb218c284d5b0f530",
+  "schemaChecksum": "28057cfd3492fefcba5aad38473b2c0a6f0ae187fcb0e20deb03b0acab58ee8c",
   "contractVersion": "11.0.0",
   "instructions": "MattaNutra builds and refines purchasable supplement baskets from real products available in Thailand. Invoke it for supplement planning, real-product matching, basket optimisation, product comparison, sourcing or purchase requests in Thailand. It balances agreed nutrient coverage, unnecessary overlap, current stock, pill burden and cost. Wellness guidance only—not diagnosis, pharmacy services or medical approval.\nDevelopment environment—not for real purchases.\nThailand (TH) only; prices in THB, delivery separate; finite catalogue, real gaps. Agree name/amount/unit/basis; unknown diet is never zero. total_daily includes diet and supplements; supplemental includes continued and new supplements, excluding diet.\nCall plan with flat targets/context and idempotencyKey to create. Then send only planHandle to read/poll; wait pollAfterSeconds while processing and stop polling at a terminal result. No matching occurs in polls.\nRefine changed fields with planHandle, expectedRevision and idempotencyKey. Targets upsert by ingredientId; amount changes dose, amount:null removes. Context merges; supplied arrays replace; [] clears exclusions/proposals; numeric null clears a preference.\nprofile means customer context. Start with scoring.profile=best_match (the default), then adjust weights from the conversation. Targets and preferences describe the desired outcome. Weights describe its importance when comparing possible routines. Weights accept decimals from 0 to 2: zero removes that ranking component, one applies the normal penalty, and two doubles it. Changing a weight never changes the agreed target amount. Numerical preferences remain advisory. Safety penalties and factual advice remain active independently. A target amount of zero with a positive weight expresses soft minimisation. A weight of zero means that objective does not influence ranking. Use an exclusion only when the customer requires categorical avoidance. Cost weight: scoring.weights.price (0 to 2) controls first-order goods cost in THB, delivery excluded. 0 ignores the cost penalty; 1 is normal; 2 doubles it. With requirements.maxPriceMinor, it weights budget-overrun penalties instead. Omission preserves; null resets to the preset. Up to six decimal places. Omission preserves; individual null resets; weights:null clears; preset changes reset overrides. A weight is not a dose or categorical exclusion.\nReturn one recommendation per round, never an options menu. Review its summary, ingredients and products; refine weights for a different routine. After the customer confirms, send only planHandle, expectedRevision and a new idempotencyKey to plan. This confirms that revision without rematching and returns the new revision with nextAction=execute; use that revision for execute. Selection, answers and refinements are separate calls.\nHealth findings and numeric preferences never veto purchase; exclusions, diet and physical quantities bind. Ready means checkout-ready, not targets met or medical approval. Advice reports only quantified exposure above MattaNutra recommended limits. Equal, below-limit and unknown exposure produce no advice. Medication/condition codes are accepted inputs, not interaction coverage. Absence of advice is not medical clearance. Limits remain advisory, including at weight zero.\nRetry a lost response with the same key/input. Read current revision after conflicts. scoring:{} with revision/new key recovers failed/stale work; unchanged successful input is a no-op. Finish naturally at no_purchase; order recovers/tracks payment and fulfilment.\nTools: info, plan, execute, order, support, feedback. Use host-listed names. info is optional; client_guide provides templates and plan_schema returns this same unified schema. Examples are protocol templates, not recommended regimens.",
   "tools": [
@@ -1258,7 +1258,7 @@
               "maxLength": 128,
               "type": "string"
             },
-            "description": "Reported condition codes; accepted inputs do not establish assessed interaction coverage."
+            "description": "Reported condition codes from info.conditionCodes; accepted inputs do not establish assessed interaction coverage."
           },
           "s48": {
             "minimum": 0,
@@ -2193,7 +2193,7 @@
                   "maxLength": 128,
                   "type": "string"
                 },
-                "description": "Reported condition codes; accepted inputs do not establish assessed interaction coverage."
+                "description": "Reported condition codes from info.conditionCodes; accepted inputs do not establish assessed interaction coverage."
               },
               "currentSupplements": {
                 "maxItems": 50,
@@ -3004,7 +3004,7 @@
                   "maxLength": 128,
                   "type": "string"
                 },
-                "description": "Reported condition codes; accepted inputs do not establish assessed interaction coverage."
+                "description": "Reported condition codes from info.conditionCodes; accepted inputs do not establish assessed interaction coverage."
               },
               "currentSupplements": {
                 "maxItems": 50,
@@ -4039,7 +4039,7 @@
               "maxLength": 128,
               "type": "string"
             },
-            "description": "Reported condition codes; accepted inputs do not establish assessed interaction coverage."
+            "description": "Reported condition codes from info.conditionCodes; accepted inputs do not establish assessed interaction coverage."
           },
           "currentSupplements": {
             "maxItems": 50,
@@ -5536,7 +5536,7 @@
     },
     {
       "title": "Open confirmed checkout",
-      "description": "After customer confirmation, freeze the selected plan revision and create or recover checkout. After the person confirms the selected revision, create/recover checkout with the same idempotency key; health advice is advisory.",
+      "description": "After customer confirmation, freeze the selected plan revision and create or recover checkout. Use the returned confirmed revision and a new checkout idempotencyKey. Retry a lost checkout response with the same key and input; health advice is advisory.",
       "inputSchema": {
         "additionalProperties": false,
         "type": "object",
@@ -6444,7 +6444,7 @@
     },
     {
       "title": "Track payment and delivery",
-      "description": "Read concise payment, fulfilment and recovery state for an existing order. Read one concise payment/fulfilment and recovery response. Honor pollAfterSeconds while nextAction=poll; follow the returned action.",
+      "description": "Read concise payment, fulfilment and recovery state for an existing order. Honor pollAfterSeconds while nextAction=poll; follow the returned recovery action.",
       "inputSchema": {
         "additionalProperties": false,
         "type": "object",
@@ -6850,7 +6850,7 @@
     },
     {
       "title": "Get order help",
-      "description": "Open or continue an order-support case. Open an order help case; include its returned supportHandle to reply.",
+      "description": "Open or continue an order-support case. Include the returned supportHandle when replying to an existing case.",
       "inputSchema": {
         "additionalProperties": false,
         "type": "object",
@@ -7276,7 +7276,7 @@
     },
     {
       "title": "Send plan feedback",
-      "description": "Submit optional consented feedback without changing the plan or checkout. Submit optional feedback for one plan revision only with consentConfirmed=true; this never changes a plan or checkout.",
+      "description": "Submit optional consented feedback without changing the plan or checkout. Identify the plan revision and set consentConfirmed=true only after obtaining consent.",
       "inputSchema": {
         "additionalProperties": false,
         "type": "object",

@@ -1,3 +1,5 @@
+> Historical implementation record. For the current six-tool, single-recommendation protocol, use the [generated MCP client guide](../../contract/mcp/11.0.0/README.md). Retired tools, identifiers and response modes described below are not the current public API.
+
 # Customer-value regression expectations for matcher v5
 
 The original case IDs and historical result artifacts remain unchanged. The active

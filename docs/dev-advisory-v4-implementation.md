@@ -1,3 +1,5 @@
+> Historical implementation record. For the current six-tool, single-recommendation protocol, use the [generated MCP client guide](../contract/mcp/11.0.0/README.md). Retired tools, identifiers and response modes described below are not the current public API.
+
 # DEV advisory guidance and MCP v4 implementation
 
 Status: implementation in progress. No release or green-suite claim yet.
