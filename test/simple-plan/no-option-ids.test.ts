@@ -11,7 +11,7 @@ const retiredId = /(?:optionId|candidateKey)/i;
 
 test('NOID-01 every public schema and discovery surface removes redundant option identifiers', () => {
   for (const value of [AGENTIC_TOOL_SCHEMAS, AGENTIC_OUTPUT_SCHEMAS, toolList(), AGENT_CARD, CLIENT_EXAMPLES,
-    ...['en','th','zh-CN'].map(clientGuideMarkdown)]) assert.doesNotMatch(JSON.stringify(value), retiredId);
+    ...['en','th','zh-CN'].map(locale => clientGuideMarkdown(locale, 'dev'))]) assert.doesNotMatch(JSON.stringify(value), retiredId);
   const confirm = { planHandle: 'cap_returned_plan_handle_000000001', expectedRevision: 1, idempotencyKey: 'confirm-current-recommendation' };
   assert.deepEqual(validateToolIssues(AGENTIC_TOOL_SCHEMAS.plan, confirm), []);
   assert.ok(validateToolIssues(AGENTIC_TOOL_SCHEMAS.plan, { ...confirm, selectedOptionId: 'opt_retired' }).some(issue => issue.reasonCode === 'unexpected_property'));
