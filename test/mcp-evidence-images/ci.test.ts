@@ -9,6 +9,19 @@ test('QA-CI-01 current CI runs the maintained paired MCP inventory with a compil
   assert.match(text,/npm run build/);
   assert.doesNotMatch(text,/v10 scoped|test:mcp:simple-plan/);
 });
+test('QA-CI-03 CI accommodates both measured full passes without enlarging request or case deadlines',()=>{
+  const workflow=readFileSync('.github/workflows/mcp-722.yml','utf8');
+  const minutes=Number(workflow.match(/timeout-minutes:\s*(\d+)/)?.[1]);
+  // The preserved full-8 run measured 59.2 minutes of Node cases plus 3.8
+  // minutes of PostgreSQL cases. Two passes, bootstrap and build need >120m.
+  assert.ok(minutes>=180,'The CI container must accommodate two complete passes plus build/setup');
+  assert.match(readFileSync('scripts/run-matcher-test-suite.mjs','utf8'),/--test-timeout=600000/);
+  for(const file of ['journeys.test.ts','journeys-th.test.ts','journeys-zh.test.ts'])
+    assert.match(readFileSync(`test/ax-refinement/${file}`,'utf8'),/timeout: 90000/);
+});
+test('QA-CI-04 fresh CI bootstrap includes the payment schema required by support',()=>{
+  assert.match(readFileSync('scripts/prepare-matcher-test-db.mjs','utf8'),/'apply-retail-checkout-schema'/);
+});
 test('QA-CI-02 isolated reference fixtures retain captured amounts, scope and confidence',async()=>{
   const {frozenReferenceRows}=await import('../../scripts/seed-matcher-reference-fixtures.mjs');
   const frozen=JSON.parse(gunzipSync(readFileSync('test/fixtures/mcp-evidence-images/dev-20260911.json.gz')).toString());
