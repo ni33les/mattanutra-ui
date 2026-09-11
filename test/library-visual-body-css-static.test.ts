@@ -89,7 +89,7 @@ type Article = {
 };
 
 function zipEnDir() {
-  return fileURLToPath(new URL("../files/ttf-ws1-tl/library/en/", import.meta.url));
+  return fileURLToPath(new URL("../.cache/ttf-ws1/MattaNutra_TH_Localization_Handoff_2026-07-19/library/en/", import.meta.url));
 }
 
 function zipBodyClassSet(html: string) {

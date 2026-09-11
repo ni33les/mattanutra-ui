@@ -79,18 +79,33 @@ test("ANNA-REF-PG-06 bootstrap never resurrects an explicitly retired reference"
 });
 
 test("ANNA-REF-PG-07 a changed catalogue epoch refreshes references before the ten-minute TTL", async () => {
-  await fixture(async (tx, supplementId) => {
-    await appendSupplementSafetyLimitVersion(tx, { ...base, supplementId });
-    const firstEpoch = await getCatalogueRuntimeRevision(tx);
-    const first = await loader.refreshAdminSafetyCeilings({ sql: tx, runtimeRevision: firstEpoch });
+  const supplementId = randomUUID();
+  try {
+    await sql.begin(async tx => {
+      await tx`insert into public.supplements (id,name,normalized_name,category) values (${supplementId},${`Reference ${supplementId}`},${supplementId},'Vitamin')`;
+      await appendSupplementSafetyLimitVersion(tx, { ...base, supplementId });
+    });
+    const firstEpoch = await getCatalogueRuntimeRevision(sql);
+    const first = await loader.refreshAdminSafetyCeilings({ sql, runtimeRevision: firstEpoch });
     assert.equal(first.find(row => row.subjectId === supplementId)?.maxAmount, 100);
-    await appendSupplementSafetyLimitVersion(tx, { ...base, supplementId, maxAmount: null });
-    const nextEpoch = await getCatalogueRuntimeRevision(tx);
+    await sql.begin(async tx => {
+      await appendSupplementSafetyLimitVersion(tx, { ...base, supplementId, maxAmount: null });
+      assert.equal(await getCatalogueRuntimeRevision(tx), firstEpoch, "publication is deferred until commit");
+    });
+    const nextEpoch = await getCatalogueRuntimeRevision(sql);
     assert.ok(nextEpoch > firstEpoch);
-    const next = await loader.refreshAdminSafetyCeilings({ sql: tx, runtimeRevision: nextEpoch });
+    const next = await loader.refreshAdminSafetyCeilings({ sql, runtimeRevision: nextEpoch });
     assert.equal(next.some(row => row.subjectId === supplementId), false);
-    await assert.rejects(loader.refreshAdminSafetyCeilings({ sql: tx, runtimeRevision: firstEpoch, force: true }), /epoch changed/);
-  });
+    await assert.rejects(loader.refreshAdminSafetyCeilings({ sql, runtimeRevision: firstEpoch, force: true }), /epoch changed/);
+  } finally {
+    resetMatcherSafetyCeilings();
+    await sql.begin(async tx => {
+      // Isolated teardown of this random fixture only; production versions stay append-only.
+      await tx`set local session_replication_role = replica`;
+      await tx`delete from public.supplement_safety_limits where supplement_id=${supplementId}`;
+      await tx`delete from public.supplements where id=${supplementId}`;
+    });
+  }
 });
 
 test("ANNA-REF-PG-08 concurrent writers fail fast without writes and can retry after the nutrient lock releases", async () => {
