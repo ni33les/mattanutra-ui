@@ -142,6 +142,9 @@ test("LOCK-CATALOGUE-01 validation is prepared before writer fences and publicat
     statements.length=0;
     assert.equal((await refreshApprovedAdvisoryCaches(observed,manifest,true,prepared))[0]?.status,"applied");
     assert.ok(statements.some(q=>/for update/.test(q)));assert.ok(statements.every(q=>!/jsonb_agg|from public.product_facts/i.test(q)),"no fact reconstruction inside writer fences");
+    const epoch = statements.findIndex(q => /catalogue_runtime_revision.*for update/.test(q));
+    const audit = statements.findIndex(q => /insert into public.catalogue_correction_audit/.test(q));
+    assert.ok(audit >= 0 && epoch > audit, "The global catalogue fence belongs after prepared product/audit writes");
     throw rollback;
   }),error=>error===rollback); } finally {await sql.end();}
 });

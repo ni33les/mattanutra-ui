@@ -222,8 +222,8 @@ describe("database transaction boundaries", () => {
     const prepare = functionBody(source, "prepareApprovedAdvisoryCaches");
     const caller = await readFile("scripts/refresh-advisory-product-caches.ts", "utf8");
     assert.match(refresh, /show transaction_isolation[\s\S]*transaction_isolation !== "serializable"[\s\S]*throw new Error/);
-    assert.match(refresh, /if \(apply && prepared\.entries\.length\)[\s\S]*catalogue_runtime_revision where singleton=true for update[\s\S]*for \(const row of prepared\.entries\)[\s\S]*if \(apply\) await tx`select id from public\.products where id=\$\{entry\.productId\}::uuid for update nowait/,
-      "publication fences epoch then stable prepared product order; dry runs do not lock");
+    assert.match(refresh, /for \(const row of prepared\.entries\)[\s\S]*for update nowait[\s\S]*insert into public\.catalogue_correction_audit[\s\S]*catalogue_runtime_revision where singleton=true for update/,
+      "prepared product mutations precede the final catalogue fence; dry runs do not lock");
     assert.match(refresh, /p is not distinct from jsonb_populate_record[\s\S]*update public\.products[\s\S]*insert into public\.catalogue_correction_audit/,
       "publication compares the exact prepared native row, writes cached validation and appends the prepared audit atomically");
     assert.match(prepare, /manifest\.entries\]\.sort/);
