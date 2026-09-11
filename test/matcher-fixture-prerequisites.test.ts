@@ -25,3 +25,14 @@ test("MCP-FIXTURE-03 the HTTP support journey requires the actual retail payment
     assert.throws(() => prerequisites.validateMatcherFixtureRelations({ ...relations, [name]: undefined }), new RegExp(name));
   }
 });
+
+test('MCP-FIXTURE-04 reject missing payment locales and accounting accounts before the long inventory',async()=>{
+  const p=await import('../scripts/matcher-fixture-prerequisites.mjs');
+  assert.equal(typeof p.validateMatcherPaymentPrerequisites,'function');
+  const complete={paymentLocaleConstraint:"CHECK ((locale = ANY (ARRAY['en'::text, 'th'::text, 'zh-CN'::text])))",accountCount:3};
+  assert.deepEqual(p.validateMatcherPaymentPrerequisites(complete),complete);
+  for(const locale of ['en','th','zh-CN'])
+    assert.throws(()=>p.validateMatcherPaymentPrerequisites({...complete,paymentLocaleConstraint:complete.paymentLocaleConstraint.replace(`'${locale}'`,"'missing'")}),new RegExp(locale));
+  assert.throws(()=>p.validateMatcherPaymentPrerequisites({...complete,accountCount:2}),/account/i);
+  assert.throws(()=>p.validateMatcherPaymentPrerequisites({...complete,paymentLocaleConstraint:null}),/locale/i);
+});
