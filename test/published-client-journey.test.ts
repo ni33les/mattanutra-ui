@@ -99,3 +99,29 @@ it("V5-CLIENT-12 the documented client exercises stale refinement and direct che
   assert.match(client, /assert.deepEqual\(await call\("execute", args\), order\)/);
   assert.match(client, /product.quantity \* Math.round\(product.unitPrice/);
 });
+
+it("FULL-CYCLE-04 current client writes the exact checkout receipt required by external settlement", async () => {
+  const client = await import("../scripts/published-client-journey.mjs");
+  const receiptFor = (client as unknown as { publishedClientReceipt: (input: unknown) => Record<string, unknown> }).publishedClientReceipt;
+  assert.equal(typeof receiptFor, "function");
+  const order = { ok: true, orderHandle: "returned-order", orderReference: "reference", paymentStatus: "unpaid" };
+  const result = { locale: "th", discovery: "tools_only", observations: [{ tool: "execute", result: order }], terminal: [order] };
+  const receipt = receiptFor({ endpoint: "http://127.0.0.1:3100/api/mcp", result });
+  assert.equal(receipt.endpoint, "http://127.0.0.1:3100/api/mcp"); assert.equal(receipt.locale, "th");assert.deepEqual(receipt.checkout, order);
+  assert.throws(() => receiptFor({ endpoint: "http://127.0.0.1:3100/api/mcp", result: { ...result, observations: [] } }), /checkout|order/i);
+});
+
+it("FULL-CYCLE-05 paid resume only reads the returned order and rejects cross-endpoint receipts", async () => {
+  const client = await import("../scripts/published-client-journey.mjs");
+  const resume = (client as unknown as { resumePublishedOrder: (input: Record<string, unknown>) => Promise<{ order: unknown }> }).resumePublishedOrder;
+  assert.equal(typeof resume, "function");
+  const endpoint = "https://uat.mattanutra.com/api/mcp", checkout = { orderHandle: "returned-order" };
+  const receipt = { endpoint, locale: "en", discovery: "tools_only", checkout };
+  const order = { ok: true, orderHandle: checkout.orderHandle, paymentStatus: "paid", fulfilment: { status: "delivered" }, nextAction: "none" };
+  const requests: unknown[] = [];
+  const rpc = async (method: string, params: unknown) => { requests.push({ method, params });return method === "tools/list" ? { tools: [{ name: "order", inputSchema: { type: "object", required: ["orderHandle"], properties: { orderHandle: { const: "returned-order" } }, additionalProperties: false }, outputSchema: { type: "object", required: ["ok", "paymentStatus"] } }] } : { structuredContent: order }; };
+  const result = await resume({ endpoint, receipt, locale: "en", discovery: "tools_only", rpc });assert.deepEqual(result.order, order);
+  assert.deepEqual(requests, [{ method: "tools/list", params: {} }, { method: "tools/call", params: { name: "order", arguments: { orderHandle: "returned-order" } } }]);
+  requests.length = 0;
+  await assert.rejects(resume({ endpoint: "https://dev.mattanutra.com/api/mcp", receipt, locale: "en", discovery: "tools_only", rpc }), /endpoint/);assert.equal(requests.length, 0);
+});

@@ -10,3 +10,13 @@ test("local MCP candidate requires explicit intent and identical isolated databa
   const target = mcpTestTarget(env); assert.equal(target.publicUrl, target.originUrl); assert.equal(target.isolatedCandidate, true);
   for (const override of [{ MCP_ISOLATED_CANDIDATE: "0" }, { DB_URL: "postgresql://fixture:fixture@127.0.0.1:55436/mattanutra_dev" }, { MCP_URL: "https://uat.mattanutra.com/api/mcp" }, { MCP_URL: "http://127.0.0.1.evil.test:3401/api/mcp" }, { TEST_DB_URL: "postgresql://fixture:fixture@127.0.0.1:55436/mattanutra_dev" }]) assert.throws(() => mcpTestTarget({ ...env, ...override }));
 });
+
+test("FULL-CYCLE-03 public documented clients permit explicit UAT without weakening fixture isolation", async () => {
+  const targets = await import("../scripts/mcp-test-target.mjs");
+  const publicEndpoint = (targets as unknown as { publicMcpClientEndpoint: (value: string) => URL }).publicMcpClientEndpoint;
+  assert.equal(typeof publicEndpoint, "function");
+  for (const host of ["dev.mattanutra.com", "uat.mattanutra.com"]) assert.equal(publicEndpoint(`https://${host}/api/mcp`).hostname, host);
+  assert.equal(publicEndpoint("http://127.0.0.1:3100/api/mcp").hostname, "127.0.0.1");
+  for (const endpoint of ["https://mattanutra.com/api/mcp", "https://uat.mattanutra.com.evil.test/api/mcp", "http://uat.mattanutra.com/api/mcp", "https://user@uat.mattanutra.com/api/mcp", "https://uat.mattanutra.com/api/mcp/qa", "https://uat.mattanutra.com/api/mcp?token=secret"]) assert.throws(() => publicEndpoint(endpoint));
+  assert.throws(() => mcpTestTarget({ MATTANUTRA_ENV: "uat", MCP_URL: "https://uat.mattanutra.com/api/mcp" }), /DEV|isolated/);
+});

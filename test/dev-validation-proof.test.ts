@@ -23,7 +23,7 @@ function evidence() {
     writeFileSync(path, JSON.stringify(named[file] ?? { passed: true }));
     return { file, sha256: createHash("sha256").update(readFileSync(path)).digest("hex") };
   });
-  const proof = { version: "dev-advisory-validation-3", contractVersion: "7.0.0", releaseBaseCommit: "b".repeat(40), releaseLintSha256: lint.sha256, testInventorySha256: inventory.sha256, databaseSchemaSha256: data.schemaSha256, catalogueSha256: data.catalogueSha256, environment: "dev", candidateOrigin: "http://127.0.0.1:3100",
+  const proof = { version: "dev-advisory-validation-3", contractVersion: "11.0.0", releaseBaseCommit: "b".repeat(40), releaseLintSha256: lint.sha256, testInventorySha256: inventory.sha256, databaseSchemaSha256: data.schemaSha256, catalogueSha256: data.catalogueSha256, environment: "dev", candidateOrigin: "http://127.0.0.1:3100",
     passed: true, unchangedSource: true, sourceSha256: source, buildId: source.slice(0, 40), schemaChecksum: "fixture-contract-checksum",
     steps: REQUIRED_VALIDATION_STAGES.map(label => ({ label, passed: true })), artifacts };
   const file = join(directory, "attestation.json");
@@ -87,4 +87,13 @@ it("ANNA-GATE-01 rejects obsolete proofs and missing tools-only equality even wh
       assert.throws(() => readDevValidationProof(fixture.file, fixture.source), /incomplete|language/);
     } finally { rmSync(fixture.directory, { recursive: true, force: true }); }
   }
+});
+
+it("FULL-CYCLE-01 refuses a retired contract even when its old proof is internally consistent", () => {
+  const fixture = evidence();
+  try {
+    fixture.proof.contractVersion = "7.0.0";
+    writeFileSync(fixture.file, JSON.stringify(fixture.proof));
+    assert.throws(() => readDevValidationProof(fixture.file, fixture.source), /incomplete|contract/);
+  } finally { rmSync(fixture.directory, { recursive: true, force: true }); }
 });
