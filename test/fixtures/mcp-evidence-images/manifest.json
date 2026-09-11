@@ -1,0 +1,129 @@
+{
+  "version": 1,
+  "capturedAt": "2026-09-11T00:39:45.652Z",
+  "baselineBuild": "bbdb316662d2d1254bebfb03d612a96ea82351ab",
+  "baselineContract": "10.0.0",
+  "baselineSchemaChecksum": "3c85e1bdbaa76acb55b3c96a2a1e1bae10c485d63eaf0f3e3284fc3dbfbada08",
+  "sha256": "49aec8a457bad03730469bbbb52e2752b793572ed7aad794e20bf4fd1f546269",
+  "catalogueRevision": 103,
+  "referenceFingerprint": "6aeeb93b7a440097b848bf6e57de1a7ca94b653825ae2e541e4bbb0c6d7423d7",
+  "fixtures": [
+    {
+      "productId": "prd_617d837380b34ada99c0769d502b5b1c",
+      "productVersion": 7,
+      "imageUrl": "https://mattanutra.sgp1.cdn.digitaloceanspaces.com/dev/products/617d8373-80b3-4ada-99c0-769d502b5b1c/1e25b3e82fc73b84b84ced7757015bd6e33e191b53acd4cef54fb91026210c40.webp",
+      "unitPriceMinor": 48500,
+      "servingsPerDay": 1,
+      "composition": [
+        {
+          "amount": 1000,
+          "comparableAmount": 25,
+          "confidence": "high",
+          "source": "admin",
+          "sourceUrl": null,
+          "sourceText": null,
+          "mappingStatus": "verified",
+          "itemType": "supplement",
+          "name": "Vitamin D3",
+          "normalizedName": "vitamin_d3",
+          "servingLabel": "60 servings per container",
+          "supplementId": "927083fb-b90a-5a24-b4c5-5067b06ead5f",
+          "unit": "IU"
+        }
+      ],
+      "administration": {
+        "route": "oral",
+        "physicalUnit": "capsule",
+        "unitsPerServing": 1,
+        "doseIncrement": 1,
+        "packQuantity": null,
+        "provenance": {
+          "status": "verified",
+          "sourceUrl": "https://www.blackmores.com.au/products/vitamin-d3-1000-iu",
+          "sourceText": "Manufacturer composition is 1000 IU vitamin D3 per capsule, taken orally. The catalogue image identifies the same Vitamin D3 1000 IU capsule variant. Pack quantity remains unset because the manufacturer page mixes 60-tablet and 200-capsule variants. Nutrient facts, confidence, prices and dietary evidence are unchanged.",
+          "verifiedAt": "2026-09-08T12:00:00Z"
+        }
+      }
+    },
+    {
+      "productId": "prd_2c9107c2db6244759755c683ff46a98e",
+      "productVersion": 5,
+      "imageUrl": "https://mattanutra.sgp1.cdn.digitaloceanspaces.com/uat/products/2c9107c2-db62-4475-9755-c683ff46a98e/5de7b472cd5e954754df0df525a99cfa9853302aa61e45d286cec363450ef816.jpg",
+      "unitPriceMinor": 32300,
+      "servingsPerDay": 5,
+      "composition": [
+        {
+          "amount": 500,
+          "comparableAmount": 500000,
+          "confidence": "high",
+          "source": "admin",
+          "sourceUrl": null,
+          "sourceText": null,
+          "mappingStatus": "verified",
+          "itemType": "supplement",
+          "name": "Calcium",
+          "normalizedName": "calcium",
+          "servingLabel": null,
+          "supplementId": "684e1966-535b-59c7-8984-ce1e68a181a0",
+          "unit": "mg"
+        },
+        {
+          "amount": 200,
+          "comparableAmount": 5,
+          "confidence": "high",
+          "source": "admin",
+          "sourceUrl": null,
+          "sourceText": null,
+          "mappingStatus": "verified",
+          "itemType": "supplement",
+          "name": "Vitamin D3",
+          "normalizedName": "vitamin_d3",
+          "servingLabel": null,
+          "supplementId": "927083fb-b90a-5a24-b4c5-5067b06ead5f",
+          "unit": "IU"
+        }
+      ],
+      "administration": {
+        "route": "oral",
+        "physicalUnit": "tablet",
+        "unitsPerServing": 1,
+        "doseIncrement": 1,
+        "packQuantity": null,
+        "provenance": {
+          "status": "verified",
+          "sourceUrl": "https://www.blackmores.co.th/en/products/supplement/2122-blackmores-bio-calciumd3",
+          "sourceText": "Manufacturer composition and oral directions support physical unit tablet. Composition basis is 1 physical unit(s) per labelled serving. Pack quantity for this SKU is not independently established.",
+          "verifiedAt": "2026-09-07T11:30:05.821523+00:00"
+        }
+      }
+    }
+  ],
+  "missingImageCoverage": {
+    "id": "IMG-02",
+    "status": "REAL_DATA_UNAVAILABLE",
+    "reason": "No active DEV retail listing has a missing image. 180 products with missing images have no active retail listings. No SKU or sale eligibility is fabricated.",
+    "missingProductCount": 180
+  },
+  "provenance": [
+    {
+      "table": "products",
+      "count": 703,
+      "digest": "db9183ffabb1e8949115bf863b065877"
+    },
+    {
+      "table": "product_versions",
+      "count": 1470,
+      "digest": "074d5ef243562a0f6871715d574bfa28"
+    },
+    {
+      "table": "product_facts",
+      "count": 1576,
+      "digest": "bb8a74b5eacf36bdc179df1fb0e8270b"
+    },
+    {
+      "table": "supplement_safety_limits",
+      "count": 571,
+      "digest": "b999ede7a64d3249c42dd92d1b03b6e3"
+    }
+  ]
+}
