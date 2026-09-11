@@ -17,7 +17,7 @@ export const VALIDATION_CLIENT_LOCALES = ["en", "th", "zh-CN"];
 export const VALIDATION_CLIENT_DISCOVERY = ["resources", "tools_only"];
 const clientSuffixes = ["", "-tools"];
 export const REQUIRED_VALIDATION_STAGES = [
-  "prepare-assets", "administration-schema", "web-schema", "agentic-schema", "matcher-runtime-schema", "reference-integrity-schema", "demand-cache-schema", "runtime-schema", "public-catalogue-fixtures", "typecheck", "changed-lint", "production-build", "browser-fixtures", "data-fingerprints-before", "test-full",
+  "prepare-assets", "administration-schema", "payment-schema", "web-schema", "agentic-schema", "matcher-runtime-schema", "reference-integrity-schema", "demand-cache-schema", "efficiency-schema", "matching-lock-boundaries-schema", "runtime-schema", "public-catalogue-fixtures", "typecheck", "changed-lint", "production-build", "browser-fixtures", "data-fingerprints-before", "test-full",
   "matcher-two-runs", "documented-client-rate-window", ...clientSuffixes.flatMap(suffix => ["a", "b"].flatMap(run => VALIDATION_CLIENT_LOCALES.flatMap(locale => [`docs-client-${run}-${locale}${suffix}`, `fixture-settlement-${run}-${locale}${suffix}`, `docs-client-${run}-${locale}${suffix}-paid`]))),
   "documented-client-non-latency-equality", "full-suite-results", "matcher-results", "data-fingerprints-after", "unchanged-schema-and-catalogue"
 ];

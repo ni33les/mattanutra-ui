@@ -290,7 +290,9 @@ describe("codebase cleanup guardrails", () => {
       const path = file.pathname;
       const source = readFileSync(file, "utf8");
 
-      if (path.endsWith("/lib/grok-client.ts")) {
+      // Transport unit tests deliberately invoke the raw client with mocked fetch.
+      // Every production caller must still use the governed, costed transport.
+      if (path.endsWith("/lib/grok-client.ts") || file.href.startsWith(new URL("test/", repoRoot).href)) {
         continue;
       }
 

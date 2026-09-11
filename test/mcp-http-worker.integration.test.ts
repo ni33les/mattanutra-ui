@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { readFileSync, mkdtempSync } from "node:fs";
+import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
@@ -14,7 +14,8 @@ test("MCP-HTTP-WORKER-01 the isolated public client reaches ready through a sepa
   isolatedValidationEnvironment(process.env);
   const fixtureDb=postgres(process.env.TEST_DB_URL,{max:1,prepare:false});
   try { await fixtureDb.begin(seedPublicMatcherFixtures); } finally { await fixtureDb.end(); }
-  const buildId=JSON.parse(readFileSync(".next/required-server-files.json","utf8")).config.env.AGENTIC_BUILD_ID;
+  const buildId=process.env.AGENTIC_BUILD_ID;
+  assert.match(buildId ?? "", /^[a-f0-9]{40}$/, "The isolated runner must pin application and worker identity without requiring an unrelated browser build");
   const output=mkdtempSync(join(tmpdir(),"mcp-http-worker-"));
   const server=await startHttpCandidate({...isolatedValidationEnvironment(process.env),AGENTIC_BUILD_ID:buildId,DB_URL:process.env.TEST_DB_URL,DB_WORKER_URL:process.env.TEST_DB_URL,MATTANUTRA_ENV:"dev",NODE_ENV:"test"},output);
   try {
