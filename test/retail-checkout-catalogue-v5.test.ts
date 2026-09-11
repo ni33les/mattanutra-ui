@@ -14,13 +14,13 @@ function database(runRevision: string | null, currentRevision = '7') {
     const query = parts.join('?'); calls.push(query);
     if (query.includes('catalogue_runtime_revision')) { assert.match(query, /for share/i, 'new checkout serializes its epoch check with catalogue updates'); return [{ revision: currentRevision }]; }
     if (query.includes('product_recommendation_runs')) return [{ id: runId, catalogue_revision: runRevision, selection_revision: 0, input_revision: 1, current_selection_revision: 0, excluded_product_ids: [],
-      diagnostics: { algorithmVersion: MATCHER_VERSION, matching: { selectedOptionId: 'option', options: [{ optionId: 'option', productIds, recommendations: [] }] } } }];
+      diagnostics: { algorithmVersion: MATCHER_VERSION, matching: { selectedCandidateKey: 'option', options: [{ candidateKey: 'option', productIds, recommendations: [] }] } } }];
     if (query.includes('product_recommendation_items')) return productIds.map((product_id, rank) => ({ product_id, rank, price_amount: 10 + rank, currency: 'THB', title: `Product ${rank}` }));
     throw Error(`Unexpected SQL ${query}`);
   };
   return { calls, sql: sql as unknown as Parameters<typeof lockCurrentWebCheckoutRecommendations>[0] };
 }
-const selection = { planId, locale: 'en' as const, selectedItemIds: productIds, recommendationRunId: runId, optionId: 'option', assessmentRevision: 1, selectionRevision: 0 };
+const selection = { planId, locale: 'en' as const, selectedItemIds: productIds, recommendationRunId: runId, candidateKey: 'option', assessmentRevision: 1, selectionRevision: 0 };
 it('V5-CHECKOUT-01: changed or unproven catalogue provenance rejects new checkout before reading purchase lines', async () => {
   for (const revision of ['6', null]) {
     const { sql, calls } = database(revision);
@@ -42,7 +42,21 @@ it('V5-CHECKOUT-03: exact existing intent resumes its frozen payment without cat
   const input = { ...selection, address, billingAddress: address, billingSameAsShipping: true, selectedProductIds: productIds };
   assert.deepEqual(await findReusableWebCheckoutPayment(sql, input), payment);
   assert.equal(calls.length, 1);
-  assert.equal(await findReusableWebCheckoutPayment(sql, { ...input, optionId: 'changed' }), null);
+  assert.equal(await findReusableWebCheckoutPayment(sql, { ...input, candidateKey: 'changed' }), null);
   assert.equal(await findReusableWebCheckoutPayment(sql, { ...input, address: { ...address, customerEmail: 'another@example.test' } }), null);
   assert.equal(await findReusableWebCheckoutPayment(sql, { ...input, selectedProductIds: productIds.slice(0, 7) }), null);
+});
+
+it('NOID-COM-01 previously saved web recommendations preserve their selected products and prices after protocol cleanup', async () => {
+  const base = database('7');
+  const sql = (async (parts: TemplateStringsArray, ...values: unknown[]) => {
+    const rows = await (base.sql as Function)(parts, ...values);
+    if (parts.join('?').includes('product_recommendation_runs')) rows[0].diagnostics.matching = {
+      selectedOptionId: 'option', options: [{ optionId: 'option', productIds, recommendations: [] }]
+    };
+    return rows;
+  }) as typeof base.sql;
+  const rows = await lockCurrentWebCheckoutRecommendations(sql, selection);
+  assert.deepEqual(rows.map(row => row.product_id), productIds);
+  assert.deepEqual(rows.map(row => row.price_amount), productIds.map((_, rank) => 10 + rank));
 });
