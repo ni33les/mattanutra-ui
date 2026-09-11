@@ -64,3 +64,35 @@ test("EFF-WAKE-06 one task wakes one registered worker; distinct tasks distribut
   assert.equal(first.length, 1); assert.equal(second.length, 1); assert.notDeepEqual(first, second);
   assert.deepEqual(choose(urls, { taskType: "match" }), urls);
 });
+
+test("EFF-WAKE-07 rollout wakeups ignore retired builds and another replica's loopback address", async () => {
+  const module = await import("../../lib/worker-wake.ts");
+  const eligible = (module as unknown as { eligibleWorkerWakeUrls: (rows: unknown[], identity: { host: string; buildId: string }) => string[] }).eligibleWorkerWakeUrls;
+  assert.equal(typeof eligible, "function");
+  const buildId = "a".repeat(40);
+  const targets = [
+    { wake_url: "http://127.0.0.1:1001/wake", wake_host: "pod-a", worker_version: "b".repeat(40) },
+    { wake_url: "http://127.0.0.1:1002/wake", wake_host: "pod-b", worker_version: buildId },
+    { wake_url: "http://127.0.0.1:1003/wake", wake_host: "pod-a", worker_version: buildId },
+    { wake_url: "http://127.0.0.1:1003/wake", wake_host: "pod-a", worker_version: buildId },
+    { wake_url: "https://worker.example.test/wake", wake_host: "remote", worker_version: buildId },
+    { wake_url: "file:///tmp/wake", wake_host: "pod-a", worker_version: buildId }
+  ];
+  assert.deepEqual(eligible(targets, { host: "pod-a", buildId }), ["http://127.0.0.1:1003/wake", "https://worker.example.test/wake"]);
+  assert.deepEqual(eligible(targets, { host: "pod-b", buildId }), ["http://127.0.0.1:1002/wake", "https://worker.example.test/wake"]);
+});
+
+test("EFF-WAKE-08 a refused local wake falls through to a reachable current worker without duplicate delivery", async () => {
+  const module = await import("../../lib/worker-wake.ts");
+  const deliver = (module as unknown as { deliverWorkerWake: (urls: string[], signal: TaskQueueSignal, ping: (url: string, signal: TaskQueueSignal) => Promise<void>) => Promise<void> }).deliverWorkerWake;
+  assert.equal(typeof deliver, "function");
+  const signal = { taskType: "match_agentic_plan", taskId: "one" };
+  const calls: string[] = [];
+  await deliver(["http://127.0.0.1:1001/wake", "http://127.0.0.1:1002/wake"], signal, async (url, actual) => {
+    assert.deepEqual(actual, signal);calls.push(url);if (calls.length === 1) throw new Error("ECONNREFUSED");
+  });
+  assert.equal(calls.length, 2);assert.equal(new Set(calls).size, 2);
+  const successful: string[] = [];
+  await deliver(["https://one.invalid", "https://two.invalid"], signal, async url => { successful.push(url); });
+  assert.equal(successful.length, 1);
+});
