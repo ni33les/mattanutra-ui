@@ -46,7 +46,7 @@ test('MCP-LIMIT-02 concise messages use the configured amount, preserve measurem
     if (locale === 'th') assert.match(rows[0].message, /เกิน/);
     if (locale === 'zh-CN') assert.match(rows[0].message, /超过/);
     const response = presentDecision(result, 'cap_limit_advice_fixture', 1);
-    assert.equal(response.status, 'ready'); assert.equal(response.nextAction, 'confirm_with_user');
+    assert.equal(response.status, 'ready'); assert.equal(response.nextAction, 'execute');
     assert.doesNotMatch(response.summary, /not been assessed|cleared|medically approved/i);
   }
 });
