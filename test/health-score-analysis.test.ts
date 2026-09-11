@@ -129,7 +129,7 @@ describe("HealthScore AI copy validator", () => {
     assert.doesNotMatch(source, /callGrokChatCompletion\(\{/);
     assert.match(source, /getRequiredXaiApiKey/);
     assert.match(source, /process\.env\.GROK_MODEL/);
-    assert.match(source, /v8-single-display-locale/);
+    assert.match(source, /v9-compact-structured/);
     assert.match(source, /Return exactly one top-level key: pageCopy/);
     assert.match(source, /outputLocaleMode: "single_display_locale"/);
     assert.match(source, /Return only the requested display locale/);

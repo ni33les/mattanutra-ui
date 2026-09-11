@@ -14,7 +14,6 @@ describe("grok task config", () => {
   it("uses medium reasoning for clinical and customer advice paths", () => {
     assert.equal(grokTaskReasoningDefault("formulation"), "medium");
     assert.equal(grokTaskReasoningDefault("foodGuidance"), "medium");
-    assert.equal(grokTaskReasoningDefault("healthScoreCopy"), "medium");
     assert.equal(grokTaskReasoningDefault("nutritionAdvisor"), "medium");
     assert.equal(grokTaskReasoningDefault("panyaChat"), "medium");
   });
@@ -25,6 +24,11 @@ describe("grok task config", () => {
     assert.equal(grokTaskReasoningDefault("productFactCorrection"), "low");
     assert.equal(grokTaskReasoningDefault("customerInsights"), "low");
     assert.equal(grokTaskReasoningDefault("foodReview"), "low");
+  });
+
+  it("HS-PERF-09: uses low reasoning only for deterministic HealthScore copy polishing", () => {
+    assert.equal(grokTaskReasoningDefault("healthScoreCopy"), "low");
+    assert.equal(grokTaskReasoningDefault("formulation"), "medium");
   });
 
   it("only uses supported task reasoning values", () => {
