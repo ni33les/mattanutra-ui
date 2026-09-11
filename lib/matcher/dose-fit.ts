@@ -14,6 +14,22 @@ const exactParts = new WeakMap<DoseFitScore, { fitting: Fraction; safety: Fracti
 const fixedWeights = new WeakMap<CanonicalRequest, number | null>();
 const scoreCache = new WeakMap<CanonicalRequest, WeakMap<object, DoseFitScore>>();
 const weightedCache = new WeakMap<CanonicalRequest, WeakMap<object, DoseFitScore>>();
+const sharedInputs = new WeakMap<CanonicalRequest, CanonicalRequest>();
+/** Only the internal profile copier calls this: all intake, target and reference
+ * objects are shared immutable inputs, while weighted endpoint caches stay separate. */
+export function shareDoseFitInputs(profile: CanonicalRequest, source: CanonicalRequest) {
+  sharedInputs.set(profile, sharedInputs.get(source) ?? source);
+}
+const ONE = fromDecimal(1);
+const weightCache = new WeakMap<ReturnType<typeof effectiveWeights>, { defaultWeight: Fraction; subjects: Map<string, Fraction> }>();
+function exactWeights(settings: ReturnType<typeof effectiveWeights>) {
+  let value = weightCache.get(settings);
+  if (!value) {
+    value = { defaultWeight: fromDecimal(settings.defaultNutrient), subjects: new Map(Object.entries(settings.nutrients).map(([id, weight]) => [id, fromDecimal(weight)])) };
+    weightCache.set(settings, value);
+  }
+  return value;
+}
 
 function gcd(a: bigint, b: bigint): bigint {
   while (b !== BigInt(0)) [a, b] = [b, a % b];
@@ -112,6 +128,7 @@ function compileSubject(request: CanonicalRequest, subjectId: string) {
   return { requested, target, ranges, dietary, referenceRows, reference, scale, bounds: limitsFor(request, subjectId) };
 }
 function subjectInputs(request: CanonicalRequest, subjectId: string) {
+  request = sharedInputs.get(request) ?? request;
   let compiled = subjectCache.get(request); if (!compiled) { compiled = new Map(); subjectCache.set(request, compiled); }
   let value = compiled.get(subjectId); if (!value) { value = compileSubject(request, subjectId); compiled.set(subjectId, value); } return value;
 }
@@ -122,7 +139,7 @@ function compareFractions(a: Fraction, b: Fraction) {
 }
 
 export function doseFitScore(request: CanonicalRequest, exposure: ReadonlyMap<string, bigint>): DoseFitScore {
-  return calculateDoseFit(request, exposure, false);
+  return calculateDoseFit(sharedInputs.get(request) ?? request, exposure, false);
 }
 export function weightedDoseFitScore(request: CanonicalRequest, exposure: ReadonlyMap<string, bigint>): DoseFitScore {
   const settings = request.scoring ? effectiveWeights(request.scoring) : null;
@@ -154,6 +171,7 @@ function calculateDoseFit(request: CanonicalRequest, exposure: ReadonlyMap<strin
   if (previous) return previous;
   let under = ZERO, over = ZERO, limit = ZERO, intentTotal = ZERO;
   const settings = applyWeights && request.scoring ? effectiveWeights(request.scoring) : null;
+  const weights = settings ? exactWeights(settings) : null;
   const perTarget: DoseFitScore["perTarget"][number][] = [];
   const perContinuedDose: NonNullable<DoseFitScore["perContinuedDose"]>[number][] = [];
   const perLimit: DoseFitScore["perLimit"][number][] = [];
@@ -164,8 +182,7 @@ function calculateDoseFit(request: CanonicalRequest, exposure: ReadonlyMap<strin
     const minimum = known + ranges.minimum - ranges.base, maximum = known + ranges.maximum - ranges.base;
     const added = known > ranges.base ? known - ranges.base : BigInt(0);
     const continuedIncrease = reference > BigInt(0) ? { num: added, den: reference } : ZERO;
-    const weightValue = settings ? settings.nutrients[subjectId] ?? settings.defaultNutrient : 1;
-    const weight = fromDecimal(weightValue);
+    const weight = weights ? weights.subjects.get(subjectId) ?? weights.defaultWeight : ONE;
     const cases = [...new Set([minimum, maximum])].flatMap((supplemental) =>
       [...new Set([dietary.minimum, dietary.maximum])].map((food) => {
         const want = target?.requested.units ?? BigInt(0);
