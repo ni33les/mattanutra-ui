@@ -90,3 +90,11 @@ test('NOID-07 execute discovery distinguishes a new checkout from replaying a lo
   assert.match(description, /Retry.*same key and input/);
   assert.match(description, /returned.*revision/);
 });
+
+test('NOID-08 checkout template advances the confirmed revision and uses a distinct mutation key', () => {
+  const confirm = CLIENT_EXAMPLES.find(row => row.name === 'confirm-recommendation')!.arguments;
+  const checkout = CLIENT_EXAMPLES.find(row => row.name === 'confirmed-checkout')!.arguments;
+  assert.equal(checkout.planHandle, confirm.planHandle);
+  assert.equal(checkout.expectedRevision, confirm.expectedRevision + 1, 'Confirmation returns a new revision for checkout');
+  assert.notEqual(checkout.idempotencyKey, confirm.idempotencyKey, 'Checkout is a new mutation, not a replay of confirmation');
+});
