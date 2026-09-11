@@ -450,6 +450,18 @@
       "slice": "browser-reference",
       "expectedCases": 1,
       "reason": "The shared web/admin matcher must compile and execute in a browser without importing Node async context; server reference isolation remains independently covered"
+    },
+    {
+      "file": "test/service-efficiency/scoring-hot-path.test.ts",
+      "slice": "matcher-hot-path",
+      "expectedCases": 4,
+      "reason": "Exact scoring comparison reuse, immutable profile identity, raw nutrient sharing and independent weighted uncertainty endpoints"
+    },
+    {
+      "file": "test/service-efficiency/checkpoint-hot-path.test.ts",
+      "slice": "matcher-hot-path",
+      "expectedCases": 3,
+      "reason": "Completion without redundant checkpoint continuation, historical cursor recovery and standard-to-expanded attempt accounting"
     }
   ],
   "inputs": [
