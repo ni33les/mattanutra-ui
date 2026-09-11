@@ -9,6 +9,7 @@ import { DEFAULT_MATCHER_CONFIG } from "@/lib/matcher/config";
 import { fingerprintState } from "@/lib/matcher/dominance";
 import { aggregateDailyExposure, isDoseError } from "@/lib/matcher/dose";
 import { evaluateSafety, labelledSafetyExposure } from "@/lib/matcher/safety";
+import { smallest } from "@/lib/matcher/top-k";
 import type {
   CanonicalRequest,
   DoseVariant,
@@ -425,18 +426,18 @@ export function reviewFrontier(states: readonly SearchState[], request: Canonica
   if (states.length <= 192) return [...states];
   const fitOrder = [...states].sort((a, b) => order(a, b));
   const doseOrder = (a: SearchState, b: SearchState) => compareDoseFit(doseFitScore(request, a.exposure), doseFitScore(request, b.exposure)) || order(a, b);
-  const chosen = new Set<SearchState>([...incumbents, ...[...states].sort(doseOrder).slice(0, 16)]);
+  const chosen = new Set<SearchState>([...incumbents, ...smallest(states, 16, doseOrder)]);
   // A close fit on one target can become the best complete basket after a
   // complementary addition, despite losing every aggregate/profile ranking.
   const additiveBases = states.filter(state => doseFitScore(request,state.exposure).perTarget.every(row=>row.over===0));
   for (const target of request.targets.filter(row => !isDeferredConditional(row)).slice(0, 32)) {
     const deviation = (state: SearchState) => { const row = doseFitScore(request,state.exposure).perTarget.find(row=>row.subjectId===target.subjectId); return row ? row.under + row.over : Infinity; };
-    const reference = [...additiveBases].sort((a,b)=>deviation(a)-deviation(b) || doseOrder(a,b))[0];
+    const reference = smallest(additiveBases, 1, (a,b)=>deviation(a)-deviation(b) || doseOrder(a,b))[0];
     if (reference) chosen.add(reference);
   }
   for (const objective of PRACTICAL_OBJECTIVES) {
     const profile = requestForProfile(request, objective);
-    for (const state of [...states].sort((a, b) => compareSearchStates(a, b, profile)).slice(0, 12)) chosen.add(state);
+    for (const state of smallest(states, 12, (a, b) => compareSearchStates(a, b, profile))) chosen.add(state);
   }
   const nonempty = states.filter(row => row.count > 0);
   const targetIds = new Set(request.targets.map(row => row.subjectId));
@@ -444,17 +445,17 @@ export function reviewFrontier(states: readonly SearchState[], request: Canonica
     const facts = group.product.labelledContributions.filter(row => row.amount != null && row.amount > 0);
     return facts.length > 0 && facts.every(row => row.subjectId !== null && targetIds.has(row.subjectId));
   }).map(group => group.productId));
-  const focused = nonempty.filter(row => row.count === 1 && row.selectedProductIds?.some(id => focusedIds.has(id))).sort(order)[0];
+  const focused = smallest(nonempty.filter(row => row.count === 1 && row.selectedProductIds?.some(id => focusedIds.has(id))), 1, order)[0];
   if (focused) chosen.add(focused);
   for (const compare of [
     (a: SearchState, b: SearchState) => a.price - b.price || order(a, b),
     (a: SearchState, b: SearchState) => a.count - b.count || comparePillCounts(a.pills, a.pillCountKnown, b.pills, b.pillCountKnown) || order(a, b),
     (a: SearchState, b: SearchState) => comparePillCounts(a.pills, a.pillCountKnown, b.pills, b.pillCountKnown) || order(a, b)
-  ]) for (const state of [...nonempty].sort(compare).slice(0, 24)) chosen.add(state);
+  ]) for (const state of smallest(nonempty, 24, compare)) chosen.add(state);
   const protectedIds = new Set(request.targets.filter(row => row.importance === "core" || row.importance === "required").map(row => row.subjectId));
   if (protectedIds.size && request.targets.some(row => row.importance === "optional")) {
     const protectedFit = (state: SearchState) => doseFitScore(request, state.exposure).perTarget.filter(row => protectedIds.has(row.subjectId)).reduce((sum, row) => sum + row.under + row.over, 0);
-    for (const state of [...states].sort((a, b) => protectedFit(a) - protectedFit(b) || order(a, b)).slice(0, 48)) chosen.add(state);
+    for (const state of smallest(states, 48, (a, b) => protectedFit(a) - protectedFit(b) || order(a, b))) chosen.add(state);
   }
   const patterns = new Set<string>();
   for (const state of fitOrder) {

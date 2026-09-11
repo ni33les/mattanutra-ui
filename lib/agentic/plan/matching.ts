@@ -14,6 +14,7 @@ import {
   summarizeRejections
 } from "@/lib/matcher";
 import {
+  compileGroups,
   contributionFor,
   productIsDedicatedForTarget,
   variantPillBurden
@@ -30,7 +31,8 @@ import { factSupportsQuantifiedExposure } from "@/lib/matcher/fact-provenance";
 import {
   canonicalTargetSetHash,
   canonicalizeCurrents,
-  canonicalizeTargets
+  canonicalizeTargets,
+  orderInvariantRequest
 } from "@/lib/matcher/canonicalizer";
 import { normalizeProductKey } from "@/lib/product-key-matching";
 import { nutrientNameMatchesTarget } from "@/lib/nutrient-identity";
@@ -38,6 +40,7 @@ import type {
   CanonicalRequest,
   CanonicalTarget,
   MatcherUnit,
+  ProductGroup,
   ScoredBasket
 } from "@/lib/matcher/types";
 import { upperLimitAmount } from "@/lib/agentic/plan/limits";
@@ -1170,8 +1173,9 @@ function computeMatchPlan(input: Readonly<{
   snapshot: CatalogueSnapshot;
   state: CanonicalPlanState;
   completedCursor?: MatchCursor;
+  prepared?: { request: CanonicalRequest; groups?: readonly ProductGroup[] };
 }>): ReturnType<typeof matchPlan> {
-  const request = toCanonicalRequest(input.state);
+  const request = input.prepared?.request ?? toCanonicalRequest(input.state);
 
   if ("error" in request) {
     return {
@@ -1188,7 +1192,7 @@ function computeMatchPlan(input: Readonly<{
     availabilityAsOf: snapshot.availabilityAsOf,
     catalogueVersion: snapshot.catalogueVersion,
     products: matcherProductsFor(input.snapshot)
-  }, DEFAULT_MATCHER_CONFIG, undefined, undefined, input.completedCursor);
+  }, DEFAULT_MATCHER_CONFIG, input.prepared?.groups, undefined, input.completedCursor);
   const withSafety = (option: StackOption): StackOption => ({
     ...option,
     safety: optionSafety({
@@ -1308,7 +1312,7 @@ export function matchPlanChunk(input: Parameters<typeof matchPlan>[0], options: 
   const session = createResidentPlanSession(input, options.checkpoint);
   const step = advanceResidentSearch(session, options);
   const checkpoint = { ...sessionCheckpoint(session), cursor: encodeMatchCursor(session.cursor) };
-  return { ...step, checkpoint, ...(step.done ? { result: computeMatchPlan({ ...input, completedCursor: session.cursor }) } : {}) };
+  return { ...step, checkpoint, ...(step.done ? { result: computeMatchPlan({ ...input, completedCursor: session.cursor, prepared: { request: session.request, groups: session.compiledGroups } }) } : {}) };
 }
 
 export function createResidentPlanSession(input: Parameters<typeof matchPlan>[0], checkpoint?: PlanSearchCheckpoint | BinaryPlanSearchCheckpoint) {
@@ -1317,11 +1321,16 @@ export function createResidentPlanSession(input: Parameters<typeof matchPlan>[0]
   const catalog = { availabilityAsOf: input.snapshot.availabilityAsOf, catalogueVersion: input.snapshot.catalogueVersion, products: matcherProductsFor(input.snapshot) };
   const inputIdentity = planCheckpointInputIdentity(input);
   if (checkpoint && checkpoint.inputIdentity !== inputIdentity) throw new Error("Plan checkpoint input identity changed");
+  // The search clones these groups before adding dynamic quantities. Keep the
+  // original compilation for unchanged final diagnostics and seller facts.
+  // Recovery already has compiled dynamic groups in its cursor. Defer the
+  // original compilation until finalization instead of rebuilding it per replay.
+  const compiledGroups = checkpoint ? undefined : compileGroups(orderInvariantRequest(request), catalog);
   const cursor = checkpoint
     ? decodeMatchCursor(checkpoint.cursor, matchCursorIdentity(request, catalog, DEFAULT_MATCHER_CONFIG))
-    : createMatchCursor(request, catalog, DEFAULT_MATCHER_CONFIG);
+    : createMatchCursor(request, catalog, DEFAULT_MATCHER_CONFIG, compiledGroups);
   if (input.state.searchEffort === "expanded" && cursor.effort !== "expanded") expandMatchCursor(cursor);
-  return { input, request, cursor, inputIdentity };
+  return { input, request, cursor, inputIdentity, compiledGroups };
 }
 type ResidentSession = ReturnType<typeof createResidentPlanSession>;
 function sessionCheckpoint(session: ResidentSession) {
@@ -1347,7 +1356,7 @@ function advanceResidentSearch(session: ResidentSession, options: { chunkBudget:
 export function advanceResidentPlanSession(session: ResidentSession, options: { chunkBudget: number; lostAttempts?: number }): ResidentPlanMatchChunk {
   const step = advanceResidentSearch(session, options);
   const checkpoint = { ...sessionCheckpoint(session), cursor: Uint8Array.from(encodeMatchCursorBytes(session.cursor)) };
-  return { ...step, checkpoint, ...(step.done ? { result: computeMatchPlan({ ...session.input, completedCursor: session.cursor }) } : {}) };
+  return { ...step, checkpoint, ...(step.done ? { result: computeMatchPlan({ ...session.input, completedCursor: session.cursor, prepared: { request: session.request, groups: session.compiledGroups } }) } : {}) };
 }
 
 export function planCheckpointInputIdentity(input: Parameters<typeof matchPlan>[0]) {
