@@ -114,6 +114,24 @@ export async function runBatch(label, args, env, evidence) {
   return result;
 }
 
+/** HTTP cases need a durable executor; controlled DB cases must own their leases exclusively. */
+export async function runNodePair({ common, evidence, args, files, integration,
+  unitLabel, postgresLabel, httpLabel, start, batch = runBatch }) {
+  const httpEvidence = join(evidence, httpLabel);
+  mkdirSync(httpEvidence, { recursive: true });
+  const server = await start(common, httpEvidence);
+  const results = [];
+  try {
+    results.push(await batch(unitLabel, [...args, ...files.filter(file => !integration.includes(file))],
+      { ...common, MCP_URL: `${server.identity.origin}/api/mcp`, MCP_ISOLATED_CANDIDATE: "1",
+        NEXT_PUBLIC_SITE_URL: server.identity.origin, SITE_URL: server.identity.origin,
+        DB_POOL_MAX: "1", DB_WORKER_POOL_MAX: "1" }, evidence));
+  } finally { await server.stop(); }
+  if (integration.length) results.push(await batch(postgresLabel, [...args, ...integration],
+    { ...common, DB_POOL_MAX: "6", DB_WORKER_POOL_MAX: "6" }, evidence));
+  return results;
+}
+
 async function main() {
   process.chdir(ROOT);
   const inventory = fullTestInventory();
@@ -128,15 +146,12 @@ async function main() {
   const common = { ...process.env, DB_WORKER_URL: process.env.TEST_DB_URL, MATTANUTRA_ENV: "dev", STRIPE_PAYMENT_MODE: "mock", NODE_ENV: "test", DB_POOL_IDLE_TIMEOUT_SECONDS: "1" };
   const nodeArgs = ["--test", "--test-concurrency=1", "--experimental-strip-types", "--import", "./test/helpers/offline-network.mjs", "--import", "./scripts/register-ts-path-loader.mjs"];
   const results = [];
-  results.push(await runBatch("node-application", [...nodeArgs, ...inventory.node.filter(file => !inventory.integration.includes(file))],
-    { ...common, DB_POOL_MAX: "1", DB_WORKER_POOL_MAX: "1" }, evidence));
-  results.push(await runBatch("node-postgres", [...nodeArgs, ...inventory.integration],
-    { ...common, DB_URL: common.TEST_DB_URL, DB_POOL_MAX: "6", DB_WORKER_POOL_MAX: "6" }, evidence));
-  results.push(await runBatch("node-mcp-replay", [...nodeArgs, ...inventory.mcp.filter(file => !inventory.integration.includes(file))],
-    { ...common, DB_POOL_MAX: "1", DB_WORKER_POOL_MAX: "1" }, evidence));
+  const { startHttpCandidate } = await import("./run-matcher-test-suite.mjs");
+  results.push(...await runNodePair({ common, evidence, args: nodeArgs, files: inventory.node, integration: inventory.integration,
+    unitLabel: "node-application", postgresLabel: "node-postgres", httpLabel: "http-application", start: startHttpCandidate }));
   const mcpIntegration = inventory.mcp.filter(file => inventory.integration.includes(file));
-  if (mcpIntegration.length) results.push(await runBatch("node-mcp-postgres-replay", [...nodeArgs, ...mcpIntegration],
-    { ...common, DB_POOL_MAX: "6", DB_WORKER_POOL_MAX: "6" }, evidence));
+  results.push(...await runNodePair({ common, evidence, args: nodeArgs, files: inventory.mcp, integration: mcpIntegration,
+    unitLabel: "node-mcp-replay", postgresLabel: "node-mcp-postgres-replay", httpLabel: "http-replay", start: startHttpCandidate }));
   const readEvents = name => readFileSync(join(evidence, `${name}-events.jsonl`), "utf8").trim().split("\n").filter(Boolean).map(row => JSON.parse(row));
   const canonical = rows => rows.filter(row => inventory.mcp.includes(row.file))
     .map(row => JSON.stringify(row)).sort();

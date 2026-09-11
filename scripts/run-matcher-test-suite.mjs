@@ -4,7 +4,7 @@ import { createHash } from "node:crypto";
 import { createWriteStream, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { cloneIsolatedDatabase, fullTestInventory, isolatedDatabasePreflight, runBatch, sourceManifest, testSourceHygiene } from "./run-full-test-suite.mjs";
+import { cloneIsolatedDatabase, fullTestInventory, isolatedDatabasePreflight, runBatch, runNodePair, sourceManifest, testSourceHygiene } from "./run-full-test-suite.mjs";
 import { isolatedValidationEnvironment } from "./run-dev-advisory-validation.mjs";
 import { normalizePublishedClientResult } from "./published-client-semantics.mjs";
 import { unclassifiedMatcherConsumers } from "./matcher-test-inventory.mjs";
@@ -49,20 +49,10 @@ export async function runMatcherBatches({ common, evidence, inventory, args, run
   start = startHttpCandidate, batch = runBatch }) {
   const results = [];
   for (const run of runs) {
-    const httpEvidence = join(evidence, `http-${run}`);
-    mkdirSync(httpEvidence, { recursive: true });
-    const runEnv = environments[run] ?? common;
-    const server = await start(runEnv, httpEvidence);
-    const httpEnv = { ...runEnv, MCP_URL: `${server.identity.origin}/api/mcp`,
-      MCP_ISOLATED_CANDIDATE: "1", NEXT_PUBLIC_SITE_URL: server.identity.origin, SITE_URL: server.identity.origin };
-    try {
-      results.push(await batch(`node-matcher-${run}`, [...args, ...inventory.files.filter(file => !inventory.integration.includes(file))],
-        { ...httpEnv, DB_POOL_MAX: "1", DB_WORKER_POOL_MAX: "1" }, evidence));
-    } finally { await server.stop(); }
-    // These fixtures own their controlled tasks and leases. HTTP integration
-    // cases start and stop their own executor; no pack-wide worker may compete.
-    results.push(await batch(`node-matcher-postgres-${run}`, [...args, ...inventory.integration],
-      { ...runEnv, DB_POOL_MAX: "6", DB_WORKER_POOL_MAX: "6" }, evidence));
+    results.push(...await runNodePair({ common: environments[run] ?? common, evidence, args,
+      files: inventory.files, integration: inventory.integration,
+      unitLabel: `node-matcher-${run}`, postgresLabel: `node-matcher-postgres-${run}`,
+      httpLabel: `http-${run}`, start, batch }));
   }
   return results;
 }
