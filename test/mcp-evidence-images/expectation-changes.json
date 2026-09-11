@@ -103,5 +103,15 @@
         "replacedBareGuardReturns": 14
       }
     ]
+  },
+  "inventoryCorrection": {
+    "reason": "Preflight discovered five existing matcher consumers missing from the maintained inventory; include them without altering assertions.",
+    "files": [
+      "test/web-journey-fix/priorities.test.ts",
+      "test/web-journey-fix/reported.test.ts",
+      "test/web-journey-fix/scoring.test.ts",
+      "test/web-journey-fix/search.test.ts",
+      "test/web-reveal-tidy.test.ts"
+    ]
   }
 }
