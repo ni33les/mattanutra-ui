@@ -1,3 +1,5 @@
+import { executeTaskWorkItem } from '../lib/task-execution.ts';
+import { warmLiveRetailSnapshot, requireCachedLiveRetailSnapshot } from '../lib/agentic/catalogue/live.ts';
 import { cleanupFixtureRelationships } from "./helpers/fixture-teardown.ts";
 import { loadAdminSafetyReferenceSnapshot } from "../lib/agentic/catalogue/load-safety-ceilings.ts";
 import { getCatalogueRuntimeRevision } from "../lib/catalogue-runtime-revision.ts";
@@ -49,12 +51,34 @@ describe("web advisory revisions on PostgreSQL", () => {
     const { runtimeRevision, fingerprint } = await loadAdminSafetyReferenceSnapshot(getSql()!);
     return { runtimeRevision, fingerprint };
   }
-  async function seed() {
+  async function seed(overrides: Record<string,unknown> = {}) {
     const planId = randomUUID(); plans.push(planId);
-    await persistAssessmentSubmission({ answers, locale: "en", status: "captured", selectedPlan: "precision",
+    await persistAssessmentSubmission({ answers: { ...answers, ...overrides }, locale: "en", status: "captured", selectedPlan: "precision",
       snapshot: createAssessmentSnapshot({ planId, healthScore: computeHealthScore(answers, "en") }) });
     return planId;
   }
+  it("REVEAL-EMPTY-01 a loaded country with no retail listings completes matching and opens its saved formula", async () => {
+    const planId=await seed({country:"Malaysia"}),sql=getSql()!,generation=(await loadGenerationInput(sql,planId))!;
+    await insertFormulationVersion(sql,{planId,generation,modelVersion:"empty-market-regression",formulation:{
+      supplementBreakdown:[{id:"vitamin-d3",supplement:"Vitamin D3",dailyDose:"1000 IU",category:"Core",status:"add",effectivenessRank:1}],sectionStatuses:{supplements:"pending"}}});
+    await sql`insert into assessment_healthscore_results(plan_id,revision,locale,generator_version,result) values(${planId}::uuid,1,'en',${FUNNEL_GENERATOR_VERSION},${sql.json(completeHealthScoreFixture("en"))})`;
+    const {task}=await createTask({planId,title:"Empty market regression",taskType:"generate_product_recommendations",payload:{catalogueRevision:await getCatalogueRuntimeRevision(sql),safetyReferenceIdentity:await referenceIdentity(),productPreferences:{revision:0,excludedProductIds:[],searchEffort:"standard"}}});
+    const marker=process.env.NODE_TEST_CONTEXT;
+    try {
+      // Exercise the production cache/readiness path; its test-context bypass hid this bug.
+      delete process.env.NODE_TEST_CONTEXT;
+      const snapshot=await warmLiveRetailSnapshot("MY");assert.equal(snapshot.products.length,0,"The isolated Malaysian fixture must have no retail listings");
+      assert.deepEqual(requireCachedLiveRetailSnapshot("MY"),snapshot);
+      const work=await buildTaskWorkItem(task);assert.equal(work.taskType,"generate_product_recommendations");
+      assert.equal(work.countryCode,"MY");assert.deepEqual(work.retailerCandidateSets,[]);
+      const result=await executeTaskWorkItem(work);
+      assert.deepEqual(result.recommendations.recommendations,[]);
+      await withDatabaseTransaction(sql,tx=>applyTaskCompletionResult({sql:tx,task,taskId:task.id,resultPayload:result}));
+      const status=await getFunnelReadiness(planId,"en");assert.equal(status?.readyForReveal,true);assert.equal(status?.formulationStatus,"ready");
+      assert.equal((await sql`select count(*)::int as n from formulations where plan_id=${planId}::uuid`)[0].n,1);
+      assert.equal((await sql`select count(*)::int as n from tasks where plan_id=${planId}::uuid and task_type='generate_supplement_guidance'`)[0].n,0);
+    } finally { if(marker===undefined)delete process.env.NODE_TEST_CONTEXT;else process.env.NODE_TEST_CONTEXT=marker; }
+  });
   it("creates current-version work beside a completed historical deterministic task and reuses the current task", async () => {
     const planId = await seed();
     const generation = (await loadGenerationInput(getSql()!, planId))!;

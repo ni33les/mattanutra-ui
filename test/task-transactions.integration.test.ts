@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { after, before, describe, it } from "node:test";
 import { closeSqlPool, getSql, getWorkerSql, withDatabaseTransaction } from "../lib/db.ts";
-import { completeTask, reserveNextTask, releaseExpiredReservations, renewTaskLease, failTask } from "../lib/task-service.ts";
+import { completeTask, reserveNextTask, releaseExpiredReservations, renewTaskLease, failTask, releaseReservedTaskToQueue } from "../lib/task-service.ts";
 import type { TaskAgentAccessScope } from "../lib/task-service-types.ts";
 import postgres from "postgres";
 
@@ -55,6 +55,25 @@ describe("task lifecycle transactions on PostgreSQL", () => {
     assert.ok(result);
     return {taskId, reservationId: result.reservationId, workerSessionId: sessionId, accessScope: scope};
   }
+
+  it("REVEAL-QUEUE-01 preparation retries reach failure at the attempt limit instead of becoming unclaimable queued work", async () => {
+    const input = await reserved();
+    await getSql()!`update public.tasks set attempts=max_attempts where id=${input.taskId}::uuid`;
+    await releaseReservedTaskToQueue({ ...input, errorMessage: "Controlled catalogue preparation failure" });
+    const [row] = await getSql()!`select status,attempts,max_attempts,error_message,lease_until from tasks where id=${input.taskId}::uuid`;
+    assert.equal(row.status, "failed"); assert.equal(row.attempts,row.max_attempts);
+    assert.equal(row.error_message,"Controlled catalogue preparation failure"); assert.equal(row.lease_until,null);
+    assert.equal((await getSql()!`select count(*)::int as n from task_reservations where task_id=${input.taskId}::uuid and status='active'`)[0].n,0);
+    await releaseReservedTaskToQueue({ ...input, errorMessage: "A replay must not alter the terminal failure" });
+    assert.equal((await getSql()!`select error_message from tasks where id=${input.taskId}::uuid`)[0].error_message,row.error_message);
+  });
+  it("REVEAL-QUEUE-02 preparation retries below the limit remain recoverable with their cause recorded", async () => {
+    const input = await reserved();
+    await releaseReservedTaskToQueue({ ...input, errorMessage: "Temporary preparation failure" });
+    const [row] = await getSql()!`select status,attempts,error_message from tasks where id=${input.taskId}::uuid`;
+    assert.equal(row.status,"queued"); assert.equal(row.attempts,1); assert.equal(row.error_message,"Temporary preparation failure");
+    assert.ok(await reserveNextTask({accessScope:scope,agent:{id:agentId,name:scope.agentName},workerSessionId:sessionId,taskId:input.taskId}));
+  });
 
   it("LOCK-TASK-01 result preparation occurs before the task lock and the prepared payload is used once", async () => {
     const input = await reserved();

@@ -76,6 +76,7 @@ async function handleGET(request: Request, { params }: WorkItemRouteProps) {
     if (isRetryableMatchingWorkItemError(error)) {
       try {
         await releaseReservedTaskToQueue({
+          errorMessage,
           reservationId,
           taskId: id,
           workerSessionId
