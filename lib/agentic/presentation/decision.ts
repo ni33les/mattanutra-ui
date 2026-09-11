@@ -10,15 +10,15 @@ import type { PlanResult, StackOption, SafetyGuidance, BasketItem, PlanRequestTa
 import type { MatcherUnit } from "@/lib/matcher/types";
 
 const COPY = {
-  en: { processing: "Matching your targets. Wait before checking this plan again.", failed: "Matching did not finish. Retry this refinement with scoring:{} and a new idempotency key.",
+  en: { processing: "Updating your plan. Wait before checking again.", failed: "Matching did not finish. Retry this refinement with scoring:{} and a new idempotency key.",
     ready: "Review the recommended routine, then confirm it or adjust the weights.", selected: "Your routine is confirmed. Continue to checkout.",
     review: "No purchase is recommended. Review the gaps and adjust the targets or weights to refine this plan.", none: "No new supplement purchase is needed for these targets.", noTargets: "No targets remain, so no purchase is recommended.",
     stale: "Product facts changed. Refresh with scoring:{} before choosing a routine.", question: "Answer the question that affects your next choice." },
-  th: { processing: "กำลังจับคู่ตามเป้าหมาย โปรดรอก่อนตรวจสอบแผนอีกครั้ง", failed: "การจับคู่ยังไม่เสร็จ ลองส่ง scoring:{} พร้อมคีย์ idempotency ใหม่",
+  th: { processing: "กำลังอัปเดตแผน โปรดรอก่อนตรวจสอบอีกครั้ง", failed: "การจับคู่ยังไม่เสร็จ ลองส่ง scoring:{} พร้อมคีย์ idempotency ใหม่",
     ready: "ตรวจสอบชุดที่แนะนำ แล้วยืนยันหรือปรับน้ำหนักความสำคัญ", selected: "ยืนยันชุดแล้ว ดำเนินการชำระเงินได้",
     review: "ยังไม่แนะนำให้ซื้อ โปรดตรวจสอบส่วนที่ยังขาดและปรับเป้าหมายหรือน้ำหนักความสำคัญ", none: "เป้าหมายเหล่านี้ไม่จำเป็นต้องซื้ออาหารเสริมเพิ่ม", noTargets: "ไม่มีเป้าหมายเหลืออยู่ จึงไม่แนะนำให้ซื้อ",
     stale: "ข้อมูลผลิตภัณฑ์เปลี่ยนแล้ว ส่ง scoring:{} เพื่อปรับข้อมูลก่อนเลือก", question: "ตอบคำถามที่มีผลต่อตัวเลือกถัดไป" },
-  "zh-CN": { processing: "正在匹配目标，请稍后再查询此计划。", failed: "匹配未完成。请使用 scoring:{} 和新的幂等键重试。",
+  "zh-CN": { processing: "正在更新计划，请稍后再查询。", failed: "匹配未完成。请使用 scoring:{} 和新的幂等键重试。",
     ready: "查看推荐组合，然后确认或调整权重。", selected: "已确认组合，可以继续结账。",
     review: "目前不建议购买。请查看尚未满足的目标，并调整目标或权重以完善方案。", none: "这些目标目前无需购买新的补充剂。", noTargets: "已无目标，因此不建议购买。",
     stale: "产品信息已变化。选择前请用 scoring:{} 刷新。", question: "请回答会影响下一步选择的问题。" }
