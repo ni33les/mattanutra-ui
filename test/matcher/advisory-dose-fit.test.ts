@@ -9,7 +9,7 @@ import { searchGroups, seedState, tryAddVariant } from "../../lib/matcher/search
 import { compareDoseFit, doseFitScore } from "../../lib/matcher/dose-fit.ts";
 import { scaleAmount } from "../../lib/matcher/dose.ts";
 import { safetyCeilingFor } from "../../lib/matcher/safety-ceilings.ts";
-import { optionIdFor } from "../../lib/matcher/explainer.ts";
+import { candidateKeyFor } from "../../lib/matcher/explainer.ts";
 import { hasFewerConcerns, materiallyDifferent } from "../../lib/matcher/selector.ts";
 import type { CanonicalRequest, MatcherProduct, ScoredBasket } from "../../lib/matcher/types.ts";
 
@@ -312,7 +312,7 @@ describe("advisory dose fit", () => {
   });
 
   it("uses product and dose identity and gives explicit incomplete-search evidence", () => {
-    assert.notEqual(optionIdFor(["seller:a:x1"]), optionIdFor(["seller:a:x2"]));
+    assert.notEqual(candidateKeyFor(["seller:a:x1"]), candidateKeyFor(["seller:a:x2"]));
     assert.equal(materiallyDifferent(
       { sellerId: "one", productIds: ["a"], variantIds: ["one:a:x1"] } as ScoredBasket,
       { sellerId: "two", productIds: ["a"], variantIds: ["two:a:x1"] } as ScoredBasket), false);

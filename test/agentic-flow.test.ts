@@ -46,12 +46,12 @@ function runtimeFor(principal: string | null = null): AgenticRuntime {
     });
 }
 function routine(value: Record<string, unknown>) {
-    const choices = value.choices as Array<{optionId: string; roles: string[]; products: Array<{name: string}>; ingredients: Array<{advice?: Array<{kind:string;severity:string;exposure:number;reference:number}>}>}>;
+    const choices = value.choices as Array<{candidateKey: string; roles: string[]; products: Array<{name: string}>; ingredients: Array<{advice?: Array<{kind:string;severity:string;exposure:number;reference:number}>}>}>;
     assert.ok(choices?.length, JSON.stringify(value));
     const result = choices.find(row => row.products.length && row.roles.includes("closest_dose")) ?? choices.find(row => row.products.length); assert.ok(result); return result;
 }
 async function select(runtime: AgenticRuntime, created: Record<string,unknown>, key: string) {
-    const selected = await call(runtime, "plan", {planHandle:created.planHandle,expectedRevision:created.revision,selectedOptionId:routine(created).optionId,idempotencyKey:key});
+    const selected = await call(runtime, "plan", {planHandle:created.planHandle,expectedRevision:created.revision,idempotencyKey:key});
     assert.equal(selected.ok,true,JSON.stringify(selected));return selected;
 }
 async function call(runtime: AgenticRuntime, name: string, args: unknown, id = 1) {
@@ -107,7 +107,7 @@ describe("agentic DEV flow", () => {
         assert.equal(created.ok, true);
         assert.equal(created.status, "ready");
         assert.ok(routine(created).products.length >= 4);
-        assert.equal(created.selectedOptionId, null);
+        assert.equal(created.nextAction, 'confirm_with_user');
         assert.equal(typeof created.planHandle, "string");
         assert.ok(String(created.planHandle).length >= 32);
         const replay = await call(runtime, "plan", {

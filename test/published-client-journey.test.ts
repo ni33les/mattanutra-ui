@@ -32,12 +32,12 @@ it("V5-CLIENT-02 request templates come from the connector and never mutate thei
   assert.throws(() => publishedExample(contract, "undocumented"), /missing published example/);
 });
 it("V5-CLIENT-03 the client confirms only the single returned recommendation", () => {
-  const closest = { optionId: "closest", roles: ["best_match"], products: [{ productId: "p" }] };
-  const cheaper = { optionId: "cheaper", roles: ["lower_cost"], products: [{ productId: "q" }] };
-  assert.equal(currentRecommendation({ recommendedOptionId: "closest", choices: [closest] }), closest);
-  assert.throws(() => currentRecommendation({ recommendedOptionId: "closest", choices: [closest, cheaper] }), /one current recommendation/);
-  assert.throws(() => currentRecommendation({ recommendedOptionId: "closest", choices: [{ ...closest, products: [] }] }), /No current purchasable recommendation/);
-  assert.throws(() => currentRecommendation({ recommendedOptionId: null, choices: [closest] }), /No current purchasable recommendation/);
+  const closest = { candidateKey: "closest", roles: ["best_match"], products: [{ productId: "p" }] };
+  const cheaper = { candidateKey: "cheaper", roles: ["lower_cost"], products: [{ productId: "q" }] };
+  assert.equal(currentRecommendation({ recommendedCandidateKey: "closest", choices: [closest] }), closest);
+  assert.throws(() => currentRecommendation({ recommendedCandidateKey: "closest", choices: [closest, cheaper] }), /one current recommendation/);
+  assert.throws(() => currentRecommendation({ recommendedCandidateKey: "closest", choices: [{ ...closest, products: [] }] }), /No current purchasable recommendation/);
+  assert.throws(() => currentRecommendation({ recommendedCandidateKey: null, choices: [closest] }), /No current purchasable recommendation/);
 });
 it("V5-CLIENT-04 documented client has no application, database, fixture-endpoint or private catalogue dependency", () => {
   const client = readFileSync("scripts/run-published-mcp-client.mjs", "utf8") + readFileSync("scripts/published-client-journey.mjs", "utf8");
@@ -95,7 +95,7 @@ it("V5-CLIENT-11 failed reloads never reapply a stale patch or use a guessed rev
 
 it("V5-CLIENT-12 the documented client exercises stale selection and preserves returned identity", () => {
   const client = readFileSync("scripts/published-client-journey.mjs", "utf8");
-  assert.match(client, /stale_revision/); assert.match(client, /selectedOptionId: candidate.optionId/);
+  assert.match(client, /stale_revision/); assert.match(client, /const selection = \{ planHandle: plan.planHandle, expectedRevision: plan.revision, idempotencyKey:/);
   assert.match(client, /assert.deepEqual\(await call\("plan", selection\), plan\)/);
   assert.match(client, /product.quantity \* Math.round\(product.unitPrice/);
 });

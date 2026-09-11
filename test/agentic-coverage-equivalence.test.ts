@@ -10,7 +10,7 @@ const nutrient = snapshot.supplements[1]!;
 const product = snapshot.products[1]!;
 const state: CanonicalPlanState = {
   acceptedGaps: [], conditionCodes: [], currency: "THB", currentSupplements: [], destinationCountry: "TH",
-  leftovers: [], locale: "en", medicationCodes: [], optimization: "lowest_cost", pinnedOptionId: null,
+  leftovers: [], locale: "en", medicationCodes: [], optimization: "lowest_cost", pinnedCandidateKey: null,
   profile: { ageYears: 35, lifeStage: "adult" }, requirements: {}, safetyAcknowledgement: null,
   targets: [{ name: nutrient.name, supplementId: nutrient.supplementId, amount: 300, unit: "mg" }]
 };

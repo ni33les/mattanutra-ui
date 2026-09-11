@@ -19,7 +19,7 @@ function item(id: string, pills: number, known = true): BasketItem {
 
 function option(id: string, pills: number, known = true): StackOption {
   return {
-    optionId: id, basket: [item(id, pills, known)], coverage: [], coveragePercent: 100,
+    candidateKey: id, basket: [item(id, pills, known)], coverage: [], coveragePercent: 100,
     dailyPills: pills, matcherVersion: "fixture", reason: "fixture", snapshotId: "fixture",
     totalPriceMinor: 100, tradeOff: { cash90DayDeltaMinor: 0, coverageDelta: 0, dailyPillsDelta: -2 },
     economics: {
@@ -93,7 +93,7 @@ test("historical options without saved economic deltas remain readable without i
 
 test("v5 frozen orders preserve unknown counts and immutable commercial values on replay", () => {
   const frozen = { dailyPills: 0, items: [item("unknown", 0, false)],
-    selectedOptionId: "frozen-option", planRevision: 7, subtotalMinor: 100, totalPriceMinor: 100 };
+    selectedCandidateKey: "frozen-option", planRevision: 7, subtotalMinor: 100, totalPriceMinor: 100 };
   const before = structuredClone(frozen);
   const published = publicFrozenOrder(frozen) as { dailyPills: number | null; items: { dailyPills: number | null; pillsPerServing: number | null }[]; totalPriceMinor: number; planRevision: number };
   assert.equal(published.dailyPills, null);

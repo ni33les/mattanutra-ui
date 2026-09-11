@@ -19,12 +19,12 @@ for (const locale of ["en", "th", "zh-CN"]) test(`AXR-SPEC-02 ${locale} tools-on
   const info = await rpc(client, "info", { locale });
   assert.equal(info.ok, true); assert.ok(ajv.validate(AGENTIC_OUTPUT_SCHEMAS.info, info), JSON.stringify(ajv.errors));
   const text = JSON.stringify(info);
-  for (const required of ["selectedOptionId", "supplemental", "idempotencyKey"]) assert.ok(text.includes(required), `Ordinary info is missing ${required}`);
+  for (const required of ["expectedRevision", "supplemental", "idempotencyKey"]) assert.ok(text.includes(required), `Ordinary info is missing ${required}`);
   const help = await rpc(client, "info", { locale, view: "client_guide" });
   assert.equal(help.ok, true);
   for (const required of ["no_purchase", "expectedRevision", "searchEffort", "pillCountAtLeast"]) assert.ok(String(help.clientGuideText).includes(required), `Tools-only guide is missing ${required}`);
   const guide = readContractResource(CLIENT_GUIDE_URI); assert.ok(guide);
-  assert.ok(guide.contents[0]!.text.includes("selectedOptionId"));
+  assert.ok(guide.contents[0]!.text.includes("expectedRevision"));
   for (const example of CLIENT_EXAMPLES) assert.ok(ajv.validate(AGENTIC_TOOL_SCHEMAS[example.tool], example.arguments), example.name);
   const schema = await rpc(client, "info", { locale, view: "plan_schema" });
   assert.equal(schema.ok, true); assert.equal(JSON.parse(String(schema.planSchemaJson)).anyOf.length, 5);

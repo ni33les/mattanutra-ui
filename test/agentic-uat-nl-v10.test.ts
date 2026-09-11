@@ -68,9 +68,9 @@ function assertReadyPlan(result: Record<string, unknown>, label: string) {
   assert.equal(Array.isArray(result.basket) && (result.basket as unknown[]).length > 0, true, label);
   assert.equal(Array.isArray(result.coverage), true, label);
   assert.equal(result.orderSchedule !== undefined, true, label);
-  const selected = result.selected as { optionId?: string } | undefined;
+  const selected = result.selected as { candidateKey?: string } | undefined;
   assert.equal(
-    typeof (selected?.optionId ?? result.optionId) === "string",
+    typeof (selected?.candidateKey ?? result.candidateKey) === "string",
     true,
     label
   );

@@ -12,14 +12,14 @@ export const DECISION_INGREDIENT_SCHEMA = o({ ingredientId: id, name: str, unit:
   productIds: list(id), targetBasis: p(e(["total_daily", "supplemental"] as const)), existing: p(intake), gap: p(n(num)), excess: p(n(num)), advice: p(list(INGREDIENT_ADVICE_SCHEMA)) });
 const product = o({ productId: id, name: str, imageUrl: { ...n(str), description: "Recorded product image URL (absolute HTTPS), or null when unavailable. Preserve the association with this product; never infer a replacement." }, productUrl: n(str), quantity: num, unitPrice: n(money), lineTotal: n(money),
   servingsPerDay: num, dailyQuantity: n(o({ amount: num, unit: str })), supplyDays: n(num) });
-const choice = o({ optionId: id, roles: list(str), summary: o({ text: str, pillCount: n(num), pillCountAtLeast: p(num), productCount: Type.Integer({ minimum: 0 }),
+const choice = o({ roles: list(str), summary: o({ text: str, pillCount: n(num), pillCountAtLeast: p(num), productCount: Type.Integer({ minimum: 0 }),
   goodsPrice: n(money), goodsPriceAtLeast: p(money), coveragePercent: n(num), coverageAtLeastPercent: p(num), ingredientDataComplete: Type.Boolean(), deliveryPrice: p(n(money)) }),
   ingredients: list(DECISION_INGREDIENT_SCHEMA), products: list(product) });
 const base = { ok: Type.Literal(true), planHandle: id, revision: Type.Integer({ minimum: 1 }), summary: str };
 export const PROCESSING_DECISION_SCHEMA = o({ ...base, status: Type.Literal("processing"), nextAction: Type.Literal("poll_plan"), pollAfterSeconds: Type.Number({ exclusiveMinimum: 0 }) });
 export const FAILED_DECISION_SCHEMA = o({ ...base, status: Type.Literal("failed"), nextAction: Type.Literal("change_request") });
 export const READY_DECISION_SCHEMA = o({ ...base, status: e(["ready", "needs_input", "no_purchase"] as const), currency: p(str), scoring: o({ profile: e(["best_match", "best_coverage", "fewest_pills", "lowest_cost"] as const), weights: o({ pills: p(Type.Number({ minimum: 0, maximum: 2 })), products: p(Type.Number({ minimum: 0, maximum: 2 })), price: p(Type.Number({ minimum: 0, maximum: 2 })), servings: p(Type.Number({ minimum: 0, maximum: 2 })), nutrients: p(Type.Record(Type.String(), Type.Number({ minimum: 0, maximum: 2 }))) }) }),
-  recommendedOptionId: n(id), selectedOptionId: n(id), choices: Type.Array(choice, { maxItems: 1, description: "One current recommendation, never an alternative menu. Empty only when no targets remain. Refine weights to receive the next recommendation." }), nextAction: e(["confirm_with_user", "execute", "answer_questions", "change_request", "no_purchase", "replenish_later"] as const),
+  choices: Type.Array(choice, { maxItems: 1, description: "One current recommendation, never an alternative menu. Empty only when no targets remain. Refine weights to receive the next recommendation." }), nextAction: e(["confirm_with_user", "execute", "answer_questions", "change_request", "no_purchase", "replenish_later"] as const),
   questions: p(list(o({ questionId: id, prompt: str, choices: list(o({ choice: str, label: str })) }))), refreshRequired: p(Type.Boolean()), nextReplenishmentDay: p(num) });
 export const SIMPLE_PLAN_SUCCESS_SCHEMA = Type.Union([PROCESSING_DECISION_SCHEMA, FAILED_DECISION_SCHEMA, READY_DECISION_SCHEMA]);
 export type SimplePlanDecision = Static<typeof SIMPLE_PLAN_SUCCESS_SCHEMA>;

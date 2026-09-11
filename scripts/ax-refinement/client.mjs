@@ -48,15 +48,15 @@ export async function refinementJourney({ rpc, request, discovery = "tools_only"
       idempotencyKey: `${key}-continued`, requestPatch: { targets: request.targets.filter(row => row.name === "Vitamin D3") } }));
     assert.equal(plan.status, "no_purchase"); assert.equal(plan.purchaseRequiredNow, false);
     assert.equal(plan.operationalDecision.nextAction, "replenish_later");
-    assert.equal(plan.compactDecision.highlightedAlternativeOptionId, null);
+    assert.equal(plan.compactDecision.highlightedAlternativeCandidateKey, null);
   } else {
-    const pointer = plan.compactDecision?.highlightedAlternativeOptionId;
+    const pointer = plan.compactDecision?.highlightedAlternativeCandidateKey;
     if (pointer) {
-      const alternative = plan.options.find(row => row.optionId === pointer);
+      const alternative = plan.options.find(row => row.candidateKey === pointer);
       assert.ok(alternative?.purchaseEligible && alternative.basket.length && alternative.coveragePercent > 0);
       plan = await complete(await call("plan", { operation: "select", planHandle: plan.planHandle, expectedRevision: plan.revision,
-        idempotencyKey: `${key}-select`, optionId: pointer }));
-      assert.equal(plan.optionId, pointer);
+        idempotencyKey: `${key}-select`, candidateKey: pointer }));
+      assert.equal(plan.candidateKey, pointer);
     }
     const product = plan.basket[0] ?? plan.options.flatMap(row => row.basket)[0];
     assert.ok(product, "Real exploratory profile must expose an eligible product");
@@ -68,7 +68,7 @@ export async function refinementJourney({ rpc, request, discovery = "tools_only"
       idempotencyKey: `${key}-exclude`, requestPatch: { requirements: { productDoses: [], excludeProductIds: [product.productId], maxDailyPills: null, maxPriceMinor: null, maxProductCount: null } } }));
     for (const option of plan.options) assert.equal(option.basket.some(row => row.productId === product.productId), false);
     const stale = await call("plan", { operation: "select", planHandle: plan.planHandle, expectedRevision: baseRevision,
-      idempotencyKey: `${key}-stale`, optionId: original.optionId ?? original.options[0].optionId });
+      idempotencyKey: `${key}-stale`, candidateKey: original.candidateKey ?? original.options[0].candidateKey });
     assert.equal(stale.ok, false); assert.equal(stale.error.reasonCode, "stale_revision");
     const latest = await complete(await call("plan", { operation: "get", planHandle: plan.planHandle }));
     assert.equal(latest.revision, plan.revision);

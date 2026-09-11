@@ -44,7 +44,7 @@ function intentState(
     locale: "en",
     medicationCodes: [],
     optimization: "lowest_cost",
-    pinnedOptionId: null,
+    pinnedCandidateKey: null,
     profile: { ageYears: 35, lifeStage: "adult", sex: "female" },
     requirements: {},
     safetyAcknowledgement: null,
@@ -250,7 +250,7 @@ describe("Slice 5 agent explanation safety and determinism", () => {
       option: recommended,
       safetyState: published.acknowledgementStatus ?? published.status ?? ""
     });
-    assert.equal(explanation.recommendedOptionId, expected.recommendedOptionId);
+    assert.equal(explanation.recommendedCandidateKey, expected.recommendedCandidateKey);
     assert.ok(Array.isArray(explanation.purchases));
     assert.ok((explanation.purchases as unknown[]).length >= 1);
     assert.deepEqual(
@@ -492,7 +492,7 @@ describe("Slice 5 agent explanation safety and determinism", () => {
     for (const outcome of [pending, wrong, ok]) {
       assert.equal(outcome.published.status, "ready");
       assert.ok(outcome.published.safetyGuidance?.some(item => item.code === "medication_interaction" && item.action === "review"));
-      assert.equal(outcome.published.optionId, pending.published.optionId);
+      assert.equal(outcome.published.candidateKey, pending.published.candidateKey);
     }
   });
 

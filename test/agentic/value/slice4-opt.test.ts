@@ -33,7 +33,7 @@ function intentState(
     locale: "en",
     medicationCodes: [],
     optimization: "lowest_cost",
-    pinnedOptionId: null,
+    pinnedCandidateKey: null,
     profile: { ageYears: 35, lifeStage: "adult", sex: "female" },
     requirements: {},
     safetyAcknowledgement: null,
@@ -274,16 +274,16 @@ describe("Slice 4 Pareto relevance burden and labels", () => {
     const options = optionsOf(result);
     const derived = oracleLabelRoles(options);
     assert.ok(derived.requestedObjective);
-    assert.equal(derived.recommended?.optionId, derived.requestedObjective.optionId);
+    assert.equal(derived.recommended?.candidateKey, derived.requestedObjective.candidateKey);
     const recommended = options.find((item) => item.recommended);
     assert.ok(recommended);
-    assert.equal(recommended.optionId, derived.recommended?.optionId);
+    assert.equal(recommended.candidateKey, derived.recommended?.candidateKey);
     assert.equal(recommended.role, "requested_objective");
     for (const option of options) {
-      const expectedRole = derived.byOptionId.get(option.optionId);
+      const expectedRole = derived.byCandidateKey.get(option.candidateKey);
       assert.ok(expectedRole);
       assert.equal(option.role, expectedRole);
-      assert.deepEqual(option.roles, derived.rolesByOptionId.get(option.optionId));
+      assert.deepEqual(option.roles, derived.rolesByCandidateKey.get(option.candidateKey));
     }
     assert.equal(derived.noDistinctAlternative, options.length === 1);
     assert.equal(

@@ -58,7 +58,7 @@ try {
     await sql`insert into public.product_recommendation_runs (catalogue_revision, plan_id, assessment_revision, generation_locale, generator_version, selection_revision, diagnostics)
       values ((select revision from public.catalogue_runtime_revision where singleton=true), ${input.planId}::uuid, ${generation.revision}, ${locale}, ${FUNNEL_GENERATOR_VERSION},
         coalesce((select revision from public.assessment_product_preferences where plan_id = ${input.planId}::uuid), 0),
-        '{"stackPreference":"balanced","matching":{"operationalStatus":"no_purchase","selectedOptionId":null,"options":[],"alternativeSearch":{"status":"not_needed","reason":"No purchase fixture"}}}')`;
+        '{"stackPreference":"balanced","matching":{"operationalStatus":"no_purchase","selectedCandidateKey":null,"options":[],"alternativeSearch":{"status":"not_needed","reason":"No purchase fixture"}}}')`;
     await sql`update public.tasks set status = 'completed' where plan_id = ${input.planId}::uuid and task_type in ('generate_supplement_guidance','generate_product_recommendations')`;
     output = { ready: true };
   } else if (input.action === "fulfill") {
@@ -75,7 +75,7 @@ try {
   } else if (input.action === "checkoutSelection") {
     try {
       const rows = await currentWebCheckoutRecommendations(sql, { planId: input.planId, locale,
-        recommendationRunId: input.runId, optionId: input.optionId, selectedItemIds: input.selectedItemIds,
+        recommendationRunId: input.runId, candidateKey: input.candidateKey, selectedItemIds: input.selectedItemIds,
         assessmentRevision: input.assessmentRevision, selectionRevision: input.selectionRevision });
       output = { allowed: true, productIds: rows.map(row => row.product_id) };
     } catch (error) {

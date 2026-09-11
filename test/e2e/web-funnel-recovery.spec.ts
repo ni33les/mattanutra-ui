@@ -125,7 +125,7 @@ for (const locale of ["en", "th", "zh-CN"] as const) {
         if (Array.isArray(value)) { value.forEach(visit); return; }
         if (!value || typeof value !== "object") return;
         const row = value as Record<string, unknown>;
-        if (row.optionId && Array.isArray(row.productIds) && Array.isArray(row.preferences)) {
+        if (row.candidateKey && Array.isArray(row.productIds) && Array.isArray(row.preferences)) {
           row.dailyPills = null;
           for (const preference of row.preferences as Array<Record<string, unknown>>) {
             if (preference.kind === "daily_pills") Object.assign(preference, { actual: null, complete: false, delta: null,
@@ -146,13 +146,13 @@ for (const locale of ["en", "th", "zh-CN"] as const) {
     await expect(page.getByTestId("matching-option")).toHaveCount(0);
     // Previously issued checkout URLs remain valid even though reveal no longer lists alternatives.
     const params = new URLSearchParams({ plan: seeded.planId, selected: scenario.alternative.productIds.join(","),
-      option: scenario.alternative.optionId, run: seeded.runId, revision: "1", selectionRevision: "0" });
+      option: scenario.alternative.candidateKey, run: seeded.runId, revision: "1", selectionRevision: "0" });
     await expect(page.getByRole("checkbox", { name: /acknowledge|รับทราบ|确认风险/i })).toHaveCount(0);
     await page.goto(`/${locale}/basket/checkout?${params}`);
     await expect(page).toHaveURL(/\/basket\/checkout\?/);
     await expect(page.locator('input[name="customerName"]').first()).toBeVisible();
     const selection = { action: "checkoutSelection", locale, planId: seeded.planId, runId: seeded.runId,
-      optionId: scenario.alternative.optionId, selectedItemIds: scenario.alternative.productIds, assessmentRevision: 1, selectionRevision: 0 };
+      candidateKey: scenario.alternative.candidateKey, selectedItemIds: scenario.alternative.productIds, assessmentRevision: 1, selectionRevision: 0 };
     expect(await fixture(selection)).toEqual({ allowed: true, productIds: scenario.alternative.productIds });
 
     await page.unroute("**/formulation?locale=*&products=1");

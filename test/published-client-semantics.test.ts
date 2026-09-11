@@ -62,7 +62,7 @@ it("keeps UUID business IDs and non-support thread IDs meaningful", () => {
   for (const make of [
     (id: string) => ({ id }),
     (id: string) => ({ thread: [{ id, body: "A business thread" }] }),
-    (id: string) => ({ productId: id, optionId: id }),
+    (id: string) => ({ productId: id, candidateKey: id }),
     (id: string) => ({ supportHandle: "cap_support", caseReference: "tkt_case", thread: [{ id: "business-id" }], business: { id } })
   ]) assert.notDeepEqual(normalize(make(left), endpoint), normalize(make(right), endpoint));
 });
@@ -81,7 +81,7 @@ it("preserves distinct URL-only checkout capabilities while normalizing generate
 });
 
 it("V5-CLIENT-05 acceptance retains option roles, eligibility, physical quantities and search results", () => {
-  const baseline = { options: [{ optionId: "opt-current", roles: ["closest_dose", "simpler"], purchaseEligible: true,
+  const baseline = { options: [{ candidateKey: "opt-current", roles: ["closest_dose", "simpler"], purchaseEligible: true,
     basket: [{ productId: "p", servingsPerDay: 0.5, administration: { route: "oral", physicalUnit: "capsule", unitsPerServing: 2, doseIncrement: 1, provenance: { status: "verified", verifiedAt: "2026-09-01T00:00:00Z" } } }] }],
     searchSummary: { effort: "expanded", complete: false, canExpand: false, expansionAttempts: 64000, expansionBudget: 64000 },
     coverage: [{ currentAmount: 100, deliveredAmount: 50, remainingGap: 50, intakeCertainty: "unknown" }], locale: "zh-CN" };

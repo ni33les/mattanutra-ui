@@ -10,7 +10,7 @@ import {
   impliedOmegaPreference,
   MATCHER_VERSION,
   match,
-  optionIdFor,
+  candidateKeyFor,
   summarizeRejections
 } from "@/lib/matcher";
 import {
@@ -886,7 +886,7 @@ function toStackOption(
     includedTargetIds,
     matcherVersion: MATCHER_VERSION,
     omittedTargetIds,
-    optionId: optionIdFor(basket.variantIds),
+    candidateKey: candidateKeyFor(basket.variantIds),
     reason: basket.reason,
     recommended: Boolean(basket.recommended) || basket === recommendedBasket,
     ...(retainedCurrent.length > 0 ? { retainedCurrent } : {}),
@@ -1106,7 +1106,7 @@ export function matcherTelemetryFor(input: Readonly<{
         .filter((item) => item.reason === "not_in_catalogue")
         .map((item) => item.name)
     ],
-    selectedOptionId: input.selected?.optionId ?? null,
+    selectedCandidateKey: input.selected?.candidateKey ?? null,
     ...(input.lossCertificates && input.lossCertificates.length > 0
       ? { lossCertificates: input.lossCertificates }
       : {}),

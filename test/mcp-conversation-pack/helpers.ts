@@ -8,7 +8,8 @@ import { runtime } from "../ax-refinement/helpers.ts";
 import { issueCapability } from "../../lib/agentic/capabilities.ts";
 
 export function d3Fixture(): PlanSuccessWire {
-  return JSON.parse(readFileSync(new URL("./d3-fixture.json", import.meta.url), "utf8"));
+  // Preserve the historical wire capture; adapt its private basket keys only for current internal fixtures.
+  return JSON.parse(readFileSync(new URL("./d3-fixture.json", import.meta.url), "utf8"), (_key, value) => value && typeof value === "object" && !Array.isArray(value) ? Object.fromEntries(Object.entries(value).map(([key, item]) => [key.replace(/OptionId/g, "CandidateKey").replace(/optionId/g, "candidateKey"), item])) : value);
 }
 // An in-memory committed record for presentation tests, not a reconstructed
 // historical matching run. Public products, doses and prices are frozen above.
@@ -17,7 +18,7 @@ export function internalFixture(): PlanResult {
   const options = wire.options!.map(option => ({ ...option, basket: option.basket,
     dailyPills: option.stackSummary.totalDailyPills, totalPriceMinor: option.stackSummary.totalPriceMinor,
     snapshotId: "presentation-fixture", matcherVersion: "unchanged", safety: { guidance: [] } })) as unknown as StackOption[];
-  const selected = options.find(option => option.optionId === wire.optionId); assert.ok(selected?.basket.length);
+  const selected = options.find(option => option.candidateKey === wire.candidateKey); assert.ok(selected?.basket.length);
   return { status: "ready", summary: wire.summary, selected, alternatives: options.filter(option => option !== selected),
     basket: selected.basket, coverage: selected.coverage, safetyGuidance: [], questions: [], changeSummary: [], unmetRequirements: [],
     requestSnapshot: aug25PlanState(), contractVersion: AGENTIC_CONTRACT_VERSION, matcherTelemetry: { snapshotId: "presentation-fixture", matcherVersion: "unchanged" }

@@ -12,7 +12,7 @@ const context = JSON.parse(readFileSync(new URL('./fixtures/reported-client-cont
 test('PRACTICAL-REPORTED-01 historical prices, unknown pills and 625 labelled servings remain immutable evidence', () => {
   for (const row of manifest.files) assert.equal(createHash('sha256').update(readFileSync(row.file)).digest('hex'), row.sha256);
   assert.equal(manifest.environment, 'dev'); assert.equal(frozen.snapshot.products.length, 154);
-  const selected = frozen.runs[0].diagnostics.matching.options.find(row => row.optionId === frozen.runs[0].diagnostics.matching.selectedOptionId);
+  const selected = frozen.runs[0].diagnostics.matching.options.find(row => row.candidateKey === frozen.runs[0].diagnostics.matching.selectedCandidateKey);
   assert.ok(selected); assert.equal(selected.dailyPills, null); assert.equal(selected.priceMinor, 507900);
   assert.equal(selected.productIds.length, 10); assert.ok(selected.dailyServings.includes(625));
 });
@@ -24,7 +24,7 @@ test('PRACTICAL-REPORTED-02 the strong web profile selects lower overall burden 
       ...context, stackPreference: 'balanced', countryCode: 'TH', catalogueFingerprint: frozen.snapshot.catalogueVersion });
     const matching = result.diagnostics.matching;
     assert.ok(matching && matching.options.length > 1);
-    const selected = matching.options.find(row => row.optionId === matching.selectedOptionId);
+    const selected = matching.options.find(row => row.candidateKey === matching.selectedCandidateKey);
     assert.ok(selected?.overallScore && selected.productIds.length > 0);
     assert.equal(selected.overallScore.profile.importance.maxDailyPills, 'strong');
     assert.ok(selected.overallScore.preferences.maxDailyPills.actualLowerBound < 16);

@@ -11,7 +11,7 @@ import type { SafetyGuidance } from '../../lib/agentic/plan/types.ts';
 beforeEach(installGoldCatalogue); afterEach(uninstallGoldCatalogue);
 type Runtime = ReturnType<typeof createAgenticRuntime>;
 async function call(app:Runtime, name:string, arguments_:unknown) {
-  if (name === 'evidence') return evidenceTool({ ...app, ...(arguments_ as {planHandle:string;expectedRevision:number;optionId:string;ingredientId?:string}) });
+  if (name === 'evidence') return evidenceTool({ ...app, ...(arguments_ as {planHandle:string;expectedRevision:number;ingredientId?:string}) });
   const reply=await handleCompletedJsonRpc(app,{id:1,method:'tools/call',params:{name,arguments:arguments_}});
   assert.ok(reply?.result?.structuredContent,JSON.stringify(reply));return reply.result.structuredContent as Record<string,unknown>;
 }
@@ -30,7 +30,7 @@ test('AE-06 AE-07 AE-08 AX2-01 AX2-02 unassessed context adds no unsolicited war
   const app=createAgenticRuntime();
   const created=await call(app,'plan',{...request,medicationCodes:['warfarin'],conditionCodes:['diabetes']});assert.equal(created.ok,true);
   assert.doesNotMatch(String(created.summary),/not been assessed|cleared|medically approved/i);assert.doesNotMatch(JSON.stringify(created),/checkoutUrl|paymentIntent|orderHandle|feedbackInvitation|acknowledge_safety/);
-  assert.equal(created.selectedOptionId,null);assert.equal(created.nextAction,'confirm_with_user');
+  assert.ok(!('selectedCandidateKey' in created));assert.equal(created.nextAction,'confirm_with_user');
   assert.deepEqual(await call(app,'plan',{planHandle:created.planHandle}),created);
 });
 test('AE-09 AX4-06 AX6-03 quantified exposure remains 1104 without unsolicited interaction or missing-reference advice',()=>{
@@ -50,8 +50,8 @@ test('B-SECURITY-01 shared-store principal isolation protects plan, internal fac
   const alice=createAgenticRuntime({scope:{environment:'dev',tenantScope:'mattanutra',principalScope:'alice'}});
   const bob=createAgenticRuntime({config:alice.config,store:alice.store,scope:{...alice.scope,principalScope:'bob'}});
   const plan=await call(alice,'plan',request);assert.equal(plan.ok,true);
-  const choice=(plan.choices as Array<{optionId:string;ingredients:Array<{ingredientId:string}>}>)[0];assert.ok(choice?.ingredients.length);
-  for(const [tool,args]of [['plan',{planHandle:plan.planHandle}],['evidence',{planHandle:plan.planHandle,expectedRevision:plan.revision,optionId:choice.optionId,ingredientId:choice.ingredients[0].ingredientId}],['feedback',{planHandle:plan.planHandle,expectedRevision:plan.revision,consentConfirmed:true,idempotencyKey:'retained-isolation-feedback',summary:'Not mine'}]] as const){
+  const choice=(plan.choices as Array<{ingredients:Array<{ingredientId:string}>}>)[0];assert.ok(choice?.ingredients.length);
+  for(const [tool,args]of [['plan',{planHandle:plan.planHandle}],['evidence',{planHandle:plan.planHandle,expectedRevision:plan.revision,ingredientId:choice.ingredients[0].ingredientId}],['feedback',{planHandle:plan.planHandle,expectedRevision:plan.revision,consentConfirmed:true,idempotencyKey:'retained-isolation-feedback',summary:'Not mine'}]] as const){
     const denied=await call(bob,tool,args);assert.equal(denied.ok,false);assert.equal((denied.error as {reasonCode:string}).reasonCode,'not_found');
   }
   assert.deepEqual(await call(alice,'plan',{planHandle:plan.planHandle}),plan);

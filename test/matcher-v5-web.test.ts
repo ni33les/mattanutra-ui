@@ -77,7 +77,7 @@ test("WEB6-02 useful commercial alternatives remain visible when health-concern 
  const peer = recommendWithMatcher({ ...input, candidates: [{ ...candidate(names[0], 80), id: "cheaper", priceAmount: 1 }] });
  assert.equal(primary.diagnostics.matching?.alternativeSearch?.status, "not_needed");
  const merged = mergeWebRetailerAlternatives(primary, [peer]);
- assert.equal(merged.diagnostics.matching?.selectedOptionId, primary.diagnostics.matching?.selectedOptionId);
+ assert.equal(merged.diagnostics.matching?.selectedCandidateKey, primary.diagnostics.matching?.selectedCandidateKey);
  assert.deepEqual(merged.recommendations.map(row => row.product.id), ["exact"]);
  assert.ok(merged.diagnostics.matching?.options.some(option => option.productIds[0] === "cheaper" && option.roles?.includes("lower_cost")));
  assert.equal(merged.diagnostics.matching?.options.find(option => option.productIds[0] === "cheaper")?.coveragePercent, 80);
@@ -96,12 +96,12 @@ test("WEB6-03 a better retailer trade-off removes an outclassed unlabelled optio
  const peer = recommendWithMatcher({ ...input, candidates: [{ ...candidate("alpha", 80), id: "better-cheaper", priceAmount: 1 }] });
  const before = primary.diagnostics.matching!;
  assert.ok(before.options.some(option => option.productIds.includes("earlier-cheaper") && option.roles?.includes("lower_cost")));
- const selectedBefore = before.options.find(option => option.optionId === before.selectedOptionId)!;
+ const selectedBefore = before.options.find(option => option.candidateKey === before.selectedCandidateKey)!;
  const merged = mergeWebRetailerAlternatives(primary, [peer]);
  const after = merged.diagnostics.matching!;
- assert.equal(after.selectedOptionId, before.selectedOptionId);
+ assert.equal(after.selectedCandidateKey, before.selectedCandidateKey);
  assert.deepEqual(merged.recommendations, primary.recommendations);
- const selectedAfter = after.options.find(option => option.optionId === after.selectedOptionId)!;
+ const selectedAfter = after.options.find(option => option.candidateKey === after.selectedCandidateKey)!;
  assert.ok(selectedAfter.roles?.includes("closest_dose"));
  assert.equal(selectedAfter.priceMinor, 1000);
  assert.deepEqual(selectedAfter.dailyServings, selectedBefore.dailyServings);

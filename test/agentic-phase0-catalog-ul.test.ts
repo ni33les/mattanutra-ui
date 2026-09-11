@@ -249,7 +249,7 @@ describe("Phase 0 catalog-sourced upper limits", () => {
       coveragePercent: 50,
       dailyPills: 1,
       matcherVersion: "pareto-hybrid-1",
-      optionId: "opt_overlap",
+      candidateKey: "opt_overlap",
       reason: "test",
       snapshotId: "snap_phase0_ul",
       totalPriceMinor: 120
@@ -326,7 +326,7 @@ describe("Phase 0 catalog-sourced upper limits", () => {
       coveragePercent: 175,
       dailyPills: 1,
       matcherVersion: "pareto-hybrid-1",
-      optionId: "opt_exact",
+      candidateKey: "opt_exact",
       reason: "test",
       snapshotId: "snap_phase0_ul",
       totalPriceMinor: 120

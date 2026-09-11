@@ -210,7 +210,7 @@ async function prepareCheckout(input: Parameters<typeof executeTool>[0], plan: P
       },
       planRevision: plan.currentRevision,
       safetyGuidanceIds: result.safetyGuidance.map((item) => item.guidanceId),
-      selectedOptionId: selected.optionId,
+      selectedCandidateKey: selected.candidateKey,
       shippingMinor: payable.shippingMinor,
       snapshotId: selected.snapshotId,
       subtotalMinor: payable.subtotalMinor,
@@ -537,7 +537,7 @@ async function executeFresh(
     }
 
     if (!planContractCompatible(result.contractVersion)) return businessError({ reasonCode: "not_found", message: "Not found.", fieldPath: "planHandle" });
-    if (result.requestSnapshot.scoring && !result.requestSnapshot.pinnedOptionId) return businessError({ reasonCode: "plan_not_ready", fieldPath: "planHandle", message: "Select a returned option with the current revision before checkout." });
+    if (result.requestSnapshot.scoring && !result.requestSnapshot.pinnedCandidateKey) return businessError({ reasonCode: "plan_not_ready", fieldPath: "planHandle", message: "Confirm the current recommendation with planHandle, expectedRevision and a new idempotencyKey before checkout." });
     if (revision.status !== "ready" || !snapshot) return executeError(locale, "plan_not_ready");
 
     const selected = result.selected;
@@ -567,7 +567,7 @@ async function executeFresh(
       });
     }
 
-    if (!prepared || prepared.order.frozenPlan.selectedOptionId !== selected.optionId) return executeError(locale, "plan_not_ready");
+    if (!prepared || prepared.order.frozenPlan.selectedCandidateKey !== selected.candidateKey) return executeError(locale, "plan_not_ready");
     if (snapshot.runtimeRevision !== undefined && (!store.isCatalogueRevisionCurrent || !await store.isCatalogueRevisionCurrent(snapshot.runtimeRevision))) {
       return businessError({ fieldPath: "expectedRevision", reasonCode: "availability_changed", message: "Catalogue facts changed while checkout was prepared. Refresh the unexecuted plan before creating checkout.", nextActions: ["refresh_plan"] });
     }

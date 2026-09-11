@@ -7,7 +7,7 @@ import { sampleRetailProduct, sampleValueSnapshot } from "./agentic/value/sample
 
 const snapshot = sampleValueSnapshot();
 const d3 = snapshot.supplements[2]!;
-const state: CanonicalPlanState = { acceptedGaps: [], conditionCodes: [], currency: "THB", currentSupplements: [], destinationCountry: "TH", leftovers: [], locale: "en", medicationCodes: ["apixaban"], optimization: "lowest_cost", pinnedOptionId: null, profile: { ageYears: 35, lifeStage: "adult" }, requirements: {}, safetyAcknowledgement: null, targets: [{ name: d3.name, supplementId: d3.supplementId, amount: 1000, unit: "IU" }] };
+const state: CanonicalPlanState = { acceptedGaps: [], conditionCodes: [], currency: "THB", currentSupplements: [], destinationCountry: "TH", leftovers: [], locale: "en", medicationCodes: ["apixaban"], optimization: "lowest_cost", pinnedCandidateKey: null, profile: { ageYears: 35, lifeStage: "adult" }, requirements: {}, safetyAcknowledgement: null, targets: [{ name: d3.name, supplementId: d3.supplementId, amount: 1000, unit: "IU" }] };
 function options(unknownDuration = false) {
   const make = (id: string, price: number, omega: boolean) => sampleRetailProduct({ id, title: `D3 ${id}`, name: d3.name, supplementId: d3.supplementId, amount: 1000, unit: "IU", unitPriceMinor: price, form: "capsule", servingLabel: unknownDuration ? "1 capsule" : "1 capsule; 30 capsules per bottle", ...(omega ? { extraFacts: [{ name: "Omega-3", supplementId: "sup_omega3", normalizedName: "omega-3", amount: 1000, unit: "mg", confidence: "high" as const, itemType: "supplement" as const }] } : {}) });
   return matchPlan({ state, snapshot: { ...snapshot, products: [make("eeeeeeee-eeee-eeee-eeee-eeeeeeeeeee1", 10000, true), make("eeeeeeee-eeee-eeee-eeee-eeeeeeeeeee2", 11000, false)] } });

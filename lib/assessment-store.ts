@@ -1,6 +1,6 @@
+import { readStoredMatching } from "@/lib/recommendation-storage";
 import { hasHealthScoreAiCopy } from "@/lib/healthscore-readiness";
 export { hasHealthScoreAiCopy } from "@/lib/healthscore-readiness";
-import type { ProductRecommendationSummary } from "@/lib/formulation-types";
 import { getFunnelReadiness } from "@/lib/funnel-readiness";
 import { assessmentInputHash, FUNNEL_GENERATOR_VERSION, getRevisionHealthScore } from "@/lib/assessment-revisions";
 import { withDatabaseTransaction, deferUntilDatabaseCommit } from "@/lib/db";
@@ -2246,7 +2246,7 @@ export async function getStoredFormulationResult(
           ? { maxProducts }
           : {}),
         productRecommendations: {
-          matching: asRecord(diagnostics).matching as ProductRecommendationSummary["matching"],
+          matching: readStoredMatching(asRecord(diagnostics).matching),
           ...(generatedAt ? { generatedAt } : {}),
           matchedCount: coverage.recommendations.length,
           needsCount:
@@ -2399,7 +2399,7 @@ export async function getStoredFormulationResult(
     ...(productRecommendationStatus
       ? {
           productRecommendations: {
-            matching: asRecord(row.product_recommendation_diagnostics).matching as ProductRecommendationSummary["matching"],
+            matching: readStoredMatching(asRecord(row.product_recommendation_diagnostics).matching),
             ...(productRecommendationGeneratedAt
               ? { generatedAt: productRecommendationGeneratedAt }
               : {}),

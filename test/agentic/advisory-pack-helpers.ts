@@ -11,7 +11,7 @@ export async function rejectObsoleteHealthAnswer(
   assert.equal(rejected.ok, false);
   assert.equal((rejected.error as Record<string, unknown>)?.reasonCode, "invalid_request");
   const after = await harness.call("plan", { operation: "get", responseView: "full", planHandle: args.planHandle });
-  for (const key of ["revision", "status", "optionId", "planHandle", "safetyGuidance", "medicationCodes", "conditionCodes"]) {
+  for (const key of ["revision", "status", "candidateKey", "planHandle", "safetyGuidance", "medicationCodes", "conditionCodes"]) {
     assert.deepEqual(after[key], before[key], `Rejected health answer mutated ${key}`);
   }
   assert.equal(after.acknowledgementStatus, "not_required");

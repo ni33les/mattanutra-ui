@@ -133,12 +133,12 @@ export type ProductRecommendationDiagnostics = Readonly<{
   catalogueFingerprint?: string;
   matching?: Readonly<{
     operationalStatus: "ready" | "review_options" | "no_purchase";
-    selectedOptionId: string | null;
+    selectedCandidateKey: string | null;
     options: readonly Readonly<{
       preferences?: readonly import("@/lib/matcher/preferences").PreferenceAssessment[];
       roles?: readonly import("@/lib/matcher/types").ConversationalOptionRole[];
       purchaseEligible?: boolean;
-      optionId: string;
+      candidateKey: string;
       productIds: readonly string[];
       dailyServings: readonly number[];
       coveragePercent: number;

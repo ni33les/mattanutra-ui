@@ -33,12 +33,12 @@ async function domain(runtime: ReturnType<typeof makeRuntime>, value: Record<str
 }
 function choice(value: Record<string, unknown>) {
     const rows = value.choices as Array<{
-        optionId: string;
+        candidateKey: string;
         products: Array<{
             productId: string;
         }>;
     }>;
-    const selected = rows.find(row => row.optionId === value.selectedOptionId || row.optionId === value.recommendedOptionId) ?? rows[0];
+    const selected = rows.find(row => row.candidateKey === value.selectedCandidateKey || row.candidateKey === value.recommendedCandidateKey) ?? rows[0];
     assert.ok(selected);
     return selected;
 }
@@ -279,7 +279,7 @@ describe("Current flat contract and retained intake, advice and commerce invaria
         const runtime = makeRuntime();
         const created = await call(runtime, "plan", { idempotencyKey: "v4-seven-tools-plan01", ...request });
         assert.equal(created.status, "ready");
-        const selected=await call(runtime,"plan",{planHandle:created.planHandle,expectedRevision:created.revision,idempotencyKey:"v4-seven-tools-select01",selectedOptionId:choice(created).optionId});
+        const selected=await call(runtime,"plan",{planHandle:created.planHandle,expectedRevision:created.revision,idempotencyKey:"v4-seven-tools-select01"});
         await call(runtime,"feedback",{planHandle:selected.planHandle,expectedRevision:selected.revision,idempotencyKey:"v4-seven-tools-feed01",consentConfirmed:true,rating:4});
         const checkout = await call(runtime, "execute", { planHandle: created.planHandle, expectedRevision: selected.revision, idempotencyKey: "v4-seven-tools-exec01" });
         assert.equal(checkout.ok, true, JSON.stringify(checkout));

@@ -52,7 +52,7 @@ it('V5-CV-STORE-02: snapshot publication is nonlocking while stale selection ret
       assert.equal(status.status, epoch === 41 ? 'no_purchase' : 'needs_input');
       const purchase = current.options?.find(option => option.purchaseEligible && option.basket.length > 0);
       assert.ok(purchase, 'A valid above-target purchase must remain selectable');
-      const selection = { operation: 'select' as const, idempotencyKey: `cv-select-${epoch}-0001`, planHandle: current.planHandle, expectedRevision: 1, optionId: purchase.optionId };
+      const selection = { operation: 'select' as const, idempotencyKey: `cv-select-${epoch}-0001`, planHandle: current.planHandle, expectedRevision: 1, candidateKey: purchase.candidateKey };
       const admission = await planTool({ ...runtime, now: runtime.now!, payload: selection }); assert.equal(admission.ok, true);
       const op = await store.getPlanOperationByKey(`dev:mattanutra:${runtime.scope.principalScope}`, selection.idempotencyKey); assert.ok(op);
       const selected = await within(() => runAdmittedPlanOperation({ store, config, operationId: op.id }));

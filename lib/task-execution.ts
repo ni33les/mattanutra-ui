@@ -189,7 +189,7 @@ function retailerOptionSummary(option: RetailerRecommendationOption) {
 
 function selectedRetailerMatchingOption(option: RetailerRecommendationOption) {
   const matching = option.recommendations.diagnostics.matching;
-  return matching?.options.find(item => item.optionId === matching.selectedOptionId);
+  return matching?.options.find(item => item.candidateKey === matching.selectedCandidateKey);
 }
 
 function compareRetailerDoseFit(left: RetailerRecommendationOption, right: RetailerRecommendationOption) {

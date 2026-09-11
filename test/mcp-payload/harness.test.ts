@@ -38,13 +38,13 @@ test("PAY-BASE-04 normalizes only generated support identities while preserving 
     const value = { caseReference: `tkt_${digit.repeat(12)}`, messageId: first,
       orderContext: { paymentStatus: "paid", stateVersion: 2 },
       thread: [{ id: first, body: "Recorded", sequence: 1 }, { id: second, body: "Payment confirmed", sequence: 2 }] };
-    return { outcomes: [{ calls: [{ request: { params: { name: "support" } }, response: { result: toolResult(value) } }], optionId: "opt_original" }] };
+    return { outcomes: [{ calls: [{ request: { params: { name: "support" } }, response: { result: toolResult(value) } }], candidateKey: "opt_original" }] };
   };
   const a = fixture("a"), b = fixture("b");
   assert.deepEqual(semanticJourney(a), semanticJourney(b));
   assert.notEqual(a.outcomes[0].calls[0].response.result.structuredContent.caseReference, b.outcomes[0].calls[0].response.result.structuredContent.caseReference, "Raw evidence remains unchanged");
   for (const mutation of [
-    (row: typeof b) => { row.outcomes[0].optionId = "opt_changed"; },
+    (row: typeof b) => { row.outcomes[0].candidateKey = "opt_changed"; },
     (row: typeof b) => { row.outcomes[0].calls[0].response.result.structuredContent.thread[0].body = "Altered message"; },
     (row: typeof b) => { row.outcomes[0].calls[0].response.result.structuredContent.orderContext.paymentStatus = "unpaid"; },
     (row: typeof b) => { const wire = row.outcomes[0].calls[0].response.result.structuredContent; wire.messageId = wire.thread[1].id; }

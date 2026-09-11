@@ -16,7 +16,7 @@ const adviceFixture: SafetyGuidance = {
 };
 function adviceOption(guidance: readonly SafetyGuidance[]): StackOption {
   return {
-    optionId: "opt_advice_fixture", basket: [{
+    candidateKey: "opt_advice_fixture", basket: [{
       availabilityAsOf: "2026-09-07T00:00:00Z", contributionSupplementIds: ["magnesium"], currency: "THB",
       dailyPills: 1, deliveryWindow: null, fixture: true, form: "capsule", imageUrl: null,
       incidentalNutrientNames: [], incidentalNutrients: [], incompleteCommercialFacts: false,
@@ -70,7 +70,7 @@ describe("one operational decision", () => {
     assert.deepEqual(value.compactDecision?.operationalDecision, value.operationalDecision);
   });
   it("concise copy counts unresolved targets instead of claiming their names are covered", () => {
-    const selected = { ...adviceOption([]), optionId: "opt_partial_fixture", coverage: [
+    const selected = { ...adviceOption([]), candidateKey: "opt_partial_fixture", coverage: [
       ...[0, 1, 2, 3].map(index => ({ name: `Known ${index}`, status: "covered" })),
       { name: "Unavailable nutrient", status: "uncovered" }
     ] } as StackOption;
@@ -99,7 +99,7 @@ describe("one operational decision", () => {
   });
   it("uses one public status for legacy empty recommendations and their purchasable alternatives", () => {
     const nonempty = adviceOption([adviceFixture]);
-    const empty = { ...nonempty, optionId: "opt_empty", basket: [], totalPriceMinor: 0, dailyPills: 0 };
+    const empty = { ...nonempty, candidateKey: "opt_empty", basket: [], totalPriceMinor: 0, dailyPills: 0 };
     for (const alternatives of [[], [nonempty]]) {
       const projected = publicPlanFields({ alternatives, basket: [], selected: empty, status: "ready",
         coverage: [], questions: [], changeSummary: [], unmetRequirements: [], safetyGuidance: [adviceFixture], summary: "Ready to confirm this basket." });
@@ -111,7 +111,7 @@ describe("one operational decision", () => {
       assert.equal(projected.summaryKey, alternatives.length ? "plan.summary.review_options" : "plan.summary.no_purchase");
       assert.notEqual(projected.summary, "Ready to confirm this basket.");
       assert.equal(projected.compactDecision?.advice[0].threshold, 350);
-      if (alternatives.length) assert.ok(projected.options?.some(option => option.optionId === nonempty.optionId && option.purchaseEligible));
+      if (alternatives.length) assert.ok(projected.options?.some(option => option.candidateKey === nonempty.candidateKey && option.purchaseEligible));
     }
     const purchasable = publicPlanFields({ alternatives: [], basket: nonempty.basket, selected: nonempty, status: "ready",
       coverage: [], questions: [], changeSummary: [], unmetRequirements: [], safetyGuidance: [adviceFixture], summary: "Ready with dose advice." });

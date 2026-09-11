@@ -67,7 +67,7 @@ test('MCP-LIMIT-04 internal fact lookup returns only exceeded-limit findings whi
   const result = fixture([finding({ authorityUrl: 'https://example.test/limit', evidence: ['Frozen source'] }), finding({ code: 'medication_interaction', threshold: null })]);
   const { app, handle } = await storedFixture(result);
   const decision = presentDecision(result, handle, 1); assert.ok('choices' in decision);
-  const body = await evidenceTool({ ...app, planHandle: handle, expectedRevision: 1, optionId: decision.choices[0].optionId, ingredientId: 'sup_fixture' });
+  const body = await evidenceTool({ ...app, planHandle: handle, expectedRevision: 1, ingredientId: 'sup_fixture' });
   assert.ok('findings' in body);
   assert.equal(body.ok, true); assert.ok(Array.isArray(body.facts)); assert.equal(body.findings.length, 1);
   assert.equal(body.findings[0].reference, 1010); assert.equal(body.findings[0].source, 'https://example.test/limit');

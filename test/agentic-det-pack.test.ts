@@ -119,7 +119,7 @@ function planState(overrides: Partial<CanonicalPlanState> = {}): CanonicalPlanSt
     locale: "en",
     medicationCodes: [],
     optimization: "fewest_pills",
-    pinnedOptionId: null,
+    pinnedCandidateKey: null,
     profile: { ageYears: 52, lifeStage: "adult", sex: "male" },
     requirements: {},
     safetyAcknowledgement: null,
@@ -216,7 +216,7 @@ function caseShape(input: Readonly<{
     id: input.id,
     leftovers: leftoverRows(input.leftovers),
     names: [...(input.selected?.basket ?? []).map((item) => item.productName)].sort(),
-    optionId: input.selected?.optionId ?? null,
+    candidateKey: input.selected?.candidateKey ?? null,
     safety: safetyRows(input.safety),
     skus: [...(input.selected?.basket ?? []).map((item) => item.productId)].sort()
   };
@@ -323,7 +323,7 @@ function fewestPillsWins(input: Readonly<{
   if (penalty == null || !Number.isFinite(penalty) || generated.some(item => item.doseFit == null)) return false;
   if (generated.some(item => item.doseFit!.total < penalty)) return false;
   const minPills = Math.min(...generated.filter(item => item.doseFit!.total === penalty).map(item => item.dailyPills));
-  return selected.dailyPills === minPills && selected.optionId.length > 0;
+  return selected.dailyPills === minPills && selected.candidateKey.length > 0;
 }
 
 export async function pinWithoutRematch(snapshot: CatalogueSnapshot, store = createSnapshotMemoryStore(snapshot)) {
@@ -349,7 +349,7 @@ export async function pinWithoutRematch(snapshot: CatalogueSnapshot, store = cre
     store
   });
 
-  if (!("ok" in created) || created.ok !== true || !created.planHandle || !created.optionId) {
+  if (!("ok" in created) || created.ok !== true || !created.planHandle || !created.candidateKey) {
     return { pinKeptOption: false, pinWithoutRematch: false };
   }
 
@@ -370,13 +370,13 @@ export async function pinWithoutRematch(snapshot: CatalogueSnapshot, store = cre
             expectedRevision: created.revision,
             idempotencyKey: `det-pack-pin-${randomUUID()}`,
             planHandle: created.planHandle,
-            selectOptionId: created.optionId
+            selectCandidateKey: created.candidateKey
           },
     scope,
     store
   });
 
-  if (!("ok" in pinned) || pinned.ok !== true || pinned.status === "processing" || !pinned.optionId) {
+  if (!("ok" in pinned) || pinned.ok !== true || pinned.status === "processing" || !pinned.candidateKey) {
     return { pinKeptOption: false, pinWithoutRematch: false };
   }
 
@@ -385,7 +385,7 @@ export async function pinWithoutRematch(snapshot: CatalogueSnapshot, store = cre
   ).matcherTelemetry?.matchMs;
 
   return {
-    pinKeptOption: pinned.optionId === created.optionId,
+    pinKeptOption: pinned.candidateKey === created.candidateKey,
     pinWithoutRematch: rematchMs == null
   };
 }
@@ -617,7 +617,7 @@ async function runDetPackRecorded(input: DetPackCatalog): Promise<DetPackReport>
         id: "efficiency.structural",
         leftovers: [],
         names: [],
-        optionId: null,
+        candidateKey: null,
         safety: [],
         skus: []
       }

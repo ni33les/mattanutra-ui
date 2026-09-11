@@ -7,13 +7,13 @@ import { readPlanPresentation } from '../../lib/agentic/presentation/plan-read.t
 import { internalFixture, storedFixture } from '../mcp-conversation-pack/helpers.ts';
 
 const advice = webHealthAdvice({ code: 'medication_interaction', kind: 'context', ingredient: 'Omega-3', evidence: 'controlled-rule' });
-const input = { planId: '10000000-0000-4000-8000-000000000001', locale: 'en' as const, selectedItemIds: ['20000000-0000-4000-8000-000000000001'], recommendationRunId: '30000000-0000-4000-8000-000000000001', optionId: 'other', assessmentRevision: 1, selectionRevision: 0 };
+const input = { planId: '10000000-0000-4000-8000-000000000001', locale: 'en' as const, selectedItemIds: ['20000000-0000-4000-8000-000000000001'], recommendationRunId: '30000000-0000-4000-8000-000000000001', candidateKey: 'other', assessmentRevision: 1, selectionRevision: 0 };
 function database(algorithmVersion = MATCHER_VERSION) {
   const queries: string[] = [];
   const sql = async(parts: TemplateStringsArray) => { const query = parts.join('?'); queries.push(query);
     if (query.includes('catalogue_runtime_revision')) return [{ revision: 7 }];
     if (query.includes('product_recommendation_runs')) return [{ id: input.recommendationRunId, catalogue_revision: 7, selection_revision: 0, input_revision: 1, current_selection_revision: 0, excluded_product_ids: [],
-      diagnostics: { algorithmVersion, matching: { selectedOptionId: 'original', options: [{ optionId: 'other', productIds: input.selectedItemIds, advice: [advice], recommendations: [] }] } } }];
+      diagnostics: { algorithmVersion, matching: { selectedCandidateKey: 'original', options: [{ candidateKey: 'other', productIds: input.selectedItemIds, advice: [advice], recommendations: [] }] } } }];
     if (query.includes('product_recommendation_items')) return [{ product_id: input.selectedItemIds[0], rank: 1, price_amount: 123, currency: 'THB', title: 'Selected fixture' }];
     throw new Error(`Unexpected SQL: ${query}`);
   };

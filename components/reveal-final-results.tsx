@@ -1160,7 +1160,7 @@ function RevealProductsFinalSection({
   const labels = productRecommendationCopy[locale];
   const matchingCopy = webMatchingCopy[locale];
   const matching = activeProductRecommendations?.matching;
-  const selectedMatchingOption = matching?.options.find(option => option.optionId === matching.selectedOptionId);
+  const selectedMatchingOption = matching?.options.find(option => option.candidateKey === matching.selectedCandidateKey);
   const [requestedSelectionRevision, setRequestedSelectionRevision] = useState<number | null>(null);
   const [replanError, setReplanError] = useState<string | null>(null);
   const [replanning, setReplanning] = useState(false);
@@ -1345,7 +1345,7 @@ function RevealProductsFinalSection({
             selected: selectedBasketIdList.join(","),
             removed: removedBasketIdList.join(","),
             ...(activeProductRecommendations?.runId ? { run: activeProductRecommendations.runId } : {}),
-            ...(activeProductRecommendations?.matching?.selectedOptionId ? { option: activeProductRecommendations.matching.selectedOptionId } : {}),
+            ...(activeProductRecommendations?.matching?.selectedCandidateKey ? { option: activeProductRecommendations.matching.selectedCandidateKey } : {}),
             ...(result.assessmentRevision != null ? { revision: String(result.assessmentRevision) } : {}),
             ...(result.selectionRevision != null ? { selectionRevision: String(result.selectionRevision) } : {}),
           });

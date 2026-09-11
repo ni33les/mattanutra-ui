@@ -24,7 +24,7 @@ export function publicCoveragePercent(basket: ScoredBasket | null) {
   return Math.round(basket.aggregateCoverage / (COVERAGE_SCALE / 100));
 }
 
-export function optionIdFor(productIds: readonly string[]) {
+export function candidateKeyFor(productIds: readonly string[]) {
   return `opt_${sha256Hex([...productIds].sort().join("|")).slice(0, 16)}`;
 }
 

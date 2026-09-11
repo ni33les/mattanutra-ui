@@ -242,7 +242,7 @@ describe("formulation results product recommendation readiness", () => {
     const payload = result({
       productRecommendations: {
         matchedCount: 0, needsCount: 1, stackCoveragePercent: 100, stackPreference: "balanced", status: "ready",
-        matching: { operationalStatus: "no_purchase", selectedOptionId: null, options: [], alternativeSearch: { status: "not_needed", reason: "No additional product is needed." } }
+        matching: { operationalStatus: "no_purchase", selectedCandidateKey: null, options: [], alternativeSearch: { status: "not_needed", reason: "No additional product is needed." } }
       }
     });
     assert.equal(resultHasTransientEmptyProductRecommendations(payload), false);

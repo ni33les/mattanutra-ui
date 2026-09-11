@@ -37,11 +37,11 @@ async function create(dailyServings: number) {
     const created = await call(runtime, "plan", { idempotencyKey: `pack-quote-create-${dailyServings}`, ...{ destinationCountry: "TH", locale: "en", scoring: { profile: "lowest_cost" }, profile: { ageYears: 35, lifeStage: "adult" },
             requirements: {}, currentSupplements: [], targets: [{ name: d3.name, amount: 1000 * dailyServings, unit: "IU", basis: "supplemental" }] } });
     assert.equal(created.ok, true, JSON.stringify(created));
-    const choices = created.choices as Array<{ optionId: string; products: Array<{ servingsPerDay: number }>; roles: string[] }>;
+    const choices = created.choices as Array<{ candidateKey: string; products: Array<{ servingsPerDay: number }>; roles: string[] }>;
     const option = choices.find(row => row.products.length === 1 && row.products[0]!.servingsPerDay === dailyServings);
     assert.ok(option, "Exact requested bottle quantity remains an eligible returned choice");
     const plan = await call(runtime, "plan", { planHandle: created.planHandle, expectedRevision: created.revision,
-        selectedOptionId: option.optionId, idempotencyKey: `pack-quote-select-${dailyServings}` });
+         idempotencyKey: `pack-quote-select-${dailyServings}` });
     assert.equal(plan.status, "ready");
     const capability = await resolveCapability({ action: "plan.read", config: runtime.config, handle: String(plan.planHandle),
         now: new Date().toISOString(), resourceType: "plan", scope: runtime.scope, store: runtime.store });
@@ -63,7 +63,7 @@ for (const dailyServings of [1, 2, 3])
         assert.equal(item.unitPriceMinor, 48500);
         assert.equal(item.lineTotalMinor, 48500);
         assert.equal(result.selected!.totalPriceMinor, 48500);
-        const choice = (plan.choices as Array<Record<string, unknown>>).find(row => row.optionId === plan.selectedOptionId)!;
+        const choice = (plan.choices as Array<Record<string, unknown>>)[0]!;
     assert.equal(record(choice.summary).goodsPrice, 485);
 
         const dayZero = result.horizon!.orders.find(order => order.day === 0)!;

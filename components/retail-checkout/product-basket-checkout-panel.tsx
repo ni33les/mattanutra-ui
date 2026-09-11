@@ -76,7 +76,7 @@ type ProductBasketCheckoutPanelProps = Readonly<{
   selectedRetailerOrganisationId?: string | null;
   selectedItemIds: readonly string[];
   recommendationRunId?: string | null;
-  optionId?: string | null;
+  candidateKey?: string | null;
   assessmentRevision?: number | null;
   selectionRevision?: number | null;
   selectedProducts: readonly ProductBasketProduct[];
@@ -415,7 +415,7 @@ export function ProductBasketCheckoutPanel({
   removedItemIds,
   selectedRetailerOrganisationId = null,
   selectedItemIds,
-  recommendationRunId, optionId, assessmentRevision, selectionRevision,
+  recommendationRunId, candidateKey, assessmentRevision, selectionRevision,
   selectedProducts,
   shippingAmount: shippingAmountFrozen = null
 }: ProductBasketCheckoutPanelProps) {
@@ -719,7 +719,7 @@ export function ProductBasketCheckoutPanel({
           removedItemIds,
           selectedRetailerOrganisationId,
           selectedItemIds,
-          recommendationRunId, optionId, assessmentRevision, selectionRevision,
+          recommendationRunId, candidateKey, assessmentRevision, selectionRevision,
           shippingAmount:
             shippingAmountFrozen ?? activeQuotePreview.shippingAmount ?? null
         }),
@@ -785,7 +785,7 @@ export function ProductBasketCheckoutPanel({
     removedItemIds,
     selectedRetailerOrganisationId,
     selectedItemIds,
-    recommendationRunId, optionId, assessmentRevision, selectionRevision,
+    recommendationRunId, candidateKey, assessmentRevision, selectionRevision,
     shippingAmountFrozen,
     touchInvalidFields
   ]);

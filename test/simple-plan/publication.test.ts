@@ -11,7 +11,7 @@ test('SPLAN-SPEC-01/02 six tools and the plan card teach flat conversation witho
   const tools = toolList('dev'); assert.equal(tools.length, 6); assert.ok(!tools.some(row => row.name === 'evidence'));
   const plan = tools.find(row => row.name === 'plan')!;
   assert.deepEqual(plan.inputSchema, JSON.parse(JSON.stringify(AGENTIC_INPUT_SCHEMAS.plan)));
-  for (const word of ['Thailand', 'selectedOptionId', 'scoring', 'idempotencyKey', 'expectedRevision']) assert.ok(plan.description.includes(word), word);
+  for (const word of ['Thailand', 'confirms that revision without rematching', 'scoring', 'idempotencyKey', 'expectedRevision']) assert.ok(plan.description.includes(word), word);
   assert.ok(!/responseView|requestPatch|plan\(create\)|planOperation/.test(plan.description));
 });
 test('SPLAN-SPEC-03 only the current contract is published and all examples validate', () => {
@@ -24,7 +24,7 @@ test('SPLAN-SPEC-03 only the current contract is published and all examples vali
 test('SPLAN-SPEC-02 instructions and guides describe the same bounded weight/reset protocol', () => {
   for (const locale of ['en', 'th', 'zh-CN']) {
     const instructions = agenticServerInstructions('dev', locale), guide = clientGuideMarkdown(locale, 'dev');
-    assert.ok(instructions.includes('scoring')); assert.ok(guide.includes('scoring')); assert.ok(guide.includes('selectedOptionId'));
+    assert.ok(instructions.includes('scoring')); assert.ok(guide.includes('scoring')); assert.ok(guide.includes('send only planHandle, expectedRevision and a new idempotencyKey to plan'));
     assert.ok(!/responseView|requestPatch|planOperation|flexible\/normal\/strong/.test(instructions + guide));
     assert.ok(/0.*1.*2/s.test(guide));
   }

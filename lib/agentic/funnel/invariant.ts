@@ -7,7 +7,7 @@ export function planBusinessView(plan: Readonly<Record<string, unknown>>) {
     claimIds: plan.claimIds ?? [],
     compactDecision: plan.compactDecision ?? null,
     estimatedOrderTotalMinor: plan.estimatedOrderTotalMinor ?? null,
-    optionId: plan.optionId ?? null,
+    candidateKey: plan.candidateKey ?? null,
     researchVersion: plan.researchVersion ?? null,
     safetyGuidance: plan.safetyGuidance ?? [],
     shippingMinor: plan.shippingMinor ?? null,

@@ -8,7 +8,7 @@ import { matcherSafetyCeilings, setMatcherSafetyCeilings } from "../lib/matcher/
 const subjectId = "sup_magnesium_provenance";
 const state: CanonicalPlanState = {
   acceptedGaps: [], conditionCodes: [], currency: "THB", currentSupplements: [], destinationCountry: "TH",
-  leftovers: [], locale: "en", medicationCodes: [], optimization: "lowest_cost", pinnedOptionId: null,
+  leftovers: [], locale: "en", medicationCodes: [], optimization: "lowest_cost", pinnedCandidateKey: null,
   profile: { ageYears: 35, lifeStage: "adult" }, profileKnown: { ageYears: true, lifeStage: true, sex: false },
   requirements: {}, safetyAcknowledgement: null,
   targets: [{ name: "Magnesium", supplementId: subjectId, amount: 300, unit: "mg", basis: "total_daily" }]

@@ -25,11 +25,11 @@ export function ensureAssessmentProductPreferences(sql: Db, planId: string) {
   return getAssessmentProductPreferences(sql, planId, true);
 }
 
-export function requireCurrentProductSelection(input: Readonly<{ expectedAssessmentRevision?: number | null; assessmentRevision: number; expectedSelectionRevision?: number | null; selectionRevision: number; runSelectionRevision: number; expectedRunId?: string | null; runId: string; optionId?: string | null; availableOptionIds: readonly string[]; selectedIds: readonly string[]; allowedIds: readonly string[]; excludedIds: readonly string[] }>) {
+export function requireCurrentProductSelection(input: Readonly<{ expectedAssessmentRevision?: number | null; assessmentRevision: number; expectedSelectionRevision?: number | null; selectionRevision: number; runSelectionRevision: number; expectedRunId?: string | null; runId: string; candidateKey?: string | null; availableCandidateKeys: readonly string[]; selectedIds: readonly string[]; allowedIds: readonly string[]; excludedIds: readonly string[] }>) {
   if ((input.expectedAssessmentRevision != null && input.expectedAssessmentRevision !== input.assessmentRevision) ||
       (input.expectedSelectionRevision != null && input.expectedSelectionRevision !== input.selectionRevision) ||
       input.runSelectionRevision !== input.selectionRevision || (input.expectedRunId && input.expectedRunId !== input.runId) ||
-      (input.optionId && !input.availableOptionIds.includes(input.optionId))) {
+      (input.candidateKey && !input.availableCandidateKeys.includes(input.candidateKey))) {
     throw new FunnelError("Product options changed. Reload and confirm the current basket.", 409, "stale_product_selection");
   }
   if (!input.selectedIds.length || new Set(input.selectedIds).size !== new Set(input.allowedIds).size || input.selectedIds.some(id => !input.allowedIds.includes(id) || input.excludedIds.includes(id))) {

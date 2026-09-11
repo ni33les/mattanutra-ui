@@ -58,7 +58,7 @@ test('PRACTICAL-API-04 web balanced and compact use shared profiles and strong e
   try {
     for (const preference of ['balanced', 'compact'] as const) {
       const result = recommendWithMatcher({ needs: [need], candidates: [candidate(60)], stackPreference: preference, clientContext: { pillLimit: '1-3', currentSupplements: 'none' } });
-      const selected = result.diagnostics.matching?.options.find(row => row.optionId === result.diagnostics.matching?.selectedOptionId);
+      const selected = result.diagnostics.matching?.options.find(row => row.candidateKey === result.diagnostics.matching?.selectedCandidateKey);
       assert.ok(selected?.overallScore);
       assert.equal(selected.overallScore.profile.hash, resolvePracticalProfile({ selectorMode: 'web_single', optimization: preference === 'compact' ? 'fewest_pills' : 'balanced', preferenceImportance: { maxDailyPills: 'strong' } }).hash);
       assert.equal(selected.overallScore.preferences.maxDailyPills.preferred, 3);
@@ -71,7 +71,7 @@ test('PRACTICAL-API-05 monthly budget uses verified packs and preserves unknown 
   try {
     for (const pack of [60, null]) {
       const result = recommendWithMatcher({ needs: [need], candidates: [candidate(pack)], clientContext: { budgetPreference: 'u1000', currentSupplements: 'none' } });
-      const selected = result.diagnostics.matching?.options.find(row => row.optionId === result.diagnostics.matching?.selectedOptionId);
+      const selected = result.diagnostics.matching?.options.find(row => row.candidateKey === result.diagnostics.matching?.selectedCandidateKey);
       assert.ok(selected?.overallScore); const price = selected.overallScore.preferences.maxPriceMinor;
       assert.equal(selected.overallScore.profile.pricePreferenceBasis, 'monthly_30_days');
       assert.equal(price.preferred, 100000); assert.equal(price.actual, pack ? 60000 : null);
@@ -114,7 +114,7 @@ test('PRACTICAL-API-09 web and MCP share arithmetic with the explicit web produc
       const web = recommendWithMatcher({ needs: [need], candidates: [{ ...row.candidate, priceAmount: 600, selectedRetailerOrganisationId: row.sellerId }],
         stackPreference: compact ? 'compact' : 'balanced', maxProducts: 1, budgetAmount: 600,
         productDoses: [{ productId: row.candidate.id, servingsPerDay: 4 }], clientContext: { ageYears: 38, lifestage: 'adult', pillLimit: '1-3', currentSupplements: 'none' } });
-      const selected = web.diagnostics.matching?.options.find(option => option.optionId === web.diagnostics.matching?.selectedOptionId);
+      const selected = web.diagnostics.matching?.options.find(option => option.candidateKey === web.diagnostics.matching?.selectedCandidateKey);
       assert.ok(mcp.selected?.overallScore); assert.ok(selected?.overallScore);
       const { profile: webProfile, ...webScore } = selected.overallScore;
       const { profile: mcpProfile, ...mcpScore } = mcp.selected.overallScore;

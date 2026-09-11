@@ -8,7 +8,7 @@ test("AXR-ALT-01 highlights an existing positive-coverage option without changin
   const selected = choice("selected", [0], 0, 0, 0), alternatives = [choice("zero", [0]), choice("partial", [50]), choice("full", [100])];
   const original = structuredClone(alternatives);
   const compact = buildCompactDecision({ status: "no_purchase", selected, alternatives });
-  assert.equal(compact.highlightedAlternativeOptionId, "full");
+  assert.equal(compact.highlightedAlternativeCandidateKey, "full");
   assert.deepEqual(alternatives, original);
   assert.equal(compact.operationalDecision.nextAction, "review_options");
 });
@@ -34,16 +34,16 @@ test("AXR-ALT-02 exact highlight priorities respect full targets, coverage, know
   ] as const;
   for (const [left, right, expected] of pairs) {
     // Basket daily pills, rather than the display aggregate, determine comparability.
-    if (left.optionId === "two") left.basket.forEach(item => Object.assign(item, { dailyPills: 1 }));
-    for (const alternatives of [[left, right], [right, left]]) assert.equal(buildCompactDecision({ status: "no_purchase", selected, alternatives }).highlightedAlternativeOptionId, expected);
+    if (left.candidateKey === "two") left.basket.forEach(item => Object.assign(item, { dailyPills: 1 }));
+    for (const alternatives of [[left, right], [right, left]]) assert.equal(buildCompactDecision({ status: "no_purchase", selected, alternatives }).highlightedAlternativeCandidateKey, expected);
   }
 });
 
 test("AXR-ALT-03 selected duplicates, ineligible options and zero coverage cannot become highlights", () => {
   const selected = choice("selected", [50]);
-  const duplicate = { ...structuredClone(selected), optionId: "another-id" };
+  const duplicate = { ...structuredClone(selected), candidateKey: "another-id" };
   const compact = buildCompactDecision({ status: "ready", selected, alternatives: [duplicate, choice("zero", [0]), { ...choice("ineligible", [100]), purchaseEligible: false }] });
-  assert.equal(compact.highlightedAlternativeOptionId, null);
+  assert.equal(compact.highlightedAlternativeCandidateKey, null);
 });
 
 for (const locale of ["en", "th", "zh-CN"] as const) test(`AXR-NOP-01 ${locale} continued intake completes naturally with optional purchases preserved`, () => {
@@ -55,8 +55,8 @@ for (const locale of ["en", "th", "zh-CN"] as const) test(`AXR-NOP-01 ${locale} 
   const output = publicPlanFields(result);
   assert.equal(output.status, "no_purchase"); assert.equal(output.purchaseRequiredNow, false);
   assert.equal(output.operationalDecision.nextAction, "replenish_later"); assert.equal(output.operationalDecision.purchaseEligible, false);
-  assert.equal(output.compactDecision!.highlightedAlternativeOptionId, null);
-  assert.equal(output.options!.find(row => row.optionId === "optional")!.purchaseEligible, true);
+  assert.equal(output.compactDecision!.highlightedAlternativeCandidateKey, null);
+  assert.equal(output.options!.find(row => row.candidateKey === "optional")!.purchaseEligible, true);
   assert.deepEqual(output.compactDecision!.operationalDecision, output.operationalDecision);
 });
 
@@ -64,7 +64,7 @@ test("AXR-NOP-02 unknown replenishment finishes without a buying prompt; unresol
   const empty = choice("empty", [100], 0, 0, 0), alternatives = [choice("purchase", [100])];
   const result = buildCompactDecision({ status: "no_purchase", selected: { ...empty, coverage: [coverage(100, "a", 100)] }, alternatives,
     horizon: { purchaseRequiredNow: false, durationUnknown: true, nextReplenishmentDay: null } });
-  assert.equal(result.operationalDecision.nextAction, "no_purchase"); assert.equal(result.highlightedAlternativeOptionId, null);
+  assert.equal(result.operationalDecision.nextAction, "no_purchase"); assert.equal(result.highlightedAlternativeCandidateKey, null);
   const unresolved = buildCompactDecision({ status: "no_purchase", selected: choice("empty", [0], 0, 0, 0), alternatives });
-  assert.equal(unresolved.operationalDecision.nextAction, "review_options"); assert.equal(unresolved.highlightedAlternativeOptionId, "purchase");
+  assert.equal(unresolved.operationalDecision.nextAction, "review_options"); assert.equal(unresolved.highlightedAlternativeCandidateKey, "purchase");
 });

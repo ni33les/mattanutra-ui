@@ -56,7 +56,7 @@ function parseIds(value: unknown) {
 
 async function selectedProductsForCheckout(
   planId: string, selectedItemIds: readonly string[], locale: Locale,
-  selection: { recommendationRunId?: string | null; optionId?: string | null; assessmentRevision?: number | null; selectionRevision?: number | null }
+  selection: { recommendationRunId?: string | null; candidateKey?: string | null; assessmentRevision?: number | null; selectionRevision?: number | null }
 ) {
   const sql = getSql();
   if (!sql || !selectedItemIds.length) return { products: [], advice: [] };
@@ -137,7 +137,7 @@ export default async function BasketCheckoutPage({
     redirect(`/${locale}/nutrition`);
   }
 
-  const selection = { recommendationRunId: query.run ?? null, optionId: query.option ?? null,
+  const selection = { recommendationRunId: query.run ?? null, candidateKey: query.option ?? null,
     assessmentRevision: query.revision ? Number(query.revision) : null, selectionRevision: query.selectionRevision ? Number(query.selectionRevision) : null };
   const dictionary = getDictionary(locale);
   const labels = getNamespace<BasketCheckoutCopy>(locale, "customer.basketCheckout");

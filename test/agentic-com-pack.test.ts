@@ -221,7 +221,7 @@ async function com01() {
       planFixture: "A",
       planRevision: seeded.revision,
       reason: errorOf(executed).reasonCode ?? null,
-      selectedOptionId: selectedOptionOf(executed.frozenPlan),
+      selectedCandidateKey: selectedOptionOf(executed.frozenPlan),
       stateVersion: executed.stateVersion ?? null
     });
   });
@@ -400,7 +400,7 @@ async function com08() {
     const money = moneyFromFrozen(executed.frozenPlan);
     const ok =
       executed.ok === true && order.ok === true &&
-      executeOption === COM_OPT_B_LOW &&
+      executeOption === null &&
       orderOption === COM_OPT_B_LOW &&
       money.productIds.includes(COM_PRD_B12.productId) &&
       money.productIds.includes(COM_PRD_MG.productId) &&
@@ -419,7 +419,9 @@ async function com09() {
   return withCase(async (runtime) => {
     const seeded = await seedPlanA(runtime);
     const executed = await executeReady(runtime, seeded, key("09-immut"));
-    const before = JSON.stringify(executed.frozenPlan);
+    const originalOrder = await orderRecord(runtime, String(executed.orderHandle));
+    assert.ok(originalOrder);
+    const before = JSON.stringify(originalOrder.frozenPlan);
     await advancePlanRevision(runtime, seeded.planId, 2, planBResult());
     const order = await comCall(runtime, "order", { orderHandle: executed.orderHandle });
     const stored = await orderRecord(runtime, String(executed.orderHandle ?? ""));
@@ -431,7 +433,7 @@ async function com09() {
     return verdict("COM-09", ok, {
       frozenUnchanged: JSON.stringify(stored?.frozenPlan) === before,
       planRevision: stored?.planRevision ?? null,
-      selectedOptionId: selectedOptionOf(stored?.frozenPlan)
+      selectedCandidateKey: selectedOptionOf(stored?.frozenPlan)
     });
   });
 }
@@ -447,7 +449,7 @@ async function com10() {
     const ok = executed.ok === true && ids.includes(COM_SAFETY_ID);
     return verdict("COM-10", ok, {
       safetyGuidanceIds: ids,
-      selectedOptionId: selectedOptionOf(frozen)
+      selectedCandidateKey: selectedOptionOf(frozen)
     });
   });
 }
@@ -1347,6 +1349,9 @@ async function com39() {
   return withCase(async (runtime) => {
     const seeded = await seedPlanA(runtime);
     const executed = await executeReady(runtime, seeded, key("39-ref"));
+    const originalOrder = await orderRecord(runtime, String(executed.orderHandle));
+    assert.ok(originalOrder);
+    const originalFrozen = JSON.stringify(originalOrder.frozenPlan);
     await pay(runtime, String(executed.orderHandle), "success");
     await pay(runtime, String(executed.orderHandle), "refund");
     const order = await comCall(runtime, "order", { orderHandle: executed.orderHandle });
@@ -1356,12 +1361,12 @@ async function com39() {
     const ok =
       (order.paymentStatus === "refunded" || order.orderStatus === "cancelled") &&
       (receipt.currency === "THB" || order.paymentStatus === "refunded") &&
-      selectedOptionOf(stored?.frozenPlan) === selectedOptionOf(executed.frozenPlan);
+      JSON.stringify(stored.frozenPlan) === originalFrozen;
     return verdict("COM-39", ok, {
       orderStatus: order.orderStatus ?? null,
       paymentStatus: order.paymentStatus ?? null,
       receipt,
-      selectedOptionId: selectedOptionOf(stored?.frozenPlan)
+      selectedCandidateKey: selectedOptionOf(stored?.frozenPlan)
     });
   });
 }
@@ -1494,7 +1499,7 @@ async function com44() {
       omsChildOrderCount: counts?.omsChildOrderCount ?? null,
       paymentConfirmedCount: counts?.paymentConfirmedCount ?? null,
       paymentStatus: order.paymentStatus ?? null,
-      selectedOptionId: selectedOptionOf(stored?.frozenPlan)
+      selectedCandidateKey: selectedOptionOf(stored?.frozenPlan)
     });
   });
 }
@@ -1526,7 +1531,7 @@ async function com45() {
       declinedStatus: declined.orderStatus ?? null,
       paidStatus: paid.paymentStatus ?? null,
       sameReference: paid.orderReference === executed.orderReference,
-      selectedOptionId: selectedOptionOf(stored?.frozenPlan)
+      selectedCandidateKey: selectedOptionOf(stored?.frozenPlan)
     });
   });
 }
@@ -1804,7 +1809,7 @@ if (process.env.NODE_TEST_CONTEXT) {
         [0, ["frozenPlan", "items", 0, "unitPriceMinor"], 39001],
         [0, ["frozenPlan", "coveragePercent"], 99],
         [0, ["frozenPlan", "planRevision"], 2],
-        [0, ["frozenPlan", "selectedOptionId"], "changed-option"],
+        [0, ["frozenPlan", "selectedCandidateKey"], "changed-option"],
         [0, ["frozenPlan", "items", 0, "productId"], "00000000-0000-0000-0000-000000000099"],
         [0, ["responsibility", "domains", 0, "text"], "Changed clinical advice"],
         [0, ["paymentStatus"], "paid"],

@@ -8,15 +8,15 @@ import type { OrderRecord } from '../../lib/agentic/store/types.ts';
 import type { AgenticRuntime } from '../../lib/agentic/runtime.ts';
 
 async function call(app: AgenticRuntime, name: string, args: Record<string, unknown>) {
-  if (name === 'evidence') return evidenceTool({ ...app, ...(args as {planHandle:string;expectedRevision:number;optionId:string;productId?:string}) });
+  if (name === 'evidence') return evidenceTool({ ...app, ...(args as {planHandle:string;expectedRevision:number;productId?:string}) });
   const rpc = await handleJsonRpc(app, { id: 1, method: 'tools/call', params: { name, arguments: args } });
   assert.ok(rpc?.result?.structuredContent); return rpc.result.structuredContent as Record<string, unknown>;
 }
-test('SPLAN-EVID-01 internal fact lookup uses current option and product IDs; rejects unrelated IDs and stale revisions', async () => {
+test('SPLAN-EVID-01 internal fact lookup uses current recommendation and product IDs; rejects unrelated IDs and stale revisions', async () => {
   const { app, handle } = await storedFixture(internalFixture());
   const plan = await call(app, 'plan', { planHandle: handle }); assert.ok(plan.choices.length);
   const choice = plan.choices[0], productId = choice.products[0].productId;
-  const args = { planHandle: handle, expectedRevision: 1, optionId: choice.optionId, productId };
+  const args = { planHandle: handle, expectedRevision: 1, productId };
   const evidence = await call(app, 'evidence', args);
   assert.equal(evidence.ok, true, JSON.stringify(evidence)); assert.equal(evidence.productId, productId);
   assert.ok(Array.isArray(evidence.facts)); assert.ok(!('choices' in evidence));

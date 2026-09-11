@@ -35,7 +35,7 @@ describe("current conversational contract", () => {
     assert.equal(readContractResource("mattanutra://contract/4.0.0/schema"), null);
     assert.equal(readContractResource("mattanutra://contract/8.0.0/schema"), null);
     const current = readContractResource(CLIENT_GUIDE_URI); assert.ok(current);
-    for (const phrase of ["productDoses", "searchEffort", "scoring", "selectedOptionId"]) assert.ok(current.contents[0].text.includes(phrase), phrase);
+    for (const phrase of ["productDoses", "searchEffort", "scoring", "selectedCandidateKey"]) assert.ok(current.contents[0].text.includes(phrase), phrase);
     for (const example of CLIENT_EXAMPLES) assert.deepEqual(validateToolIssues(AGENTIC_INPUT_SCHEMAS[example.tool], example.arguments), [], example.name);
   });
 });

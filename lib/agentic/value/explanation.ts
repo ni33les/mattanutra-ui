@@ -55,7 +55,7 @@ export function buildExplanation(input: Readonly<{
       productName: item.productName,
       quantity: item.quantity
     })),
-    recommendedOptionId: input.option.optionId,
+    recommendedCandidateKey: input.option.candidateKey,
     retainedCurrent: input.option.retainedCurrent ?? [],
     safetyState: "advisory",
     savings90DayMinor: input.option.economics?.savings90DayMinor ?? null

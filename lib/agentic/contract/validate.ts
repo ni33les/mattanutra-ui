@@ -51,9 +51,9 @@ function issueFrom(error: ErrorObject, data: unknown): SchemaIssue {
 function branch(schema: JsonSchema, data: unknown): JsonSchema {
   if (schema === PLAN_INPUT_SCHEMA && record(data)) {
     if (!("planHandle" in data)) return PLAN_BRANCH_SCHEMAS.create;
-    if ("selectedOptionId" in data) return PLAN_BRANCH_SCHEMAS.select;
     if ("answers" in data) return PLAN_BRANCH_SCHEMAS.answer;
-    return Object.keys(data).some(key => key !== "planHandle") ? PLAN_BRANCH_SCHEMAS.revise : PLAN_BRANCH_SCHEMAS.get;
+    if (Object.keys(data).length === 1) return PLAN_BRANCH_SCHEMAS.get;
+    return Object.keys(data).every(key => ["planHandle", "expectedRevision", "idempotencyKey"].includes(key)) ? PLAN_BRANCH_SCHEMAS.select : PLAN_BRANCH_SCHEMAS.revise;
   }
   if (record(data) && typeof data.ok === "boolean" && Array.isArray(schema.anyOf)) {
     const selected = schema.anyOf.find((option: JsonSchema) => record(option.properties) && record(option.properties.ok) && option.properties.ok.const === data.ok &&

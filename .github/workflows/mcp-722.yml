@@ -1,4 +1,4 @@
-name: MCP pure importance v10 scoped checks
+name: MCP 11 maintained protocol and paired acceptance
 on:
   push:
     branches: [dev]
@@ -9,7 +9,7 @@ permissions:
 jobs:
   affected:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 120
     services:
       postgres:
         image: postgres:16
@@ -35,10 +35,18 @@ jobs:
           cache: npm
       - run: npm ci --include=dev
       - run: node scripts/prepare-matcher-test-db.mjs
-      - run: npm run test:mcp:simple-plan -- --output "$RUNNER_TEMP/mcp-simple-plan-evidence"
+      - run: npm run typecheck
+      - run: npm run build -- --webpack
+        env:
+          NODE_ENV: production
+          NEXT_BUILD_SKIP_TYPECHECK: "1"
+          NEXT_BUILD_CPUS: "2"
+      - run: npm run test:matcher:twice
+        env:
+          MATCHER_TEST_EVIDENCE_DIR: ${{ runner.temp }}/mcp-maintained-evidence
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: mcp-simple-plan-scoped-evidence
-          path: ${{ runner.temp }}/mcp-simple-plan-evidence
+          name: mcp-maintained-evidence
+          path: ${{ runner.temp }}/mcp-maintained-evidence
           if-no-files-found: error

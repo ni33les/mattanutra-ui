@@ -10,7 +10,7 @@ const magnesium = original.products.find(product => product.candidate.title === 
 const snapshot = { ...original, products: [magnesium] };
 const state: CanonicalPlanState = {
   acceptedGaps: [], conditionCodes: [], currency: "THB", currentSupplements: [], destinationCountry: "TH",
-  leftovers: [], locale: "en", medicationCodes: [], optimization: "balanced", pinnedOptionId: null,
+  leftovers: [], locale: "en", medicationCodes: [], optimization: "balanced", pinnedCandidateKey: null,
   profile: { ageYears: 35, lifeStage: "adult" }, requirements: {}, safetyAcknowledgement: null,
   targets: [{ name: "Magnesium", supplementId: magnesium.contributionSupplementIds[0]!, amount: 150, unit: "mg" }]
 };

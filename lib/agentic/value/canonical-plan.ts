@@ -234,7 +234,7 @@ function canonicalOptionValue(option: StackOption) {
       currentInventory: [...option.economics.comparisonBasis.currentInventory].sort((a, b) => a.supplementId.localeCompare(b.supplementId) || String(a.productId).localeCompare(String(b.productId)) || Number(a.daysRemaining) - Number(b.daysRemaining))
     } : null,
     equivalent: option.economics?.equivalent ?? null,
-    optionId: option.optionId,
+    candidateKey: option.candidateKey,
     products: option.basket
       .map((item) => ({
         daysOfSupply: item.daysOfSupply ?? null,
@@ -307,12 +307,12 @@ export function canonicalPlanValue(input: Readonly<{
     threshold?: number | null;
     unit?: string | null;
   }>[];
-  selectedOptionId?: string | null;
+  selectedCandidateKey?: string | null;
   snapshotId?: string;
   status: string;
 }>) {
   const selected =
-    input.options.find((item) => item.optionId === input.selectedOptionId) ??
+    input.options.find((item) => item.candidateKey === input.selectedCandidateKey) ??
     input.options.find((item) => item.recommended) ??
     null;
   return {
@@ -344,7 +344,7 @@ export function canonicalPlanValue(input: Readonly<{
     questions: [...(input.questions ?? [])].map((item) => item.questionId).slice().sort(),
     reasonCode: input.reasonCode ?? null,
     selected: selected ? canonicalOptionValue(selected) : null,
-    selectedOptionId: input.selectedOptionId ?? selected?.optionId ?? null,
+    selectedCandidateKey: input.selectedCandidateKey ?? selected?.candidateKey ?? null,
     snapshotId: input.snapshotId ?? "",
     safety: [...input.safetyGuidance]
       .map(canonicalSafetyRow)
@@ -381,7 +381,7 @@ export function buildCanonicalPlanStamp(input: Readonly<{
   questions?: readonly Readonly<{ questionId: string }>[];
   reasonCode?: string | null;
   safetyGuidance: readonly Readonly<{ action: string; code: string }>[];
-  selectedOptionId?: string | null;
+  selectedCandidateKey?: string | null;
   snapshotId: string;
   status: string;
 }>): CanonicalPlanStamp {

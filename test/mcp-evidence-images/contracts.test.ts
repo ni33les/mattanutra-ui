@@ -32,7 +32,7 @@ test('EV-02 removed evidence and a fixed unknown tool return the same unknown-to
   const app=runtime();let calls=0;
   const store=new Proxy(app.store,{get(target,key){const value=Reflect.get(target,key);return typeof value==='function'?()=>{calls++;throw Error('Unknown tool must not access plan/order storage');}:value;}});
   for(const name of ['evidence','ev_nonexistent_control']) {
-    const result=await rpc({...app,store},name,{planHandle:'cap_removed_tool_fixture_000000000001',expectedRevision:1,optionId:'opt_returned_fixture',productId:manifest.fixtures[0].productId});
+    const result=await rpc({...app,store},name,{planHandle:'cap_removed_tool_fixture_000000000001',expectedRevision:1,candidateKey:'opt_returned_fixture',productId:manifest.fixtures[0].productId});
     assert.deepEqual(result,{jsonrpc:'2.0',id:1,error:{code:-32601,message:`Unknown tool: ${name}`}});
   }
   assert.equal(calls,0);
@@ -57,7 +57,7 @@ test('EV-04 / IMG-01 / IMG-03 / IMG-05 / AX-01 real-product create, refine, sele
   }
   check(first,0);
   const revised=await plan(app,{planHandle:first.planHandle,expectedRevision:1,idempotencyKey:'ev-images-refine',requirements:requirements(1)});assert.equal(revised.revision,2);check(revised,1);
-  const selected=await plan(app,{planHandle:first.planHandle,expectedRevision:2,idempotencyKey:'ev-images-select',selectedOptionId:revised.recommendedOptionId});assert.equal(selected.revision,3);check(selected,1);
+  const selected=await plan(app,{planHandle:first.planHandle,expectedRevision:2,idempotencyKey:'ev-images-select'});assert.equal(selected.revision,3);check(selected,1);
   const read=await withServiceMeasurements(async()=>{const read=await plan(app,{planHandle:first.planHandle});assert.equal(serviceMeasurements()['db.statements']?.total??0,0,'Stored image delivery must not add database metadata queries');return read;});
   assert.deepEqual(read,selected);assert.equal(read.nextAction,'execute');
   const structured=toolResult(read,false,'plan','structured'),text=toolResult(read,false,'plan','text');
@@ -68,7 +68,7 @@ test('EV-04 / IMG-01 / IMG-03 / IMG-05 / AX-01 real-product create, refine, sele
 test('IMG-04 retained real stock avoids a new product or image-only placeholder',async()=>{
   const app=runtime(),request=create();const ingredient=frozen.snapshot.supplements.find(s=>s.name==='Vitamin D3');assert.ok(ingredient);
   const result=await plan(app,{...request,idempotencyKey:'ev-images-stock-01',requirements:{},currentSupplements:[{name:'Vitamin D3',supplementId:ingredient.supplementId,productId:manifest.fixtures[0].productId,dailyAmount:1000,daysRemaining:30,unit:'IU'}]});
-  assert.equal(result.status,'no_purchase');assert.ok(result.choices.every(c=>c.products.length===0));assert.equal(result.recommendedOptionId,null);
+  assert.equal(result.status,'no_purchase');assert.ok(result.choices.every(c=>c.products.length===0));assert.equal(result.nextAction,'no_purchase');
 });
 test('IMG-02 coverage availability is explicit; no missing-image real retail SKU is fabricated',()=>{
   assert.equal(manifest.missingImageCoverage.status,'REAL_DATA_UNAVAILABLE');assert.ok(manifest.missingImageCoverage.missingProductCount>0);

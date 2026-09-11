@@ -59,7 +59,7 @@ export async function runConversationalJourney({ rpc, locale = "en", discovery =
     if (discovery === "resources") {
       const resources = await rpc("resources/list", {}), selected = selectPublishedResources(info, resources.resources);
       const text = (await rpc("resources/read", { uri: selected.guide.uri })).contents[0].text;
-      assert.ok(text.includes("selectedOptionId") && text.includes("scoring"));
+      assert.ok(text.includes("send only planHandle, expectedRevision and a new idempotencyKey to plan") && text.includes("scoring"));
     }
   }
   async function complete(value, deadline = 175000) {
@@ -73,7 +73,7 @@ export async function runConversationalJourney({ rpc, locale = "en", discovery =
   const create = { locale, destinationCountry: "TH", idempotencyKey: `${key}-create`, targets: [{ name: "Vitamin D3", amount: 2000, unit: "IU", basis: "supplemental" }] };
   const started = performance.now(); let plan = await complete(await call("plan", create), 15000);
   const readyMs = performance.now() - started; assert.ok(readyMs <= 15000, `Idle D3 readiness ${readyMs}ms`);
-  assert.equal(plan.selectedOptionId, null); assert.equal(plan.choices.length, 1); assert.equal(plan.scoring.profile, "best_match"); assert.ok(plan.recommendedOptionId);
+  assert.equal(plan.nextAction, "confirm_with_user"); assert.equal(plan.choices.length, 1); assert.equal(plan.scoring.profile, "best_match");
   const original = plan;
   const change = async (suffix, fields) => { plan = await complete(await call("plan", { planHandle: plan.planHandle, expectedRevision: plan.revision, idempotencyKey: `${key}-${suffix}`, ...fields })); return plan; };
   await change("noop", { scoring: {} }); assert.equal(plan.revision, original.revision);
@@ -84,12 +84,12 @@ export async function runConversationalJourney({ rpc, locale = "en", discovery =
   assert.ok(plan.choices.flatMap(row => row.ingredients).some(row => row.requested === 0));
   await change("reset", { targets: [{ ingredientId: ingredient.ingredientId, amount: 2000 }], scoring: { weights: null } }); assert.deepEqual(plan.scoring.weights, {});
   const candidate = currentRecommendation(plan); assert.ok(candidate?.products.length);
-  const stale = await call("plan", { planHandle: plan.planHandle, expectedRevision: original.revision, selectedOptionId: candidate.optionId, idempotencyKey: `${key}-stale` });
+  const stale = await call("plan", { planHandle: plan.planHandle, expectedRevision: original.revision, idempotencyKey: `${key}-stale` });
   assert.equal(stale.ok, false); assert.equal(stale.error.reasonCode, "stale_revision");
-  const selection = { planHandle: plan.planHandle, expectedRevision: plan.revision, selectedOptionId: candidate.optionId, idempotencyKey: `${key}-select` };
-  plan = await complete(await call("plan", selection)); assert.ok(plan.selectedOptionId); assert.equal(plan.nextAction, "execute");
+  const selection = { planHandle: plan.planHandle, expectedRevision: plan.revision, idempotencyKey: `${key}-select` };
+  plan = await complete(await call("plan", selection)); assert.equal(plan.nextAction, "execute");
   assert.deepEqual(await call("plan", selection), plan);
-  const selected = plan.choices.find(row => row.optionId === plan.selectedOptionId); assert.ok(selected);
+  const selected = plan.choices[0]; assert.ok(selected);
   for (const product of selected.products) if (product.lineTotal !== null) assert.equal(Math.round(product.lineTotal * 100), product.quantity * Math.round(product.unitPrice * 100));
   for (const product of selected.products) {
     assert.ok(Object.hasOwn(product, "imageUrl"));
@@ -118,7 +118,7 @@ export function customerTargetConfirmation(plan) {
 export function currentRecommendation(plan) {
   if (plan.choices.length !== 1) throw new Error('Expected one current recommendation');
   const choice = plan.choices[0];
-  if (choice.optionId !== (plan.selectedOptionId ?? plan.recommendedOptionId) || !choice.products.length) throw new Error('No current purchasable recommendation');
+  if (!choice.products.length) throw new Error('No current purchasable recommendation');
   return choice;
 }
 export async function recoverPublishedPatch({ intended, idempotencyKey, current, callPlan }) {

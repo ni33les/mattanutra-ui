@@ -32,7 +32,7 @@ export function aug25PlanState(
     locale: "en",
     medicationCodes: [],
     optimization: "fewest_pills",
-    pinnedOptionId: null,
+    pinnedCandidateKey: null,
     profile: { ageYears: 52, lifeStage: "adult", sex: "male" },
     requirements: {},
     safetyAcknowledgement: null,

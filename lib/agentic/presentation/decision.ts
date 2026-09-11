@@ -30,9 +30,6 @@ export function processingDecision(planHandle: string, revision: number, locale?
 export function failedDecision(planHandle: string, revision: number, locale?: string): SimplePlanDecision {
   return { ok: true, planHandle, revision, status: "failed", summary: copy(locale).failed, nextAction: "change_request" };
 }
-export function decisionOptionId(planHandle: string, revision: number, option: StackOption) {
-  return `opt_${sha256Hex(JSON.stringify([planHandle, revision, option.basket.map(row => [row.productId, row.sellerId, row.servingsPerDay, row.quantity, row.unitPriceMinor]).sort()])).slice(0, 32)}`;
-}
 export function decisionOptions(result: PlanResult) {
   // Internal candidates remain available to matching, but MCP exposes only the
   // current winner (or the explicitly confirmed routine). Refinement re-ranks.
@@ -40,7 +37,7 @@ export function decisionOptions(result: PlanResult) {
   // Empty supply is still a decision: preserve requested ingredients and gaps
   // using the committed coverage, without inventing a purchasable routine.
   if (!options.length && (result.requestSnapshot.originalRequest?.targets ?? result.requestSnapshot.targets).length) {
-    options.push({ optionId: "empty", basket: [], coverage: result.coverage, coveragePercent: 0, dailyPills: 0,
+    options.push({ candidateKey: "empty", basket: [], coverage: result.coverage, coveragePercent: 0, dailyPills: 0,
       totalPriceMinor: 0, purchaseEligible: false, roles: ["best_match"], reason: result.summary,
       matcherVersion: result.matcherTelemetry.matcherVersion, snapshotId: result.matcherTelemetry.snapshotId ?? "unknown" });
   }
@@ -147,7 +144,7 @@ function productDecision(row: BasketItem): Ready["choices"][number]["products"][
 export function presentDecision(result: PlanResult, planHandle: string, revision: number): SimplePlanDecision {
   const state = result.requestSnapshot, text = copy(state.locale);
   if (result.status === "processing") return processingDecision(planHandle, revision, state.locale);
-  const options = decisionOptions(result), pinned = state.pinnedOptionId ? result.selected : null;
+  const options = decisionOptions(result), pinned = state.pinnedCandidateKey ? result.selected : null;
   const recommended = options[0];
   const noTargets = !(state.originalRequest?.targets ?? state.targets).length;
   const noPurchase = noTargets || result.status === "no_purchase";
@@ -157,8 +154,7 @@ export function presentDecision(result: PlanResult, planHandle: string, revision
   const nextAction = refresh ? "change_request" : questions.length ? "answer_questions" : noPurchase && !alreadyCovered ? "change_request" : noPurchase ? result.horizon?.nextReplenishmentDay && result.horizon?.nextReplenishmentDay > 0 ? "replenish_later" : "no_purchase" : pinned?.basket.length ? "execute" : recommended?.basket.length ? "confirm_with_user" : "change_request";
   const summary: string = refresh ? text.stale : questions.length ? text.question : noTargets ? text.noTargets : noPurchase ? alreadyCovered ? text.none : text.review : pinned ? text.selected : recommended?.basket.length ? text.ready : text.review;
   return { ok: true, planHandle, revision, status, summary, scoring: publicScoring(state.scoring ?? patchScoring(undefined)), currency: state.currency,
-    recommendedOptionId: !noPurchase && recommended?.basket.length ? decisionOptionId(planHandle, revision, recommended) : null,
-    selectedOptionId: pinned ? decisionOptionId(planHandle, revision, pinned) : null, nextAction,
+    nextAction,
     ...(refresh ? { refreshRequired: true } : {}), ...(result.horizon?.nextReplenishmentDay && result.horizon?.nextReplenishmentDay > 0 ? { nextReplenishmentDay: result.horizon?.nextReplenishmentDay } : {}),
     ...(questions.length ? { questions: questions.map(row => ({ questionId: row.questionId, prompt: row.prompt, choices: row.choices.map(choice => ({ choice: choice.choice, label: choice.label })) })) } : {}),
     choices: options.map(option => {
@@ -173,7 +169,7 @@ export function presentDecision(result: PlanResult, planHandle: string, revision
       const pills = option.basket.map(row => { const count = administrationDailyPills(row.administration); return count === null ? null : count * row.servingsPerDay; });
       const knownPills = pills.reduce<number>((n, count) => n + (count ?? 0), 0), pillsKnown = pills.every(n => n !== null);
       const complete = option.basket.every(row => !row.incompleteCommercialFacts);
-      return { optionId: decisionOptionId(planHandle, revision, option), roles: [...(option.roles ?? (option.role ? [option.role] : []))],
+      return { roles: [...(option.roles ?? (option.role ? [option.role] : []))],
         summary: { text: option.reason, pillCount: pillsKnown ? knownPills : null, ...(!pillsKnown ? { pillCountAtLeast: knownPills } : {}), productCount: option.basket.length,
           goodsPrice: complete ? option.basket.reduce((n, row) => n + row.lineTotalMinor, 0) / 100 : null,
           coveragePercent: coverageComplete ? coverage : null, ...(!coverageComplete ? { coverageAtLeastPercent: coverage } : {}), ingredientDataComplete: ingredients.every(row => row.supplied !== null) }, ingredients, products: option.basket.map(productDecision) };

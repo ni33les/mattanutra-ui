@@ -340,7 +340,7 @@ describe("matcher phase 3 rejected-candidate reasons", () => {
         rejectedAll: result.rejected,
         requestedDoses: [],
         requestedNames: ["Vitamin D3"],
-        selectedOptionId: "opt_test"
+        selectedCandidateKey: "opt_test"
       },
       questions: [],
       safetyGuidance: [],

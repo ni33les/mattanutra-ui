@@ -3,7 +3,7 @@ import { describe, it } from "node:test";
 import { operationalDecision } from "../lib/agentic/value/operational-decision.ts";
 import { safetyQuestions, planStatus } from "../lib/agentic/plan/safety.ts";
 import type { CanonicalPlanState, StackOption } from "../lib/agentic/plan/types.ts";
-const state: CanonicalPlanState = { acceptedGaps: [], conditionCodes: [], currency: "THB", currentSupplements: [], destinationCountry: "TH", leftovers: [], locale: "en", medicationCodes: [], optimization: "balanced", pinnedOptionId: null, profile: { ageYears: 35, lifeStage: "adult" }, requirements: {}, safetyAcknowledgement: null, targets: [{ name: "Magnesium", supplementId: "sup_mag", amount: 200, unit: "mg" }] };
+const state: CanonicalPlanState = { acceptedGaps: [], conditionCodes: [], currency: "THB", currentSupplements: [], destinationCountry: "TH", leftovers: [], locale: "en", medicationCodes: [], optimization: "balanced", pinnedCandidateKey: null, profile: { ageYears: 35, lifeStage: "adult" }, requirements: {}, safetyAcknowledgement: null, targets: [{ name: "Magnesium", supplementId: "sup_mag", amount: 200, unit: "mg" }] };
 const empty = { basket: [], coverage: [{ supplementId: "sup_mag", name: "Magnesium", requestedAmount: 200, currentAmount: 0, deliveredAmount: 0, remainingGap: 200, totalExposureAmount: 0, coveragePercent: 0, status: "uncovered", unit: "mg" }] } as unknown as StackOption;
 describe("v5 conversation has no automatic health or gap decision gates", () => {
   it("zero coverage and partial coverage both remain advice without a required gap acknowledgement", () => {

@@ -169,11 +169,11 @@ export type PlanToolInput = Readonly<{
   idempotencyKey?: string;
   publicInput?: Record<string, unknown>;
   operation?: "answer" | "create" | "get" | "revise" | "select";
-  optionId?: string;
+  candidateKey?: string;
   planHandle?: string;
   request?: unknown;
   safetyAcknowledgement?: unknown;
-  selectOptionId?: string;
+  selectCandidateKey?: string;
   searchEffort?: "standard" | "expanded";
 }>;
 
@@ -252,7 +252,7 @@ function composeResult(input: Readonly<{
   const workState = {
     ...input.state,
     leftovers: input.leftovers,
-    pinnedOptionId: input.state.scoring ? input.state.pinnedOptionId : input.selected?.optionId ?? input.state.pinnedOptionId
+    pinnedCandidateKey: input.state.scoring ? input.state.pinnedCandidateKey : input.selected?.candidateKey ?? input.state.pinnedCandidateKey
   };
   const safety = evaluateSafety({
     coverage,
@@ -313,9 +313,9 @@ function composeResult(input: Readonly<{
       changeSummary.push(`status:${input.previous.status}->${status}`);
     }
 
-    if (input.previous.selected?.optionId !== input.selected?.optionId) {
+    if (input.previous.selected?.candidateKey !== input.selected?.candidateKey) {
       changeSummary.push(
-        input.selected ? `selected_option:${input.selected.optionId}` : "selected_cleared"
+        input.selected ? `selected_option:${input.selected.candidateKey}` : "selected_cleared"
       );
     }
 
@@ -571,8 +571,8 @@ function advertisedAlternatives(
   );
   return rows.filter(
     (item, index, list) =>
-      item.optionId !== selected.optionId &&
-      list.findIndex((row) => row.optionId === item.optionId) === index
+      item.candidateKey !== selected.candidateKey &&
+      list.findIndex((row) => row.candidateKey === item.candidateKey) === index
   );
 }
 
@@ -765,7 +765,7 @@ function draftStateFromPayload(input: Readonly<{
         medicationCodes: [...new Set(request.medicationCodes ?? [])],
         optimization: request.optimization,
         ...(request.scoring ? { scoring: request.scoring } : {}),
-        pinnedOptionId: request.scoring ? null : input.previous?.selected?.optionId ?? null,
+        pinnedCandidateKey: request.scoring ? null : input.previous?.selected?.candidateKey ?? null,
         profile: { ...request.profile, ageYears: request.profile.ageYears ?? 0, lifeStage: request.profile.lifeStage ?? "adult" },
         profileKnown: { ageYears: request.profile.ageYears != null, lifeStage: request.profile.lifeStage != null, sex: request.profile.sex != null },
         originalRequest: structuredClone(request),
@@ -807,7 +807,7 @@ function processingResult(input: Readonly<{
   const pinnedState = {
     ...input.state,
     leftovers,
-    pinnedOptionId: selected?.optionId ?? input.state.pinnedOptionId
+    pinnedCandidateKey: selected?.candidateKey ?? input.state.pinnedCandidateKey
   };
 
   return {
@@ -926,7 +926,7 @@ type PreparedPlanCommand = Readonly<{
   processing: PlanResult;
   resume: boolean;
   revision: number;
-  selectOptionId?: string;
+  selectCandidateKey?: string;
   searchEffort?: "standard" | "expanded";
   shownRevision: number;
   state: CanonicalPlanState;
@@ -1247,8 +1247,8 @@ async function executePlanTool(input: Readonly<{
     }
     const answers = incomingAnswers(payload);
     const ack = null;
-    const selectOptionId =
-      payload.selectOptionId ?? payload.optionId ?? selectFromAnswers(answers);
+    const selectCandidateKey =
+      payload.selectCandidateKey ?? payload.candidateKey ?? selectFromAnswers(answers);
 
     let planHandle = payload.planHandle;
     let planId: string;
@@ -1313,7 +1313,7 @@ async function executePlanTool(input: Readonly<{
       shownRevision = payload.expectedRevision ?? 1;
       const isPoll =
         !hasFullRequest(payload) &&
-        !selectOptionId &&
+        !selectCandidateKey &&
         answers.length === 0 &&
         !ack;
 
@@ -1328,24 +1328,24 @@ async function executePlanTool(input: Readonly<{
     }
 
 
-    if (selectOptionId && (!previous || !existingPlan || !planHandle)) {
+    if (selectCandidateKey && (!previous || !existingPlan || !planHandle)) {
       return businessError({
-        fieldPath: "selectOptionId",
+        fieldPath: "selectCandidateKey",
         message: "Not found.",
         reasonCode: "not_found"
       });
     }
 
-    if (selectOptionId && previous) {
+    if (selectCandidateKey && previous) {
       const option =
-        previous.selected?.optionId === selectOptionId
+        previous.selected?.candidateKey === selectCandidateKey
           ? previous.selected
-          : previous.alternatives.find((item) => item.optionId === selectOptionId) ??
+          : previous.alternatives.find((item) => item.candidateKey === selectCandidateKey) ??
             null;
 
       if (!option) {
         return businessError({
-          fieldPath: "selectOptionId",
+          fieldPath: "selectCandidateKey",
           message: "Not found.",
           reasonCode: "not_found"
         });
@@ -1353,7 +1353,7 @@ async function executePlanTool(input: Readonly<{
     }
 
     const effectiveRequest = payload.request as PlanRequest | undefined;
-    if (previous?.refreshRequired && !hasFullRequest(payload) && (selectOptionId || answers.length > 0)) return businessError({ fieldPath: "planHandle", reasonCode: "contract_refresh_required", message: "Refresh this unexecuted plan with scoring:{} and the current revision before selecting or answering.", nextActions: ["refresh_plan"] });
+    if (previous?.refreshRequired && !hasFullRequest(payload) && (selectCandidateKey || answers.length > 0)) return businessError({ fieldPath: "planHandle", reasonCode: "contract_refresh_required", message: "Refresh this unexecuted plan with scoring:{} and the current revision before selecting or answering.", nextActions: ["refresh_plan"] });
     for (const [index, answer] of answers.entries()) {
       const question = previous?.questions?.find(item => item.questionId === answer.questionId);
       const fieldPath = `answers[${index}].${question ? "choice" : "questionId"}`;
@@ -1384,7 +1384,7 @@ async function executePlanTool(input: Readonly<{
       state: {
         ...draft,
         acceptedGaps: draft.acceptedGaps.map((gap) => ({ ...gap, revision })),
-        ...(selectOptionId ? { pinnedOptionId: selectOptionId } : {})
+        ...(selectCandidateKey ? { pinnedCandidateKey: selectCandidateKey } : {})
       }
     });
     const pendingInput = hasFullRequest(payload)
@@ -1394,7 +1394,7 @@ async function executePlanTool(input: Readonly<{
 
     const persistProcessing = (!resume || (!input.matchPort && payload.operation !== "get" && Boolean(payload.idempotencyKey))) && !(
       !hasFullRequest(payload) &&
-      !selectOptionId &&
+      !selectCandidateKey &&
       answers.length === 0 &&
       !ack &&
       previous &&
@@ -1416,7 +1416,7 @@ async function executePlanTool(input: Readonly<{
         processing,
         resume,
         revision,
-        selectOptionId,
+        selectCandidateKey,
         shownRevision,
         state
       } satisfies PreparedPlanCommand;
@@ -1488,7 +1488,7 @@ async function executePlanTool(input: Readonly<{
       processing,
       resume: false,
       revision,
-      selectOptionId,
+      selectCandidateKey,
       shownRevision,
       state
     };
@@ -1516,7 +1516,7 @@ async function executePlanTool(input: Readonly<{
   if (!prepared.resume && prepared.previous && isTerminalPlanStatus(prepared.previous.status)) {
     const isPoll =
       !hasFullRequest(payload) &&
-      !prepared.selectOptionId &&
+      !prepared.selectCandidateKey &&
       prepared.answers.length === 0 &&
       !prepared.ack;
 
@@ -1669,36 +1669,36 @@ async function completePreparedPlan(
   const replacingPendingRequest = prepared.resume && Boolean(input.payload.planHandle) && hasFullRequest(input.payload);
   const answers = [...(replacingPendingRequest ? [] : pendingInput?.answers ?? []), ...prepared.answers];
   const ack = prepared.ack ?? pendingInput?.safetyAcknowledgement ?? null;
-  const selectOptionId = prepared.selectOptionId;
+  const selectCandidateKey = prepared.selectCandidateKey;
   const previous = prepared.previous;
   const revision = prepared.revision;
   const shownRevision = prepared.shownRevision;
 
-  if (selectOptionId) {
+  if (selectCandidateKey) {
     if (!previous) {
       return businessError({
-        fieldPath: "selectOptionId",
+        fieldPath: "selectCandidateKey",
         message: "Not found.",
         reasonCode: "not_found"
       });
     }
 
     const option: StackOption | null =
-      previous.selected?.optionId === selectOptionId
+      previous.selected?.candidateKey === selectCandidateKey
         ? previous.selected
-        : previous.alternatives.find((item) => item.optionId === selectOptionId) ??
+        : previous.alternatives.find((item) => item.candidateKey === selectCandidateKey) ??
           null;
 
     if (!option) {
       return businessError({
-        fieldPath: "selectOptionId",
+        fieldPath: "selectCandidateKey",
         message: "Not found.",
         reasonCode: "not_found"
       });
     }
 
     if (!isolated && option.snapshotId && option.snapshotId !== catalogueSnapshotId(snapshot)) {
-      return businessError({ fieldPath: "optionId", reasonCode: "availability_changed", message: "Catalogue facts changed after this option was evaluated. Refine with scoring:{} and the current revision, review the new options, then select a returned option ID.", nextActions: ["refresh_plan"] });
+      return businessError({ fieldPath: "planHandle", reasonCode: "availability_changed", message: "Catalogue facts changed after this recommendation was evaluated. Refine with scoring:{} and the current revision, review the refreshed recommendation, then confirm it.", nextActions: ["refresh_plan"] });
     }
     const nextResult = buildPinnedResult({
       locale: prepared.locale,
@@ -1708,7 +1708,7 @@ async function completePreparedPlan(
       snapshot,
       state: {
         ...prepared.state,
-        pinnedOptionId: option.optionId
+        pinnedCandidateKey: option.candidateKey
       }
     });
     return persistTerminalPlan({
@@ -1740,7 +1740,7 @@ async function completePreparedPlan(
         ? {
             ...merged,
             leftovers: previous!.requestSnapshot.leftovers,
-            pinnedOptionId: previous!.selected?.optionId ?? null
+            pinnedCandidateKey: previous!.selected?.candidateKey ?? null
           }
         : merged;
     } else if (previous) {
@@ -1785,7 +1785,7 @@ async function completePreparedPlan(
                 (row) => row.reason === item.reason && row.name === item.name
               ) === index
           ),
-          pinnedOptionId: previous!.selected?.optionId ?? null
+          pinnedCandidateKey: previous!.selected?.candidateKey ?? null
         }
       : merged;
   } else if (prepared.resume || hasFullRequest(input.payload)) {
@@ -1811,7 +1811,7 @@ async function completePreparedPlan(
       ? {
           ...merged,
           leftovers: previous.requestSnapshot.leftovers,
-          pinnedOptionId: previous.selected?.optionId ?? null
+          pinnedCandidateKey: previous.selected?.candidateKey ?? null
         }
       : merged;
   } else {
@@ -1822,7 +1822,7 @@ async function completePreparedPlan(
     });
   }
 
-  if (state.scoring) state = { ...state, pinnedOptionId: null };
+  if (state.scoring) state = { ...state, pinnedCandidateKey: null };
 
   if (state.targets.length === 1) {
     const only = state.targets[0]!;
@@ -1884,9 +1884,9 @@ async function completePreparedPlan(
   const locale = negotiateLocale(state.locale);
   const pinnedOption =
     pinPrevious && previous
-      ? previous.selected?.optionId === state.pinnedOptionId || !state.pinnedOptionId
+      ? previous.selected?.candidateKey === state.pinnedCandidateKey || !state.pinnedCandidateKey
         ? previous.selected
-        : previous.alternatives.find((item) => item.optionId === state.pinnedOptionId) ??
+        : previous.alternatives.find((item) => item.candidateKey === state.pinnedCandidateKey) ??
           previous.selected
       : null;
   let result: PlanResult;
@@ -2008,8 +2008,8 @@ async function persistTerminalPlan(input: Readonly<{
     throwIfAborted(planCorrelationId(key));
     // Calculation publishes its immutable snapshot even if the catalogue moved.
     // Only selection must fence current commercial facts; reads project stale results.
-    const selectsOption = input.input.payload.operation === "select" || input.input.payload.selectOptionId ||
-      input.input.payload.optionId || selectFromAnswers(asAnswers(input.input.payload.answers));
+    const selectsOption = input.input.payload.operation === "select" || input.input.payload.selectCandidateKey ||
+      input.input.payload.candidateKey || selectFromAnswers(asAnswers(input.input.payload.answers));
     if (selectsOption && input.expectedCatalogueRevision != null &&
       (!store.isCatalogueRevisionCurrent || !await store.isCatalogueRevisionCurrent(input.expectedCatalogueRevision))) {
       // Keep the saved processing request and its idempotency receipt. A retry

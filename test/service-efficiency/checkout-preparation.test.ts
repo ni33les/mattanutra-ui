@@ -16,7 +16,7 @@ async function fixture(name: string) {
   const app=runtime(name), created=await rpcWithTaskExecutor(app,"plan",{operation:"create",idempotencyKey:name,request,responseView:"full"});
   const option=created.options.find(row=>row.purchaseEligible && row.basket.length && row.roles?.includes("closest_dose"));
   assert.ok(option, "Checkout contention fixtures require an explicit eligible purchase");
-  const plan=await rpcWithTaskExecutor(app,"plan",{operation:"select",planHandle:created.planHandle,expectedRevision:created.revision,optionId:option.optionId,idempotencyKey:name+"-select",responseView:"full"});
+  const plan=await rpcWithTaskExecutor(app,"plan",{operation:"select",planHandle:created.planHandle,expectedRevision:created.revision,candidateKey:option.candidateKey,idempotencyKey:name+"-select",responseView:"full"});
   assert.equal(plan.status,"ready");
   return {app,call:{...app,now:app.now!,expectedRevision:Number(plan.revision),planHandle:String(plan.planHandle),idempotencyKey:name+"-execute"}};
 }

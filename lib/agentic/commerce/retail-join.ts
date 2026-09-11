@@ -283,7 +283,7 @@ export async function persistMcpAssessment(input: Readonly<{
 }
 
 export async function persistMcpPlanFeedback(input: Readonly<{
-  optionId: string | null;
+  candidateKey: string | null;
   planId: string;
   rating: number | null;
   revision: number;
@@ -314,7 +314,7 @@ export async function persistMcpPlanFeedback(input: Readonly<{
         {
           body: input.summary.trim(),
           feedbackType: "other",
-          itemId: input.optionId,
+          itemId: input.candidateKey,
           itemName: "MCP plan",
           itemType: "plan",
           urgency: "normal"

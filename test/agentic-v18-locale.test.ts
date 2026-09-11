@@ -150,7 +150,7 @@ describe("v1.8 TECH-04 locale/business boundary", () => {
     assert.equal(th.result.status, "ready");
     assert.equal(canonicalHashOf(th.result), canonicalHashOf(en.result));
     assert.deepEqual(coverageOf(th.result), coverageOf(en.result));
-    assert.equal(th.result.optionId, en.result.optionId);
+    assert.equal(th.result.candidateKey, en.result.candidateKey);
     assert.equal(th.result.estimatedOrderTotalMinor, en.result.estimatedOrderTotalMinor);
     assert.deepEqual(th.result.orderSchedule, en.result.orderSchedule);
     const pointer = firstForbiddenDiff(localeDiff(en.result, th.result));
@@ -223,7 +223,7 @@ describe("v1.8 TECH-04 locale/business boundary", () => {
     const enC = compactOf(en.result);
     const thC = compactOf(th.result);
     assert.equal(enC.status, thC.status);
-    assert.equal(enC.optionId, thC.optionId);
+    assert.equal(enC.candidateKey, thC.candidateKey);
     assert.deepEqual(enC.cost, thC.cost);
     assert.ok(String(enC.why ?? "").length > 0);
     assert.ok(String(thC.why ?? "").length > 0);
@@ -350,7 +350,7 @@ describe("v1.8 TECH-04 locale/business boundary", () => {
         tuples.push(
           serialize({
             hash: canonicalHashOf(created.result),
-            optionId: created.result.optionId ?? null,
+            candidateKey: created.result.candidateKey ?? null,
             basket: created.result.basket ?? null,
             coverage: created.result.coverage ?? null,
             orderSchedule: created.result.orderSchedule ?? null,

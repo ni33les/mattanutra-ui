@@ -48,7 +48,7 @@ function planState(overrides: Partial<CanonicalPlanState> = {}): CanonicalPlanSt
     locale: "en",
     medicationCodes: [],
     optimization: "fewest_pills",
-    pinnedOptionId: null,
+    pinnedCandidateKey: null,
     profile: { ageYears: 52, lifeStage: "adult", sex: "male" },
     requirements: {},
     safetyAcknowledgement: null,
@@ -136,7 +136,7 @@ function magOption(coverage: CoverageRow, item: BasketItem): StackOption {
     coveragePercent: coverage.coveragePercent,
     dailyPills: item.dailyPills,
     matcherVersion: "pareto-hybrid-1",
-    optionId: "opt_test_mag",
+    candidateKey: "opt_test_mag",
     reason: "fewest_pills",
     snapshotId: "snap_test",
     totalPriceMinor: 618000

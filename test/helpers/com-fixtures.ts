@@ -249,7 +249,7 @@ function basketFromProduct(
 }
 
 function optionFromBasket(
-  optionId: string,
+  candidateKey: string,
   items: readonly BasketItem[],
   reason: string
 ): StackOption {
@@ -261,7 +261,7 @@ function optionFromBasket(
     coveragePercent: 100,
     dailyPills,
     matcherVersion: "pareto-hybrid-1",
-    optionId,
+    candidateKey,
     reason,
     snapshotId: COM_SNAPSHOT_ID,
     totalPriceMinor
@@ -289,7 +289,7 @@ function safetyGuidance(action: SafetyGuidance["action"]): SafetyGuidance {
   };
 }
 
-function requestSnapshot(selectedOptionId: string | null) {
+function requestSnapshot(selectedCandidateKey: string | null) {
   return {
     acceptedGaps: [],
     conditionCodes: [],
@@ -298,9 +298,9 @@ function requestSnapshot(selectedOptionId: string | null) {
     destinationCountry: "TH",
     leftovers: [],
     locale: "en",
-    medicationCodes: selectedOptionId === COM_OPT_B_LOW ? ["apixaban"] : [],
+    medicationCodes: selectedCandidateKey === COM_OPT_B_LOW ? ["apixaban"] : [],
     optimization: "lowest_cost" as const,
-    pinnedOptionId: selectedOptionId,
+    pinnedCandidateKey: selectedCandidateKey,
     profile: {
       ageYears: 38,
       lifeStage: "adult" as const,
@@ -308,7 +308,7 @@ function requestSnapshot(selectedOptionId: string | null) {
     },
     requirements: {},
     safetyAcknowledgement:
-      selectedOptionId === COM_OPT_B_LOW
+      selectedCandidateKey === COM_OPT_B_LOW
         ? {
             confirmed: true as const,
             guidanceIds: [COM_SAFETY_ID],
@@ -333,7 +333,7 @@ function planResult(input: Readonly<{
   selected: StackOption | null;
   status: PlanResult["status"];
 }>): PlanResult {
-  const selectedOptionId = input.selected?.optionId ?? null;
+  const selectedCandidateKey = input.selected?.candidateKey ?? null;
   return {
     contractVersion: AGENTIC_CONTRACT_VERSION,
     alternatives: input.alternatives ?? [],
@@ -350,7 +350,7 @@ function planResult(input: Readonly<{
       constraints: {
         conditionCodes: [],
         medicationCodes: [],
-        ...requestSnapshot(selectedOptionId).requirements
+        ...requestSnapshot(selectedCandidateKey).requirements
       },
       coveragePercent: input.selected?.coveragePercent ?? null,
       leftovers: [],
@@ -359,7 +359,7 @@ function planResult(input: Readonly<{
       productSkus: (input.selected?.basket ?? []).map((item) => item.retailerSku),
       requestedDoses: [],
       requestedNames: [],
-      selectedOptionId,
+      selectedCandidateKey,
       snapshotId: COM_SNAPSHOT_ID
     },
     optimizationEvidence: {
@@ -367,7 +367,7 @@ function planResult(input: Readonly<{
       tieBreak: ["lowest_cost", "fewest_pills"]
     },
     questions: input.questions ?? [],
-    requestSnapshot: requestSnapshot(selectedOptionId),
+    requestSnapshot: requestSnapshot(selectedCandidateKey),
     safetyGuidance: input.safetyGuidance ?? [],
     selected: input.selected,
     status: input.status,
@@ -443,7 +443,7 @@ export type SeededPlan = Readonly<{
   planId: string;
   result: PlanResult;
   revision: number;
-  selectedOptionId: string | null;
+  selectedCandidateKey: string | null;
 }>;
 
 async function seedPlan(
@@ -493,7 +493,7 @@ async function seedPlan(
     planId,
     result: input.result,
     revision,
-    selectedOptionId: input.result.selected?.optionId ?? null
+    selectedCandidateKey: input.result.selected?.candidateKey ?? null
   };
 }
 
@@ -584,7 +584,7 @@ export function frozenOf(value: unknown): Record<string, unknown> {
 
 export function selectedOptionOf(frozen: unknown): string | null {
   const record = frozenOf(frozen);
-  const value = record.selectedOptionId ?? record.selected_option_id;
+  const value = record.selectedCandidateKey ?? record.selected_option_id;
   return typeof value === "string" && value.length > 0 ? value : null;
 }
 

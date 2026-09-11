@@ -94,12 +94,12 @@ describe("web advisory behavior v4", () => {
   });
 
   it("rejects stale selection revisions and excluded products while permitting current clinical-advisory baskets", () => {
-    const selection = { assessmentRevision: 3, selectionRevision: 2, runSelectionRevision: 2, runId: "run", optionId: "option", availableOptionIds: ["option"], selectedIds: [planId], allowedIds: [planId], excludedIds: [] };
+    const selection = { assessmentRevision: 3, selectionRevision: 2, runSelectionRevision: 2, runId: "run", candidateKey: "option", availableCandidateKeys: ["option"], selectedIds: [planId], allowedIds: [planId], excludedIds: [] };
     assert.doesNotThrow(() => requireCurrentProductSelection(selection));
     assert.throws(() => requireCurrentProductSelection({ ...selection, expectedAssessmentRevision: 2 }), /changed/);
     assert.throws(() => requireCurrentProductSelection({ ...selection, runSelectionRevision: 1 }), /changed/);
     assert.throws(() => requireCurrentProductSelection({ ...selection, excludedIds: [planId] }), /Replan/);
-    assert.throws(() => requireCurrentProductSelection({ ...selection, optionId: "old-option" }), /changed/);
+    assert.throws(() => requireCurrentProductSelection({ ...selection, candidateKey: "old-option" }), /changed/);
     assert.throws(() => requireCurrentProductSelection({ ...selection, allowedIds: [planId, taskId] }), /Replan/, "removing part of an option requires replanning");
     assert.deepEqual(normalizedProductExclusions([planId, planId]), [planId]);
     assert.deepEqual(normalizedProductExclusions([]), []);

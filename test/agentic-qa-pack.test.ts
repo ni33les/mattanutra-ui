@@ -58,7 +58,7 @@ function baseRequest(overrides: Record<string, unknown> = {}) {
     };
 }
 function choices(plan: Record<string,unknown>) {
-    assert.equal(plan.ok,true,JSON.stringify(plan)); const rows=plan.choices as Array<{optionId:string;roles:string[];summary:{goodsPrice:number|null;coveragePercent:number|null};products:Array<{name:string;productId:string;imageUrl:string}>;ingredients:Array<{ingredientId:string;name:string;requested:number|null;supplied:number|null}>}>;assert.ok(rows.length);return rows;
+    assert.equal(plan.ok,true,JSON.stringify(plan)); const rows=plan.choices as Array<{candidateKey:string;roles:string[];summary:{goodsPrice:number|null;coveragePercent:number|null};products:Array<{name:string;productId:string;imageUrl:string}>;ingredients:Array<{ingredientId:string;name:string;requested:number|null;supplied:number|null}>}>;assert.ok(rows.length);return rows;
 }
 function namesInBasket(plan: Record<string,unknown>) { return choices(plan).flatMap(row=>row.products.map(item=>item.name)); }
 async function saved(runtime:AgenticRuntime,plan:Record<string,unknown>) { const [id]=await runtime.store.listPlanIdsByPrincipal("agentic-qa");assert.ok(id);const row=await runtime.store.getPlanRevision(id,Number(plan.revision));assert.ok(row);return row; }
@@ -110,10 +110,10 @@ describe("Repository MattaNutra Agentic QA coverage", () => {
         assert.deepEqual(stored.originalRequest?.targets.map(({name,amount,unit})=>({name,amount,unit})),eightTargets());
         assert.ok(stored.requestSnapshot.acceptedGaps.some(row=>row.supplementId===iron.supplementId));
         const option=choices(patched).find(row=>row.products.length);assert.ok(option);
-        const selected=await call(runtime,"plan",{planHandle:patched.planHandle,expectedRevision:patched.revision,idempotencyKey:"qa-a2-select-0000001",selectedOptionId:option.optionId});
+        const selected=await call(runtime,"plan",{planHandle:patched.planHandle,expectedRevision:patched.revision,idempotencyKey:"qa-a2-select-0000001"});
         assert.equal(selected.ok,true);assert.deepEqual(choices(selected).map(row=>row.products),choices(patched).map(row=>row.products));
     });
-    it("A3 optionId stays sticky until targets change", async () => {
+    it("A3 recommendation stays stable until targets change", async () => {
         const runtime = runtimeFor();
         const created = await call(runtime, "plan", {
             idempotencyKey: "qa-a3-create-0000001",
@@ -123,7 +123,7 @@ describe("Repository MattaNutra Agentic QA coverage", () => {
             planHandle: created.planHandle
         });
         assert.equal(sticky.ok, true);
-        assert.deepEqual(choices(sticky).map(row=>row.optionId), choices(created).map(row=>row.optionId));
+        assert.deepEqual(choices(sticky), choices(created));
         const changed = await call(runtime, "plan", {
             expectedRevision: sticky.revision,
             idempotencyKey: "qa-a3-change-0000001",
@@ -131,7 +131,7 @@ describe("Repository MattaNutra Agentic QA coverage", () => {
             targets: [{ingredientId:choices(created).flatMap(row=>row.ingredients).find(row=>row.name==="Vitamin D3")!.ingredientId,amount:2100}]
         });
         assert.equal(changed.ok, true);
-        assert.notDeepEqual(choices(changed).map(row=>row.optionId),choices(created).map(row=>row.optionId));
+        assert.notDeepEqual(choices(changed).map(row=>row.ingredients),choices(created).map(row=>row.ingredients));
     });
     it("A4 clinical advice uses stable family IDs and stale selection revisions fail", async () => {
         const runtime = runtimeFor();
@@ -151,20 +151,21 @@ describe("Repository MattaNutra Agentic QA coverage", () => {
         const stale = await call(runtime, "plan", {
             expectedRevision: 99,
             idempotencyKey: "qa-a4-stale-00000001",
-            planHandle: created.planHandle,
-            selectedOptionId: choices(created).find(row=>row.products.length)!.optionId
+            planHandle: created.planHandle
         });
         assert.equal(stale.ok, false);
         assert.equal((stale.error as {
             reasonCode: string;
         }).reasonCode, "stale_revision");
     });
-    it("A5 defaults to balanced and reconciles the disclosed lower-cost goods price", async () => {
+    it("A5 defaults to best_match and reconciles goods prices after lower-cost refinement", async () => {
         const runtime=runtimeFor(),plan=await call(runtime,"plan",{...baseRequest(),idempotencyKey:"qa-a5-coverage-00001"});
-        assert.equal((plan.scoring as {profile:string}).profile,"balanced");
-        const options=choices(plan);assert.ok(options.some(row=>row.optionId===plan.recommendedOptionId));
+        assert.equal((plan.scoring as {profile:string}).profile,"best_match");
+        const options=choices(plan);assert.equal(options.length,1);assert.ok(options[0].products.length);
         for(const option of options)assert.equal(option.summary.goodsPrice,option.products.reduce((sum,item)=>sum+(item as {lineTotal:number}).lineTotal,0));
-        const cheapest=options.find(row=>row.roles.includes("lower_cost"));assert.ok(cheapest);assert.ok(cheapest.summary.goodsPrice!==null);assert.ok(cheapest.products.length>0);
+        const refined = await call(runtime,"plan",{planHandle:plan.planHandle,expectedRevision:plan.revision,idempotencyKey:"qa-a5-cost-refine-01",scoring:{profile:"lowest_cost"}});
+        assert.equal(refined.ok,true); assert.equal((refined.scoring as {profile:string}).profile,"lowest_cost");
+        const routine=choices(refined)[0];assert.ok(routine);assert.equal(routine.summary.goodsPrice,routine.products.reduce((sum,item)=>sum+(item as {lineTotal:number}).lineTotal,0));
     });
     it("A6 Vitamin K2 is recognised, not INVALID_ARGUMENT", async () => {
         const runtime = runtimeFor();
@@ -294,7 +295,7 @@ describe("Repository MattaNutra Agentic QA coverage", () => {
         assert.equal(plan.ok, true);
         assert.equal(namesInBasket(plan).some((name) => /conceive|prenatal|pregnancy|fertility/i.test(name)), false);
     });
-    it("A13 tools/list is exactly the seven public tools", async () => {
+    it("A13 tools/list is exactly the six public tools", async () => {
         const runtime = runtimeFor();
         const listed = await handleJsonRpc(runtime, { id: 3, method: "tools/list" });
         const names = ((listed?.result?.tools as Array<{

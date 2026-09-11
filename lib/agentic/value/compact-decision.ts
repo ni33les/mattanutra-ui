@@ -1,5 +1,5 @@
 import { adviceKind, type AdviceKind } from "@/lib/agentic/value/advice-kind";
-import { continuedIntakeCoversTargets, highlightedAlternativeOptionId } from "@/lib/agentic/value/customer-choice";
+import { continuedIntakeCoversTargets, highlightedAlternativeCandidateKey } from "@/lib/agentic/value/customer-choice";
 import type { MatchingExplanation } from "@/lib/agentic/value/matching-explanation";
 import { assessPreferences, verifiedPillLowerBound, type PreferenceAssessment, type NumericPreferences } from "@/lib/matcher/preferences";
 import { RESEARCH_VERSION } from "@/lib/agentic/discovery/versions";
@@ -17,7 +17,7 @@ import { requestedTargetCoverage } from "@/lib/agentic/value/coverage-summary";
 const COMPACT_LIMIT_BYTES = 4 * 1024;
 
 export type CompactDecision = Readonly<{
-  highlightedAlternativeOptionId?: string | null;
+  highlightedAlternativeCandidateKey?: string | null;
   preferenceAssessment?: readonly PreferenceAssessment[];
   matchingExplanation?: MatchingExplanation;
   advice: readonly Readonly<{
@@ -48,7 +48,7 @@ export type CompactDecision = Readonly<{
     currency: string;
     firstOrderMinor: number | null;
   }>;
-  optionId: string | null;
+  candidateKey: string | null;
   status: PlanResult["status"];
   what: readonly string[];
   when: string;
@@ -141,7 +141,7 @@ export function buildCompactDecision(result: CompactPlanView, resolvedDecision?:
     dailyPills: selected?.basket.some(item => item.pillCountKnown === false || item.dailyPills == null) ? null : selected?.dailyPills ?? 0,
     firstOrderGoodsPriceMinor: selected?.basket.some(item => item.incompleteCommercialFacts) ? null : selected?.basket.reduce((sum, item) => sum + item.lineTotalMinor, 0) ?? 0, currency: selected?.basket[0]?.currency ?? "THB" }, locale).filter(row => row.status !== "not_requested");
   return {
-    highlightedAlternativeOptionId: highlightedAlternativeOptionId(selected, result.alternatives ?? [], continuedTargetsCovered),
+    highlightedAlternativeCandidateKey: highlightedAlternativeCandidateKey(selected, result.alternatives ?? [], continuedTargetsCovered),
     ...(preferenceAssessment.length ? { preferenceAssessment } : {}),
     ...(matchingExplanation ? { matchingExplanation } : {}),
     advice,
@@ -153,7 +153,7 @@ export function buildCompactDecision(result: CompactPlanView, resolvedDecision?:
       currency: "THB",
       firstOrderMinor: selected?.economics?.cashTotalMinor ?? selected?.totalPriceMinor ?? null
     },
-    optionId: selected?.optionId ?? null,
+    candidateKey: selected?.candidateKey ?? null,
     status: result.status,
     what,
     when: decision.nextAction === "review_options" || (!decision.purchaseEligible && result.status !== "no_purchase")

@@ -58,7 +58,7 @@ function optionWithIncidental(
     coveragePercent: 100,
     dailyPills: 1,
     matcherVersion: "pareto-hybrid-1",
-    optionId: "opt_d3",
+    candidateKey: "opt_d3",
     reason: "test",
     snapshotId: "snap_named",
     totalPriceMinor: 100

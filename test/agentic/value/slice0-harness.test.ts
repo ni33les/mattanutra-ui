@@ -186,7 +186,7 @@ function creatineState(supplementId: string): CanonicalPlanState {
     locale: "en",
     medicationCodes: [],
     optimization: "lowest_cost",
-    pinnedOptionId: null,
+    pinnedCandidateKey: null,
     profile: { ageYears: 35, lifeStage: "adult", sex: "female" },
     requirements: {},
     safetyAcknowledgement: null,

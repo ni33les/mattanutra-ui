@@ -271,7 +271,7 @@ describe("life-stage stack UL on every live matching flow", () => {
           locale: "en",
           medicationCodes: [],
           optimization: "balanced",
-          pinnedOptionId: null,
+          pinnedCandidateKey: null,
           profile: { ageYears: 40, lifeStage: "adult", sex: "female" },
           requirements: { maxProductCount: 2 },
           safetyAcknowledgement: null,

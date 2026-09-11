@@ -223,7 +223,7 @@ optionalTargetAmountsAreCoherent(mag, VALUE_ROLE_REQUEST.magnesium.amount)
     assertEq("FIX-01.A3", "conditional_deferred", d3?.status),
     assertTrue(
       "FIX-01.A4",
-      recommended.role === "minimum_core" || String(plan.optionId ?? "") !== ""
+      recommended.role === "minimum_core" || String(plan.candidateKey ?? "") !== ""
     ),
     assertEq("FIX-01.A5", "ready", plan.status),
     assertTrue(
@@ -245,7 +245,7 @@ optionalTargetAmountsAreCoherent(mag, VALUE_ROLE_REQUEST.magnesium.amount)
     assertTrue(
       "FIX-01.A9",
       !options.some(
-        (item) => item.recommended !== true && item.optionId !== plan.optionId && item.selected === true
+        (item) => item.recommended !== true && item.candidateKey !== plan.candidateKey && item.selected === true
       )
     ),
     assertTrue("FIX-01.A10", hasContextAssessment(plan, "medication", "apixaban")),
@@ -538,7 +538,7 @@ async function runDevState02(session: PlanSession, runIndex: number): Promise<Cv
     operation: "get",
     planHandle: ready.planHandle
   });
-  const selectedId = String(ready.optionId ?? "");
+  const selectedId = String(ready.candidateKey ?? "");
   const revised = await callPlan(session, {
     expectedRevision: ready.revision,
     idempotencyKey: "cv-impl-state-02-revise",
@@ -552,7 +552,7 @@ async function runDevState02(session: PlanSession, runIndex: number): Promise<Cv
         expectedRevision: latest.revision,
         idempotencyKey: "cv-impl-state-02-select",
         operation: "select",
-        optionId: selectedId,
+        candidateKey: selectedId,
         planHandle: ready.planHandle
       })
     : latest;
@@ -586,13 +586,13 @@ async function runDevState03(session: PlanSession, runIndex: number): Promise<Cv
     operation: "get",
     planHandle: created.planHandle
   });
-  const selectedId = String(created.optionId ?? "");
+  const selectedId = String(created.candidateKey ?? "");
   const selected = selectedId
     ? await callPlan(session, {
         expectedRevision: created.revision,
         idempotencyKey: "cv-impl-state-03-select",
         operation: "select",
-        optionId: selectedId,
+        candidateKey: selectedId,
         planHandle: created.planHandle
       })
     : created;
@@ -844,7 +844,7 @@ async function runDevSave01(session: PlanSession, runIndex: number): Promise<CvI
   const plan = await createPlan(session, core.request);
   const economics = economicsOf(plan);
   const baseline = asRecord(economics.baseline);
-  const optionIds = basketOf(plan).map((item) => String(item.productId)).slice().sort();
+  const candidateKeys = basketOf(plan).map((item) => String(item.productId)).slice().sort();
   const baselineIds = (Array.isArray(baseline.lines) ? baseline.lines.map(asRecord) : [])
     .map((item) => String(item.productId))
     .slice()
@@ -855,7 +855,7 @@ async function runDevSave01(session: PlanSession, runIndex: number): Promise<CvI
     assertEq("SAVE-01.complete", true, economics.complete),
     assertEq("SAVE-01.claim", "none", economics.savingClaim),
     assertEq("SAVE-01.saving", 0, economics.savings90DayMinor),
-    assertTrue("SAVE-01.sameProducts", optionIds.join("|") === baselineIds.join("|")),
+    assertTrue("SAVE-01.sameProducts", candidateKeys.join("|") === baselineIds.join("|")),
     assertTrue("SAVE-01.basis", Boolean(asRecord(economics.comparisonBasis).catalogId))
   ];
   return conclude(
@@ -1017,7 +1017,7 @@ async function runDevContract01(session: PlanSession, runIndex: number): Promise
   const blob = planSchemaBlob();
   const assertions = [
     assertEq("CONTRACT-01.names", "info,plan,execute,order,support,feedback", names.join()),
-    assertTrue("CONTRACT-01.ops", AGENTIC_TOOL_SCHEMAS.plan.anyOf.length === 5 && ["targets", "planHandle", "answers", "selectedOptionId", "expectedRevision", "idempotencyKey"].every(field => blob.includes(JSON.stringify(field))) && !blob.includes('"operation"')),
+    assertTrue("CONTRACT-01.ops", AGENTIC_TOOL_SCHEMAS.plan.anyOf.length === 5 && ["targets", "planHandle", "answers", "expectedRevision", "idempotencyKey"].every(field => blob.includes(JSON.stringify(field))) && !blob.includes('"operation"')),
     assertTrue("CONTRACT-01.importance", !blob.includes('"importance"') && blob.includes('"weights"')),
     assertTrue("CONTRACT-01.range", blob.includes('"acceptableRange"')),
     assertTrue("CONTRACT-01.prerequisite", !blob.includes('"prerequisite"') && blob.includes('"basis"')),
@@ -1361,7 +1361,7 @@ async function runDevDet01(session: PlanSession, runIndex: number): Promise<CvIm
   const assertions = [
     assertEq("DET-01.status", first.status, second.status),
     assertEq("DET-01.coverage", coverageSignature(first), coverageSignature(second)),
-    assertEq("DET-01.option", first.optionId ?? null, second.optionId ?? null)
+    assertEq("DET-01.option", first.candidateKey ?? null, second.candidateKey ?? null)
   ];
   return conclude("DEV-DET-01", assertions, envelopeFor(session, request, first, assertions, runIndex));
 }
@@ -1384,7 +1384,7 @@ async function runDevDet03(session: PlanSession, runIndex: number): Promise<CvIm
     hashes.push(
       canonicalHash({
         coverage: coverageSignature(plan),
-        optionId: plan.optionId ?? null,
+        candidateKey: plan.candidateKey ?? null,
         status: plan.status ?? null
       })
     );
@@ -1416,7 +1416,7 @@ async function runDevDet04(session: PlanSession, runIndex: number): Promise<CvIm
         // Coverage follows the requested display order; compare complete rows by identity.
         coverage: coverageOf(plan).sort((left, right) => String(left.supplementId).localeCompare(String(right.supplementId))),
         basket: basketOf(plan),
-        optionId: plan.optionId ?? null,
+        candidateKey: plan.candidateKey ?? null,
         status: plan.status ?? null
       })
     );
@@ -1452,7 +1452,7 @@ async function runDevDet06(session: PlanSession, runIndex: number): Promise<CvIm
   const plan = await createPlan(session, primaryRequest(session.freeze));
   const base = canonicalHash({
     coverage: coverageSignature(plan),
-    optionId: plan.optionId ?? null,
+    candidateKey: plan.candidateKey ?? null,
     productIds: basketOf(plan).map((item) => item.productId),
     quantity: basketOf(plan).map((item) => item.quantity),
     savings: economicsOf(plan).savings90DayMinor ?? null,
@@ -1460,7 +1460,7 @@ async function runDevDet06(session: PlanSession, runIndex: number): Promise<CvIm
   });
   const mutated = canonicalHash({
     coverage: coverageSignature(plan),
-    optionId: `${String(plan.optionId ?? "x")}-mut`,
+    candidateKey: `${String(plan.candidateKey ?? "x")}-mut`,
     productIds: basketOf(plan).map((item) => `${item.productId}-x`),
     quantity: basketOf(plan).map((item) => Number(item.quantity) + 1),
     savings: Number(economicsOf(plan).savings90DayMinor ?? 0) + 1,

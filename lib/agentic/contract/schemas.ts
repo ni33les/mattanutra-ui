@@ -69,7 +69,7 @@ export const INTAKE_OBSERVATION_SCHEMA = Type.Union([
 export type IntakeObservation = Static<typeof INTAKE_OBSERVATION_SCHEMA>;
 export const PLAN_REQUEST = object({
   answers: optional(PLAN_ANSWERS),
-  conditionCodes: optional({ ...strings(), description: "Condition codes from info.conditionCodes; unrecognised reported context is preserved as unassessed advice." }), medicationCodes: optional({ ...strings(), description: "Medication codes from info.medicationCodes; omission means unknown, not confirmed none." }),
+  conditionCodes: optional({ ...strings(), description: "Reported condition codes; accepted inputs do not establish assessed interaction coverage." }), medicationCodes: optional({ ...strings(), description: "Medication codes from info.medicationCodes; omission means unknown, not confirmed none." }),
   currentSupplements: optional(Type.Array(object({ dailyAmount: amount, daysRemaining: optional(Type.Number({ exclusiveMinimum: 0, maximum: 36500, description: "Positive remaining days of retained inventory. Omit when unknown. If none remains, remove this retained inventory entry and revise the intended request." })), name: text(240), productId: optional(productId), supplementId: optional(supplementId), unit: UNIT_SCHEMA }), { maxItems: 50, description: "Quantified continued supplements. Omission means unknown; [] explicitly reports none. A (productId, nutrient) pair may occur only once across this field and current-source intake observations." })),
   intake: optional(Type.Array(INTAKE_OBSERVATION_SCHEMA, { maxItems: 100, description: "Reported observations. Omission or [] does not establish zero dietary intake. An explicitly reported known amount of 0 is required to establish zero for a nutrient." })),
   costHorizonsDays: optional(Type.Array(Type.Unsafe<30 | 90>({ type: "integer", enum: [30, 90] }), { minItems: 1, maxItems: 2, uniqueItems: true, default: [30, 90], description: "Supported comparison horizons in days. The response exposes the 30- and 90-day ledgers; other periods are unavailable." })),
@@ -102,12 +102,12 @@ const targetFields = { ingredientId: optional(ingredientId), name: optional(text
 const targetCreate = { ...object(targetFields), anyOf: [{ required: ["ingredientId"] }, { required: ["name"] }] };
 const targetEdit = object({ ingredientId, amount: optional(nullable(targetAmount)), unit: optional(UNIT_SCHEMA), basis: TARGET_SCHEMA.properties.basis,
   acceptableRange: TARGET_SCHEMA.properties.acceptableRange });
-const conversationalRequirements = Type.Omit(REQUIREMENTS_SCHEMA, ["preferenceImportance"]);
+const conversationalRequirements = { ...Type.Omit(REQUIREMENTS_SCHEMA, ["preferenceImportance"]), description: "Numerical values are advisory preferences for ranking, never purchase limits. Omission preserves; null clears. Zero remains advisory. Unknown quantities remain unknown. Public health advice reports only quantified exposure above MattaNutra recommended limits." };
 const contextFields = { locale: PLAN_REQUEST.properties.locale, destinationCountry: PLAN_REQUEST.properties.destinationCountry,
   profile: optional(PROFILE_SCHEMA), requirements: optional(conversationalRequirements), scoring: optional(SCORING_SCHEMA), searchEffort: optional(SEARCH_EFFORT_SCHEMA),
   medicationCodes: PLAN_REQUEST.properties.medicationCodes, conditionCodes: PLAN_REQUEST.properties.conditionCodes,
   currentSupplements: PLAN_REQUEST.properties.currentSupplements, intake: PLAN_REQUEST.properties.intake,
-  baseline: PLAN_REQUEST.properties.baseline, costHorizonsDays: PLAN_REQUEST.properties.costHorizonsDays };
+  baseline: PLAN_REQUEST.properties.baseline, costHorizonsDays: { ...PLAN_REQUEST.properties.costHorizonsDays, description: "Internal comparison horizons in days: 30 and/or 90. The decision reports first-order goods prices and verified supply duration; it does not return recurring-cost ledgers." } };
 const refinement = Type.Partial(object({ ...contextFields, targets: Type.Array(Type.Union([targetEdit, targetCreate]), { maxItems: 100 }) }));
 export const PLAN_REFINEMENT_FIELDS = Object.keys(refinement.properties);
 const controls = { planHandle: handle, expectedRevision: revision, idempotencyKey: key };
@@ -116,7 +116,7 @@ export const PLAN_BRANCH_SCHEMAS = {
   get: object({ planHandle: handle }),
   revise: { ...object({ ...refinement.properties, ...controls }), anyOf: PLAN_REFINEMENT_FIELDS.map(field => ({ required: [field] })) },
   answer: object({ ...controls, answers: { ...PLAN_ANSWERS, minItems: 1 } }),
-  select: object({ ...controls, selectedOptionId: Type.String({ minLength: 8, maxLength: 128 }) })
+  select: object(controls)
 } as const;
 export const PLAN_INPUT_SCHEMA = visibleOperationVariants(Type.Union(Object.values(PLAN_BRANCH_SCHEMAS)));
 export const PLAN_ADVERTISED_SCHEMA = PLAN_INPUT_SCHEMA;
@@ -124,7 +124,7 @@ export const INFO_INPUT_SCHEMA = object({ locale: optional(Type.String({ minLeng
 export const EXECUTE_INPUT_SCHEMA = object({ planHandle: handle, expectedRevision: revision, idempotencyKey: key });
 export const ORDER_INPUT_SCHEMA = object({ orderHandle: handle, locale: optional(text(35)) });
 export const SUPPORT_INPUT_SCHEMA = object({ orderHandle: handle, supportHandle: optional(handle), idempotencyKey: key, message: text(4000) });
-export const FEEDBACK_INPUT_SCHEMA = object({ planHandle: handle, expectedRevision: revision, idempotencyKey: key, consentConfirmed: Type.Literal(true), optionId: optional(Type.String({ minLength: 8, maxLength: 128 })), points: optional(Type.Array(text(240), { maxItems: 8, uniqueItems: true })), rating: optional(Type.Integer({ minimum: 1, maximum: 5 })), summary: optional(text(1000)) });
+export const FEEDBACK_INPUT_SCHEMA = object({ planHandle: handle, expectedRevision: revision, idempotencyKey: key, consentConfirmed: Type.Literal(true), points: optional(Type.Array(text(240), { maxItems: 8, uniqueItems: true })), rating: optional(Type.Integer({ minimum: 1, maximum: 5 })), summary: optional(text(1000)) });
 export const AGENTIC_INPUT_SCHEMAS = { info: INFO_INPUT_SCHEMA, plan: PLAN_INPUT_SCHEMA, execute: EXECUTE_INPUT_SCHEMA, order: ORDER_INPUT_SCHEMA, support: SUPPORT_INPUT_SCHEMA, feedback: FEEDBACK_INPUT_SCHEMA } as const;
 export const AGENTIC_TOOL_SCHEMAS = AGENTIC_INPUT_SCHEMAS;
 export const EXECUTE_ADVERTISED_SCHEMA = EXECUTE_INPUT_SCHEMA;

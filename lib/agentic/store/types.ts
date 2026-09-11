@@ -219,7 +219,7 @@ export type FeedbackRecord = Readonly<{
   consentConfirmed: true;
   createdAt: string;
   id: string;
-  optionId: string | null;
+  candidateKey: string | null;
   planId: string;
   points: readonly string[];
   rating: number | null;

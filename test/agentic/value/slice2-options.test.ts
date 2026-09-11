@@ -22,7 +22,7 @@ function intentState(snapshot = sampleValueSnapshot()): CanonicalPlanState {
     locale: "en",
     medicationCodes: [],
     optimization: "lowest_cost",
-    pinnedOptionId: null,
+    pinnedCandidateKey: null,
     profile: { ageYears: 35, lifeStage: "adult", sex: "female" },
     requirements: {},
     safetyAcknowledgement: null,
@@ -101,15 +101,15 @@ describe("Slice 2 value options and current supplements", () => {
       )
     );
     assert.equal(signatures.size, options.length);
-    const extra = options.filter((item) => item.optionId !== core.optionId);
+    const extra = options.filter((item) => item.candidateKey !== core.candidateKey);
     for (const option of extra) {
       assert.ok(option.tradeOff?.cash90DayDeltaMinor != null);
       assert.ok(option.tradeOff?.coverageDelta != null);
       assert.ok(option.tradeOff?.dailyPillsDelta != null);
     }
     assert.equal(
-      canonicalHash(options.map((item) => item.optionId)),
-      canonicalHash(optionList(second.selected, second.alternatives).map((item) => item.optionId))
+      canonicalHash(options.map((item) => item.candidateKey)),
+      canonicalHash(optionList(second.selected, second.alternatives).map((item) => item.candidateKey))
     );
   });
 

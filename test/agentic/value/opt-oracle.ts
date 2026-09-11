@@ -130,7 +130,7 @@ export function oracleDominates(left: StackOption, right: StackOption) {
 export function oracleHasDominatedPair(options: readonly StackOption[]) {
   for (const left of options) {
     for (const right of options) {
-      if (left.optionId === right.optionId) {
+      if (left.candidateKey === right.candidateKey) {
         continue;
       }
 
@@ -174,13 +174,13 @@ export function oracleLabelRoles(options: readonly StackOption[]) {
   const fewerConcerns = requestedObjective ? [...eligible].sort(compareFit).find(option => concerns(option) < concerns(requestedObjective) &&
     requestedObjective.coverage.every(reference => (option.coverage.find(row => row.supplementId === reference.supplementId)?.coveragePercent ?? 0) >= reference.coveragePercent)) : undefined;
   const fallback = requestedObjective?.basket.length === 0 ? [...eligible].sort(compareFit)[0] : undefined;
-  const rolesByOptionId = new Map<string, string[]>();
+  const rolesByCandidateKey = new Map<string, string[]>();
   for (const [option, role] of [[requestedObjective, "best_match"], [closest, "closest_dose"], [lowerCost, "lower_cost"], [simpler, "simpler"], [fewerConcerns, "fewer_concerns"], [fallback, "purchase_fallback"]] as const) {
-    if (option) rolesByOptionId.set(option.optionId, [...(rolesByOptionId.get(option.optionId) ?? []), role]);
+    if (option) rolesByCandidateKey.set(option.candidateKey, [...(rolesByCandidateKey.get(option.candidateKey) ?? []), role]);
   }
-  const byOptionId = new Map(options.map(option => [option.optionId,
-    option.optionId === requestedObjective?.optionId ? "requested_objective" : rolesByOptionId.get(option.optionId)?.includes("fewer_concerns") ? "fewer_concerns" : "best_value"] as const));
-  return { byOptionId, rolesByOptionId, noDistinctAlternative: options.length === 1, recommended: requestedObjective, requestedObjective };
+  const byCandidateKey = new Map(options.map(option => [option.candidateKey,
+    option.candidateKey === requestedObjective?.candidateKey ? "requested_objective" : rolesByCandidateKey.get(option.candidateKey)?.includes("fewer_concerns") ? "fewer_concerns" : "best_value"] as const));
+  return { byCandidateKey, rolesByCandidateKey, noDistinctAlternative: options.length === 1, recommended: requestedObjective, requestedObjective };
 }
 
 export function oracleAcceptedTargetIds(coverage: readonly CoverageRow[]) {

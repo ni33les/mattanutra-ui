@@ -191,5 +191,20 @@
       "test/web-journey-fix/search.test.ts",
       "test/web-reveal-tidy.test.ts"
     ]
+  },
+  "singleRecommendationConfirmation": {
+    "testFirstCommits": [
+      "76bf0aae",
+      "2d61c107"
+    ],
+    "replaced": "Revision-scoped public option identifiers and client selection of hidden alternatives",
+    "replacement": "Confirm the single returned recommendation with handle/revision/key. Refine explicit products or weights before confirmation; no replacement candidate IDs on the MCP wire.",
+    "redEvidence": [
+      "noid-red.log",
+      "noid-publication-red.log",
+      "noid-frozen-red.log"
+    ],
+    "retained": "Products, doses, original prices, commerce assertions and stored payment hashes. Private historical storage decoding is isolated in recommendation-storage.ts. Old MCP handles stay unsupported.",
+    "commerceFixture": "Vitamin C commerce tests use the same frozen 1000 mg/25000-minor product as an explicit one-serving proposal, instead of selecting a hidden alternative."
   }
 }

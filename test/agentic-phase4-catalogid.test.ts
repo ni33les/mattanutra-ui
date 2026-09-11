@@ -11,7 +11,7 @@ function option(snapshotId: string): StackOption {
     coveragePercent: 0,
     dailyPills: 1,
     matcherVersion: "pareto-hybrid-1",
-    optionId: "opt_frozen",
+    candidateKey: "opt_frozen",
     reason: "test",
     snapshotId,
     totalPriceMinor: 100

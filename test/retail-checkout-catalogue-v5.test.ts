@@ -50,7 +50,7 @@ it('V5-CHECKOUT-03: exact existing intent resumes its frozen payment without cat
 it('NOID-COM-01 previously saved web recommendations preserve their selected products and prices after protocol cleanup', async () => {
   const base = database('7');
   const sql = (async (parts: TemplateStringsArray, ...values: unknown[]) => {
-    const rows = await (base.sql as Function)(parts, ...values);
+    const rows = await (base.sql as (parts: TemplateStringsArray, ...values: unknown[]) => Promise<Array<{diagnostics: Record<string, unknown>}>>)(parts, ...values);
     if (parts.join('?').includes('product_recommendation_runs')) rows[0].diagnostics.matching = {
       selectedOptionId: 'option', options: [{ optionId: 'option', productIds, recommendations: [] }]
     };

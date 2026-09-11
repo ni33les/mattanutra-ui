@@ -320,7 +320,7 @@ export async function runCvFixPack(frozenInput?: ValueCatalogueFreeze): Promise<
         if (d3?.status !== "conditional_deferred") {
           failed.push("FIX-01.A3");
         }
-        if (recommended.role !== "minimum_core" && String(plan.optionId ?? "") === "") {
+        if (recommended.role !== "minimum_core" && String(plan.candidateKey ?? "") === "") {
           failed.push("FIX-01.A4");
         }
         if (plan.status !== "ready") {
@@ -336,7 +336,7 @@ export async function runCvFixPack(frozenInput?: ValueCatalogueFreeze): Promise<
         if (/required|choose|another choice|accept or remove/i.test(summary) && plan.status !== "ready") {
           failed.push("FIX-01.A8");
         }
-        const extra = options.filter((item) => item.recommended !== true && item.optionId !== plan.optionId);
+        const extra = options.filter((item) => item.recommended !== true && item.candidateKey !== plan.candidateKey);
         if (extra.some((item) => item.selected === true)) {
           failed.push("FIX-01.A9");
         }
@@ -357,12 +357,12 @@ export async function runCvFixPack(frozenInput?: ValueCatalogueFreeze): Promise<
           ? fail("FIX-01", {
               failed,
               coverage,
-              optionId: plan.optionId ?? null,
+              candidateKey: plan.candidateKey ?? null,
               questions: questions.map((item) => item.questionId),
               status: plan.status ?? null,
               summary
             })
-          : pass("FIX-01", { optionId: plan.optionId ?? null, status: plan.status });
+          : pass("FIX-01", { candidateKey: plan.candidateKey ?? null, status: plan.status });
       })
     );
 
@@ -863,13 +863,13 @@ export async function runCvFixPack(frozenInput?: ValueCatalogueFreeze): Promise<
           : {};
         const left = canonicalHash({
           nextActions: secondPlan.nextActions ?? null,
-          optionId: secondPlan.optionId ?? null,
+          candidateKey: secondPlan.candidateKey ?? null,
           roles: optionsOf(secondPlan).map((item) => item.role ?? null),
           status: secondPlan.status ?? null
         });
         const right = canonicalHash({
           nextActions: thirdPlan.nextActions ?? null,
-          optionId: thirdPlan.optionId ?? null,
+          candidateKey: thirdPlan.candidateKey ?? null,
           roles: optionsOf(thirdPlan).map((item) => item.role ?? null),
           status: thirdPlan.status ?? null
         });
@@ -888,7 +888,7 @@ export async function runCvFixPack(frozenInput?: ValueCatalogueFreeze): Promise<
           const plan = await createPlan(freeze, primaryRequest(freeze));
           hashes.push(
             canonicalHash({
-              optionId: plan.optionId ?? null,
+              candidateKey: plan.candidateKey ?? null,
               roles: optionsOf(plan).map((item) => item.role ?? null),
               status: plan.status ?? null
             })

@@ -223,7 +223,7 @@ export function canonicalTuple(result: Record<string, unknown>) {
   const canonical = asRecord(result.canonical);
   return JSON.stringify({
     hash: String(canonical.hash ?? ""),
-    optionId: String(selected.optionId ?? result.optionId ?? ""),
+    candidateKey: String(selected.candidateKey ?? result.candidateKey ?? ""),
     schedule: result.orderSchedule ?? null,
     snapshotId: String(result.catalogueSnapshotId ?? result.snapshotId ?? "")
   });

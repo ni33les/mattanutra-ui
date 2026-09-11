@@ -100,17 +100,17 @@ try {
     assert.ok(chosen, "Controlled C/D3 labels must retain their exact-dose purchase alternative");
     const options = matching.options.map(option => {
       if (scenario.scenario !== "practical_advice") return option;
-      const medical = webHealthAdvice({ code: "medication_interaction", kind: "context", ingredient: option.optionId === chosen.optionId ? "Selected fixture nutrient" : "Alternative fixture nutrient", evidence: "Explicit isolated UI interaction fixture" });
+      const medical = webHealthAdvice({ code: "medication_interaction", kind: "context", ingredient: option.candidateKey === chosen.candidateKey ? "Selected fixture nutrient" : "Alternative fixture nutrient", evidence: "Explicit isolated UI interaction fixture" });
       const incomplete = webHealthAdvice({ code: "intake_unknown", kind: "unknown", ingredient: "Fixture intake" });
       return { ...option, advice: [medical, medical, incomplete, incomplete] };
     });
     recommendation = { ...recommendation, recommendations: [...chosen.recommendations],
       stackCoveragePercent: chosen.coveragePercent, supplementProductCoveragePercent: chosen.coveragePercent,
-      diagnostics: { ...recommendation.diagnostics, matching: { ...matching, operationalStatus: "ready", selectedOptionId: chosen.optionId, options } } };
+      diagnostics: { ...recommendation.diagnostics, matching: { ...matching, operationalStatus: "ready", selectedCandidateKey: chosen.candidateKey, options } } };
   }
   assert.ok(recommendation.recommendations.length, "Browser fixture must contain an actual product basket");
   const selectedIds = recommendation.recommendations.map(item => item.product.id);
-  const selectedOptionId = recommendation.diagnostics.matching!.selectedOptionId!;
+  const selectedCandidateKey = recommendation.diagnostics.matching!.selectedCandidateKey!;
   const price = Number(product.unitPriceAmount ?? product.priceAmount);
   assert.ok(price > 0);
   const rawAnswers = { firstName: "Browser Fixture", sex: "female", age: "36-45", goals: ["energy", "bone"], activity: "light", meds: "none", kidney: "normal", liver: "normal", surgery: "none", supplements: "none", reproStatus: "none" };
@@ -158,9 +158,9 @@ try {
         ${tx.json(toJsonValue(quoteLines))}, '{"source":"isolated_browser_fixture","synthetic":true,"channel":"web"}', ${`browser-fixture:${paymentId}`}, now(), now())`;
 
   });
-  const checkoutQuery = new URLSearchParams({ plan: planId, selected: selectedIds.join(","), removed: "", run: runId, option: selectedOptionId, revision: "1", selectionRevision: "0", retailer: set.organisationId });
-  const selectedOption = recommendation.diagnostics.matching!.options.find(option => option.optionId === selectedOptionId)!;
-  const alternative = recommendation.diagnostics.matching!.options.find(option => option.optionId !== selectedOptionId && option.purchaseEligible && option.productIds.length > 0);
+  const checkoutQuery = new URLSearchParams({ plan: planId, selected: selectedIds.join(","), removed: "", run: runId, option: selectedCandidateKey, revision: "1", selectionRevision: "0", retailer: set.organisationId });
+  const selectedOption = recommendation.diagnostics.matching!.options.find(option => option.candidateKey === selectedCandidateKey)!;
+  const alternative = recommendation.diagnostics.matching!.options.find(option => option.candidateKey !== selectedCandidateKey && option.purchaseEligible && option.productIds.length > 0);
   if (scenario) {
     assert.equal(selectedOption.productIds.length, 2); assert.ok(alternative, "Numeric preference browser fixture requires a selectable simpler option");
     const [rrp] = await sql`select sum(price_amount)::numeric as amount from public.products where id=any(${selectedOption.productIds}::uuid[])`;
@@ -170,7 +170,7 @@ try {
   const fixtures = { planId, runId, paymentId, orderId, orderNumber, adminAgentId, locale, generatorVersion: FUNNEL_GENERATOR_VERSION,
     ...(scenario ? { preferenceScenario: { selectedProductCount: selectedOption.productIds.length, selectedProductIds: selectedOption.productIds,
       selectedDailyPills: selectedOption.dailyPills, selectedPriceMinor: selectedOption.priceMinor, firstOrderLineSubtotalMinor: Math.round(subtotal * 100), preferenceAssessment: selectedOption.preferences,
-      alternative: { optionId: alternative!.optionId, productIds: alternative!.productIds } } } : {}),
+      alternative: { candidateKey: alternative!.candidateKey, productIds: alternative!.productIds } } } : {}),
     ADMIN_E2E_TARGET_ORGANISATION_ID: adminTargetId,
     REVEAL_VISUAL_SMOKE_URL: new URL(`/${locale}/nutrition/reveal?plan=${planId}`, base).href,
     MOBILE_UX_REVEAL_URL: new URL(`/${locale}/nutrition/reveal?plan=${planId}`, base).href,

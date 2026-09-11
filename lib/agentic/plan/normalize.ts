@@ -408,7 +408,7 @@ export function applyPlanAnswers(
       }
       return true;
     }),
-    pinnedOptionId: state.pinnedOptionId
+    pinnedCandidateKey: state.pinnedCandidateKey
   };
 }
 
@@ -661,7 +661,7 @@ export async function normalizePlanRequest(input: Readonly<{
       normalizeCode(item, MEDICATION_ALIASES)
     ))],
     optimization: request.optimization,
-    pinnedOptionId: null,
+    pinnedCandidateKey: null,
     profile: { ...request.profile, ageYears: request.profile.ageYears ?? 0, lifeStage: request.profile.lifeStage ?? "adult" },
     profileKnown: { ageYears: request.profile.ageYears != null, lifeStage: request.profile.lifeStage != null, sex: request.profile.sex != null },
     originalRequest: structuredClone(request),

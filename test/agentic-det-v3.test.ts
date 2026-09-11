@@ -42,7 +42,6 @@ import {
 import { publicCoverage, publicPlanFields } from "../lib/agentic/public-mapper.ts";
 import { handleCompletedJsonRpc as handleJsonRpc } from "./helpers/completed-mcp-client.ts";
 import { validateToolIssues } from "../lib/agentic/contract/validate.ts";
-import { EVIDENCE_INPUT_SCHEMA } from "../lib/agentic/contract/schemas.ts";
 import { queryCount, resetQueryBudget } from "../lib/agentic/plan/query-budget.ts";
 import { mergeBySemanticKey } from "../lib/agentic/plan/merge.ts";
 import { resetMatchPlanCache } from "../lib/agentic/plan/matching.ts";
@@ -160,7 +159,7 @@ function magView(status: "ready" | "no_purchase", extra: Record<string, unknown>
               savings90DayMinor: null
             },
             matcherVersion: "test",
-            optionId: "opt_mag",
+            candidateKey: "opt_mag",
             reason: "dedicated",
             snapshotId: "snap",
             totalPriceMinor: 39000
@@ -454,12 +453,11 @@ describe("Slice B compact decision and evidence", () => {
     assert.equal(mixedPlanClaims.includes("clm_mg_muscle_relaxation_v1"), false);
   });
 
-  it("B-CONTRACT-02 evidence schema rejects open queries", () => {
-    const issues = validateToolIssues(EVIDENCE_INPUT_SCHEMA, {
-      evidenceHandle: "cap_abcdefghijklmnopqrstuvwxyzabcdef",
-      query: "tell me everything"
-    });
-    assert.ok(issues.some((item) => item.reasonCode === "unexpected_property"));
+  it("B-CONTRACT-02 removed evidence requests reject open queries without a callable schema", async () => {
+    const response = await handleJsonRpc(createAgenticRuntime(), { id: 1, method: "tools/call",
+      params: { name: "evidence", arguments: { query: "tell me everything" } } });
+    assert.deepEqual(response?.error, { code: -32601, message: "Unknown tool: evidence" });
+    assert.equal(response?.result, undefined);
   });
 });
 

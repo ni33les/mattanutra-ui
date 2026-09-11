@@ -146,10 +146,10 @@ describe("MCP reliability: atomic plan and checkout commands", () => {
         let orders = 0;
         const insert = runtime.store.insertOrder;
         runtime.store.insertOrder = async (order) => { orders++; await insert(order); };
-        const created = await call(runtime, { idempotencyKey: "review-orders-create", ...request });
-        const option = (created.choices as Array<{ optionId: string; products: unknown[] }>).find(row => row.products.length);
+        const created = await call(runtime, { idempotencyKey: "review-orders-create", ...request, requirements: { productDoses: [{ productId: "prd_b1111111111111111111111111111111", servingsPerDay: 1 }] } });
+        const option = (created.choices as Array<{ candidateKey: string; products: unknown[] }>).find(row => row.products.length);
         assert.ok(option, "A purchase choice must survive practical no-purchase recommendation");
-        const plan = await call(runtime, { planHandle: created.planHandle, expectedRevision: created.revision, selectedOptionId: option.optionId, idempotencyKey: "review-orders-select" });
+        const plan = await call(runtime, { planHandle: created.planHandle, expectedRevision: created.revision,  idempotencyKey: "review-orders-select" });
         assert.equal(plan.status, "ready");
         const [a, b] = await Promise.all([1, 2].map(n => import(new URL("../lib/agentic/commerce/execute.ts?replica=" + n, import.meta.url).href)));
         const input = { ...runtime, now: new Date().toISOString(), planHandle: plan.planHandle, expectedRevision: plan.revision };

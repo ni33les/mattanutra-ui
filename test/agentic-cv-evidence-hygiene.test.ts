@@ -15,12 +15,12 @@ describe("customer-value acceptance evidence", () => {
     const base = {
       doseFit: { score: 0.5 }, coverage: [{ currentAmount: 25, deliveredAmount: 50, remainingGap: 25 }],
       advice: [{ severity: "important", threshold: 200 }], priceMinor: 12345,
-      optionId: "option-a", revision: 2, status: "ready", requirements: { maxProductCount: 2 }
+      candidateKey: "option-a", revision: 2, status: "ready", requirements: { maxProductCount: 2 }
     };
     for (const patch of [
       { doseFit: { score: 0.6 } }, { coverage: [{ currentAmount: 25, deliveredAmount: 51, remainingGap: 24 }] },
       { advice: [{ severity: "important", threshold: 201 }] }, { priceMinor: 12346 },
-      { optionId: "option-b" }, { revision: 3 }, { status: "no_purchase" }, { requirements: { maxProductCount: null } }
+      { candidateKey: "option-b" }, { revision: 3 }, { status: "no_purchase" }, { requirements: { maxProductCount: null } }
     ]) assert.notDeepEqual(evidence(base), evidence({ ...base, ...patch }), JSON.stringify(patch));
   });
 

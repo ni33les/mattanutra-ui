@@ -197,7 +197,7 @@ export function businessView(result: Record<string, unknown>) {
     coverage: result.coverage ?? null,
     orderSchedule: result.orderSchedule ?? null,
     reasonCode: result.reasonCode ?? null,
-    selectedOptionId: asRecord(result.selected).optionId ?? result.optionId ?? null,
+    selectedCandidateKey: asRecord(result.selected).candidateKey ?? result.candidateKey ?? null,
     skuIds: basket.map((item) => String(asRecord(item).productId ?? "")),
     sources: basket.map((item) => String(asRecord(item).source ?? "")),
     status: result.status ?? null,

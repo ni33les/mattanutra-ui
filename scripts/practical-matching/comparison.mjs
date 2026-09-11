@@ -24,7 +24,7 @@ export function verifyNoAddedLocks(before, after) {
 }
 function selected(row) {
   const m = row.semantic.diagnostics?.matching;
-  return m ? m.options.find(option => option.optionId === m.selectedOptionId) : row.semantic.selected;
+  return m ? m.options.find(option => option.candidateKey === m.selectedCandidateKey) : row.semantic.selected;
 }
 function metrics(row) {
   const s = selected(row); assert.ok(s);

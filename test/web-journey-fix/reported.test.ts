@@ -22,7 +22,7 @@ test('WEB-JOURNEY-08 corrected frozen journey chooses a smaller useful routine w
       clientContext: frozen.clientContext as ProductRecommendationClientContext, clientSex: 'male', countryCode: 'TH', stackPreference: 'balanced', catalogueFingerprint: `${frozen.catalogueVersion}:active-b12-corrected` });
     const matching = result.diagnostics.matching;
     assert.ok(matching);
-    const selected = matching.options.find(o => o.optionId === matching.selectedOptionId);
+    const selected = matching.options.find(o => o.candidateKey === matching.selectedCandidateKey);
     assert.ok(selected?.overallScore);
     assert.ok(selected.productIds.length > 0 && selected.productIds.length <= 6);
     assert.ok(selected.priceMinor < frozen.original.priceMinor);

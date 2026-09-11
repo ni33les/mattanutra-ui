@@ -429,6 +429,12 @@
       "expectedCases": 4,
       "reason": "Existing price cost-weight arithmetic, sparse refinements, field documentation and conversational discovery",
       "slice": "publication"
+    },
+    {
+      "file": "test/simple-plan/no-option-ids.test.ts",
+      "reason": "Current MCP identifier-free confirmation, publication and checkout instruction regressions.",
+      "expectedCases": 5,
+      "slice": "requests"
     }
   ],
   "inputs": [

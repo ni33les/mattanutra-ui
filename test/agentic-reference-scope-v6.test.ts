@@ -7,7 +7,7 @@ import type { CanonicalPlanState } from "../lib/agentic/plan/types.ts";
 
 function state(basis: "supplemental" | "total_daily" = "supplemental"): CanonicalPlanState {
   return { acceptedGaps: [], conditionCodes: [], currency: "THB", destinationCountry: "TH", leftovers: [], locale: "en",
-    medicationCodes: [], optimization: "fewest_pills", pinnedOptionId: null, requirements: {}, safetyAcknowledgement: null,
+    medicationCodes: [], optimization: "fewest_pills", pinnedCandidateKey: null, requirements: {}, safetyAcknowledgement: null,
     profile: { ageYears: 40, lifeStage: "adult", sex: "female" },
     targets: [{ supplementId: "sup_d3", name: "Vitamin D3", amount: 150, unit: "mcg", basis }],
     currentSupplements: [{ supplementId: "sup_d3", name: "Current D3", dailyAmount: 80, unit: "mcg" }],

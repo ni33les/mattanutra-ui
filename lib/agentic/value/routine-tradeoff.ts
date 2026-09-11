@@ -7,10 +7,10 @@ export function routineTradeoff(selected: StackOption | null | undefined, option
   if (!selected || selected.basket.length < 2) return "";
   const covered = selected.coverage.filter(row => row.coveragePercent >= 100 && !row.unresolved);
   if (!covered.length) return "";
-  const alternative = options.filter(option => option.optionId !== selected.optionId && option.purchaseEligible !== false && option.basket.length > 0 && option.basket.length < selected.basket.length
+  const alternative = options.filter(option => option.candidateKey !== selected.candidateKey && option.purchaseEligible !== false && option.basket.length > 0 && option.basket.length < selected.basket.length
     && option.coverage.some(row => row.remainingGap > 0)
     && covered.every(target => option.coverage.some(row => row.supplementId === target.supplementId && row.coveragePercent >= 100 && !row.unresolved)))
-    .sort((a, b) => a.basket.length - b.basket.length || a.optionId.localeCompare(b.optionId))[0];
+    .sort((a, b) => a.basket.length - b.basket.length || a.candidateKey.localeCompare(b.candidateKey))[0];
   if (!alternative) return "";
   const gaps = alternative.coverage.filter(row => row.remainingGap > 0).map(row => `${row.name} ${Number(row.remainingGap.toPrecision(12))} ${row.unit}`).join(", ");
   return agenticMessage(negotiateLocale(locale), "plan.summary.simpler_partial", {

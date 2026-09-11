@@ -1,3 +1,4 @@
+import { publicFrozenOrder } from "@/lib/agentic/public-mapper";
 import { readPlanState } from "@/lib/agentic/presentation/plan-read";
 import { simplePlanTool } from "@/lib/agentic/plan/simple-service";
 import {
@@ -127,7 +128,6 @@ async function callTool(
           expectedRevision: Number(params.expectedRevision),
           idempotencyKey: String(params.idempotencyKey),
           now,
-          optionId: typeof params.optionId === "string" ? params.optionId : undefined,
           planHandle: String(params.planHandle),
           points: Array.isArray(params.points)
             ? params.points.filter((item): item is string => typeof item === "string")
@@ -145,6 +145,7 @@ async function callTool(
         });
     }
 
+    if (canonical === "execute" && record(value).ok === true) { const executed = record(value); value = { ...executed, frozenPlan: publicFrozenOrder(executed.frozenPlan) }; }
     const outputIssues = validateToolIssues(AGENTIC_OUTPUT_SCHEMAS[canonical], value);
     if (outputIssues.length > 0) {
       log.error("contract_output_invalid", { tool: canonical, fields: outputIssues.map(issue => issue.fieldPath) });

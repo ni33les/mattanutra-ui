@@ -611,7 +611,7 @@ export function recommendWithMatcher(
         monthlyGoodsPriceMinor: monthlyBasis ? basket.overallScore?.preferences.maxPriceMinor.actual ?? null : undefined, currency: request.currency }),
       overallScore: basket.overallScore,
       roles: basket.roles, purchaseEligible: basket.productIds.length > 0,
-      optionId: `webopt_${sha256Hex([...basket.variantIds].sort().join("|")).slice(0, 20)}`,
+      candidateKey: `webopt_${sha256Hex([...basket.variantIds].sort().join("|")).slice(0, 20)}`,
       productIds: [...basket.productIds], dailyServings: basket.productIds.map(id => servingMultiplierFromBasket(id, basket)),
       coveragePercent: marketingCoveragePercentFromNeedCoverage(needDiagnosticsFromBasket(supplementNeeds, basket)),
       priceMinor: basket.priceMinor,
@@ -625,7 +625,7 @@ export function recommendWithMatcher(
     clientNeeds: input.needs,
     diagnostics: {
       catalogueFingerprint: input.catalogueFingerprint,
-      matching: { operationalStatus: recommendations.length ? "ready" : options.some(option => option.purchaseEligible) ? "review_options" : "no_purchase", selectedOptionId: options[0]?.optionId ?? null, options, alternativeSearch: result.alternativeSearch, searchSummary: result.searchSummary, matchingDiagnostics: result.matchingDiagnostics },
+      matching: { operationalStatus: recommendations.length ? "ready" : options.some(option => option.purchaseEligible) ? "review_options" : "no_purchase", selectedCandidateKey: options[0]?.candidateKey ?? null, options, alternativeSearch: result.alternativeSearch, searchSummary: result.searchSummary, matchingDiagnostics: result.matchingDiagnostics },
       algorithmVersion: MATCHER_VERSION,
       blockedProducts: [],
       coverage: {
@@ -706,23 +706,23 @@ export function mergeWebRetailerAlternatives(primary: ProductRecommendationResul
     .filter(basket => basket.roles?.some(role => role === "lower_cost" || role === "simpler"));
   const fewer = entries.filter(row => hasFewerConcerns(row.basket, selected, context.request))
     .sort((a, b) => compareBaskets(a.basket, b.basket, context.request))[0];
-  const options = new Map<string, NonNullable<ProductRecommendationResult["diagnostics"]["matching"]>["options"][number]>(matching.options.map(option => [option.optionId, { ...option, roles: option.roles?.filter(role => role !== "lower_cost" && role !== "simpler") }]));
+  const options = new Map<string, NonNullable<ProductRecommendationResult["diagnostics"]["matching"]>["options"][number]>(matching.options.map(option => [option.candidateKey, { ...option, roles: option.roles?.filter(role => role !== "lower_cost" && role !== "simpler") }]));
   for (const basket of commercial) {
     const entry = entries.find(row => row.basket.sellerId === basket.sellerId && row.basket.variantIds.join("|") === basket.variantIds.join("|"));
     if (!entry) continue;
-    const previous = options.get(entry.option.optionId);
+    const previous = options.get(entry.option.candidateKey);
     const commercialRoles = basket.roles!.filter(role => role === "lower_cost" || role === "simpler");
-    options.set(entry.option.optionId, { ...entry.option, roles: [...new Set([...(previous?.roles ?? []), ...commercialRoles])] });
+    options.set(entry.option.candidateKey, { ...entry.option, roles: [...new Set([...(previous?.roles ?? []), ...commercialRoles])] });
   }
   if (fewer) {
-    const previous = options.get(fewer.option.optionId);
-    options.set(fewer.option.optionId, { ...fewer.option, roles: [...new Set([...(previous?.roles ?? []), "fewer_concerns" as const])] });
+    const previous = options.get(fewer.option.candidateKey);
+    options.set(fewer.option.candidateKey, { ...fewer.option, roles: [...new Set([...(previous?.roles ?? []), "fewer_concerns" as const])] });
   }
   const incomplete = peers.some(peer => peer.diagnostics.matching?.alternativeSearch?.status === "incomplete");
   const alternativeSearch = fewer ? { status: "found" as const, reason: "Fewer concerns without lower requested-target coverage across eligible retailers" }
     : matching.alternativeSearch?.status === "not_needed" ? matching.alternativeSearch
       : incomplete ? { status: "incomplete" as const, reason: "Some retailer alternatives could not be fully evaluated" }
         : { status: "none_found" as const, reason: "No distinct option with fewer concerns met the same requirements across eligible retailers" };
-  const retainedOptions = [...options.values()].filter(option => option.optionId === matching.selectedOptionId || Boolean(option.roles?.length));
+  const retainedOptions = [...options.values()].filter(option => option.candidateKey === matching.selectedCandidateKey || Boolean(option.roles?.length));
   return { ...primary, diagnostics: { ...primary.diagnostics, matching: { ...matching, options: retainedOptions, alternativeSearch } } };
 }

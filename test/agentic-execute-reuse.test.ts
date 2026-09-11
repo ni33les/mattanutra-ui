@@ -31,10 +31,13 @@ async function call(runtime: AgenticRuntime, name: string, args: unknown) {
 // Checkout invariants start from an explicitly selected returned purchase choice.
 // Practical scoring may correctly recommend no new products for these frozen doses.
 async function purchasePlan(runtime: AgenticRuntime, args: Record<string, unknown>) {
-    const created = await call(runtime, "plan", args);
+    // The old client selected a hidden Vitamin C trade-off. The single-routine
+    // protocol evaluates the same frozen 1000 mg product through an explicit proposal.
+    const created = await call(runtime, "plan", { ...args, requirements: { ...(args.requirements as object ?? {}),
+      productDoses: [{ productId: "prd_b5555555555555555555555555555555", servingsPerDay: 1 }] } });
     assert.equal(created.ok, true);
     const choices = created.choices as Array<{
-        optionId: string;
+        candidateKey: string;
         
         products: unknown[];
         roles?: string[];
@@ -43,7 +46,7 @@ async function purchasePlan(runtime: AgenticRuntime, args: Record<string, unknow
         ?? choices.find(row => row.products.length);
     assert.ok(option, "Frozen checkout fixture must retain an eligible purchase choice");
     const selected = await call(runtime, "plan", { planHandle: created.planHandle,
-        expectedRevision: created.revision, selectedOptionId: option.optionId, idempotencyKey: `${String(args.idempotencyKey)}-select` });
+        expectedRevision: created.revision,  idempotencyKey: `${String(args.idempotencyKey)}-select` });
     assert.equal(selected.ok, true);
     assert.equal(selected.status, "ready");
     return selected;

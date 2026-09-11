@@ -11,7 +11,7 @@ const endpoint = 'https://fixture.example/api/mcp';
 const response = () => ({ status: 'ready', planHandle: 'opaque-plan', revision: 2,
   basket: [{ productId: 'fixed-product', servingsPerDay: 2, unitPriceMinor: 1900 }],
   coverage: [{ currentAmount: 100, deliveredAmount: 50, requestedAmount: 200, remainingGap: 50, coveragePercent: 75 }],
-  options: [{ optionId: 'fixed-option', roles: ['closest_dose'], purchaseEligible: true }],
+  options: [{ candidateKey: 'fixed-option', roles: ['closest_dose'], purchaseEligible: true }],
   safetyGuidance: [{ code: 'above_reference', amount: 150, referenceLimit: 100, message: 'Review this exposure with a clinician.' }],
   requirements: { maxProductCount: null as number | null }, nextActions: ['confirm_with_user'] });
 
@@ -71,7 +71,7 @@ it('MCP-TRANSCRIPT-04: equal PASS flags cannot conceal dose, advice, price, cove
     (body: ReturnType<typeof response>) => { body.coverage[0]!.currentAmount = 0; },
     (body: ReturnType<typeof response>) => { body.safetyGuidance[0]!.referenceLimit = 151; },
     (body: ReturnType<typeof response>) => { body.safetyGuidance[0]!.message = 'No concern'; },
-    (body: ReturnType<typeof response>) => { body.options[0]!.optionId = 'different-option'; },
+    (body: ReturnType<typeof response>) => { body.options[0]!.candidateKey = 'different-option'; },
     (body: ReturnType<typeof response>) => { body.options[0]!.purchaseEligible = false; },
     (body: ReturnType<typeof response>) => { body.requirements.maxProductCount = 1; },
     (body: ReturnType<typeof response>) => { body.status = 'failed'; }

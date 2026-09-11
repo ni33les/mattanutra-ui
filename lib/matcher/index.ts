@@ -172,7 +172,7 @@ export { evaluateSafety } from "@/lib/matcher/safety";
 export { productEligible } from "@/lib/matcher/eligibility";
 export { compileGroups } from "@/lib/matcher/candidates";
 export {
-  optionIdFor,
+  candidateKeyFor,
   publicCoveragePercent,
   rejectedCandidatesFor,
   summarizeRejections,

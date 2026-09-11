@@ -12,7 +12,7 @@ const product = sampleRetailProduct({ id: "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeee6"
   supplementId: target.supplementId, amount: 50, unit: "mg", unitPriceMinor: 10000, form: "capsule", servingLabel: "1 capsule; 30 capsules per bottle" });
 const state: CanonicalPlanState = { acceptedGaps: [], conditionCodes: [], currency: "THB", currentSupplements: [{ name: target.name,
   supplementId: target.supplementId, dailyAmount: 100, unit: "mg" }], destinationCountry: "TH", leftovers: [], locale: "en", medicationCodes: [],
-  optimization: "balanced", pinnedOptionId: null, profile: { ageYears: 35, lifeStage: "adult" },
+  optimization: "balanced", pinnedCandidateKey: null, profile: { ageYears: 35, lifeStage: "adult" },
   requirements: { productDoses: [{ productId: product.productId, servingsPerDay: 1 }] }, safetyAcknowledgement: null,
   targets: [{ name: target.name, supplementId: target.supplementId, amount: 200, unit: "mg" }] };
 

@@ -2,7 +2,7 @@ import { resolveMarket } from "@/lib/agentic/catalogue/market";
 import type { AgenticRuntime } from "@/lib/agentic/runtime";
 import { businessError, isAgenticErrorResult } from "@/lib/agentic/contract/errors";
 import { readPlanState, readPlanPresentation } from "@/lib/agentic/presentation/plan-read";
-import { processingDecision, failedDecision, presentDecision, decisionOptions, decisionOptionId } from "@/lib/agentic/presentation/decision";
+import { processingDecision, failedDecision, presentDecision, decisionOptions } from "@/lib/agentic/presentation/decision";
 import { ensureCatalogueSnapshot } from "@/lib/agentic/catalogue/snapshot";
 import { prepareSimpleRequest } from "@/lib/agentic/plan/simple-input";
 import { canonicalRequestHash } from "@/lib/agentic/idempotency";
@@ -13,7 +13,7 @@ import { AGENTIC_CONTRACT_VERSION } from "@/lib/agentic/config";
 export async function simplePlanTool(runtime: AgenticRuntime, params: Record<string, unknown>) {
   const now = runtime.now ?? new Date().toISOString();
   const handle = typeof params.planHandle === "string" ? params.planHandle : undefined;
-  const kind = !handle ? "create" : "selectedOptionId" in params ? "select" : "answers" in params ? "answer" : Object.keys(params).length === 1 ? "get" : "revise";
+  const kind = !handle ? "create" : "answers" in params ? "answer" : Object.keys(params).length === 1 ? "get" : Object.keys(params).every(key => ["planHandle", "expectedRevision", "idempotencyKey"].includes(key)) ? "select" : "revise";
   const state = handle ? await readPlanState(runtime, handle) : null;
   if (isAgenticErrorResult(state)) return state;
   if (kind === "get" && state) {
@@ -55,9 +55,9 @@ export async function simplePlanTool(runtime: AgenticRuntime, params: Record<str
     }
   }
   if (kind === "select" && prior) {
-    const option = decisionOptions(prior.result).find(option => decisionOptionId(handle!, prior.revision.revision, option) === params.selectedOptionId);
-    if (!option || !option.basket.length || option.purchaseEligible === false) return businessError({ reasonCode: "not_found", fieldPath: "selectedOptionId", message: "Use an eligible option ID returned by the current plan." });
-    Object.assign(payload, { selectOptionId: option.optionId });
+    const option = decisionOptions(prior.result)[0];
+    if (!option || !option.basket.length || option.purchaseEligible === false) return businessError({ reasonCode: "not_found", fieldPath: "planHandle", message: "This revision has no purchasable recommendation to confirm." });
+    Object.assign(payload, { selectCandidateKey: option.candidateKey });
   }
   if (kind === "answer") Object.assign(payload, { answers: params.answers });
   const completed = await planTool({ ...runtime, now, payload });

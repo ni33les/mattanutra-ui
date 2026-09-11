@@ -11,9 +11,9 @@ test('SPLAN-DOC-01/02 schema-only and tools-only journeys use returned identifie
   const output = process.env['MCP_simple-plan_EVIDENCE_DIR'];
   if (output) { mkdirSync(output, { recursive: true }); writeFileSync(resolve(output, 'documented-inventory-run.json'), JSON.stringify(results, null, 2), { flag: 'wx' }); }
 });
-test('SPLAN-DOC-03 semantic normalization preserves choice relationships and business differences', () => {
-  const a = { recommendedOptionId: 'random-a', choices: [{ optionId: 'random-a', products: [{ productId: 'sku', quantity: 2, lineTotal: 100 }] }] };
-  const b = { recommendedOptionId: 'random-b', choices: [{ optionId: 'random-b', products: [{ productId: 'sku', quantity: 2, lineTotal: 100 }] }] };
+test('SPLAN-DOC-03 semantic normalization preserves recommendation facts and business differences', () => {
+  const a = { planHandle: 'cap_random-a', choices: [{ products: [{ productId: 'sku', quantity: 2, lineTotal: 100 }] }] };
+  const b = { planHandle: 'cap_random-b', choices: [{ products: [{ productId: 'sku', quantity: 2, lineTotal: 100 }] }] };
   assert.deepEqual(normalizePublishedClientResult(a), normalizePublishedClientResult(b));
   b.choices[0].products[0].quantity = 3; assert.notDeepEqual(normalizePublishedClientResult(a), normalizePublishedClientResult(b));
 });

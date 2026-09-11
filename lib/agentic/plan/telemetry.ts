@@ -86,7 +86,7 @@ export async function persistMatcherTelemetry(input: Readonly<{
             ? { targetClassifications: telemetry.targetClassifications }
             : {})
         })}::jsonb,
-        ${telemetry.selectedOptionId},
+        ${telemetry.selectedCandidateKey},
         ${telemetry.coveragePercent},
         ${sql.json(telemetry.productIds)}::jsonb,
         ${sql.json(telemetry.productSkus)}::jsonb,

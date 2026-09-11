@@ -64,7 +64,7 @@ function option(rows: CoverageRow[]): StackOption {
     coveragePercent: 100,
     dailyPills: 1,
     matcherVersion: "pareto-hybrid-1",
-    optionId: "opt_test",
+    candidateKey: "opt_test",
     reason: "test",
     snapshotId: "snap_testphase6",
     totalPriceMinor: 120
@@ -83,7 +83,7 @@ function state(): CanonicalPlanState {
     leftovers: [],
     medicationCodes: [],
     optimization: "fewest_pills",
-    pinnedOptionId: null,
+    pinnedCandidateKey: null,
     profile: { ageYears: 52, lifeStage: "adult", sex: "male" },
     requirements: {},
     safetyAcknowledgement: null,

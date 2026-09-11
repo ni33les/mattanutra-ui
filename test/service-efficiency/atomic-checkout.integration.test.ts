@@ -44,7 +44,7 @@ test("LOCK-ATOMIC-02 simultaneous checkout owns one frozen order and stale catal
   const created=await rpcWithTaskExecutor(app,"plan",{operation:"create",idempotencyKey:"atomic-checkout-plan",request,responseView:"full"});
   const option=created.options.find(row=>row.purchaseEligible && row.basket.length && row.roles?.includes("closest_dose"));
   assert.ok(option, "Atomic checkout requires an explicitly selected purchase");
-  const plan=await rpcWithTaskExecutor(app,"plan",{operation:"select",planHandle:created.planHandle,expectedRevision:created.revision,optionId:option.optionId,idempotencyKey:"atomic-checkout-select",responseView:"full"});
+  const plan=await rpcWithTaskExecutor(app,"plan",{operation:"select",planHandle:created.planHandle,expectedRevision:created.revision,candidateKey:option.candidateKey,idempotencyKey:"atomic-checkout-select",responseView:"full"});
   assert.equal(plan.status,"ready",JSON.stringify(plan));
   let release!:()=>void,entered=0;const gate=new Promise<void>(resolve=>{release=resolve;});
   setExecuteFreshGateForTests(gate);setExecuteFreshEnteredForTests(()=>{entered++;});

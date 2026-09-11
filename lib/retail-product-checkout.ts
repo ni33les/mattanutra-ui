@@ -1,9 +1,9 @@
+import { readStoredMatching, frozenCheckoutIdentityJson } from "@/lib/recommendation-storage";
 import { MATCHER_VERSION } from "@/lib/matcher/config";
 import { requireCurrentProductSelection } from "@/lib/assessment-product-preferences";
 import { FunnelError } from "@/lib/funnel-errors";
 import { ensureRetailProviderSession, recordRetailProviderSession, retailPaymentConfirmed } from "@/lib/retail-checkout-provider-session";
 import { FUNNEL_GENERATOR_VERSION } from "@/lib/assessment-revisions";
-import type { ProductRecommendationDiagnostics } from "@/lib/product-recommendation-types";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import Stripe from "stripe";
 import type postgres from "postgres";
@@ -82,7 +82,7 @@ export type RetailCheckoutQuoteInput = Readonly<{
   selectedRetailerOrganisationId?: string | null;
   selectedItemIds: readonly string[];
   recommendationRunId?: string | null;
-  optionId?: string | null;
+  candidateKey?: string | null;
   assessmentRevision?: number | null;
   selectionRevision?: number | null;
   shippingAmount?: number | null;
@@ -239,7 +239,7 @@ function hashToken(token: string) {
 }
 
 function idempotencyHash(input: unknown) {
-  return createHash("sha256").update(JSON.stringify(input)).digest("hex");
+  return createHash("sha256").update(frozenCheckoutIdentityJson(input)).digest("hex");
 }
 
 function cleanText(value: unknown) {
@@ -361,7 +361,7 @@ async function recordVersion(
   `;
 }
 
-type WebCheckoutSelectionInput = Pick<RetailCheckoutQuoteInput, "planId" | "locale" | "selectedItemIds" | "recommendationRunId" | "optionId" | "assessmentRevision" | "selectionRevision">;
+type WebCheckoutSelectionInput = Pick<RetailCheckoutQuoteInput, "planId" | "locale" | "selectedItemIds" | "recommendationRunId" | "candidateKey" | "assessmentRevision" | "selectionRevision">;
 
 /** Presentation observes a committed snapshot without acquiring any row locks. */
 export async function currentWebCheckoutSelection(sql: RetailCheckoutDb, input: WebCheckoutSelectionInput) {
@@ -392,8 +392,8 @@ async function readCurrentWebCheckoutSelection(sql: RetailCheckoutDb, input: Web
     if (catalogueRevision == null || run.catalogue_revision == null || String(run.catalogue_revision) !== String(catalogueRevision)) continue;
     if (input.recommendationRunId && input.recommendationRunId !== run.id) continue;
     if (objectValue(run.diagnostics).algorithmVersion !== MATCHER_VERSION) continue;
-    const matching = objectValue(run.diagnostics).matching as ProductRecommendationDiagnostics["matching"];
-    const option = matching?.options.find(item => item.optionId === (input.optionId ?? matching.selectedOptionId));
+    const matching = readStoredMatching(objectValue(run.diagnostics).matching);
+    const option = matching?.options.find(item => item.candidateKey === (input.candidateKey ?? matching.selectedCandidateKey));
     const rows = await sql`select i.product_id::text, i.rank, i.price_amount, i.currency,
         p.title, coalesce(p.image_url, i.image_url) as image_url
       from public.product_recommendation_items i join public.products p on p.id = i.product_id
@@ -404,7 +404,7 @@ async function readCurrentWebCheckoutSelection(sql: RetailCheckoutDb, input: Web
       assessmentRevision: Number(run.input_revision), expectedAssessmentRevision: input.assessmentRevision,
       selectionRevision: Number(run.current_selection_revision), expectedSelectionRevision: input.selectionRevision,
       runSelectionRevision: Number(run.selection_revision), runId: String(run.id), expectedRunId: input.recommendationRunId,
-      optionId: input.optionId, availableOptionIds: matching?.options.map(item => item.optionId) ?? [],
+      candidateKey: input.candidateKey, availableCandidateKeys: matching?.options.map(item => item.candidateKey) ?? [],
       selectedIds: input.selectedItemIds, allowedIds, excludedIds: run.excluded_product_ids
     });
     const recommendations = input.selectedItemIds.map((id, index) => {
@@ -721,7 +721,7 @@ async function ensureAssessmentForPlan(
  * Catalogue edits must not turn an exact paid/unpaid checkout retry into a
  * differently priced purchase, or force a new matching revision first. */
 export async function findReusableWebCheckoutPayment(sql: RetailCheckoutDb, input: Readonly<{
-  planId: string; agenticOrderId?: string | null; recommendationRunId?: string | null; optionId?: string | null;
+  planId: string; agenticOrderId?: string | null; recommendationRunId?: string | null; candidateKey?: string | null;
   assessmentRevision?: number | null; selectionRevision?: number | null;
   selectedRetailerOrganisationId?: string | null; selectedProductIds: readonly string[];
   address: RetailCheckoutAddress; billingAddress: RetailCheckoutAddress; billingSameAsShipping: boolean;
@@ -735,7 +735,7 @@ export async function findReusableWebCheckoutPayment(sql: RetailCheckoutDb, inpu
     const key = idempotencyHash({
       address: input.address, agenticOrderId: input.agenticOrderId ?? null, billingAddress: input.billingAddress,
       billingSameAsShipping: input.billingSameAsShipping, channel: 'web', planId: input.planId,
-      runId: payment.recommendation_run_id, optionId: input.optionId ?? null,
+      runId: payment.recommendation_run_id, candidateKey: input.candidateKey ?? null,
       assessmentRevision: input.assessmentRevision ?? null, selectionRevision: input.selectionRevision ?? null,
       selectedRetailerOrganisationId: input.selectedRetailerOrganisationId ?? null,
       shippingAmount: Math.max(0, Number(objectValue(payment.metadata).shippingAmount) || 0),
@@ -947,7 +947,7 @@ export async function createRetailCheckoutSession(input: RetailCheckoutQuoteInpu
     channel: checkoutMode === "agentic" ? "mcp" : "web",
     planId: input.planId,
     runId,
-    optionId: input.optionId ?? null,
+    candidateKey: input.candidateKey ?? null,
     assessmentRevision: input.assessmentRevision ?? null,
     selectionRevision: input.selectionRevision ?? null,
     selectedRetailerOrganisationId: input.selectedRetailerOrganisationId ?? null,

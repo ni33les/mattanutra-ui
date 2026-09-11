@@ -20,8 +20,8 @@ async function saved(runtime: ReturnType<typeof runtimeFor>, response: Record<st
     const row = await runtime.store.getPlanRevision(id, Number(response.revision)); assert.ok(row); return row.result as PlanResult;
 }
 function purchase(plan: Record<string, unknown>) {
-    const choices = plan.choices as Array<{ optionId: string; products: Array<{ productId: string; servingsPerDay: number }> }>;
-    const choice = choices.find(row => row.optionId === plan.recommendedOptionId && row.products.length) ?? choices.find(row => row.products.length);
+    const choices = plan.choices as Array<{ candidateKey: string; products: Array<{ productId: string; servingsPerDay: number }> }>;
+    const choice = choices.find(row => row.products.length);
     assert.ok(choice); return choice;
 }
 const request = { locale: "en", destinationCountry: "TH", scoring: { profile: "balanced" }, profile: {}, requirements: {}, medicationCodes: ["apixaban"], targets: [{ name: "Vitamin D3", amount: 2000, unit: "IU" }] };
@@ -39,7 +39,7 @@ describe("Current flat conversational plan mutations and immutable purchase", ()
                 } });
             assert.equal(plan.ok, true, JSON.stringify(plan));
             assert.equal(plan.status, "no_purchase");
-            assert.equal(plan.recommendedOptionId, null);
+            assert.ok(!('recommendedCandidateKey' in plan));
             assert.equal(plan.nextAction, "no_purchase");
             assert.equal(plan.nextReplenishmentDay, undefined, "Unknown remaining inventory cannot invent a schedule");
             const result = await saved(runtime, plan);
@@ -57,16 +57,16 @@ describe("Current flat conversational plan mutations and immutable purchase", ()
             assert.equal(plan.ok, true, JSON.stringify(plan));
             assert.equal(plan.status, "no_purchase");
             assert.equal(plan.nextAction, "change_request");
-            assert.equal(plan.recommendedOptionId, null);
-            const choices = plan.choices as Array<{ optionId: string; products: unknown[] }>;
+            assert.ok(!('recommendedCandidateKey' in plan));
+            const choices = plan.choices as Array<{ candidateKey: string; products: unknown[] }>;
             assert.equal(choices.length, 1); assert.deepEqual(choices[0].products, []);
             // The user changes importance to remove target-fit ranking, while
             // explicitly proposing a physical dose; neither instruction buys it.
             const refined = await call(runtime, "plan", { planHandle: plan.planHandle, expectedRevision: plan.revision, idempotencyKey: `v5-review-refine-${locale}-01`,
               scoring: { weights: { nutrients: { [target.supplementId]: 0 } } }, requirements: { productDoses: [{ productId: product.productId, servingsPerDay: 1 }] } });
             assert.equal(refined.ok, true, JSON.stringify(refined));
-            const recommendation = purchase(refined); assert.equal(refined.choices.length, 1);
-            const selected = await call(runtime, "plan", { planHandle: plan.planHandle, expectedRevision: refined.revision, selectedOptionId: recommendation.optionId, idempotencyKey: `v5-review-select-${locale}-01` });
+            assert.ok(purchase(refined).products.length); assert.equal(refined.choices.length, 1);
+            const selected = await call(runtime, "plan", { planHandle: plan.planHandle, expectedRevision: refined.revision,  idempotencyKey: `v5-review-select-${locale}-01` });
             assert.equal(selected.ok, true);
             assert.equal(selected.status, "ready");
         });
@@ -103,27 +103,28 @@ describe("Current flat conversational plan mutations and immutable purchase", ()
         const productId = purchase(created).products[0].productId;
         const changed = { ...snapshot, products: snapshot.products.map(p => p.productId === productId ? { ...p, candidate: { ...p.candidate, facts: p.candidate.facts.map(f => ({ ...f, amount: (f.amount ?? 0) * 2 })) } } : p) };
         replaceCatalogueSnapshot(changed);
-        const stale = await call(runtime, "plan", { planHandle: created.planHandle, expectedRevision: created.revision, selectedOptionId: purchase(created).optionId, idempotencyKey: "v5-catalogue-select01" });
+        const stale = await call(runtime, "plan", { planHandle: created.planHandle, expectedRevision: created.revision,  idempotencyKey: "v5-catalogue-select01" });
         assert.equal(stale.ok, false);
         assert.equal(stale.error.reasonCode, "availability_changed");
         const refreshed = await call(runtime, "plan", { planHandle: created.planHandle, expectedRevision: created.revision, scoring: {}, idempotencyKey: "v5-catalogue-refresh1" });
         assert.equal(refreshed.ok, true);
         const [savedId] = await runtime.store.listPlanIdsByPrincipal("v5-journey");
         assert.deepEqual((await runtime.store.getPlanRevision(savedId, Number(refreshed.revision)))!.result.originalRequest.targets.map(row => [row.name, row.amount, row.unit]), request.targets.map(row => [row.name, row.amount, row.unit]));
-        assert.notEqual(purchase(refreshed).optionId, purchase(created).optionId);
+        assert.ok(Number(refreshed.revision) > Number(created.revision));
+        assert.notDeepEqual(purchase(refreshed).products, purchase(created).products);
     });
     it("allows conversational selection after an unchanged catalogue freshness refresh", async () => {
         const runtime = runtimeFor(), snapshot = sampleValueSnapshot();
         replaceCatalogueSnapshot(snapshot);
         const created = await call(runtime, "plan", { ...request, idempotencyKey: "v5-freshness-create1" });
         assert.equal(created.ok, true);
-        assert.ok(purchase(created).optionId);
+        assert.ok(purchase(created).products.length);
         replaceCatalogueSnapshot({ ...snapshot, availabilityAsOf: "2026-09-08T12:00:00.000Z" });
         const selected = await call(runtime, "plan", { planHandle: created.planHandle,
-            expectedRevision: created.revision, selectedOptionId: purchase(created).optionId, idempotencyKey: "v5-freshness-select1" });
+            expectedRevision: created.revision,  idempotencyKey: "v5-freshness-select1" });
         assert.equal(selected.ok, true, JSON.stringify(selected));
         assert.equal(selected.status, "ready");
-        assert.ok(selected.selectedOptionId);
+        assert.equal(selected.nextAction, 'execute');
         assert.deepEqual(purchase(selected).products, purchase(created).products);
     });
     it("keeps every valid requested target in coverage when the catalogue is empty", async () => {
@@ -148,7 +149,7 @@ describe("Current flat conversational plan mutations and immutable purchase", ()
             const plan = await call(runtime, "plan", create);
             assert.equal(plan.ok, true, JSON.stringify(plan));
             assert.equal(purchase(plan).products.length, 8);
-            const selected = await call(runtime, "plan", { planHandle: plan.planHandle, expectedRevision: plan.revision, selectedOptionId: purchase(plan).optionId, idempotencyKey: `v5-eight-select-${locale}-01` });
+            const selected = await call(runtime, "plan", { planHandle: plan.planHandle, expectedRevision: plan.revision,  idempotencyKey: `v5-eight-select-${locale}-01` });
             assert.equal(selected.ok, true);
             const execute = { planHandle: plan.planHandle, expectedRevision: selected.revision, idempotencyKey: `v5-eight-execute-${locale}-01` };
             const checkout = await call(runtime, "execute", execute);

@@ -58,7 +58,7 @@ function compactPublic(
     }
     if (key === "administration" || key === "labelledFacts" || key === "originalRequest" || key === "preferenceAssessment" || key === "overallScore" || key === "matchingDiagnostics" || key === "matchingExplanation") { out[key] = nested; continue; }
     if (nested == null) {
-      if (nested === null && ["highlightedAlternativeOptionId", "administration", "pills", "dailyPills", "pillsPerServing", "totalDailyPills", "pillDelta", "dailyPillsDelta", "dailyCostMinor", "supplyDays", "totalExposureAmount", "supplementId", "exposure", "threshold", "nextReplenishmentDay", "cash30DayMinor", "cash90DayMinor", "cash90DayDeltaMinor"].includes(key)) out[key] = null;
+      if (nested === null && ["highlightedAlternativeCandidateKey", "administration", "pills", "dailyPills", "pillsPerServing", "totalDailyPills", "pillDelta", "dailyPillsDelta", "dailyCostMinor", "supplyDays", "totalExposureAmount", "supplementId", "exposure", "threshold", "nextReplenishmentDay", "cash30DayMinor", "cash90DayMinor", "cash90DayDeltaMinor"].includes(key)) out[key] = null;
       continue;
     }
     if (stripEmptyArrays && Array.isArray(nested) && nested.length === 0) {
@@ -370,17 +370,17 @@ function truthfulReasonMap(options: readonly StackOption[]) {
     : [];
 
   if (coverageWinners.length === 1) {
-    assigned.set(coverageWinners[0]!.optionId, "highest_coverage");
+    assigned.set(coverageWinners[0]!.candidateKey, "highest_coverage");
   }
-  if (costWinners.length === 1 && !assigned.has(costWinners[0]!.optionId)) {
-    assigned.set(costWinners[0]!.optionId, "lowest_cost");
+  if (costWinners.length === 1 && !assigned.has(costWinners[0]!.candidateKey)) {
+    assigned.set(costWinners[0]!.candidateKey, "lowest_cost");
   }
-  if (pillWinners.length === 1 && !assigned.has(pillWinners[0]!.optionId)) {
-    assigned.set(pillWinners[0]!.optionId, "fewest_pills");
+  if (pillWinners.length === 1 && !assigned.has(pillWinners[0]!.candidateKey)) {
+    assigned.set(pillWinners[0]!.candidateKey, "fewest_pills");
   }
   for (const option of options) {
-    if (!assigned.has(option.optionId)) {
-      assigned.set(option.optionId, "balanced");
+    if (!assigned.has(option.candidateKey)) {
+      assigned.set(option.candidateKey, "balanced");
     }
   }
   return assigned;
@@ -422,7 +422,7 @@ function optionReasonFields(
     };
   }
 
-  const code = truthfulReasonMap(group).get(option.optionId) ?? "balanced";
+  const code = truthfulReasonMap(group).get(option.candidateKey) ?? "balanced";
   const key = `plan.option.${code}`;
   return { code, key, message: agenticMessage(negotiated, key) };
 }
@@ -608,7 +608,7 @@ function tradeOffPresentation(
   locale: string
 ) {
   const negotiated = negotiateLocale(locale);
-  if (!selected || option.optionId === selected.optionId) {
+  if (!selected || option.candidateKey === selected.candidateKey) {
     return {
       summary: agenticMessage(negotiated, "plan.tradeoff.selected"),
       summaryKey: "plan.tradeoff.selected"
@@ -722,7 +722,7 @@ export function publicOption(
   const currency = option.basket[0]?.currency ?? "THB";
   const group = advertised.length > 0 ? advertised : selected ? [selected, option] : [option];
   const unique = group.filter(
-    (item, index, list) => list.findIndex((row) => row.optionId === item.optionId) === index
+    (item, index, list) => list.findIndex((row) => row.candidateKey === item.candidateKey) === index
   );
   const reason = optionReasonFields(option, locale, unique);
   const pillComparisonKnown = comparedPillDelta(option, selected) != null;
@@ -740,14 +740,14 @@ export function publicOption(
     coverage: option.coverage.map(row => publicCoverage(row, locale)),
     basket: option.basket.map(item => publicBasketItem(item, locale)),
     ...(option.safety ? { advice: option.safety.guidance.map(item => publicSafetyGuidance(item, "not_required", option.coverage.find(row => row.supplementId === item.supplementIds[0])?.requestedAmount)) } : {}),
-    optionId: option.optionId,
+    candidateKey: option.candidateKey,
     reason: option.basket.length > 0 && counts.coveragePercent === 0
       ? (locale === "th" ? "ตัวเลือกนี้ไม่ครอบคลุมสารอาหารตามเป้าหมายที่ขอ" : locale === "zh-CN" ? "此选项未覆盖所请求的营养目标。" : "This option does not cover the requested targets.")
       : reason.message,
     reasonCode: reason.code,
     reasonKey: reason.key,
     recommended: Boolean(option.recommended),
-    selected: Boolean(selected && option.optionId === selected.optionId),
+    selected: Boolean(selected && option.candidateKey === selected.candidateKey),
     stackSummary: stackSummaryFor(option.basket, currency),
     tradeOffs: publicTradeOffs(option, selected, locale),
     ...(option.role ? { role: option.role } : {}),
@@ -949,7 +949,7 @@ export function publicPlanFields(result: Pick<
     }
 
     const sameProducts =
-      item.optionId === selected.optionId ||
+      item.candidateKey === selected.candidateKey ||
       item.basket
         .map((row) => `${row.productId}:${row.servingsPerDay}:${row.quantity}`)
         .slice()
@@ -999,10 +999,10 @@ export function publicPlanFields(result: Pick<
   const uniqueAlternatives = mergeBySemanticKey(
     alternatives.filter(
       (item, index, list) =>
-        item.optionId !== selected?.optionId &&
-        list.findIndex((row) => row.optionId === item.optionId) === index
+        item.candidateKey !== selected?.candidateKey &&
+        list.findIndex((row) => row.candidateKey === item.candidateKey) === index
     ),
-    (item) => item.optionId
+    (item) => item.candidateKey
   );
   const advertisedOptions = [selected, ...uniqueAlternatives]
     .filter((item): item is NonNullable<typeof item> => Boolean(item));
@@ -1163,7 +1163,7 @@ export function publicPlanFields(result: Pick<
       : {}),
     ...(selected
       ? {
-          optionId: selected.optionId,
+          candidateKey: selected.candidateKey,
           reason: optionReasonFields(selected, locale, advertisedOptions).message,
           reasonCode: optionReasonFields(selected, locale, advertisedOptions).code,
           reasonKey: optionReasonFields(selected, locale, advertisedOptions).key,
@@ -1222,7 +1222,7 @@ export function publicPlanFields(result: Pick<
         questions: result.questions ?? [],
         reasonCode: matchingExplanation && result.status === "no_purchase" ? matchingExplanation.reasonCode : result.horizon?.reasonCode ?? (tooBroad ? "request_too_broad" : null),
         safetyGuidance: result.safetyGuidance,
-        selectedOptionId: selected?.optionId ?? null,
+        selectedCandidateKey: selected?.candidateKey ?? null,
         snapshotId:
           selected?.snapshotId ??
           result.matcherTelemetry?.snapshotId ??
@@ -1299,8 +1299,8 @@ export function publicMatcherTelemetry(
   if (telemetry.requestedNames.length > 0) {
     payload.requestedNames = telemetry.requestedNames;
   }
-  if (telemetry.selectedOptionId) {
-    payload.selectedOptionId = telemetry.selectedOptionId;
+  if (telemetry.selectedCandidateKey) {
+    payload.selectedCandidateKey = telemetry.selectedCandidateKey;
   }
   if (telemetry.rejected && telemetry.rejected.total > 0) {
     payload.rejected = {
@@ -1408,7 +1408,6 @@ export function publicFrozenOrder(frozen: unknown) {
     market: record.market,
     planRevision: record.planRevision,
     safetyGuidanceIds: record.safetyGuidanceIds,
-    selectedOptionId: record.selectedOptionId,
     shippingMinor: record.shippingMinor,
     snapshotId: record.snapshotId,
     subtotalMinor: record.subtotalMinor,

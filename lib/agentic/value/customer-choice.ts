@@ -23,7 +23,7 @@ function knownFirst(a: number | null, b: number | null) { return a == null ? b =
 
 /** A pointer into already evaluated choices. No search, substitution, new
  * basket, reordering of options, or recurring-savings inference occurs here. */
-export function highlightedAlternativeOptionId(selected: StackOption | null, alternatives: readonly StackOption[], noPurchaseNeeded = false) {
+export function highlightedAlternativeCandidateKey(selected: StackOption | null, alternatives: readonly StackOption[], noPurchaseNeeded = false) {
   if (noPurchaseNeeded) return null;
   const selectedVector = selected ? vector(selected) : null;
   const currency = selected?.basket[0]?.currency ?? alternatives.flatMap(option => option.basket).map(item => item.currency).sort()[0] ?? "THB";
@@ -34,5 +34,5 @@ export function highlightedAlternativeOptionId(selected: StackOption | null, alt
     return right.coveredCount - left.coveredCount || right.coveragePercent - left.coveragePercent || knownFirst(pills(a), pills(b)) ||
       a.basket.length - b.basket.length || knownFirst(goodsPrice(a, currency), goodsPrice(b, currency)) || vector(a).localeCompare(vector(b));
   });
-  return eligible[0]?.optionId ?? null;
+  return eligible[0]?.candidateKey ?? null;
 }

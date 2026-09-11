@@ -17,12 +17,12 @@ test('SPLAN-REQ-01 handle-only polling uses the published schema', () => {
 });
 test('SPLAN-REQ-02 five field-dispatched behaviours are advertised without a discriminator', () => {
   for (const input of [{ ...mutation, scoring: { weights: { pills: 2 } } },
-    { ...mutation, selectedOptionId: 'opt_returned_choice' },
+    mutation,
     { ...mutation, answers: [{ questionId: 'returned-question', choice: 'returned-choice' }] }]) assert.deepEqual(issues(input), []);
 });
 test('SPLAN-REQ-02 ambiguous selections and answers never validate as refinements', () => {
-  for (const input of [{ ...mutation, selectedOptionId: 'opt_returned_choice', scoring: {} },
-    { ...mutation, answers: [], requirements: {} }, { ...mutation, selectedOptionId: 'opt_returned_choice', answers: [] }]) assert.ok(issues(input).length);
+  for (const input of [{ ...mutation, selectedCandidateKey: 'opt_returned_choice', scoring: {} },
+    { ...mutation, answers: [], requirements: {} }, { ...mutation, selectedCandidateKey: 'opt_returned_choice', answers: [] }]) assert.ok(issues(input).length);
 });
 test('SPLAN-REQ-01 retired fields and unknown controls are rejected', () => {
   for (const key of ['operation', 'request', 'requestPatch', 'responseView', 'verbosity', 'statusOnly', 'optimization']) {
@@ -48,8 +48,8 @@ test('SPLAN-WGT-02 bounded weights accept zero and two with precise invalid-fiel
     assert.ok(!found.some(row => row.fieldPath === 'scoring.weights.pills' && row.reasonCode === 'required'));
   }
 });
-test('SPLAN-REQ-02 metadata without mutation and revisions on create are errors', () => {
-  assert.ok(issues(mutation).length); assert.ok(issues({ ...create, expectedRevision: 1 }).length); assert.ok(issues({}).length);
+test('SPLAN-REQ-02 mutation controls confirm, while revisions on create are errors', () => {
+  assert.deepEqual(issues(mutation), []); assert.ok(issues({ ...create, expectedRevision: 1 }).length); assert.ok(issues({}).length);
 });
 test('SPLAN-SPEC-02 order and unified schema discovery have no response-mode selectors', () => {
   assert.deepEqual(validateToolIssues(AGENTIC_INPUT_SCHEMAS.order, { orderHandle: handle }), []);

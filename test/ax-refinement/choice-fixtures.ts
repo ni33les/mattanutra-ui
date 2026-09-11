@@ -6,7 +6,7 @@ export function coverage(percent: number, id = "a", current = 0): CoverageRow {
     upperLimitAmount: null, percentOfUpperLimit: null };
 }
 export function choice(id: string, percentages: number[], pills: number | null = 1, price: number | null = 100, count = 1): StackOption {
-  return { optionId: id, purchaseEligible: count > 0, basket: Array.from({ length: count }, (_, i) => ({
+  return { candidateKey: id, purchaseEligible: count > 0, basket: Array.from({ length: count }, (_, i) => ({
     availabilityAsOf: "2026-09-07T00:00:00Z", contributionSupplementIds: ["a"], currency: "THB", dailyPills: pills ?? 0,
     pillCountKnown: pills != null, deliveryWindow: null, fixture: true, form: "capsule", imageUrl: null, incidentalNutrientNames: [],
     incidentalNutrients: [], incompleteCommercialFacts: price == null, lineTotalMinor: price ?? 0, pillsPerServing: pills ?? 0,

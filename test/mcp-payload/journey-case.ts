@@ -64,7 +64,7 @@ export async function runPayloadJourney(locale: "en" | "th" | "zh-CN", fixture: 
   assert.equal(concise.outcome.decisions.length, full.outcome.decisions.length);
   for (const [i, value] of concise.outcome.decisions.entries()) {
     const original = full.outcome.decisions[i];
-    assert.deepEqual(value.options.map(row => row.optionId), original.options.map(row => row.optionId));
+    assert.deepEqual(value.options.map(row => row.candidateKey), original.options.map(row => row.candidateKey));
     assert.deepEqual(value.options.map(row => row.stackSummary), original.options.map(row => row.stackSummary));
     assert.deepEqual(value.options.map(row => row.coveragePercent), original.options.map(row => row.coveragePercent));
     assert.ok(value.options.every(row => !("basket" in row) && !("coverage" in row)));

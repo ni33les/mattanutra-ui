@@ -7,7 +7,7 @@ import { publicCoverage, publicOption } from "../lib/agentic/public-mapper.ts";
 import { sampleRetailProduct, sampleValueSnapshot } from "./agentic/value/sample-catalogue.ts";
 import type { CanonicalPlanState } from "../lib/agentic/plan/types.ts";
 const snapshot = sampleValueSnapshot(), target = snapshot.supplements[1]!;
-const state: CanonicalPlanState = { acceptedGaps: [], conditionCodes: [], currency: "THB", currentSupplements: [], destinationCountry: "TH", leftovers: [], locale: "en", medicationCodes: [], optimization: "balanced", pinnedOptionId: null, profile: { ageYears: 35, lifeStage: "adult" }, requirements: {}, safetyAcknowledgement: null, targets: [{ name: target.name, supplementId: target.supplementId, amount: 100, unit: "mg" }] };
+const state: CanonicalPlanState = { acceptedGaps: [], conditionCodes: [], currency: "THB", currentSupplements: [], destinationCountry: "TH", leftovers: [], locale: "en", medicationCodes: [], optimization: "balanced", pinnedCandidateKey: null, profile: { ageYears: 35, lifeStage: "adult" }, requirements: {}, safetyAcknowledgement: null, targets: [{ name: target.name, supplementId: target.supplementId, amount: 100, unit: "mg" }] };
 const baseProduct = sampleRetailProduct({ id: "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeee5", title: "Magnesium measured fixture", name: target.name, supplementId: target.supplementId, amount: 200, unit: "mg", unitPriceMinor: 10000, form: "capsule", servingLabel: "2 capsules; 60 capsules per bottle" });
 const product = { ...baseProduct, dailyPills: 2, candidate: { ...baseProduct.candidate, administration: { ...baseProduct.candidate.administration!, unitsPerServing: 2 } } };
 

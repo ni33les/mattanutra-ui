@@ -178,7 +178,7 @@ export type CanonicalPlanState = Readonly<{
   locale: string;
   medicationCodes: readonly string[];
   optimization: OptimizationMode;
-  pinnedOptionId: string | null;
+  pinnedCandidateKey: string | null;
   profile: PlanProfile;
   requirements: PlanRequirements;
   safetyAcknowledgement: SafetyAcknowledgement | null;
@@ -255,7 +255,7 @@ export type MatcherTelemetry = Readonly<{
   requestedNames: readonly string[];
   searchDeadlineMs?: number;
   searchMs?: number;
-  selectedOptionId: string | null;
+  selectedCandidateKey: string | null;
   serializeMs?: number;
   snapshotId?: string;
   targetSetHash?: string;
@@ -594,7 +594,7 @@ export type PlanExplanation = Readonly<{
     productName: string;
     quantity: number;
   }>[];
-  recommendedOptionId: string;
+  recommendedCandidateKey: string;
   retainedCurrent: readonly RetainedCurrent[];
   safetyState: string;
   savings90DayMinor: number | null;
@@ -667,7 +667,7 @@ export type StackOption = Readonly<{
   matcherVersion: string;
   noDistinctAlternative?: boolean;
   omittedTargetIds?: readonly string[];
-  optionId: string;
+  candidateKey: string;
   reason: string;
   recommended?: boolean;
   retainedCurrent?: readonly RetainedCurrent[];

@@ -313,13 +313,13 @@ export function createPostgresStore(inputSql: Sql, inTransaction = false): Agent
       return row ? mapCheckout(row) : null;
     },
     async getFeedback(id) {
-      const [row] = await sql<DatabaseRow<FeedbackRecord>>`select * from public.agentic_feedback where id = ${id}::uuid`;
+      const [row] = await sql<DatabaseRow<FeedbackRecord>>`select *, option_id as candidate_key from public.agentic_feedback where id = ${id}::uuid`;
       if (!row) return null;
       return {
         consentConfirmed: true as const,
         createdAt: toIso(row.created_at),
         id: row.id,
-        optionId: row.option_id,
+        candidateKey: row.candidate_key,
         planId: row.plan_id,
         points: row.points ?? [],
         rating: row.rating,
@@ -579,7 +579,7 @@ export function createPostgresStore(inputSql: Sql, inTransaction = false): Agent
         insert into public.agentic_feedback (
           id, plan_id, revision, option_id, consent_confirmed, summary, points, rating, created_at
         ) values (
-          ${record.id}::uuid, ${record.planId}::uuid, ${record.revision}, ${record.optionId},
+          ${record.id}::uuid, ${record.planId}::uuid, ${record.revision}, ${record.candidateKey},
           ${record.consentConfirmed}, ${record.summary}, ${record.points}, ${record.rating},
           ${record.createdAt}::timestamptz
         )

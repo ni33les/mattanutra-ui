@@ -50,8 +50,8 @@ async function storedFields(runtime:AgenticRuntime,plan:Record<string,unknown>){
     const cap=await resolveCapability({action:"plan.read",config:runtime.config,handle:String(plan.planHandle),now:runtime.now??new Date().toISOString(),resourceType:"plan",scope:runtime.scope,store:runtime.store});assert.ok(cap,JSON.stringify(plan));
     const row=await runtime.store.getPlanRevision(cap.resourceId,Number(plan.revision));assert.ok(row);return publicPlanFields(row.result as PlanResult);
 }
-function option(plan:Record<string,unknown>){const choices=plan.choices as Array<{optionId:string;roles:string[];products:unknown[]}>;assert.ok(choices?.length,JSON.stringify(plan));const row=choices.find(row=>row.products.length&&row.roles.includes("closest_dose"))??choices.find(row=>row.products.length);assert.ok(row);return row;}
-async function purchase(runtime:AgenticRuntime,created:Record<string,unknown>,key:string){if(created.selectedOptionId)return created;const selected=await call(runtime,"plan",{planHandle:created.planHandle,expectedRevision:created.revision,idempotencyKey:key,selectedOptionId:option(created).optionId});assert.equal(selected.ok,true,JSON.stringify(selected));return selected;}
+function option(plan:Record<string,unknown>){const choices=plan.choices as Array<{candidateKey:string;roles:string[];products:unknown[]}>;assert.ok(choices?.length,JSON.stringify(plan));const row=choices.find(row=>row.products.length&&row.roles.includes("closest_dose"))??choices.find(row=>row.products.length);assert.ok(row);return row;}
+async function purchase(runtime:AgenticRuntime,created:Record<string,unknown>,key:string){if(created.nextAction==='execute')return created;const selected=await call(runtime,"plan",{planHandle:created.planHandle,expectedRevision:created.revision,idempotencyKey:key});assert.equal(selected.ok,true,JSON.stringify(selected));return selected;}
 beforeEach(() => {
     installGoldCatalogue();
 });
@@ -544,7 +544,9 @@ describe("agentic P1 pack fixes", () => {
         assert.equal(result.ok, true);
         assert.equal(result.status, "no_purchase");
         const selectPurchase = (plan: Record<string, unknown>) => purchase(runtime, plan, `p1-over-budget-select-${String(plan.revision)}-01`);
-        result = await selectPurchase(result);
+        result = await call(runtime, "plan", { planHandle: result.planHandle, expectedRevision: result.revision,
+          idempotencyKey: "p1-over-budget-propose-01", requirements: { productDoses: [{ productId: "prd_b1111111111111111111111111111111", servingsPerDay: 1 }] } });
+        assert.equal(result.ok, true); result = await selectPurchase(result);
         assert.deepEqual(result.questions ?? [], []);
         assert.ok(Array.isArray((await storedFields(runtime, result)).basket) && (await storedFields(runtime, result)).basket.length === 1);
         assert.equal((await storedFields(runtime, result)).basket.reduce((sum, item) => sum + Number(item.lineTotalMinor), 0), 39000);
@@ -557,7 +559,7 @@ describe("agentic P1 pack fixes", () => {
             idempotencyKey: "p1-over-budget-locale-01",
             ...{ locale: "th" }
         });
-        assert.equal(unrelated.selectedOptionId, null, "Refinement invalidates selection while retaining eligible choices");
+        assert.equal(unrelated.nextAction, 'confirm_with_user', "Refinement invalidates selection while retaining the recommendation");
         const purchased = (items: unknown) => (items as Array<Record<string, unknown>>).map(item => ({ productId: item.productId, servingsPerDay: item.servingsPerDay, lineTotalMinor: item.lineTotalMinor }));
         assert.ok((unrelated.choices as Array<{products: unknown[]}>).some(choice => choice.products.length === 1), JSON.stringify(unrelated));
         const [planId] = await runtime.store.listPlanIdsByPrincipal("tester");
@@ -565,7 +567,7 @@ describe("agentic P1 pack fixes", () => {
         const stored = await runtime.store.getPlanRevision(planId, Number(unrelated.revision));
         assert.ok(stored);
         const preserved = stored.result as PlanResult;
-        assert.deepEqual(preserved.originalRequest?.requirements, request.requirements);
+        assert.deepEqual(preserved.originalRequest?.requirements, { ...request.requirements, productDoses: [{ productId: "prd_b1111111111111111111111111111111", servingsPerDay: 1 }] });
         assert.equal(preserved.originalRequest?.targets[0]?.amount, 2000);
         assert.deepEqual(preserved.originalRequest?.medicationCodes, request.medicationCodes);
         const relaxed = await call(runtime, "plan", {
@@ -611,12 +613,11 @@ describe("agentic P1 pack fixes", () => {
             }
         });
         assert.equal(created.status, "ready");
-        assert.equal(typeof option(created).optionId, "string");
+        assert.ok(option(created).products.length);
         const selected = await call(runtime, "plan", {
             expectedRevision: created.revision,
             idempotencyKey: "p1-select-option-pick-01",
-            planHandle: created.planHandle,
-            selectedOptionId: option(created).optionId
+            planHandle: created.planHandle
         });
         assert.equal(selected.ok, true);
         assert.equal(selected.status, "ready");
@@ -661,16 +662,10 @@ describe("agentic P1 pack fixes", () => {
             productCount?: number;
         };
         assert.ok((stackSummary.productCount ?? 0) >= 1);
-        const options = (plan.options as Array<{
-            stackSummary?: {
-                productCount?: number;
-            };
-            tradeOffs?: unknown;
-        }>) ?? [];
-        for (const option of options) {
-            assert.equal(typeof option.stackSummary?.productCount, "number");
-            assert.equal(typeof option.tradeOffs, "object");
-        }
+        const recommendations = plan.choices as Array<{summary:{productCount:number}; products: unknown[]}>;
+        assert.equal(recommendations.length, 1);
+        assert.equal(recommendations[0].summary.productCount, recommendations[0].products.length);
+        assert.ok(recommendations[0].products.length > 0);
     });
     it("keeps client-visible trade-offs free of matcher internals", async () => {
         const runtime = runtimeFor();
@@ -886,7 +881,7 @@ describe("agentic P1 pack fixes", () => {
                 servingsPerDay?: number;
                 quantity?: number;
             }>;
-            optionId?: string;
+            candidateKey?: string;
             tradeOffs?: {
                 summary?: string;
             };
@@ -898,7 +893,7 @@ describe("agentic P1 pack fixes", () => {
                 .sort()
                 .join("|");
             assert.notEqual(ids, selectedIds);
-            assert.notEqual(option.optionId, plan.optionId);
+            assert.notEqual(option.candidateKey, plan.candidateKey);
         }
     });
     it("agrees error category with error_code and treats missing order as an error", async () => {

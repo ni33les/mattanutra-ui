@@ -304,7 +304,7 @@ function significantCanonical(plan: Record<string, unknown>) {
       savingClaim: economics.savingClaim ?? null,
       savings90DayMinor: economics.savings90DayMinor ?? null
     },
-    selectedOptionId: plan.optionId ?? null,
+    selectedCandidateKey: plan.candidateKey ?? null,
     snapshotId: identityOf(plan).snapshotId ?? asRecord(plan.canonical).snapshotId ?? null,
     status: plan.status ?? null
   };
@@ -335,7 +335,7 @@ async function runReg01(session: PlanSession, runIndex: number): Promise<R2CaseR
       optionalTargetAmountsAreCoherent(mag, VALUE_ROLE_REQUEST.magnesium.amount)
     ),
     assertEq("REG-01.d3", "conditional_deferred", d3?.status),
-    assertTrue("REG-01.role", recommended.role === "minimum_core" || Boolean(plan.optionId)),
+    assertTrue("REG-01.role", recommended.role === "minimum_core" || Boolean(plan.candidateKey)),
     assertEq("REG-01.ready", "ready", plan.status),
     assertTrue("REG-01.af", hasContextAssessment(plan, "condition", "atrial_fibrillation")),
     assertTrue("REG-01.apixaban", hasContextAssessment(plan, "medication", "apixaban"))
@@ -494,7 +494,7 @@ async function runReg07(session: PlanSession, runIndex: number): Promise<R2CaseR
   const hashes = new Set<string>();
   for (let index = 0; index < 10; index += 1) {
     const plan = await createPlan(session, request);
-    hashes.add(canonicalHash({ optionId: plan.optionId ?? null, status: plan.status ?? null }));
+    hashes.add(canonicalHash({ candidateKey: plan.candidateKey ?? null, status: plan.status ?? null }));
   }
   const assertions = [
     assertEq("REG-07.replay", rawResponseHash(first), rawResponseHash(second)),
@@ -628,24 +628,24 @@ async function runInv05(session: PlanSession, runIndex: number): Promise<R2CaseR
 
 async function runHash01(session: PlanSession, runIndex: number): Promise<R2CaseResult> {
   const created = await createPlan(session, primaryRequest(session.freeze));
-  const alternative = optionsOf(created).find((item) => item.optionId !== created.optionId && item.recommended !== true);
-  const extra = alternative ?? optionsOf(created).find((item) => item.optionId === created.optionId);
-  if (!extra?.optionId) return blocked("R2-HASH-01", { reason: "no_returned_option" });
+  const alternative = optionsOf(created).find((item) => item.candidateKey !== created.candidateKey && item.recommended !== true);
+  const extra = alternative ?? optionsOf(created).find((item) => item.candidateKey === created.candidateKey);
+  if (!extra?.candidateKey) return blocked("R2-HASH-01", { reason: "no_returned_option" });
   const selected = await callPlan(session, {
     expectedRevision: created.revision,
     idempotencyKey: "r2-hash-01-select",
     operation: "select",
-    optionId: extra.optionId,
+    candidateKey: extra.candidateKey,
     planHandle: created.planHandle,
-    selectOptionId: extra.optionId
+    selectCandidateKey: extra.candidateKey
   });
   const replay = await callPlan(session, {
     expectedRevision: created.revision,
     idempotencyKey: "r2-hash-01-select",
     operation: "select",
-    optionId: extra.optionId,
+    candidateKey: extra.candidateKey,
     planHandle: created.planHandle,
-    selectOptionId: extra.optionId
+    selectCandidateKey: extra.candidateKey
   });
   const got = await callPlan(session, {
     expectedRevision: selected.revision,
@@ -653,7 +653,7 @@ async function runHash01(session: PlanSession, runIndex: number): Promise<R2Case
     planHandle: created.planHandle
   });
   const assertions = [
-    assertTrue("HASH-01.option", String(selected.optionId) === String(extra.optionId)),
+    assertTrue("HASH-01.option", String(selected.candidateKey) === String(extra.candidateKey)),
     assertTrue(
       "HASH-01.hashChanged",
       alternative ? String(asRecord(created.canonical).hash) !== String(asRecord(selected.canonical).hash) : String(asRecord(created.canonical).hash) === String(asRecord(selected.canonical).hash)
@@ -895,7 +895,7 @@ async function runOrder05(session: PlanSession, runIndex: number): Promise<R2Cas
   const day0 = ordersOf(plan, 90).filter((row) => Number(row.day) === 0);
   const shipping = day0.map((row) => Number(row.shippingMinor ?? 0));
   const assertions = [
-    assertTrue("ORDER-05.frozen", Boolean(plan.optionId) || plan.status === "ready" || plan.status === "no_purchase"),
+    assertTrue("ORDER-05.frozen", Boolean(plan.candidateKey) || plan.status === "ready" || plan.status === "no_purchase"),
     assertTrue(
       "ORDER-05.sameDay",
       day0.length <= 1 || shipping.every((item) => item === shipping[0])
@@ -908,7 +908,7 @@ async function runSave01(session: PlanSession, runIndex: number): Promise<R2Case
   const plan = await createPlan(session, magPurchaseRequest(session));
   const economics = economicsOf(plan);
   const baseline = asRecord(economics.baseline);
-  const optionIds = basketOf(plan).map((item) => String(item.productId)).slice().sort();
+  const candidateKeys = basketOf(plan).map((item) => String(item.productId)).slice().sort();
   const baselineIds = (Array.isArray(baseline.lines) ? baseline.lines.map(asRecord) : [])
     .map((item) => String(item.productId))
     .slice()
@@ -918,7 +918,7 @@ async function runSave01(session: PlanSession, runIndex: number): Promise<R2Case
     assertEq("SAVE-01.equivalent", true, economics.equivalent),
     assertEq("SAVE-01.claim", "none", economics.savingClaim),
     assertEq("SAVE-01.saving", 0, economics.savings90DayMinor),
-    assertEq("SAVE-01.sameProducts", optionIds.join("|"), baselineIds.join("|"))
+    assertEq("SAVE-01.sameProducts", candidateKeys.join("|"), baselineIds.join("|"))
   ];
   return conclude("R2-SAVE-01", assertions, envelopeFor(session, magPurchaseRequest(session), plan, assertions, runIndex));
 }
@@ -1036,7 +1036,7 @@ async function runHash04(session: PlanSession, runIndex: number): Promise<R2Case
   const base = significantCanonical(plan);
   const baseHash = canonicalHash(base);
   const mutations = [
-    { ...base, selectedOptionId: `${String(base.selectedOptionId)}-x` },
+    { ...base, selectedCandidateKey: `${String(base.selectedCandidateKey)}-x` },
     { ...base, products: base.products.map((item) => ({ ...item, quantity: Number(item.quantity) + 1 })) },
     { ...base, coverage: base.coverage.map((item) => ({ ...item, status: `${item.status}-x` })) },
     { ...base, inventory: [{ daysRemaining: 1, productId: "x", supplementId: "x" }] },
@@ -1075,7 +1075,7 @@ async function runContract01(session: PlanSession, runIndex: number): Promise<R2
   const blob = planSchemaBlob();
   const assertions = [
     assertEq("CONTRACT-01.names", "info,plan,execute,order,support,feedback", names.join()),
-    assertTrue("CONTRACT-01.ops", AGENTIC_TOOL_SCHEMAS.plan.anyOf.length === 5 && ["targets", "planHandle", "answers", "selectedOptionId", "expectedRevision", "idempotencyKey"].every(field => blob.includes(JSON.stringify(field))) && !blob.includes('"operation"')),
+    assertTrue("CONTRACT-01.ops", AGENTIC_TOOL_SCHEMAS.plan.anyOf.length === 5 && ["targets", "planHandle", "answers", "expectedRevision", "idempotencyKey"].every(field => blob.includes(JSON.stringify(field))) && !blob.includes('"operation"')),
     assertTrue("CONTRACT-01.importance", !blob.includes('"importance"') && blob.includes('"weights"')),
     assertTrue("CONTRACT-01.range", blob.includes('"acceptableRange"')),
     assertTrue("CONTRACT-01.prerequisite", !blob.includes('"prerequisite"') && blob.includes('"basis"')),

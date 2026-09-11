@@ -2,7 +2,7 @@
   "version": 1,
   "contractVersion": "11.0.0",
   "releaseBase": "bbdb316662d2d1254bebfb03d612a96ea82351ab",
-  "scope": "Remove public evidence and preserve recorded product images; no scoring, catalogue or payment changes",
+  "scope": "Remove public evidence and option identifiers; align every MCP publication and runtime confirmation; preserve images, shared matching and frozen commerce.",
   "files": [
     {
       "file": "test/agentic-com-pack.test.ts",
@@ -171,6 +171,290 @@
     {
       "file": "test/agentic-cv-r4-pack.test.ts",
       "reason": "Retain customer-value assertions while aligning current discovery and immutable matcher/reference identity expectations."
+    },
+    {
+      "file": "test/agentic-advisory-v6-readiness.test.ts",
+      "reason": "Affected confirmation protocol, private candidate field consumers, or publication and commerce regression coverage; retain scoring, prices and payment invariants."
+    },
+    {
+      "file": "test/agentic-catalogue-cache-identity.test.ts",
+      "reason": "Affected confirmation protocol, private candidate field consumers, or publication and commerce regression coverage; retain scoring, prices and payment invariants."
+    },
+    {
+      "file": "test/agentic-coverage-equivalence.test.ts",
+      "reason": "Affected confirmation protocol, private candidate field consumers, or publication and commerce regression coverage; retain scoring, prices and payment invariants."
+    },
+    {
+      "file": "test/agentic-cv-snapshot-store.test.ts",
+      "reason": "Affected confirmation protocol, private candidate field consumers, or publication and commerce regression coverage; retain scoring, prices and payment invariants."
+    },
+    {
+      "file": "test/agentic-det-pack.test.ts",
+      "reason": "Affected confirmation protocol, private candidate field consumers, or publication and commerce regression coverage; retain scoring, prices and payment invariants."
+    },
+    {
+      "file": "test/agentic-det-v3.test.ts",
+      "reason": "Affected confirmation protocol, private candidate field consumers, or publication and commerce regression coverage; retain scoring, prices and payment invariants."
+    },
+    {
+      "file": "test/agentic-execute-reuse.test.ts",
+      "reason": "Affected confirmation protocol, private candidate field consumers, or publication and commerce regression coverage; retain scoring, prices and payment invariants."
+    },
+    {
+      "file": "test/agentic-flexible-v5-bridge.test.ts",
+      "reason": "Affected confirmation protocol, private candidate field consumers, or publication and commerce regression coverage; retain scoring, prices and payment invariants."
+    },
+    {
+      "file": "test/agentic-flexible-v5-conversation.test.ts",
+      "reason": "Affected confirmation protocol, private candidate field consumers, or publication and commerce regression coverage; retain scoring, prices and payment invariants."
+    },
+    {
+      "file": "test/agentic-flexible-v5-coverage.test.ts",
+      "reason": "Affected confirmation protocol, private candidate field consumers, or publication and commerce regression coverage; retain scoring, prices and payment invariants."
+    },
+    {
+      "file": "test/agentic-flexible-v5-journey.test.ts",
+      "reason": "Affected confirmation protocol, private candidate field consumers, or publication and commerce regression coverage; retain scoring, prices and payment invariants."
+    },
+    {
+      "file": "test/agentic-flow.test.ts",
+      "reason": "Affected confirmation protocol, private candidate field consumers, or publication and commerce regression coverage; retain scoring, prices and payment invariants."
+    },
+    {
+      "file": "test/agentic-intake-certainty.test.ts",
+      "reason": "Affected confirmation protocol, private candidate field consumers, or publication and commerce regression coverage; retain scoring, prices and payment invariants."
+    },
+    {
+      "file": "test/agentic-matching-bridge-v4.test.ts",
+      "reason": "Affected confirmation protocol, private candidate field consumers, or publication and commerce regression coverage; retain scoring, prices and payment invariants."
+    },
+    {
+      "file": "test/agentic-matching.test.ts",
+      "reason": "Affected confirmation protocol, private candidate field consumers, or publication and commerce regression coverage; retain scoring, prices and payment invariants."
+    },
+    {
+      "file": "test/agentic-mcp-transcript-evidence.test.ts",
+      "reason": "Affected confirmation protocol, private candidate field consumers, or publication and commerce regression coverage; retain scoring, prices and payment invariants."
+    },
+    {
+      "file": "test/agentic-operational-decision.test.ts",
+      "reason": "Affected confirmation protocol, private candidate field consumers, or publication and commerce regression coverage; retain scoring, prices and payment invariants."
+    },
+    {
+      "file": "test/agentic-phase0-catalog-ul.test.ts",
+      "reason": "Affected confirmation protocol, private candidate field consumers, or publication and commerce regression coverage; retain scoring, prices and payment invariants."
+    },
+    {
+      "file": "test/agentic-phase2-named-safety.test.ts",
+      "reason": "Affected confirmation protocol, private candidate field consumers, or publication and commerce regression coverage; retain scoring, prices and payment invariants."
+    },
+    {
+      "file": "test/agentic-phase3-leftover-ready.test.ts",
+      "reason": "Affected confirmation protocol, private candidate field consumers, or publication and commerce regression coverage; retain scoring, prices and payment invariants."
+    },
+    {
+      "file": "test/agentic-phase4-catalogid.test.ts",
+      "reason": "Affected confirmation protocol, private candidate field consumers, or publication and commerce regression coverage; retain scoring, prices and payment invariants."
+    },
+    {
+      "file": "test/agentic-phase5-demographic.test.ts",
+      "reason": "Affected confirmation protocol, private candidate field consumers, or publication and commerce regression coverage; retain scoring, prices and payment invariants."
+    },
+    {
+      "file": "test/agentic-plan-status.test.ts",
+      "reason": "Affected confirmation protocol, private candidate field consumers, or publication and commerce regression coverage; retain scoring, prices and payment invariants."
+    },
+    {
+      "file": "test/agentic-purchased-pack-quote.test.ts",
+      "reason": "Affected confirmation protocol, private candidate field consumers, or publication and commerce regression coverage; retain scoring, prices and payment invariants."
+    },
+    {
+      "file": "test/agentic-qa-pack.test.ts",
+      "reason": "Affected confirmation protocol, private candidate field consumers, or publication and commerce regression coverage; retain scoring, prices and payment invariants."
+    },
+    {
+      "file": "test/agentic-r25-bounce-gates.test.ts",
+      "reason": "Affected confirmation protocol, private candidate field consumers, or publication and commerce regression coverage; retain scoring, prices and payment invariants."
+    },
+    {
+      "file": "test/agentic-reference-scope-v6.test.ts",
+      "reason": "Affected confirmation protocol, private candidate field consumers, or publication and commerce regression coverage; retain scoring, prices and payment invariants."
+    },
+    {
+      "file": "test/agentic-reliability.test.ts",
+      "reason": "Affected confirmation protocol, private candidate field consumers, or publication and commerce regression coverage; retain scoring, prices and payment invariants."
+    },
+    {
+      "file": "test/agentic-safety-parity-rca.test.ts",
+      "reason": "Affected confirmation protocol, private candidate field consumers, or publication and commerce regression coverage; retain scoring, prices and payment invariants."
+    },
+    {
+      "file": "test/agentic-uat-nl-v10.test.ts",
+      "reason": "Affected confirmation protocol, private candidate field consumers, or publication and commerce regression coverage; retain scoring, prices and payment invariants."
+    },
+    {
+      "file": "test/agentic-v16-plan90.test.ts",
+      "reason": "Affected confirmation protocol, private candidate field consumers, or publication and commerce regression coverage; retain scoring, prices and payment invariants."
+    },
+    {
+      "file": "test/agentic-v18-locale.test.ts",
+      "reason": "Affected confirmation protocol, private candidate field consumers, or publication and commerce regression coverage; retain scoring, prices and payment invariants."
+    },
+    {
+      "file": "test/agentic/v5-pill-certainty.test.ts",
+      "reason": "Affected confirmation protocol, private candidate field consumers, or publication and commerce regression coverage; retain scoring, prices and payment invariants."
+    },
+    {
+      "file": "test/agentic/value/continued-inventory.test.ts",
+      "reason": "Affected confirmation protocol, private candidate field consumers, or publication and commerce regression coverage; retain scoring, prices and payment invariants."
+    },
+    {
+      "file": "test/agentic/value/slice0-harness.test.ts",
+      "reason": "Affected confirmation protocol, private candidate field consumers, or publication and commerce regression coverage; retain scoring, prices and payment invariants."
+    },
+    {
+      "file": "test/agentic/value/slice1-intent.test.ts",
+      "reason": "Affected confirmation protocol, private candidate field consumers, or publication and commerce regression coverage; retain scoring, prices and payment invariants."
+    },
+    {
+      "file": "test/agentic/value/slice2-options.test.ts",
+      "reason": "Affected confirmation protocol, private candidate field consumers, or publication and commerce regression coverage; retain scoring, prices and payment invariants."
+    },
+    {
+      "file": "test/agentic/value/slice3-cost.test.ts",
+      "reason": "Affected confirmation protocol, private candidate field consumers, or publication and commerce regression coverage; retain scoring, prices and payment invariants."
+    },
+    {
+      "file": "test/agentic/value/slice4-opt.test.ts",
+      "reason": "Affected confirmation protocol, private candidate field consumers, or publication and commerce regression coverage; retain scoring, prices and payment invariants."
+    },
+    {
+      "file": "test/agentic/value/slice5-agent.test.ts",
+      "reason": "Affected confirmation protocol, private candidate field consumers, or publication and commerce regression coverage; retain scoring, prices and payment invariants."
+    },
+    {
+      "file": "test/ax-refinement/choices.test.ts",
+      "reason": "Affected confirmation protocol, private candidate field consumers, or publication and commerce regression coverage; retain scoring, prices and payment invariants."
+    },
+    {
+      "file": "test/e2e/practical-matching.spec.ts",
+      "reason": "Affected confirmation protocol, private candidate field consumers, or publication and commerce regression coverage; retain scoring, prices and payment invariants."
+    },
+    {
+      "file": "test/e2e/web-funnel-recovery.spec.ts",
+      "reason": "Affected confirmation protocol, private candidate field consumers, or publication and commerce regression coverage; retain scoring, prices and payment invariants."
+    },
+    {
+      "file": "test/formulation-results-helpers.test.ts",
+      "reason": "Affected confirmation protocol, private candidate field consumers, or publication and commerce regression coverage; retain scoring, prices and payment invariants."
+    },
+    {
+      "file": "test/magnesium-ul-source.test.ts",
+      "reason": "Affected confirmation protocol, private candidate field consumers, or publication and commerce regression coverage; retain scoring, prices and payment invariants."
+    },
+    {
+      "file": "test/matcher-v5-web.test.ts",
+      "reason": "Affected confirmation protocol, private candidate field consumers, or publication and commerce regression coverage; retain scoring, prices and payment invariants."
+    },
+    {
+      "file": "test/matcher-v6-browser-preferences.integration.test.ts",
+      "reason": "Affected confirmation protocol, private candidate field consumers, or publication and commerce regression coverage; retain scoring, prices and payment invariants."
+    },
+    {
+      "file": "test/matcher/phase3.test.ts",
+      "reason": "Affected confirmation protocol, private candidate field consumers, or publication and commerce regression coverage; retain scoring, prices and payment invariants."
+    },
+    {
+      "file": "test/matcher/stack-life-stage-ul-flows.test.ts",
+      "reason": "Affected confirmation protocol, private candidate field consumers, or publication and commerce regression coverage; retain scoring, prices and payment invariants."
+    },
+    {
+      "file": "test/mcp-payload/harness.test.ts",
+      "reason": "Affected confirmation protocol, private candidate field consumers, or publication and commerce regression coverage; retain scoring, prices and payment invariants."
+    },
+    {
+      "file": "test/practical-matching/checkout.integration.test.ts",
+      "reason": "Affected confirmation protocol, private candidate field consumers, or publication and commerce regression coverage; retain scoring, prices and payment invariants."
+    },
+    {
+      "file": "test/practical-matching/checkout.test.ts",
+      "reason": "Affected confirmation protocol, private candidate field consumers, or publication and commerce regression coverage; retain scoring, prices and payment invariants."
+    },
+    {
+      "file": "test/practical-matching/reported-journey.test.ts",
+      "reason": "Affected confirmation protocol, private candidate field consumers, or publication and commerce regression coverage; retain scoring, prices and payment invariants."
+    },
+    {
+      "file": "test/published-client-journey.test.ts",
+      "reason": "Affected confirmation protocol, private candidate field consumers, or publication and commerce regression coverage; retain scoring, prices and payment invariants."
+    },
+    {
+      "file": "test/retail-checkout-catalogue-v5.integration.test.ts",
+      "reason": "Affected confirmation protocol, private candidate field consumers, or publication and commerce regression coverage; retain scoring, prices and payment invariants."
+    },
+    {
+      "file": "test/retail-checkout-catalogue-v5.test.ts",
+      "reason": "Affected confirmation protocol, private candidate field consumers, or publication and commerce regression coverage; retain scoring, prices and payment invariants."
+    },
+    {
+      "file": "test/service-efficiency/atomic-checkout.integration.test.ts",
+      "reason": "Affected confirmation protocol, private candidate field consumers, or publication and commerce regression coverage; retain scoring, prices and payment invariants."
+    },
+    {
+      "file": "test/service-efficiency/checkout-preparation.test.ts",
+      "reason": "Affected confirmation protocol, private candidate field consumers, or publication and commerce regression coverage; retain scoring, prices and payment invariants."
+    },
+    {
+      "file": "test/service-efficiency/duplicate-admission.test.ts",
+      "reason": "Affected confirmation protocol, private candidate field consumers, or publication and commerce regression coverage; retain scoring, prices and payment invariants."
+    },
+    {
+      "file": "test/simple-plan/documented.test.ts",
+      "reason": "Affected confirmation protocol, private candidate field consumers, or publication and commerce regression coverage; retain scoring, prices and payment invariants."
+    },
+    {
+      "file": "test/simple-plan/journey.test.ts",
+      "reason": "Affected confirmation protocol, private candidate field consumers, or publication and commerce regression coverage; retain scoring, prices and payment invariants."
+    },
+    {
+      "file": "test/simple-plan/no-option-ids.test.ts",
+      "reason": "Affected confirmation protocol, private candidate field consumers, or publication and commerce regression coverage; retain scoring, prices and payment invariants."
+    },
+    {
+      "file": "test/simple-plan/requests.test.ts",
+      "reason": "Affected confirmation protocol, private candidate field consumers, or publication and commerce regression coverage; retain scoring, prices and payment invariants."
+    },
+    {
+      "file": "test/simple-plan/response.test.ts",
+      "reason": "Affected confirmation protocol, private candidate field consumers, or publication and commerce regression coverage; retain scoring, prices and payment invariants."
+    },
+    {
+      "file": "test/simple-plan/retained-choice-values.test.ts",
+      "reason": "Affected confirmation protocol, private candidate field consumers, or publication and commerce regression coverage; retain scoring, prices and payment invariants."
+    },
+    {
+      "file": "test/simple-plan/state.test.ts",
+      "reason": "Affected confirmation protocol, private candidate field consumers, or publication and commerce regression coverage; retain scoring, prices and payment invariants."
+    },
+    {
+      "file": "test/task-transactions.integration.test.ts",
+      "reason": "Affected confirmation protocol, private candidate field consumers, or publication and commerce regression coverage; retain scoring, prices and payment invariants."
+    },
+    {
+      "file": "test/web-advisory.integration.test.ts",
+      "reason": "Affected confirmation protocol, private candidate field consumers, or publication and commerce regression coverage; retain scoring, prices and payment invariants."
+    },
+    {
+      "file": "test/web-advisory.test.ts",
+      "reason": "Affected confirmation protocol, private candidate field consumers, or publication and commerce regression coverage; retain scoring, prices and payment invariants."
+    },
+    {
+      "file": "test/web-journey-fix/reported.test.ts",
+      "reason": "Affected confirmation protocol, private candidate field consumers, or publication and commerce regression coverage; retain scoring, prices and payment invariants."
+    },
+    {
+      "file": "test/mcp-evidence-images/ci.test.ts",
+      "reason": "Current publication, identifier-free confirmation and complete maintained CI reference prerequisites."
     }
   ],
   "runnerConsumers": [

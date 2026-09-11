@@ -195,7 +195,7 @@ describe("v1.6 TECH-02 plan(create) completion", () => {
     for (const view of views) {
       assert.deepEqual(view.coverage, views[0]!.coverage);
       assert.deepEqual(view.orderSchedule, views[0]!.orderSchedule);
-      assert.equal(view.selectedOptionId, views[0]!.selectedOptionId);
+      assert.equal(view.selectedCandidateKey, views[0]!.selectedCandidateKey);
       assert.equal(view.status, views[0]!.status);
     }
     const reversed = deferred();

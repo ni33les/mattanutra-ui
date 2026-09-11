@@ -86,7 +86,7 @@ describe("Slice 1 target intent and conditional no-sale", () => {
       locale: "en",
       medicationCodes: [],
       optimization: "lowest_cost",
-      pinnedOptionId: null,
+      pinnedCandidateKey: null,
       profile: { ageYears: 35, lifeStage: "adult", sex: "female" },
       requirements: {},
       safetyAcknowledgement: null,

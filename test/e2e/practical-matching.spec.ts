@@ -27,12 +27,12 @@ for (const locale of ['en', 'th', 'zh-CN']) test(`PRACTICAL-BROWSER-01 ${locale}
   const details = page.getByTestId('matching-advice-details').first();
   await expect(details).not.toHaveAttribute('open'); await details.locator('summary').click();
   await expect(details.locator('[data-advice-code="intake_unknown"]')).toBeVisible();
-  const alternative = page.locator(`[data-option-id="${seeded.preferenceScenario.alternative.optionId}"]`);
+  const alternative = page.locator(`[data-option-id="${seeded.preferenceScenario.alternative.candidateKey}"]`);
   await expect(alternative).toHaveCount(0);
   await expect(page.getByTestId('selected-matching-preferences')).toHaveCount(0);
   // Removing reveal's alternative cards does not invalidate existing option checkout links.
   const params = new URLSearchParams({ plan: seeded.planId, run: seeded.runId,
-    option: seeded.preferenceScenario.alternative.optionId, selected: seeded.preferenceScenario.alternative.productIds.join(','),
+    option: seeded.preferenceScenario.alternative.candidateKey, selected: seeded.preferenceScenario.alternative.productIds.join(','),
     revision: '1', selectionRevision: '0' });
   await page.goto(`/${locale}/basket/checkout?${params}`);
   await expect(page).toHaveURL(/\/basket\/checkout\?/);

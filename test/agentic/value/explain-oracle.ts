@@ -26,7 +26,7 @@ export type OraclePublishedOption = Readonly<{
     savings90DayMinor?: number;
   }>;
   omittedTargetIds?: readonly string[];
-  optionId: string;
+  candidateKey: string;
   productIds?: readonly string[];
   recommended?: boolean;
   retainedCurrent?: readonly Readonly<{
@@ -113,7 +113,7 @@ export function oracleExplanation(input: Readonly<{
     pills: input.option.stackSummary?.totalDailyPills ?? 0,
     productCount: input.option.stackSummary?.productCount ?? input.basket?.length ?? 0,
     purchases: (input.basket ?? []).map(({ productId }) => ({ productId })),
-    recommendedOptionId: input.option.optionId,
+    recommendedCandidateKey: input.option.candidateKey,
     retainedCurrent: input.option.retainedCurrent ?? [],
     safetyState: input.safetyState,
     savings90DayMinor: input.option.economics?.savings90DayMinor ?? null
@@ -125,14 +125,14 @@ export function oracleCanonicalValue(published: OraclePublishedPlan) {
     .map((option) => ({
       stackSummary: option.stackSummary ?? null,
       cash90DayMinor: option.economics?.cash90DayMinor ?? option.cash90DayMinor ?? null,
-      optionId: option.optionId,
+      candidateKey: option.candidateKey,
       recommended: Boolean(option.recommended),
       role: option.role ?? null,
       deferredTargetIds: [...(option.deferredTargetIds ?? [])].sort(),
       omittedTargetIds: [...(option.omittedTargetIds ?? [])].sort(),
       savings90DayMinor: option.economics?.savings90DayMinor ?? null
     }))
-    .sort((left, right) => left.optionId.localeCompare(right.optionId));
+    .sort((left, right) => left.candidateKey.localeCompare(right.candidateKey));
 
   return {
     basket: [...(published.basket ?? [])].map((line) => ({

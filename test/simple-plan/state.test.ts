@@ -23,12 +23,12 @@ test('SPLAN-STATE-01/03 flat create admits one durable owner; handle polling cre
   assert.equal((await app.store.getPlanOperationByKey(owner, initial.idempotencyKey))?.id, operation.id);
   assert.equal((await app.store.getPlanOperation(operation.id))?.status, 'queued');
 });
-test('SPLAN-REQ-02 mixed select/refine returns offending field before admission', async () => {
+test('SPLAN-REQ-02 retired selection field returns offending field before admission', async () => {
   const app = createAgenticRuntime();
   const value = await call(app, { planHandle: 'cap_returned_example_valid_handle', expectedRevision: 1,
-    idempotencyKey: 'simple-plan-ambiguous', selectedOptionId: 'opt_returned_choice', scoring: {} });
+    idempotencyKey: 'simple-plan-ambiguous', selectedCandidateKey: 'opt_returned_choice', scoring: {} });
   assert.equal(value.ok, false);
-  assert.equal((value.error as Record<string, unknown>).fieldPath, 'scoring');
+  assert.equal((value.error as Record<string, unknown>).fieldPath, 'selectedCandidateKey');
   const owner = `${app.scope.environment}:${app.scope.tenantScope}:${app.scope.principalScope ?? 'anon'}`;
   assert.equal(await app.store.getPlanOperationByKey(owner, 'simple-plan-ambiguous'), null);
 });

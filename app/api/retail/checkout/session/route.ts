@@ -128,7 +128,7 @@ export async function POST(request: Request) {
       frozenLines,
       locale,
       recommendationRunId: typeof body.recommendationRunId === "string" ? body.recommendationRunId : null,
-      optionId: typeof body.optionId === "string" ? body.optionId : null,
+      candidateKey: typeof body.candidateKey === "string" ? body.candidateKey : null,
       assessmentRevision: typeof body.assessmentRevision === "number" ? body.assessmentRevision : null,
       selectionRevision: typeof body.selectionRevision === "number" ? body.selectionRevision : null,
       mode,

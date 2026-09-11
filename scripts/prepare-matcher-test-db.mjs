@@ -1,3 +1,4 @@
+import { seedMatcherReferenceFixtures } from "./seed-matcher-reference-fixtures.mjs";
 /** Bootstrap a fresh isolated CI database using existing schemas and controlled fixtures. */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -17,5 +18,6 @@ try {
     execFileSync(process.execPath, ['--experimental-strip-types', '--import', './scripts/register-ts-path-loader.mjs', `scripts/${script}.ts`], { env, stdio: 'inherit' });
   }
   await prepareLockFixtures(sql, url.href);
+  await seedMatcherReferenceFixtures(sql, url.href);
   await sql.begin(tx => seedPublicMatcherFixtures(tx));
 } finally { await sql.end(); }

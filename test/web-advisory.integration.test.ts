@@ -215,7 +215,7 @@ describe("web advisory revisions on PostgreSQL", () => {
     await insertFormulationVersion(sql, { planId, generation, modelVersion: "v5-completion-fixture", formulation: { supplementBreakdown: [], sectionStatuses: { supplements: "ready" } } });
     const { task } = await createTask({ planId, title: "Actual product completion", taskType: "generate_product_recommendations", payload: { catalogueRevision, safetyReferenceIdentity, productPreferences: { revision: 0, excludedProductIds: [], searchEffort: "standard" } } });
     const empty = recommendWithMatcher({ needs: [], candidates: [] });
-    const recommendations = { ...empty, diagnostics: { ...empty.diagnostics, matching: { operationalStatus: "no_purchase" as const, selectedOptionId: null, options: [], alternativeSearch: undefined } } };
+    const recommendations = { ...empty, diagnostics: { ...empty.diagnostics, matching: { operationalStatus: "no_purchase" as const, selectedCandidateKey: null, options: [], alternativeSearch: undefined } } };
     const resultPayload = { catalogueRevision, safetyReferenceIdentity, catalogueFingerprint: "fixture-v5", recommendations, recommendationVariants: [{ stackPreference: "balanced", maxProducts: null, recommendations }] };
     await withDatabaseTransaction(sql, tx => applyTaskCompletionResult({ task, taskId: task.id, sql: tx, afterCommit: () => {}, resultPayload }));
     const runs = await sql`select selection_revision,generation_locale,generator_version,assessment_revision,catalogue_revision from public.product_recommendation_runs where plan_id=${planId}::uuid`;

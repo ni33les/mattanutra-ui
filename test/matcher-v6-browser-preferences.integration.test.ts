@@ -38,11 +38,11 @@ it("ANNA-BROWSER-PG-01 numeric preference fixture retains real options and check
       assert.equal(row.prominent, true); assert.equal(row.complete, true);
     }
     const alternative = fixture.preferenceScenario.alternative;
-    assert.ok(alternative.optionId); assert.equal(alternative.productIds.length, 1);
+    assert.ok(alternative.candidateKey); assert.equal(alternative.productIds.length, 1);
     process.env.DB_URL = database.href;
     const selected = await currentWebCheckoutRecommendations(getSql()!, {
       planId: fixture.planId, locale: "th", recommendationRunId: fixture.runId,
-      optionId: alternative.optionId, selectedItemIds: alternative.productIds,
+      candidateKey: alternative.candidateKey, selectedItemIds: alternative.productIds,
       assessmentRevision: 1, selectionRevision: 0
     });
     assert.deepEqual(selected.map(row => row.product_id), alternative.productIds);

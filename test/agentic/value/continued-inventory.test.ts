@@ -14,7 +14,7 @@ function current(extra: Partial<CurrentSupplement> = {}): CurrentSupplement {
 }
 function state(rows: readonly CurrentSupplement[] = [], extra: Partial<CanonicalPlanState> = {}): CanonicalPlanState {
   return { acceptedGaps: [], conditionCodes: [], currency: "THB", currentSupplements: rows, destinationCountry: "TH", leftovers: [], locale: "en",
-    medicationCodes: [], optimization: "lowest_cost", pinnedOptionId: null, profile: { ageYears: 35, lifeStage: "adult", sex: "female" },
+    medicationCodes: [], optimization: "lowest_cost", pinnedCandidateKey: null, profile: { ageYears: 35, lifeStage: "adult", sex: "female" },
     requirements: {}, safetyAcknowledgement: null, targets: [{ amount: 400, name: mag.name, supplementId: mag.supplementId, unit: "mg" }], ...extra };
 }
 function basket(index = 0): BasketItem {

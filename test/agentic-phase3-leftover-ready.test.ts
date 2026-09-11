@@ -58,7 +58,7 @@ function vitaminCOption(): StackOption {
     coveragePercent: 100,
     dailyPills: 1,
     matcherVersion: "pareto-hybrid-1",
-    optionId: "opt_c",
+    candidateKey: "opt_c",
     reason: "test",
     snapshotId: "snap_c",
     totalPriceMinor: 100

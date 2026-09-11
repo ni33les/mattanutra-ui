@@ -12,7 +12,7 @@ function request(body: string | ReadableStream<Uint8Array>, signal?: AbortSignal
 describe("MCP client and HTTP contract", () => {
   it("gives text-only clients every continuation field and error detail", () => {
     for (const payload of [
-      { ok: true, planHandle: "opaque", revision: 2, nextAction: "execute", optionId: "choice" },
+      { ok: true, planHandle: "opaque", revision: 2, nextAction: "execute", candidateKey: "choice" },
       { ok: false, error: { reasonCode: "stale_revision", message: "Refresh the plan.", retryable: false } }
     ]) {
       const result = toolResult(payload, !payload.ok, "plan", "text");

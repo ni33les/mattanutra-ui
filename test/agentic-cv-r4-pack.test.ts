@@ -1083,14 +1083,14 @@ async function runReg05(session: PlanSession, runIndex: number): Promise<R4CaseR
       idempotencyKey: selectKey,
       operation: "select",
       planHandle: first.planHandle,
-      selectOptionId: select.optionId
+      selectCandidateKey: select.candidateKey
     });
     selectReplay = await callPlan(session, {
       expectedRevision: first.revision,
       idempotencyKey: selectKey,
       operation: "select",
       planHandle: first.planHandle,
-      selectOptionId: select.optionId
+      selectCandidateKey: select.candidateKey
     });
   }
   const fresh = new Set<string>();

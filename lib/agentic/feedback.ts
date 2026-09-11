@@ -1,5 +1,4 @@
 import { AGENTIC_CONTRACT_VERSION } from "@/lib/agentic/config";
-import { decisionOptions, decisionOptionId } from "@/lib/agentic/presentation/decision";
 import { randomUUID } from "node:crypto";
 import type { AgenticConfig } from "@/lib/agentic/config";
 import { businessError, type AgenticErrorResult } from "@/lib/agentic/contract/errors";
@@ -24,7 +23,6 @@ export async function feedbackTool(input: Readonly<{
   expectedRevision: number;
   idempotencyKey: string;
   now: string;
-  optionId?: string;
   planHandle: string;
   points?: readonly string[];
   rating?: number;
@@ -53,7 +51,6 @@ export async function feedbackTool(input: Readonly<{
   const ownerScope = `${input.scope.environment}:${input.scope.tenantScope}:${input.scope.principalScope ?? "anon"}`;
   const payload = {
     expectedRevision: input.expectedRevision,
-    optionId: input.optionId ?? null,
     planHandle: input.planHandle,
     points: input.points ?? [],
     rating: input.rating ?? null,
@@ -114,9 +111,7 @@ export async function feedbackTool(input: Readonly<{
 
   const result = revision.result as PlanResult;
   if (result.contractVersion !== AGENTIC_CONTRACT_VERSION) return businessError({ reasonCode: "not_found", message: "Not found." });
-  const option = input.optionId ? decisionOptions(result).find(row => (result.requestSnapshot.scoring ? decisionOptionId(input.planHandle, input.expectedRevision, row) : row.optionId) === input.optionId) : result.selected;
-  if (input.optionId && !option) return businessError({ reasonCode: "not_found", fieldPath: "optionId", message: "Not found." });
-  const optionId = option?.optionId ?? null;
+  const candidateKey = result.selected?.candidateKey ?? null;
 
   let inserted = false;
   const response = await input.store.transaction(async (store) => {
@@ -130,7 +125,7 @@ export async function feedbackTool(input: Readonly<{
     if (claimed.kind === "conflict") return claimed.error;
     if (claimed.kind === "replay") return claimed.response;
     await store.insertFeedback({
-      consentConfirmed: true, createdAt: input.now, id: randomUUID(), optionId,
+      consentConfirmed: true, createdAt: input.now, id: randomUUID(), candidateKey,
       planId: plan.id, points: input.points ?? [], rating: input.rating ?? null,
       revision: input.expectedRevision, summary: input.summary ?? null
     });
@@ -144,7 +139,7 @@ export async function feedbackTool(input: Readonly<{
   });
   if (inserted) {
     await persistMcpPlanFeedback({
-      optionId, planId: plan.id, rating: input.rating ?? null,
+      candidateKey, planId: plan.id, rating: input.rating ?? null,
       revision: input.expectedRevision, summary: input.summary ?? null
     });
   }

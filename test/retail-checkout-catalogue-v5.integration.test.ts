@@ -27,10 +27,10 @@ it('V5-CHECKOUT-PG-01: new checkout holds catalogue epoch stable until its short
       values (${planId}::uuid, 'en', '{}'::jsonb, '{}'::jsonb, '{}'::jsonb, 1)`;
     await sql`insert into public.product_recommendation_runs (id, plan_id, assessment_revision, generation_locale, generator_version, selection_revision, catalogue_revision, diagnostics)
       values (${runId}::uuid, ${planId}::uuid, 1, 'en', ${FUNNEL_GENERATOR_VERSION}, 0, ${epoch.revision}::bigint,
-        ${sql.json({ algorithmVersion: MATCHER_VERSION, matching: { selectedOptionId: 'eight', options: [{ optionId: 'eight', productIds, recommendations: [] }] } })}::jsonb)`;
+        ${sql.json({ algorithmVersion: MATCHER_VERSION, matching: { selectedCandidateKey: 'eight', options: [{ candidateKey: 'eight', productIds, recommendations: [] }] } })}::jsonb)`;
     for (const [rank, productId] of productIds.entries()) await sql`insert into public.product_recommendation_items (run_id, product_id, rank, url_used, price_amount)
       values (${runId}::uuid, ${productId}::uuid, ${rank + 1}, ${`https://fixture.invalid/${productId}`}, ${rank + 10})`;
-    const input = { planId, locale: 'en' as const, selectedItemIds: productIds, recommendationRunId: runId, optionId: 'eight', assessmentRevision: 1, selectionRevision: 0 };
+    const input = { planId, locale: 'en' as const, selectedItemIds: productIds, recommendationRunId: runId, candidateKey: 'eight', assessmentRevision: 1, selectionRevision: 0 };
     let ready!: () => void;
     const checkoutReady = new Promise<void>(resolve => { ready = resolve; });
     const hold = new Promise<void>(resolve => { release = resolve; });

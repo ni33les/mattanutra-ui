@@ -34,7 +34,7 @@ function stateFor(product: CatalogueProduct, overrides: Partial<CanonicalPlanSta
     locale: "en",
     medicationCodes: [],
     optimization: "balanced",
-    pinnedOptionId: null,
+    pinnedCandidateKey: null,
     profile: { ageYears: 52, lifeStage: "adult", sex: "male" },
     requirements: {},
     safetyAcknowledgement: null,
