@@ -12,7 +12,7 @@ after(closeSqlPool);
 const sql = getSql()!;
 const answers = { firstName: 'Parallel Fixture', age: '36-45', sex: 'male', goals: ['energy'] };
 
-test('HS-PAR-PG-01 submission admits independent advice/formula work; unpaid display waits for both current outputs', async () => {
+test('HS-PAR-PG-01 HealthScore waits for advice and formula only; reveal also waits for product matching', async () => {
   const receipt = await captureAssessment({ answers, locale: 'en', intent: 'capture' }, { idempotencyKey: randomUUID() });
   const id = receipt.planId;
   const tasks = await sql`select id,task_type,payload->>'dependsOnTaskId' as depends_on_task_id,status from tasks where plan_id=${id}::uuid`;
@@ -22,12 +22,33 @@ test('HS-PAR-PG-01 submission admits independent advice/formula work; unpaid dis
   const read = () => getFunnelReadiness(id, 'en');
   assert.equal((await read())?.readyForHealthScore, false);
   await sql`insert into formulations(plan_id,version,assessment_revision,generation_locale,generator_version,formulation) values(${id}::uuid,1,1,'en',${FUNNEL_GENERATOR_VERSION},'{"supplementBreakdown":[{"id":"target"}]}')`;
-  assert.equal((await read())?.readyForHealthScore, false);
+  assert.equal((await read())?.readyForHealthScore, true);
+  assert.equal((await read())?.readyForReveal, false);
+  await sql`update assessments set selected_plan='precision' where plan_id=${id}::uuid`;
+  assert.equal((await read())?.readyForReveal, false);
+  await sql`update tasks set status='failed' where plan_id=${id}::uuid and task_type='generate_product_recommendations'`;
+  const failedProducts = await read();
+  assert.equal(failedProducts?.readyForHealthScore, true);
+  assert.equal(failedProducts?.healthScorePageFailed, false);
+  assert.equal(failedProducts?.readyForReveal, false);
+  assert.equal(failedProducts?.failed, true);
+  await sql`update tasks set status='queued' where plan_id=${id}::uuid and task_type='generate_product_recommendations'`;
   await sql`insert into product_recommendation_runs(plan_id,assessment_revision,generation_locale,generator_version,catalogue_revision) values(${id}::uuid,1,'en',${FUNNEL_GENERATOR_VERSION},(select revision from catalogue_runtime_revision where singleton=true))`;
-  const ready = await read(); assert.equal(ready?.readyForHealthScore, true); assert.equal(ready?.hasPaidPlan, false);
+  const ready = await read(); assert.equal(ready?.readyForHealthScore, true); assert.equal(ready?.readyForReveal, true);
   assert.equal((await getFunnelReadiness(id, 'th'))?.readyForHealthScore, false);
   await sql`update assessments set input_revision=2 where plan_id=${id}::uuid`;
   assert.equal((await read())?.readyForHealthScore, false);
+});
+
+test('HS-PAR-PG-04 product failure cannot fail HealthScore while its formula is still running', async () => {
+  const { planId } = await captureAssessment({ answers, locale: 'en' }, { idempotencyKey: randomUUID() });
+  await sql`insert into assessment_healthscore_results(plan_id,revision,locale,generator_version,result) values(${planId}::uuid,1,'en',${FUNNEL_GENERATOR_VERSION},${sql.json(completeHealthScoreFixture('en'))})`;
+  await sql`update tasks set status='failed' where plan_id=${planId}::uuid and task_type='generate_product_recommendations'`;
+  const waiting = await getFunnelReadiness(planId, 'en');
+  assert.equal(waiting?.readyForHealthScore, false);
+  assert.equal(waiting?.healthScorePageFailed, false);
+  await sql`update tasks set status='failed' where plan_id=${planId}::uuid and task_type='generate_supplement_guidance'`;
+  assert.equal((await getFunnelReadiness(planId, 'en'))?.healthScorePageFailed, true);
 });
 
 test('HS-PAR-PG-02 analysis retry also repairs failed formulation for the saved assessment without recapture', async () => {

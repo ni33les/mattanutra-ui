@@ -26,7 +26,7 @@ test('HS-PAR-02 advice alone cannot release chat/classic/direct HealthScore poll
   assert.match(read('app/[locale]/nutrition/healthscore/page.tsx'), /readyForHealthScore/);
 });
 
-test('HS-PAR-03 a failed reveal preparation exposes recovery even when advice is complete', async t => {
+test('HS-PAR-03 a failed nutrient formula exposes recovery even when advice is complete', async t => {
   let reads = 0;
   t.mock.method(globalThis, 'fetch', async () => Response.json(++reads === 1
     ? { copyReady: true, copyFailed: false, readyForHealthScore: false, healthScorePageFailed: true }

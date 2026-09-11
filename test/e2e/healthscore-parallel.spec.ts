@@ -10,7 +10,7 @@ const execute = promisify(execFile);
 assert.ok(process.env.TEST_DB_URL, 'Isolated PostgreSQL is required');
 const url = new URL(process.env.TEST_DB_URL); assert.equal(url.hostname, '127.0.0.1'); assert.match(url.pathname, /^\/mattanutra_lock_review_/);
 
-for (const locale of ['en', 'th', 'zh-CN']) test(`HS-PAR-BROWSER-01 ${locale} keeps the original page hidden until both branches finish`, async ({ page }) => {
+for (const locale of ['en', 'th', 'zh-CN']) test(`HS-PAR-BROWSER-01 ${locale} opens HealthScore before product matching and keeps reveal waiting`, async ({ page }) => {
   const sql = postgres(url.href, { max: 1, prepare: false });
   const directory = await mkdtemp(join(tmpdir(), 'hs-parallel-'));
   try {
@@ -28,14 +28,19 @@ for (const locale of ['en', 'th', 'zh-CN']) test(`HS-PAR-BROWSER-01 ${locale} ke
     await sql.begin(async tx => {
       await tx`set local session_replication_role = replica`;
       await tx`update product_recommendation_runs set catalogue_revision=-1 where id=${fixture.runId}::uuid`;
+      await tx`update formulations set formulation=jsonb_set(formulation,'{sectionStatuses,supplements}','"pending"'),read_projection=null where plan_id=${fixture.planId}::uuid`;
     });
     await page.reload();
-    await expect(page.getByTestId('questionnaire-calculating')).toBeVisible();
-    await expect(page.locator('.mn-healthscore-v7')).toHaveCount(0);
+    await expect(page.locator('.mn-healthscore-v7')).toBeVisible();
+    await expect(page.getByTestId('questionnaire-calculating')).toHaveCount(0);
+    await page.goto(`/${locale}/nutrition/reveal?plan=${fixture.planId}`);
+    await expect(page).toHaveURL(new RegExp(`/${locale}/nutrition/progress\\?`));
+    await expect(page.locator('.nutrient-card')).toHaveCount(0);
     await sql.begin(async tx => {
       await tx`set local session_replication_role = replica`;
       await tx`update product_recommendation_runs set catalogue_revision=(select revision from catalogue_runtime_revision where singleton=true) where id=${fixture.runId}::uuid`;
     });
+    await page.goto(`/${locale}/nutrition/healthscore?plan=${fixture.planId}`);
     await expect(page.locator('.mn-healthscore-v7')).toBeVisible({ timeout: 10000 });
     const section = page.locator('.mn-hs-shortlist-section'); await section.scrollIntoViewIfNeeded();
     await expect(section.locator('.n')).toHaveCount(3);
