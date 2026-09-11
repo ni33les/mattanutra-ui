@@ -1,6 +1,17 @@
 import { createHash } from "node:crypto";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { dirname, isAbsolute, relative, resolve } from "node:path";
+
+/** Identity comes from generated publications, shared by readiness and release proofs. */
+export function validationContractIdentity() {
+  const directory = new URL("../contract/mcp/", import.meta.url);
+  const versions = readdirSync(directory).filter(value => /^\d+\.\d+\.\d+$/.test(value))
+    .sort((a, b) => { const left = a.split(".").map(Number), right = b.split(".").map(Number); return right[0] - left[0] || right[1] - left[1] || right[2] - left[2]; });
+  if (!versions.length) throw new Error("Current generated contract publication is missing");
+  const artifact = JSON.parse(readFileSync(new URL(`${versions[0]}/tools.json`, directory), "utf8"));
+  if (artifact.contractVersion !== versions[0] || !/^[a-f0-9]{64}$/.test(artifact.schemaChecksum)) throw new Error("Generated contract identity is inconsistent");
+  return { contractVersion: artifact.contractVersion, schemaChecksum: artifact.schemaChecksum };
+}
 
 export const VALIDATION_CLIENT_LOCALES = ["en", "th", "zh-CN"];
 export const VALIDATION_CLIENT_DISCOVERY = ["resources", "tools_only"];
@@ -17,10 +28,10 @@ export const REQUIRED_VALIDATION_ARTIFACTS = ["source-before.json", "source-afte
 /** Reuse complete evidence only for byte-identical source; a commit alone is insufficient. */
 export function readDevValidationProof(file, sourceSha256) {
   const proof = JSON.parse(readFileSync(file, "utf8"));
-  if (proof.version !== "dev-advisory-validation-3" || proof.contractVersion !== "7.0.0" || !/^[a-f0-9]{40}$/.test(proof.releaseBaseCommit ?? "") || ["releaseLintSha256", "testInventorySha256", "databaseSchemaSha256", "catalogueSha256"].some(key => !/^[a-f0-9]{64}$/.test(proof[key] ?? "")) || proof.environment !== "dev" ||
+  if (proof.version !== "dev-advisory-validation-3" || proof.contractVersion !== validationContractIdentity().contractVersion || !/^[a-f0-9]{40}$/.test(proof.releaseBaseCommit ?? "") || ["releaseLintSha256", "testInventorySha256", "databaseSchemaSha256", "catalogueSha256"].some(key => !/^[a-f0-9]{64}$/.test(proof[key] ?? "")) || proof.environment !== "dev" ||
       proof.candidateOrigin !== "http://127.0.0.1:3100" || proof.passed !== true ||
       proof.unchangedSource !== true || proof.sourceSha256 !== sourceSha256 ||
-      proof.buildId !== sourceSha256.slice(0, 40) || !proof.schemaChecksum) {
+      proof.buildId !== sourceSha256.slice(0, 40) || proof.schemaChecksum !== validationContractIdentity().schemaChecksum) {
     throw new Error("DEV validation evidence is failed, incomplete, or belongs to different source.");
   }
   if (!Array.isArray(proof.steps) || proof.steps.some(step => step.passed !== true) ||

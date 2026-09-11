@@ -24,7 +24,7 @@ function evidence() {
     return { file, sha256: createHash("sha256").update(readFileSync(path)).digest("hex") };
   });
   const proof = { version: "dev-advisory-validation-3", contractVersion: "11.0.0", releaseBaseCommit: "b".repeat(40), releaseLintSha256: lint.sha256, testInventorySha256: inventory.sha256, databaseSchemaSha256: data.schemaSha256, catalogueSha256: data.catalogueSha256, environment: "dev", candidateOrigin: "http://127.0.0.1:3100",
-    passed: true, unchangedSource: true, sourceSha256: source, buildId: source.slice(0, 40), schemaChecksum: "fixture-contract-checksum",
+    passed: true, unchangedSource: true, sourceSha256: source, buildId: source.slice(0, 40), schemaChecksum: JSON.parse(readFileSync("contract/mcp/11.0.0/tools.json", "utf8")).schemaChecksum,
     steps: REQUIRED_VALIDATION_STAGES.map(label => ({ label, passed: true })), artifacts };
   const file = join(directory, "attestation.json");
   writeFileSync(file, JSON.stringify(proof));

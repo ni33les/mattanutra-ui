@@ -8,9 +8,11 @@ import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { fullTestInventory, sourceManifest } from "./run-full-test-suite.mjs";
 import { mcpTestTarget } from "./mcp-test-target.mjs";
-import { REQUIRED_VALIDATION_STAGES, VALIDATION_CLIENT_LOCALES, VALIDATION_CLIENT_DISCOVERY } from "./dev-validation-proof.mjs";
+import { REQUIRED_VALIDATION_STAGES, VALIDATION_CLIENT_LOCALES, VALIDATION_CLIENT_DISCOVERY, validationContractIdentity } from "./dev-validation-proof.mjs";
 
 import { browserFixtureEnvironment } from "./browser-fixture-environment.mjs";
+
+export { validationContractIdentity };
 
 const ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const ORIGIN = "http://127.0.0.1:3100";
@@ -119,7 +121,7 @@ async function main() {
       if (candidateError || candidate.exitCode !== null || candidate.signalCode !== null) throw new Error(candidateError?.message ?? "Candidate exited before readiness.");
       try {
         const probe = await rpc(`${ORIGIN}/api/mcp`, "info", {}, env);
-        if (probe.result.buildId !== buildId || probe.result.contractVersion !== "7.0.0") throw new Error("Candidate identity differs from the built source.");
+        if (probe.result.buildId !== buildId || probe.result.contractVersion !== validationContractIdentity().contractVersion || probe.result.schemaChecksum !== validationContractIdentity().schemaChecksum) throw new Error("Candidate identity differs from the built source.");
         schemaChecksum = probe.result.schemaChecksum;
         writeJson(join(evidence, "candidate-identity.json"), probe);
         return;
@@ -171,13 +173,13 @@ async function main() {
     for (const { runId, locale, discovery } of validationClientMatrix()) {
       const journey = `${runId}-${locale}${discovery === "tools_only" ? "-tools" : ""}`;
       const clientDir = join(evidence, `client-${journey}`), resumeDir = join(evidence, `client-${journey}-paid`);
-      await run(`docs-client-${journey}`, process.execPath, ["scripts/run-published-mcp-client.mjs", "--discovery", discovery, "--locale", locale, "--url", `${ORIGIN}/api/mcp`, "--output", clientDir]);
+      await run(`docs-client-${journey}`, process.execPath, ["scripts/run-published-mcp-client.mjs", "--checkout", "--discovery", discovery, "--locale", locale, "--url", `${ORIGIN}/api/mcp`, "--output", clientDir]);
       const receiptPath = join(clientDir, "receipt.json"), receipt = JSON.parse(readFileSync(receiptPath, "utf8"));
       if (receipt.endpoint !== `${ORIGIN}/api/mcp` || receipt.locale !== locale || !receipt.checkout?.orderHandle) throw new Error("Client receipt is not an isolated candidate order.");
       await run(`fixture-settlement-${journey}`, process.execPath, [...TS, "scripts/settle-local-mcp-client-fixture.ts", receiptPath, join(evidence, `fixture-settlement-${journey}.json`)]);
       await run(`docs-client-${journey}-paid`, process.execPath, ["scripts/run-published-mcp-client.mjs", "--discovery", discovery, "--locale", locale, "--url", `${ORIGIN}/api/mcp`, "--resume", receiptPath, "--output", resumeDir]);
       const paid = JSON.parse(readFileSync(join(resumeDir, "receipt.json"), "utf8"));
-      if (paid.order?.paymentStatus !== "paid" || paid.order?.fulfilment?.status !== "delivered" || paid.order?.terminal !== true) throw new Error("Public tracking did not confirm the fixture payment and delivery.");
+      if (paid.order?.paymentStatus !== "paid" || paid.order?.fulfilment?.status !== "delivered" || paid.order?.nextAction !== "none") throw new Error("Public tracking did not confirm the fixture payment and delivery.");
     }
     const comparisons = VALIDATION_CLIENT_DISCOVERY.flatMap(discovery => VALIDATION_CLIENT_LOCALES.flatMap(locale => ["", "-paid"].map(suffix => ({ locale, discovery, phase: suffix || "checkout", identical: readFileSync(join(evidence, `client-a-${locale}${discovery === "tools_only" ? "-tools" : ""}${suffix}/semantic.json`), "utf8") === readFileSync(join(evidence, `client-b-${locale}${discovery === "tools_only" ? "-tools" : ""}${suffix}/semantic.json`), "utf8") }))));
     writeJson(join(evidence, "client-comparison.json"), { passed: comparisons.every(item => item.identical), comparisons, normalization: "Only declared identities/clocks/latency fields; complete intermediate transcripts are compared." });
@@ -204,7 +206,7 @@ async function main() {
     const unchangedSource = Boolean(before && before.sha256 === after?.sha256);
     const passed = !failure && !interrupted && unchangedSource && REQUIRED_VALIDATION_STAGES.every(label => steps.filter(step => step.label === label && step.passed).length === 1) && steps.every(step => step.passed);
     writeJson(join(evidence, "stage-results.json"), { passed, failure: failure ?? null, interrupted, steps });
-    const attestation = { version: "dev-advisory-validation-3", contractVersion: "7.0.0", releaseBaseCommit: releaseLint?.baseCommit ?? null, releaseLintSha256: releaseLint?.sha256 ?? null, testInventorySha256: inventory?.sha256 ?? null, databaseSchemaSha256: dataBefore?.schemaSha256 ?? null, catalogueSha256: dataBefore?.catalogueSha256 ?? null, environment: "dev", candidateOrigin: ORIGIN, sourceSha256: before?.sha256 ?? null, buildId: buildId ?? null, schemaChecksum: schemaChecksum ?? null, gitCommit: execFileSync("git", ["rev-parse", "HEAD"], { cwd: ROOT, encoding: "utf8" }).trim(), unchangedSource, passed, finishedAt: new Date().toISOString(), steps, failure: failure ?? null, artifacts: hashFiles(evidence) };
+    const attestation = { version: "dev-advisory-validation-3", contractVersion: validationContractIdentity().contractVersion, releaseBaseCommit: releaseLint?.baseCommit ?? null, releaseLintSha256: releaseLint?.sha256 ?? null, testInventorySha256: inventory?.sha256 ?? null, databaseSchemaSha256: dataBefore?.schemaSha256 ?? null, catalogueSha256: dataBefore?.catalogueSha256 ?? null, environment: "dev", candidateOrigin: ORIGIN, sourceSha256: before?.sha256 ?? null, buildId: buildId ?? null, schemaChecksum: schemaChecksum ?? null, gitCommit: execFileSync("git", ["rev-parse", "HEAD"], { cwd: ROOT, encoding: "utf8" }).trim(), unchangedSource, passed, finishedAt: new Date().toISOString(), steps, failure: failure ?? null, artifacts: hashFiles(evidence) };
     writeJson(join(evidence, "attestation.json"), attestation);
     console.log(JSON.stringify({ passed, evidence, attestation: join(evidence, "attestation.json"), failure: failure ?? null }));
     if (!passed) process.exitCode = 1;

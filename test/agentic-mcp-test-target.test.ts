@@ -18,5 +18,5 @@ test("FULL-CYCLE-03 public documented clients permit explicit UAT without weaken
   for (const host of ["dev.mattanutra.com", "uat.mattanutra.com"]) assert.equal(publicEndpoint(`https://${host}/api/mcp`).hostname, host);
   assert.equal(publicEndpoint("http://127.0.0.1:3100/api/mcp").hostname, "127.0.0.1");
   for (const endpoint of ["https://mattanutra.com/api/mcp", "https://uat.mattanutra.com.evil.test/api/mcp", "http://uat.mattanutra.com/api/mcp", "https://user@uat.mattanutra.com/api/mcp", "https://uat.mattanutra.com/api/mcp/qa", "https://uat.mattanutra.com/api/mcp?token=secret"]) assert.throws(() => publicEndpoint(endpoint));
-  assert.throws(() => mcpTestTarget({ MATTANUTRA_ENV: "uat", MCP_URL: "https://uat.mattanutra.com/api/mcp" }), /DEV|isolated/);
+  assert.throws(() => mcpTestTarget({ MATTANUTRA_ENV: "uat", MCP_URL: "https://uat.mattanutra.com/api/mcp" }), /DEV|isolated/i);
 });

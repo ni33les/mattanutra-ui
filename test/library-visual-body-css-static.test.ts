@@ -196,9 +196,7 @@ describe("library article body visual CSS", () => {
 
   it("true zip body markup modules are present on all 35×2 node trees", () => {
     const enDir = zipEnDir();
-    if (!existsSync(enDir)) {
-      return;
-    }
+    assert.ok(existsSync(enDir), "Verified library fixtures are required: run python3 scripts/extract-ttf-ws1.py --verify");
 
     const articles = visualKnowledge.articles as Article[];
     const bySlug = new Map(articles.map((a) => [a.slug, a]));

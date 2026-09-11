@@ -1,14 +1,15 @@
 #!/usr/bin/env node
 /** Public MCP client only. Payment settlement belongs to the external isolated harness. */
 import { randomUUID } from 'node:crypto';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, writeFile, readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import { runConversationalJourney } from './published-client-journey.mjs';
+import { runConversationalJourney, publishedClientReceipt, resumePublishedOrder } from './published-client-journey.mjs';
+import { publicMcpClientEndpoint } from './mcp-test-target.mjs';
+import { normalizePublishedClientResult } from './published-client-semantics.mjs';
 import { createPacedRequest } from './published-client-pacing.mjs';
 const args = process.argv.slice(2);
 const arg = (name, fallback) => args.includes(name) ? args[args.indexOf(name) + 1] : fallback;
-const endpoint = new URL(arg('--url', 'http://127.0.0.1:3000/api/mcp'));
-if (!['localhost', '127.0.0.1', 'dev.mattanutra.com'].includes(endpoint.hostname)) throw new Error('This work package permits DEV and isolated localhost only.');
+const endpoint = publicMcpClientEndpoint(arg('--url', 'http://127.0.0.1:3000/api/mcp'));
 const output = resolve(arg('--output', '/tmp/mattanutra-published-client'));
 const transcript = []; let id = 0, session;
 const rpc = createPacedRequest(async (method, params) => {
@@ -24,7 +25,14 @@ const rpc = createPacedRequest(async (method, params) => {
 await mkdir(output, { recursive: true, mode: 0o700 });
 try {
   await rpc('initialize', { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'documented-v11-client', version: '11.0.0' } });
-  const result = await runConversationalJourney({ rpc, locale: arg('--locale', 'en'), discovery: arg('--discovery', 'tools_only'), key: arg('--run-key', randomUUID()), checkout: args.includes('--checkout') });
+  const locale = arg('--locale', 'en'), discovery = arg('--discovery', 'tools_only');
+  const resume = arg('--resume', null);
+  const result = resume
+    ? await resumePublishedOrder({ endpoint: endpoint.href, locale, discovery, rpc, receipt: JSON.parse(await readFile(resolve(resume), 'utf8')) })
+    : await runConversationalJourney({ rpc, locale, discovery, key: arg('--run-key', randomUUID()), checkout: args.includes('--checkout') });
+  const receipt = resume ? result : args.includes('--checkout') ? publishedClientReceipt({ endpoint: endpoint.href, result }) : null;
+  if (receipt) await writeFile(resolve(output, 'receipt.json'), JSON.stringify(receipt, null, 2), { flag: 'wx', mode: 0o600 });
+  await writeFile(resolve(output, 'semantic.json'), JSON.stringify(normalizePublishedClientResult({ receipt, result }, endpoint.href), null, 2), { flag: 'wx', mode: 0o600 });
   await writeFile(resolve(output, 'result.json'), JSON.stringify(result, null, 2), { flag: 'wx', mode: 0o600 });
   console.log(JSON.stringify({ passed: true, output, readyMs: result.readyMs, measurements: result.measurements }));
 } finally { await writeFile(resolve(output, 'transcript.json'), JSON.stringify(transcript, null, 2), { flag: 'wx', mode: 0o600 }); }

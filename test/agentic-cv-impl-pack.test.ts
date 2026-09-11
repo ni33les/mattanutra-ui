@@ -1017,7 +1017,7 @@ async function runDevContract01(session: PlanSession, runIndex: number): Promise
   const blob = planSchemaBlob();
   const assertions = [
     assertEq("CONTRACT-01.names", "info,plan,execute,order,support,feedback", names.join()),
-    assertTrue("CONTRACT-01.ops", AGENTIC_TOOL_SCHEMAS.plan.anyOf.length === 5 && ["targets", "planHandle", "answers", "expectedRevision", "idempotencyKey"].every(field => blob.includes(JSON.stringify(field))) && !blob.includes('"operation"')),
+    assertTrue("CONTRACT-01.ops", AGENTIC_TOOL_SCHEMAS.plan.anyOf.length === 4 && ["targets", "planHandle", "answers", "expectedRevision", "idempotencyKey"].every(field => blob.includes(JSON.stringify(field))) && !blob.includes('"operation"') && !blob.includes('"optionId"')),
     assertTrue("CONTRACT-01.importance", !blob.includes('"importance"') && blob.includes('"weights"')),
     assertTrue("CONTRACT-01.range", blob.includes('"acceptableRange"')),
     assertTrue("CONTRACT-01.prerequisite", !blob.includes('"prerequisite"') && blob.includes('"basis"')),

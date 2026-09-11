@@ -301,17 +301,11 @@ describe("questionnaire v14 UX on v6 schema", () => {
 
     let { state } = started;
     const r1 = applyAnswer(state, "firstName", "Alex");
-    assert.equal(r1.ok, true);
-    if (!r1.ok) {
-      return;
-    }
+    assert.ok(r1.ok);
 
     state = r1.state;
     const reopened = reopenTurn(state, "firstName");
-    assert.equal(reopened.ok, true);
-    if (!reopened.ok) {
-      return;
-    }
+    assert.ok(reopened.ok);
 
     assert.equal(reopened.state.answers.firstName, undefined);
     assert.equal(reopened.state.turnIndex, 0);
@@ -387,16 +381,10 @@ describe("questionnaire v14 UX on v6 schema", () => {
       createInitialState({ locale: "en", channel: "web" })
     );
     const name = applyAnswer(state, "firstName", "Alex");
-    assert.equal(name.ok, true);
-    if (!name.ok) {
-      return;
-    }
+    assert.ok(name.ok);
     state = name.state;
     const goals = applyAnswer(state, "goals", ["energy", "sleep"]);
-    assert.equal(goals.ok, true);
-    if (!goals.ok) {
-      return;
-    }
+    assert.ok(goals.ok);
     const react = goals.state.log.find(
       (m) => m.kind === "react" && m.id === "goals"
     );

@@ -20,3 +20,14 @@ export function mcpTestTarget(env = process.env) {
   }
   return { publicUrl: target.href, originUrl: target.href, qaUrl: `${target.href}/qa`, isolatedCandidate: true };
 }
+
+/** Public-only journeys may target UAT; private fixture/database acceptance stays isolated above. */
+export function publicMcpClientEndpoint(value) {
+  const url = new URL(value);
+  const local = ["127.0.0.1", "localhost"].includes(url.hostname);
+  const hosted = ["dev.mattanutra.com", "uat.mattanutra.com"].includes(url.hostname);
+  if ((!local && !hosted) || (hosted && (url.protocol !== "https:" || url.port)) ||
+      (local && url.protocol !== "http:") || url.pathname !== "/api/mcp" || url.search || url.hash || url.username || url.password)
+    throw new Error("Public MCP journeys require the exact DEV/UAT HTTPS endpoint or an isolated localhost HTTP endpoint");
+  return url;
+}

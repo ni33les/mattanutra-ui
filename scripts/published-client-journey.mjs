@@ -124,3 +124,32 @@ export async function recoverPublishedPatch({ intended, idempotencyKey, current,
   const recovered = await current(await callPlan({ ...intended, planHandle: latest.planHandle, expectedRevision: latest.revision, idempotencyKey }));
   return { current: latest, recovered };
 }
+
+/** Receipt consumed by the external fixture driver; it contains returned public identities only. */
+export function publishedClientReceipt({ endpoint, result }) {
+  const checkout = result.observations.filter(row => row.tool === "execute" && row.result?.ok).at(-1)?.result;
+  if (!checkout?.orderHandle || !checkout.orderReference) throw new Error("A successful direct checkout is required for the settlement receipt");
+  return { endpoint: new URL(endpoint).href, locale: result.locale, discovery: result.discovery, checkout };
+}
+
+/** Recover payment/fulfilment through the published order tool, without repeating checkout or matching. */
+export async function resumePublishedOrder({ endpoint, receipt, locale, discovery, rpc }) {
+  const assert = (await import("node:assert/strict")).default;
+  assert.equal(receipt.endpoint, new URL(endpoint).href, "Receipt endpoint differs from this client");
+  assert.equal(receipt.locale, locale, "Receipt locale differs from this client");
+  assert.equal(receipt.discovery, discovery, "Receipt discovery mode differs from this client");
+  assert.equal(typeof receipt.checkout?.orderHandle, "string", "Receipt must contain the returned order handle");
+  const listing = await rpc("tools/list", {});
+  const tool = listing.tools.find(row => row.name === "order" || row.name.endsWith("___order"));
+  assert.ok(tool, "Order tool must be published");
+  const { default: Ajv } = await import("ajv");
+  const ajv = new Ajv({ strict: false, allErrors: true, validateFormats: false });
+  const args = { orderHandle: receipt.checkout.orderHandle }, input = ajv.compile(tool.inputSchema);
+  assert.ok(input(args), JSON.stringify(input.errors));
+  const response = await rpc("tools/call", { name: tool.name, arguments: args });
+  const order = response.structuredContent ?? JSON.parse(response.content[0].text);
+  const output = ajv.compile(tool.outputSchema); assert.ok(output(order), JSON.stringify(output.errors));
+  assert.equal(order.ok, true, JSON.stringify(order));
+  assert.equal(order.orderHandle, receipt.checkout.orderHandle);
+  return { ...receipt, order };
+}
