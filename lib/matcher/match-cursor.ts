@@ -64,5 +64,8 @@ export function advanceMatchCursor(cursor: MatchCursor, request: CanonicalReques
     if (!seller.cursor.done) advanceSearchCursor(seller.cursor, request, chunkBudget - (matchCursorAttempts(cursor) - start));
     if (seller.cursor.done) cursor.seller++;
   }
+  // Completion is metadata, not another expansion. An exact chunk boundary
+  // must not require a new dispatch and a duplicate full checkpoint.
+  if (cursor.seller >= cursor.sellers.length && (cursor.effort !== "expanded" || cursor.expanded)) cursor.done = true;
   return cursor;
 }

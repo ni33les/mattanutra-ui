@@ -463,6 +463,66 @@
       "reason": "Committed catalogue identity and concurrent graph-specific cycle protection in isolated PostgreSQL",
       "expectedCases": 5,
       "database": true
+    },
+    {
+      "file": "test/service-efficiency/scoring-hot-path.test.ts",
+      "expectedCases": 4,
+      "reason": "Exact score reuse, raw profile sharing and weighted uncertainty isolation",
+      "slice": "matcher-hot-path"
+    },
+    {
+      "file": "test/service-efficiency/checkpoint-hot-path.test.ts",
+      "expectedCases": 3,
+      "reason": "Terminal checkpoint, old cursor recovery and expanded accounting",
+      "slice": "matcher-hot-path"
+    },
+    {
+      "file": "test/service-efficiency/frontier-hot-path.test.ts",
+      "expectedCases": 2,
+      "reason": "Stable top-K retention and reduced comparison count",
+      "slice": "matcher-hot-path"
+    },
+    {
+      "file": "test/practical-matching/scoring.test.ts",
+      "expectedCases": 11,
+      "reason": "Practical arithmetic, preference semantics and validation",
+      "slice": "matcher-hot-path"
+    },
+    {
+      "file": "test/practical-matching/search.test.ts",
+      "expectedCases": 13,
+      "reason": "Candidate retention, quantity probes, order invariance and core priority",
+      "slice": "matcher-hot-path"
+    },
+    {
+      "file": "test/practical-matching/oracle.test.ts",
+      "expectedCases": 4,
+      "reason": "Independent exhaustive practical scores and supported quantities",
+      "slice": "matcher-hot-path"
+    },
+    {
+      "file": "test/simple-plan/weights.test.ts",
+      "expectedCases": 7,
+      "reason": "Shared MCP exact fitting, zero weights and uncertainty endpoints",
+      "slice": "matcher-hot-path"
+    },
+    {
+      "file": "test/simple-plan/importance.test.ts",
+      "expectedCases": 10,
+      "reason": "Fractional coefficients, fitting symmetry, continued exposure and scope",
+      "slice": "matcher-hot-path"
+    },
+    {
+      "file": "test/matcher/advisory-dose-fit.test.ts",
+      "expectedCases": 36,
+      "reason": "Preserved raw proportional dose fit and twofold safety excess",
+      "slice": "matcher-hot-path"
+    },
+    {
+      "file": "test/matcher/flexible-v5-priority.test.ts",
+      "expectedCases": 4,
+      "reason": "Required-target protection under shared search ranking",
+      "slice": "matcher-hot-path"
     }
   ],
   "inputs": [
@@ -502,6 +562,19 @@
     "test/task-transactions.integration.test.ts",
     "test/db-transactions.integration.test.ts",
     "test/product-advisory-cache-refresh.integration.test.ts",
-    "test/transaction-boundary.test.ts"
+    "test/transaction-boundary.test.ts",
+    "test/service-efficiency/scoring-hot-path.test.ts",
+    "test/service-efficiency/checkpoint-hot-path.test.ts",
+    "test/service-efficiency/frontier-hot-path.test.ts",
+    "test/practical-matching/scoring.test.ts",
+    "test/practical-matching/search.test.ts",
+    "test/practical-matching/oracle.test.ts",
+    "test/simple-plan/weights.test.ts",
+    "test/simple-plan/importance.test.ts",
+    "test/matcher/advisory-dose-fit.test.ts",
+    "test/matcher/flexible-v5-priority.test.ts",
+    "test/service-efficiency/affinity.test.ts",
+    "test/ax-refinement/checkpoints.test.ts",
+    "test/service-efficiency/reference-browser.test.ts"
   ]
 }

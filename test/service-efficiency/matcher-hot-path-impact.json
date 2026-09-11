@@ -1,0 +1,78 @@
+{
+  "version": 1,
+  "releaseBase": "6fd7a63b062975ba3937e08a79286a24fe4de095",
+  "scope": "matcher CPU and checkpoint overhead only",
+  "files": [
+    {
+      "file": "test/service-efficiency/scoring-hot-path.test.ts",
+      "expectedCases": 4,
+      "reason": "Exact score reuse, raw profile sharing and weighted uncertainty isolation"
+    },
+    {
+      "file": "test/service-efficiency/checkpoint-hot-path.test.ts",
+      "expectedCases": 3,
+      "reason": "Terminal checkpoint, old cursor recovery and expanded accounting"
+    },
+    {
+      "file": "test/service-efficiency/frontier-hot-path.test.ts",
+      "expectedCases": 2,
+      "reason": "Stable top-K retention and reduced comparison count"
+    },
+    {
+      "file": "test/practical-matching/scoring.test.ts",
+      "expectedCases": 11,
+      "reason": "Practical arithmetic, preference semantics and validation"
+    },
+    {
+      "file": "test/practical-matching/search.test.ts",
+      "expectedCases": 13,
+      "reason": "Candidate retention, quantity probes, order invariance and core priority"
+    },
+    {
+      "file": "test/practical-matching/oracle.test.ts",
+      "expectedCases": 4,
+      "reason": "Independent exhaustive practical scores and supported quantities"
+    },
+    {
+      "file": "test/simple-plan/weights.test.ts",
+      "expectedCases": 7,
+      "reason": "Shared MCP exact fitting, zero weights and uncertainty endpoints"
+    },
+    {
+      "file": "test/simple-plan/importance.test.ts",
+      "expectedCases": 10,
+      "reason": "Fractional coefficients, fitting symmetry, continued exposure and scope"
+    },
+    {
+      "file": "test/matcher/advisory-dose-fit.test.ts",
+      "expectedCases": 36,
+      "reason": "Preserved raw proportional dose fit and twofold safety excess"
+    },
+    {
+      "file": "test/matcher/flexible-v5-priority.test.ts",
+      "expectedCases": 4,
+      "reason": "Required-target protection under shared search ranking"
+    },
+    {
+      "file": "test/service-efficiency/sessions.test.ts",
+      "expectedCases": 4,
+      "reason": "Real worker continuation, restart and binary checkpoint output equivalence"
+    },
+    {
+      "file": "test/service-efficiency/affinity.test.ts",
+      "expectedCases": 4,
+      "reason": "Lost acknowledgement, capacity and recoverable resident state"
+    },
+    {
+      "file": "test/ax-refinement/checkpoints.test.ts",
+      "expectedCases": 3,
+      "reason": "Reference and input identity fencing plus historical checkpoint reader"
+    },
+    {
+      "file": "test/service-efficiency/reference-browser.test.ts",
+      "expectedCases": 1,
+      "reason": "Shared matcher bundles without Node-only browser imports"
+    }
+  ],
+  "exclusions": "No full application/MCP, live database, payment or unrelated browser suites; no contract or scoring-policy changes."
+}
