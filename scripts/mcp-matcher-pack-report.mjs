@@ -15,6 +15,7 @@ import { canonicalR4Report, runCvR4Pack } from "../test/agentic-cv-r4-pack.test.
 import { freezeImplCatalogue, freezeFinancialCatalogue } from "../test/agentic/value/impl-harness.ts";
 import { frozenPackInput } from "../test/helpers/frozen-pack-input.ts";
 import { assertRecordedMcpEvidence } from "../test/helpers/mcp-evidence.ts";
+import { refreshAdminSafetyCeilings } from "../lib/agentic/catalogue/load-safety-ceilings.ts";
 import { freezeLiveThailandCatalogue } from "../lib/agentic/value/freeze.ts";
 import { replaceCatalogueSnapshot, resetCatalogueSnapshotCache } from "../lib/agentic/catalogue/snapshot.ts";
 import { captureMatcherSafetySnapshot, resetMatcherSafetyCeilings, setMatcherSafetyCeilings } from "../lib/matcher/safety-ceilings.ts";
@@ -82,6 +83,7 @@ export async function runPackOnce(inputs = {}) {
   const commercial = await runComPack();
   await resetAfterMatcher();
   const remediationInput = await frozenPackInput(inputs, "valueRemediation", async () => {
+    await refreshAdminSafetyCeilings();
     const freeze = await freezeLiveThailandCatalogue("TH");
     return { freeze, references: captureMatcherSafetySnapshot(freeze.snapshot.runtimeRevision) };
   });

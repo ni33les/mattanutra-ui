@@ -28,6 +28,7 @@ import {
   resetCatalogueSnapshotCache,
   runWithCatalogueSnapshot
 } from "../lib/agentic/catalogue/snapshot.ts";
+import { refreshAdminSafetyCeilings } from "../lib/agentic/catalogue/load-safety-ceilings.ts";
 import { catalogueSnapshotId } from "../lib/agentic/catalogue/freeze.ts";
 import { captureMatcherSafetySnapshot, matcherSafetyCeilings, safetyCeilingFor } from "../lib/matcher/safety-ceilings.ts";
 import { runWithMatcherSafetySnapshot } from "../lib/matcher/safety-ceilings-server.ts";
@@ -287,6 +288,7 @@ export async function runCvFixPack(
   frozenInput?: ValueCatalogueFreeze,
   frozenReferences?: ReturnType<typeof captureMatcherSafetySnapshot>
 ): Promise<CvFixPackReport> {
+  if (!frozenInput) await refreshAdminSafetyCeilings();
   const freeze = frozenInput ?? await freezeLiveThailandCatalogue("TH");
   const references = frozenReferences ?? captureMatcherSafetySnapshot(freeze.snapshot.runtimeRevision);
   return runWithMatcherSafetySnapshot(references, () => runCvFixPackRecorded(freeze));
