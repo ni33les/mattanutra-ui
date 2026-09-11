@@ -75,6 +75,16 @@ describe("task lifecycle transactions on PostgreSQL", () => {
     assert.ok(await reserveNextTask({accessScope:scope,agent:{id:agentId,name:scope.agentName},workerSessionId:sessionId,taskId:input.taskId}));
   });
 
+  it("LOCK-BOUNDARY-TASK-01 completion acquires its task fence once across nested lifecycle helpers", async () => {
+    const { withServiceMeasurements, serviceMeasurements } = await import("../lib/service-metrics.ts");
+    const input = await reserved();
+    await withServiceMeasurements(async () => {
+      const completed = await completeTask({ ...input, applyResult: async () => ({ value: "single fence" }) });
+      assert.equal(completed.status, "completed");
+      assert.equal(serviceMeasurements()["db.lock_statement_client_ms"]?.count, 1);
+    });
+  });
+
   it("LOCK-TASK-01 result preparation occurs before the task lock and the prepared payload is used once", async () => {
     const input = await reserved();
     let release!: () => void, entered!: () => void;
