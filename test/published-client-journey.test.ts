@@ -125,3 +125,17 @@ it("FULL-CYCLE-05 paid resume only reads the returned order and rejects cross-en
   requests.length = 0;
   await assert.rejects(resume({ endpoint: "https://dev.mattanutra.com/api/mcp", receipt, locale: "en", discovery: "tools_only", rpc }), /endpoint/);assert.equal(requests.length, 0);
 });
+
+it("FULL-CYCLE-10 public images require HTTPS; isolated images may use their exact loopback candidate", async () => {
+  const client = await import("../scripts/published-client-journey.mjs");
+  const valid = (client as unknown as { isPublishedProductImageUrl: (value: unknown, endpoint?: string) => boolean }).isPublishedProductImageUrl;
+  assert.equal(typeof valid, "function");
+  assert.equal(valid(null), true);
+  assert.equal(valid("https://cdn.example/product.png"), true);
+  assert.equal(valid("http://127.0.0.1:3211/product.png", "http://127.0.0.1:3211/api/mcp"), true);
+  for (const image of [undefined, "not a URL", "http://cdn.example/product.png", "file:///tmp/image.png", "http://127.0.0.1:3212/product.png", "http://user:secret@127.0.0.1:3211/product.png"]) {
+    assert.equal(valid(image, "http://127.0.0.1:3211/api/mcp"), false, String(image));
+  }
+  assert.equal(valid("http://127.0.0.1:3211/product.png", "https://uat.mattanutra.com/api/mcp"), false);
+  assert.equal(valid("http://127.0.0.1:3211/product.png"), false);
+});
