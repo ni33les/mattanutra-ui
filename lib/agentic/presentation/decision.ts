@@ -134,9 +134,16 @@ function choiceIngredients(result: PlanResult, option: StackOption): Ingredient[
   }
   return [...rows.values()];
 }
+function publicProductImage(value: string | null | undefined): string | null {
+  if (!value) return null;
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" && !url.username && !url.password ? value.trim() : null;
+  } catch { return null; }
+}
 function productDecision(row: BasketItem): Ready["choices"][number]["products"][number] {
   const administration = verifiedAdministration(row.administration);
-  return { productId: row.productId, name: row.productName, imageUrl: row.imageUrl || null, productUrl: row.productUrl ?? null,
+  return { productId: row.productId, name: row.productName, imageUrl: publicProductImage(row.imageUrl), productUrl: row.productUrl ?? null,
     quantity: row.quantity, unitPrice: row.incompleteCommercialFacts ? null : row.unitPriceMinor / 100, lineTotal: row.incompleteCommercialFacts ? null : row.lineTotalMinor / 100,
     servingsPerDay: row.servingsPerDay, dailyQuantity: administration?.unitsPerServing != null && administration.physicalUnit !== "unknown" ? { amount: row.servingsPerDay * administration.unitsPerServing!, unit: administration.physicalUnit } : null,
     supplyDays: row.daysOfSupply ?? null };
