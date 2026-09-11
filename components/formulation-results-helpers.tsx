@@ -111,29 +111,6 @@ export function supplementProductCoverageById(
 
 export type PanelLabels = (typeof formulationResultsCopy)["en"];
 
-export function NutritionGuidancePreparingPanel({
-  labels,
-}: Readonly<{
-  labels: PanelLabels;
-  locale: Locale;
-}>) {
-  return (
-    <section className="mx-auto w-full max-w-6xl px-6 py-10 sm:px-8 lg:py-14">
-      <div
-        aria-live="polite"
-        className="rounded-lg bg-white p-6 ring-1 ring-foreground/10 transition-colors sm:p-8"
-      >
-        <h1 className="mn-hero-title max-w-2xl text-2xl font-semibold tracking-normal text-[var(--mn-ink)] sm:text-3xl">
-          {labels.nutritionProgressTitle}
-        </h1>
-        <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground">
-          {labels.nutritionProgressBody}
-        </p>
-      </div>
-    </section>
-  );
-}
-
 export function revealContextChips(result: FormulationResult) {
   return [
     { kind: "profile", value: result.assessmentSummary.profile },

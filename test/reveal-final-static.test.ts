@@ -63,6 +63,12 @@ function assertOrder(source: string, labels: readonly string[]) {
 }
 
 describe("final reveal UX", () => {
+  it("leaves the reveal content blank while loading its saved result", () => {
+    assert.match(wrapper, /if \(loadState === "loading"\) \{\s*return null;\s*\}/);
+    assert.doesNotMatch(wrapper, /NutritionGuidancePreparingPanel/);
+    assert.match(wrapper, /data-testid="formulation-retry"/);
+  });
+
   it("counts covered nutrients from dose percent, not product cover tags", () => {
     assert.match(reveal, /coveredRevealNeedCount\(needCoverage\)/);
     assert.match(reveal, /formulaNeedCount\(needCoverage\)/);

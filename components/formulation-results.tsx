@@ -11,7 +11,6 @@ import { getWelcomeCopy } from "@/components/chat-questionnaire/questionnaire-we
 import { useFormulationPolling } from "@/components/nutrition-flow/use-formulation-polling";
 import { formulationResultsCopy } from "@/components/formulation-results-copy";
 import {
-  NutritionGuidancePreparingPanel,
   defaultProductStackPreferenceForResult,
   planPaywallHref,
   productRecommendationOptionsForResult,
@@ -81,7 +80,7 @@ export function FormulationResults({
   }, [productPollingPreference, result]);
 
   if (loadState === "loading") {
-    return <NutritionGuidancePreparingPanel labels={labels} locale={locale} />;
+    return null;
   }
 
   if (loadState === "error" || !result) {
