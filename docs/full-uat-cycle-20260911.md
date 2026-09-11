@@ -23,3 +23,5 @@ New runner regressions were committed in `91448934`; eight failures are recorded
 Final execution counts and deployment identities will be recorded after the complete unchanged-source run. An incomplete or failing baseline is not acceptance evidence.
 
 `EFF-WAKE-07–08` failed before the worker fix (commit `13b85848`). Wake routing now excludes retired builds and another replica’s loopback address, and makes bounded fallback attempts after a refused nudge. The 19 affected wake/consistency cases pass without adding locks.
+
+`AXR-REG-01/02` preserved journeys still requested the removed `confirm-recommendation` template. Their stale-revision check now uses the published unchanged-refinement template; current successful recovery preserves revision and remains directly checkout-ready. The historical Thai RED journeys are retained in the baseline log.

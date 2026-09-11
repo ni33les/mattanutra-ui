@@ -65,12 +65,13 @@ export async function refinementJourney({ rpc, request, discovery = "tools_only"
     const baseRevision = plan.revision;
     await change("exclude", { requirements: { productDoses: [], excludeProductIds: [product.productId], maxDailyPills: null, maxPriceMinor: null, maxProductCount: null } });
     for (const choice of plan.choices) assert.equal(choice.products.some(row => row.productId === product.productId), false);
-    const stale = await call("plan", { ...publishedExample(contract, "confirm-recommendation"), planHandle: plan.planHandle, expectedRevision: baseRevision, idempotencyKey: `${key}-stale` });
+    const stale = await call("plan", { ...publishedExample(contract, "recover-failed-or-stale-work"), planHandle: plan.planHandle, expectedRevision: baseRevision, idempotencyKey: `${key}-stale` });
     assert.equal(stale.ok, false); assert.equal(stale.error.reasonCode, "stale_revision");
     const latest = await complete(await call("plan", { ...publishedExample(contract, "read-or-poll"), planHandle: plan.planHandle }));
     assert.deepEqual(latest, plan);
     if (latest.choices[0]?.products.length) {
-      await change("confirm", {}); assert.equal(plan.nextAction, "execute");
+      await change("noop", { scoring: {} }); assert.equal(plan.nextAction, "execute");
+      assert.equal(plan.revision, latest.revision, "A successful unchanged refinement must not create a confirmation revision");
       assert.deepEqual(plan.choices, latest.choices);
       if (settle) await settle({ call, plan });
     }

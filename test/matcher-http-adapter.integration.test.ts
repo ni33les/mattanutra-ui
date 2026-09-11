@@ -52,7 +52,7 @@ it("V5-INFRA-05 complete matcher pack uses real isolated HTTP handlers without a
       const schema = await callInfo({ view: "plan_schema" });
       const definition = JSON.parse(schema.planSchemaJson as string);
       assert.equal(schema.planOperation, undefined);
-      assert.equal(definition.anyOf.length, 5);
+      assert.equal(definition.anyOf.length, 4);
       for (const branch of definition.anyOf) assert.equal(branch.properties.operation, undefined);
       const overview = await callInfo({});
       assert.equal(overview.clientGuideText, undefined);

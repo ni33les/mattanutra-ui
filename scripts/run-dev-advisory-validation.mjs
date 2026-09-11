@@ -98,7 +98,7 @@ async function main() {
   if (existsSync(evidence)) throw new Error("Evidence directory must be new; previous results are immutable.");
   mkdirSync(dirname(evidence), { recursive: true }); mkdirSync(evidence, { mode: 0o700 });
   const steps = [];
-  let candidate, candidateExit, candidateError, candidateLog, active, interrupted = false, before, buildId, schemaChecksum, failure, releaseLint, dataBefore, dataAfter, inventory;
+  let documentedServer, candidate, candidateExit, candidateError, candidateLog, active, interrupted = false, before, buildId, schemaChecksum, failure, releaseLint, dataBefore, dataAfter, inventory;
   const interrupt = () => { interrupted = true; signalValidationProcess(active); signalValidationProcess(candidate); };
   process.on("SIGINT", interrupt); process.on("SIGTERM", interrupt);
   async function run(label, command, args, stageEnv = env, required = true) {
@@ -170,14 +170,19 @@ async function main() {
     await run("test-full", "npm", ["run", "test:full"], { ...env, FULL_TEST_EVIDENCE_DIR: join(evidence, "full-suite") }, false);
     await run("matcher-two-runs", process.execPath, ["scripts/run-mcp-matcher-pack-twice.mjs"], { ...env, NODE_ENV: "test", MCP_ACCEPTANCE_EVIDENCE_DIR: join(evidence, "matcher") }, false);
     await run("documented-client-rate-window", process.execPath, ["scripts/published-client-pacing.mjs", "--clear-window"]);
+    const { startHttpCandidate } = await import("./run-matcher-test-suite.mjs");
+    const documentedEvidence = join(evidence, "http-documented"); mkdirSync(documentedEvidence);
+    documentedServer = await startHttpCandidate(env, documentedEvidence);
+    const documentedEndpoint = `${documentedServer.identity.origin}/api/mcp`;
+    const documentedEnv = { ...env, MCP_URL: documentedEndpoint, NEXT_PUBLIC_SITE_URL: documentedServer.identity.origin, SITE_URL: documentedServer.identity.origin };
     for (const { runId, locale, discovery } of validationClientMatrix()) {
       const journey = `${runId}-${locale}${discovery === "tools_only" ? "-tools" : ""}`;
       const clientDir = join(evidence, `client-${journey}`), resumeDir = join(evidence, `client-${journey}-paid`);
-      await run(`docs-client-${journey}`, process.execPath, ["scripts/run-published-mcp-client.mjs", "--checkout", "--discovery", discovery, "--locale", locale, "--url", `${ORIGIN}/api/mcp`, "--output", clientDir]);
+      await run(`docs-client-${journey}`, process.execPath, ["scripts/run-published-mcp-client.mjs", "--checkout", "--discovery", discovery, "--locale", locale, "--url", documentedEndpoint, "--output", clientDir], documentedEnv);
       const receiptPath = join(clientDir, "receipt.json"), receipt = JSON.parse(readFileSync(receiptPath, "utf8"));
-      if (receipt.endpoint !== `${ORIGIN}/api/mcp` || receipt.locale !== locale || !receipt.checkout?.orderHandle) throw new Error("Client receipt is not an isolated candidate order.");
-      await run(`fixture-settlement-${journey}`, process.execPath, [...TS, "scripts/settle-local-mcp-client-fixture.ts", receiptPath, join(evidence, `fixture-settlement-${journey}.json`)]);
-      await run(`docs-client-${journey}-paid`, process.execPath, ["scripts/run-published-mcp-client.mjs", "--discovery", discovery, "--locale", locale, "--url", `${ORIGIN}/api/mcp`, "--resume", receiptPath, "--output", resumeDir]);
+      if (receipt.endpoint !== documentedEndpoint || receipt.locale !== locale || !receipt.checkout?.orderHandle) throw new Error("Client receipt is not an isolated candidate order.");
+      await run(`fixture-settlement-${journey}`, process.execPath, [...TS, "scripts/settle-local-mcp-client-fixture.ts", receiptPath, join(evidence, `fixture-settlement-${journey}.json`)], documentedEnv);
+      await run(`docs-client-${journey}-paid`, process.execPath, ["scripts/run-published-mcp-client.mjs", "--discovery", discovery, "--locale", locale, "--url", documentedEndpoint, "--resume", receiptPath, "--output", resumeDir], documentedEnv);
       const paid = JSON.parse(readFileSync(join(resumeDir, "receipt.json"), "utf8"));
       if (paid.order?.paymentStatus !== "paid" || paid.order?.fulfilment?.status !== "delivered" || paid.order?.nextAction !== "none") throw new Error("Public tracking did not confirm the fixture payment and delivery.");
     }
@@ -193,6 +198,7 @@ async function main() {
     steps.push({ label: "unchanged-schema-and-catalogue", passed: dataBefore.schemaSha256 === dataAfter.schemaSha256 && dataBefore.catalogueSha256 === dataAfter.catalogueSha256 });
   } catch (error) { failure = error instanceof Error ? error.message : String(error); }
   finally {
+    if (documentedServer) await documentedServer.stop();
     if (candidate && candidate.exitCode === null && candidate.signalCode === null) {
       signalValidationProcess(candidate);
       await Promise.race([candidateExit, new Promise(done => setTimeout(done, 5000))]);
