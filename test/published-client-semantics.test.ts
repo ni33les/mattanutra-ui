@@ -100,3 +100,24 @@ it("V5-CLIENT-05 acceptance retains option roles, eligibility, physical quantiti
     assert.notDeepEqual(normalize(baseline, endpoint), normalize(changed, endpoint));
   }
 });
+
+it("FULL-CYCLE-07 documented equality ignores polling frequency but preserves every changed business state", async () => {
+  const module = await import("../scripts/published-client-semantics.mjs");
+  const canonical = (module as unknown as { publishedJourneySemantics: (input: unknown, endpoint: string) => unknown }).publishedJourneySemantics;
+  assert.equal(typeof canonical, "function");
+  const processing = { ok: true, planHandle: "cap_one", revision: 1, status: "processing", nextAction: "poll_plan", pollAfterSeconds: 3 };
+  const create = { tool: "plan", arguments: { idempotencyKey: "create-one", targets: [{ name: "D3", amount: 2000 }] }, result: processing };
+  const ready = { tool: "plan", arguments: { planHandle: "cap_one" }, result: { ...processing, status: "ready", nextAction: "execute", price: 1200, attempts: 8000 } };
+  const baseline = { receipt: null, result: { observations: [create, ready], measurements: [{ structuredBytes: 200 }], terminal: [ready.result], readyMs: 20 } };
+  const delayed = structuredClone(baseline);
+  delayed.result.observations.splice(1, 0, { tool: "plan", arguments: { planHandle: "cap_one" }, result: processing } as typeof ready);
+  delayed.result.measurements.push({ structuredBytes: 200 });delayed.result.readyMs = 40;
+  assert.deepEqual(canonical(baseline, endpoint), canonical(delayed, endpoint));
+  for (const fields of [{ price: 1201 }, { attempts: 7999 }, { revision: 2 }, { status: "failed" }]) {
+    const changed = structuredClone(delayed);Object.assign(changed.result.observations.at(-1)!.result, fields);
+    assert.notDeepEqual(canonical(baseline, endpoint), canonical(changed, endpoint));
+  }
+  const mutation = structuredClone(baseline);mutation.result.observations.splice(1, 0, create);
+  assert.notDeepEqual(canonical(baseline, endpoint), canonical(mutation, endpoint), "A repeated mutation is never discarded as polling");
+  assert.equal(delayed.result.observations.length, 3, "Raw transcripts and byte measurements remain intact");
+});
