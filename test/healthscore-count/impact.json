@@ -1,0 +1,19 @@
+{
+  "releaseBase": "fc0b08ad36683cba2db5f97933fe6ce065e0c874",
+  "files": [
+    {"file":"test/healthscore-count/reuse.integration.test.ts","reason":"HS-COUNT-01–03: completed formula reuse across concurrent retry, checkout, payment fulfillment, locales and changed answers; missing-output repair"},
+    {"file":"test/healthscore-parallel/readiness.integration.test.ts","reason":"Independent parallel admission, failed formula recovery and complete advice plus reveal readiness"},
+    {"file":"test/assessment-capture.integration.test.ts","reason":"Capture and retry generation admission remains transactional and preserves input identity"},
+    {"file":"test/assessment-revisions.integration.test.ts","reason":"Revision fencing and generation snapshots remain valid"},
+    {"file":"test/web-payment-fulfillment.integration.test.ts","reason":"Checkout and payment fulfillment share the existing prepared-output adoption path"},
+    {"file":"test/web-journey-fix/reads.integration.test.ts","reason":"Current revision nutrient counts and nonlocking reads"},
+    {"file":"test/service-efficiency/lock-register.test.ts","reason":"No new lock site in shared task admission"}
+  ],
+  "browser": [
+    {"file":"test/e2e/web-journey-counts.spec.ts","grep":"WEB-JOURNEY-BROWSER-01","expectedCases":3}
+  ],
+  "expectationChanges": [
+    "A retry for unchanged inputs reuses a completed, current formula rather than scheduling a replacement. Active failed/missing-output recovery and changed-answer regeneration remain supported.",
+    "WEB-JOURNEY-BROWSER-01 now exercises retry between HealthScore and reveal; existing count/layout assertions remain intact."
+  ]
+}

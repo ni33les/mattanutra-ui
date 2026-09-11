@@ -36,7 +36,7 @@ test('HS-COUNT-01 completed ten-ingredient formula survives concurrent retries a
   assert.equal((await sql`select count(*)::int as n from formulations where plan_id=${id}::uuid`)[0].n,1);
   assert.equal((await sql`select fulfillment_status from payments where id=${session.paymentId}::uuid`)[0].fulfillment_status,'complete');
 });
-test('HS-COUNT-02 completed task with missing output and failed work remain recoverable',async()=>{
+test('HS-COUNT-02 completed task with missing output remains recoverable',async()=>{
   const receipt=await prepared();await sql`delete from formulations where plan_id=${receipt.planId}::uuid`;
   await retryAssessmentHealthScore(receipt.planId,'en');
   const rows=await formulaTasks(receipt.planId);assert.equal(rows.length,2);assert.equal(rows[1].status,'queued');

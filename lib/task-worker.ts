@@ -492,6 +492,7 @@ export async function enqueueAssessmentPregenerationTasks({
 
   const plan = DEFAULT_ASSESSMENT_PLAN;
   const inputHash = stableHash({ answers, locale });
+  const readiness = await nutritionOutputReadiness(sql, planId, inputHash);
   const taskGroupId = deterministicUuid(
     `mattanutra:task-group:assessment-pregeneration:${planId}:${inputHash}`
   );
@@ -508,7 +509,9 @@ export async function enqueueAssessmentPregenerationTasks({
         planId,
         taskGroupId
       });
-  const formulationTaskId = await createWorkTask({
+  // Reuse the formula already shown on HealthScore. Active-task deduplication
+  // alone does not protect completed outputs from being regenerated on retry.
+  const formulationTaskId = readiness.formulationReady ? null : await createWorkTask({
     actorType: "deterministic",
     businessValue: TASK_BUSINESS_VALUES.precision,
     groupLabel: "Pre-generate nutrition guidance",
