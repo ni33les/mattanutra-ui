@@ -83,3 +83,10 @@ test('NOID-06 confirmed-copy and checkout instructions agree in every locale', a
     assert.equal(confirmed.summary, summaries[locale]);
   }
 });
+
+test('NOID-07 execute discovery distinguishes a new checkout from replaying a lost response', () => {
+  const description = toolList().find(row => row.name === 'execute')!.description;
+  assert.match(description, /new checkout idempotencyKey/);
+  assert.match(description, /Retry.*same key and input/);
+  assert.match(description, /returned.*revision/);
+});
