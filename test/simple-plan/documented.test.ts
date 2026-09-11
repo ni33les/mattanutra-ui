@@ -23,3 +23,10 @@ test('SPLAN-DOC-04 paired evidence treats readiness stopwatch values as latency,
   assert.notDeepEqual(normalizePublishedClientResult(a), normalizePublishedClientResult({...a,checkoutUrl:'https://wrong.example/en/basket/checkout'}));
   assert.notDeepEqual(normalizePublishedClientResult(a), normalizePublishedClientResult({...a,products:[{productId:'sku',lineTotal:101}]}));
 });
+test('SPLAN-DOC-05 independent documented checkout journeys have identical business evidence', async () => {
+  const first = await documentedRun('en', 'schema_only', true);
+  const second = await documentedRun('en', 'schema_only', true);
+  assert.deepEqual(normalizePublishedClientResult(first), normalizePublishedClientResult(second));
+  const checkout = first.observations.find((row: {tool:string}) => row.tool === 'execute');
+  assert.ok(checkout); assert.equal(new URL(checkout.result.checkoutUrl).origin, 'https://fixture.example');
+});

@@ -1,6 +1,6 @@
 /** Normalize only declared run identities and clocks; preserve business values and identity relationships. */
 export const CLIENT_NORMALIZATION = Object.freeze({
-  discarded: ["latencyMs", "ackMs", "catalogueMs", "matchMs", "searchMs", "serializeMs"],
+  discarded: ["readyMs", "latencyMs", "ackMs", "catalogueMs", "matchMs", "searchMs", "serializeMs"],
   opaqueIdentityFields: ["planHandle", "orderHandle", "evidenceHandle", "supportHandle", "orderReference", "caseReference", "messageId", "correlationId", "idempotencyKey", "runKey"],
   eventIdentities: "Only UUID-backed order:, payment: and fulfilment: event IDs; ordinals preserve repeated and distinct events.",
   supportMessageIdentities: "UUID-backed thread[].id values in support payloads containing caseReference and supportHandle share the messageId mapping; message references and distinct thread entries remain distinguishable.",

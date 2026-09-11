@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { runConversationalJourney } from '../../scripts/published-client-journey.mjs';
+import { loadAgenticConfig } from '../../lib/agentic/config.ts';
 import { createAgenticRuntime } from '../../lib/agentic/runtime.ts';
 import { handleJsonRpc } from '../helpers/recording-mcp-dispatcher.ts';
 import { captureMcpTranscript } from '../helpers/mcp-evidence.ts';
@@ -10,7 +11,7 @@ import { installGoldCatalogue, uninstallGoldCatalogue } from '../helpers/gold-ca
 
 // The harness controls the executor. The imported client sees public RPC only.
 export async function documentedRun(locale: string, discovery: string, checkout = false) {
-  installGoldCatalogue(); resetMatchPlanCache(); const app = createAgenticRuntime();
+  installGoldCatalogue(); resetMatchPlanCache(); const app = createAgenticRuntime({ config: { ...loadAgenticConfig(), siteUrl: "https://fixture.example" } });
   const pending = new Set<string>(); const owner = `${app.scope.environment}:${app.scope.tenantScope}:${app.scope.principalScope ?? 'anon'}`;
   try {
     return await runConversationalJourney({ locale, discovery, checkout, key: `docs-${locale}-${discovery}`,

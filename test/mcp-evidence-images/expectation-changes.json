@@ -223,7 +223,8 @@
       "Support semantic comparison accepts current structured/brief-text or complete JSON text, preserving complete content and generated-ID relationships without extra ignored fields.",
       "The public HTTP client uses the existing pacing function and records rate-limit failures; it does not automatically retry failed acceptance operations.",
       "Process-recovery tests compare the full persisted operation response with its idempotency receipt and independently compare both public replay decisions; private ledgers are not expected on the MCP wire.",
-      "AXR-REL-01 separates the existing 90-second per-request client deadline from the existing 175-second durable operation deadline. Admission and read latencies are asserted separately, and successful matching must complete within 175 seconds. A 185-second test-container bound accommodates reporting/cleanup. The old combined 90-second assertion cancelled a still-valid async operation; its RED evidence remains current-ax-reliability-final.log. No runtime timeout changed."
+      "AXR-REL-01 separates the existing 90-second per-request client deadline from the existing 175-second durable operation deadline. Admission and read latencies are asserted separately, and successful matching must complete within 175 seconds. A 185-second test-container bound accommodates reporting/cleanup. The old combined 90-second assertion cancelled a still-valid async operation; its RED evidence remains current-ax-reliability-final.log. No runtime timeout changed.",
+      "SPLAN-DOC-04 classifies only readyMs as diagnostic latency, alongside existing timing fields; URL origins and prices remain significant. In-memory documented journeys use fixed https://fixture.example checkout configuration so independent HTTP listener ports are not different fixture inputs. Historical evidence is unchanged. RED: readiness-clock-red.log."
     ],
     "copyFixes": [
       "info.conditionCodes vocabulary pointer",
