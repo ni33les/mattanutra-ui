@@ -24,6 +24,9 @@ jobs:
           --health-interval 5s --health-timeout 3s --health-retries 10
     env:
       TEST_DB_URL: postgres://nobody:isolated-ci@127.0.0.1:55439/mattanutra_lock_review_ax_ci
+      DB_URL: postgres://nobody:isolated-ci@127.0.0.1:55439/mattanutra_lock_review_ax_ci
+      DB_WORKER_URL: postgres://nobody:isolated-ci@127.0.0.1:55439/mattanutra_lock_review_ax_ci
+      DB_ALLOW_DIRECT_CONNECTION: "true"
       MATTANUTRA_ENV: dev
       NODE_ENV: test
     steps:
