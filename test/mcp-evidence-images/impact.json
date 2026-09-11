@@ -65,6 +65,10 @@
       "reason": "Affected confirmation protocol, private candidate field consumers, or publication and commerce regression coverage; retain scoring, prices and payment invariants."
     },
     {
+      "file": "test/agentic-det-profile.test.ts",
+      "reason": "Independent current-profile comparison replaces the retired raw-dose-only check exposed by frozen catalogue CI repair."
+    },
+    {
       "file": "test/agentic-det-v3-remediation.test.ts",
       "reason": "Maintained MCP replay exposed retired request/response expectations; preserve underlying domain, ownership, lifecycle, financial or discovery assertions through the current protocol."
     },
@@ -593,5 +597,8 @@
   "acceptance": "Complete maintained matcher/MCP inventory twice, independent identical initial PostgreSQL clones; existing canonicalization only",
   "realDataGap": "IMG-02 REAL_DATA_UNAVAILABLE: no sellable real DEV listing lacking image; synthetic DTO check is not real matching coverage",
   "separatelyTracked": "Known supplemental-only retained-stock coverage defect remains out of scope; any failing maintained assertion prevents full-suite PASS.",
-  "deploymentBase": "2ed2b765a137a9ca2e554446ce7e50cf212df608"
+  "deploymentBase": "2ed2b765a137a9ca2e554446ce7e50cf212df608",
+  "fixtureHelpers": [
+    "test/helpers/captured-matcher-catalogue.ts"
+  ]
 }

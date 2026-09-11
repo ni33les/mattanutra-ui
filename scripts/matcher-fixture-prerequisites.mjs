@@ -18,6 +18,14 @@ export function validateMatcherFixtureRelations(relations) {
   return Object.fromEntries(required.map(name => [name, true]));
 }
 
+export function validateMatcherPaymentPrerequisites(row) {
+  for (const locale of ["en", "th", "zh-CN"])
+    assert.ok(typeof row.paymentLocaleConstraint === "string" && row.paymentLocaleConstraint.includes(`'${locale}'`),
+      `Missing maintained MCP payment locale prerequisite: ${locale}`);
+  assert.equal(row.accountCount, 3, "Missing maintained MCP Stripe, clearing or revenue account prerequisite");
+  return row;
+}
+
 export async function checkMatcherFixtureDatabase(env) {
   isolatedValidationEnvironment(env);
   const sql = postgres(env.TEST_DB_URL, { max: 1, prepare: false });
@@ -26,13 +34,20 @@ export async function checkMatcherFixtureDatabase(env) {
       to_regclass('public.retail_checkout_payments') is not null as retail_checkout_payments,
       to_regclass('public.retail_customer_orders') is not null as retail_customer_orders`;
     validateMatcherFixtureRelations(relations);
+    const [payments] = await sql`select
+      (select pg_get_constraintdef(oid) from pg_constraint
+        where conrelid='public.payments'::regclass and conname='payments_locale_check') as "paymentLocaleConstraint",
+      (select count(*)::int from public.finance_accounts where id in
+        ('33333333-3333-4333-8333-333333333333','44444444-4444-4444-8444-444444444444',
+         '55555555-5555-4555-8555-555555555555')) as "accountCount"`;
+    validateMatcherPaymentPrerequisites(payments);
     const [row] = await sql`select
       (select count(*)::integer from public.products) as products,
       (select count(*)::integer from public.product_facts) as "productFacts",
       (select count(*)::integer from public.supplements) as supplements,
       (select count(*)::integer from public.retail_sellable_products) as "retailListings",
       (select count(*)::integer from public.supplement_safety_limits) as "safetyReferences"`;
-    return { version: 1, passed: true, counts: validateMatcherFixtureCounts(row), relations };
+    return { version: 1, passed: true, counts: validateMatcherFixtureCounts(row), relations, payments };
   } finally { await sql.end(); }
 }
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

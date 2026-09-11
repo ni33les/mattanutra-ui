@@ -1,3 +1,4 @@
+import { capturedMatcherCatalogue } from './helpers/captured-matcher-catalogue.ts';
 import { canonicalHash } from "../lib/agentic/value/canonical.ts";
 import { runWithMatcherSafetySnapshot } from "../lib/matcher/safety-ceilings-server.ts";
 import { captureMatcherSafetySnapshot } from "../lib/matcher/safety-ceilings.ts";
@@ -303,6 +304,27 @@ function coveredTargetsHaveContributionIds(selected: StackOption | null) {
   });
 }
 
+/** Independent reference for this pack's fewest-pills request with no numerical preferences.
+ * Keep nutrient loss intact; all convenience terms come from the basket facts.
+ */
+function independentFewestPenalty(option: StackOption): number {
+  if (!option.doseFit || !Number.isFinite(option.doseFit.total)) return NaN;
+  let pills = 0, money = 0, servingBurden = 0, uncertain = 0;
+  for (const line of option.basket) {
+    const a = line.administration;
+    const verified = a?.provenance.status === "verified" && Boolean(a.provenance.sourceUrl && a.provenance.sourceText);
+    const basis = verified && a.route !== "unknown" && a.physicalUnit !== "unknown" && a.unitsPerServing != null && a.unitsPerServing > 0;
+    uncertain += Number(!basis);
+    if (basis && a.route === "oral" && ["capsule", "tablet", "softgel", "gummy"].includes(a.physicalUnit))
+      pills += a.unitsPerServing! * line.servingsPerDay;
+    if (![line.servingsPerDay, line.quantity, line.unitPriceMinor].every(value => Number.isFinite(value) && value >= 0)) return NaN;
+    money += line.quantity * line.unitPriceMinor;
+    servingBurden += Math.max(0, line.servingsPerDay - 1) ** 2;
+  }
+  return option.doseFit.total + 0.2 * pills / 3 + 0.1 * new Set(option.basket.map(line => line.productId)).size +
+    0.05 * money / 100000 + 0.2 * servingBurden + 0.25 * uncertain;
+}
+
 export function fewestPillsWins(input: Readonly<{
   balanced: ReturnType<typeof matchPlan>;
   fewest: ReturnType<typeof matchPlan>;
@@ -318,12 +340,12 @@ export function fewestPillsWins(input: Readonly<{
     return false;
   }
 
-  // Dose fit is the primary objective. Pills decide only equal-penalty baskets.
-  const penalty = selected.doseFit?.total;
-  if (penalty == null || !Number.isFinite(penalty) || generated.some(item => item.doseFit == null)) return false;
-  if (generated.some(item => item.doseFit!.total < penalty)) return false;
-  const minPills = Math.min(...generated.filter(item => item.doseFit!.total === penalty).map(item => item.dailyPills));
-  return selected.dailyPills === minPills && selected.candidateKey.length > 0;
+  // Compare every explored witness under ONE profile, independently of the
+  // production scorer. Raw closest-dose ranking was retired by the approved
+  // practical policy; a 27-pill basket cannot win just for a smaller dose loss.
+  const penalty = independentFewestPenalty(selected);
+  return Number.isFinite(penalty) && selected.candidateKey.length > 0 &&
+    generated.every(item => penalty <= independentFewestPenalty(item) + 1e-12);
 }
 
 export async function pinWithoutRematch(snapshot: CatalogueSnapshot, store = createSnapshotMemoryStore(snapshot)) {
@@ -391,6 +413,11 @@ export async function pinWithoutRematch(snapshot: CatalogueSnapshot, store = cre
 }
 
 export async function loadDetCatalog(): Promise<DetPackCatalog> {
+  if (process.env.NODE_TEST_CONTEXT) {
+    const { snapshot, references } = capturedMatcherCatalogue();
+    setMatcherSafetyCeilings(references.ceilings, { runtimeRevision: references.runtimeRevision, fingerprint: references.fingerprint });
+    return { snapshot, ceilings: references.ceilings };
+  }
   nextEnv.loadEnvConfig(process.cwd());
   const snapshot = freezeCatalogueSnapshot(await loadLiveRetailSnapshot("TH"));
   await refreshAdminSafetyCeilings();
@@ -647,7 +674,7 @@ const invokedAsTest = process.argv.some((arg) => arg.endsWith("agentic-det-pack.
 
 if (invokedAsTest) {
   describe("deterministic matcher pack", () => {
-    it("runs three properties against the live catalog", async () => {
+    it("runs three properties against the captured retail catalogue", async () => {
       const loaded = await loadDetCatalog();
       const peer = await loadDetCatalog();
       const report = await runDetPack({ ...loaded, freezePeer: peer });

@@ -1,3 +1,4 @@
+import { capturedMatcherCatalogue } from '../../helpers/captured-matcher-catalogue.ts';
 import { runWithMatcherSafetySnapshot } from "../../../lib/matcher/safety-ceilings-server.ts";
 import { captureMatcherSafetySnapshot } from "../../../lib/matcher/safety-ceilings.ts";
 import { canonicalHash } from "../../../lib/agentic/value/canonical.ts";
@@ -36,7 +37,7 @@ import { asRecord, stringList } from "./impl-evidence.ts";
 import type { AgenticStore } from "../../../lib/agentic/store/types.ts";
 import { sampleValueSnapshot } from "./sample-catalogue.ts";
 import { candidateSetHash, valueCatalogueFingerprint } from "../../../lib/agentic/value/fingerprint.ts";
-import { matcherSafetyCeilings } from "../../../lib/matcher/safety-ceilings.ts";
+import { matcherSafetyCeilings, setMatcherSafetyCeilings } from "../../../lib/matcher/safety-ceilings.ts";
 import { refreshAdminSafetyCeilings } from "../../../lib/agentic/catalogue/load-safety-ceilings.ts";
 
 export type PlanSession = Readonly<{
@@ -165,6 +166,19 @@ export function d3OnlyRequest(
 }
 
 export async function freezeImplCatalogue() {
+  if (process.env.NODE_TEST_CONTEXT) {
+    const { snapshot, references } = capturedMatcherCatalogue();
+    setMatcherSafetyCeilings(references.ceilings, { runtimeRevision: references.runtimeRevision, fingerprint: references.fingerprint });
+    const freeze: ValueCatalogueFreeze = {
+      buildId: loadAgenticConfig().buildId,
+      candidateSetHash: candidateSetHash(snapshot.products.map(product => product.productId)),
+      catalogueVersion: snapshot.catalogueVersion, countryCode: "TH", currency: "THB",
+      fingerprint: valueCatalogueFingerprint(snapshot, references.ceilings),
+      productCount: snapshot.products.length, retailerId: "retailer_th_delight", snapshot,
+      supplementCount: snapshot.supplements.length
+    };
+    return { freeze, live: true, snapshotId: catalogueSnapshotId(snapshot), usable: isUsableLiveFreeze(freeze) };
+  }
   // Freeze reference inputs before the first run, including cases preceding
   // the financial fixture. A later fixture must not silently initialise them.
   await refreshAdminSafetyCeilings();

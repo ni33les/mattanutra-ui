@@ -144,6 +144,24 @@
         "test/agentic-cv-r4-pack.test.ts"
       ],
       "change": "Keep historical case IDs and all matching, safety and monetary checks. Current discovery asserts six tools and five flat schema branches, with weights/basis replacing retired target importance/prerequisite inputs. Assert the unchanged deployed importance-matching-2 identity. FIX-08 looks up adult D3 in its supported total-intake scope, retaining unknown/reference-amount/source-scope checks."
+    },
+    {
+      "caseIds": [
+        "QA-CI-06",
+        "QA-CI-07",
+        "QA-CI-08",
+        "MCP-FIXTURE-04"
+      ],
+      "change": "Preserved CI run 34564001991 (source 730c049c) failed identically twice: three catalogue-dependent property packs were reading a nine-product synthetic bootstrap instead of their real catalogue prerequisites; five payment cases lacked the existing payment locale constraint or finance account rows. Maintained test invocations now load the committed captured DEV catalogue and reference heads with its unchanged SHA, prices, facts and unknowns; live audit script callers retain their live loader. Fresh isolated bootstrap applies the existing payment schema/account setup. The prerequisite gate checks those constraints/accounts before long execution. Existing domain assertions and all eight failure cases remain. RED evidence: ci-captured-prerequisites-red-c.log, payment-preflight-red.log and original CI artifact."
+    },
+    {
+      "caseIds": [
+        "DET5-PROFILE-01",
+        "DET5-PROFILE-02",
+        "DEV-DET-05",
+        "R2-DET-05"
+      ],
+      "change": "The captured real catalogue exposed a retired raw-dose-only assertion in fewestPillsWins. Its six-pill selected basket has dose loss 1.6975 and practical penalty 2.9725; an alternative has dose loss 1.42748 but at least 27 pills and much greater serving burden. Replace only that comparison with an independent calculation of the already-approved fewest-pills 4/2/1/4 penalties from unchanged basket facts, cross-scoring all the same returned witnesses. Keep coverage, contribution IDs, leftovers, safety checks and the required 10/10 property score. Two hand-calculated RED cases prove the old check both rejected a valid practical winner and accepted an inferior exact-dose routine. Production scoring and fixture prices unchanged. Evidence: det-current-objective-probe.jsonl, det-profile-red.log, ci-eight-failures-repair.log."
     }
   ],
   "casesRemoved": 0,
