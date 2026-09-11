@@ -26,3 +26,11 @@ test('DET5-PROFILE-02 reject a closer-dose basket when its independent practical
   const practical=routine('practical',0.1,1),exact=routine('exact',0,10);
   assert.equal(fewestPillsWins({fewest:result(exact),balanced:result(practical)}),false);
 });
+test('DET5-PROFILE-03 a missing comparison score cannot silently count as a passing precondition',()=>{
+  const practical=routine('practical',0.1,1),invalid={...routine('invalid',0,1),doseFit:undefined};
+  assert.equal(fewestPillsWins({fewest:result(practical),balanced:result(invalid)}),false);
+});
+test('DET5-PROFILE-04 a valid empty basket remains in the independent comparison',()=>{
+  const practical=routine('practical',0.1,1),empty={...routine('empty',0.05,0),basket:[]};
+  assert.equal(fewestPillsWins({fewest:result(practical),balanced:result(empty)}),false);
+});
