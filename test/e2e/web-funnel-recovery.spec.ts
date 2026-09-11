@@ -98,6 +98,7 @@ test("capture failure, persistence failure, reload and analysis retry remain sep
   await page.locator('[data-testid="calc-emailbox"] button').click();
   await expect(page.getByTestId("calc-emailbox")).toHaveCount(0);
   await fixture({ action: "copy", planId: captured.planId });
+  await fixture({ action: "ready", planId: captured.planId });
   await page.unroute("**/journey?locale=*");
   await page.getByTestId("retry-analysis").click();
   expect(captures).toBe(2);
