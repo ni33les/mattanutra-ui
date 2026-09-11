@@ -138,7 +138,8 @@ function userPrompt({
         "Keep copy concise enough for responsive cards: heroTitle under 120 English characters, card headlines under 70 English characters, card bodies under 190 English characters.",
         "No HTML tags. No markdown. No medical advice. No diagnosis. No bloodwork/lab-test/get-tested language.",
         "Do not mention that any value is locked, capped, or unmeasured.",
-        "Do not alter or restate numbers unless they appear in deterministicContent.locked or copySeeds."
+        "For each pageCopy field, use integer digits only if they occur in the same field's copySeed. Numbers in other fields, locked values, or questionnaire answers are not permitted in that field. Use qualitative wording instead; do not add measurements.",
+        "Keep each seeded field between 0.5x and 1.5x its own copySeed character length, including each individual card headline/title and body. These per-field bounds take precedence over general brevity guidance. heroTitle has no direct seed; keep its existing 120-character guidance."
       ],
       locale,
       outputLocaleMode: "single_display_locale",

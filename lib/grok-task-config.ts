@@ -45,7 +45,7 @@ export const GROK_TASK_REASONING_DEFAULTS = {
   /** Supplement stack design — highest clinical leverage among generative paths. */
   formulation: "medium",
   /** Stage-6 style page polish; locked numbers validated server-side. */
-  healthScoreCopy: "medium",
+  healthScoreCopy: "low",
   /** Plan refinement / advisor replies. */
   nutritionAdvisor: "medium",
   /** Ongoing customer chat (Nong Mata). */

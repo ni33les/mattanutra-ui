@@ -12,7 +12,6 @@ type Request = { messages: { content: string; role: string }[]; response_format:
 } };
 
 function capture(t: TestContext, responses: unknown[]) {
-  t.mock.method(process, "emitWarning", () => {});
   const previous = process.env.XAI_API_KEY;
   process.env.XAI_API_KEY = "offline-test-key";
   t.after(() => { if (previous === undefined) delete process.env.XAI_API_KEY; else process.env.XAI_API_KEY = previous; });
@@ -120,4 +119,18 @@ test("HS-PERF-08: first HealthScore request explains the validator's per-field r
   assert.match(instructions, /same field's copySeed/);
   assert.match(instructions, /0\.5x.*1\.5x/);
   assert.doesNotMatch(instructions, /unless they appear in deterministicContent\.locked or copySeeds/);
+});
+
+test("HS-PERF-10: compact refinement retains prior formula, feedback and chat context", async t => {
+  const requests = capture(t, [formulaResponse]);
+  const input = { ...formulaInput, previousFormulation: formulaResponse, planFeedback: [],
+    chatMessages: [{ id: "message-1", status: "ready" as const, body: "Keep my medication context", createdAt: "2026-09-11T00:00:00Z", role: "user" as const }] };
+  await analyzeFormulationWithGrok(input);
+  const prompt = JSON.parse(requests[0].messages[1].content);
+  assert.deepEqual(prompt.assessment, answers);
+  assert.deepEqual(prompt.currentPlanContext, {
+    previousSupplementGuidance: formulaResponse, planFeedback: [],
+    chatMessages: [{ body: "Keep my medication context", createdAt: "2026-09-11T00:00:00Z", role: "user" }]
+  });
+  assert.deepEqual(prompt.assessmentSafetyContext.medications.classes, answers.medTypes);
 });
