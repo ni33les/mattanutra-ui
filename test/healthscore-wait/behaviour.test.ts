@@ -42,3 +42,23 @@ test('DEV-FILL-02 random completion preserves already-entered answers', () => {
   const filled=fastForwardQuestionnaire(named.state,()=>0.8);assert.ok(filled.ok);
   assert.equal(filled.state.answers.firstName,'Morgan');
 });
+
+test('DEV-FILL-03 random filling keeps the Thailand market in every locale', () => {
+  for (const locale of ['en', 'th', 'zh-CN'] as const) {
+    for (const value of [0, 0.15, 0.25, 0.6, 0.95]) {
+      const filled = fastForwardQuestionnaire(createInitialState({ locale, channel: 'web' }), () => value);
+      assert.ok(filled.ok);
+      assert.equal(filled.state.phase, 'complete');
+      assert.equal(filled.state.answers.country, 'Thailand');
+      assert.equal(toAssessmentAnswers(filled.state.answers).country, 'Thailand');
+    }
+  }
+});
+
+test('DEV-FILL-04 random filling preserves an explicitly saved country', () => {
+  const state = createInitialState({ locale: 'en', channel: 'web' });
+  state.answers.country = 'Singapore';
+  const filled = fastForwardQuestionnaire(state, () => 0);
+  assert.ok(filled.ok);
+  assert.equal(filled.state.answers.country, 'Singapore');
+});

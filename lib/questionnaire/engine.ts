@@ -1147,7 +1147,8 @@ export function fastForwardQuestionnaire(
       return { ok: true, events: completed.events, state: completed.state };
     }
 
-    const option = random && turn.opts?.length
+    // Vary the DEV health profile without changing its default retail market.
+    const option = random && turn.k !== "country" && turn.opts?.length
       ? turn.opts[Math.floor(random() * turn.opts.length)]
       : undefined;
     const answer = next.answers[turn.k] ?? (option
