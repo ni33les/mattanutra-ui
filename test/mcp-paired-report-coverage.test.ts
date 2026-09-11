@@ -114,3 +114,19 @@ it("MCP-REPORT-04 a frozen remediation pack retains its complete reference ident
     } finally {await closeSqlPool();resetMatcherSafetyCeilings();}
   `, 180000);
 });
+
+it("MCP-REPORT-05 standalone documented clients use their declared catalogue independently of database or earlier packs", () => {
+  standaloneFixtureProbe(`
+    import assert from "node:assert/strict";
+    import {documentedRun} from "./test/simple-plan/documented-harness.ts";
+    import {fixtureSnapshot} from "./lib/agentic/catalogue/fixtures.ts";
+    import {closeSqlPool} from "./lib/db.ts";
+    const allowed=new Set(fixtureSnapshot().products.map(p=>p.productId));
+    try {const journey=await documentedRun("en","tools_only");
+      const ready=journey.observations.filter(o=>o.tool==="plan"&&o.result.status==="ready");
+      assert.ok(ready.length>0,"The documented client must reach a useful result");
+      const products=ready.flatMap(o=>o.result.choices.flatMap(c=>c.products));assert.ok(products.length>0);
+      assert.ok(products.every(p=>allowed.has(p.productId)),"No prior pack or live database may replace the declared client fixture");
+    } finally {await closeSqlPool();}
+  `, 45000, true);
+});
