@@ -462,6 +462,12 @@
       "slice": "matcher-hot-path",
       "expectedCases": 3,
       "reason": "Completion without redundant checkpoint continuation, historical cursor recovery and standard-to-expanded attempt accounting"
+    },
+    {
+      "file": "test/service-efficiency/frontier-hot-path.test.ts",
+      "slice": "matcher-frontier-hot-path",
+      "expectedCases": 2,
+      "reason": "Bounded candidate retention matches a stable full sort, preserves ties and inputs, and demonstrably reduces comparison calls"
     }
   ],
   "inputs": [
