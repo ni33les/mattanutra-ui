@@ -126,16 +126,23 @@ it("FULL-CYCLE-05 paid resume only reads the returned order and rejects cross-en
   await assert.rejects(resume({ endpoint: "https://dev.mattanutra.com/api/mcp", receipt, locale: "en", discovery: "tools_only", rpc }), /endpoint/);assert.equal(requests.length, 0);
 });
 
-it("FULL-CYCLE-10 public images require HTTPS; isolated images may use their exact loopback candidate", async () => {
-  const client = await import("../scripts/published-client-journey.mjs");
-  const valid = (client as unknown as { isPublishedProductImageUrl: (value: unknown, endpoint?: string) => boolean }).isPublishedProductImageUrl;
-  assert.equal(typeof valid, "function");
-  assert.equal(valid(null), true);
-  assert.equal(valid("https://cdn.example/product.png"), true);
-  assert.equal(valid("http://127.0.0.1:3211/product.png", "http://127.0.0.1:3211/api/mcp"), true);
-  for (const image of [undefined, "not a URL", "http://cdn.example/product.png", "file:///tmp/image.png", "http://127.0.0.1:3212/product.png", "http://user:secret@127.0.0.1:3211/product.png"]) {
-    assert.equal(valid(image, "http://127.0.0.1:3211/api/mcp"), false, String(image));
+it("FULL-CYCLE-10 MCP image projection honors absolute HTTPS without changing the recommendation", async () => {
+  const { presentDecision } = await import("../lib/agentic/presentation/decision.ts");
+  const { internalFixture } = await import("./mcp-conversation-pack/helpers.ts");
+  const result = internalFixture(); assert.ok(result.selected?.basket.length);
+  const original = presentDecision(result, "cap_image_contract_fixture", 1); assert.ok("choices" in original);
+  const withoutImages = (decision: typeof original) => ({ ...decision, choices: decision.choices.map(choice => ({
+    ...choice, products: choice.products.map(product => ({ ...product, imageUrl: null }))
+  })) });
+  for (const [image, expected] of [
+    ["https://images.example/product.png", "https://images.example/product.png"],
+    [null, null], ["/healthscore/box-v7.jpg", null], ["http://images.example/product.png", null],
+    ["not a URL", null], ["file:///tmp/image.png", null], ["https://user:secret@images.example/product.png", null]
+  ] as const) {
+    const input = structuredClone(result); for (const item of input.selected!.basket) item.imageUrl = image;
+    const decision = presentDecision(input, "cap_image_contract_fixture", 1); assert.ok("choices" in decision);
+    assert.ok(decision.choices.length > 0);
+    for (const product of decision.choices[0].products) assert.equal(product.imageUrl, expected, String(image));
+    assert.deepEqual(withoutImages(decision), withoutImages(original), "Images cannot change products, doses, advice, money or actions");
   }
-  assert.equal(valid("http://127.0.0.1:3211/product.png", "https://uat.mattanutra.com/api/mcp"), false);
-  assert.equal(valid("http://127.0.0.1:3211/product.png"), false);
 });
