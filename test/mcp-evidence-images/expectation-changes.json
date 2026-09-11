@@ -1,0 +1,107 @@
+{
+  "version": 1,
+  "base": "bbdb316662d2d1254bebfb03d612a96ea82351ab",
+  "testFirstCommit": "ec207a55",
+  "beforeContract": "10.0.0",
+  "afterContract": "11.0.0",
+  "baseline": {
+    "contracts": {
+      "cases": 7,
+      "passed": 5,
+      "failed": [
+        "EV-01",
+        "EV-02"
+      ]
+    },
+    "runner": {
+      "cases": 2,
+      "passed": 1,
+      "failed": [
+        "QA-01 separate state"
+      ]
+    }
+  },
+  "expectationChanges": [
+    {
+      "files": [
+        "test/agentic-com-pack.test.ts",
+        "test/agentic-contract-v4.test.ts",
+        "test/agentic-contract.test.ts",
+        "test/agentic-live-trust-copy.test.ts",
+        "test/agentic-mcp-sale-states.test.ts",
+        "test/agentic-mcp-transport-reliability.test.ts",
+        "test/agentic-p1.test.ts",
+        "test/ax-refinement/contract.test.ts",
+        "test/consistency-r1-guards.test.ts",
+        "test/consistency-r2-guards.test.ts",
+        "test/consistency-r3-guards.test.ts",
+        "test/consistency-r4-guards.test.ts",
+        "test/consistency-r5-guards.test.ts",
+        "test/mcp-7-2-2/locks.test.ts",
+        "test/mcp-discovery/discovery.test.ts",
+        "test/practical-matching/adapters.test.ts",
+        "test/simple-plan/commerce-evidence.test.ts",
+        "test/simple-plan/hosted.test.ts",
+        "test/simple-plan/limit-advice.test.ts",
+        "test/simple-plan/publication.test.ts",
+        "test/simple-plan/retained-public-invariants.test.ts",
+        "test/simple-plan/single-recommendation.test.ts",
+        "test/simple-plan/version.test.ts"
+      ],
+      "change": "Exact six public tools replace seven; evidence removed. Existing case IDs, prices and historical snapshots retained. Current version assertions move to 11.0.0."
+    },
+    {
+      "caseIds": [
+        "SPLAN-EVID-01",
+        "MCP-LIMIT-04",
+        "MCP-SINGLE-03",
+        "B-SECURITY-01"
+      ],
+      "change": "Underlying fact, source, ownership, revision and returned-ID checks now call the retained internal fact lookup. Public unknown-tool behaviour is asserted in EV-02."
+    },
+    {
+      "file": "test/agentic-contract-v4.test.ts",
+      "change": "Removed one evidence RPC from retained-tool journey, preserving its case ID and every commerce/selection assertion. EV-01/02 replace public evidence step."
+    },
+    {
+      "file": "scripts/published-client-journey.mjs",
+      "change": "Six-tool discovery, current version and image-field validity replace removed evidence call; full commerce and state steps preserved."
+    }
+  ],
+  "casesRemoved": 0,
+  "newCases": 9,
+  "historicalPacks": "No historical contract or frozen result rewritten.",
+  "hygieneChanges": {
+    "reason": "Replace redundant early-return type guards with explicit assertion failures. Existing preceding assertions and numerical expectations remain unchanged; no test may silently stop.",
+    "files": [
+      {
+        "file": "test/agentic-phase1-units.test.ts",
+        "replacedBareGuardReturns": 2
+      },
+      {
+        "file": "test/agentic-phase6.test.ts",
+        "replacedBareGuardReturns": 1
+      },
+      {
+        "file": "test/matcher-prd-gates.test.ts",
+        "replacedBareGuardReturns": 2
+      },
+      {
+        "file": "test/matcher/advisory-dose-fit.test.ts",
+        "replacedBareGuardReturns": 15
+      },
+      {
+        "file": "test/matcher/dose.test.ts",
+        "replacedBareGuardReturns": 5
+      },
+      {
+        "file": "test/matcher/qa-safety.test.ts",
+        "replacedBareGuardReturns": 1
+      },
+      {
+        "file": "test/matcher/safety.test.ts",
+        "replacedBareGuardReturns": 14
+      }
+    ]
+  }
+}

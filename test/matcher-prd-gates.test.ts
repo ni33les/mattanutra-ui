@@ -107,7 +107,7 @@ describe("PRD matcher gates", () => {
     });
     assert.equal(isDoseError(mag), false);
     if (isDoseError(mag)) {
-      return;
+      assert.fail("Unexpected fixture precondition failure");
     }
     const variant: DoseVariant = {
       amountPerUnit: new Map([["sup_mag", mag]]),
@@ -125,7 +125,7 @@ describe("PRD matcher gates", () => {
     const exposure = aggregateDailyExposure({ current: [], variants: [variant] });
     assert.equal(isDoseError(exposure), false);
     if (isDoseError(exposure)) {
-      return;
+      assert.fail("Unexpected fixture precondition failure");
     }
     const safety = evaluateSafety({
       exposure,

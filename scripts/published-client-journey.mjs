@@ -27,7 +27,7 @@ export async function runConversationalJourney({ rpc, locale = "en", discovery =
   const { default: Ajv } = await import("ajv");
   const assert = (await import("node:assert/strict")).default;
   const listing = await rpc("tools/list", {});
-  assert.equal(listing.contractVersion, "10.0.0"); assert.equal(listing.tools.length, 7);
+  assert.equal(listing.contractVersion, "11.0.0"); assert.equal(listing.tools.length, 6);
   const nameOf = name => listing.tools.find(row => row.name === name || row.name.endsWith(`___${name}`))?.name;
   const ajv = new Ajv({ multipleOfPrecision: 8, strict: false, allErrors: true, validateFormats: false, useDefaults: false });
   const schemas = new Map(listing.tools.map(row => [row.name, { input: ajv.compile(row.inputSchema), output: ajv.compile(row.outputSchema) }]));
@@ -91,8 +91,10 @@ export async function runConversationalJourney({ rpc, locale = "en", discovery =
   assert.deepEqual(await call("plan", selection), plan);
   const selected = plan.choices.find(row => row.optionId === plan.selectedOptionId); assert.ok(selected);
   for (const product of selected.products) if (product.lineTotal !== null) assert.equal(Math.round(product.lineTotal * 100), product.quantity * Math.round(product.unitPrice * 100));
-  const evidence = await call("evidence", { planHandle: plan.planHandle, expectedRevision: plan.revision, optionId: selected.optionId, productId: selected.products[0].productId });
-  assert.equal(evidence.ok, true); assert.ok(Array.isArray(evidence.facts));
+  for (const product of selected.products) {
+    assert.ok(Object.hasOwn(product, "imageUrl"));
+    assert.ok(product.imageUrl === null || /^https:\/\//.test(product.imageUrl));
+  }
   if (checkout) {
     const args = { planHandle: plan.planHandle, expectedRevision: plan.revision, idempotencyKey: `${key}-checkout` };
     const order = await call("execute", args); assert.equal(order.ok, true, JSON.stringify(order));

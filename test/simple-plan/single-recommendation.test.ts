@@ -1,3 +1,4 @@
+import { evidenceTool } from '../../lib/agentic/evidence/tool.ts';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { validateToolIssues } from '../../lib/agentic/contract/validate.ts';
@@ -39,7 +40,7 @@ test('MCP-SINGLE-02 empty recommendations expose gaps and weight refinement, nev
   }
 });
 
-test('MCP-SINGLE-03 hidden alternatives are not available through selection or evidence', async () => {
+test('MCP-SINGLE-03 hidden alternatives are not available through selection or internal fact lookup', async () => {
   const result = internalFixture(); assert.ok(result.alternatives.length > 0);
   const { app, handle } = await storedFixture(result);
   const hidden = result.alternatives[0], optionId = decisionOptionId(handle, 1, hidden);
@@ -47,8 +48,9 @@ test('MCP-SINGLE-03 hidden alternatives are not available through selection or e
     ['plan', { selectedOptionId: optionId, idempotencyKey: 'single-hidden-selection' }],
     ['evidence', { optionId, productId: hidden.basket[0].productId }]
   ] as const) {
-    const rpc = await handleJsonRpc(app, { id: 1, method: 'tools/call', params: { name, arguments: { planHandle: handle, expectedRevision: 1, ...fields } } });
-    const body = rpc?.result?.structuredContent as { ok: boolean; error?: { reasonCode: string } };
+    const args = { planHandle: handle, expectedRevision: 1, ...fields };
+    const body = (name === 'evidence' ? await evidenceTool({ ...app, ...args }) :
+      (await handleJsonRpc(app, { id: 1, method: 'tools/call', params: { name, arguments: args } }))?.result?.structuredContent) as { ok: boolean; error?: { reasonCode: string } };
     assert.equal(body.ok, false); assert.equal(body.error?.reasonCode, 'not_found');
   }
 });

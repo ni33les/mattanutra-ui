@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { internalFixture, storedFixture } from '../mcp-conversation-pack/helpers.ts';
 import { presentDecision } from '../../lib/agentic/presentation/decision.ts';
-import { handleJsonRpc } from '../../lib/agentic/mcp/dispatcher.ts';
+import { evidenceTool } from '../../lib/agentic/evidence/tool.ts';
 import { agenticServerInstructions } from '../../lib/agentic/contract/instructions.ts';
 import { clientGuideMarkdown } from '../../lib/agentic/contract/guide.ts';
 import type { SafetyGuidance } from '../../lib/agentic/plan/types.ts';
@@ -63,14 +63,12 @@ test('MCP-LIMIT-03 an estimated upper endpoint alone is not a confirmed excess',
   }
 });
 
-test('MCP-LIMIT-04 explicit evidence returns only exceeded-limit findings while preserving label facts and source', async () => {
+test('MCP-LIMIT-04 internal fact lookup returns only exceeded-limit findings while preserving label facts and source', async () => {
   const result = fixture([finding({ authorityUrl: 'https://example.test/limit', evidence: ['Frozen source'] }), finding({ code: 'medication_interaction', threshold: null })]);
   const { app, handle } = await storedFixture(result);
   const decision = presentDecision(result, handle, 1); assert.ok('choices' in decision);
-  const rpc = await handleJsonRpc(app, { id: 1, method: 'tools/call', params: { name: 'evidence', arguments: {
-    planHandle: handle, expectedRevision: 1, optionId: decision.choices[0].optionId, ingredientId: 'sup_fixture'
-  } } });
-  const body = rpc?.result?.structuredContent as { ok: boolean; facts: unknown[]; findings: Array<{ message: string; reference: number; source: string }> };
+  const body = await evidenceTool({ ...app, planHandle: handle, expectedRevision: 1, optionId: decision.choices[0].optionId, ingredientId: 'sup_fixture' });
+  assert.ok('findings' in body);
   assert.equal(body.ok, true); assert.ok(Array.isArray(body.facts)); assert.equal(body.findings.length, 1);
   assert.equal(body.findings[0].reference, 1010); assert.equal(body.findings[0].source, 'https://example.test/limit');
   assert.equal(body.findings[0].message, 'This dose exceeds the MattaNutra recommended limit of 1010 µg/day.');

@@ -9,7 +9,7 @@ import { computeSchemaChecksum } from "../../lib/agentic/release-manifest.ts";
 import { testSourceHygiene } from "../../scripts/test-execution-proof.mjs";
 import { validateInstalledConnectorProjection } from "../../scripts/validate-installed-connector-projection.mjs";
 
-const names = ["info", "plan", "execute", "order", "support", "feedback", "evidence"];
+const names = ["info", "plan", "execute", "order", "support", "feedback"];
 const locales = ["en", "th", "zh-CN"];
 const environments: AgenticEnvironment[] = ["dev", "uat", "prd"];
 const read = (path: string) => JSON.parse(readFileSync(path, "utf8"));
@@ -51,7 +51,7 @@ test("DISC-MCP-02 initialize preserves service and operational boundaries", asyn
   const text = String((await call("initialize")).instructions);
   for (const term of [/Thailand/, /real products/, /refine/, /coverage/, /overlap/, /current stock/, /pill burden/, /cost/, /not diagnosis/, ...operationalRules]) assert.match(text, term);
 });
-test("DISC-MCP-03 native seven-tool order is unchanged", async () => { const result = await call("tools/list"); assert.deepEqual((result.tools as {name:string}[]).map(tool => tool.name), names); });
+test("DISC-MCP-03 native six-tool order is unchanged", async () => { const result = await call("tools/list"); assert.deepEqual((result.tools as {name:string}[]).map(tool => tool.name), names); });
 test("DISC-MCP-04 every native tool has the approved title", async () => { const result = await call("tools/list"); for (const tool of result.tools as {name:string;title?:string}[]) assert.equal(tool.title, golden().titles[tool.name]); });
 test("DISC-MCP-05 descriptions lead with purpose and keep operation instructions", async () => {
   const result = await call("tools/list"); const tools = result.tools as {name:string;description:string}[];

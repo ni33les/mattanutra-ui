@@ -37,15 +37,14 @@ function extractBalancedCalls(source: string, marker: RegExp) {
 }
 
 describe("consistency r3 regression guards", () => {
-  it("keeps the public MCP tools including evidence", () => {
+  it("keeps the public MCP tools without the removed public evidence tool", () => {
     assert.deepEqual([...AGENTIC_PUBLIC_TOOLS], [
       "info",
       "plan",
       "execute",
       "order",
       "support",
-      "feedback",
-      "evidence"
+      "feedback"
     ]);
   });
 

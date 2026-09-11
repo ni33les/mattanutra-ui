@@ -7,9 +7,9 @@ import { AGENTIC_PUBLIC_TOOLS, AGENTIC_OUTPUT_SCHEMAS, AGENTIC_TOOL_SCHEMAS } fr
 import { CLIENT_GUIDE_URI, CONTRACT_SCHEMA_URI, readContractResource, CLIENT_EXAMPLES } from "../../lib/agentic/contract/guide.ts";
 import { runtime, rpc } from "./helpers.ts";
 
-test("AXR-SPEC-01 only v9 publishes seven tools and current schemas; clinical references stay unchanged", () => {
+test("AXR-SPEC-01 only v9 publishes six tools and current schemas; clinical references stay unchanged", () => {
   assert.equal(AGENTIC_CONTRACT_VERSION, "9.0.0"); assert.equal(GUIDANCE_RULES_VERSION, "6.0.0");
-  assert.deepEqual([...AGENTIC_PUBLIC_TOOLS], ["info", "plan", "execute", "order", "support", "feedback", "evidence"]);
+  assert.deepEqual([...AGENTIC_PUBLIC_TOOLS], ["info", "plan", "execute", "order", "support", "feedback"]);
   for (const version of ["4.0.0", "5.0.0", "6.0.0", "7.0.0", "8.0.0"]) assert.equal(readContractResource(`mattanutra://contract/${version}/schema`), null);
   assert.ok(CLIENT_GUIDE_URI.includes("9.0.0")); assert.ok(CONTRACT_SCHEMA_URI.includes("9.0.0"));
 });

@@ -4,8 +4,9 @@ import { createHash } from "node:crypto";
 import { createWriteStream, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { fullTestInventory, isolatedDatabasePreflight, runBatch, sourceManifest, testSourceHygiene } from "./run-full-test-suite.mjs";
+import { cloneIsolatedDatabase, fullTestInventory, isolatedDatabasePreflight, runBatch, sourceManifest, testSourceHygiene } from "./run-full-test-suite.mjs";
 import { isolatedValidationEnvironment } from "./run-dev-advisory-validation.mjs";
+import { normalizePublishedClientResult } from "./published-client-semantics.mjs";
 import { unclassifiedMatcherConsumers } from "./matcher-test-inventory.mjs";
 
 const ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)));
@@ -44,14 +45,15 @@ export async function startHttpCandidate(env, evidence) {
   } catch (error) { await stop(); throw error; }
 }
 
-export async function runMatcherBatches({ common, evidence, inventory, args, runs,
+export async function runMatcherBatches({ common, evidence, inventory, args, runs, environments = {},
   start = startHttpCandidate, batch = runBatch }) {
   const results = [];
   for (const run of runs) {
     const httpEvidence = join(evidence, `http-${run}`);
     mkdirSync(httpEvidence, { recursive: true });
-    const server = await start(common, httpEvidence);
-    const httpEnv = { ...common, MCP_URL: `${server.identity.origin}/api/mcp`,
+    const runEnv = environments[run] ?? common;
+    const server = await start(runEnv, httpEvidence);
+    const httpEnv = { ...runEnv, MCP_URL: `${server.identity.origin}/api/mcp`,
       MCP_ISOLATED_CANDIDATE: "1", NEXT_PUBLIC_SITE_URL: server.identity.origin, SITE_URL: server.identity.origin };
     try {
       results.push(await batch(`node-matcher-${run}`, [...args, ...inventory.files.filter(file => !inventory.integration.includes(file))],
@@ -60,7 +62,7 @@ export async function runMatcherBatches({ common, evidence, inventory, args, run
     // These fixtures own their controlled tasks and leases. HTTP integration
     // cases start and stop their own executor; no pack-wide worker may compete.
     results.push(await batch(`node-matcher-postgres-${run}`, [...args, ...inventory.integration],
-      { ...common, DB_POOL_MAX: "6", DB_WORKER_POOL_MAX: "6" }, evidence));
+      { ...runEnv, DB_POOL_MAX: "6", DB_WORKER_POOL_MAX: "6" }, evidence));
   }
   return results;
 }
@@ -95,8 +97,25 @@ async function main() {
   const fingerprints = await runBatch("catalogue-inputs", ["scripts/validation-data-fingerprints.mjs", join(evidence, "catalogue-inputs.json")], common, evidence);
   if (!fingerprints.passed) throw new Error("Frozen catalogue/schema fingerprint evidence is missing");
   const runs = process.argv.includes("--twice") ? ["a", "b"] : ["a"];
-  const results = [prerequisites, fixture, fingerprints,
-    ...await runMatcherBatches({ common, evidence, inventory, args, runs })];
+  const environments = {}, initialInputs = {}, preparations = [];
+  // Both clones are created from the same prepared state before either run starts.
+  for (const run of runs) {
+    const database = await cloneIsolatedDatabase(common.TEST_DB_URL, `${evidence}:${run}`);
+    const semanticOutput = join(evidence, `semantic-${run}`);
+    mkdirSync(semanticOutput, { recursive: true });
+    environments[run] = { ...common, TEST_DB_URL: database, DB_URL: database, DB_WORKER_URL: database,
+      MCP_EVIDENCE_IMAGES_OUTPUT: semanticOutput, "MCP_simple-plan_EVIDENCE_DIR": semanticOutput };
+    const fingerprint = await runBatch(`initial-inputs-${run}`, ["scripts/validation-data-fingerprints.mjs", join(evidence, `initial-inputs-${run}.json`)], environments[run], evidence);
+    preparations.push(fingerprint);
+    if (!fingerprint.passed) throw new Error(`Missing independent initial state: ${run}`);
+    const data = JSON.parse(readFileSync(join(evidence, `initial-inputs-${run}.json`), "utf8"));
+    initialInputs[run] = { database: new URL(database).pathname, schemaSha256: data.schemaSha256, catalogueSha256: data.catalogueSha256 };
+  }
+  if (runs.length === 2 && (initialInputs.a.database === initialInputs.b.database ||
+      initialInputs.a.schemaSha256 !== initialInputs.b.schemaSha256 || initialInputs.a.catalogueSha256 !== initialInputs.b.catalogueSha256)) throw new Error("Acceptance runs do not have independent identical initial inputs");
+  writeFileSync(join(evidence, "independent-initial-state.json"), JSON.stringify(initialInputs, null, 2), { flag: "wx" });
+  const results = [prerequisites, fixture, fingerprints, ...preparations,
+    ...await runMatcherBatches({ common, environments, evidence, inventory, args, runs })];
   let identicalNonLatency = null;
   if (runs.length === 2) {
     const canonical = run => ["node-matcher", "node-matcher-postgres"].flatMap(batch => readFileSync(join(evidence, `${batch}-${run}-events.jsonl`), "utf8").trim().split("\n").filter(Boolean).map(line => JSON.stringify(JSON.parse(line)))).sort();
@@ -104,10 +123,20 @@ async function main() {
     identicalNonLatency = JSON.stringify(a) === JSON.stringify(b);
     for (const [run, data] of [["a", a], ["b", b]]) writeFileSync(join(evidence, `canonical-${run}.json`), JSON.stringify(data.map(row => JSON.parse(row)), null, 2), { flag: "wx" });
   }
+  // Test outcomes alone are not business-semantic evidence. Require full stored
+  // real-catalogue and documented-client payloads, with the existing normalizer.
+  const semanticFiles = ["real-plan-journey.json", "documented-inventory-run.json"];
+  let semanticComparison;
+  try {
+    const semantic = Object.fromEntries(runs.map(run => [run, semanticFiles.map(file => ({ file,
+      result: normalizePublishedClientResult(JSON.parse(readFileSync(join(evidence, `semantic-${run}`, file), "utf8"))) }))]));
+    semanticComparison = { files: semanticFiles, runs: runs.length, passed: runs.length === 1 || JSON.stringify(semantic.a) === JSON.stringify(semantic.b) };
+    for (const run of runs) writeFileSync(join(evidence, `business-canonical-${run}.json`), JSON.stringify(semantic[run], null, 2), { flag: "wx" });
+  } catch (error) { semanticComparison = { files: semanticFiles, runs: runs.length, passed: false, error: error.message }; }
   const after = sourceManifest(), unchangedSource = before.sha256 === after.sha256;
   writeFileSync(join(evidence, "source-after.json"), JSON.stringify(after, null, 2), { flag: "wx" });
-  const result = { results, sourceCommit, sourceSha256: before.sha256, inventorySha256, unchangedSource, identicalNonLatency,
-    passed: unchangedSource && identicalNonLatency !== false && results.every(row => row.passed) };
+  const result = { results, sourceCommit, sourceSha256: before.sha256, inventorySha256, unchangedSource, identicalNonLatency, semanticComparison, initialInputs,
+    passed: unchangedSource && semanticComparison.passed && identicalNonLatency !== false && results.every(row => row.passed) };
   writeFileSync(join(evidence, "results.json"), JSON.stringify(result, null, 2), { flag: "wx" });
   console.log(JSON.stringify({ evidence, passed: result.passed, unchangedSource, identicalNonLatency }));
   if (!result.passed) process.exitCode = 1;

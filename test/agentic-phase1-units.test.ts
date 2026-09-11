@@ -52,7 +52,7 @@ describe("Phase 1 unit canonicalization", () => {
     assert.equal("reason" in iu, false);
     assert.equal("reason" in mcg, false);
     if ("reason" in iu || "reason" in mcg) {
-      return;
+      assert.fail("Unexpected fixture precondition failure");
     }
     assert.equal(iu.units, mcg.units);
     assert.equal(iu.dim, mcg.dim);
@@ -88,7 +88,7 @@ describe("Phase 1 unit canonicalization", () => {
     assert.equal("reason" in mg, false);
     assert.equal("reason" in grams, false);
     if ("reason" in mg || "reason" in grams) {
-      return;
+      assert.fail("Unexpected fixture precondition failure");
     }
     assert.equal(mg.units, grams.units);
     assert.equal(convertAmount({

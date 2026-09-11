@@ -235,7 +235,7 @@ describe("Phase 6 bounded evidence fields", () => {
     });
     assert.equal("error" in normalized, false);
     if ("error" in normalized) {
-      return;
+      assert.fail("Unexpected fixture precondition failure");
     }
     assert.equal(normalized.state.currentSupplements[0]?.supplementId, mag.supplementId);
     const matched = matchPlan({ snapshot, state: normalized.state });

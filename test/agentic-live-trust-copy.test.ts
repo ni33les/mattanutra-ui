@@ -66,7 +66,7 @@ describe("live connector discovery contract identity", () => {
     assert.equal(discovery.contractVersion, AGENTIC_CONTRACT_VERSION);
     assert.equal(discovery.contractVersion, info.structured.contractVersion);
     assert.equal(discovery.contractVersion, contract.contractVersion);
-    assert.equal(discovery.tools.length, 7);
+    assert.equal(discovery.tools.length, 6);
     for (const tool of discovery.tools) {
       assert.deepEqual(tool.inputSchema, contract.tools[tool.name].inputSchema);
       assert.deepEqual(tool.outputSchema, contract.tools[tool.name].outputSchema);

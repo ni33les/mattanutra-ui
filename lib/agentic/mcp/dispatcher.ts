@@ -14,7 +14,6 @@ import { executeTool } from "@/lib/agentic/commerce/execute";
 import { orderTool } from "@/lib/agentic/commerce/order";
 import { supportTool } from "@/lib/agentic/support";
 import { feedbackTool } from "@/lib/agentic/feedback";
-import { evidenceTool } from "@/lib/agentic/evidence/tool";
 import { nowIso, type AgenticRuntime } from "@/lib/agentic/runtime";
 import {
   canonicalPublicToolName,
@@ -120,11 +119,6 @@ async function callTool(
           supportHandle:
             typeof params.supportHandle === "string" ? params.supportHandle : undefined
         });
-        break;
-      case "evidence":
-        value = await evidenceTool({ config: runtime.config, now, scope: runtime.scope, store: runtime.store,
-          planHandle: String(params.planHandle), expectedRevision: Number(params.expectedRevision), optionId: String(params.optionId),
-          ingredientId: params.ingredientId as string | undefined, productId: params.productId as string | undefined });
         break;
       case "feedback":
         value = await feedbackTool({

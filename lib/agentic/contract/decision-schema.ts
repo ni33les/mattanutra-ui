@@ -10,7 +10,7 @@ export const INGREDIENT_ADVICE_SCHEMA = o({ kind: Type.Literal("dose_review", { 
 const intake = Type.Union([num, Type.Null(), o({ minimum: num, maximum: num, certainty: Type.Literal("estimated") })]);
 export const DECISION_INGREDIENT_SCHEMA = o({ ingredientId: id, name: str, unit: n(str), requested: n(num), supplied: n(num), suppliedAtLeast: p(num),
   productIds: list(id), targetBasis: p(e(["total_daily", "supplemental"] as const)), existing: p(intake), gap: p(n(num)), excess: p(n(num)), advice: p(list(INGREDIENT_ADVICE_SCHEMA)) });
-const product = o({ productId: id, name: str, imageUrl: n(str), productUrl: n(str), quantity: num, unitPrice: n(money), lineTotal: n(money),
+const product = o({ productId: id, name: str, imageUrl: { ...n(str), description: "Recorded product image URL (absolute HTTPS), or null when unavailable. Preserve the association with this product; never infer a replacement." }, productUrl: n(str), quantity: num, unitPrice: n(money), lineTotal: n(money),
   servingsPerDay: num, dailyQuantity: n(o({ amount: num, unit: str })), supplyDays: n(num) });
 const choice = o({ optionId: id, roles: list(str), summary: o({ text: str, pillCount: n(num), pillCountAtLeast: p(num), productCount: Type.Integer({ minimum: 0 }),
   goodsPrice: n(money), goodsPriceAtLeast: p(money), coveragePercent: n(num), coverageAtLeastPercent: p(num), ingredientDataComplete: Type.Boolean(), deliveryPrice: p(n(money)) }),

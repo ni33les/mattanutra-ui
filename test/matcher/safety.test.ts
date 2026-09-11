@@ -61,7 +61,7 @@ describe("matcher safety engine", () => {
     });
     assert.equal("reason" in amount, false);
     if ("reason" in amount) {
-      return;
+      assert.fail("Unexpected fixture precondition failure");
     }
     const variant: DoseVariant = {
       amountPerUnit: new Map([["sup_zinc", amount]]),
@@ -75,7 +75,7 @@ describe("matcher safety engine", () => {
     const exposure = aggregateDailyExposure({ current: [], variants: [variant] });
     assert.equal("reason" in exposure, false);
     if ("reason" in exposure) {
-      return;
+      assert.fail("Unexpected fixture precondition failure");
     }
     const safety = evaluateSafety({
       exposure,
@@ -108,7 +108,7 @@ describe("matcher safety engine", () => {
     });
     assert.equal("reason" in amount, false);
     if ("reason" in amount) {
-      return;
+      assert.fail("Unexpected fixture precondition failure");
     }
     const variant: DoseVariant = {
       amountPerUnit: new Map([["sup_zinc", amount]]),
@@ -122,7 +122,7 @@ describe("matcher safety engine", () => {
     const exposure = aggregateDailyExposure({ current: [], variants: [variant] });
     assert.equal("reason" in exposure, false);
     if ("reason" in exposure) {
-      return;
+      assert.fail("Unexpected fixture precondition failure");
     }
     const safety = evaluateSafety({
       exposure,
@@ -158,7 +158,7 @@ describe("matcher safety engine", () => {
     });
     assert.equal("reason" in mag, false);
     if ("reason" in mag) {
-      return;
+      assert.fail("Unexpected fixture precondition failure");
     }
     const variant: DoseVariant = {
       amountPerUnit: new Map([["sup_mag", mag]]),
@@ -185,7 +185,7 @@ describe("matcher safety engine", () => {
     const exposure = aggregateDailyExposure({ current: [], variants: [variant] });
     assert.equal("reason" in exposure, false);
     if ("reason" in exposure) {
-      return;
+      assert.fail("Unexpected fixture precondition failure");
     }
     const safety = evaluateSafety({
       exposure,
@@ -213,7 +213,7 @@ describe("matcher safety engine", () => {
     });
     assert.equal("reason" in amount, false);
     if ("reason" in amount) {
-      return;
+      assert.fail("Unexpected fixture precondition failure");
     }
     const variant: DoseVariant = {
       amountPerUnit: new Map([["sup_zinc", amount]]),
@@ -227,7 +227,7 @@ describe("matcher safety engine", () => {
     const exposure = aggregateDailyExposure({ current: [], variants: [variant] });
     assert.equal("reason" in exposure, false);
     if ("reason" in exposure) {
-      return;
+      assert.fail("Unexpected fixture precondition failure");
     }
     const safety = evaluateSafety({
       exposure,
@@ -259,7 +259,7 @@ describe("matcher safety engine", () => {
     });
     assert.equal("reason" in amount, false);
     if ("reason" in amount) {
-      return;
+      assert.fail("Unexpected fixture precondition failure");
     }
     const requested = scaleAmount({
       amount: 200,
@@ -269,7 +269,7 @@ describe("matcher safety engine", () => {
     });
     assert.equal("reason" in requested, false);
     if ("reason" in requested) {
-      return;
+      assert.fail("Unexpected fixture precondition failure");
     }
     const variant: DoseVariant = {
       amountPerUnit: new Map([["sup_mag", amount]]),
@@ -283,7 +283,7 @@ describe("matcher safety engine", () => {
     const exposure = aggregateDailyExposure({ current: [], variants: [variant] });
     assert.equal("reason" in exposure, false);
     if ("reason" in exposure) {
-      return;
+      assert.fail("Unexpected fixture precondition failure");
     }
     const safety = evaluateSafety({
       exposure,
@@ -321,7 +321,7 @@ describe("matcher safety engine", () => {
     });
     assert.equal("reason" in amount, false);
     if ("reason" in amount) {
-      return;
+      assert.fail("Unexpected fixture precondition failure");
     }
     const requested = scaleAmount({
       amount: 2000,
@@ -331,7 +331,7 @@ describe("matcher safety engine", () => {
     });
     assert.equal("reason" in requested, false);
     if ("reason" in requested) {
-      return;
+      assert.fail("Unexpected fixture precondition failure");
     }
     const variant: DoseVariant = {
       amountPerUnit: new Map([["sup_d3", amount]]),
@@ -345,7 +345,7 @@ describe("matcher safety engine", () => {
     const exposure = aggregateDailyExposure({ current: [], variants: [variant] });
     assert.equal("reason" in exposure, false);
     if ("reason" in exposure) {
-      return;
+      assert.fail("Unexpected fixture precondition failure");
     }
     const safety = evaluateSafety({
       exposure,

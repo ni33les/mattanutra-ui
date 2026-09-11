@@ -143,7 +143,7 @@ describe("Current flat contract and retained intake, advice and commerce invaria
     it("publishes all seven output schemas and both connector resources", async () => {
         const runtime = makeRuntime();
         const listed = await handleJsonRpc(runtime, { id: 1, method: "tools/list" });
-        assert.equal((listed?.result?.tools as unknown[]).length, 7);
+        assert.equal((listed?.result?.tools as unknown[]).length, 6);
         const resources = await handleJsonRpc(runtime, { id: 1, method: "resources/list" });
         // Only the current guide and schema are published.
         const publishedResources = resources?.result?.resources as Array<{
@@ -279,7 +279,6 @@ describe("Current flat contract and retained intake, advice and commerce invaria
         const created = await call(runtime, "plan", { idempotencyKey: "v4-seven-tools-plan01", ...request });
         assert.equal(created.status, "ready");
         const selected=await call(runtime,"plan",{planHandle:created.planHandle,expectedRevision:created.revision,idempotencyKey:"v4-seven-tools-select01",selectedOptionId:choice(created).optionId});
-        await call(runtime,"evidence",{planHandle:selected.planHandle,expectedRevision:selected.revision,optionId:selected.selectedOptionId,productId:choice(selected).products[0].productId});
         await call(runtime,"feedback",{planHandle:selected.planHandle,expectedRevision:selected.revision,idempotencyKey:"v4-seven-tools-feed01",consentConfirmed:true,rating:4});
         const checkout = await call(runtime, "execute", { planHandle: created.planHandle, expectedRevision: selected.revision, idempotencyKey: "v4-seven-tools-exec01" });
         assert.equal(checkout.ok, true, JSON.stringify(checkout));

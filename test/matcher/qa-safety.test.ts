@@ -105,7 +105,7 @@ describe("QA-GOLD safety stacks", () => {
     const exposure = aggregateDailyExposure({ current: [], variants: [variant] });
     assert.equal(isDoseError(exposure), false);
     if (isDoseError(exposure)) {
-      return;
+      assert.fail("Unexpected fixture precondition failure");
     }
     const safety = evaluateSafety({
       exposure,

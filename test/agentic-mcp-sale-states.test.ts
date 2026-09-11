@@ -8,7 +8,7 @@ import { handleCompletedJsonRpc as handleJsonRpc } from "./helpers/completed-mcp
 import { createAgenticRuntime, setAgenticRuntimeForTests, type AgenticRuntime } from "../lib/agentic/runtime.ts";
 import { createMemoryStore } from "../lib/agentic/store/memory.ts";
 import { installGoldCatalogue, uninstallGoldCatalogue } from "./helpers/gold-catalogue.ts";
-const PUBLIC_TOOLS = ["info", "plan", "execute", "order", "support", "feedback", "evidence"];
+const PUBLIC_TOOLS = ["info", "plan", "execute", "order", "support", "feedback"];
 const D3_PLAN = {
     idempotencyKey: "sale-states-mcp-d3-plan-key-01",
     ...{

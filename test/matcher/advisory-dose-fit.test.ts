@@ -110,7 +110,7 @@ describe("advisory dose fit", () => {
   it("uses total daily targets for food plus supplements and preserves supplemental targets", () => {
     const current = canonicalizeCurrents([{ subjectId: "a", name: "A", dailyAmount: 10, unit: "mg", sourceId: "continued" }]);
     const diet = canonicalizeCurrents([{ subjectId: "a", name: "A", dailyAmount: 40, unit: "mg", sourceId: "diet" }]);
-    assert.ok(!("error" in current) && !("error" in diet)); if ("error" in current || "error" in diet) return;
+    assert.ok(!("error" in current) && !("error" in diet)); if ("error" in current || "error" in diet) assert.fail("Unexpected fixture precondition failure");
     const products = [product("fifty", 50, 0, 1), product("ninety", 90, 0, 10)];
     const make = (basis: "total_daily" | "supplemental") => request({ safetyCeilings: [], currentSupplements: current, dietaryIntake: diet,
       maxDailyPills: 1, targets: canonicalizeTargets({ targets: [{ subjectId: "a", name: "A", amount: 100, unit: "mg", basis }] }).targets });
@@ -130,14 +130,14 @@ describe("advisory dose fit", () => {
 
   it("counts known food in zero-purchase and candidate coverage without changing source-scoped limits", () => {
     const diet = canonicalizeCurrents([{ subjectId: "a", name: "A", dailyAmount: 100, unit: "mg", sourceId: "food" }]);
-    assert.ok(!("error" in diet)); if ("error" in diet) return;
+    assert.ok(!("error" in diet)); if ("error" in diet) assert.fail("Unexpected fixture precondition failure");
     const r = request({ dietaryIntake: diet, targets: request().targets.map(target => ({ ...target, basis: "total_daily" })) });
     const result = run(r, [product("extra", 20)]);
     assert.deepEqual(result.selected?.productIds, []);
     assert.equal(result.selected?.coverageBySubject.get("a"), 10000);
     assert.deepEqual(result.leftovers, []);
     const partialDiet = canonicalizeCurrents([{ subjectId: "a", name: "A", dailyAmount: 40, unit: "mg", sourceId: "food" }]);
-    assert.ok(!("error" in partialDiet)); if ("error" in partialDiet) return;
+    assert.ok(!("error" in partialDiet)); if ("error" in partialDiet) assert.fail("Unexpected fixture precondition failure");
     assert.equal(productHitsCoverageFloor(product("small", 20), { ...r, dietaryIntake: partialDiet }, r.targets[0]!), true);
     assert.equal(productHitsCoverageFloor(product("small", 20), request({ dietaryIntake: partialDiet, maxDailyPills: 3 }), request().targets[0]!), true);
     const limits = doseFitScore({ ...r, safetyCeilings: [
@@ -153,7 +153,7 @@ describe("advisory dose fit", () => {
   it("uses estimated food in worst-case dose-fit bounds without promising known coverage", () => {
     const diet = canonicalizeCurrents([{ subjectId: "a", name: "A", dailyAmount: 50, minimumDailyAmount: 20, maximumDailyAmount: 80,
       certainty: "estimated", unit: "mg", sourceId: "food" }]);
-    assert.ok(!("error" in diet)); if ("error" in diet) return;
+    assert.ok(!("error" in diet)); if ("error" in diet) assert.fail("Unexpected fixture precondition failure");
     const r = request({ dietaryIntake: diet, safetyCeilings: [], targets: request().targets.map(target => ({ ...target, basis: "total_daily" })) });
     const result = run(r, [product("fifty", 50)]);
     assert.equal(result.selected?.doseFit?.total, 0.3);
@@ -166,7 +166,7 @@ describe("advisory dose fit", () => {
 
   it("compares alternatives using the same known total-daily coverage basis", () => {
     const diet = canonicalizeCurrents([{ subjectId: "a", name: "A", dailyAmount: 60, unit: "mg", sourceId: "food" }]);
-    assert.ok(!("error" in diet)); if ("error" in diet) return;
+    assert.ok(!("error" in diet)); if ("error" in diet) assert.fail("Unexpected fixture precondition failure");
     const r = request({ dietaryIntake: diet, targets: request().targets.map(target => ({ ...target, basis: "total_daily" })) });
     const selected = run({ ...r, retainProductIds: ["high"] }, [product("high", 100)]).selected!;
     const candidate = run({ ...r, retainProductIds: ["right"] }, [product("right", 40)]).selected!;
@@ -177,7 +177,7 @@ describe("advisory dose fit", () => {
 
   it("penalizes increments above known continued doses without inventing an agreed target", () => {
     const currents = canonicalizeCurrents([{ subjectId: "b", name: "B", dailyAmount: 20, unit: "mg", sourceId: "continued-b" }]);
-    assert.ok(!("error" in currents)); if ("error" in currents) return;
+    assert.ok(!("error" in currents)); if ("error" in currents) assert.fail("Unexpected fixture precondition failure");
     const r = request({ currentSupplements: currents });
     for (const optimization of ["lowest_cost", "fewest_pills", "best_coverage"] as const) {
       const result = run({ ...r, optimization }, [product("cheap-extra-b", 100, 10, 1), product("a-only", 100, 0, 50)]);
@@ -199,7 +199,7 @@ describe("advisory dose fit", () => {
 
   it("adds the stronger reference-limit penalty to continued-dose increments", () => {
     const currents = canonicalizeCurrents([{ subjectId: "b", name: "B", dailyAmount: 20, unit: "mg", sourceId: "continued-b" }]);
-    assert.ok(!("error" in currents)); if ("error" in currents) return;
+    assert.ok(!("error" in currents)); if ("error" in currents) assert.fail("Unexpected fixture precondition failure");
     const score = doseFitScore(request({ currentSupplements: currents, safetyCeilings: [{ subjectId: "b", name: "B", maxAmount: 25, maxUnit: "mg" }] }), exposure(100, 30));
     assert.equal(score.over, 0.5);
     assert.equal(score.weightedLimit, 0.4);
@@ -222,7 +222,7 @@ describe("advisory dose fit", () => {
       { subjectId: "b", name: "B", unit: "mg", sourceId: "known-b", dailyAmount: 20, certainty: "known" },
       { subjectId: "b", name: "B", unit: "mg", sourceId: "estimate-b", dailyAmount: 10, certainty: "estimated" }
     ]);
-    assert.ok(!("error" in currents)); if ("error" in currents) return;
+    assert.ok(!("error" in currents)); if ("error" in currents) assert.fail("Unexpected fixture precondition failure");
     const score = doseFitScore(request({ currentSupplements: currents, safetyCeilings: [], estimatedIntakeSubjectIds: ["b"] }), exposure(100, 40));
     assert.equal(score.over, 0.5);
     assert.equal(score.perContinuedDose?.[0]?.referenceDose, 20);
@@ -256,7 +256,7 @@ describe("advisory dose fit", () => {
   it("permits proportional tradeoffs without a protected-target veto", () => {
     const targets = canonicalizeTargets({ targets: [{ subjectId: "a", name: "A", amount: 100, unit: "mg" }, { subjectId: "b", name: "B", amount: 100, unit: "mg" }] }).targets;
     const currents = canonicalizeCurrents([{ subjectId: "a", name: "A", dailyAmount: 100, unit: "mg", sourceId: "existing" }]);
-    assert.ok(!("error" in currents)); if ("error" in currents) return;
+    assert.ok(!("error" in currents)); if ("error" in currents) assert.fail("Unexpected fixture precondition failure");
     const result = run(request({ targets, currentSupplements: currents }), [product("tradeoff", 50, 100)]);
     assert.deepEqual(result.selected?.productIds, ["tradeoff"]);
     assert.equal(result.selected?.doseFit?.total, 0.5);
@@ -271,7 +271,7 @@ describe("advisory dose fit", () => {
   it("includes continued intake once and checks incidental and total-source limits", () => {
     const currents = canonicalizeCurrents([{ subjectId: "a", name: "A", dailyAmount: 30, unit: "mg", sourceId: "existing" }]);
     const diet = canonicalizeCurrents([{ subjectId: "a", name: "A", dailyAmount: 50, unit: "mg", sourceId: "food" }]);
-    assert.ok(!("error" in currents) && !("error" in diet)); if ("error" in currents || "error" in diet) return;
+    assert.ok(!("error" in currents) && !("error" in diet)); if ("error" in currents || "error" in diet) assert.fail("Unexpected fixture precondition failure");
     const r = request({ currentSupplements: currents, dietaryIntake: diet, retainProductIds: ["mixed"], safetyCeilings: [
       { subjectId: "a", name: "A", maxAmount: 100, maxUnit: "mg", sourceScope: "supplemental" },
       { subjectId: "a", name: "A", maxAmount: 120, maxUnit: "mg", sourceScope: "total" },
@@ -288,7 +288,7 @@ describe("advisory dose fit", () => {
 
   it("uses the worst whole-penalty endpoint for estimated intake", () => {
     const currents = canonicalizeCurrents([{ subjectId: "a", name: "A", dailyAmount: 80, minimumDailyAmount: 60, maximumDailyAmount: 100, unit: "mg", sourceId: "range" }]);
-    assert.ok(!("error" in currents)); if ("error" in currents) return;
+    assert.ok(!("error" in currents)); if ("error" in currents) assert.fail("Unexpected fixture precondition failure");
     const r = request({ currentSupplements: currents, estimatedIntakeSubjectIds: ["a"] });
     const score = doseFitScore(r, exposure(80));
     assert.equal(score.total, 0.4); assert.equal(score.perTarget[0]?.conservativeExposure, 60);
@@ -431,7 +431,7 @@ describe("advisory dose fit", () => {
     const targets = canonicalizeTargets({ targets: [{ subjectId: "d", name: "Vitamin D3", amount: 1000, unit: "IU" }] }).targets;
     const r = request({ targets, safetyCeilings: [{ subjectId: "d", name: "Vitamin D3", maxAmount: 50, maxUnit: "mcg" }] });
     const amount = scaleAmount({ amount: 25, subjectId: "d", subjectName: "Vitamin D3", unit: "mcg" });
-    assert.ok(!("reason" in amount)); if ("reason" in amount) return;
+    assert.ok(!("reason" in amount)); if ("reason" in amount) assert.fail("Unexpected fixture precondition failure");
     assert.equal(doseFitScore(r, new Map([["d", amount.units]])).total, 0);
   });
 
@@ -448,13 +448,13 @@ describe("advisory dose fit", () => {
     assert.equal(tiny.leftovers[0]?.reason, "unsupported_unit_conversion");
     const left = canonicalizeCurrents([{ ...row, minimumDailyAmount: 20, maximumDailyAmount: 100 }]);
     const right = canonicalizeCurrents([{ ...row, minimumDailyAmount: 50, maximumDailyAmount: 100 }]);
-    assert.ok(!("error" in left) && !("error" in right)); if ("error" in left || "error" in right) return;
+    assert.ok(!("error" in left) && !("error" in right)); if ("error" in left || "error" in right) assert.fail("Unexpected fixture precondition failure");
     assert.notEqual(canonicalTargetSetHash(request({ currentSupplements: left })), canonicalTargetSetHash(request({ currentSupplements: right })));
   });
 
   it("reports possible limit excess even when the low endpoint drives dose loss", () => {
     const currents = canonicalizeCurrents([{ subjectId: "a", name: "A", dailyAmount: 80, minimumDailyAmount: 10, maximumDailyAmount: 105, unit: "mg", sourceId: "range" }]);
-    assert.ok(!("error" in currents)); if ("error" in currents) return;
+    assert.ok(!("error" in currents)); if ("error" in currents) assert.fail("Unexpected fixture precondition failure");
     const result = run(request({ currentSupplements: currents, safetyCeilings: [{ subjectId: "a", name: "A", maxAmount: 100, maxUnit: "mg" }] }), []);
     assert.equal(result.selected?.doseFit?.perTarget[0]?.conservativeExposure, 10);
     const warning = result.selected?.safety.findings.find((row) => row.code === "dose_review_required");
@@ -464,7 +464,7 @@ describe("advisory dose fit", () => {
 
   it("does not prune dose choices that improve the low end of uncertain intake", () => {
     const currents = canonicalizeCurrents([{ subjectId: "a", name: "A", dailyAmount: 100, minimumDailyAmount: 0, maximumDailyAmount: 100, unit: "mg", sourceId: "range" }]);
-    assert.ok(!("error" in currents)); if ("error" in currents) return;
+    assert.ok(!("error" in currents)); if ("error" in currents) assert.fail("Unexpected fixture precondition failure");
     const r = request({ currentSupplements: currents });
     const group = compileGroups(r, { products: [product("add", 20)], availabilityAsOf: "frozen", catalogueVersion: "frozen" })[0]!;
     const zero = { ...seedState(r), nextGroupIndex: 1 };

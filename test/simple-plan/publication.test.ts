@@ -7,17 +7,17 @@ import { validateToolIssues } from '../../lib/agentic/contract/validate.ts';
 import { agenticServerInstructions } from '../../lib/agentic/contract/instructions.ts';
 import { AGENTIC_CONTRACT_VERSION } from '../../lib/agentic/config.ts';
 
-test('SPLAN-SPEC-01/02 seven tools and the plan card teach flat conversation without private knowledge', () => {
-  const tools = toolList('dev'); assert.equal(tools.length, 7); assert.ok(tools.some(row => row.name === 'evidence'));
+test('SPLAN-SPEC-01/02 six tools and the plan card teach flat conversation without private knowledge', () => {
+  const tools = toolList('dev'); assert.equal(tools.length, 6); assert.ok(!tools.some(row => row.name === 'evidence'));
   const plan = tools.find(row => row.name === 'plan')!;
   assert.deepEqual(plan.inputSchema, JSON.parse(JSON.stringify(AGENTIC_INPUT_SCHEMAS.plan)));
   for (const word of ['Thailand', 'selectedOptionId', 'scoring', 'idempotencyKey', 'expectedRevision']) assert.ok(plan.description.includes(word), word);
   assert.ok(!/responseView|requestPatch|plan\(create\)|planOperation/.test(plan.description));
 });
 test('SPLAN-SPEC-03 only the current contract is published and all examples validate', () => {
-  assert.equal(AGENTIC_CONTRACT_VERSION, '10.0.0');
+  assert.equal(AGENTIC_CONTRACT_VERSION, '11.0.0');
   assert.ok(CONTRACT_RESOURCES.length > 0);
-  for (const resource of CONTRACT_RESOURCES) assert.ok(resource.uri.includes('/10.0.0/'), resource.uri);
+  for (const resource of CONTRACT_RESOURCES) assert.ok(resource.uri.includes('/11.0.0/'), resource.uri);
   assert.ok(CLIENT_EXAMPLES.length >= 5);
   for (const example of CLIENT_EXAMPLES) assert.deepEqual(validateToolIssues(AGENTIC_INPUT_SCHEMAS[example.tool], example.arguments), [], example.name);
 });

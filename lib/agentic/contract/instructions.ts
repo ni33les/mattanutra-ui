@@ -5,7 +5,6 @@ export { AGENTIC_PUBLIC_TOOLS, type AgenticPublicToolName } from "@/lib/agentic/
 const OPERATIONAL_DESCRIPTIONS = {
   info: `${SERVICE_SCOPE} ${READY_MEANING} Optional discovery: overview, client_guide or the unified plan_schema. Medication/condition codes are accepted inputs, not evidence of an assessed interaction.`,
   plan: OVERVIEW_CARD,
-  evidence: "Read supporting facts for a returned plan/option and ingredient or product ID. Requires current expectedRevision; does not change the plan.",
   execute: "After the person confirms the selected revision, create/recover checkout with the same idempotency key; health advice is advisory.",
   order: "Read one concise payment/fulfilment and recovery response. Honor pollAfterSeconds while nextAction=poll; follow the returned action.",
   support: "Open an order help case; include its returned supportHandle to reply.",

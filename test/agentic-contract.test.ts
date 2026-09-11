@@ -37,11 +37,10 @@ describe(`agentic MCP contract ${AGENTIC_CONTRACT_VERSION}`, () => {
       "execute",
       "order",
       "support",
-      "feedback",
-      "evidence"
+      "feedback"
     ]);
-    assert.equal(Object.keys(AGENTIC_TOOL_SCHEMAS).length, 7);
-    assert.ok(Object.hasOwn(AGENTIC_TOOL_SCHEMAS, "evidence"), "evidence is a published, callable read-only contract");
+    assert.equal(Object.keys(AGENTIC_TOOL_SCHEMAS).length, 6);
+    assert.equal(Object.hasOwn(AGENTIC_TOOL_SCHEMAS, "evidence"), false, "public evidence was removed in v11; internal facts remain tested");
     assert.equal(JSON.stringify(AGENTIC_TOOL_SCHEMAS).includes("sexAtBirth"), false);
     assert.equal(JSON.stringify(AGENTIC_TOOL_SCHEMAS).includes("intersex"), false);
     assert.equal(JSON.stringify(AGENTIC_TOOL_SCHEMAS.plan).includes("unspecified"), false);
@@ -50,7 +49,7 @@ describe(`agentic MCP contract ${AGENTIC_CONTRACT_VERSION}`, () => {
     assert.equal(JSON.stringify(AGENTIC_TOOL_SCHEMAS.plan).includes('"$defs"'), false);
     assert.equal(JSON.stringify(AGENTIC_INPUT_SCHEMAS.plan).includes('"anyOf"'), true);
     assert.deepEqual(AGENTIC_INPUT_SCHEMAS.plan, AGENTIC_TOOL_SCHEMAS.plan);
-    assert.equal(Object.keys(AGENTIC_TOOL_DESCRIPTIONS).length, 7);
+    assert.equal(Object.keys(AGENTIC_TOOL_DESCRIPTIONS).length, 6);
     const planRequest = JSON.stringify(AGENTIC_TOOL_SCHEMAS.plan);
     assert.match(planRequest, /info\.medicationCodes/);
     assert.match(planRequest, /info\.conditionCodes/);
@@ -145,7 +144,7 @@ describe(`agentic MCP contract ${AGENTIC_CONTRACT_VERSION}`, () => {
       (item) => item.name
     );
     assert.deepEqual(names, [...AGENTIC_PUBLIC_TOOLS]);
-    assert.equal(names.includes("evidence"), true);
+    assert.equal(names.includes("evidence"), false);
     assert.equal((result.serverInfo as { name: string }).name, "mattanutra_uat");
   });
 

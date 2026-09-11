@@ -7,7 +7,7 @@ async function info(args: Record<string, unknown>) {
   const value = result!.result!.structuredContent as Record<string, unknown>; assert.equal(value.ok, true); return value;
 }
 test("L1_overview_is_honest_and_advertises_seven_tools", async () => {
-  assert.deepEqual(toolList().map(row => row.name).sort(), ["evidence", "execute", "feedback", "info", "order", "plan", "support"]);
+  assert.deepEqual(toolList().map(row => row.name).sort(), ["execute", "feedback", "info", "order", "plan", "support"]);
   for (const locale of ["en", "th", "zh-CN"]) {
     const value = await info({ locale }); const text = String(value.clientInstructions);
     assert.match(text, /TH.*only/); assert.match(text, /finite catalogue/); assert.match(text, /gaps are real/);

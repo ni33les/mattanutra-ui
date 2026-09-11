@@ -41,7 +41,7 @@ describe("matcher dose engine", () => {
     const exposure = aggregateDailyExposure({ current: [current], variants: [variant] });
     assert.equal("reason" in exposure, false);
     if ("reason" in exposure) {
-      return;
+      assert.fail("Unexpected fixture precondition failure");
     }
     assert.equal(amountFromScaled(exposure.totals.get("sup_zinc")!, "mg", "Zinc"), 40);
     assert.equal(exposure.provenance.length, 2);
@@ -53,7 +53,7 @@ describe("matcher dose engine", () => {
     const total = addScaled(mcg, mg);
     assert.equal("reason" in total, false);
     if ("reason" in total) {
-      return;
+      assert.fail("Unexpected fixture precondition failure");
     }
     assert.equal(amountFromScaled(total, "mg", "Zinc"), 2);
     assert.equal(amountFromScaled(total, "mcg", "Zinc"), 2000);
@@ -75,7 +75,7 @@ describe("matcher dose engine", () => {
     assert.equal("reason" in one, false);
     assert.equal("reason" in twoPacksSameSchedule, false);
     if ("reason" in one || "reason" in twoPacksSameSchedule) {
-      return;
+      assert.fail("Unexpected fixture precondition failure");
     }
     assert.equal(one.totals.get("sup_zinc")?.units, twoPacksSameSchedule.totals.get("sup_zinc")?.units);
   });
@@ -121,7 +121,7 @@ describe("matcher dose engine", () => {
     assert.equal("reason" in left, false);
     assert.equal("reason" in right, false);
     if ("reason" in left || "reason" in right) {
-      return;
+      assert.fail("Unexpected fixture precondition failure");
     }
     assert.equal(left.totals.get("sup_zinc")?.units, right.totals.get("sup_zinc")?.units);
     assert.deepEqual(
@@ -158,7 +158,7 @@ describe("matcher dose engine", () => {
     const exposure = aggregateDailyExposure({ current: [], variants: [x2] });
     assert.equal("reason" in exposure, false);
     if ("reason" in exposure) {
-      return;
+      assert.fail("Unexpected fixture precondition failure");
     }
     assert.equal(amountFromScaled(exposure.totals.get("sup_zinc")!, "mg", "Zinc"), 50);
   });

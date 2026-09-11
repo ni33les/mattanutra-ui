@@ -37,6 +37,21 @@ export function isolatedDatabasePreflight(env) {
   return failures;
 }
 
+/** Clone only the explicitly isolated database; never reuse a previous acceptance run. */
+export async function cloneIsolatedDatabase(templateUrl, identity) {
+  const failures = isolatedDatabasePreflight({ TEST_DB_URL: templateUrl, DB_URL: templateUrl });
+  if (failures.length) throw new Error(failures.join("\n"));
+  const { default: postgres } = await import("postgres");
+  const url = new URL(templateUrl), adminUrl = new URL(url);
+  adminUrl.pathname = "/postgres";
+  const admin = postgres(adminUrl.href, { max: 1, prepare: false });
+  const name = `mattanutra_lock_review_ax_mcp_${createHash("sha256").update(identity).digest("hex").slice(0, 16)}`;
+  try { await admin.unsafe(`create database ${name} template ${url.pathname.slice(1)}`); }
+  finally { await admin.end(); }
+  url.pathname = `/${name}`;
+  return url.href;
+}
+
 export function fullTestPreflight(env, inventory = fullTestInventory()) {
   const failures = isolatedDatabasePreflight(env);
   let app;

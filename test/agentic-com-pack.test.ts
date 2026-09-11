@@ -1009,7 +1009,7 @@ async function com28() {
       advertisedLeaks.length === 0 &&
       leaks.length === 0 &&
       JSON.stringify(publicNames) ===
-        JSON.stringify(["evidence", "execute", "feedback", "info", "order", "plan", "support"]);
+        JSON.stringify(["execute", "feedback", "info", "order", "plan", "support"]);
     return verdict("COM-28", ok, {
       advertisedLeaks,
       leaks,

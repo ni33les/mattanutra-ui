@@ -1,0 +1,149 @@
+{
+  "version": 1,
+  "contractVersion": "11.0.0",
+  "releaseBase": "bbdb316662d2d1254bebfb03d612a96ea82351ab",
+  "scope": "Remove public evidence and preserve recorded product images; no scoring, catalogue or payment changes",
+  "files": [
+    {
+      "file": "test/agentic-com-pack.test.ts",
+      "reason": "Remove only the public evidence capability assertion; preserve retained-tool, ownership, revision, commerce and catalogue checks."
+    },
+    {
+      "file": "test/agentic-contract-v4.test.ts",
+      "reason": "Remove only the public evidence capability assertion; preserve retained-tool, ownership, revision, commerce and catalogue checks."
+    },
+    {
+      "file": "test/agentic-contract.test.ts",
+      "reason": "Remove only the public evidence capability assertion; preserve retained-tool, ownership, revision, commerce and catalogue checks."
+    },
+    {
+      "file": "test/agentic-live-trust-copy.test.ts",
+      "reason": "Remove only the public evidence capability assertion; preserve retained-tool, ownership, revision, commerce and catalogue checks."
+    },
+    {
+      "file": "test/agentic-mcp-sale-states.test.ts",
+      "reason": "Remove only the public evidence capability assertion; preserve retained-tool, ownership, revision, commerce and catalogue checks."
+    },
+    {
+      "file": "test/agentic-mcp-transport-reliability.test.ts",
+      "reason": "Remove only the public evidence capability assertion; preserve retained-tool, ownership, revision, commerce and catalogue checks."
+    },
+    {
+      "file": "test/agentic-p1.test.ts",
+      "reason": "Remove only the public evidence capability assertion; preserve retained-tool, ownership, revision, commerce and catalogue checks."
+    },
+    {
+      "file": "test/ax-refinement/contract.test.ts",
+      "reason": "Remove only the public evidence capability assertion; preserve retained-tool, ownership, revision, commerce and catalogue checks."
+    },
+    {
+      "file": "test/consistency-r1-guards.test.ts",
+      "reason": "Remove only the public evidence capability assertion; preserve retained-tool, ownership, revision, commerce and catalogue checks."
+    },
+    {
+      "file": "test/consistency-r2-guards.test.ts",
+      "reason": "Remove only the public evidence capability assertion; preserve retained-tool, ownership, revision, commerce and catalogue checks."
+    },
+    {
+      "file": "test/consistency-r3-guards.test.ts",
+      "reason": "Remove only the public evidence capability assertion; preserve retained-tool, ownership, revision, commerce and catalogue checks."
+    },
+    {
+      "file": "test/consistency-r4-guards.test.ts",
+      "reason": "Remove only the public evidence capability assertion; preserve retained-tool, ownership, revision, commerce and catalogue checks."
+    },
+    {
+      "file": "test/consistency-r5-guards.test.ts",
+      "reason": "Remove only the public evidence capability assertion; preserve retained-tool, ownership, revision, commerce and catalogue checks."
+    },
+    {
+      "file": "test/mcp-7-2-2/locks.test.ts",
+      "reason": "Remove only the public evidence capability assertion; preserve retained-tool, ownership, revision, commerce and catalogue checks."
+    },
+    {
+      "file": "test/mcp-discovery/discovery.test.ts",
+      "reason": "Remove only the public evidence capability assertion; preserve retained-tool, ownership, revision, commerce and catalogue checks."
+    },
+    {
+      "file": "test/mcp-evidence-images/contracts.test.ts",
+      "reason": "Freeze real catalogue image associations and removal red-to-green contracts; independent state and semantic evidence for paired full-suite execution."
+    },
+    {
+      "file": "test/mcp-evidence-images/runner.test.ts",
+      "reason": "Freeze real catalogue image associations and removal red-to-green contracts; independent state and semantic evidence for paired full-suite execution."
+    },
+    {
+      "file": "test/practical-matching/adapters.test.ts",
+      "reason": "Remove only the public evidence capability assertion; preserve retained-tool, ownership, revision, commerce and catalogue checks."
+    },
+    {
+      "file": "test/simple-plan/commerce-evidence.test.ts",
+      "reason": "Remove only the public evidence capability assertion; preserve retained-tool, ownership, revision, commerce and catalogue checks."
+    },
+    {
+      "file": "test/simple-plan/hosted.test.ts",
+      "reason": "Remove only the public evidence capability assertion; preserve retained-tool, ownership, revision, commerce and catalogue checks."
+    },
+    {
+      "file": "test/simple-plan/limit-advice.test.ts",
+      "reason": "Remove only the public evidence capability assertion; preserve retained-tool, ownership, revision, commerce and catalogue checks."
+    },
+    {
+      "file": "test/simple-plan/publication.test.ts",
+      "reason": "Remove only the public evidence capability assertion; preserve retained-tool, ownership, revision, commerce and catalogue checks."
+    },
+    {
+      "file": "test/simple-plan/retained-public-invariants.test.ts",
+      "reason": "Remove only the public evidence capability assertion; preserve retained-tool, ownership, revision, commerce and catalogue checks."
+    },
+    {
+      "file": "test/simple-plan/single-recommendation.test.ts",
+      "reason": "Remove only the public evidence capability assertion; preserve retained-tool, ownership, revision, commerce and catalogue checks."
+    },
+    {
+      "file": "test/simple-plan/version.test.ts",
+      "reason": "Remove only the public evidence capability assertion; preserve retained-tool, ownership, revision, commerce and catalogue checks."
+    },
+    {
+      "file": "test/agentic-phase1-units.test.ts",
+      "reason": "Full-inventory hygiene disallows bare early-return guards; explicit failure preserves all canonicalization, scoring and safety assertions."
+    },
+    {
+      "file": "test/agentic-phase6.test.ts",
+      "reason": "Full-inventory hygiene disallows bare early-return guards; explicit failure preserves all canonicalization, scoring and safety assertions."
+    },
+    {
+      "file": "test/matcher-prd-gates.test.ts",
+      "reason": "Full-inventory hygiene disallows bare early-return guards; explicit failure preserves all canonicalization, scoring and safety assertions."
+    },
+    {
+      "file": "test/matcher/advisory-dose-fit.test.ts",
+      "reason": "Full-inventory hygiene disallows bare early-return guards; explicit failure preserves all canonicalization, scoring and safety assertions."
+    },
+    {
+      "file": "test/matcher/dose.test.ts",
+      "reason": "Full-inventory hygiene disallows bare early-return guards; explicit failure preserves all canonicalization, scoring and safety assertions."
+    },
+    {
+      "file": "test/matcher/qa-safety.test.ts",
+      "reason": "Full-inventory hygiene disallows bare early-return guards; explicit failure preserves all canonicalization, scoring and safety assertions."
+    },
+    {
+      "file": "test/matcher/safety.test.ts",
+      "reason": "Full-inventory hygiene disallows bare early-return guards; explicit failure preserves all canonicalization, scoring and safety assertions."
+    }
+  ],
+  "runnerConsumers": [
+    "test/full-test-suite-discovery.test.ts",
+    "test/mcp-test-discovery.test.ts"
+  ],
+  "inputs": [
+    "test/fixtures/mcp-evidence-images/dev-20260911.json.gz",
+    "test/fixtures/mcp-evidence-images/manifest.json",
+    "contract/mcp/11.0.0/schema.json"
+  ],
+  "acceptance": "Complete maintained matcher/MCP inventory twice, independent identical initial PostgreSQL clones; existing canonicalization only",
+  "realDataGap": "IMG-02 REAL_DATA_UNAVAILABLE: no sellable real DEV listing lacking image; synthetic DTO check is not real matching coverage",
+  "separatelyTracked": "Known supplemental-only retained-stock coverage defect remains out of scope; any failing maintained assertion prevents full-suite PASS.",
+  "deploymentBase": "2ed2b765a137a9ca2e554446ce7e50cf212df608"
+}

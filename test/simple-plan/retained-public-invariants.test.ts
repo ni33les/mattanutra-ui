@@ -1,3 +1,4 @@
+import { evidenceTool } from '../../lib/agentic/evidence/tool.ts';
 import assert from 'node:assert/strict';
 import test, { beforeEach, afterEach } from 'node:test';
 import { handleCompletedJsonRpc } from '../helpers/completed-mcp-client.ts';
@@ -10,6 +11,7 @@ import type { SafetyGuidance } from '../../lib/agentic/plan/types.ts';
 beforeEach(installGoldCatalogue); afterEach(uninstallGoldCatalogue);
 type Runtime = ReturnType<typeof createAgenticRuntime>;
 async function call(app:Runtime, name:string, arguments_:unknown) {
+  if (name === 'evidence') return evidenceTool({ ...app, ...(arguments_ as {planHandle:string;expectedRevision:number;optionId:string;ingredientId?:string}) });
   const reply=await handleCompletedJsonRpc(app,{id:1,method:'tools/call',params:{name,arguments:arguments_}});
   assert.ok(reply?.result?.structuredContent,JSON.stringify(reply));return reply.result.structuredContent as Record<string,unknown>;
 }
@@ -44,7 +46,7 @@ test('AE-09 AX4-06 AX6-03 quantified exposure remains 1104 without unsolicited i
     assert.equal(decision.nextAction,'confirm_with_user');for(const advice of row.advice??[])assert.ok(advice.message.length<=240);
   }
 });
-test('B-SECURITY-01 shared-store principal isolation protects plan, evidence and feedback with valid returned handles',async()=>{
+test('B-SECURITY-01 shared-store principal isolation protects plan, internal fact lookup and feedback with valid returned handles',async()=>{
   const alice=createAgenticRuntime({scope:{environment:'dev',tenantScope:'mattanutra',principalScope:'alice'}});
   const bob=createAgenticRuntime({config:alice.config,store:alice.store,scope:{...alice.scope,principalScope:'bob'}});
   const plan=await call(alice,'plan',request);assert.equal(plan.ok,true);
