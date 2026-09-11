@@ -98,3 +98,28 @@ test('NOID-08 checkout template advances the confirmed revision and uses a disti
   assert.equal(checkout.expectedRevision, confirm.expectedRevision + 1, 'Confirmation returns a new revision for checkout');
   assert.notEqual(checkout.idempotencyKey, confirm.idempotencyKey, 'Checkout is a new mutation, not a replay of confirmation');
 });
+
+test('NOID-09 queued confirmation reports a plan update, then checkout readiness without a new search', async () => {
+  const summaries: Record<string, string> = {
+    en: 'Updating your plan. Wait before checking again.',
+    th: 'กำลังอัปเดตแผน โปรดรอก่อนตรวจสอบอีกครั้ง',
+    'zh-CN': '正在更新计划，请稍后再查询。'
+  };
+  for (const locale of ['en', 'th', 'zh-CN']) {
+    const app = runtime();
+    const created = await plan(app, { ...create(), locale, idempotencyKey: `noid-queued-create-${locale}` });
+    const args = { planHandle: created.planHandle, expectedRevision: created.revision, idempotencyKey: `noid-queued-confirm-${locale}` };
+    const admitted = (await rpc(app, 'plan', args))!.result!.structuredContent as { status: string; summary: string; nextAction: string };
+    assert.equal(admitted.status, 'processing');
+    assert.equal(admitted.nextAction, 'poll_plan');
+    assert.equal(admitted.summary, summaries[locale]);
+    const confirmed = await plan(app, args);
+    assert.equal(confirmed.nextAction, 'execute');
+    assert.deepEqual(confirmed.choices, created.choices);
+    const owner = `${app.scope.environment}:${app.scope.tenantScope}:${app.scope.principalScope ?? 'anon'}`;
+    const operation = await app.store.getPlanOperationByKey(owner, args.idempotencyKey);
+    assert.ok(operation);
+    assert.equal(operation.status, 'complete');
+    assert.equal(operation.checkpoint, null, 'Confirmation must not create a search checkpoint');
+  }
+});
