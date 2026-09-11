@@ -10,7 +10,7 @@ Evidence root: `/root/.codex/deploy/full-uat-cycle-20260911` (outside the checko
 
 | Cases | Failure / replacement |
 |---|---|
-| `DEV-CONTRACT-01`, `R2-CONTRACT-01` | Five plan request branches still included removed confirmation/selection. Require the four current flat request shapes and absence of operation/option identifiers. Six tools, financial, dose and advice assertions are retained. |
+| `DEV-CONTRACT-01`, `R2-CONTRACT-01`, `ANNA-AX-01/08/09`, `AXR-SPEC-02` | Five plan request branches still included removed confirmation/selection. Require the four current flat request shapes and absence of operation/option identifiers. Six tools, financial, dose and advice assertions are retained. |
 | Full validation proof | Contract 7.0.0 was still accepted and emitted. Bind readiness and proof to current generated publication identity; reject retired versions and wrong schema checksums. |
 | `FULL-CYCLE-03` | Public documented client rejected UAT. Permit exact DEV/UAT HTTPS endpoints; preserve isolated-only fixture/database runners and reject PRD, credential-bearing URLs and private QA routes. |
 | `FULL-CYCLE-04–05` | Current client no longer emitted the receipt/semantic files or resumed paid orders required by full validation. Record returned checkout identity and resume with the public order tool; never repeat a charge or matcher operation during recovery. |
@@ -21,3 +21,5 @@ Evidence root: `/root/.codex/deploy/full-uat-cycle-20260911` (outside the checko
 New runner regressions were committed in `91448934`; eight failures are recorded in `red-gate/tests.log` before implementation. The first baseline adapter startup also rejected an unrelated, older local build artifact. That artifact was preserved outside the checkout; deployed DEV/UAT artifacts were untouched.
 
 Final execution counts and deployment identities will be recorded after the complete unchanged-source run. An incomplete or failing baseline is not acceptance evidence.
+
+`EFF-WAKE-07–08` failed before the worker fix (commit `13b85848`). Wake routing now excludes retired builds and another replica’s loopback address, and makes bounded fallback attempts after a refused nudge. The 19 affected wake/consistency cases pass without adding locks.

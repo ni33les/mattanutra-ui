@@ -10,7 +10,7 @@ import { infoTool } from "../lib/agentic/info.ts";
 import { loadAgenticConfig } from "../lib/agentic/config.ts";
 
 describe("current conversational discovery and advisory preferences", () => {
-  it("ANNA-AX-01: existing locale-only discovery explains basis and links to five executable operation templates", () => {
+  it("ANNA-AX-01: existing locale-only discovery explains basis and links to executable flat request templates", () => {
     const value = clientDiscovery("en");
     assert.match(value.clientInstructions, /total_daily/);
     assert.match(value.clientInstructions, /supplemental/);
@@ -18,8 +18,9 @@ describe("current conversational discovery and advisory preferences", () => {
     assert.match(clientGuideMarkdown("en"), /only quantified exposure above MattaNutra recommended limits/);
     assert.ok(CLIENT_EXAMPLES.some(example => example.arguments.targets?.some(target => target.basis === "supplemental")));
     assert.equal(value.clientExamples.length, 2);
-    assert.ok(clientGuideMarkdown("en").includes("select"));
-    assert.equal(AGENTIC_INPUT_SCHEMAS.plan.anyOf.length, 5);
+    assert.match(clientGuideMarkdown("en"), /execute/);
+    assert.doesNotMatch(JSON.stringify(AGENTIC_INPUT_SCHEMAS.plan), /"optionId"|"operation"/);
+    assert.equal(AGENTIC_INPUT_SCHEMAS.plan.anyOf.length, 4);
     for (const example of value.clientExamples) assert.deepEqual(validateToolIssues(AGENTIC_INPUT_SCHEMAS[example.tool], example.arguments), [], example.name);
   });
   it("ANNA-AX-02: retired resources return ordinary not-found; only current publication remains", () => {
@@ -66,7 +67,7 @@ describe("current conversational discovery and advisory preferences", () => {
       messages.push(overview.clientInstructions);
       const detail = await infoTool({ config, locale, isolatedInfo, view: "plan_schema" });
       assert.deepEqual(validateToolIssues(AGENTIC_OUTPUT_SCHEMAS.info, detail), []);
-      assert.equal(JSON.parse(detail.planSchemaJson!).anyOf.length, 5);
+      assert.equal(JSON.parse(detail.planSchemaJson!).anyOf.length, 4);
     }
     assert.equal(new Set(messages).size, 3);
   });

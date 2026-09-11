@@ -40,7 +40,7 @@ test("AXR-DEPLOY-02 scoped verification is explicit and DEV-only while ordinary 
   const published = JSON.parse(readFileSync(new URL("../../public/.well-known/mcp.json", import.meta.url), "utf8"));
   assert.equal(published.contractVersion, "11.0.0");
   const fullGate = readFileSync(new URL("../../scripts/run-dev-advisory-validation.mjs", import.meta.url), "utf8");
-  assert.ok(fullGate.includes('contractVersion !== "7.0.0"'), "The historical full-advisory gate remains separately versioned");
+  assert.match(fullGate, /contractVersion !== validationContractIdentity\(\)\.contractVersion/, "Full acceptance must bind the current generated contract identity");
   assert.match(dev, /--ax-refinement-attestation/); assert.match(dev, /verify:dev/); assert.match(dev, /readAxValidationProof/);
   const uat = readFileSync(new URL("../../scripts/deploy-uat.mjs", import.meta.url), "utf8");
   assert.doesNotMatch(uat, /readAxValidationProof|ax-refinement-attestation/);

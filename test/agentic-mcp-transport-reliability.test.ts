@@ -55,7 +55,7 @@ describe("MCP client and HTTP contract", () => {
       const schema = await call({ view: "plan_schema" });
       const definition = JSON.parse(schema.planSchemaJson as string);
       assert.equal(schema.planOperation, undefined);
-      assert.equal(definition.anyOf.length, 5);
+      assert.equal(definition.anyOf.length, 4);
       for (const branch of definition.anyOf) assert.equal(branch.properties.operation, undefined);
       const overview = await call({});
       assert.equal(overview.clientGuideText, undefined, "A detail request must not contaminate the compact overview");

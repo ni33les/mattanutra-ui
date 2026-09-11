@@ -27,5 +27,5 @@ for (const locale of ["en", "th", "zh-CN"]) test(`AXR-SPEC-02 ${locale} tools-on
   assert.ok(guide.contents[0]!.text.includes("expectedRevision"));
   for (const example of CLIENT_EXAMPLES) assert.ok(ajv.validate(AGENTIC_TOOL_SCHEMAS[example.tool], example.arguments), example.name);
   const schema = await rpc(client, "info", { locale, view: "plan_schema" });
-  assert.equal(schema.ok, true); assert.equal(JSON.parse(String(schema.planSchemaJson)).anyOf.length, 5);
+  assert.equal(schema.ok, true); assert.equal(JSON.parse(String(schema.planSchemaJson)).anyOf.length, 4);
 });
