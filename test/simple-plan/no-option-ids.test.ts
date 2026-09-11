@@ -64,3 +64,12 @@ test('NOID-04 public descriptions do not promise retired response ledgers or evi
     assert.match(guide, /send only planHandle, expectedRevision and a new idempotencyKey to plan/);
   }
 });
+
+test('NOID-05 checkout before confirmation explains the current protocol instead of asking for an option', async () => {
+  const app = runtime(), created = await plan(app, create());
+  const reply = await rpc(app, 'execute', { planHandle: created.planHandle, expectedRevision: created.revision, idempotencyKey: 'noid-before-confirmation' });
+  const body = reply!.result!.structuredContent as {ok:boolean;error:{reasonCode:string;message:string}};
+  assert.equal(body.ok,false); assert.equal(body.error.reasonCode,'plan_not_ready');
+  assert.match(body.error.message,/confirm.*recommendation/i);
+  assert.doesNotMatch(body.error.message,/select.*option/i);
+});
