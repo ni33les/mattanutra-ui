@@ -166,3 +166,15 @@ it("FULL-CYCLE-08 full validation prepares payment constraints before running ca
   const source = (await import("node:fs")).readFileSync("scripts/run-dev-advisory-validation.mjs", "utf8");
   assert.match(source, /run\("payment-schema",.*apply-payment-schema\.ts/);
 });
+
+it("FULL-CYCLE-09 full validation applies current projections and lock-boundary guards after older additive schemas", async () => {
+  const { REQUIRED_VALIDATION_STAGES: stages } = await import("../scripts/dev-validation-proof.mjs");
+  for (const label of ["efficiency-schema", "matching-lock-boundaries-schema"]) {
+    assert.ok(stages.includes(label), label);
+    assert.ok(stages.indexOf(label) > stages.indexOf("matcher-runtime-schema"));
+    assert.ok(stages.indexOf(label) < stages.indexOf("runtime-schema"));
+  }
+  const source = (await import("node:fs")).readFileSync("scripts/run-dev-advisory-validation.mjs", "utf8");
+  assert.match(source, /run\("efficiency-schema",.*apply-service-efficiency-schema\.ts/);
+  assert.match(source, /run\("matching-lock-boundaries-schema",.*apply-matching-lock-boundaries\.ts/);
+});
