@@ -158,3 +158,11 @@ it("FULL-CYCLE-02 readiness and attestation identify the current published contr
   const expected = JSON.parse((await import("node:fs")).readFileSync("contract/mcp/11.0.0/tools.json", "utf8"));
   assert.deepEqual(identity(), { contractVersion: expected.contractVersion, schemaChecksum: expected.schemaChecksum });
 });
+
+it("FULL-CYCLE-08 full validation prepares payment constraints before running capture and checkout cases", async () => {
+  const { REQUIRED_VALIDATION_STAGES } = await import("../scripts/dev-validation-proof.mjs");
+  assert.ok(REQUIRED_VALIDATION_STAGES.includes("payment-schema"));
+  assert.ok(REQUIRED_VALIDATION_STAGES.indexOf("payment-schema") < REQUIRED_VALIDATION_STAGES.indexOf("runtime-schema"));
+  const source = (await import("node:fs")).readFileSync("scripts/run-dev-advisory-validation.mjs", "utf8");
+  assert.match(source, /run\("payment-schema",.*apply-payment-schema\.ts/);
+});
