@@ -44,7 +44,7 @@
     {
       "file": "test/service-efficiency/dispatch.test.ts",
       "slice": "dispatch",
-      "expectedCases": 6,
+      "expectedCases": 7,
       "reason": "Pre-dispatch accounting, durable start acknowledgement, affine continuations and shared CPU capacity"
     },
     {
@@ -461,7 +461,7 @@
       "file": "test/service-efficiency/lock-boundaries.integration.test.ts",
       "slice": "lock-boundaries",
       "reason": "Committed catalogue identity and concurrent graph-specific cycle protection in isolated PostgreSQL",
-      "expectedCases": 5,
+      "expectedCases": 6,
       "database": true
     },
     {

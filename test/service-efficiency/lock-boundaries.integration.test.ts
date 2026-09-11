@@ -102,3 +102,24 @@ test("LOCK-BOUNDARY-PG-05 product publication reconciles runs, lines and decisio
     throw rollback;
   }), error => error === rollback);
 });
+
+test("LOCK-BOUNDARY-PG-06 public same-input refinement recovers expired work while polling remains read-only", async () => {
+  const { createPostgresStore } = await import("../../lib/agentic/store/postgres.ts");
+  const { installCatalogue, goldens } = await import("../mcp-7-2-3/helpers.ts");
+  const { rpc, runtime, publicRequest, uninstallRealCatalogue } = await import("../ax-refinement/helpers.ts");
+  await installCatalogue();
+  const store = createPostgresStore(sql), app = runtime(`expired-public-${randomUUID()}`, store);
+  try {
+    const first = await rpc(app, "plan", { idempotencyKey: "expired-public-original", ...publicRequest(goldens.d3) });
+    assert.equal(first.ok, true, JSON.stringify(first)); assert.equal(first.status, "processing");
+    const owner = `dev:mattanutra:${app.scope.principalScope}`;
+    const old = await store.getPlanOperationByKey(owner, "expired-public-original"); assert.ok(old);
+    await store.updatePlanOperation({ ...old, deadlineAt: "2026-09-06T23:59:59.000Z", version: old.version + 1 }, old.version);
+    await rpc(app, "plan", { planHandle: first.planHandle });
+    assert.equal((await store.getPlanOperation(old.id))?.status, "queued", "GET must not persist expiry");
+    const next = await rpc(app, "plan", { planHandle: first.planHandle, expectedRevision: first.revision, idempotencyKey: "expired-public-recovery", scoring: {} });
+    assert.equal(next.ok, true, JSON.stringify(next)); assert.equal(next.status, "processing");
+    const admitted = await store.getPlanOperationByKey(owner, "expired-public-recovery"); assert.ok(admitted);
+    assert.notEqual(admitted.id, old.id); assert.equal((await store.getPlanOperation(old.id))?.status, "failed");
+  } finally { await store.deletePrincipalScope(app.scope.principalScope!); uninstallRealCatalogue(); }
+});

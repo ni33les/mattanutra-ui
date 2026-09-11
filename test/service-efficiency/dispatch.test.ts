@@ -89,3 +89,24 @@ test("LOCK-DISPATCH-06 cancellation during reservation releases known unstarted 
     assert.deepEqual(worker.posts,[]);assert.equal(reserved,0);assert.equal(returned,1);
   }finally{release();await pool.close();await rejected;}
 });
+
+test("LOCK-BOUNDARY-DISPATCH-07 cancellation while awaiting CPU returns the committed unstarted reservation", async () => {
+  const workers: FakeWorker[] = [];
+  const create = () => { const worker = new FakeWorker(); workers.push(worker); return worker as unknown as Worker; };
+  const busy = new ThreadPool(create, 2, 4), waiting = new ThreadPool(create, 1, 2);
+  const jobs = [busy.run("one", undefined, 1000), busy.run("two", undefined, 1000)];
+  const settled = Promise.allSettled(jobs), controller = new AbortController();
+  let reserved = 0, refunds = 0;
+  try {
+    await tick();
+    const job = waiting.run("waiting", controller.signal, 1000, { beforeStart: async () => {
+      reserved = 4000;
+      return async () => { reserved = 0; refunds++; };
+    } });
+    const rejected = assert.rejects(job, /cancelled while awaiting CPU/);
+    await tick(); assert.equal(reserved, 4000); assert.deepEqual(workers[2].posts, []);
+    controller.abort(new Error("cancelled while awaiting CPU")); await rejected; await tick();
+    assert.equal(reserved, 0); assert.equal(refunds, 1);
+    workers[0].reply("done"); workers[1].reply("done"); await Promise.all(jobs);
+  } finally { await Promise.all([busy.close(), waiting.close()]); await settled; }
+});

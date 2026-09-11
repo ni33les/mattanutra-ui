@@ -15,6 +15,14 @@ INSERT INTO public.catalogue_runtime_revision (singleton) VALUES (true) ON CONFL
 CREATE TABLE IF NOT EXISTS public.catalogue_revision_commits (
   transaction_id bigint PRIMARY KEY
 );
+DO $$ DECLARE writer_role text; BEGIN
+  FOR writer_role IN SELECT DISTINCT grantee FROM information_schema.role_table_grants
+    WHERE table_schema='public' AND table_name='catalogue_runtime_revision' AND privilege_type='UPDATE'
+  LOOP
+    EXECUTE 'GRANT SELECT,INSERT,DELETE ON public.catalogue_revision_commits TO ' ||
+      CASE WHEN writer_role='PUBLIC' THEN 'PUBLIC' ELSE quote_ident(writer_role) END;
+  END LOOP;
+END $$;
 CREATE OR REPLACE FUNCTION public.commit_catalogue_runtime_revision() RETURNS trigger
 LANGUAGE plpgsql AS $$
 BEGIN
@@ -35,6 +43,7 @@ BEGIN
   INSERT INTO public.catalogue_revision_commits(transaction_id) VALUES(txid_current()) ON CONFLICT DO NOTHING;
   RETURN NULL;
 END $$;
+
 DO $$ DECLARE table_name text; BEGIN
   FOREACH table_name IN ARRAY ARRAY['products','product_facts','supplements','supplement_aliases','supplement_safety_limits','supplement_country_availability','retail_sellable_products'] LOOP
     IF to_regclass('public.'||table_name) IS NOT NULL AND NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgrelid=to_regclass('public.'||table_name) AND tgname='catalogue_runtime_revision_changed') THEN
