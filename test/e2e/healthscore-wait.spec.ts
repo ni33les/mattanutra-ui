@@ -13,7 +13,8 @@ for(const locale of ['en','th','zh-CN']) test(`HS-WAIT-BROWSER-01 ${locale} inli
   const sql=postgres(url.href,{max:1,prepare:false}),dir=await mkdtemp(join(tmpdir(),'hs-wait-'));
   try {
     await page.setViewportSize({width:375,height:850});
-    await page.clock.install();
+    await page.clock.install({time:new Date('2026-09-11T00:00:00Z')});
+    await page.clock.pauseAt(new Date('2026-09-11T00:00:01Z'));
     const output=join(dir,'fixture.json');
     await execute(process.execPath,['--experimental-strip-types','--import','./scripts/register-ts-path-loader.mjs','scripts/seed-browser-fixtures.ts',output,JSON.stringify({scenario:'practical_advice',locale})],{env:process.env,timeout:60_000,maxBuffer:1024*1024});
     const fixture=JSON.parse(await readFile(output,'utf8'));
@@ -28,7 +29,12 @@ for(const locale of ['en','th','zh-CN']) test(`HS-WAIT-BROWSER-01 ${locale} inli
     });
     await page.goto(`/${locale}/nutrition/healthscore?plan=${fixture.planId}`);
     const calc=page.getByTestId('questionnaire-calculating'),email=page.getByTestId('calc-emailbox');
-    await expect(calc).toBeVisible();await expect(email).toBeVisible();
+    await expect(calc).toBeVisible();await expect(email).toHaveCount(0);
+    await page.clock.fastForward(119_999);
+    await expect(email).toHaveCount(0);
+    await expect(calc.locator('.mn-quiz-calc__spinner')).toBeVisible();
+    await page.clock.fastForward(1);
+    await expect(email).toBeVisible();
     await expect(calc.locator('.mn-quiz-calc__spinner')).toBeVisible();
     await expect(page.getByTestId('calc-fallback')).toHaveCount(0);
     const box=await email.boundingBox();assert.ok(box);expect(box.x).toBeGreaterThanOrEqual(0);expect(box.x+box.width).toBeLessThanOrEqual(375);
