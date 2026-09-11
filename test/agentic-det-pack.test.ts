@@ -303,7 +303,7 @@ function coveredTargetsHaveContributionIds(selected: StackOption | null) {
   });
 }
 
-function fewestPillsWins(input: Readonly<{
+export function fewestPillsWins(input: Readonly<{
   balanced: ReturnType<typeof matchPlan>;
   fewest: ReturnType<typeof matchPlan>;
 }>) {
