@@ -24,3 +24,14 @@ Historical evidence and prices are unchanged.
 - `acceptance-4` passed 151 cases but exposed asynchronous setup queries contaminating the funnel benchmark's global SQL counter (22 counted SELECTs for 20 one-query polls). EFF-PACK-06 reproduces cross-scope attribution (2 versus 1). The benchmark now measures consumed queries in the polling request's own async scope, including transaction boundaries; setup work is excluded on both control and candidate. Structural limits are unchanged. The gate completes compilation and browser checks before running the paired benchmark matrix.
 
 - `acceptance-5` passed 152 cases, typecheck and release lint, then the kernel again killed the compiler at approximately 6.4 GiB RSS despite the smaller V8 heap. A temporary 4 GiB build swapfile addresses native/compiler memory on the resized host; no runtime limits changed. `acceptance-6` was stopped before compilation after final review found worker aggregates were collected but not published. EFF-MET-05 locks application and external-worker startup wiring to the already behaviourally tested bounded reporter; its RED evidence is `worker-report-wiring-red`.
+
+## Matcher hot path — 11 September 2026
+
+EFF-HOT-01–09 add structural efficiency and compatibility assertions without
+changing historical matching outputs or prices. The final productive chunk now
+sets `done=true` immediately instead of requiring a zero-attempt continuation;
+old checkpoints remain readable, and all attempt budgets and recovery semantics
+are retained. Stable top-K selection must return the same ordered prefix as the
+previous complete sort. Full result equality is independently recorded against
+the frozen D3 control. The scoped consumer inventory is
+`matcher-hot-path-impact.json`; this is not full-application acceptance.
