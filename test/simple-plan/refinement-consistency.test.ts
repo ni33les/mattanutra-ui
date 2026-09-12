@@ -113,3 +113,14 @@ test('REF-REV-06 a pending refinement cannot be bypassed by checking out its pre
   assert.equal(checkout.ok, false, 'Last committed data is retained for recovery, not offered as the pending recommendation');
   assert.equal(checkout.error?.currentRevision, 2);
 });
+
+test('REF-REV-07 an existing frozen checkout remains recoverable while a newer refinement is pending', async () => {
+  const app = runtime(), first = await plan(app, create());
+  const args = { planHandle: first.planHandle, expectedRevision: first.revision, idempotencyKey: 'frozen-before-refinement' };
+  const opened = (await rpc(app, 'execute', args))!.result!.structuredContent as { ok: boolean };
+  assert.equal(opened.ok, true, JSON.stringify(opened));
+  const revised = await value(app, { planHandle: first.planHandle, expectedRevision: first.revision, idempotencyKey: 'refinement-after-frozen-checkout', scoring: { weights: { price: 0.5 } } });
+  assert.equal(revised.status, 'processing'); assert.equal(revised.revision, 2);
+  const recovered = (await rpc(app, 'execute', { ...args, idempotencyKey: 'recover-frozen-during-refinement' }))!.result!.structuredContent;
+  assert.deepEqual(recovered, opened);
+});

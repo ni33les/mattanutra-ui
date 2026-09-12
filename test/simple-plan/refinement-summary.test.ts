@@ -48,3 +48,19 @@ for (const locale of ['en', 'th', 'zh-CN']) test(`REF-SUM-05 ${locale} summaries
   if (locale === 'zh-CN') assert.match(value.summary, /[\u4e00-\u9fff]/);
   assert.ok(value.choices[0].summary.text.length <= 600);
 });
+
+test('REF-SUM-06 equivalent supplied doses in different units do not invent a refinement change', async () => {
+  const { refinementCopy } = await import('../../lib/agentic/presentation/decision-copy.ts');
+  const before = decision('daniel-create').choices[0], after = structuredClone(before);
+  const magnesium = after.ingredients.find(row => row.name === 'Magnesium'); assert.ok(magnesium); assert.equal(magnesium.supplied, 202.5);
+  magnesium.unit = 'g'; magnesium.supplied = 0.2025; magnesium.requested = 0.2;
+  assert.equal(refinementCopy(before, after, 'THB', fixtures['daniel-create'].requestSnapshot), '');
+});
+test('REF-SUM-07 unavailable and differently denominated prices never become claimed savings', async () => {
+  const { refinementCopy } = await import('../../lib/agentic/presentation/decision-copy.ts');
+  const before = decision('daniel-create').choices[0], after = structuredClone(before);
+  const state = fixtures['daniel-create'].requestSnapshot;
+  assert.equal(refinementCopy(before, after, 'USD', state), 'Price comparison unavailable.');
+  after.summary.goodsPrice = null;
+  assert.equal(refinementCopy(before, after, 'THB', state), 'Price comparison unavailable.');
+});

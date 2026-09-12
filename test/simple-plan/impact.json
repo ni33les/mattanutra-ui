@@ -444,13 +444,13 @@
     },
     {
       "file": "test/simple-plan/refinement-consistency.test.ts",
-      "expectedCases": 12,
+      "expectedCases": 13,
       "reason": "Accepted refinement revision remains visible during processing, terminal failure and recovery without publishing the old basket under a new revision",
       "slice": "refinement"
     },
     {
       "file": "test/simple-plan/refinement-summary.test.ts",
-      "expectedCases": 7,
+      "expectedCases": 9,
       "reason": "Captured Daniel and Maya request fit, first-order budget deviation and revision comparisons remain concise, localized and nonblocking",
       "slice": "refinement"
     },
