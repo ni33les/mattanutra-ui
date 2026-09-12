@@ -199,3 +199,13 @@ test('REF-CPU-15 archive recovery in a live cursor preserves original numerical 
   assert.strictEqual(restored.exposure, original.exposure, 'An already-calculated immutable basket must not lose all exact term caches when restored locally');
   assert.deepEqual([...archivedSearchStates(structuredClone(cursor))], [...archivedSearchStates(cursor)], 'Durable recovery retains the same state values');
 });
+
+test('REF-CPU-16 numerical nutrient scores omit display-only trees and retain exact incumbent comparisons', () => {
+  const input = request(), exposure = new Map([['a', 75_000_000n], ['incidental', 100n]]);
+  const numeric = numericalDoseFitScore(input, exposure);
+  for (const field of ['perTarget', 'perContinuedDose', 'perLimit', 'unknownSubjectIds', 'estimatedSubjectIds']) assert.equal(Object.hasOwn(numeric, field), false, field + ' belongs to retained response materialization');
+  const display = doseFitScore(input, exposure);
+  assert.deepEqual(exactDoseFit(display), exactDoseFit(numeric));
+  assert.equal(compareDoseFit(display, numeric), 0);
+  assert.equal(display.perTarget[0].exposure, 75);
+});
