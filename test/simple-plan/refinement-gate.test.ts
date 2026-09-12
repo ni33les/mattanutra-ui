@@ -38,7 +38,7 @@ test('REF-PACK-03 kernel-only, stale, semantic-change, oversized and unfinished 
 });
 
 test('REF-PACK-04 frozen expanded commands retain their requested effort over the admission draft', async () => {
-  const { frozenMatchingInput } = await import('../../scripts/service-efficiency/refinement-input.mjs');
+  const { frozenMatchingInput } = await import('../../scripts/service-efficiency/refinement-input.ts');
   const frozen = { state: { searchEffort: 'standard' }, request: { searchEffort: 'expanded' }, snapshot: { catalogueVersion: 'frozen' } };
   const result = frozenMatchingInput(frozen);
   assert.equal(result.state.searchEffort, 'expanded');

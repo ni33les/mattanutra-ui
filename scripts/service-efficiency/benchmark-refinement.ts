@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { frozenMatchingInput } from './refinement-input.mjs';
+import { frozenMatchingInput } from './refinement-input.ts';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { resolve, relative } from 'node:path';
 import { createHash } from 'node:crypto';
