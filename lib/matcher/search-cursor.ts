@@ -54,16 +54,18 @@ function unpackedExposure(cursor: SearchCursor, packed: ExactVector) {
 // Packed rows are immutable and scoped to one cursor. Re-reading an edge must
 // not rebuild the same maps (and discard all numerical WeakMap caches).
 const restoredStates = new WeakMap<ArchivedState, SearchState>();
+const archivedExposure = new WeakMap<ArchivedState, Pick<SearchState, "exposure" | "delivered">>();
 function restoreState(cursor: SearchCursor, packed: ArchivedState): SearchState {
   const cached = restoredStates.get(packed); if (cached) return cached;
   const selectedVariantIds = packed[5].map(index => cursor.variantIds[index]!);
-  const exposure = unpackedExposure(cursor, packed[6]);
+  const live = archivedExposure.get(packed);
+  const exposure = live?.exposure ?? unpackedExposure(cursor, packed[6]);
   const state: SearchState = { nextGroupIndex: packed[0], price: packed[1], pills: packed[2], count: packed[3], pillCountKnown: packed[4],
     selectedVariantIds, selectedProductIds: selectedVariantIds.map(id => {
       const group = cursor.groups.find(row => id.startsWith(`${row.sellerId}:${row.productId}:x`));
       if (!group) throw new Error("Archive lost a selected product");
       return group.productId;
-    }), exposure, delivered: packed[7] === packed[6] ? exposure : unpackedExposure(cursor, packed[7]), unknownProductIds: packed[8],
+    }), exposure, delivered: live?.delivered ?? (packed[7] === packed[6] ? exposure : unpackedExposure(cursor, packed[7])), unknownProductIds: packed[8],
     ...(packed[9] ? { routineServings: packed[9][0], uncertainAdministrationCount: packed[9][1], monthlyPriceMinor: packed[9][2], monthlyPriceLowerBound: packed[9][3], servingBurden: packed[9][4] } : {}) };
   restoredStates.set(packed, state); return state;
 }
@@ -79,6 +81,7 @@ function remember(cursor: SearchCursor, state: SearchState) {
       ids, exposure,
       state.delivered === state.exposure ? exposure : packedExposure(cursor, state.delivered), [...(state.unknownProductIds ?? [])],
       [[...(state.routineServings ?? [])], state.uncertainAdministrationCount ?? state.count, state.monthlyPriceMinor ?? null, state.monthlyPriceLowerBound ?? 0, state.servingBurden]]);
+    archivedExposure.set(cursor.archive.get(key)!, { exposure: state.exposure, delivered: state.delivered });
     cursor.unreviewed.push(state);
   }
   return key;
