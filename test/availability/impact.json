@@ -39,7 +39,7 @@
     },
     {
       "file": "test/web-availability-copy.test.ts",
-      "expectedCases": 3,
+      "expectedCases": 4,
       "slice": "presentation",
       "reason": "Raw positive/missing coverage and three localized availability labels"
     },

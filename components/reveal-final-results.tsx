@@ -15,6 +15,7 @@ import {
   productCoveredNeedCount,
   replaceRevealStackUrl,
   revealContextChips,
+  revealCoverageLabel,
   revealHeroMetaItems,
   selectedStackCoverage,
   selectProductRecommendationOption,
@@ -1006,8 +1007,7 @@ function RevealFormulaFinalSection({
                   ? null
                   : productCoverageBySupplementId.get(ingredient.id);
                 const coverageReason = activeProductRecommendations?.needCoverage?.find(row => row.id === `supplement:${ingredient.id}`)?.bestRejectedReason;
-                const coverageLabel = productCoveragePending ? copy.productsPendingBadge : coverage == null || coverageReason === 'unknown' ? copy.coverageUnknown
-                  : coverage === 0 ? copy.currentlyUnavailable : coverage < 0.01 ? '<0.01%' : `${Number(coverage.toFixed(2))}%`;
+                const coverageLabel = revealCoverageLabel(coverageReason === 'unknown' ? null : coverage, productCoveragePending, copy);
                 const benefit = supplementBenefitTags(ingredient)[0];
                 const benefitLabel = benefit
                   ? localizedBenefitTagLabel(benefit, locale)
