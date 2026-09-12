@@ -62,3 +62,15 @@ test("RETURN-08 stored expiry remains expired without inventing payment success"
   failure = Error("provider unavailable"); stored = { ...payment(), status: "expired", paidAt: null, fulfillmentStatus: "not_started" };
   const body = await html(); assert.match(body, /This checkout session has expired/); assert.doesNotMatch(body, /Payment received|quick review/);
 });
+for (const [locale, label] of [["th", "ตรวจสอบอีกครั้ง"], ["zh-CN", "重新检查"]]) test(`RETURN-09 ${locale}: verification recovery is localized and does not blame Stripe`, async () => {
+  failure = Error("database unavailable"); stored = null;
+  const body = await html(locale); assert.ok(body.includes(label)); assert.doesNotMatch(body, /Stripe|Return home|Check again/);
+});
+test("RETURN-10 historical paid evidence remains recoverable despite an older failure status", async () => {
+  failure = Error("transient failure"); stored = { ...payment(), status: "fulfillment_failed" };
+  await assert.rejects(page(), { destination: `/en/nutrition/progress?plan=${planId}` });
+});
+test("RETURN-11 missing session remains an explicit invalid return link", async () => {
+  const body = renderToStaticMarkup(await Page({ params: Promise.resolve({ locale: "en" }), searchParams: Promise.resolve({}) }));
+  assert.match(body, /could not find a payment session/); assert.deepEqual(recoveredSessions, []);
+});
