@@ -38,7 +38,7 @@ test('REF-CPU-03 unchanged subject exposure reuses exact arithmetic across disti
   assert.equal(first.total, 0.25); assert.ok(multiplications > 0);
   multiplications = 0;
   const second = doseFitScore(input, new Map([['a', 75_000_000n], ['unrequested', 1n]]));
-  assert.equal(second.total, first.total); assert.equal(multiplications, 0, 'Unchanged exact nutrient terms need no repeated endpoint arithmetic');
+  assert.equal(second.total, first.total); assert.strictEqual(second, first, 'Identical scoring facts reuse the existing bounded score memo'); assert.equal(multiplications, 0, 'Unchanged exact nutrient terms need no repeated endpoint arithmetic');
 });
 test('REF-CPU-04 neutral rational operations reuse immutable values without changing exact arithmetic', () => {
   const value = fractions.rational(7n, 13n);
