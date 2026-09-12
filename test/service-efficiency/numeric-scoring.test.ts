@@ -185,3 +185,17 @@ test('REF-CPU-14 complete resident matching hashes its immutable catalogue only 
     assert.equal(canonicalWrites, oneHash, 'Compilation, checkpoint identity and all retained response baskets share one catalogue identity');
   } finally { uninstallGoldCatalogue(); }
 });
+
+test('REF-CPU-15 archive recovery in a live cursor preserves original numerical exposure identity', async () => {
+  const { createSearchCursor, advanceSearchCursor, archivedSearchStates } = await import('../../lib/matcher/search-cursor.ts');
+  const { compileGroups } = await import('../../lib/matcher/candidates.ts');
+  const { DEFAULT_MATCHER_CONFIG } = await import('../../lib/matcher/config.ts');
+  const { product } = await import('../matcher/flexible-v5-fixtures.ts');
+  const input = request(), groups = compileGroups(input, { catalogueVersion: 'archive', availabilityAsOf: '2026-01-01T00:00:00Z', products: [product('archive-basis', { a: 37 })] });
+  const cursor = createSearchCursor(groups, input, DEFAULT_MATCHER_CONFIG);
+  advanceSearchCursor(cursor, input, 10);
+  const original = cursor.unreviewed.find(row => row.count > 0); assert.ok(original);
+  const restored = [...archivedSearchStates(cursor)].find(row => row.selectedVariantIds.join('|') === original.selectedVariantIds.join('|')); assert.ok(restored);
+  assert.strictEqual(restored.exposure, original.exposure, 'An already-calculated immutable basket must not lose all exact term caches when restored locally');
+  assert.deepEqual([...archivedSearchStates(structuredClone(cursor))], [...archivedSearchStates(cursor)], 'Durable recovery retains the same state values');
+});
