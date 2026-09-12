@@ -48,8 +48,15 @@ export async function paymentPreservationSnapshot(uri, columns) {
 export function verifyOriginalPayments(before, after) {
   assert.ok(Object.keys(before.tables).length >= 128, "Incomplete restored corpus");
   assert.deepEqual(after.columns, before.columns);
-  const tables = [];
+  const tables = [], fixtureRuntimeChanges = [];
   for (const [name, hashes] of Object.entries(before.tables)) {
+    // Fixture writes invalidate the catalogue cache through existing triggers.
+    // This singleton is an operational version counter, not catalogue facts.
+    if (name === "catalogue_runtime_revision") {
+      assert.equal(after.tables[name].length, hashes.length);
+      fixtureRuntimeChanges.push({ table: name, beforeSha256: payloadHash(JSON.stringify(hashes)), afterSha256: payloadHash(JSON.stringify(after.tables[name])) });
+      continue;
+    }
     const remaining = new Map();
     for (const hash of after.tables[name]) remaining.set(hash, (remaining.get(hash) ?? 0) + 1);
     for (const hash of hashes) {
@@ -58,5 +65,5 @@ export function verifyOriginalPayments(before, after) {
     }
     tables.push({ name, originalRows: hashes.length, sha256: payloadHash(JSON.stringify(hashes)) });
   }
-  return { passed: true, tables, originalRows: tables.reduce((n, row) => n + row.originalRows, 0), originalSha256: payloadHash(JSON.stringify(tables)) };
+  return { passed: true, tables, fixtureRuntimeChanges, originalRows: tables.reduce((n, row) => n + row.originalRows, 0), originalSha256: payloadHash(JSON.stringify(tables)) };
 }

@@ -65,7 +65,9 @@ export function checkMcp721Proof(file, expected, packageId = "721") {
     const restored = json("restored-payment-preservation.json"), locks = json("no-new-locks.json");
     assert.equal(restored.passed, true); assert.equal(restored.backupSha256, expected.backupSha256);
     assert.ok(restored.restoreReceiptSha256 && restored.originalSha256);
-    assert.ok(restored.tables.length >= 128 && restored.originalRows >= 27979);
+    assert.ok(restored.tables.length >= 127 && restored.originalRows >= 27978);
+    assert.deepEqual(restored.fixtureRuntimeChanges.map(row => row.table), ["catalogue_runtime_revision"]);
+    assert.deepEqual(inventory, JSON.parse(readFileSync(`${definition.directory}/impact.json`)));
     assert.equal(locks.passed, true); assert.ok(locks.candidateCount > 0 && locks.candidateCount <= locks.controlCount);
     assert.ok(locks.controlSha256 && locks.candidateSha256);
     assert.equal(build.sourceCommit, expected.sourceCommit);

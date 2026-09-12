@@ -43,7 +43,10 @@ The original PRD rehearsal remains unchanged in `prd-3161c459-20260912`.
 
 The encrypted backup checksum is pinned in the inventory; final validation requires
 its verified restore receipt and checks all original rows across the restored tables
-before/after the affected tests. Hashes are exported, never private row bodies.
+before/after the affected tests. The singleton `catalogue_runtime_revision` is an
+operational cache counter advanced by existing synthetic-fixture triggers; its
+before/after hashes are reported separately. All original business rows remain
+subject to exact preservation. Hashes are exported, never private row bodies.
 Synthetic fixtures may add their own isolated rows and advance sequences; original
 payment, order, finance, catalogue and food rows must all remain unchanged.
 No test charges a real payment or sends external email.
