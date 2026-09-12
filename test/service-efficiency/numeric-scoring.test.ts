@@ -238,3 +238,18 @@ test('REF-CPU-20 historical packed search checkpoints retain their exact recover
   assert.equal(rows[0].count, 0); assert.equal(rows[0].price, 0); assert.equal(rows[0].exposure.size, 0);
   assert.deepEqual(rows[0].servingBurden, { num: 0n, den: 1n });
 });
+
+test('REF-CPU-21 stable nutrient names reuse normalization without broadening directional form eligibility', async () => {
+  const { nutrientNameMatchesTarget } = await import('../../lib/nutrient-identity.ts');
+  assert.equal(nutrientNameMatchesTarget('Vitamin D3', 'Vitamin D'), false);
+  assert.equal(nutrientNameMatchesTarget('Vitamin D', 'Vitamin D3'), true);
+  const original = String.prototype.normalize; let normalizations = 0;
+  try {
+    String.prototype.normalize = function (form?: string) { normalizations++; return original.call(this, form); };
+    assert.equal(nutrientNameMatchesTarget('Vitamin D3', 'Vitamin D'), false);
+    assert.equal(nutrientNameMatchesTarget('Vitamin D', 'Vitamin D3'), true);
+    assert.equal(normalizations, 0, 'Loaded immutable names must not rerun Unicode normalization in candidate compilation');
+  } finally { String.prototype.normalize = original; }
+  assert.equal(nutrientNameMatchesTarget('Vitamin D3', 'Vitamin D2'), false);
+  assert.equal(nutrientNameMatchesTarget('EPA', 'DHA'), false);
+});
