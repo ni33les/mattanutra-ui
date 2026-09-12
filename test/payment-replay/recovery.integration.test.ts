@@ -6,7 +6,7 @@ import { closeSqlPool } from "../../lib/db.ts";
 import { fulfillCheckoutSession, handleStripeWebhookPayload, bindPaidReservationToAssessment } from "../../lib/stripe-payments.ts";
 import { fulfillWebPayment, enqueueWebPaymentFulfillment } from "../../lib/web-payment-fulfillment.ts";
 import { paymentFulfillmentEvidence } from "../../lib/payment-fulfillment-evidence.ts";
-import { isolated, paidFixture } from "./helpers.ts";
+import { isolated, paidFixture, fx } from "./helpers.ts";
 after(closeSqlPool);
 
 test("PAY-RECOVER-01 historical live return uses completion evidence without provider access", async () => {
@@ -72,5 +72,18 @@ test("PAY-RECOVER-07 missing completion receipt resumes without repeating proven
     const [after] = await sql`select row_to_json(a)::text as exact from assessments a where plan_id=${p.plan_id}::uuid`;
     assert.deepEqual(after, before);
     assert.equal((await sql`select count(*)::int as n from tasks where plan_id=${p.plan_id}::uuid`)[0].n, 0);
+  });
+});
+
+test("PAY-RECOVER-08 stale worker failure cannot downgrade a newer binding", async () => {
+  await isolated(async sql => {
+    const p = await paidFixture(sql, { plan: false, accounting: false, receipt: false }); const nextPlan = randomUUID();
+    await sql`insert into assessments(plan_id,locale,status,answers,answer_summary) values (${nextPlan}::uuid,'en','captured','{}','{}')`;
+    await assert.rejects(fulfillWebPayment(p.id, { session: async () => {
+      await sql`update payments set plan_id=${nextPlan}::uuid where id=${p.id}::uuid`; return null;
+    }, rate: async () => fx }), /binding or accounting changed/);
+    const [current] = await sql`select plan_id,fulfillment_status from payments where id=${p.id}::uuid`;
+    assert.deepEqual(current, { plan_id: nextPlan, fulfillment_status: "not_started" });
+    assert.equal((await sql`select count(*)::int as n from finance_transactions where source_ref=${`stripe:payment:${p.id}:nominal-revenue`}`)[0].n, 0);
   });
 });

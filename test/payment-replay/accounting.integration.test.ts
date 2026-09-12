@@ -45,3 +45,16 @@ test("PAY-ACCOUNT-04 known revenue replays without querying FX", async () => {
     assert.equal(await entry(tx, p.id), before);
   });
 });
+test("PAY-ACCOUNT-05 revenue and a known Stripe fee both retain their original booking", async () => {
+  await run(async tx => {
+    const p = await payment(tx);
+    const session = { id: `cs_${p.id}`, amount_total: 69000, currency: "thb", payment_intent: {
+      id: `pi_${p.id}`, latest_charge: { balance_transaction: { id: `txn_${p.id}`, fee: 300 } }
+    } } as unknown as import("stripe").default.Checkout.Session;
+    await recordStripePaymentAccounting(tx, p, session, fx);
+    const before = await tx`select row_to_json(f)::text as exact from finance_transactions f where metadata->>'paymentId'=${p.id} order by id`;
+    assert.equal(before.length, 2);
+    await recordStripePaymentAccounting(tx, p, session);
+    assert.deepEqual(await tx`select row_to_json(f)::text as exact from finance_transactions f where metadata->>'paymentId'=${p.id} order by id`, before);
+  });
+});

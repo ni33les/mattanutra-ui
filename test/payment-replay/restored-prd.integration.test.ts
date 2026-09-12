@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { after, test } from "node:test";
 import { getSql, closeSqlPool, withDatabaseTransaction } from "../../lib/db.ts";
 import { enqueueWebPaymentFulfillment, fulfillWebPayment } from "../../lib/web-payment-fulfillment.ts";
-import { getPayment, type PaymentRow } from "../../lib/stripe-payments.ts";
+import { getPayment, recordStripePaymentAccounting, type PaymentRow } from "../../lib/stripe-payments.ts";
 import { getFunnelReadiness } from "../../lib/funnel-readiness.ts";
 
 const uri = new URL(process.env.TEST_DB_URL!);
@@ -58,5 +58,19 @@ test("PRD-COMPAT-04 payment and readiness reads expose effective completion in e
     assert.equal((await getPayment(p.id))!.fulfillmentStatus, "complete");
     for (const locale of ["en", "th", "zh-CN"]) assert.equal((await getFunnelReadiness(p.plan_id!, locale))!.fulfillmentStatus, "complete");
   }
+  assert.deepEqual(await preservedRows(), before);
+});
+
+test("PRD-COMPAT-02 restored original accounting rows remain byte-for-byte unchanged", async () => {
+  const before = await preservedRows();
+  await assert.rejects(withDatabaseTransaction(sql, async tx => {
+    for (const p of await completedHistoricalPayments()) {
+      const rows = await tx`select row_to_json(f)::text as exact from finance_transactions f where source='stripe' and source_ref=${`stripe:payment:${p.id}:nominal-revenue`}`;
+      assert.equal(rows.length, 1);
+      await recordStripePaymentAccounting(tx, p, null);
+      assert.deepEqual(await tx`select row_to_json(f)::text as exact from finance_transactions f where source='stripe' and source_ref=${`stripe:payment:${p.id}:nominal-revenue`}`, rows);
+    }
+    throw rollback;
+  }), error => error === rollback);
   assert.deepEqual(await preservedRows(), before);
 });
