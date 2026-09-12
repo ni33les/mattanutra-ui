@@ -98,7 +98,7 @@
     },
     {
       "file": "test/healthscore-performance/prompts.test.ts",
-      "expectedCases": 9,
+      "expectedCases": 11,
       "database": false,
       "slice": "matching",
       "reason": "Affected formulation prompt preserves schema, deterministic formula and reasoning settings"
