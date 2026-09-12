@@ -1,5 +1,8 @@
 import assert from 'node:assert/strict';
 import test, { mock } from 'node:test';
+const freeze = await import('../../lib/agentic/catalogue/freeze.ts');
+let snapshotHashes = 0;
+mock.module('../../lib/agentic/catalogue/freeze.ts', { namedExports: { ...freeze, catalogueSnapshotId: (...args: Parameters<typeof freeze.catalogueSnapshotId>) => { snapshotHashes++; return freeze.catalogueSnapshotId(...args); } } });
 const dose = await import('../../lib/matcher/dose.ts');
 const fractions = await import('../../lib/matcher/rational.ts');
 let conversions = 0, unitCompilations = 0, exactEncodings = 0;
@@ -148,4 +151,33 @@ test('REF-CPU-12 frontier numerical records contain no response getters or displ
   assert.equal(Object.hasOwn(score, 'overallExact'), false);
   assert.equal(scoring.compareOverallScores(score, score), 0);
   assert.equal(scoring.searchStateScore(input, state).overallPenalty, score.overallPenalty);
+});
+
+
+test('REF-CPU-13 cursor continuations reuse immutable product facts while isolating dynamic variants', async () => {
+  const { compileGroups } = await import('../../lib/matcher/candidates.ts');
+  const { createSearchCursor, advanceSearchCursor } = await import('../../lib/matcher/search-cursor.ts');
+  const { DEFAULT_MATCHER_CONFIG } = await import('../../lib/matcher/config.ts');
+  const { product } = await import('../matcher/flexible-v5-fixtures.ts');
+  const input = request(), groups = compileGroups(input, { catalogueVersion: 'isolated', availabilityAsOf: '2026-01-01T00:00:00Z', products: [product('basis', { a: 37 })] });
+  assert.ok(groups.length > 0); const original = structuredClone(groups);
+  const cursor = createSearchCursor(groups, input, DEFAULT_MATCHER_CONFIG);
+  assert.strictEqual(cursor.groups[0].product, groups[0].product, 'Immutable compilation must survive entry into the search cursor');
+  assert.notStrictEqual(cursor.groups[0].variants, groups[0].variants);
+  advanceSearchCursor(cursor, input, 100);
+  assert.deepEqual(groups, original, "Quantity search must not change another request's compiled inputs");
+});
+
+test('REF-CPU-14 complete resident matching hashes its immutable catalogue only once', async () => {
+  const { input } = await import('./support.ts');
+  const { uninstallGoldCatalogue } = await import('../helpers/gold-catalogue.ts');
+  const matching = await import('../../lib/agentic/plan/matching.ts');
+  try {
+    const value = await input(); matching.resetMatchPlanCache(); snapshotHashes = 0;
+    const session = matching.createResidentPlanSession(value);
+    let step = matching.advanceResidentPlanSession(session, { chunkBudget: 4000 });
+    while (!step.done) step = matching.advanceResidentPlanSession(session, { chunkBudget: 4000 });
+    assert.ok(step.result?.selected); assert.ok(step.expansionAttempts > 0);
+    assert.equal(snapshotHashes, 1, 'Compilation, checkpoint identity and all retained response baskets share one catalogue identity');
+  } finally { uninstallGoldCatalogue(); }
 });
