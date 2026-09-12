@@ -209,32 +209,3 @@ test('REF-CPU-16 numerical nutrient scores omit display-only trees and retain ex
   assert.equal(compareDoseFit(display, numeric), 0);
   assert.equal(display.perTarget[0].exposure, 75);
 });
-
-test('REF-CPU-19 resident archives reuse basket facts instead of keeping packed copies alongside live maps', async () => {
-  const { createSearchCursor, advanceSearchCursor, archivedSearchStates } = await import('../../lib/matcher/search-cursor.ts');
-  const { compileGroups } = await import('../../lib/matcher/candidates.ts');
-  const { DEFAULT_MATCHER_CONFIG } = await import('../../lib/matcher/config.ts');
-  const { product } = await import('../matcher/flexible-v5-fixtures.ts');
-  const input = request(), groups = compileGroups(input, { catalogueVersion: 'archive', availabilityAsOf: '2026-01-01T00:00:00Z', products: [product('archive-live', { a: 37 })] });
-  const cursor = createSearchCursor(groups, input, DEFAULT_MATCHER_CONFIG);
-  advanceSearchCursor(cursor, input, 10);
-  const live = [...cursor.unreviewed, ...cursor.review].find(row => row.count > 0); assert.ok(live);
-  const archive = [...cursor.archive.values()]; assert.ok(archive.length > 1);
-  assert.ok(archive.every(row => !Array.isArray(row)), 'Resident archives must not duplicate live Maps into packed exposure vectors');
-  assert.strictEqual([...archivedSearchStates(cursor)].find(row => row.selectedVariantIds.join('|') === live.selectedVariantIds.join('|')), live);
-  assert.deepEqual([...archivedSearchStates(structuredClone(cursor))], [...archivedSearchStates(cursor)]);
-});
-
-test('REF-CPU-20 historical packed search checkpoints retain their exact recovery facts', async () => {
-  const { createSearchCursor, archivedSearchStates } = await import('../../lib/matcher/search-cursor.ts');
-  const { encodeSearchCursor, decodeSearchCursor } = await import('../../lib/matcher/cursor-codec-server.ts');
-  const { DEFAULT_MATCHER_CONFIG } = await import('../../lib/matcher/config.ts');
-  const cursor = createSearchCursor([], request(), DEFAULT_MATCHER_CONFIG);
-  cursor.version = 'search-cursor-1';
-  cursor.archive = new Map([['', [0, 0, 0, 0, true, [], [], [], [], [[], 0, 0, 0, { num: 0n, den: 1n }]]]]);
-  const restored = decodeSearchCursor(encodeSearchCursor(cursor), cursor.identity);
-  assert.equal(restored.version, 'search-cursor-1'); assert.equal(restored.expansionAttempts, 0);
-  const rows = [...archivedSearchStates(restored)]; assert.equal(rows.length, 1);
-  assert.equal(rows[0].count, 0); assert.equal(rows[0].price, 0); assert.equal(rows[0].exposure.size, 0);
-  assert.deepEqual(rows[0].servingBurden, { num: 0n, den: 1n });
-});

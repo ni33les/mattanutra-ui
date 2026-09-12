@@ -8,7 +8,7 @@ import { measureService, recordServiceMetric } from "@/lib/service-metrics";
 export function encodeSearchCursor(cursor: SearchCursor) { return serialize(cursor).toString("base64"); }
 export function decodeSearchCursor(text: string, expectedIdentity: string): SearchCursor {
   const cursor = deserialize(Buffer.from(text, "base64")) as SearchCursor;
-  if (!["search-cursor-1", "search-cursor-2"].includes(cursor.version) || cursor.identity !== expectedIdentity) throw new Error("Search cursor identity changed");
+  if (cursor.version !== "search-cursor-1" || cursor.identity !== expectedIdentity) throw new Error("Search cursor identity changed");
   if (!Number.isSafeInteger(cursor.expansionBudget) || !Number.isSafeInteger(cursor.expansionAttempts) || cursor.expansionAttempts < 0 || cursor.expansionAttempts > cursor.expansionBudget) throw new Error("Invalid search cursor budget");
   return cursor;
 }
