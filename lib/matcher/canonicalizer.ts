@@ -103,8 +103,10 @@ function compareCurrentOrder(left: CanonicalCurrent, right: CanonicalCurrent) {
     (left.certainty ?? "known").localeCompare(right.certainty ?? "known") || left.sourceId.localeCompare(right.sourceId);
 }
 
+const orderedRequests = new WeakMap<CanonicalRequest, CanonicalRequest>();
 export function orderInvariantRequest(request: CanonicalRequest): CanonicalRequest {
-  return {
+  const cached = orderedRequests.get(request); if (cached) return cached;
+  const ordered: CanonicalRequest = {
     ...request,
     productDoses: [...(request.productDoses ?? [])].sort((a, b) => a.productId.localeCompare(b.productId)),
     acceptedGapSubjectIds: [...request.acceptedGapSubjectIds].sort(compareStrings),
@@ -129,6 +131,8 @@ export function orderInvariantRequest(request: CanonicalRequest): CanonicalReque
     retainSubjectIds: [...request.retainSubjectIds].sort(compareStrings),
     targets: [...request.targets].sort(compareCanonicalTargetOrder)
   };
+  orderedRequests.set(request, ordered); orderedRequests.set(ordered, ordered);
+  return ordered;
 }
 
 export function canonicalTargetSetHash(request: CanonicalRequest): string {
