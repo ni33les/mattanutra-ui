@@ -120,6 +120,7 @@ function rangeOffsets(rows: CanonicalRequest["currentSupplements"], subjectId: s
   return { minimum, maximum, base };
 }
 
+const fixedSubjects = new WeakMap<CanonicalRequest, readonly string[] | null>();
 const subjectCache = new WeakMap<CanonicalRequest, Map<string, ReturnType<typeof compileSubject>>>();
 function compileSubject(request: CanonicalRequest, subjectId: string) {
   const requested = request.targets.find(row => row.subjectId === subjectId);
@@ -225,8 +226,14 @@ function calculateDoseFit(request: CanonicalRequest, exposure: ReadonlyMap<strin
   const perContinuedDose: NonNullable<DoseFitScore["perContinuedDose"]>[number][] = [];
   const perLimit: DoseFitScore["perLimit"][number][] = [];
   const deviations: TargetDeviation[] = [], estimatedTargets: string[] = [];
-  const subjects = new Set([...exposure.keys(), ...(request.dietaryIntake ?? []).map((row) => row.subjectId), ...request.targets.map((row) => row.subjectId)]);
-  for (const subjectId of [...subjects].sort()) {
+  let fixed = fixedSubjects.get(request);
+  if (fixed === undefined) {
+    fixed = request.currentSupplements.length === 0 && (!knownLimitProfile(request) || !request.safetyCeilings?.length)
+      ? [...new Set([...(request.dietaryIntake ?? []).map(row => row.subjectId), ...request.targets.map(row => row.subjectId)])].sort() : null;
+    fixedSubjects.set(request, fixed);
+  }
+  const subjects = fixed ?? [...new Set([...exposure.keys(), ...(request.dietaryIntake ?? []).map(row => row.subjectId), ...request.targets.map(row => row.subjectId)])].sort();
+  for (const subjectId of subjects) {
     const { target, ranges, dietary, referenceRows, reference, scale, bounds } = subjectInputs(request, subjectId);
     if (!target && reference === BigInt(0) && bounds.length === 0) continue;
     const known = exposure.get(subjectId) ?? BigInt(0);
