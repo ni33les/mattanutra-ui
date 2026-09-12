@@ -447,6 +447,12 @@
       "expectedCases": 5,
       "reason": "Accepted refinement revision remains visible during processing, terminal failure and recovery without publishing the old basket under a new revision",
       "slice": "refinement"
+    },
+    {
+      "file": "test/simple-plan/refinement-summary.test.ts",
+      "expectedCases": 7,
+      "reason": "Captured Daniel and Maya request fit, first-order budget deviation and revision comparisons remain concise, localized and nonblocking",
+      "slice": "refinement"
     }
   ],
   "inputs": [
@@ -495,6 +501,7 @@
     "test/simple-plan/zero-scales.test.ts",
     "test/simple-plan/direct-checkout.test.ts",
     "test/simple-plan/no-option-ids.test.ts",
-    "test/simple-plan/refinement-consistency.test.ts"
+    "test/simple-plan/refinement-consistency.test.ts",
+    "test/simple-plan/refinement-summary.test.ts"
   ]
 }

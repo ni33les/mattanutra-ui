@@ -6,3 +6,4 @@ Control: 26e90472b0d23c9904eb1cf625ce70197384ac4e. Contract 11.0.0 and public fi
 - RED evidence: `/root/.codex/deploy/mcp-refinement-speed-20260912/revision-red.log`.
 - Original Daniel/Maya inputs, frozen catalogue/references and prices remain outside the checkout under the same evidence root. Historical results are not rewritten.
 - Scope is affected simple-plan/efficiency tests only. Fresh standard matching must be under 1,000 ms; a cached result or faster acknowledgement cannot satisfy the release gate.
+- REF-SUM-01–05 (seven cases): replace generic ready copy with known request fit and first-order budget deviation; preserve a concise revision comparison. All seven fail before implementation (`summary-red-2.log`), including a real adapter journey with original THB 2,594 / 2,126 prices. The first RED invocation exposed an internal-target field in the harness; that prerequisite was corrected before recording behavioural RED.

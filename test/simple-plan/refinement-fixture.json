@@ -1,0 +1,1300 @@
+{
+  "source": "26e90472b0d23c9904eb1cf625ce70197384ac4e",
+  "note": "Allowlisted saved decision facts; no handles, owner identities or health profile. Original products, quantities and prices preserved.",
+  "rows": {
+    "daniel-create": {
+      "status": "ready",
+      "summary": "A purchasable stack is ready. Confirm with the person first.",
+      "coverage": [
+        {
+          "name": "Creatine",
+          "unit": "g",
+          "basis": "supplemental",
+          "excess": 0,
+          "ruleId": "a076875d-05a1-4236-9102-952f8255e24d",
+          "status": "covered",
+          "importance": "required",
+          "sourceScope": "supplemental",
+          "authorityUrl": "https://www.nccih.nih.gov/health/dietary-and-herbal-supplements",
+          "contributors": [
+            {
+              "unit": "g",
+              "amount": 3,
+              "productId": "prd_2c298ab52a8056268aed426a29dda3aa",
+              "productName": "Optimum Nutrition Micronized Creatine Monohydrate Powder"
+            }
+          ],
+          "remainingGap": 0,
+          "rulesVersion": "2",
+          "supplementId": "sup_fb1c10b058d55c6083aec2f73fb8b310",
+          "currentAmount": 0,
+          "basisRationale": "Round 9 governed golden catalogue safety successor for 03f1674d-3e07-5d71-b535-41853bc15a1e.",
+          "coveragePercent": 100,
+          "deliveredAmount": 3,
+          "intakeCertainty": "unknown",
+          "populationScope": "adult",
+          "requestedAmount": 3,
+          "upperLimitAmount": 5,
+          "percentOfUpperLimit": 60,
+          "referenceConfidence": "moderate",
+          "safetyLedgerVersion": "6.0.0",
+          "totalExposureAmount": 3,
+          "totalExposureComplete": false
+        },
+        {
+          "name": "Vitamin D3",
+          "unit": "IU",
+          "basis": "supplemental",
+          "excess": 0,
+          "ruleId": "ca3a3da1-4e5b-438a-9322-8ca511182ac9",
+          "status": "covered",
+          "importance": "required",
+          "sourceScope": "total",
+          "authorityUrl": "https://ods.od.nih.gov/factsheets/VitaminD-HealthProfessional/",
+          "contributors": [
+            {
+              "unit": "IU",
+              "amount": 1000,
+              "productId": "prd_617d837380b34ada99c0769d502b5b1c",
+              "productName": "Blackmores Vitamin D3 1000 IU"
+            }
+          ],
+          "remainingGap": 0,
+          "rulesVersion": "1",
+          "supplementId": "sup_927083fbb90a5a24b4c55067b06ead5f",
+          "currentAmount": 0,
+          "basisRationale": "NIH ODS/FNB age-specific vitamin D total-intake UL from foods and supplements. Adult 100 mcg/day equals 4000 IU/day; this is an advisory reference, not approval or a purchase block. Unknown diet prevents verifying total exposure below the reference.",
+          "coveragePercent": 100,
+          "deliveredAmount": 1000,
+          "intakeCertainty": "unknown",
+          "populationScope": "adult",
+          "requestedAmount": 1000,
+          "upperLimitAmount": 4000,
+          "percentOfUpperLimit": 25,
+          "referenceConfidence": "high",
+          "safetyLedgerVersion": "6.0.0",
+          "totalExposureAmount": 1000,
+          "totalExposureComplete": false
+        },
+        {
+          "name": "Magnesium",
+          "unit": "mg",
+          "basis": "supplemental",
+          "excess": 2.5,
+          "ruleId": "9a044d45-3e36-4319-9262-1bf6a5425574",
+          "status": "over_target",
+          "importance": "required",
+          "sourceScope": "supplemental",
+          "authorityUrl": "https://ods.od.nih.gov/factsheets/Magnesium-HealthProfessional/",
+          "contributors": [
+            {
+              "unit": "mg",
+              "amount": 150,
+              "productId": "prd_ae75035d257051658a606e8d4c28b6d2",
+              "productName": "MAGNESIUM"
+            },
+            {
+              "unit": "mg",
+              "amount": 52.5,
+              "productId": "prd_c13bd4164a854d54a3c5669f310c2afb",
+              "productName": "Blackmores Bio Zinc A Chelate"
+            }
+          ],
+          "remainingGap": 0,
+          "rulesVersion": "6",
+          "supplementId": "sup_199df5c489215c37b85b6bcb14b443fa",
+          "currentAmount": 0,
+          "basisRationale": "NIH ODS adult supplemental UL is 350 mg. Restored from a product-review raise to 1,100 mg. https://ods.od.nih.gov/factsheets/Magnesium-HealthProfessional/",
+          "coveragePercent": 100,
+          "deliveredAmount": 202.5,
+          "intakeCertainty": "unknown",
+          "populationScope": "adult",
+          "requestedAmount": 200,
+          "upperLimitAmount": 350,
+          "percentOfUpperLimit": 58,
+          "referenceConfidence": "high",
+          "safetyLedgerVersion": "6.0.0",
+          "totalExposureAmount": 202.5,
+          "totalExposureComplete": false
+        }
+      ],
+      "contractVersion": "11.0.0",
+      "changeSummary": [],
+      "questions": [],
+      "safetyGuidance": [],
+      "alternatives": [],
+      "requestSnapshot": {
+        "locale": "en",
+        "currency": "THB",
+        "targets": [
+          {
+            "name": "Creatine",
+            "unit": "g",
+            "basis": "supplemental",
+            "amount": 3,
+            "importance": "required",
+            "supplementId": "sup_fb1c10b058d55c6083aec2f73fb8b310",
+            "requestedName": "Creatine"
+          },
+          {
+            "name": "Vitamin D3",
+            "unit": "IU",
+            "basis": "supplemental",
+            "amount": 1000,
+            "importance": "required",
+            "supplementId": "sup_927083fbb90a5a24b4c55067b06ead5f",
+            "requestedName": "Vitamin D3"
+          },
+          {
+            "name": "Magnesium",
+            "unit": "mg",
+            "basis": "supplemental",
+            "amount": 200,
+            "importance": "required",
+            "supplementId": "sup_199df5c489215c37b85b6bcb14b443fa",
+            "requestedName": "Magnesium"
+          }
+        ],
+        "requirements": {
+          "maxDailyPills": 2,
+          "maxPriceMinor": 200000,
+          "dietaryPreference": "any"
+        },
+        "scoring": {
+          "profile": "balanced",
+          "weights": {}
+        },
+        "intake": [],
+        "currentSupplements": [],
+        "originalRequest": {
+          "targets": [
+            {
+              "name": "Creatine",
+              "unit": "g",
+              "basis": "supplemental",
+              "amount": 3,
+              "ingredientId": "sup_fb1c10b058d55c6083aec2f73fb8b310",
+              "supplementId": "sup_fb1c10b058d55c6083aec2f73fb8b310"
+            },
+            {
+              "name": "Vitamin D3",
+              "unit": "IU",
+              "basis": "supplemental",
+              "amount": 1000,
+              "ingredientId": "sup_927083fbb90a5a24b4c55067b06ead5f",
+              "supplementId": "sup_927083fbb90a5a24b4c55067b06ead5f"
+            },
+            {
+              "name": "Magnesium",
+              "unit": "mg",
+              "basis": "supplemental",
+              "amount": 200,
+              "ingredientId": "sup_199df5c489215c37b85b6bcb14b443fa",
+              "supplementId": "sup_199df5c489215c37b85b6bcb14b443fa"
+            }
+          ]
+        }
+      },
+      "matcherTelemetry": {
+        "snapshotId": "snap_777f072a854a4237",
+        "matcherVersion": "importance-matching-3"
+      },
+      "selected": {
+        "coverage": [
+          {
+            "name": "Creatine",
+            "unit": "g",
+            "basis": "supplemental",
+            "excess": 0,
+            "ruleId": "a076875d-05a1-4236-9102-952f8255e24d",
+            "status": "covered",
+            "importance": "required",
+            "sourceScope": "supplemental",
+            "authorityUrl": "https://www.nccih.nih.gov/health/dietary-and-herbal-supplements",
+            "contributors": [
+              {
+                "unit": "g",
+                "amount": 3,
+                "productId": "prd_2c298ab52a8056268aed426a29dda3aa",
+                "productName": "Optimum Nutrition Micronized Creatine Monohydrate Powder"
+              }
+            ],
+            "remainingGap": 0,
+            "rulesVersion": "2",
+            "supplementId": "sup_fb1c10b058d55c6083aec2f73fb8b310",
+            "currentAmount": 0,
+            "basisRationale": "Round 9 governed golden catalogue safety successor for 03f1674d-3e07-5d71-b535-41853bc15a1e.",
+            "coveragePercent": 100,
+            "deliveredAmount": 3,
+            "intakeCertainty": "unknown",
+            "populationScope": "adult",
+            "requestedAmount": 3,
+            "upperLimitAmount": 5,
+            "percentOfUpperLimit": 60,
+            "referenceConfidence": "moderate",
+            "safetyLedgerVersion": "6.0.0",
+            "totalExposureAmount": 3,
+            "totalExposureComplete": false
+          },
+          {
+            "name": "Vitamin D3",
+            "unit": "IU",
+            "basis": "supplemental",
+            "excess": 0,
+            "ruleId": "ca3a3da1-4e5b-438a-9322-8ca511182ac9",
+            "status": "covered",
+            "importance": "required",
+            "sourceScope": "total",
+            "authorityUrl": "https://ods.od.nih.gov/factsheets/VitaminD-HealthProfessional/",
+            "contributors": [
+              {
+                "unit": "IU",
+                "amount": 1000,
+                "productId": "prd_617d837380b34ada99c0769d502b5b1c",
+                "productName": "Blackmores Vitamin D3 1000 IU"
+              }
+            ],
+            "remainingGap": 0,
+            "rulesVersion": "1",
+            "supplementId": "sup_927083fbb90a5a24b4c55067b06ead5f",
+            "currentAmount": 0,
+            "basisRationale": "NIH ODS/FNB age-specific vitamin D total-intake UL from foods and supplements. Adult 100 mcg/day equals 4000 IU/day; this is an advisory reference, not approval or a purchase block. Unknown diet prevents verifying total exposure below the reference.",
+            "coveragePercent": 100,
+            "deliveredAmount": 1000,
+            "intakeCertainty": "unknown",
+            "populationScope": "adult",
+            "requestedAmount": 1000,
+            "upperLimitAmount": 4000,
+            "percentOfUpperLimit": 25,
+            "referenceConfidence": "high",
+            "safetyLedgerVersion": "6.0.0",
+            "totalExposureAmount": 1000,
+            "totalExposureComplete": false
+          },
+          {
+            "name": "Magnesium",
+            "unit": "mg",
+            "basis": "supplemental",
+            "excess": 2.5,
+            "ruleId": "9a044d45-3e36-4319-9262-1bf6a5425574",
+            "status": "over_target",
+            "importance": "required",
+            "sourceScope": "supplemental",
+            "authorityUrl": "https://ods.od.nih.gov/factsheets/Magnesium-HealthProfessional/",
+            "contributors": [
+              {
+                "unit": "mg",
+                "amount": 150,
+                "productId": "prd_ae75035d257051658a606e8d4c28b6d2",
+                "productName": "MAGNESIUM"
+              },
+              {
+                "unit": "mg",
+                "amount": 52.5,
+                "productId": "prd_c13bd4164a854d54a3c5669f310c2afb",
+                "productName": "Blackmores Bio Zinc A Chelate"
+              }
+            ],
+            "remainingGap": 0,
+            "rulesVersion": "6",
+            "supplementId": "sup_199df5c489215c37b85b6bcb14b443fa",
+            "currentAmount": 0,
+            "basisRationale": "NIH ODS adult supplemental UL is 350 mg. Restored from a product-review raise to 1,100 mg. https://ods.od.nih.gov/factsheets/Magnesium-HealthProfessional/",
+            "coveragePercent": 100,
+            "deliveredAmount": 202.5,
+            "intakeCertainty": "unknown",
+            "populationScope": "adult",
+            "requestedAmount": 200,
+            "upperLimitAmount": 350,
+            "percentOfUpperLimit": 58,
+            "referenceConfidence": "high",
+            "safetyLedgerVersion": "6.0.0",
+            "totalExposureAmount": 202.5,
+            "totalExposureComplete": false
+          }
+        ],
+        "coveragePercent": 100,
+        "candidateKey": "opt_8839c0572d6e98fd",
+        "roles": [
+          "best_match",
+          "closest_dose"
+        ],
+        "role": "requested_objective",
+        "reason": "Best overall match balancing dose fit, daily routine, preferences and price",
+        "dailyPills": 2,
+        "totalPriceMinor": 259400,
+        "purchaseEligible": true,
+        "snapshotId": "snap_777f072a854a4237",
+        "matcherVersion": "importance-matching-3",
+        "basket": [
+          {
+            "productId": "prd_2c298ab52a8056268aed426a29dda3aa",
+            "productName": "Optimum Nutrition Micronized Creatine Monohydrate Powder",
+            "servingsPerDay": 1,
+            "quantity": 1,
+            "unitPriceMinor": 116600,
+            "lineTotalMinor": 116600,
+            "incompleteCommercialFacts": false,
+            "administration": null,
+            "daysOfSupply": null,
+            "requestedNutrients": [
+              {
+                "name": "Creatine",
+                "unit": "g",
+                "amount": 3,
+                "supplementId": "sup_fb1c10b058d55c6083aec2f73fb8b310"
+              }
+            ],
+            "incidentalNutrients": [],
+            "labelledFacts": [
+              {
+                "name": "Creatine",
+                "unit": "g",
+                "amount": 3,
+                "sourceUrl": "https://shopee.co.th/Optimum-Nutrition-Micronized-Creatine-300g-i.35570873.2263078874",
+                "confidence": "high",
+                "sourceText": "Creatine 5000 mg [high]",
+                "supplementId": "fb1c10b0-58d5-5c60-83ae-c2f73fb8b310",
+                "mappingStatus": "verified"
+              }
+            ]
+          },
+          {
+            "productId": "prd_617d837380b34ada99c0769d502b5b1c",
+            "productName": "Blackmores Vitamin D3 1000 IU",
+            "servingsPerDay": 1,
+            "quantity": 1,
+            "unitPriceMinor": 48500,
+            "lineTotalMinor": 48500,
+            "incompleteCommercialFacts": false,
+            "administration": {
+              "route": "oral",
+              "provenance": {
+                "status": "verified",
+                "sourceUrl": "https://www.blackmores.com.au/products/vitamin-d3-1000-iu",
+                "sourceText": "Manufacturer composition is 1000 IU vitamin D3 per capsule, taken orally. The catalogue image identifies the same Vitamin D3 1000 IU capsule variant. Pack quantity remains unset because the manufacturer page mixes 60-tablet and 200-capsule variants. Nutrient facts, confidence, prices and dietary evidence are unchanged.",
+                "verifiedAt": "2026-09-08T12:00:00Z"
+              },
+              "packQuantity": null,
+              "physicalUnit": "capsule",
+              "doseIncrement": 1,
+              "unitsPerServing": 1
+            },
+            "daysOfSupply": null,
+            "requestedNutrients": [
+              {
+                "name": "Vitamin D3",
+                "unit": "IU",
+                "amount": 1000,
+                "supplementId": "sup_927083fbb90a5a24b4c55067b06ead5f"
+              }
+            ],
+            "incidentalNutrients": [],
+            "labelledFacts": [
+              {
+                "name": "Vitamin D3",
+                "unit": "IU",
+                "amount": 1000,
+                "sourceUrl": null,
+                "confidence": "high",
+                "sourceText": null,
+                "supplementId": "927083fb-b90a-5a24-b4c5-5067b06ead5f",
+                "mappingStatus": "verified"
+              }
+            ]
+          },
+          {
+            "productId": "prd_ae75035d257051658a606e8d4c28b6d2",
+            "productName": "MAGNESIUM",
+            "servingsPerDay": 1,
+            "quantity": 1,
+            "unitPriceMinor": 47500,
+            "lineTotalMinor": 47500,
+            "incompleteCommercialFacts": false,
+            "administration": null,
+            "daysOfSupply": null,
+            "requestedNutrients": [
+              {
+                "name": "Magnesium",
+                "unit": "mg",
+                "amount": 150,
+                "supplementId": "sup_199df5c489215c37b85b6bcb14b443fa"
+              }
+            ],
+            "incidentalNutrients": [],
+            "labelledFacts": [
+              {
+                "name": "Magnesium",
+                "unit": "mg",
+                "amount": 150,
+                "sourceUrl": null,
+                "confidence": "high",
+                "sourceText": null,
+                "supplementId": "199df5c4-8921-5c37-b85b-6bcb14b443fa",
+                "mappingStatus": "verified"
+              }
+            ]
+          },
+          {
+            "productId": "prd_c13bd4164a854d54a3c5669f310c2afb",
+            "productName": "Blackmores Bio Zinc A Chelate",
+            "servingsPerDay": 1,
+            "quantity": 1,
+            "unitPriceMinor": 46800,
+            "lineTotalMinor": 46800,
+            "incompleteCommercialFacts": false,
+            "administration": {
+              "route": "oral",
+              "provenance": {
+                "status": "verified",
+                "sourceUrl": "https://www.blackmores.co.th/en/products/supplement/2118-blackmores-bio-zinc-a-chelate",
+                "sourceText": "Manufacturer composition and oral directions support physical unit tablet. Composition basis is 1 physical unit(s) per labelled serving. The source identifies a single pack size of 90 physical units.",
+                "verifiedAt": "2026-09-07T11:30:11.837729+00:00"
+              },
+              "packQuantity": 90,
+              "physicalUnit": "tablet",
+              "doseIncrement": 1,
+              "unitsPerServing": 1
+            },
+            "daysOfSupply": 90,
+            "requestedNutrients": [
+              {
+                "name": "Magnesium",
+                "unit": "mg",
+                "amount": 52.5,
+                "supplementId": "sup_199df5c489215c37b85b6bcb14b443fa"
+              }
+            ],
+            "incidentalNutrients": [
+              {
+                "name": "Manganese",
+                "unit": "mg",
+                "amount": 2,
+                "supplementId": "sup_783b46dcbe5555a9bc436a15a1bfdb80"
+              },
+              {
+                "name": "Vitamin A",
+                "unit": "IU",
+                "amount": 2500,
+                "supplementId": "sup_df05c30c144e5d0392dcc895f7cb00c4"
+              },
+              {
+                "name": "Zinc",
+                "unit": "mg",
+                "amount": 15,
+                "supplementId": "sup_e7f084983cf85caa868a27adf61afeab"
+              }
+            ],
+            "labelledFacts": [
+              {
+                "name": "Magnesium",
+                "unit": "mg",
+                "amount": 52.5,
+                "sourceUrl": null,
+                "confidence": "high",
+                "sourceText": null,
+                "supplementId": "199df5c4-8921-5c37-b85b-6bcb14b443fa",
+                "mappingStatus": "verified"
+              },
+              {
+                "name": "Manganese",
+                "unit": "mg",
+                "amount": 2,
+                "sourceUrl": null,
+                "confidence": "high",
+                "sourceText": null,
+                "supplementId": "783b46dc-be55-55a9-bc43-6a15a1bfdb80",
+                "mappingStatus": "verified"
+              },
+              {
+                "name": "Vitamin A",
+                "unit": "IU",
+                "amount": 2500,
+                "sourceUrl": null,
+                "confidence": "high",
+                "sourceText": null,
+                "supplementId": "df05c30c-144e-5d03-92dc-c895f7cb00c4",
+                "mappingStatus": "verified"
+              },
+              {
+                "name": "Zinc",
+                "unit": "mg",
+                "amount": 15,
+                "sourceUrl": null,
+                "confidence": "high",
+                "sourceText": null,
+                "supplementId": "e7f08498-3cf8-5caa-868a-27adf61afeab",
+                "mappingStatus": "verified"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "daniel-refine": {
+      "status": "ready",
+      "summary": "A purchasable stack is ready. Confirm with the person first.",
+      "coverage": [
+        {
+          "name": "Creatine",
+          "unit": "g",
+          "basis": "supplemental",
+          "excess": 0,
+          "ruleId": "a076875d-05a1-4236-9102-952f8255e24d",
+          "status": "covered",
+          "importance": "required",
+          "sourceScope": "supplemental",
+          "authorityUrl": "https://www.nccih.nih.gov/health/dietary-and-herbal-supplements",
+          "contributors": [
+            {
+              "unit": "g",
+              "amount": 3,
+              "productId": "prd_2c298ab52a8056268aed426a29dda3aa",
+              "productName": "Optimum Nutrition Micronized Creatine Monohydrate Powder"
+            }
+          ],
+          "remainingGap": 0,
+          "rulesVersion": "2",
+          "supplementId": "sup_fb1c10b058d55c6083aec2f73fb8b310",
+          "currentAmount": 0,
+          "basisRationale": "Round 9 governed golden catalogue safety successor for 03f1674d-3e07-5d71-b535-41853bc15a1e.",
+          "coveragePercent": 100,
+          "deliveredAmount": 3,
+          "intakeCertainty": "unknown",
+          "populationScope": "adult",
+          "requestedAmount": 3,
+          "upperLimitAmount": 5,
+          "percentOfUpperLimit": 60,
+          "referenceConfidence": "moderate",
+          "safetyLedgerVersion": "6.0.0",
+          "totalExposureAmount": 3,
+          "totalExposureComplete": false
+        },
+        {
+          "name": "Vitamin D3",
+          "unit": "IU",
+          "basis": "supplemental",
+          "excess": 0,
+          "ruleId": "ca3a3da1-4e5b-438a-9322-8ca511182ac9",
+          "status": "covered",
+          "importance": "required",
+          "sourceScope": "total",
+          "authorityUrl": "https://ods.od.nih.gov/factsheets/VitaminD-HealthProfessional/",
+          "contributors": [
+            {
+              "unit": "IU",
+              "amount": 1000,
+              "productId": "prd_617d837380b34ada99c0769d502b5b1c",
+              "productName": "Blackmores Vitamin D3 1000 IU"
+            }
+          ],
+          "remainingGap": 0,
+          "rulesVersion": "1",
+          "supplementId": "sup_927083fbb90a5a24b4c55067b06ead5f",
+          "currentAmount": 0,
+          "basisRationale": "NIH ODS/FNB age-specific vitamin D total-intake UL from foods and supplements. Adult 100 mcg/day equals 4000 IU/day; this is an advisory reference, not approval or a purchase block. Unknown diet prevents verifying total exposure below the reference.",
+          "coveragePercent": 100,
+          "deliveredAmount": 1000,
+          "intakeCertainty": "unknown",
+          "populationScope": "adult",
+          "requestedAmount": 1000,
+          "upperLimitAmount": 4000,
+          "percentOfUpperLimit": 25,
+          "referenceConfidence": "high",
+          "safetyLedgerVersion": "6.0.0",
+          "totalExposureAmount": 1000,
+          "totalExposureComplete": false
+        },
+        {
+          "name": "Magnesium",
+          "unit": "mg",
+          "basis": "supplemental",
+          "excess": 0,
+          "ruleId": "9a044d45-3e36-4319-9262-1bf6a5425574",
+          "status": "partial",
+          "importance": "required",
+          "sourceScope": "supplemental",
+          "authorityUrl": "https://ods.od.nih.gov/factsheets/Magnesium-HealthProfessional/",
+          "contributors": [
+            {
+              "unit": "mg",
+              "amount": 150,
+              "productId": "prd_ae75035d257051658a606e8d4c28b6d2",
+              "productName": "MAGNESIUM"
+            }
+          ],
+          "remainingGap": 50,
+          "rulesVersion": "6",
+          "supplementId": "sup_199df5c489215c37b85b6bcb14b443fa",
+          "currentAmount": 0,
+          "basisRationale": "NIH ODS adult supplemental UL is 350 mg. Restored from a product-review raise to 1,100 mg. https://ods.od.nih.gov/factsheets/Magnesium-HealthProfessional/",
+          "coveragePercent": 75,
+          "deliveredAmount": 150,
+          "intakeCertainty": "unknown",
+          "populationScope": "adult",
+          "requestedAmount": 200,
+          "upperLimitAmount": 350,
+          "percentOfUpperLimit": 43,
+          "referenceConfidence": "high",
+          "safetyLedgerVersion": "6.0.0",
+          "totalExposureAmount": 150,
+          "totalExposureComplete": false
+        }
+      ],
+      "contractVersion": "11.0.0",
+      "changeSummary": [
+        "selected_option:opt_b945fbad8ef3cfa4",
+        "price_changed"
+      ],
+      "questions": [],
+      "safetyGuidance": [],
+      "alternatives": [],
+      "requestSnapshot": {
+        "locale": "en",
+        "currency": "THB",
+        "targets": [
+          {
+            "name": "Creatine",
+            "unit": "g",
+            "basis": "supplemental",
+            "amount": 3,
+            "importance": "required",
+            "supplementId": "sup_fb1c10b058d55c6083aec2f73fb8b310",
+            "requestedName": "Creatine"
+          },
+          {
+            "name": "Vitamin D3",
+            "unit": "IU",
+            "basis": "supplemental",
+            "amount": 1000,
+            "importance": "required",
+            "supplementId": "sup_927083fbb90a5a24b4c55067b06ead5f",
+            "requestedName": "Vitamin D3"
+          },
+          {
+            "name": "Magnesium",
+            "unit": "mg",
+            "basis": "supplemental",
+            "amount": 200,
+            "importance": "required",
+            "supplementId": "sup_199df5c489215c37b85b6bcb14b443fa",
+            "requestedName": "Magnesium"
+          }
+        ],
+        "requirements": {
+          "maxDailyPills": 2,
+          "maxPriceMinor": 200000,
+          "dietaryPreference": "any",
+          "excludeProductIds": [
+            "prd_c13bd4164a854d54a3c5669f310c2afb"
+          ]
+        },
+        "scoring": {
+          "profile": "balanced",
+          "weights": {
+            "pills": 2,
+            "price": 2
+          }
+        },
+        "intake": [],
+        "currentSupplements": [],
+        "originalRequest": {
+          "targets": [
+            {
+              "name": "Creatine",
+              "unit": "g",
+              "basis": "supplemental",
+              "amount": 3,
+              "ingredientId": "sup_fb1c10b058d55c6083aec2f73fb8b310",
+              "supplementId": "sup_fb1c10b058d55c6083aec2f73fb8b310"
+            },
+            {
+              "name": "Vitamin D3",
+              "unit": "IU",
+              "basis": "supplemental",
+              "amount": 1000,
+              "ingredientId": "sup_927083fbb90a5a24b4c55067b06ead5f",
+              "supplementId": "sup_927083fbb90a5a24b4c55067b06ead5f"
+            },
+            {
+              "name": "Magnesium",
+              "unit": "mg",
+              "basis": "supplemental",
+              "amount": 200,
+              "ingredientId": "sup_199df5c489215c37b85b6bcb14b443fa",
+              "supplementId": "sup_199df5c489215c37b85b6bcb14b443fa"
+            }
+          ]
+        }
+      },
+      "matcherTelemetry": {
+        "snapshotId": "snap_777f072a854a4237",
+        "matcherVersion": "importance-matching-3"
+      },
+      "selected": {
+        "coverage": [
+          {
+            "name": "Creatine",
+            "unit": "g",
+            "basis": "supplemental",
+            "excess": 0,
+            "ruleId": "a076875d-05a1-4236-9102-952f8255e24d",
+            "status": "covered",
+            "importance": "required",
+            "sourceScope": "supplemental",
+            "authorityUrl": "https://www.nccih.nih.gov/health/dietary-and-herbal-supplements",
+            "contributors": [
+              {
+                "unit": "g",
+                "amount": 3,
+                "productId": "prd_2c298ab52a8056268aed426a29dda3aa",
+                "productName": "Optimum Nutrition Micronized Creatine Monohydrate Powder"
+              }
+            ],
+            "remainingGap": 0,
+            "rulesVersion": "2",
+            "supplementId": "sup_fb1c10b058d55c6083aec2f73fb8b310",
+            "currentAmount": 0,
+            "basisRationale": "Round 9 governed golden catalogue safety successor for 03f1674d-3e07-5d71-b535-41853bc15a1e.",
+            "coveragePercent": 100,
+            "deliveredAmount": 3,
+            "intakeCertainty": "unknown",
+            "populationScope": "adult",
+            "requestedAmount": 3,
+            "upperLimitAmount": 5,
+            "percentOfUpperLimit": 60,
+            "referenceConfidence": "moderate",
+            "safetyLedgerVersion": "6.0.0",
+            "totalExposureAmount": 3,
+            "totalExposureComplete": false
+          },
+          {
+            "name": "Vitamin D3",
+            "unit": "IU",
+            "basis": "supplemental",
+            "excess": 0,
+            "ruleId": "ca3a3da1-4e5b-438a-9322-8ca511182ac9",
+            "status": "covered",
+            "importance": "required",
+            "sourceScope": "total",
+            "authorityUrl": "https://ods.od.nih.gov/factsheets/VitaminD-HealthProfessional/",
+            "contributors": [
+              {
+                "unit": "IU",
+                "amount": 1000,
+                "productId": "prd_617d837380b34ada99c0769d502b5b1c",
+                "productName": "Blackmores Vitamin D3 1000 IU"
+              }
+            ],
+            "remainingGap": 0,
+            "rulesVersion": "1",
+            "supplementId": "sup_927083fbb90a5a24b4c55067b06ead5f",
+            "currentAmount": 0,
+            "basisRationale": "NIH ODS/FNB age-specific vitamin D total-intake UL from foods and supplements. Adult 100 mcg/day equals 4000 IU/day; this is an advisory reference, not approval or a purchase block. Unknown diet prevents verifying total exposure below the reference.",
+            "coveragePercent": 100,
+            "deliveredAmount": 1000,
+            "intakeCertainty": "unknown",
+            "populationScope": "adult",
+            "requestedAmount": 1000,
+            "upperLimitAmount": 4000,
+            "percentOfUpperLimit": 25,
+            "referenceConfidence": "high",
+            "safetyLedgerVersion": "6.0.0",
+            "totalExposureAmount": 1000,
+            "totalExposureComplete": false
+          },
+          {
+            "name": "Magnesium",
+            "unit": "mg",
+            "basis": "supplemental",
+            "excess": 0,
+            "ruleId": "9a044d45-3e36-4319-9262-1bf6a5425574",
+            "status": "partial",
+            "importance": "required",
+            "sourceScope": "supplemental",
+            "authorityUrl": "https://ods.od.nih.gov/factsheets/Magnesium-HealthProfessional/",
+            "contributors": [
+              {
+                "unit": "mg",
+                "amount": 150,
+                "productId": "prd_ae75035d257051658a606e8d4c28b6d2",
+                "productName": "MAGNESIUM"
+              }
+            ],
+            "remainingGap": 50,
+            "rulesVersion": "6",
+            "supplementId": "sup_199df5c489215c37b85b6bcb14b443fa",
+            "currentAmount": 0,
+            "basisRationale": "NIH ODS adult supplemental UL is 350 mg. Restored from a product-review raise to 1,100 mg. https://ods.od.nih.gov/factsheets/Magnesium-HealthProfessional/",
+            "coveragePercent": 75,
+            "deliveredAmount": 150,
+            "intakeCertainty": "unknown",
+            "populationScope": "adult",
+            "requestedAmount": 200,
+            "upperLimitAmount": 350,
+            "percentOfUpperLimit": 43,
+            "referenceConfidence": "high",
+            "safetyLedgerVersion": "6.0.0",
+            "totalExposureAmount": 150,
+            "totalExposureComplete": false
+          }
+        ],
+        "coveragePercent": 91.67,
+        "candidateKey": "opt_b945fbad8ef3cfa4",
+        "roles": [
+          "best_match"
+        ],
+        "role": "requested_objective",
+        "reason": "Best overall match balancing dose fit, daily routine, preferences and price",
+        "dailyPills": 1,
+        "totalPriceMinor": 212600,
+        "purchaseEligible": true,
+        "snapshotId": "snap_777f072a854a4237",
+        "matcherVersion": "importance-matching-3",
+        "basket": [
+          {
+            "productId": "prd_2c298ab52a8056268aed426a29dda3aa",
+            "productName": "Optimum Nutrition Micronized Creatine Monohydrate Powder",
+            "servingsPerDay": 1,
+            "quantity": 1,
+            "unitPriceMinor": 116600,
+            "lineTotalMinor": 116600,
+            "incompleteCommercialFacts": false,
+            "administration": null,
+            "daysOfSupply": null,
+            "requestedNutrients": [
+              {
+                "name": "Creatine",
+                "unit": "g",
+                "amount": 3,
+                "supplementId": "sup_fb1c10b058d55c6083aec2f73fb8b310"
+              }
+            ],
+            "incidentalNutrients": [],
+            "labelledFacts": [
+              {
+                "name": "Creatine",
+                "unit": "g",
+                "amount": 3,
+                "sourceUrl": "https://shopee.co.th/Optimum-Nutrition-Micronized-Creatine-300g-i.35570873.2263078874",
+                "confidence": "high",
+                "sourceText": "Creatine 5000 mg [high]",
+                "supplementId": "fb1c10b0-58d5-5c60-83ae-c2f73fb8b310",
+                "mappingStatus": "verified"
+              }
+            ]
+          },
+          {
+            "productId": "prd_617d837380b34ada99c0769d502b5b1c",
+            "productName": "Blackmores Vitamin D3 1000 IU",
+            "servingsPerDay": 1,
+            "quantity": 1,
+            "unitPriceMinor": 48500,
+            "lineTotalMinor": 48500,
+            "incompleteCommercialFacts": false,
+            "administration": {
+              "route": "oral",
+              "provenance": {
+                "status": "verified",
+                "sourceUrl": "https://www.blackmores.com.au/products/vitamin-d3-1000-iu",
+                "sourceText": "Manufacturer composition is 1000 IU vitamin D3 per capsule, taken orally. The catalogue image identifies the same Vitamin D3 1000 IU capsule variant. Pack quantity remains unset because the manufacturer page mixes 60-tablet and 200-capsule variants. Nutrient facts, confidence, prices and dietary evidence are unchanged.",
+                "verifiedAt": "2026-09-08T12:00:00Z"
+              },
+              "packQuantity": null,
+              "physicalUnit": "capsule",
+              "doseIncrement": 1,
+              "unitsPerServing": 1
+            },
+            "daysOfSupply": null,
+            "requestedNutrients": [
+              {
+                "name": "Vitamin D3",
+                "unit": "IU",
+                "amount": 1000,
+                "supplementId": "sup_927083fbb90a5a24b4c55067b06ead5f"
+              }
+            ],
+            "incidentalNutrients": [],
+            "labelledFacts": [
+              {
+                "name": "Vitamin D3",
+                "unit": "IU",
+                "amount": 1000,
+                "sourceUrl": null,
+                "confidence": "high",
+                "sourceText": null,
+                "supplementId": "927083fb-b90a-5a24-b4c5-5067b06ead5f",
+                "mappingStatus": "verified"
+              }
+            ]
+          },
+          {
+            "productId": "prd_ae75035d257051658a606e8d4c28b6d2",
+            "productName": "MAGNESIUM",
+            "servingsPerDay": 1,
+            "quantity": 1,
+            "unitPriceMinor": 47500,
+            "lineTotalMinor": 47500,
+            "incompleteCommercialFacts": false,
+            "administration": null,
+            "daysOfSupply": null,
+            "requestedNutrients": [
+              {
+                "name": "Magnesium",
+                "unit": "mg",
+                "amount": 150,
+                "supplementId": "sup_199df5c489215c37b85b6bcb14b443fa"
+              }
+            ],
+            "incidentalNutrients": [],
+            "labelledFacts": [
+              {
+                "name": "Magnesium",
+                "unit": "mg",
+                "amount": 150,
+                "sourceUrl": null,
+                "confidence": "high",
+                "sourceText": null,
+                "supplementId": "199df5c4-8921-5c37-b85b-6bcb14b443fa",
+                "mappingStatus": "verified"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "maya-create": {
+      "status": "ready",
+      "summary": "A purchasable stack is ready. Confirm with the person first.",
+      "coverage": [
+        {
+          "name": "Vitamin B12",
+          "unit": "mcg",
+          "basis": "supplemental",
+          "excess": 0,
+          "ruleId": "d63b6ce0-5a4a-4639-b38a-8bede2429864",
+          "status": "uncovered",
+          "importance": "required",
+          "sourceScope": "supplemental",
+          "authorityUrl": "https://ods.od.nih.gov/factsheets/list-VitaminsMinerals/",
+          "contributors": [],
+          "remainingGap": 250,
+          "rulesVersion": "2",
+          "supplementId": "sup_7ddcc4f2708f590599a402d80e935adf",
+          "currentAmount": 0,
+          "basisRationale": "Round 9 governed golden catalogue safety successor for d2eaf3f8-89d1-51e9-b85d-549467f521b1.",
+          "coveragePercent": 0,
+          "deliveredAmount": 0,
+          "intakeCertainty": "unknown",
+          "populationScope": "adult",
+          "requestedAmount": 250,
+          "upperLimitAmount": 2000,
+          "percentOfUpperLimit": 0,
+          "referenceConfidence": "moderate",
+          "safetyLedgerVersion": "6.0.0",
+          "totalExposureAmount": 0,
+          "totalExposureComplete": false
+        },
+        {
+          "name": "Vitamin D3",
+          "unit": "IU",
+          "basis": "supplemental",
+          "excess": 0,
+          "ruleId": "ca3a3da1-4e5b-438a-9322-8ca511182ac9",
+          "status": "covered",
+          "importance": "required",
+          "sourceScope": "total",
+          "authorityUrl": "https://ods.od.nih.gov/factsheets/VitaminD-HealthProfessional/",
+          "contributors": [
+            {
+              "unit": "IU",
+              "amount": 1000,
+              "productId": "prd_617d837380b34ada99c0769d502b5b1c",
+              "productName": "Blackmores Vitamin D3 1000 IU"
+            }
+          ],
+          "remainingGap": 0,
+          "rulesVersion": "1",
+          "supplementId": "sup_927083fbb90a5a24b4c55067b06ead5f",
+          "currentAmount": 0,
+          "basisRationale": "NIH ODS/FNB age-specific vitamin D total-intake UL from foods and supplements. Adult 100 mcg/day equals 4000 IU/day; this is an advisory reference, not approval or a purchase block. Unknown diet prevents verifying total exposure below the reference.",
+          "coveragePercent": 100,
+          "deliveredAmount": 1000,
+          "intakeCertainty": "unknown",
+          "populationScope": "adult",
+          "requestedAmount": 1000,
+          "upperLimitAmount": 4000,
+          "percentOfUpperLimit": 25,
+          "referenceConfidence": "high",
+          "safetyLedgerVersion": "6.0.0",
+          "totalExposureAmount": 1000,
+          "totalExposureComplete": false
+        },
+        {
+          "name": "Omega-3",
+          "unit": "mg",
+          "basis": "supplemental",
+          "excess": 0,
+          "ruleId": "e34367b0-f58c-4370-b0f6-83b537a0d3d2",
+          "status": "uncovered",
+          "importance": "required",
+          "sourceScope": "supplemental",
+          "authorityUrl": null,
+          "contributors": [],
+          "remainingGap": 500,
+          "rulesVersion": "3",
+          "supplementId": "sup_9da42d1d24f556d2bd625ea45adfcc4b",
+          "currentAmount": 0,
+          "basisRationale": "Round 9 governed golden catalogue safety successor for 0bfa280e-429f-4d3c-a889-5ba1b0dfe251.",
+          "coveragePercent": 0,
+          "deliveredAmount": 0,
+          "intakeCertainty": "unknown",
+          "populationScope": "adult",
+          "requestedAmount": 500,
+          "upperLimitAmount": 3000,
+          "percentOfUpperLimit": 0,
+          "referenceConfidence": "moderate",
+          "safetyLedgerVersion": "6.0.0",
+          "totalExposureAmount": 0,
+          "totalExposureComplete": false
+        }
+      ],
+      "contractVersion": "11.0.0",
+      "changeSummary": [],
+      "questions": [],
+      "safetyGuidance": [],
+      "alternatives": [],
+      "requestSnapshot": {
+        "locale": "en",
+        "currency": "THB",
+        "targets": [
+          {
+            "name": "Vitamin B12",
+            "unit": "mcg",
+            "basis": "supplemental",
+            "amount": 250,
+            "importance": "required",
+            "supplementId": "sup_7ddcc4f2708f590599a402d80e935adf",
+            "requestedName": "Vitamin B12"
+          },
+          {
+            "name": "Vitamin D3",
+            "unit": "IU",
+            "basis": "supplemental",
+            "amount": 1000,
+            "importance": "required",
+            "supplementId": "sup_927083fbb90a5a24b4c55067b06ead5f",
+            "requestedName": "Vitamin D3"
+          },
+          {
+            "name": "Omega-3",
+            "unit": "mg",
+            "basis": "supplemental",
+            "amount": 500,
+            "importance": "required",
+            "supplementId": "sup_9da42d1d24f556d2bd625ea45adfcc4b",
+            "requestedName": "Omega-3"
+          }
+        ],
+        "requirements": {
+          "maxDailyPills": 3,
+          "maxPriceMinor": 150000,
+          "dietaryPreference": "vegan",
+          "omega3SourcePreference": "algae_only"
+        },
+        "scoring": {
+          "profile": "balanced",
+          "weights": {}
+        },
+        "intake": [],
+        "currentSupplements": [],
+        "originalRequest": {
+          "targets": [
+            {
+              "name": "Vitamin B12",
+              "unit": "mcg",
+              "basis": "supplemental",
+              "amount": 250,
+              "ingredientId": "sup_7ddcc4f2708f590599a402d80e935adf",
+              "supplementId": "sup_7ddcc4f2708f590599a402d80e935adf"
+            },
+            {
+              "name": "Vitamin D3",
+              "unit": "IU",
+              "basis": "supplemental",
+              "amount": 1000,
+              "ingredientId": "sup_927083fbb90a5a24b4c55067b06ead5f",
+              "supplementId": "sup_927083fbb90a5a24b4c55067b06ead5f"
+            },
+            {
+              "name": "Omega-3",
+              "unit": "mg",
+              "basis": "supplemental",
+              "amount": 500,
+              "ingredientId": "sup_9da42d1d24f556d2bd625ea45adfcc4b",
+              "supplementId": "sup_9da42d1d24f556d2bd625ea45adfcc4b"
+            }
+          ]
+        }
+      },
+      "matcherTelemetry": {
+        "snapshotId": "snap_777f072a854a4237",
+        "matcherVersion": "importance-matching-3"
+      },
+      "selected": {
+        "coverage": [
+          {
+            "name": "Vitamin B12",
+            "unit": "mcg",
+            "basis": "supplemental",
+            "excess": 0,
+            "ruleId": "d63b6ce0-5a4a-4639-b38a-8bede2429864",
+            "status": "uncovered",
+            "importance": "required",
+            "sourceScope": "supplemental",
+            "authorityUrl": "https://ods.od.nih.gov/factsheets/list-VitaminsMinerals/",
+            "contributors": [],
+            "remainingGap": 250,
+            "rulesVersion": "2",
+            "supplementId": "sup_7ddcc4f2708f590599a402d80e935adf",
+            "currentAmount": 0,
+            "basisRationale": "Round 9 governed golden catalogue safety successor for d2eaf3f8-89d1-51e9-b85d-549467f521b1.",
+            "coveragePercent": 0,
+            "deliveredAmount": 0,
+            "intakeCertainty": "unknown",
+            "populationScope": "adult",
+            "requestedAmount": 250,
+            "upperLimitAmount": 2000,
+            "percentOfUpperLimit": 0,
+            "referenceConfidence": "moderate",
+            "safetyLedgerVersion": "6.0.0",
+            "totalExposureAmount": 0,
+            "totalExposureComplete": false
+          },
+          {
+            "name": "Vitamin D3",
+            "unit": "IU",
+            "basis": "supplemental",
+            "excess": 0,
+            "ruleId": "ca3a3da1-4e5b-438a-9322-8ca511182ac9",
+            "status": "covered",
+            "importance": "required",
+            "sourceScope": "total",
+            "authorityUrl": "https://ods.od.nih.gov/factsheets/VitaminD-HealthProfessional/",
+            "contributors": [
+              {
+                "unit": "IU",
+                "amount": 1000,
+                "productId": "prd_617d837380b34ada99c0769d502b5b1c",
+                "productName": "Blackmores Vitamin D3 1000 IU"
+              }
+            ],
+            "remainingGap": 0,
+            "rulesVersion": "1",
+            "supplementId": "sup_927083fbb90a5a24b4c55067b06ead5f",
+            "currentAmount": 0,
+            "basisRationale": "NIH ODS/FNB age-specific vitamin D total-intake UL from foods and supplements. Adult 100 mcg/day equals 4000 IU/day; this is an advisory reference, not approval or a purchase block. Unknown diet prevents verifying total exposure below the reference.",
+            "coveragePercent": 100,
+            "deliveredAmount": 1000,
+            "intakeCertainty": "unknown",
+            "populationScope": "adult",
+            "requestedAmount": 1000,
+            "upperLimitAmount": 4000,
+            "percentOfUpperLimit": 25,
+            "referenceConfidence": "high",
+            "safetyLedgerVersion": "6.0.0",
+            "totalExposureAmount": 1000,
+            "totalExposureComplete": false
+          },
+          {
+            "name": "Omega-3",
+            "unit": "mg",
+            "basis": "supplemental",
+            "excess": 0,
+            "ruleId": "e34367b0-f58c-4370-b0f6-83b537a0d3d2",
+            "status": "uncovered",
+            "importance": "required",
+            "sourceScope": "supplemental",
+            "authorityUrl": null,
+            "contributors": [],
+            "remainingGap": 500,
+            "rulesVersion": "3",
+            "supplementId": "sup_9da42d1d24f556d2bd625ea45adfcc4b",
+            "currentAmount": 0,
+            "basisRationale": "Round 9 governed golden catalogue safety successor for 0bfa280e-429f-4d3c-a889-5ba1b0dfe251.",
+            "coveragePercent": 0,
+            "deliveredAmount": 0,
+            "intakeCertainty": "unknown",
+            "populationScope": "adult",
+            "requestedAmount": 500,
+            "upperLimitAmount": 3000,
+            "percentOfUpperLimit": 0,
+            "referenceConfidence": "moderate",
+            "safetyLedgerVersion": "6.0.0",
+            "totalExposureAmount": 0,
+            "totalExposureComplete": false
+          }
+        ],
+        "coveragePercent": 33.33,
+        "candidateKey": "opt_a69ed24dab2c98b4",
+        "roles": [
+          "best_match",
+          "simpler"
+        ],
+        "role": "requested_objective",
+        "reason": "Best overall match balancing dose fit, daily routine, preferences and price",
+        "dailyPills": 1,
+        "totalPriceMinor": 48500,
+        "purchaseEligible": true,
+        "snapshotId": "snap_777f072a854a4237",
+        "matcherVersion": "importance-matching-3",
+        "basket": [
+          {
+            "productId": "prd_617d837380b34ada99c0769d502b5b1c",
+            "productName": "Blackmores Vitamin D3 1000 IU",
+            "servingsPerDay": 1,
+            "quantity": 1,
+            "unitPriceMinor": 48500,
+            "lineTotalMinor": 48500,
+            "incompleteCommercialFacts": false,
+            "administration": {
+              "route": "oral",
+              "provenance": {
+                "status": "verified",
+                "sourceUrl": "https://www.blackmores.com.au/products/vitamin-d3-1000-iu",
+                "sourceText": "Manufacturer composition is 1000 IU vitamin D3 per capsule, taken orally. The catalogue image identifies the same Vitamin D3 1000 IU capsule variant. Pack quantity remains unset because the manufacturer page mixes 60-tablet and 200-capsule variants. Nutrient facts, confidence, prices and dietary evidence are unchanged.",
+                "verifiedAt": "2026-09-08T12:00:00Z"
+              },
+              "packQuantity": null,
+              "physicalUnit": "capsule",
+              "doseIncrement": 1,
+              "unitsPerServing": 1
+            },
+            "daysOfSupply": null,
+            "requestedNutrients": [
+              {
+                "name": "Vitamin D3",
+                "unit": "IU",
+                "amount": 1000,
+                "supplementId": "sup_927083fbb90a5a24b4c55067b06ead5f"
+              }
+            ],
+            "incidentalNutrients": [],
+            "labelledFacts": [
+              {
+                "name": "Vitamin D3",
+                "unit": "IU",
+                "amount": 1000,
+                "sourceUrl": null,
+                "confidence": "high",
+                "sourceText": null,
+                "supplementId": "927083fb-b90a-5a24-b4c5-5067b06ead5f",
+                "mappingStatus": "verified"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  }
+}
