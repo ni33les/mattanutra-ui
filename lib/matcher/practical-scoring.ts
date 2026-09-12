@@ -187,16 +187,26 @@ export function overallMatchingScore(request: CanonicalRequest, exposure: Readon
   return { ...penalties, dosePenalty: dose.total, overallPenalty: toNumber(total), overallExact: encoded(total) };
 }
 
-const stateScores = new WeakMap<CanonicalRequest, WeakMap<SearchState, OverallMatchingScore>>();
+const stateScores = new WeakMap<CanonicalRequest, WeakMap<SearchState["exposure"], { state: SearchState; score: OverallMatchingScore }[]>>();
+function sameMeasurements(a: SearchState, b: SearchState) {
+  return a.pills === b.pills && a.pillCountKnown === b.pillCountKnown && a.count === b.count && a.price === b.price &&
+    a.uncertainAdministrationCount === b.uncertainAdministrationCount && a.monthlyPriceMinor === b.monthlyPriceMinor &&
+    a.monthlyPriceLowerBound === b.monthlyPriceLowerBound && (a.servingBurden && b.servingBurden
+      ? a.servingBurden.num === b.servingBurden.num && a.servingBurden.den === b.servingBurden.den
+      : a.routineServings === b.routineServings);
+}
 export function searchStateScore(request: CanonicalRequest, state: SearchState): OverallMatchingScore {
   let cache = stateScores.get(request); if (!cache) { cache = new WeakMap(); stateScores.set(request, cache); }
-  let result = cache.get(state);
-  if (!result) {
-    result = overallMatchingScore(request, state.exposure, { dailyPills: state.pillCountKnown === false ? null : state.pills,
+  let bucket = cache.get(state.exposure);
+  const found = bucket?.find(row => row.state === state || sameMeasurements(row.state, state));
+  if (found) return found.score;
+  const result = overallMatchingScore(request, state.exposure, { dailyPills: state.pillCountKnown === false ? null : state.pills,
       pillLowerBound: state.pills, productCount: state.count, priceMinor: state.price, currency: request.currency,
       servings: state.routineServings ?? [], servingBurdenExact: state.servingBurden, uncertainProductCount: state.uncertainAdministrationCount ?? state.count,
-      monthlyPriceMinor: state.monthlyPriceMinor, monthlyPriceLowerBound: state.monthlyPriceLowerBound }); cache.set(state, result);
-  }
+      monthlyPriceMinor: state.monthlyPriceMinor, monthlyPriceLowerBound: state.monthlyPriceLowerBound });
+  if (!bucket) { bucket = []; cache.set(state.exposure, bucket); }
+  if (bucket.length >= 8) bucket.shift();
+  bucket.push({ state, score: result });
   return result;
 }
 export function compareOverallScores(left: OverallMatchingScore, right: OverallMatchingScore) {
