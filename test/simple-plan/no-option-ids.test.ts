@@ -71,7 +71,8 @@ test('NOID-06 checkout-ready copy does not assert prior confirmation in any loca
   for (const locale of ['en','th','zh-CN']) {
     const app = runtime(), created = await plan(app, { ...create(), locale, idempotencyKey: `noid-ready-copy-create-${locale}` });
     assert.equal(created.nextAction, 'execute'); assert.equal(created.revision, 1);
-    assert.equal(created.summary, summaries[locale]);
+    const fit: Record<string, string> = { en: 'Known contributions meet 1/1 requested amounts (Vitamin D3).', th: 'ปริมาณที่ทราบถึงเป้าหมาย 1/1 รายการ (Vitamin D3)', 'zh-CN': '已知贡献达到 1/1 项请求量（Vitamin D3）。' };
+    assert.equal(created.summary, `${summaries[locale]} ${fit[locale]}`);
   }
 });
 
