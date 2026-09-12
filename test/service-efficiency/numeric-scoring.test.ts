@@ -97,3 +97,12 @@ test('REF-CPU-08 supported quantity probes reuse compiled subject and unit facts
   assert.equal(next.safetyExposure?.get('a')?.units, 200_000_000n);
   assert.equal(unitCompilations, 0, 'Changing supported quantities multiplies compiled units without resolving names again');
 });
+
+test('REF-CPU-09 numerical matching compiles the subject set when incidental exposure has no applicable reference', () => {
+  const input = request({ profileKnown: { ageYears: false, lifeStage: false, sex: false } });
+  let traversals = 0;
+  class Exposure extends Map<string, bigint> { override keys() { traversals++; return super.keys(); } }
+  const actual = new Exposure([['a', 75_000_000n], ['unrequested', 999_000_000n]]);
+  assert.equal(doseFitScore(input, actual).total, 0.25);
+  assert.equal(traversals, 0, 'The fixed numeric subject set is independent of irrelevant incidental facts');
+});
