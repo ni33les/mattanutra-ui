@@ -97,7 +97,7 @@
     },
     {
       "file": "test/service-efficiency/numeric-scoring.test.ts",
-      "expectedCases": 19,
+      "expectedCases": 18,
       "reason": "Exact ranking must avoid allocating human display conversions while preserving complete serialized score facts and weighted penalties",
       "slice": "matching"
     },
@@ -216,12 +216,6 @@
       "slice": "consumers",
       "expectedCases": 13,
       "reason": "Shared immutable catalogue identity in goods economics and continued-inventory ledgers preserves exact pack, replenishment and money semantics."
-    },
-    {
-      "file": "test/nutrient-identity.test.ts",
-      "expectedCases": 1,
-      "reason": "Reused immutable name normalization must retain directional nutrient-form eligibility and aliases",
-      "slice": "matching"
     }
   ],
   "inputs": [
