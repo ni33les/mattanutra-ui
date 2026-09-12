@@ -26,6 +26,9 @@ export async function paymentFulfillmentEvidence(sql: Db, payment: FulfillmentPa
       and b.event_name='payment_fulfillment_succeeded' and b.event_status='paid'
       and b.plan_id is not distinct from ${payment.plan_id}::uuid and b.selected_plan=${payment.selected_plan}::public.assessment_plan
       and b.occurred_at >= greatest(${payment.paid_at}::timestamptz,${payment.bound_at}::timestamptz,${payment.created_at}::timestamptz)) as completed_receipt,
+    exists (select 1 from public.tasks t where t.payload->>'paymentId'=${payment.id}
+      and t.plan_id is null and t.task_type='fulfill_web_payment' and t.status='completed'
+      and t.completed_at >= greatest(${payment.paid_at}::timestamptz,${payment.created_at}::timestamptz)) as reservation_completed,
     exists (select 1 from public.assessments a join public.assessment_versions v on v.plan_id=a.plan_id
       where a.plan_id=${payment.plan_id}::uuid and a.selected_plan=${payment.selected_plan}::public.assessment_plan
         and v.action='plan_selection_projection_update' and v.source='task_worker'
@@ -37,7 +40,7 @@ export async function paymentFulfillmentEvidence(sql: Db, payment: FulfillmentPa
           or exists (select 1 from public.tasks t where t.id::text=v.metadata->>'formulationTaskId'
             and t.plan_id=a.plan_id and t.task_type='generate_supplement_guidance' and t.created_at <= v.created_at))) as plan_started`;
   const planStarted = facts?.plan_started === true;
-  const historicalComplete = accountingRecorded && facts?.completed_receipt === true && (!payment.plan_id || planStarted);
+  const historicalComplete = accountingRecorded && facts?.completed_receipt === true && (payment.plan_id ? planStarted : facts?.reservation_completed === true);
   return { status: historicalComplete ? "complete" : payment.fulfillment_status, accountingRecorded, planStarted, historicalComplete };
 }
 

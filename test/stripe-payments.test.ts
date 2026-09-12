@@ -290,7 +290,7 @@ describe("Stripe payment schema and lifecycle", () => {
       /destination: paymentReturnPath\(\s*payment\.locale/
     );
     assert.doesNotMatch(paymentService, /void finishMockPaymentSideEffects\(/);
-    assert.match(paymentService, /await enqueueWebPaymentFulfillment\(tx, row\)/);
+    assert.match(paymentService, /await enqueueWebPaymentFulfillment\(tx, row, confirmed \? prepared : newlyConfirmedFulfillment\(row\)\)/);
     assert.match(
       paymentService,
       /returnUrl:\s*paymentReturnPath\(\s*input\.locale,\s*mockSessionId\s*\)/

@@ -1071,7 +1071,8 @@ export async function createStripeCheckoutSession(input: CheckoutSessionInput) {
       redirectUrl: paymentReturnPath(input.locale, payment.stripe_checkout_session_id) };
   }
   if (payment.status === "paid" || payment.status === "bound") {
-    await withDatabaseTransaction(sql, tx => enqueueWebPaymentFulfillment(tx, payment));
+    const prepared = await preparePaymentFulfillment(sql, payment);
+    await withDatabaseTransaction(sql, tx => enqueueWebPaymentFulfillment(tx, payment, prepared));
     return { paymentId, clientSecret: null, mock: config.mode === "mock", publishableKey: config.publishableKey,
       redirectUrl: payment.plan_id ? nutritionProgressPath(input.locale, payment.plan_id) : nutritionQuizPath(input.locale, undefined, { payment: payment.id }) };
   }

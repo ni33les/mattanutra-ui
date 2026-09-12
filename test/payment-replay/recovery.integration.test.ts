@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { after, test } from "node:test";
 import Stripe from "stripe";
+import { createTask } from "../../lib/task-service.ts";
 import { closeSqlPool } from "../../lib/db.ts";
 import { fulfillCheckoutSession, handleStripeWebhookPayload, bindPaidReservationToAssessment } from "../../lib/stripe-payments.ts";
 import { fulfillWebPayment, enqueueWebPaymentFulfillment } from "../../lib/web-payment-fulfillment.ts";
@@ -37,12 +38,13 @@ test("PAY-RECOVER-03 paid and accounting or telemetry alone never proves plan co
 test("PAY-RECOVER-04 reservation evidence cannot complete a newly bound assessment", async () => {
   await isolated(async sql => {
     const p = await paidFixture(sql, { plan: false });
-    await sql`insert into tasks(id,title,task_type,status,payload,completed_at) values (${randomUUID()}::uuid,'Completed reservation','fulfill_web_payment','completed',${sql.json({ paymentId: p.id })},now())`;
+    const { task } = await createTask({ title: "Completed reservation", taskType: "fulfill_web_payment", actorType: "deterministic", payload: { paymentId: p.id }, requiredCapabilities: ["payments.web.fulfill"] }, sql);
+    await sql`update tasks set status='completed',completed_at=now() where id=${task.id}::uuid`;
     assert.equal((await paymentFulfillmentEvidence(sql, p)).status, "complete");
     const planId = randomUUID(); await sql`insert into assessments(plan_id,locale,status,answers,answer_summary) values (${planId}::uuid,'en','captured','{}','{}')`;
     const bound = await bindPaidReservationToAssessment({ paymentId: p.id, planId, locale: "en" });
     assert.equal(bound?.fulfillmentStatus, "pending");
-    assert.equal((await sql`select count(*)::int as n from tasks where payload->>'paymentId'=${p.id}`)[0].n, 1);
+    assert.equal((await sql`select count(*)::int as n from tasks where payload->>'paymentId'=${p.id} and status <> 'completed'`)[0].n, 1);
   });
 });
 test("PAY-RECOVER-05 obsolete task and duplicate signed webhook do not restart completed historical work", async () => {

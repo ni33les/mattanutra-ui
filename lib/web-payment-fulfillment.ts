@@ -20,8 +20,20 @@ export async function enqueueWebPaymentFulfillment(sql: Db, payment: PaymentRow,
   if (prepared && prepared.identity !== paymentFulfillmentIdentity(payment)) throw new Error("Payment changed; retry fulfillment preparation");
   const evidence = prepared?.evidence ?? await paymentFulfillmentEvidence(sql, payment);
   if (evidence.status === "complete") return null;
-  await sql`update public.payments set fulfillment_status = 'pending', fulfillment_error = null
-    where id = ${payment.id}::uuid`;
+  const admitted = await sql`update public.payments set fulfillment_status = 'pending', fulfillment_error = null
+    where id = ${payment.id}::uuid and status in ('paid','bound') and fulfillment_status <> 'complete'
+      and plan_id is not distinct from ${payment.plan_id}::uuid
+      and selected_plan=${payment.selected_plan}::public.assessment_plan and amount=${String(payment.amount)}::bigint and currency=${payment.currency}
+      and stripe_checkout_session_id is not distinct from ${payment.stripe_checkout_session_id}
+      and stripe_payment_intent_id is not distinct from ${payment.stripe_payment_intent_id}
+      and date_trunc('milliseconds',paid_at) is not distinct from ${payment.paid_at}::timestamptz
+      and date_trunc('milliseconds',bound_at) is not distinct from ${payment.bound_at}::timestamptz
+    returning id`;
+  if (!admitted.length) {
+    const [current] = await sql<PaymentRow[]>`select * from public.payments where id=${payment.id}::uuid`;
+    if (current && paymentFulfillmentIdentity(current) === paymentFulfillmentIdentity(payment) && current.fulfillment_status === "complete") return null;
+    throw new Error("Payment changed; retry fulfillment preparation");
+  }
   const { task } = await createTask({
     actorType: "deterministic", title: "Fulfill confirmed web payment", taskType: WEB_PAYMENT_FULFILLMENT_TASK,
     planId: payment.plan_id, payload: { paymentId: payment.id },
@@ -81,7 +93,7 @@ export async function fulfillWebPayment(paymentId: string, dependencies: Fulfill
         and selected_plan=${payment.selected_plan}::public.assessment_plan and amount=${String(payment.amount)}::bigint and currency=${payment.currency}
         and stripe_checkout_session_id is not distinct from ${payment.stripe_checkout_session_id}
         and stripe_payment_intent_id is not distinct from ${payment.stripe_payment_intent_id}
-        and bound_at is not distinct from ${payment.bound_at}::timestamptz
+        and date_trunc('milliseconds',bound_at) is not distinct from ${payment.bound_at}::timestamptz
         and status in ('paid','bound') and fulfillment_status <> 'complete'`;
     void writePaymentBpmEvent({ eventName: "payment_fulfillment_failed", eventStatus: "failed", paymentId,
       planId: payment.plan_id, locale: payment.locale, errorCode: "fulfillment_failed",
