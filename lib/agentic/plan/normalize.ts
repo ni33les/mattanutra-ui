@@ -10,6 +10,7 @@ import type { MatcherUnit } from "@/lib/matcher/types";
 import { DEFAULT_TARGET_BASIS } from "@/lib/agentic/contract/schemas";
 import { resolvePracticalProfile } from "@/lib/matcher/practical-scoring";
 import { resolvedNutrientFormName } from "@/lib/nutrient-identity";
+import { preparePlanAvailability } from '@/lib/agentic/plan/availability';
 import type {
   AcceptedGap,
   CanonicalPlanState,
@@ -673,8 +674,9 @@ export async function normalizePlanRequest(input: Readonly<{
   };
 
   state = applyPlanAnswers(state, request);
-
-
+  const available = preparePlanAvailability(state, input.snapshot);
+  if (isAgenticErrorResult(available)) return available;
+  state = available;
   return {
     hash: canonicalRequestHash(state),
     state

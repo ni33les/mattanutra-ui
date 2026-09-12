@@ -34,6 +34,10 @@ export function catalogueSnapshotId(snapshot: CatalogueSnapshot) {
       acceptedUnits: [...supplement.acceptedUnits].sort() }));
     hash.update("\n");
   }
+  for (const row of [...(snapshot.disallowedSupplements ?? [])].sort((a,b) => a.supplementId.localeCompare(b.supplementId))) {
+    hash.update(canonicalJson({ disallowed: true, ...row, aliases: [...row.aliases].sort(), acceptedUnits: [...row.acceptedUnits].sort() }));
+  }
+  if (snapshot.disallowedProductIds?.length) hash.update(canonicalJson([...snapshot.disallowedProductIds].sort()));
 
   return `snap_${hash.digest("hex").slice(0, 16)}`;
 }
@@ -56,7 +60,9 @@ export function freezeCatalogueSnapshot(
     availabilityAsOf: snapshot.availabilityAsOf,
     catalogueVersion: snapshot.catalogueVersion,
     products: Object.freeze([...snapshot.products]),
-    supplements: Object.freeze([...snapshot.supplements])
+    supplements: Object.freeze([...snapshot.supplements]),
+    ...(snapshot.disallowedSupplements ? { disallowedSupplements: Object.freeze([...snapshot.disallowedSupplements]) } : {}),
+    ...(snapshot.disallowedProductIds ? { disallowedProductIds: Object.freeze([...snapshot.disallowedProductIds]) } : {})
   });
   matchingIdentities.set(frozen, matchingSnapshotId(snapshot));
   return frozen;

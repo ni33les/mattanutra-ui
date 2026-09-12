@@ -40,11 +40,12 @@ export function prepareSimpleRequest(input: Row, snapshot: CatalogueSnapshot, pr
       seen.add(id); removed.add(id); targets.splice(existingIndex, 1); continue;
     }
     let name: string | undefined = typeof row.name === "string" ? row.name : old?.name;
-    const unresolved = old?.ingredientId?.startsWith("req_") === true;
     const sourceAlias = name?.normalize("NFKC").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim() === "algae omega 3";
     const resolveName = sourceAlias && merged.requirements.omega3SourcePreference === "algae_only" ? "Omega-3" : name;
-    const found = unresolved ? null : resolveSupplement(snapshot, { name: resolveName, supplementId: id }, `${field}.${id ? "ingredientId" : "name"}`);
-    if (isAgenticErrorResult(found) && id) return found.error.reasonCode === "incompatible_identity" ? found : failure(`${field}.ingredientId`, "Use a returned or published ingredient ID.");
+    const found = resolveSupplement({ ...snapshot, supplements: [...snapshot.supplements, ...(snapshot.disallowedSupplements ?? [])] },
+      { name: resolveName, supplementId: id?.startsWith('req_') ? undefined : id }, `${field}.${id ? "ingredientId" : "name"}`);
+    if (isAgenticErrorResult(found) && found.error.reasonCode === 'incompatible_identity') return found;
+    if (isAgenticErrorResult(found) && id && !old && !name) return found.error.reasonCode === "incompatible_identity" ? found : failure(`${field}.ingredientId`, "Use a returned or published ingredient ID.");
     const known = found && !isAgenticErrorResult(found) ? found : null;
     name ??= known?.name;
     if (!name) return failure(`${field}.name`, "A new target requires a name or published ingredient ID.");
@@ -63,7 +64,7 @@ export function prepareSimpleRequest(input: Row, snapshot: CatalogueSnapshot, pr
     if (amount === 0 && !zeroTargetScale(known?.name ?? name, identity)) return failure(`${field}.amount`, "No reviewed zero-target normalization scale is available for this ingredient. Agree a positive target or use an explicit exclusion for categorical avoidance.");
     const next: PlanRequestTarget = { ...(old ?? {}), ingredientId: identity, name, amount, unit,
       basis: (row.basis ?? old?.basis ?? "total_daily") as PlanRequestTarget["basis"],
-      ...(known ? { supplementId: known.supplementId } : {}), ...(row.acceptableRange ? { acceptableRange: row.acceptableRange as PlanRequestTarget["acceptableRange"] } : {}) };
+      ...(known && !snapshot.disallowedSupplements?.some(row => row.supplementId === known.supplementId) ? { supplementId: known.supplementId } : {}), ...(row.acceptableRange ? { acceptableRange: row.acceptableRange as PlanRequestTarget["acceptableRange"] } : {}) };
     if (old) targets[existingIndex] = next; else targets.push(next);
   }
   if (targets.length > 30) return failure("targets", "At most 30 requested targets are supported; remove a target before adding another.");

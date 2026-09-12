@@ -434,9 +434,10 @@ export async function loadLiveRetailSnapshot(
 
   const runtimeRevision = await getCatalogueRuntimeRevision(sql);
   let supplements: CatalogueSnapshot["supplements"] = [];
+  const disallowedSupplements: CatalogueSupplement[] = [];
 
   try {
-    supplements = await loadLiveSupplementsForCountry(sql, code);
+    supplements = await loadLiveSupplementsForCountry(sql, code, disallowedSupplements);
   } catch (error) {
     console.warn("Unable to load live supplements for MCP", {
       countryCode: code,
@@ -445,6 +446,8 @@ export async function loadLiveRetailSnapshot(
   }
 
   const contributionIndex = buildContributionIndex(supplements);
+  const disallowedProductIds = (await sql<Array<{id: string}>>`select id::text from public.products where status <> 'approved' order by id`)
+    .map(row => publicProductId(row.id));
 
   const skuRows = await sql<SnapshotSkuRow[]>`
     with tenants as materialized (
@@ -577,6 +580,8 @@ export async function loadLiveRetailSnapshot(
     catalogueVersion: `retail-${code}-${byListing.size}`,
     runtimeRevision,
     products: [...byListing.values()],
+    disallowedSupplements,
+    disallowedProductIds,
     supplements
   };
 }

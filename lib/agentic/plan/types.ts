@@ -161,6 +161,7 @@ export type PlanLeftover = Readonly<{
 }>;
 
 export type CanonicalPlanState = Readonly<{
+  availability?: import('@/lib/agentic/plan/availability').PlanAvailability;
   scoring?: import("@/lib/matcher/scoring-policy").ScoringSettings;
   searchEffort?: "standard" | "expanded";
   acceptedGaps: readonly AcceptedGap[];

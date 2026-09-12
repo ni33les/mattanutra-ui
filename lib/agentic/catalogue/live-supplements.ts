@@ -148,7 +148,8 @@ export function buildContributionIndex(
 
 export async function loadLiveSupplementsForCountry(
   sql: postgres.Sql | postgres.TransactionSql,
-  countryCode: string
+  countryCode: string,
+  disallowed?: CatalogueSupplement[]
 ): Promise<CatalogueSupplement[]> {
   const code = countryCode.trim().toUpperCase();
   const rows = await sql<Array<{
@@ -221,6 +222,11 @@ export async function loadLiveSupplementsForCountry(
     ) json_rule on true
   `;
 
+  if (disallowed) for (const row of rows) {
+    if (row.status !== 'blocked' || row.deleted) continue;
+    const item = catalogueSupplementFromLiveRow({ aliases: row.aliases, deleted: false, factUnits: row.fact_units, maxUnit: row.max_unit, name: row.name, status: 'allowed', uuid: row.uuid });
+    if (item) disallowed.push(item);
+  }
   return rows
     .map((row) =>
       catalogueSupplementFromLiveRow({

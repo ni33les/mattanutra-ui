@@ -30,6 +30,8 @@ export type CatalogueProduct = Readonly<{
 }>;
 
 export type CatalogueSnapshot = Readonly<{
+  disallowedSupplements?: readonly CatalogueSupplement[];
+  disallowedProductIds?: readonly string[];
   runtimeRevision?: number;
   availabilityAsOf: string;
   catalogueVersion: string;

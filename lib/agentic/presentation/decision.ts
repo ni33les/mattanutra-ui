@@ -1,4 +1,5 @@
 import { boundedDecisionCopy, requestFitCopy, refinementCopy } from "@/lib/agentic/presentation/decision-copy";
+import { availabilityMessage } from '@/lib/agentic/plan/availability';
 import { isUuid, publicSupplementId } from "@/lib/agentic/contract/ids";
 import { sha256Hex } from "@/lib/sha256";
 import { convertAmount } from "@/lib/matcher/dose";
@@ -111,6 +112,9 @@ function choiceIngredients(result: PlanResult, option: StackOption): Ingredient[
   for (const row of rows.values()) {
     const amount = quantified.get(row.ingredientId) ?? 0;
     row.supplied = unknown.has(row.ingredientId) ? null : amount;
+    const prepared = state.availability?.ingredients[row.ingredientId];
+    row.availability = prepared === 'not_allowed' || prepared === 'not_on_list' ? prepared
+      : row.supplied === null ? 'unknown' : amount > 0 ? 'supplied' : prepared ?? 'unknown';
     if (row.supplied === null && amount > 0) row.suppliedAtLeast = amount;
     if (row.requested !== null && typeof row.existing === "number" && row.supplied !== null) {
       row.gap = Math.max(0, row.requested - row.existing - row.supplied);
@@ -182,6 +186,14 @@ export function presentDecision(result: PlanResult, planHandle: string, revision
           goodsPrice: complete ? option.basket.reduce((n, row) => n + row.lineTotalMinor, 0) / 100 : null,
           coveragePercent: coverageComplete ? coverage : null, ...(!coverageComplete ? { coverageAtLeastPercent: coverage } : {}), ingredientDataComplete: ingredients.every(row => row.supplied !== null) }, ingredients, products: option.basket.map(productDecision) };
     }) };
+  const requestIssues = [...(state.availability?.issues ?? [])];
+  for (const [index, target] of (state.originalRequest?.targets ?? []).entries()) {
+    const row = decision.choices[0]?.ingredients.find(item => item.ingredientId === target.ingredientId || item.ingredientId === target.supplementId);
+    if (row?.availability === 'not_selected' && row.supplied === 0 && !requestIssues.some(issue => issue.itemId === row.ingredientId)) {
+      requestIssues.push({ fieldPath: `targets[${index}]`, itemId: row.ingredientId, code: 'not_selected', message: availabilityMessage('not_selected', state.locale) });
+    }
+  }
+  if (requestIssues.length) decision.requestIssues = requestIssues;
   return status === "ready" && decision.choices[0] ? { ...decision,
     summary: boundedDecisionCopy([summary, ...requestFitCopy(state, decision.choices[0])]) } : decision;
 }
