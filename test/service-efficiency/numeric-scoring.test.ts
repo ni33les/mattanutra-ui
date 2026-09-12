@@ -106,3 +106,13 @@ test('REF-CPU-09 numerical matching compiles the subject set when incidental exp
   assert.equal(doseFitScore(input, actual).total, 0.25);
   assert.equal(traversals, 0, 'The fixed numeric subject set is independent of irrelevant incidental facts');
 });
+
+test('REF-CPU-10 compilation, cursor continuation and final selection share one immutable canonical request', async () => {
+  const { orderInvariantRequest } = await import('../../lib/matcher/canonicalizer.ts');
+  const input = request(), canonical = orderInvariantRequest(input);
+  assert.strictEqual(orderInvariantRequest(input), canonical);
+  assert.strictEqual(orderInvariantRequest(canonical), canonical);
+  const changed = orderInvariantRequest({ ...input, maxDailyPills: 2 });
+  assert.notStrictEqual(changed, canonical); assert.equal(changed.maxDailyPills, 2);
+  assert.equal(input.maxDailyPills, null);
+});
