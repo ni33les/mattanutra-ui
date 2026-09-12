@@ -49,3 +49,23 @@ test('REF-CPU-04 neutral rational operations reuse immutable values without chan
   assert.deepEqual(fractions.fromDecimal(123), { num: 123n, den: 1n });
   assert.deepEqual(fractions.fromDecimal('1.25e-2'), { num: 1n, den: 80n });
 });
+
+test('REF-CPU-05 moving a basket through the frontier preserves its numerical score cache', async () => {
+  const { seedState } = await import('../../lib/matcher/search.ts');
+  const { searchStateScore } = await import('../../lib/matcher/practical-scoring.ts');
+  const input = request(), seed = seedState(input);
+  const score = searchStateScore(input, seed);
+  assert.strictEqual(searchStateScore(input, { ...seed, nextGroupIndex: 1 }), score);
+  const priced = searchStateScore(input, { ...seed, price: 100 });
+  assert.notStrictEqual(priced, score); assert.ok(priced.overallPenalty > score.overallPenalty);
+});
+test('REF-CPU-06 repeated archive reads reuse immutable basket state within one cursor', async () => {
+  const { createSearchCursor, archivedSearchStates } = await import('../../lib/matcher/search-cursor.ts');
+  const { DEFAULT_MATCHER_CONFIG } = await import('../../lib/matcher/config.ts');
+  const cursor = createSearchCursor([], request(), DEFAULT_MATCHER_CONFIG);
+  const first = [...archivedSearchStates(cursor)]; assert.equal(first.length, 1);
+  assert.strictEqual([...archivedSearchStates(cursor)][0], first[0]);
+  const restored = structuredClone(cursor);
+  assert.deepEqual([...archivedSearchStates(restored)], first);
+  assert.notStrictEqual([...archivedSearchStates(restored)][0], first[0]);
+});
