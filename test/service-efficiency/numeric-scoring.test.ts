@@ -2,10 +2,10 @@ import assert from 'node:assert/strict';
 import test, { mock } from 'node:test';
 const dose = await import('../../lib/matcher/dose.ts');
 const fractions = await import('../../lib/matcher/rational.ts');
-let conversions = 0, unitCompilations = 0;
+let conversions = 0, unitCompilations = 0, exactEncodings = 0;
 let multiplications = 0; let measurements = 0;
 mock.module('../../lib/matcher/dose.ts', { namedExports: { ...dose, scaleAmount: (...args: Parameters<typeof dose.scaleAmount>) => { unitCompilations++; return dose.scaleAmount(...args); }, amountFromScaled: (...args: Parameters<typeof dose.amountFromScaled>) => { conversions++; return dose.amountFromScaled(...args); } } });
-mock.module('../../lib/matcher/rational.ts', { namedExports: { ...fractions, fromDecimal: (...args: Parameters<typeof fractions.fromDecimal>) => { measurements++; return fractions.fromDecimal(...args); }, multiply: (...args: Parameters<typeof fractions.multiply>) => { multiplications++; return fractions.multiply(...args); } } });
+mock.module('../../lib/matcher/rational.ts', { namedExports: { ...fractions, serialize: (...args: Parameters<typeof fractions.serialize>) => { exactEncodings++; return fractions.serialize(...args); }, fromDecimal: (...args: Parameters<typeof fractions.fromDecimal>) => { measurements++; return fractions.fromDecimal(...args); }, multiply: (...args: Parameters<typeof fractions.multiply>) => { multiplications++; return fractions.multiply(...args); } } });
 const { request } = await import('../matcher/flexible-v5-fixtures.ts');
 const { doseFitScore, exactDoseFit, compareDoseFit, weightedDoseFitScore } = await import('../../lib/matcher/dose-fit.ts');
 
@@ -115,4 +115,17 @@ test('REF-CPU-10 compilation, cursor continuation and final selection share one 
   const changed = orderInvariantRequest({ ...input, maxDailyPills: 2 });
   assert.notStrictEqual(changed, canonical); assert.equal(changed.maxDailyPills, 2);
   assert.equal(input.maxDailyPills, null);
+});
+
+test('REF-CPU-11 losing numerical candidates do not encode exact-score response objects', async () => {
+  const { overallMatchingScore, compareOverallScores } = await import('../../lib/matcher/practical-scoring.ts');
+  const input = request(), actual = { dailyPills: 1, pillLowerBound: 1, productCount: 1, priceMinor: 50000, currency: 'THB', servings: [1], uncertainProductCount: 0 };
+  exactEncodings = 0;
+  const first = overallMatchingScore(input, new Map([['a', 75_000_000n]]), actual);
+  const next = overallMatchingScore(input, new Map([['a', 75_000_000n]]), { ...actual, priceMinor: 50001 });
+  assert.equal(compareOverallScores(first, next), -1);
+  assert.equal(exactEncodings, 0, 'Exact comparisons use native fractions until a result is retained');
+  const saved = structuredClone(first); assert.deepEqual(saved.overallExact, { numerator: '41', denominator: '120' });
+  assert.ok(exactEncodings > 0); const count = exactEncodings;
+  assert.deepEqual(structuredClone(first), saved); assert.equal(exactEncodings, count);
 });
