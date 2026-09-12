@@ -225,5 +225,12 @@
     "daniel-refine",
     "maya-create"
   ],
-  "expandedFixture": "maya-expanded"
+  "expandedFixture": "maya-expanded",
+  "fixtureHashes": {
+    "daniel-create": "efcab45eb7e9ddac6b1377be0209243bd6e28efdacecb830bbee6aa8d8fc320b",
+    "daniel-refine": "bf83cc600c589aac08988ed8556408d853f686c8df580e9b67dc780ed1b2bd8e",
+    "maya-create": "4462139f277d41d03e87b96a5786681b0af04265d28ca7d71f8b93dd6f7e4337",
+    "maya-expanded": "a97554698fc62e5c27826f43ff7b09092d389d0bfda3d005a9220db6dfe5af31",
+    "d3": "a1b27347aca2bd2e03fb7e885098c04f06a4237cfe01899dcaf1dc7abc4462ca"
+  }
 }

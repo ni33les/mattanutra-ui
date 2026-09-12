@@ -1,5 +1,5 @@
 import { PRACTICAL_COMPARISON_CASES, verifyRepeatedComparison } from "./practical-matching/comparison.mjs";
-import { compareBenchmarkRuns } from "./service-efficiency/benchmark-proof.mjs";
+import { compareBenchmarkRuns, verifyFreshStandardTimings } from "./service-efficiency/benchmark-proof.mjs";
 import assert from "node:assert/strict";
 import { readFileSync, realpathSync } from "node:fs";
 import { dirname, resolve, relative, isAbsolute } from "node:path";
@@ -17,6 +17,7 @@ export function verifyVersionExpectationEdit(before, after) {
   assert.equal(after, before.replaceAll(original, replacement), "Unexpected behavioral test change");
 }
 export const MCP_PACKAGES = {
+  refinement: { version: "11.0.0", directory: "test/simple-plan", inventory: "test/simple-plan/refinement-impact.json", base: "26e90472b0d23c9904eb1cf625ce70197384ac4e", scope: "consistent_refinement_and_fresh_standard_matching" },
   "web-matching": { version: "11.0.0", directory: "test/web-matching-correctness", base: "e46e16016fe0544d48da37224dde614bc153ee15", scope: "web_matching_correctness" },
   "payment-replay": { version: "11.0.0", directory: "test/payment-replay", base: "3161c4592a050d303efd374266324a7547d2139c", scope: "payment_replay_compatibility" },
   "boundaries": { version: "11.0.0", directory: "test/service-efficiency", inventory: "test/service-efficiency/lock-boundaries-impact.json", base: "6fd7a63b062975ba3937e08a79286a24fe4de095", scope: "matching_lock_boundaries_and_shared_consumers" },
@@ -32,6 +33,7 @@ export const MCP_PACKAGES = {
 };
 export const MCP721_STAGES = ["affected-tests", "typecheck", "release-diff-lint", "production-build", "unchanged-source-and-inputs"];
 export function packageStages(packageId) {
+  if (packageId === "refinement") return ["affected-tests", "fresh-standard-performance", "no-new-locks", ...MCP721_STAGES.slice(1)];
   if (packageId === "web-matching") return ["affected-tests", "no-new-locks", ...MCP721_STAGES.slice(1)];
   if (packageId === "payment-replay") return ["affected-tests", "restored-payment-preservation", "no-new-locks", ...MCP721_STAGES.slice(1)];
   if (packageId === "simple-plan") return ["isolated-schema", "typecheck", "release-diff-lint", "production-build", "affected-tests", "documented-journeys-paired", "no-new-locks", "unchanged-source-and-inputs"];
@@ -71,6 +73,12 @@ export function checkMcp721Proof(file, expected, packageId = "721") {
   assert.equal(tests.execution.cases, inventory.files.reduce((sum, row) => sum + row.expectedCases, 0));
   assert.ok(tests.execution.cases > 0 && build.buildSha256 && build.nextBuildId);
   assert.equal(json("source-after.json").sha256, expected.sourceSha256);
+  if (packageId === "refinement") {
+    const timings = json("fresh-standard-performance.json");
+    verifyFreshStandardTimings(timings, { sourceCommit: expected.sourceCommit, fixtureHashes: JSON.parse(readFileSync("test/simple-plan/refinement-impact.json")).fixtureHashes });
+    assert.equal(json("no-new-locks.json").passed, true);
+    assert.equal(build.sourceCommit, expected.sourceCommit);
+  }
   if (packageId === "web-matching") {
     const locks = json("no-new-locks.json");
     assert.equal(locks.passed, true); assert.ok(locks.candidateCount > 0 && locks.candidateCount <= locks.controlCount);

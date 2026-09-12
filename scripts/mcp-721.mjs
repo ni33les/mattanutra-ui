@@ -13,11 +13,11 @@ assert.ok(MCP_PACKAGES[packageId], "Unknown work package");
 const args = rawArgs[0]?.startsWith("--package=") ? rawArgs.slice(1) : [...rawArgs];
 const sliceIndex = args.indexOf("--slice");
 const slice = sliceIndex < 0 ? null : args.splice(sliceIndex, 2)[1];
-assert.ok(!slice || (mode === "test" && ["efficiency", "practical", "simple-plan", "boundaries", "payment-replay", "web-matching"].includes(packageId)), "Slices are limited to efficiency development tests");
+assert.ok(!slice || (mode === "test" && ["efficiency", "practical", "simple-plan", "boundaries", "payment-replay", "web-matching", "refinement"].includes(packageId)), "Slices are limited to efficiency development tests");
 const definition = MCP_PACKAGES[packageId], MCP721_BASE = definition.base;
 assert.ok(["test", "validate"].includes(mode));
 const inventory = JSON.parse(readFileSync(definition.inventory ?? `${definition.directory}/impact.json`, "utf8"));
-const maintainedFiles = inventory.files;
+const maintainedFiles = [...inventory.files, ...(inventory.maintainedInventories ?? []).flatMap(file => JSON.parse(readFileSync(file, "utf8")).files)];
 if (inventory.releaseFiles) {
   assert.ok(inventory.releaseFiles.length > 0 && new Set(inventory.releaseFiles).size === inventory.releaseFiles.length);
   for (const file of inventory.releaseFiles) assert.ok(maintainedFiles.some(row => row.file === file), `Unreviewed release test ${file}`);
@@ -145,6 +145,18 @@ if (mode === "validate") {
     assert.equal(execFileSync("git", ["status", "--porcelain"], { cwd: control, encoding: "utf8" }).trim(), "");
     save("executed-cases.json", events);
     save("no-new-locks.json", verifyPracticalLocks(control)); stages.push({ label: "no-new-locks", passed: true });
+  }
+  if (packageId === "refinement") {
+    assert.ok(process.env.REFINEMENT_NATIVE_EVIDENCE, "Fresh native performance evidence is required; kernel diagnostics do not authorize deployment");
+    const timings = JSON.parse(readFileSync(process.env.REFINEMENT_NATIVE_EVIDENCE));
+    const { verifyFreshStandardTimings } = await import("./service-efficiency/benchmark-proof.mjs");
+    verifyFreshStandardTimings(timings, { sourceCommit: commit, fixtureHashes: inventory.fixtureHashes });
+    save("fresh-standard-performance.json", timings); stages.push({ label: "fresh-standard-performance", passed: true });
+    const { verifyPracticalLocks } = await import("./practical-matching/comparison.mjs");
+    const control = resolve(output, "../refinement-control-" + MCP721_BASE.slice(0, 12));
+    if (!existsSync(control)) git("worktree", "add", "--detach", control, MCP721_BASE);
+    save("no-new-locks.json", verifyPracticalLocks(control)); stages.push({ label: "no-new-locks", passed: true });
+    save("executed-cases.json", events);
   }
   if (packageId === "efficiency") {
     const { verifyLockExecution } = await import("./service-efficiency/rollout-proof.mjs");
