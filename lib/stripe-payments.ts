@@ -1,3 +1,4 @@
+import { effectivePayment } from "@/lib/payment-fulfillment-evidence";
 import { claimFunnelRequest } from "@/lib/funnel-idempotency";
 import { FunnelError } from "@/lib/funnel-errors";
 import { enqueueWebPaymentFulfillment } from "@/lib/web-payment-fulfillment";
@@ -138,7 +139,8 @@ async function sqlOrThrow() {
   return sql;
 }
 
-function mapPayment(row: PaymentRow) {
+async function mapPayment(input: PaymentRow) {
+  const row = await effectivePayment((await sqlOrThrow()), input);
   return {
     fulfillmentStatus: row.fulfillment_status,
     fulfillmentError: row.fulfillment_error,
@@ -264,21 +266,21 @@ async function fulfillMockCheckoutSession(
 
   if (payment.status === "expired") {
     return {
-      payment: mapPayment(payment),
+      payment: await mapPayment(payment),
       status: "expired" as const
     };
   }
 
   if (payment.status !== "paid" && payment.status !== "bound") {
     return {
-      payment: mapPayment(payment),
+      payment: await mapPayment(payment),
       status: "processing" as const
     };
   }
 
   await withDatabaseTransaction(sql, tx => enqueueWebPaymentFulfillment(tx, payment));
   return {
-    payment: mapPayment((await getPaymentRowById(sql, payment.id)) ?? payment),
+    payment: await mapPayment((await getPaymentRowById(sql, payment.id)) ?? payment),
     status: payment.plan_id
       ? ("paid_with_plan" as const)
       : ("paid_reservation" as const)
@@ -1310,7 +1312,7 @@ export async function markPaymentCheckoutOpened(input: Readonly<{
     });
   }
 
-  return mapPayment((await getPaymentRowById(sql, input.paymentId)) ?? currentPayment);
+  return await mapPayment((await getPaymentRowById(sql, input.paymentId)) ?? currentPayment);
 }
 
 export async function recordPaymentPregenerationProgress(input: Readonly<{
@@ -1342,7 +1344,7 @@ export async function recordPaymentPregenerationProgress(input: Readonly<{
       ? "pregenerationCompletedAt"
       : `${input.status}At`;
 
-  return mapPayment(await updatePaymentState(sql, {
+  return await mapPayment(await updatePaymentState(sql, {
     action: "payment_pregeneration_progress",
     actor: "system",
     metadata: {
@@ -1371,7 +1373,7 @@ export async function markPaymentCancelled(input: Readonly<{
 
   const before = await getPaymentRowById(sql, input.paymentId);
   if (!before) return null;
-  if (before.status === "paid" || before.status === "bound" || before.paid_at) return mapPayment(before);
+  if (before.status === "paid" || before.status === "bound" || before.paid_at) return await mapPayment(before);
   if (before.stripe_mode !== "mock" && before.stripe_checkout_session_id) {
     const stripe = stripeClientForConfig(stripePaymentConfig(input.request));
     let session = await stripe.checkout.sessions.retrieve(before.stripe_checkout_session_id);
@@ -1398,7 +1400,7 @@ export async function markPaymentCancelled(input: Readonly<{
   });
   if (!updated) {
     const current = await getPaymentRowById(sql, input.paymentId);
-    return current ? mapPayment(current) : null;
+    return current ? await mapPayment(current) : null;
   }
   const payment = updated;
 
@@ -1420,7 +1422,7 @@ export async function markPaymentCancelled(input: Readonly<{
     valueCurrency: payment.currency
   });
 
-  return mapPayment(updated ?? payment);
+  return await mapPayment(updated ?? payment);
 }
 
 export async function completeMockPayment(input: Readonly<{ paymentId: string; request?: Request }>) {
@@ -1439,7 +1441,7 @@ export async function completeMockPayment(input: Readonly<{ paymentId: string; r
     await enqueueWebPaymentFulfillment(tx, paid);
     return (await getPaymentRowById(tx, paid.id))!;
   });
-  return payment ? { payment: mapPayment(payment), destination: paymentReturnPath(payment.locale, payment.stripe_checkout_session_id ?? `mock_cs_${payment.id}`) } : null;
+  return payment ? { payment: await mapPayment(payment), destination: paymentReturnPath(payment.locale, payment.stripe_checkout_session_id ?? `mock_cs_${payment.id}`) } : null;
 }
 
 /** Optional notification/history work runs after durable fulfillment enables paid access. */
@@ -1757,7 +1759,7 @@ export async function getPayment(paymentId: string) {
 
   const payment = await getPaymentRowById(sql, paymentId);
 
-  return payment ? mapPayment(payment) : null;
+  return payment ? await mapPayment(payment) : null;
 }
 
 export async function getLatestPlanPayment(planId: string) {
@@ -1777,7 +1779,7 @@ export async function getLatestPlanPayment(planId: string) {
     limit 1
   `;
 
-  return rows[0] ? mapPayment(rows[0]) : null;
+  return rows[0] ? await mapPayment(rows[0]) : null;
 }
 
 async function markWebhookEventStatus(
@@ -1904,7 +1906,7 @@ export async function fulfillCheckoutSession(
   void writePaymentBpmEvent({ eventName: paid ? "payment_succeeded" : current.status === "expired" ? "payment_expired" : "payment_processing",
     eventStatus: current.status, paymentId: current.id, planId: current.plan_id, locale: current.locale,
     stripeSessionId: session.id, stripeEventId: input.stripeEventId }).catch(() => undefined);
-  return { payment: mapPayment(current), status: paid
+  return { payment: await mapPayment(current), status: paid
     ? current.plan_id ? "paid_with_plan" as const : "paid_reservation" as const
     : current.status === "expired" ? "expired" as const : "processing" as const };
 }
@@ -1936,7 +1938,7 @@ export async function bindPaidReservationToAssessment(input: Readonly<{
     }
     const payment = { ...claim.payment, ...(!claim.replayed ? { fulfillment_status: "pending" as const } : {}) };
     await enqueueWebPaymentFulfillment(tx, payment);
-    return mapPayment(payment);
+    return await mapPayment(payment);
   });
 }
 
@@ -1995,7 +1997,7 @@ export async function markStripePaymentFailure(input: Readonly<{
   });
   if (!updated) {
     const current = await getPaymentRowById(sql, payment.id);
-    return current ? mapPayment(current) : null;
+    return current ? await mapPayment(current) : null;
   }
 
   await writePaymentBpmEvent({
@@ -2026,7 +2028,7 @@ export async function markStripePaymentFailure(input: Readonly<{
     payment: updated ?? payment
   });
 
-  return updated ? mapPayment(updated) : mapPayment(payment);
+  return updated ? await mapPayment(updated) : await mapPayment(payment);
 }
 
 export async function handleStripeWebhookPayload(input: Readonly<{

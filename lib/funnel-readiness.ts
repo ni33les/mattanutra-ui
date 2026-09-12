@@ -1,3 +1,4 @@
+import { paymentFulfillmentEvidence, type FulfillmentPayment } from "@/lib/payment-fulfillment-evidence";
 import { getSql } from "@/lib/db";
 import { isUuid, hasHealthScoreAiCopy } from "@/lib/assessment-store";
 import { isLocale, type Locale } from "@/lib/i18n";
@@ -18,6 +19,11 @@ export async function getFunnelReadiness(planId: string, localeOption?: string |
       products.id as product_version, products.generated_at as product_generated_at, products.status as product_status,
       products.stack_coverage_percent, products.product_count,
       payment.status as payment_status, payment.fulfillment_status, payment.fulfillment_error,
+      case when payment.id is null then null else jsonb_build_object('id',payment.id,'plan_id',payment.plan_id,
+        'selected_plan',payment.selected_plan,'status',payment.status,'fulfillment_status',payment.fulfillment_status,
+        'paid_at',payment.paid_at,'bound_at',payment.bound_at,'created_at',payment.created_at,'amount',payment.amount::text,
+        'currency',payment.currency,'stripe_checkout_session_id',payment.stripe_checkout_session_id,
+        'stripe_payment_intent_id',payment.stripe_payment_intent_id) end as fulfillment_input,
       tasks.statuses, tasks.copy_status, tasks.formula_status, tasks.product_task_status,
       food.version as food_version, report.version as report_version
     from public.assessments a
@@ -50,7 +56,7 @@ export async function getFunnelReadiness(planId: string, localeOption?: string |
         and r.selection_revision = coalesce((select revision from public.assessment_product_preferences where plan_id = a.plan_id), 0)
       order by r.generated_at desc limit 1
     ) products on true
-    left join lateral (select p.status, p.fulfillment_status, p.fulfillment_error from public.payments p
+    left join lateral (select p.* from public.payments p
       where p.plan_id = a.plan_id and (p.status in ('paid', 'bound') or p.paid_at is not null)
       order by p.created_at desc limit 1) payment on true
     left join lateral (
@@ -82,7 +88,9 @@ export async function getFunnelReadiness(planId: string, localeOption?: string |
   const healthScorePageFailed = !readyForHealthScore && (copyFailed ||
     (!preparedFormula && ["failed", "cancelled", "completed"].includes(row.formula_status ?? "")));
   const hasPaidPlan = Boolean(row.selected_plan || row.payment_status);
-  const fulfillmentStatus = row.fulfillment_status ?? (row.selected_plan ? "complete" : "not_started");
+  const fulfillmentStatus = row.fulfillment_input
+    ? (await paymentFulfillmentEvidence(sql, row.fulfillment_input as FulfillmentPayment)).status
+    : row.selected_plan ? "complete" : "not_started";
   const fulfillmentPending = Boolean(row.payment_status && fulfillmentStatus !== "complete");
   const taskStatuses = [row.formula_version ? null : row.formula_status, row.product_version ? null : row.product_task_status].filter((s): s is string => typeof s === "string");
   // A failed older projection does not override a current retry or an available current result.
@@ -100,7 +108,7 @@ export async function getFunnelReadiness(planId: string, localeOption?: string |
     : ["failed", "cancelled"].includes(row.formula_status ?? "") ? "failed" : "pending";
   return { ...timeline, planId, locale, revision: Number(row.input_revision), inputHash: row.input_hash as string | null,
     copyReady, copyFailed, readyForHealthScore, healthScorePageFailed,
-    hasHealthScore: copyReady, hasPaidPlan, fulfillmentStatus, fulfillmentError: row.fulfillment_error as string | null,
+    hasHealthScore: copyReady, hasPaidPlan, fulfillmentStatus, fulfillmentError: fulfillmentStatus === "complete" ? null : row.fulfillment_error as string | null,
     formulationStatus, refreshPending: ["queued", "reserved", "running", "needs_review", "waiting_approval"].includes(row.product_task_status ?? ""), generationStatus: timeline.readyForReveal ? "ready" : timeline.failed ? "failed" : "pending",
     resultVersion: [row.input_revision, locale, FUNNEL_GENERATOR_VERSION, row.score_version ? new Date(row.score_version).getTime() : 0,
       row.formula_version ?? 0, row.prepared_formula_version ?? 0, row.product_version ?? "", row.product_generated_at ? new Date(row.product_generated_at).getTime() : 0,

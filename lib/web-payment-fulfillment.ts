@@ -1,3 +1,4 @@
+import { paymentFulfillmentEvidence } from "@/lib/payment-fulfillment-evidence";
 import type Stripe from "stripe";
 import { getSql, withDatabaseTransaction } from "@/lib/db";
 import { createTask } from "@/lib/task-service";
@@ -14,7 +15,7 @@ export const WEB_PAYMENT_FULFILLMENT_TASK = "fulfill_web_payment";
 
 /** Must share the confirmation/binding transaction. Existing completed work is replayable. */
 export async function enqueueWebPaymentFulfillment(sql: Db, payment: PaymentRow) {
-  if (payment.fulfillment_status === "complete") return null;
+  if ((await paymentFulfillmentEvidence(sql, payment)).status === "complete") return null;
   await sql`update public.payments set fulfillment_status = 'pending', fulfillment_error = null
     where id = ${payment.id}::uuid`;
   const { task } = await createTask({
@@ -40,7 +41,7 @@ export async function fulfillWebPayment(paymentId: string, dependencies: Fulfill
   if (!sql) throw new Error("Database is not configured");
   const [payment] = await sql<PaymentRow[]>`select * from public.payments where id = ${paymentId}::uuid`;
   if (!payment || !["paid", "bound"].includes(payment.status)) throw new Error("Payment is not confirmed");
-  if (payment.fulfillment_status === "complete") return { paymentId, fulfillmentStatus: "complete" };
+  if ((await paymentFulfillmentEvidence(sql, payment)).status === "complete") return { paymentId, fulfillmentStatus: "complete" };
 
   void writePaymentBpmEvent({ eventName: "payment_fulfillment_started", eventStatus: "pending", paymentId,
     planId: payment.plan_id, locale: payment.locale }).catch(() => undefined);
