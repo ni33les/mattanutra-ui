@@ -21,7 +21,7 @@ export async function paidFixture(sql: NonNullable<ReturnType<typeof getSql>>, {
     await appendAssessmentVersion(sql, { planId, eventType: "plan_selection_projection_update", source: "task_worker", changeReason: "plan_selected_existing_outputs_adopted",
       afterPayload: { selectedPlan: "precision", status: "ready" }, eventPayload: { formulationReady: true } });
   }
-  if (receipt) await sql`insert into bpm(event_name,event_type,event_status,emitted_by,plan_id,selected_plan,properties)
-    values ('payment_fulfillment_succeeded','payment','paid','stripe_payment_flow',${planId}::uuid,'precision',${sql.json({ paymentId: id })})`;
+  if (receipt) await sql`insert into bpm(id,event_name,event_type,event_status,emitted_by,plan_id,selected_plan,properties)
+    values (${randomUUID()}::uuid,'payment_fulfillment_succeeded','payment','paid','stripe_payment_flow',${planId}::uuid,'precision',${sql.json({ paymentId: id })})`;
   return p;
 }

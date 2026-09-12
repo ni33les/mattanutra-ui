@@ -2,11 +2,11 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { after, test } from "node:test";
 import Stripe from "stripe";
-import { getSql, closeSqlPool } from "../../lib/db.ts";
-import { fulfillCheckoutSession, handleStripeWebhookPayload, bindPaidReservationToAssessment, recordStripePaymentAccounting } from "../../lib/stripe-payments.ts";
+import { closeSqlPool } from "../../lib/db.ts";
+import { fulfillCheckoutSession, handleStripeWebhookPayload, bindPaidReservationToAssessment } from "../../lib/stripe-payments.ts";
 import { fulfillWebPayment, enqueueWebPaymentFulfillment } from "../../lib/web-payment-fulfillment.ts";
 import { paymentFulfillmentEvidence } from "../../lib/payment-fulfillment-evidence.ts";
-import { isolated, paidFixture, fx } from "./helpers.ts";
+import { isolated, paidFixture } from "./helpers.ts";
 after(closeSqlPool);
 
 test("PAY-RECOVER-01 historical live return uses completion evidence without provider access", async () => {
