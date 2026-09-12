@@ -19,11 +19,11 @@ type QuantitySearch = { key: string; ids: string[]; low: bigint; high: bigint; s
 type RepairJob = { leader: SearchState; removal: number; base: SearchState | null; retained: string[]; build: number; group: number; variant: number; variants: string[] | null; stage: "prepare" | "build" | "add" | "done";
   fixedRemoval?: string[]; replacementGroups?: number[] };
 export type SearchCursor = {
-  version: "search-cursor-1"; identity: string; groups: ProductGroup[]; baseline: string[][];
+  version: "search-cursor-1" | "search-cursor-2"; identity: string; groups: ProductGroup[]; baseline: string[][];
   config: MatcherConfig; expansionBudget: number; expansionAttempts: number;
   passStart: number; done: boolean; exhausted: boolean; trimmed: boolean; exact: boolean;
   phase: "exact" | "single" | "beam" | "pairs" | "repair" | "second" | "finished";
-  archive: Map<string, ArchivedState>; edges: Map<string, string | null>;
+  archive: Map<string, ArchivedState | SearchState>; edges: Map<string, string | null>;
   subjects: string[]; subjectIndex: Map<string, number>; variantIds: string[]; variantIndex: Map<string, number>;
   review: SearchState[]; unreviewed: SearchState[];
   singles: { state: SearchState; group: number; variant: string }[];
@@ -41,31 +41,25 @@ function indexFor(values: string[], indices: Map<string, number>, id: string) {
   const found = indices.get(id); if (found != null) return found;
   const next = values.length; values.push(id); indices.set(id, next); return next;
 }
-function packedExposure(cursor: SearchCursor, values: ReadonlyMap<string, bigint>): ExactVector {
-  const packed: ExactVector = [];
-  for (const [id, value] of values) packed.push(indexFor(cursor.subjects, cursor.subjectIndex, id), value);
-  return packed;
-}
 function unpackedExposure(cursor: SearchCursor, packed: ExactVector) {
   const values = new Map<string, bigint>();
   for (let i=0; i<packed.length; i+=2) values.set(cursor.subjects[packed[i] as number]!, packed[i+1] as bigint);
   return values;
 }
-// Packed rows are immutable and scoped to one cursor. Re-reading an edge must
-// not rebuild the same maps (and discard all numerical WeakMap caches).
+// Historical checkpoints packed maps into vectors. New resident cursors retain
+// the immutable state directly; V8 checkpoints preserve shared object identity.
 const restoredStates = new WeakMap<ArchivedState, SearchState>();
-const archivedExposure = new WeakMap<ArchivedState, Pick<SearchState, "exposure" | "delivered">>();
-function restoreState(cursor: SearchCursor, packed: ArchivedState): SearchState {
+function restoreState(cursor: SearchCursor, packed: ArchivedState | SearchState): SearchState {
+  if (!Array.isArray(packed)) return packed;
   const cached = restoredStates.get(packed); if (cached) return cached;
   const selectedVariantIds = packed[5].map(index => cursor.variantIds[index]!);
-  const live = archivedExposure.get(packed);
-  const exposure = live?.exposure ?? unpackedExposure(cursor, packed[6]);
+  const exposure = unpackedExposure(cursor, packed[6]);
   const state: SearchState = { nextGroupIndex: packed[0], price: packed[1], pills: packed[2], count: packed[3], pillCountKnown: packed[4],
     selectedVariantIds, selectedProductIds: selectedVariantIds.map(id => {
       const group = cursor.groups.find(row => id.startsWith(`${row.sellerId}:${row.productId}:x`));
       if (!group) throw new Error("Archive lost a selected product");
       return group.productId;
-    }), exposure, delivered: live?.delivered ?? (packed[7] === packed[6] ? exposure : unpackedExposure(cursor, packed[7])), unknownProductIds: packed[8],
+    }), exposure, delivered: packed[7] === packed[6] ? exposure : unpackedExposure(cursor, packed[7]), unknownProductIds: packed[8],
     ...(packed[9] ? { routineServings: packed[9][0], uncertainAdministrationCount: packed[9][1], monthlyPriceMinor: packed[9][2], monthlyPriceLowerBound: packed[9][3], servingBurden: packed[9][4] } : {}) };
   restoredStates.set(packed, state); return state;
 }
@@ -76,12 +70,8 @@ function remember(cursor: SearchCursor, state: SearchState) {
   const ids = state.selectedVariantIds.map(id => indexFor(cursor.variantIds, cursor.variantIndex, id));
   const key = [...ids].sort((a, b) => a - b).join(",");
   if (!cursor.archive.has(key)) {
-    const exposure = packedExposure(cursor, state.exposure);
-    cursor.archive.set(key, [state.nextGroupIndex, state.price, state.pills, state.count, state.pillCountKnown !== false,
-      ids, exposure,
-      state.delivered === state.exposure ? exposure : packedExposure(cursor, state.delivered), [...(state.unknownProductIds ?? [])],
-      [[...(state.routineServings ?? [])], state.uncertainAdministrationCount ?? state.count, state.monthlyPriceMinor ?? null, state.monthlyPriceLowerBound ?? 0, state.servingBurden]]);
-    archivedExposure.set(cursor.archive.get(key)!, { exposure: state.exposure, delivered: state.delivered });
+    cursor.version = "search-cursor-2";
+    cursor.archive.set(key, state);
     cursor.unreviewed.push(state);
   }
   return key;
@@ -95,7 +85,7 @@ export function createSearchCursor(groups: readonly ProductGroup[], request: Can
   const identity = sha256Hex(JSON.stringify(serializeExactValue({ version: "search-cursor-1", scoringProfileHash: resolvePracticalProfile(request).hash, groups, request: { ...request, searchEffort: undefined }, config: { ...config, expansionBudget: undefined } })));
   const exact = groups.length <= config.exactGroupLimit && groups.reduce((sum, group) => sum + group.variants.length, 0) <= config.exactVariantLimit;
   const seed = seedState(request);
-  const cursor: SearchCursor = { version: "search-cursor-1", identity, groups: copy, baseline: copy.map(group => group.variants.map(row => row.variantId)), config: { ...config },
+  const cursor: SearchCursor = { version: "search-cursor-2", identity, groups: copy, baseline: copy.map(group => group.variants.map(row => row.variantId)), config: { ...config },
     expansionBudget: Math.max(0, Math.floor(config.expansionBudget)), expansionAttempts: 0, passStart: 0,
     done: false, exhausted: false, trimmed: false, exact, phase: exact ? "exact" : "single", archive: new Map(), edges: new Map(), review: [], unreviewed: [],
     subjects: [], subjectIndex: new Map(), variantIds: [], variantIndex: new Map(),
