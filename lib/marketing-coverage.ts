@@ -1,7 +1,7 @@
 export const FORMULA_NEED_COVERED_PERCENT = 100;
 
 type NeedCoverageRow = Readonly<{
-  coveragePercent: number;
+  coveragePercent: number | null;
   itemType?: string;
 }>;
 

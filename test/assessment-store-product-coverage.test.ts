@@ -178,7 +178,7 @@ describe("assessment store product coverage reconciliation", () => {
 
     assert.equal(result.stackCoveragePercent, 20);
     assert.equal(
-      result.needCoverage.every((item) => item.coveragePercent === 0),
+      result.needCoverage.every((item) => item.coveragePercent === null),
       true
     );
     assert.equal(result.recommendations[0]?.stackCoveragePercent, 20);

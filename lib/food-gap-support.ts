@@ -330,8 +330,8 @@ export function foodGapNeedsForVariant(
   threshold = FOOD_GAP_COVERAGE_THRESHOLD
 ) {
   return variant.needCoverage
-    .filter((need) =>
-      need.itemType === "supplement" &&
+    .filter((need): need is ProductNeedCoverage & {coveragePercent: number} =>
+      need.coveragePercent !== null && need.itemType === "supplement" &&
       Number.isFinite(need.coveragePercent) &&
       need.coveragePercent < threshold
     )

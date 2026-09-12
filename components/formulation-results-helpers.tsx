@@ -95,7 +95,7 @@ export function supplementProductCoverageById(
     if (item.itemType !== "supplement") {
       continue;
     }
-    if (!Number.isFinite(item.coveragePercent)) continue;
+    if (typeof item.coveragePercent !== 'number' || !Number.isFinite(item.coveragePercent)) continue;
 
     const supplementId = item.id.startsWith("supplement:")
       ? item.id.slice("supplement:".length)

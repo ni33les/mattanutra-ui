@@ -441,8 +441,8 @@ function managedFoodPriority(seed: (typeof managedFoodSeeds)[number]) {
 
 export function foodSupportGaps(needCoverage: readonly ProductNeedCoverage[]) {
   return needCoverage
-    .filter((need) =>
-      need.itemType === "supplement" &&
+    .filter((need): need is ProductNeedCoverage & {coveragePercent: number} =>
+      need.coveragePercent !== null && need.itemType === "supplement" &&
       Number.isFinite(need.coveragePercent) &&
       need.coveragePercent < 90
     )
@@ -535,7 +535,7 @@ function scoreManagedFoodSeed(
   return gaps.reduce(
     (score, gap) =>
       score + (
-        managedFoodSeedMatchesGap(seed, gap)
+        gap.coveragePercent !== null && managedFoodSeedMatchesGap(seed, gap)
           ? Math.max(10, 100 - gap.coveragePercent)
           : 0
       ),
@@ -638,7 +638,7 @@ export function formulaIngredientRowNumbers(ingredients: readonly FormulationIng
 }
 
 export type FoodSupportFormulaGap = Readonly<{
-  coveragePercent: number;
+  coveragePercent: number | null;
   dailyDose: string;
   id: string;
   label: string;
@@ -708,7 +708,7 @@ export function foodSupportFormulaRequirementsForItem(
       );
 
       return {
-        coveragePercent: Math.min(100, Math.max(0, Math.round(requirement.coveragePercent))),
+        coveragePercent: requirement.coveragePercent === null ? null : Math.min(100, Math.max(0, Math.round(requirement.coveragePercent))),
         dailyDose: ingredient ? localizedDoseText(ingredient.dailyDose, locale) : "",
         id: requirement.id,
         label: ingredient

@@ -280,7 +280,7 @@ export type ProductStackPreference = "balanced" | "compact";
 export type ProductNeedCoverage = {
   bestRejectedProductId: string | null;
   bestRejectedReason: string | null;
-  coveragePercent: number;
+  coveragePercent: number | null;
   displayName: string;
   id: string;
   itemType: "food" | "supplement";

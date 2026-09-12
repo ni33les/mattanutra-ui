@@ -42,7 +42,7 @@ function productRecommendationSummaryExpectsRows(
   }
 
   return Boolean(
-    summary.needCoverage?.some((item) => item.coveragePercent > 0),
+    summary.needCoverage?.some((item) => item.coveragePercent !== null && item.coveragePercent > 0),
   );
 }
 

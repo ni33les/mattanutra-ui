@@ -445,7 +445,7 @@ function productNeedCoverageFromDiagnostics(
         itemType
       } satisfies ProductNeedCoverage;
     })
-    .filter((item): item is ProductNeedCoverage => Boolean(item));
+    .filter((item): item is ProductNeedCoverage & {coveragePercent: number} => Boolean(item));
 }
 
 function sourceIdFromNeedId(id: string) {
@@ -458,6 +458,7 @@ function productCoverageLookup(items: readonly ProductNeedCoverage[]) {
   const lookup = new Map<string, number>();
 
   for (const item of items) {
+    if (item.coveragePercent === null) continue;
     lookup.set(item.id, item.coveragePercent);
     lookup.set(sourceIdFromNeedId(item.id), item.coveragePercent);
     lookup.set(normalizeReviewName(item.displayName), item.coveragePercent);
@@ -495,19 +496,11 @@ function currentNeedCoverage(
         reasonLookup.get(need.sourceId) ??
         reasonLookup.get(normalizeReviewName(need.displayName));
 
+      const amount = coverageLookup.get(need.id) ?? coverageLookup.get(need.sourceId) ?? coverageLookup.get(normalizeReviewName(need.displayName));
       return {
       bestRejectedProductId: matchedReason?.bestRejectedProductId ?? null,
-      bestRejectedReason: matchedReason?.bestRejectedReason ?? null,
-      coveragePercent: Math.min(
-        100,
-        Math.max(
-          0,
-          coverageLookup.get(need.id) ??
-            coverageLookup.get(need.sourceId) ??
-            coverageLookup.get(normalizeReviewName(need.displayName)) ??
-            0
-        )
-      ),
+      bestRejectedReason: matchedReason?.bestRejectedReason ?? (amount === undefined ? 'unknown' : null),
+      coveragePercent: amount === undefined ? null : Math.min(100, Math.max(0, amount)),
       displayName: need.displayName,
       id: need.id,
       itemType: need.itemType
