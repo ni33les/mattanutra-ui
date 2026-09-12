@@ -124,3 +124,18 @@ test('REF-REV-07 an existing frozen checkout remains recoverable while a newer r
   const recovered = (await rpc(app, 'execute', { ...args, idempotencyKey: 'recover-frozen-during-refinement' }))!.result!.structuredContent;
   assert.deepEqual(recovered, opened);
 });
+
+test('REF-IO-03 create and refinement each resolve one immutable catalogue for admission', async () => {
+  const { setCatalogueInitEnteredForTests } = await import('../../lib/agentic/catalogue/snapshot.ts');
+  const app = runtime(); let loads = 0;
+  setCatalogueInitEnteredForTests(() => { loads++; });
+  try {
+    const created = await value(app, create()); assert.equal(created.status, 'processing');
+    assert.equal(loads, 1, 'Request interpretation and durable admission must share one catalogue observation');
+    const operation = await app.store.getPlanOperationByKey(owner(app), create().idempotencyKey); assert.ok(operation);
+    assert.equal((await runAdmittedPlanOperation({ store: app.store, config: app.config, operationId: operation.id })).ok, true);
+    loads = 0;
+    const refined = await value(app, { planHandle: created.planHandle, expectedRevision: 1, idempotencyKey: 'single-snapshot-refine', scoring: { weights: { price: 0.5 } } });
+    assert.equal(refined.status, 'processing'); assert.equal(loads, 1);
+  } finally { setCatalogueInitEnteredForTests(null); }
+});
