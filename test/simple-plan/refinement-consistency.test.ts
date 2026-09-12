@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test, { beforeEach, afterEach } from 'node:test';
 import { create, install, cleanup, runtime, plan, rpc } from '../mcp-evidence-images/helpers.ts';
-import { runAdmittedPlanOperation } from '../../lib/agentic/plan/service.ts';
+import { runAdmittedPlanOperation, setMatcherGateForTests, setMatcherEnteredForTests } from '../../lib/agentic/plan/service.ts';
 import type { PlanOperationRecord } from '../../lib/agentic/store/types.ts';
 beforeEach(install); afterEach(cleanup);
 const owner = (app: ReturnType<typeof runtime>) => `${app.scope.environment}:${app.scope.tenantScope}:${app.scope.principalScope ?? 'anon'}`;
@@ -46,4 +46,31 @@ test('REF-REV-04 expired work is presented without changing its durable record',
   const before = await app.store.getPlanOperation(operation.id);
   const read = await value(app, { planHandle: first.planHandle }); assert.equal(read.status, 'failed'); assert.equal(read.revision, 2);
   assert.deepEqual(await app.store.getPlanOperation(operation.id), before);
+});
+
+test('REF-IO-01 completed polling resolves ownership and coherent result state once', async () => {
+  const app = runtime(), first = await plan(app, create());
+  let capabilities = 0, states = 0;
+  const capability = app.store.getCapabilityByHash.bind(app.store), read = app.store.getPlanReadState.bind(app.store);
+  app.store.getCapabilityByHash = (...args) => { capabilities++; return capability(...args); };
+  app.store.getPlanReadState = (...args) => { states++; return read(...args); };
+  const done = await value(app, { planHandle: first.planHandle }); assert.equal(done.status, 'ready');
+  assert.equal(capabilities, 1, 'No repeated capability lookup for a coherent read');
+  assert.equal(states, 1, 'No second full-state lookup after status resolution');
+});
+test('REF-IO-02 admission replay returns its receipt while the sole durable executor is paused', async () => {
+  const { app, args, operation } = await pending();
+  let release!: () => void, entered!: () => void;
+  const gate = new Promise<void>(resolve => { release = resolve; }), ready = new Promise<void>(resolve => { entered = resolve; });
+  setMatcherGateForTests(gate); setMatcherEnteredForTests(entered);
+  const execution = runAdmittedPlanOperation({ store: app.store, config: app.config, operationId: operation.id });
+  let reply;
+  try {
+    await ready;
+    const replay = value(app, args);
+    reply = await Promise.race([replay, new Promise<null>(resolve => setImmediate(() => resolve(null)))]);
+    release(); await execution; await replay;
+  } finally { release(); setMatcherGateForTests(null); setMatcherEnteredForTests(null); await execution; }
+  assert.ok(reply, 'A paused colocated worker must not hold the HTTP admission receipt');
+  assert.equal(reply.status, 'processing'); assert.equal(reply.revision, 2);
 });
