@@ -17,6 +17,7 @@ export function verifyVersionExpectationEdit(before, after) {
   assert.equal(after, before.replaceAll(original, replacement), "Unexpected behavioral test change");
 }
 export const MCP_PACKAGES = {
+  availability: { version: "11.1.0", directory: "test/availability", base: "815bb210e38b2809b9aba32260693c70c048005c", scope: "clear_availability_and_product_backed_formulation" },
   refinement: { version: "11.0.0", directory: "test/simple-plan", inventory: "test/simple-plan/refinement-impact.json", base: "26e90472b0d23c9904eb1cf625ce70197384ac4e", scope: "consistent_refinement_and_fresh_standard_matching" },
   "web-matching": { version: "11.0.0", directory: "test/web-matching-correctness", base: "e46e16016fe0544d48da37224dde614bc153ee15", scope: "web_matching_correctness" },
   "payment-replay": { version: "11.0.0", directory: "test/payment-replay", base: "3161c4592a050d303efd374266324a7547d2139c", scope: "payment_replay_compatibility" },
@@ -33,6 +34,7 @@ export const MCP_PACKAGES = {
 };
 export const MCP721_STAGES = ["affected-tests", "typecheck", "release-diff-lint", "production-build", "unchanged-source-and-inputs"];
 export function packageStages(packageId) {
+  if (packageId === "availability") return ["affected-tests", "no-new-locks", ...MCP721_STAGES.slice(1,4), "affected-browser-tests", "unchanged-source-and-inputs"];
   if (packageId === "refinement") return ["affected-tests", "fresh-standard-performance", "no-new-locks", ...MCP721_STAGES.slice(1)];
   if (packageId === "web-matching") return ["affected-tests", "no-new-locks", ...MCP721_STAGES.slice(1)];
   if (packageId === "payment-replay") return ["affected-tests", "restored-payment-preservation", "no-new-locks", ...MCP721_STAGES.slice(1)];
@@ -45,7 +47,7 @@ export function mcp721Identity(sourceSha256, sourceCommit, packageId = "721") {
   const definition = MCP_PACKAGES[packageId]; assert.ok(definition, "Unknown work package");
   const inventory = readFileSync(definition.inventory ?? `${definition.directory}/impact.json`);
   const inputs = JSON.parse(inventory).inputs.map(file => ({ file, sha256: payloadHash(readFileSync(file)) }));
-  return { ...(packageId === "web-matching" ? { deploymentBases: JSON.parse(inventory).deploymentBases, profileSha256: payloadHash(readFileSync("lib/matcher/practical-scoring.ts")) } : {}), ...(packageId === "payment-replay" ? { deploymentBases: JSON.parse(inventory).deploymentBases, backupSha256: JSON.parse(inventory).backupSha256 } : {}), ...(packageId === "boundaries" ? { deploymentBases: JSON.parse(inventory).deploymentBases, schemaSha256: payloadHash(readFileSync("db-rollout/matching-lock-boundaries.sql")) } : {}), ...(packageId === "simple-plan" ? { deploymentBases: JSON.parse(inventory).deploymentBases, profileSha256: payloadHash(readFileSync("lib/matcher/scoring-policy.ts")), scalesSha256: payloadHash(readFileSync("lib/matcher/zero-target-policy.ts")) } : {}), ...(packageId === "practical" ? { deploymentBases: JSON.parse(inventory).deploymentBases, profileSha256: payloadHash(readFileSync("lib/matcher/practical-scoring.ts")), lockRegisterSha256: payloadHash(readFileSync("test/service-efficiency/lock-register.json")) } : {}), ...(packageId === "discovery" ? { deploymentBases: JSON.parse(inventory).deploymentBases,
+  return { ...(["availability", "web-matching"].includes(packageId) ? { deploymentBases: JSON.parse(inventory).deploymentBases, profileSha256: payloadHash(readFileSync("lib/matcher/practical-scoring.ts")) } : {}), ...(packageId === "payment-replay" ? { deploymentBases: JSON.parse(inventory).deploymentBases, backupSha256: JSON.parse(inventory).backupSha256 } : {}), ...(packageId === "boundaries" ? { deploymentBases: JSON.parse(inventory).deploymentBases, schemaSha256: payloadHash(readFileSync("db-rollout/matching-lock-boundaries.sql")) } : {}), ...(packageId === "simple-plan" ? { deploymentBases: JSON.parse(inventory).deploymentBases, profileSha256: payloadHash(readFileSync("lib/matcher/scoring-policy.ts")), scalesSha256: payloadHash(readFileSync("lib/matcher/zero-target-policy.ts")) } : {}), ...(packageId === "practical" ? { deploymentBases: JSON.parse(inventory).deploymentBases, profileSha256: payloadHash(readFileSync("lib/matcher/practical-scoring.ts")), lockRegisterSha256: payloadHash(readFileSync("test/service-efficiency/lock-register.json")) } : {}), ...(packageId === "discovery" ? { deploymentBases: JSON.parse(inventory).deploymentBases,
     positioningSha256: payloadHash(readFileSync("lib/agentic/discovery/positioning.ts")), connectorManifestSha256: payloadHash(readFileSync("lib/agentic/adapters/openai.json")) } : {}), ...(packageId === "efficiency" ? { deploymentBases: JSON.parse(inventory).deploymentBases,
     lockRegisterSha256: payloadHash(readFileSync("test/service-efficiency/lock-register.json")),
     schemaSha256: payloadHash(readFileSync("scripts/service-efficiency-schema.sql")), workerProtocolSha256: payloadHash(readFileSync("lib/agentic/plan/match-worker-protocol.ts")) } : {}), sourceSha256, sourceCommit, releaseBase: definition.base,
@@ -73,6 +75,13 @@ export function checkMcp721Proof(file, expected, packageId = "721") {
   assert.equal(tests.execution.cases, inventory.files.reduce((sum, row) => sum + row.expectedCases, 0));
   assert.ok(tests.execution.cases > 0 && build.buildSha256 && build.nextBuildId);
   assert.equal(json("source-after.json").sha256, expected.sourceSha256);
+  if (packageId === "availability") {
+    const locks = json("no-new-locks.json");
+    assert.equal(locks.passed, true); assert.ok(locks.candidateCount <= locks.controlCount);
+    assert.equal(json("browser-results.json").passed, true);
+    assert.deepEqual(inventory, JSON.parse(readFileSync(`${definition.directory}/impact.json`)));
+    assert.equal(build.sourceCommit, expected.sourceCommit);
+  }
   if (packageId === "refinement") {
     const timings = json("fresh-standard-performance.json");
     verifyFreshStandardTimings(timings, { sourceCommit: expected.sourceCommit, fixtureHashes: JSON.parse(readFileSync("test/simple-plan/refinement-impact.json")).fixtureHashes });

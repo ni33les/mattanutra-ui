@@ -1,0 +1,181 @@
+{
+  "releaseBase": "815bb210e38b2809b9aba32260693c70c048005c",
+  "deploymentBases": {
+    "dev": "815bb210e38b2809b9aba32260693c70c048005c",
+    "uat": "815bb210e38b2809b9aba32260693c70c048005c"
+  },
+  "scope": "clear_availability_and_product_backed_formulation",
+  "testPolicy": "Only directly affected tests; no application or full MCP matrix. No skipped/focused/todo/cancelled/retried/missing cases. Immutable frozen UAT catalogue prices.",
+  "files": [
+    {
+      "file": "test/simple-plan/availability.test.ts",
+      "expectedCases": 5,
+      "slice": "mcp",
+      "reason": "Alias and governance resolution; operational proposal omissions, categorical validation and compact statuses"
+    },
+    {
+      "file": "test/simple-plan/availability-journey.test.ts",
+      "expectedCases": 2,
+      "slice": "mcp",
+      "reason": "Complete multilingual partial create, replay, pending refinement and empty terminal journey"
+    },
+    {
+      "file": "test/simple-plan/availability-publication.test.ts",
+      "expectedCases": 1,
+      "slice": "publication",
+      "reason": "11.1 generated response additions and complete six-tool discovery"
+    },
+    {
+      "file": "test/healthscore-performance/availability.test.ts",
+      "expectedCases": 3,
+      "slice": "web",
+      "reason": "Strict AI whitelist and completed empty results without retries"
+    },
+    {
+      "file": "test/healthscore-performance/availability-catalogue.test.ts",
+      "expectedCases": 6,
+      "slice": "web",
+      "reason": "Frozen UAT facts, exclusions, uncertain mappings and publication input fencing"
+    },
+    {
+      "file": "test/web-availability-copy.test.ts",
+      "expectedCases": 3,
+      "slice": "presentation",
+      "reason": "Raw positive/missing coverage and three localized availability labels"
+    },
+    {
+      "file": "test/simple-plan/refinement.test.ts",
+      "expectedCases": 6,
+      "slice": "mcp",
+      "reason": "Sparse refinement preserves original targets and health context"
+    },
+    {
+      "file": "test/simple-plan/state.test.ts",
+      "expectedCases": 4,
+      "slice": "mcp",
+      "reason": "Durable admission, replay and read-only polling"
+    },
+    {
+      "file": "test/simple-plan/response.test.ts",
+      "expectedCases": 2,
+      "slice": "mcp",
+      "reason": "Ingredient response completeness and exact arithmetic"
+    },
+    {
+      "file": "test/simple-plan/publication.test.ts",
+      "expectedCases": 4,
+      "slice": "publication",
+      "reason": "Contract resources, default views and schema-generated examples"
+    },
+    {
+      "file": "test/simple-plan/hosted.test.ts",
+      "expectedCases": 3,
+      "slice": "publication",
+      "reason": "Hosted schema and descriptor verifier detects stale cards"
+    },
+    {
+      "file": "test/simple-plan/transport.test.ts",
+      "expectedCases": 3,
+      "slice": "mcp",
+      "reason": "Single payload and compatible result delivery"
+    },
+    {
+      "file": "test/simple-plan/no-option-ids.test.ts",
+      "expectedCases": 9,
+      "slice": "publication",
+      "reason": "Six current tools and identifier-free checkout publication"
+    },
+    {
+      "file": "test/simple-plan/direct-checkout.test.ts",
+      "expectedCases": 5,
+      "slice": "mcp",
+      "reason": "Partial ready result uses unchanged direct checkout and frozen order recovery"
+    },
+    {
+      "file": "test/healthscore-performance/formula-cache.test.ts",
+      "expectedCases": 7,
+      "slice": "web",
+      "reason": "Frozen prompt identity, locale isolation and bounded retries"
+    },
+    {
+      "file": "test/healthscore-performance/prompts.test.ts",
+      "expectedCases": 11,
+      "slice": "web",
+      "reason": "Compact allowed-list prompt and unrelated HealthScore transport compatibility"
+    },
+    {
+      "file": "test/matcher-web-adapter.test.ts",
+      "expectedCases": 21,
+      "slice": "web",
+      "reason": "Shared web eligibility and unchanged matcher outputs, quantities and scoring"
+    },
+    {
+      "file": "test/assessment-store-product-coverage.test.ts",
+      "expectedCases": 4,
+      "slice": "presentation",
+      "reason": "Preserve raw fractional coverage in stored projections"
+    },
+    {
+      "file": "test/healthscore-count/reuse.integration.test.ts",
+      "expectedCases": 5,
+      "slice": "postgres",
+      "reason": "Completed formula reuse across retries, checkout, fulfillment and locale",
+      "database": true
+    },
+    {
+      "file": "test/healthscore-parallel/readiness.integration.test.ts",
+      "expectedCases": 4,
+      "slice": "postgres",
+      "reason": "Independent complete-advice/formula gates and failed-work recovery",
+      "database": true
+    },
+    {
+      "file": "test/web-journey-fix/reads.integration.test.ts",
+      "expectedCases": 1,
+      "slice": "postgres",
+      "reason": "Revision-aware formula count and nonlocking reads under held writer lock",
+      "database": true
+    },
+    {
+      "file": "test/availability/work-item.integration.test.ts",
+      "expectedCases": 2,
+      "database": true,
+      "slice": "postgres",
+      "reason": "Actual task-row input freezing, lease loss, unchanged replay and empty completion preparation under isolated PostgreSQL"
+    },
+    {
+      "file": "test/formulation-results-helpers.test.ts",
+      "expectedCases": 12,
+      "slice": "presentation",
+      "reason": "Nullable missing coverage remains unknown in directly affected reveal/readiness and food-support consumers"
+    },
+    {
+      "file": "test/formulation-food-support.test.ts",
+      "expectedCases": 5,
+      "slice": "presentation",
+      "reason": "Nullable missing coverage remains unknown in directly affected reveal/readiness and food-support consumers"
+    },
+    {
+      "file": "test/food-gap-support.test.ts",
+      "expectedCases": 14,
+      "slice": "presentation",
+      "reason": "Nullable missing coverage remains unknown in directly affected reveal/readiness and food-support consumers"
+    }
+  ],
+  "browser": [
+    {
+      "file": "test/e2e/web-journey-counts.spec.ts",
+      "grep": "WEB-JOURNEY-BROWSER-01",
+      "expectedCases": 3,
+      "reason": "Same accepted formula/count across retry, HealthScore and reveal in English, Thai and Chinese"
+    }
+  ],
+  "inputs": [
+    "test/fixtures/availability/uat-catalogue.json.gz",
+    "lib/formulation-availability.ts",
+    "lib/matcher/product-availability.ts",
+    "lib/matcher/config.ts",
+    "test/healthscore-performance/fixtures.ts",
+    "test/availability/expectation-changes.md"
+  ]
+}

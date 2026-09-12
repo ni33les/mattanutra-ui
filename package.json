@@ -4,6 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "test:availability": "node scripts/mcp-721.mjs test --package=availability",
+    "validate:dev:availability": "node scripts/mcp-721.mjs validate --package=availability",
     "dev": "next dev",
     "build": "next build",
     "build:dev-fast": "node scripts/build-dev-fast.mjs",

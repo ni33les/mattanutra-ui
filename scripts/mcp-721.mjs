@@ -13,7 +13,7 @@ assert.ok(MCP_PACKAGES[packageId], "Unknown work package");
 const args = rawArgs[0]?.startsWith("--package=") ? rawArgs.slice(1) : [...rawArgs];
 const sliceIndex = args.indexOf("--slice");
 const slice = sliceIndex < 0 ? null : args.splice(sliceIndex, 2)[1];
-assert.ok(!slice || (mode === "test" && ["efficiency", "practical", "simple-plan", "boundaries", "payment-replay", "web-matching", "refinement"].includes(packageId)), "Slices are limited to efficiency development tests");
+assert.ok(!slice || (mode === "test" && ["efficiency", "practical", "simple-plan", "boundaries", "payment-replay", "web-matching", "refinement", "availability"].includes(packageId)), "Slices are limited to efficiency development tests");
 const definition = MCP_PACKAGES[packageId], MCP721_BASE = definition.base;
 assert.ok(["test", "validate"].includes(mode));
 const inventory = JSON.parse(readFileSync(definition.inventory ?? `${definition.directory}/impact.json`, "utf8"));
@@ -137,7 +137,7 @@ if (mode === "validate") {
     assert.equal(execFileSync("git", ["status", "--porcelain"], { cwd: control, encoding: "utf8" }).trim(), "");
     save("no-new-locks.json", verifyPracticalLocks(control)); stages.push({ label: "no-new-locks", passed: true });
   }
-  if (packageId === "web-matching") {
+  if (["web-matching", "availability"].includes(packageId)) {
     const { verifyPracticalLocks } = await import("./practical-matching/comparison.mjs");
     const control = resolve(output, "../web-matching-control-" + MCP721_BASE.slice(0, 12));
     if (!existsSync(control)) git("worktree", "add", "--detach", control, MCP721_BASE);
@@ -182,7 +182,7 @@ if (mode === "validate") {
       TEST_DB_URL: process.env.TEST_DB_URL, DB_URL: process.env.TEST_DB_URL, DB_WORKER_URL: process.env.TEST_DB_URL,
       DB_ALLOW_DIRECT_CONNECTION: "true", MATCHER_TEST_EVIDENCE_DIR: resolve(output, "mcp-regression") });
   }
-  if (["efficiency", "practical"].includes(packageId)) {
+  if (["efficiency", "practical", "availability"].includes(packageId)) {
     const { runEfficiencyBrowser } = await import("./service-efficiency/release-stages.mjs");
     await runEfficiencyBrowser(output, isolated ?? { ...safe, TEST_DB_URL: process.env.TEST_DB_URL, DB_URL: process.env.TEST_DB_URL, DB_WORKER_URL: process.env.TEST_DB_URL, DB_ALLOW_DIRECT_CONNECTION: "true", DB_POOL_MAX: "3" }, inventory.browser);
     stages.push({ label: "affected-browser-tests", passed: true });
