@@ -1,8 +1,8 @@
 {
   "releaseBase": "e46e16016fe0544d48da37224dde614bc153ee15",
   "deploymentBases": {
-    "dev": "ab0a2e7bd3d84c7fbd12417c2b91cfc4ccbb7ecc",
-    "uat": "ab0a2e7bd3d84c7fbd12417c2b91cfc4ccbb7ecc"
+    "dev": "264f98ccfdda3516ddb9aaf45ce66cdc2c94aba5",
+    "uat": "264f98ccfdda3516ddb9aaf45ce66cdc2c94aba5"
   },
   "scope": "web_matching_correctness",
   "inputs": [
@@ -11,12 +11,13 @@
     "lib/matcher/practical-scoring.ts",
     "lib/nutrient-identity.ts",
     "lib/product-food-allergens.ts",
-    "test/payment-return/next-loader.mjs"
+    "test/payment-return/next-loader.mjs",
+    "test/fixtures/mcp-evidence-images/manifest.json"
   ],
   "files": [
     {
       "file": "test/web-matching-correctness/regressions.test.ts",
-      "expectedCases": 14,
+      "expectedCases": 15,
       "database": false,
       "slice": "matching",
       "reason": "Reported dietary, probiotic units, botanical identity and incomplete routine scoring regressions"
@@ -121,7 +122,7 @@
     },
     {
       "file": "test/agentic-cv-r4-pack.test.ts",
-      "expectedCases": 3,
+      "expectedCases": 2,
       "database": false,
       "slice": "matching",
       "reason": "Supply and payment consistency under advanced matcher identity"

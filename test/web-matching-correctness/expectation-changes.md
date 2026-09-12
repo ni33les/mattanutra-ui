@@ -14,3 +14,5 @@ Control: e46e16016fe0544d48da37224dde614bc153ee15. Retain the separately committ
 The reported catalogue fixture retains original product prices and incorporates the six separately audited DEV label corrections. It is a corrected frozen fixture, not a new live snapshot. Full historical input/results and RED logs remain outside the checkout under /root/.codex/diagnostics/match-f2091aaa and /root/.codex/deploy/web-matching-correctness-20260912.
 
 Validation selects the reviewed impacted inventory and rejects incomplete or skipped execution. This is not a full application or full MCP acceptance claim.
+
+The collateral-dose regression still requires the exact zero-dose-loss basket to be retained. With unknown administration for both products, web fewest-pills may recommend the one-product practical basket at a disclosed 0.8 dose penalty. This is a preference trade-off, not a change to dose arithmetic. Prompt compactness remains below its original 90% size gate.

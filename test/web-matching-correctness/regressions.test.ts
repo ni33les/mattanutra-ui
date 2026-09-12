@@ -80,3 +80,11 @@ test('WM-14 ingredient identity keeps D3 and EPA form protections',()=>{
  assert.equal(nutrientNameMatchesTarget('EPA','DHA'),false);assert.equal(nutrientNameMatchesTarget('Vitamin D3','Vitamin D2'),false);
  assert.equal(nutrientNameMatchesTarget('Omega-3','EPA'),true);
 });
+test('WM-18 frozen reported basket preserves vegan exclusions and never credits botanical mass as curcumin',()=>{
+ const result=recommendWithMatcher({needs:frozen.needs,candidates:frozen.candidates,clientContext:context(),clientSex:'male'});
+ assert.ok(result.recommendations.length>0,'The corrected frozen catalogue still offers a useful eligible routine');
+ const excluded=frozen.candidates.filter(p=>p.matchingFacts?.dietarySource==='fish').map(p=>p.id);
+ for(const row of result.recommendations)assert.ok(!excluded.includes(row.product.id));
+ const curcumin=[...result.diagnostics.matchedNeeds,...result.diagnostics.unmatchedNeeds].find(n=>n.id===need('Curcumin').id);
+ assert.ok(curcumin);assert.equal(curcumin.coveragePercent,0);
+});
