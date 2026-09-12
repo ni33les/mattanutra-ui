@@ -42,3 +42,11 @@ test('AVAIL-WEB-07 publication reuses frozen permitted input and rejects mismatc
   assert.throws(()=>publishedFormulation(formula,{formulationAvailability:allowed},{formulationAvailabilityIdentity:'wrong'}),/does not match/);
   assert.notEqual(allowed.inputIdentity,formulationAvailabilityIdentity('catalogue-after',{country:'TH'},formulaInput.canonicalSupplements).inputIdentity);
 });
+test('AVAIL-WEB-08 model cannot claim an allowed ID for an unsupported ingredient',()=>{
+  const allowed=formulationAvailabilityIdentity('catalogue',{country:'TH'},formulaInput.canonicalSupplements);
+  const formula={...formulaResponse,supplementBreakdown:[{...formulaResponse.supplementBreakdown[0],supplement:'Psyllium'}]};
+  assert.equal(publishedFormulation(formula,{formulationAvailability:allowed},{formulationAvailabilityIdentity:allowed.inputIdentity}).supplementBreakdown.length,0);
+});
+test('AVAIL-WEB-09 new formulation work requires frozen availability before publication',()=>{
+  assert.throws(()=>publishedFormulation(formulaResponse,{formulationPolicy:'product-backed-v1'},{}),/permitted ingredient input/);
+});
