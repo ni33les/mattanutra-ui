@@ -456,7 +456,7 @@
     },
     {
       "file": "test/simple-plan/refinement-gate.test.ts",
-      "expectedCases": 3,
+      "expectedCases": 4,
       "reason": "Hard fresh native timing gate rejects cache hits, incomplete trials, changed semantics and stale evidence",
       "slice": "consumers"
     }
