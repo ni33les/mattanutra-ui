@@ -194,7 +194,7 @@ test('REF-CPU-15 archive recovery in a live cursor preserves original numerical 
   const input = request(), groups = compileGroups(input, { catalogueVersion: 'archive', availabilityAsOf: '2026-01-01T00:00:00Z', products: [product('archive-basis', { a: 37 })] });
   const cursor = createSearchCursor(groups, input, DEFAULT_MATCHER_CONFIG);
   advanceSearchCursor(cursor, input, 10);
-  const original = cursor.unreviewed.find(row => row.count > 0); assert.ok(original);
+  const original = [...cursor.unreviewed, ...cursor.review].find(row => row.count > 0); assert.ok(original);
   const restored = [...archivedSearchStates(cursor)].find(row => row.selectedVariantIds.join('|') === original.selectedVariantIds.join('|')); assert.ok(restored);
   assert.strictEqual(restored.exposure, original.exposure, 'An already-calculated immutable basket must not lose all exact term caches when restored locally');
   assert.deepEqual([...archivedSearchStates(structuredClone(cursor))], [...archivedSearchStates(cursor)], 'Durable recovery retains the same state values');
