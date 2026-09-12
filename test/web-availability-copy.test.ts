@@ -16,3 +16,9 @@ test('AVAIL-COPY-02 exact zero and unknown have authored, distinct localized cop
     assert.ok(revealCopy[locale].notIncludedInRoutine);
   }
 });
+test('AVAIL-COPY-03 missing persisted diagnostic remains unknown through the reveal projection',async()=>{
+  const {reconcileProductRecommendationCoverage}=await import('../lib/assessment-store.ts');
+  const result=reconcileProductRecommendationCoverage({foodGuidance:[],rawNeedCoverage:[],recommendations:[],supplementBreakdown:[{id:'d3',supplement:'Vitamin D3',category:'Foundation',dailyDose:'1000 IU/day',effectivenessRank:1,rationale:'Fixture',status:'add'}]});
+  assert.equal(result.needCoverage.length,1);assert.equal(result.needCoverage[0].coveragePercent,null);
+  assert.ok(!supplementProductCoverageById({needCoverage:result.needCoverage} as FormulationResult['productRecommendations']).has('d3'));
+});
