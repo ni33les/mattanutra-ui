@@ -188,6 +188,13 @@ async function getPaymentRowBySessionId(sql: Db, sessionId: string) {
   return rows[0] ?? null;
 }
 
+/** Read-only recovery for the same opaque Checkout session; never calls Stripe or queues work. */
+export async function getPaymentForCheckoutSession(sessionId: string) {
+  const sql = await sqlOrThrow();
+  const payment = await getPaymentRowBySessionId(sql, sessionId);
+  return payment ? mapPayment(payment) : null;
+}
+
 async function paymentBpmEventExists(
   sql: Db,
   input: Readonly<{

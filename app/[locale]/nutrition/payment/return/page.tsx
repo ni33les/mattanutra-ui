@@ -28,6 +28,7 @@ import {
 import { AMOUNT_MICROS_PER_UNIT } from "@/lib/stripe-payment-config";
 import {
   fulfillCheckoutSession,
+  getPaymentForCheckoutSession,
   paymentReturnDestination
 } from "@/lib/stripe-payments";
 import { localizedRouteMetadata } from "@/lib/seo";
@@ -132,12 +133,6 @@ const copy = {
         message:
           "Your payment was not completed. You can safely return to checkout when you are ready."
       },
-      fulfillmentFailed: {
-        badge: "Payment received",
-        headline: "Your payment needs a quick review",
-        message:
-          "Payment was received, but plan preparation needs a retry. We have logged this for review."
-      },
       paid: {
         badge: "Payment confirmed",
         headline: "Your formula is being built",
@@ -156,7 +151,7 @@ const copy = {
         badge: "Payment processing",
         headline: "Your payment is still processing",
         message:
-          "Stripe is still processing this payment. This can happen with some payment methods. Please check back shortly."
+          "We are checking the status of this payment. Use Check again to continue with the same payment; you do not need to pay again."
       }
     },
     steps: [
@@ -235,12 +230,6 @@ const copy = {
         message:
           "การชำระเงินยังไม่สำเร็จ คุณสามารถกลับไปชำระเงินใหม่ได้อย่างปลอดภัย"
       },
-      fulfillmentFailed: {
-        badge: "ได้รับการชำระเงินแล้ว",
-        headline: "การชำระเงินของคุณต้องตรวจสอบเล็กน้อย",
-        message:
-          "เราได้รับการชำระเงินแล้ว แต่การเตรียมแผนต้องลองใหม่ ระบบได้บันทึกไว้เพื่อตรวจสอบ"
-      },
       paid: {
         badge: "ยืนยันการชำระเงินแล้ว",
         headline: "กำลังสร้างสูตรของคุณ",
@@ -259,7 +248,7 @@ const copy = {
         badge: "กำลังประมวลผลการชำระเงิน",
         headline: "การชำระเงินของคุณยังประมวลผลอยู่",
         message:
-          "Stripe ยังประมวลผลการชำระเงินอยู่ ซึ่งอาจเกิดขึ้นได้กับบางวิธีชำระเงิน โปรดกลับมาตรวจสอบอีกครั้ง"
+          "เรากำลังตรวจสอบสถานะการชำระเงินนี้ กดตรวจสอบอีกครั้งเพื่อดำเนินการต่อด้วยการชำระเงินเดิม โดยไม่ต้องชำระซ้ำ"
       }
     },
     steps: [
@@ -337,12 +326,6 @@ const copy = {
         headline: "这个结账会话已过期",
         message: "你的付款未完成。准备好后可以安全返回结账页。"
       },
-      fulfillmentFailed: {
-        badge: "已收到付款",
-        headline: "你的付款需要快速审核",
-        message:
-          "我们已收到付款，但计划准备需要重试。系统已记录此问题以便审核。"
-      },
       paid: {
         badge: "付款已确认",
         headline: "正在生成你的配方",
@@ -359,7 +342,7 @@ const copy = {
         badge: "付款处理中",
         headline: "你的付款仍在处理中",
         message:
-          "Stripe 仍在处理这笔付款。某些付款方式可能会出现这种情况，请稍后再查看。"
+          "我们正在核实这笔付款的状态。点击重新检查，继续使用同一笔付款，无需再次付款。"
       }
     },
     steps: [
@@ -664,9 +647,7 @@ function buildConfirmationView(
     };
   }
 
-  const errorState = input.failureMessage
-    ? labels.states.error
-    : labels.states.fulfillmentFailed;
+  const errorState = labels.states.error;
 
   return {
     badge: errorState.badge,
@@ -727,6 +708,14 @@ function PaymentConfirmationFooter({ locale }: Readonly<{ locale: Locale }>) {
   );
 }
 
+function logPaymentReturnFailure(stage: "verification" | "recovery_read", error: unknown) {
+  const code = error && typeof error === "object" && "code" in error ? String(error.code) : "";
+  const reason = error instanceof Error && error.message === "Payment changed; retry fulfillment preparation"
+    ? "payment_changed" : "payment_return_error";
+  console.error("Payment return recovery", { stage, reason,
+    code: /^[A-Z0-9_]{2,40}$/.test(code) ? code : null });
+}
+
 export default async function PaymentReturnPage({
   params,
   searchParams
@@ -742,21 +731,36 @@ export default async function PaymentReturnPage({
   const sessionId = typeof query.session_id === "string" ? query.session_id : "";
   let result: Awaited<ReturnType<typeof fulfillCheckoutSession>> | null = null;
   let failureMessage = "";
+  let verificationPending = false;
 
   if (sessionId) {
     try {
       result = await fulfillCheckoutSession(sessionId, {
         source: "return_page"
       });
-    } catch {
-      failureMessage = "";
+    } catch (error) {
+      // Provider/DB races must not erase an already confirmed payment or its plan.
+      // Do not log session secrets, provider payloads or customer information.
+      logPaymentReturnFailure("verification", error);
+      verificationPending = true;
+      try {
+        const saved = await getPaymentForCheckoutSession(sessionId);
+        if (saved) {
+          const paid = saved.status === "paid" || saved.status === "bound" || Boolean(saved.paidAt);
+          result = { payment: saved, status: paid
+            ? saved.planId ? "paid_with_plan" : "paid_reservation"
+            : saved.status === "expired" ? "expired" : "processing" };
+        }
+      } catch (recoveryError) {
+        logPaymentReturnFailure("recovery_read", recoveryError);
+      }
     }
   } else {
     failureMessage = copy[locale].missing;
   }
 
   const payment = result?.payment ?? null;
-  const status = result?.status ?? "error";
+  const status = result?.status ?? (verificationPending ? "processing" : "error");
 
   if (status === "paid_with_plan" && payment?.planId) {
     redirect(nutritionProgressPath(locale, payment.planId));

@@ -75,7 +75,7 @@ export function fullTestPreflight(env, inventory = fullTestInventory()) {
 let interruptedSignal = null;
 export async function runBatch(label, args, env, evidence) {
   if (interruptedSignal) return { label, passed: false, interrupted: true, signal: interruptedSignal };
-  if (label.startsWith("node-")) args = ["--test-reporter=tap", "--test-reporter-destination=stdout",
+  if (label.startsWith("node-")) args = ["--experimental-test-module-mocks", "--test-reporter=tap", "--test-reporter-destination=stdout",
     "--test-reporter=./scripts/test-semantic-reporter.mjs", `--test-reporter-destination=${join(evidence, `${label}-events.jsonl`)}`, ...args];
   const output = createWriteStream(join(evidence, `${label}.log`), { flags: "wx", mode: 0o600 });
   const startedAt = new Date().toISOString();
