@@ -64,3 +64,13 @@ test("PAY-RECOVER-06 conflicting accounting is rejected before fulfillment admis
     assert.equal((await sql`select count(*)::int as n from tasks where payload->>'paymentId'=${p.id}`)[0].n, 0);
   });
 });
+test("PAY-RECOVER-07 missing completion receipt resumes without repeating proven plan adoption", async () => {
+  await isolated(async sql => {
+    const p = await paidFixture(sql, { receipt: false });
+    const [before] = await sql`select row_to_json(a)::text as exact from assessments a where plan_id=${p.plan_id}::uuid`;
+    await fulfillWebPayment(p.id, { session: async () => null, rate: async () => { throw new Error("No new booking"); } });
+    const [after] = await sql`select row_to_json(a)::text as exact from assessments a where plan_id=${p.plan_id}::uuid`;
+    assert.deepEqual(after, before);
+    assert.equal((await sql`select count(*)::int as n from tasks where plan_id=${p.plan_id}::uuid`)[0].n, 0);
+  });
+});
