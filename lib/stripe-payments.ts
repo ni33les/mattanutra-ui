@@ -1,3 +1,4 @@
+import { existingPaymentAccounting, recordPaymentAccountingOnce } from "@/lib/payment-accounting";
 import { effectivePayment } from "@/lib/payment-fulfillment-evidence";
 import { claimFunnelRequest } from "@/lib/funnel-idempotency";
 import { FunnelError } from "@/lib/funnel-errors";
@@ -14,11 +15,9 @@ import {
 } from "@/lib/communications";
 import { getSql, withDatabaseTransaction } from "@/lib/db";
 import {
-  FINANCE_ACCOUNT_IDS,
-  recordFinanceTransaction
+  FINANCE_ACCOUNT_IDS
 } from "@/lib/finance-ledger";
 import {
-  resolveUsdRateForCurrency,
   type ResolvedUsdRate
 } from "@/lib/finance-fx";
 import { isLocale, type Locale } from "@/lib/i18n";
@@ -491,9 +490,15 @@ async function recordStripePaymentCompletedRevenue(
   metadata: Record<string, unknown> = {},
   fxOverride?: ResolvedUsdRate
 ) {
-  const fx = fxOverride ?? await resolveUsdRateForCurrency(payment.currency, { sql });
+  const existing = await existingPaymentAccounting(sql, { amount: payment.amount, currency: payment.currency,
+    category: "revenue", entryType: "nominal", sourceRef: `stripe:payment:${payment.id}:nominal-revenue`,
+    metadata: { paymentId: payment.id, stripeCheckoutSessionId: payment.stripe_checkout_session_id,
+      stripePaymentIntentId: payment.stripe_payment_intent_id, ...metadata } });
+  if (existing) return existing;
+  if (!fxOverride) throw new Error("Prepare payment FX before the accounting transaction");
+  const fx = fxOverride;
 
-  return recordFinanceTransaction({
+  return recordPaymentAccountingOnce(sql, {
     amount: payment.amount,
     category: "revenue",
     currency: payment.currency,
@@ -659,9 +664,13 @@ export async function recordStripePaymentAccounting(
     const feeMicros = amountMicrosFromStripeAmount(balanceTransaction?.fee);
 
     if (balanceTransaction?.id && feeMicros) {
-      const fx = fxOverride ?? await resolveUsdRateForCurrency(payment.currency, { sql });
-
-      await recordFinanceTransaction({
+      const existingFee = await existingPaymentAccounting(sql, { amount: feeMicros, currency: payment.currency,
+        category: "payment_fee", entryType: "actual", sourceRef: `stripe:balance_transaction:${balanceTransaction.id}:fee`,
+        metadata: { paymentId: payment.id, stripeBalanceTransactionId: balanceTransaction.id, stripeCheckoutSessionId: checkoutSessionId } });
+      if (!existingFee) {
+      if (!fxOverride) throw new Error("Prepare payment FX before the accounting transaction");
+      const fx = fxOverride;
+      await recordPaymentAccountingOnce(sql, {
         amount: feeMicros,
         category: "payment_fee",
         currency: payment.currency,
@@ -686,6 +695,7 @@ export async function recordStripePaymentAccounting(
         fxRateId: fx.fxRateId,
         usdRate: fx.usdRate
       });
+      }
     }
 
     deferUntilDatabaseCommit(() => {
