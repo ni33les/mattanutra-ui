@@ -134,7 +134,14 @@ function compileSubject(request: CanonicalRequest, subjectId: string) {
   const zeroScale = request.scoring && target?.requested.units === BigInt(0) ? zeroTargetScale(target.name, subjectId) : null;
   if (request.scoring && target?.requested.units === BigInt(0) && (!zeroScale || zeroScale.dim !== target.requested.dim)) throw new Error(`No reviewed zero-target normalization scale for ${target.name}`);
   const scale = zeroScale?.units;
-  return { requested, target, ranges, dietary, referenceRows, reference, scale, bounds: limitsFor(request, subjectId), losses: new Map<Fraction, Map<bigint, ReturnType<typeof subjectLoss>>>() };
+  const bounds = limitsFor(request, subjectId);
+  // All endpoint reference losses are zero below this known-supplemental
+  // amount. Compile once; unknown intake remains unknown in display facts.
+  const zeroLimitThrough = bounds.reduce<bigint | null>((minimum, row) => {
+    const amount = row.units - (ranges.maximum - ranges.base) - (row.ceiling.sourceScope === "total" ? dietary.maximum : BigInt(0));
+    return minimum === null || amount < minimum ? amount : minimum;
+  }, null);
+  return { requested, target, ranges, dietary, referenceRows, reference, scale, bounds, zeroLimitThrough, losses: new Map<Fraction, Map<bigint, ReturnType<typeof subjectLoss>>>() };
 }
 function subjectInputs(request: CanonicalRequest, subjectId: string) {
   request = sharedInputs.get(request) ?? request;
@@ -245,6 +252,7 @@ function calculateDoseFit(request: CanonicalRequest, exposure: ReadonlyMap<strin
     const { target, dietary, referenceRows, reference, bounds } = compiled;
     if (!target && reference === BigInt(0) && bounds.length === 0) continue;
     const known = exposure.get(subjectId) ?? BigInt(0);
+    if (!materialize && !target && reference === BigInt(0) && compiled.zeroLimitThrough !== null && known <= compiled.zeroLimitThrough) continue;
     const weight = weights ? weights.subjects.get(subjectId) ?? weights.defaultWeight : ONE;
     const { minimum, maximum, added, continuedIncrease, worst } = cachedSubjectLoss(compiled, known, weight);
     if (settings) intentTotal = add(intentTotal, worst.total);
