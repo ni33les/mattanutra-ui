@@ -97,6 +97,8 @@ function measurement(value: number, field: string, integer = false): Rational {
 const square = (value: Rational) => multiply(value, value);
 // Exact values stay native during search. Restored DTOs are decoded once;
 // WeakMap ownership keeps this cache bounded by the live candidate objects.
+const practicalExact = new WeakMap<PracticalPenaltyScore, Rational>();
+const overallExact = new WeakMap<OverallMatchingScore, Rational>();
 const nativeExact = new WeakMap<PracticalPenaltyScore["exact"], Rational>();
 function decoded(value: PracticalPenaltyScore["exact"]): Rational {
   let exact = nativeExact.get(value);
@@ -104,7 +106,8 @@ function decoded(value: PracticalPenaltyScore["exact"]): Rational {
   return exact;
 }
 function encoded(value: Rational) {
-  const dto = serialize(value); nativeExact.set(dto, value); return dto;
+  const normalized = rational(value.num, value.den);
+  const dto = serialize(normalized); nativeExact.set(dto, normalized); return dto;
 }
 const QUARTER = fromDecimal(0.25), ONE = fromDecimal(1), THREE = fromDecimal(3), PRICE_SCALE = fromDecimal(100000);
 const profileCoefficients = new WeakMap<Profile, { objectives: Record<"pills" | "products" | "price" | "servings", Rational>; preferences: Record<Field, Rational> }>();
@@ -182,21 +185,26 @@ export function scorePracticalPenalties(request: PracticalRequest, actual: Pract
   };
   const total = sum(Object.values(exactComponents));
   let components: PracticalPenaltyScore["components"] | undefined, preferences: PracticalPenaltyScore["preferences"] | undefined;
-  return { profile, total: toNumber(total), exact: encoded(total), complete: measured.missingComponents.length === 0,
+  let exact: PracticalPenaltyScore["exact"] | undefined;
+  const score: PracticalPenaltyScore = { profile, total: toNumber(total), get exact() { return exact ??= encoded(total); }, complete: measured.missingComponents.length === 0,
     get components() { return components ??= Object.fromEntries(Object.entries(exactComponents).map(([k, v]) => [k, toNumber(v)])) as PracticalPenaltyScore["components"]; },
     get preferences() { return preferences ??= Object.fromEntries(measured.preferences.map((row, index) => [row.field, {
       active: row.active, actual: row.actual, actualLowerBound: row.lower, preferred: row.preferred, complete: row.actual !== null,
       scale: row.scale, importance: profile.importance[row.field], multiplier: [m.pills, m.products, m.price][index]!, penalty: toNumber(exactPreferences[index]!)
     }])) as Record<Field, PreferencePenalty>; }, missingComponents: measured.missingComponents };
+  practicalExact.set(score, total); return score;
 }
 
 export function overallMatchingScore(request: CanonicalRequest, exposure: ReadonlyMap<string, bigint>, actual: PracticalActuals): OverallMatchingScore {
   const penalties = scorePracticalPenalties(request, actual), dose = doseFitScore(doseRequest.get(request) ?? request, exposure);
   const nutrient = request.scoring ? weightedDoseFitScore(request, exposure) : dose;
-  const total = add(exactDoseFit(nutrient), decoded(penalties.exact));
+  const total = add(exactDoseFit(nutrient), practicalExact.get(penalties)!);
   // Complete this fresh score in place; copying it would allocate another DTO
   // and force lazy detail getters during every profile comparison.
-  return Object.assign(penalties, { dosePenalty: dose.total, overallPenalty: toNumber(total), overallExact: encoded(total) });
+  const score = Object.assign(penalties, { dosePenalty: dose.total, overallPenalty: toNumber(total) }) as OverallMatchingScore;
+  let exact: OverallMatchingScore["overallExact"] | undefined;
+  Object.defineProperty(score, "overallExact", { enumerable: true, get: () => exact ??= encoded(total) });
+  overallExact.set(score, total); return score;
 }
 
 const stateActuals = new WeakMap<SearchState, PracticalActuals>();
@@ -226,7 +234,7 @@ export function searchStateScore(request: CanonicalRequest, state: SearchState):
 }
 export function compareOverallScores(left: OverallMatchingScore, right: OverallMatchingScore) {
   if (left.profile.hash !== right.profile.hash) throw new Error("Cannot compare different matching profiles as one score");
-  return compare(decoded(left.overallExact), decoded(right.overallExact));
+  return compare(overallExact.get(left) ?? decoded(left.overallExact), overallExact.get(right) ?? decoded(right.overallExact));
 }
 
 export function administrationBasisKnown(product: MatcherProduct) {
