@@ -34,8 +34,8 @@ test('SERVING-DATA-02 corrections preserve identity and non-administration field
   assert.equal(new Set(manifest.corrections.map(row => row.entityId)).size, 11);
   for (const row of manifest.corrections) {
     assert.equal(row.entityTable, 'products');
-    const { administration: _before, ...before } = row.before;
-    const { administration: _after, ...after } = row.after;
+    const before = Object.fromEntries(Object.entries(row.before).filter(([key]) => key !== 'administration'));
+    const after = Object.fromEntries(Object.entries(row.after).filter(([key]) => key !== 'administration'));
     assert.deepEqual(after, before);
     assert.equal(catalogueCorrectionState(row, row.after), 'already_applied');
   }
