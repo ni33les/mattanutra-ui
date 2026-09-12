@@ -2,11 +2,26 @@
   "releaseBase": "e46e16016fe0544d48da37224dde614bc153ee15",
   "scope": "payment_return_recovery",
   "files": [
-    { "file": "test/payment-return/page.test.ts", "expectedCases": 14, "reason": "Actual return-page rendering and redirects after provider, database and concurrent-confirmation errors, in all three locales" },
-    { "file": "test/payment-confirmation-return.test.ts", "expectedCases": 8, "reason": "Existing confirmation layout, localization, receipt and reservation compatibility" },
-    { "file": "test/stripe-payments.test.ts", "expectedCases": 11, "reason": "Read-only session recovery shares the existing payment store; preserve confirmation, accounting and checkout invariants" }
+    {
+      "file": "test/payment-return/page.test.ts",
+      "expectedCases": 14,
+      "reason": "Actual return-page rendering and redirects after provider, database and concurrent-confirmation errors, in all three locales"
+    },
+    {
+      "file": "test/payment-confirmation-return.test.ts",
+      "expectedCases": 8,
+      "reason": "Existing confirmation layout, localization, receipt and reservation compatibility"
+    },
+    {
+      "file": "test/stripe-payments.test.ts",
+      "expectedCases": 11,
+      "reason": "Read-only session recovery shares the existing payment store; preserve confirmation, accounting and checkout invariants"
+    }
   ],
-  "inputs": ["test/payment-return/next-loader.mjs"],
+  "inputs": [
+    "test/payment-return/next-loader.mjs",
+    "scripts/run-full-test-suite.mjs"
+  ],
   "expectationChanges": [
     "A return exception no longer claims a review was requested or sends a known-session customer home.",
     "Recover confirmed payments from stored state; unverified payments retain a same-session retry without claiming receipt.",

@@ -22,7 +22,7 @@ const save = (name, value) => writeFileSync(resolve(output, name), JSON.stringif
 save("inventory.json", inventory); save("source-before.json", source);
 const env = Object.fromEntries(["PATH", "HOME", "TMPDIR", "LANG", "LC_ALL", "TZ"].filter(k => process.env[k]).map(k => [k, process.env[k]]));
 Object.assign(env, { NODE_ENV: "test", MATTANUTRA_ENV: "dev", AGENTIC_BUILD_ID: sha, STRIPE_PAYMENT_MODE: "mock", AGENTIC_PAYMENT_PROVIDER: "mock", NEXT_TELEMETRY_DISABLED: "1", NEXT_BUILD_CPUS: "2", NODE_OPTIONS: "--max-old-space-size=4096" });
-const result = await runBatch("node-payment-return", ["--test", "--test-concurrency=1", "--experimental-test-module-mocks", "--experimental-strip-types", "--import", "./test/helpers/offline-network.mjs", "--import", "./scripts/register-ts-path-loader.mjs", ...files], env, output);
+const result = await runBatch("node-payment-return", ["--test", "--test-concurrency=1", "--experimental-strip-types", "--import", "./test/helpers/offline-network.mjs", "--import", "./scripts/register-ts-path-loader.mjs", ...files], env, output);
 assert.ok(result.passed);
 const events = readFileSync(resolve(output, "node-payment-return-events.jsonl"), "utf8").trim().split("\n").map(line => JSON.parse(line));
 const execution = nodeExecutionProof(files, events); assert.ok(execution.passed);
