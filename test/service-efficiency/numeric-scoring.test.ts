@@ -7,30 +7,33 @@ let multiplications = 0; let measurements = 0;
 mock.module('../../lib/matcher/dose.ts', { namedExports: { ...dose, scaleAmount: (...args: Parameters<typeof dose.scaleAmount>) => { unitCompilations++; return dose.scaleAmount(...args); }, amountFromScaled: (...args: Parameters<typeof dose.amountFromScaled>) => { conversions++; return dose.amountFromScaled(...args); } } });
 mock.module('../../lib/matcher/rational.ts', { namedExports: { ...fractions, serialize: (...args: Parameters<typeof fractions.serialize>) => { exactEncodings++; return fractions.serialize(...args); }, fromDecimal: (...args: Parameters<typeof fractions.fromDecimal>) => { measurements++; return fractions.fromDecimal(...args); }, multiply: (...args: Parameters<typeof fractions.multiply>) => { multiplications++; return fractions.multiply(...args); } } });
 const { request } = await import('../matcher/flexible-v5-fixtures.ts');
-const { doseFitScore, exactDoseFit, compareDoseFit, weightedDoseFitScore } = await import('../../lib/matcher/dose-fit.ts');
+const { doseFitScore, numericalDoseFitScore, exactDoseFit, compareDoseFit, weightedDoseFitScore, numericalWeightedDoseFitScore } = await import('../../lib/matcher/dose-fit.ts');
 
 test('REF-CPU-01 numerical ranking does not format display doses for losing candidates', () => {
   const input = request({ safetyCeilings: [{ subjectId: 'a', name: 'A', maxAmount: 100, maxUnit: 'mg', sourceScope: 'supplemental' }] });
   conversions = 0;
-  const score = doseFitScore(input, new Map([['a', 150_000_000n]]));
+  const exposure = new Map([['a', 150_000_000n]]);
+  const score = numericalDoseFitScore(input, exposure);
   assert.equal(score.total, 1.5, '50% target excess plus independent 2 × 50% reference excess');
   assert.deepEqual(exactDoseFit(score), { num: 3n, den: 2n });
   assert.equal(conversions, 0, 'Ranking needs exact numerical penalties, not display unit conversions');
-  const saved = structuredClone(score);
+  const display = doseFitScore(input, exposure);
+  const saved = structuredClone(display);
   assert.equal(saved.perTarget[0].exposure, 150); assert.equal(saved.perTarget[0].target, 100);
   assert.equal(saved.perLimit[0].limit, 100); assert.equal(saved.perLimit[0].excess, 0.5);
   assert.ok(conversions > 0, 'Complete persisted score facts remain available');
-  const first = conversions; assert.deepEqual(structuredClone(score), saved); assert.equal(conversions, first, 'Display facts materialise once');
+  const first = conversions; assert.deepEqual(structuredClone(display), saved); assert.equal(conversions, first, 'Display facts materialise once');
 });
 test('REF-CPU-02 exact ordering and uniform weighted scoring avoid display allocation', () => {
   const input = request({ scoring: { profile: 'balanced', weights: { nutrients: { a: 2 } } } });
   conversions = 0;
-  const below = doseFitScore(input, new Map([['a', 99_999_999n]]));
-  const above = doseFitScore(input, new Map([['a', 100_000_001n]]));
+  const below = numericalDoseFitScore(input, new Map([['a', 99_999_999n]]));
+  const above = numericalDoseFitScore(input, new Map([['a', 100_000_001n]]));
   assert.equal(compareDoseFit(below, above), 0);
-  const weighted = weightedDoseFitScore(input, new Map([['a', 75_000_000n]])); assert.equal(weighted.total, 0.5);
+  const exposure = new Map([['a', 75_000_000n]]);
+  const weighted = numericalWeightedDoseFitScore(input, exposure); assert.equal(weighted.total, 0.5);
   assert.equal(conversions, 0);
-  assert.equal(weighted.perTarget[0].under, 0.25);
+  assert.equal(weightedDoseFitScore(input, exposure).perTarget[0].under, 0.25);
 });
 test('REF-CPU-03 unchanged subject exposure reuses exact arithmetic across distinct basket maps', () => {
   const input = request(); multiplications = 0;
@@ -118,23 +121,25 @@ test('REF-CPU-10 compilation, cursor continuation and final selection share one 
 });
 
 test('REF-CPU-11 losing numerical candidates do not encode exact-score response objects', async () => {
-  const { overallMatchingScore, compareOverallScores } = await import('../../lib/matcher/practical-scoring.ts');
+  const { overallMatchingScore, numericalOverallMatchingScore, compareOverallScores } = await import('../../lib/matcher/practical-scoring.ts');
   const input = request(), actual = { dailyPills: 1, pillLowerBound: 1, productCount: 1, priceMinor: 50000, currency: 'THB', servings: [1], uncertainProductCount: 0 };
   exactEncodings = 0;
-  const first = overallMatchingScore(input, new Map([['a', 75_000_000n]]), actual);
-  const next = overallMatchingScore(input, new Map([['a', 75_000_000n]]), { ...actual, priceMinor: 50001 });
+  const exposure = new Map([['a', 75_000_000n]]);
+  const first = numericalOverallMatchingScore(input, exposure, actual);
+  const next = numericalOverallMatchingScore(input, new Map([['a', 75_000_000n]]), { ...actual, priceMinor: 50001 });
   assert.equal(compareOverallScores(first, next), -1);
   assert.equal(exactEncodings, 0, 'Exact comparisons use native fractions until a result is retained');
-  const saved = structuredClone(first); assert.deepEqual(saved.overallExact, { numerator: '41', denominator: '120' });
+  const display = overallMatchingScore(input, exposure, actual);
+  const saved = structuredClone(display); assert.deepEqual(saved.overallExact, { numerator: '41', denominator: '120' });
   assert.ok(exactEncodings > 0); const count = exactEncodings;
-  assert.deepEqual(structuredClone(first), saved); assert.equal(exactEncodings, count);
+  assert.deepEqual(structuredClone(display), saved); assert.equal(exactEncodings, count);
 });
 
 test('REF-CPU-12 frontier numerical records contain no response getters or display trees', async () => {
   const scoring = await import('../../lib/matcher/practical-scoring.ts');
   const { seedState } = await import('../../lib/matcher/search.ts');
   const input = request(), state = { ...seedState(input), price: 50000 };
-  const evaluate = ('numericalSearchStateScore' in scoring ? scoring.numericalSearchStateScore : scoring.searchStateScore) as typeof scoring.searchStateScore;
+  const evaluate = scoring.numericalSearchStateScore;
   const score = evaluate(input, state);
   assert.equal(Object.values(Object.getOwnPropertyDescriptors(score)).filter(row => row.get).length, 0,
     'Losing states must be plain numerical records, not lazy response objects');

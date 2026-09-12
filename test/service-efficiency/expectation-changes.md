@@ -37,3 +37,5 @@ the frozen D3 control. The scoped consumer inventory is
 `matcher-hot-path-impact.json`; this is not full-application acceptance.
 
 - REF-CPU-03 experiment (2026-09-12): retain the independent arithmetic-reuse assertion; withdraw the added whole-score object-identity assertion. Its bounded value-key memo increased the uncached Daniel diagnostic from 3404ms to 3660ms, with unchanged result identity. The experiment and RED evidence remain in git and the external refinement-speed evidence; this cache is not retained.
+
+- REF-CPU-01/02/11 now exercise explicit numerical entry points, followed by explicit retained-result materialization. The lazy-DTO prototype is replaced with plain numeric records; exact arithmetic, display assertions and checkpoint DTO compatibility remain unchanged. REF-CPU-12 records its failed plain-record assertion in numeric-records-red.log. Daniel's full uncached result hash remains `19da5fc035e6d875de91ea2e0f440246f5692d155acd971ac48d12edec1731cc`.

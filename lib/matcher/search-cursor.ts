@@ -7,7 +7,7 @@ import { targetDoseTicks } from "@/lib/matcher/target-basis";
 import { compareOverallScores, resolvePracticalProfile, searchStateScore, type OverallMatchingScore } from "@/lib/matcher/practical-scoring";
 import { divide, fromDecimal, multiply, rational, toNumber } from "@/lib/matcher/rational";
 import { fingerprintState } from "@/lib/matcher/dominance";
-import { compareDoseFit, doseFitScore, doseFitTargetDeviations } from "@/lib/matcher/dose-fit";
+import { compareDoseFit, numericalDoseFitScore, doseFitTargetDeviations } from "@/lib/matcher/dose-fit";
 import { compareSearchStates, profileLeaders, residualPattern, reviewFrontier, seedState, tryAddVariant, type SearchRun } from "@/lib/matcher/search";
 import type { CanonicalRequest, DoseVariant, MatcherConfig, ProductGroup, SearchState } from "@/lib/matcher/types";
 
@@ -233,11 +233,11 @@ function diverseSingles(cursor: SearchCursor, request: CanonicalRequest) {
   return result;
 }
 function rawDoseLeaders(states: readonly SearchState[], request: CanonicalRequest, limit: number) {
-  const ranked = [...states].sort((a,b) => compareDoseFit(doseFitScore(request,a.exposure),doseFitScore(request,b.exposure)) || compareSearchStates(a,b,request));
+  const ranked = [...states].sort((a,b) => compareDoseFit(numericalDoseFitScore(request,a.exposure),numericalDoseFitScore(request,b.exposure)) || compareSearchStates(a,b,request));
   // A basket that exactly meets several targets is a useful completion base,
   // even when one remaining gap gives it a larger aggregate dose loss.
-  const exactCount = (state: SearchState) => doseFitTargetDeviations(doseFitScore(request,state.exposure)).filter(row => row.under === 0 && row.over === 0).length;
-  const exact = [...ranked].sort((a,b) => exactCount(b)-exactCount(a) || compareDoseFit(doseFitScore(request,a.exposure),doseFitScore(request,b.exposure)) || compareSearchStates(a,b,request));
+  const exactCount = (state: SearchState) => doseFitTargetDeviations(numericalDoseFitScore(request,state.exposure)).filter(row => row.under === 0 && row.over === 0).length;
+  const exact = [...ranked].sort((a,b) => exactCount(b)-exactCount(a) || compareDoseFit(numericalDoseFitScore(request,a.exposure),numericalDoseFitScore(request,b.exposure)) || compareSearchStates(a,b,request));
   const chosen: SearchState[] = [...new Set([ranked[0], ...exact.slice(0,2)].filter((row): row is SearchState => Boolean(row)))].slice(0,limit);
   const patterns = new Set(chosen.map(state => residualPattern(state,request)));
   for (const state of ranked) {
@@ -377,10 +377,10 @@ export function advanceSearchCursor(cursor: SearchCursor, request: CanonicalRequ
         // Explored complementary bases remain useful even when they did not win
         // a repair role. Give each target's closest base a completion opportunity.
         const ranked = [...new Map([...cursor.repaired, ...cursor.review, ...cursor.unreviewed].map(row => [fingerprintState(row),row])).values()].sort((a,b)=>compareSearchStates(a,b,request));
-        const additiveBases = ranked.filter(state => { const targets=doseFitTargetDeviations(doseFitScore(request,state.exposure)); return targets.every(row=>row.over===0) && targets.some(row=>row.under>0); });
+        const additiveBases = ranked.filter(state => { const targets=doseFitTargetDeviations(numericalDoseFitScore(request,state.exposure)); return targets.every(row=>row.over===0) && targets.some(row=>row.under>0); });
         const references = request.targets.filter(target => !isDeferredConditional(target)).map(target => {
-          const loss = (state: SearchState) => { const row = doseFitTargetDeviations(doseFitScore(request,state.exposure)).find(row=>row.subjectId===target.subjectId); return row ? row.under + row.over : Infinity; };
-          return [...additiveBases].sort((a,b)=>loss(a)-loss(b) || compareDoseFit(doseFitScore(request,a.exposure),doseFitScore(request,b.exposure)) || compareSearchStates(a,b,request))[0];
+          const loss = (state: SearchState) => { const row = doseFitTargetDeviations(numericalDoseFitScore(request,state.exposure)).find(row=>row.subjectId===target.subjectId); return row ? row.under + row.over : Infinity; };
+          return [...additiveBases].sort((a,b)=>loss(a)-loss(b) || compareDoseFit(numericalDoseFitScore(request,a.exposure),numericalDoseFitScore(request,b.exposure)) || compareSearchStates(a,b,request))[0];
         }).filter((row): row is SearchState => Boolean(row));
         cursor.second=[...new Set([...references.slice(0,Math.ceil(width(cursor)/4)), ...profileLeaders(ranked,request,width(cursor))])];
         for (const row of rawDoseLeaders(ranked,request,Math.ceil(width(cursor)/2))) {

@@ -1,7 +1,7 @@
 import { effectiveWeights, CONVERSATIONAL_POLICY_VERSION } from "@/lib/matcher/scoring-policy";
 import { sha256Hex } from "@/lib/sha256";
 import { verifiedAdministration } from "@/lib/product-administration";
-import { doseFitScore, weightedDoseFitScore, exactDoseFit, shareDoseFitInputs } from "@/lib/matcher/dose-fit";
+import { numericalDoseFitScore, numericalWeightedDoseFitScore, exactDoseFit, shareDoseFitInputs } from "@/lib/matcher/dose-fit";
 import { add, compare, divide, fromDecimal, multiply, positive, rational, serialize, subtract, sum, toNumber, ZERO, type Rational } from "@/lib/matcher/rational";
 import type { CanonicalRequest, MatcherProduct, OptimizationMode, PreferenceImportance, SearchState } from "@/lib/matcher/types";
 
@@ -97,8 +97,6 @@ function measurement(value: number, field: string, integer = false): Rational {
 const square = (value: Rational) => multiply(value, value);
 // Exact values stay native during search. Restored DTOs are decoded once;
 // WeakMap ownership keeps this cache bounded by the live candidate objects.
-const practicalExact = new WeakMap<PracticalPenaltyScore, Rational>();
-const overallExact = new WeakMap<OverallMatchingScore, Rational>();
 const nativeExact = new WeakMap<PracticalPenaltyScore["exact"], Rational>();
 function decoded(value: PracticalPenaltyScore["exact"]): Rational {
   let exact = nativeExact.get(value);
@@ -168,7 +166,7 @@ function measurementsFor(request: PracticalRequest, actual: PracticalActuals, pr
   return result;
 }
 /** Exact ranking estimate, with incomplete observations explicitly distinct from known zero. */
-export function scorePracticalPenalties(request: PracticalRequest, actual: PracticalActuals): PracticalPenaltyScore {
+function numericalPracticalPenalties(request: PracticalRequest, actual: PracticalActuals) {
   if (actual.currency !== request.currency || actual.currency !== "THB") throw new Error("currency must match the THB profile normalization currency");
   const profile = resolvePracticalProfile(request), m = profile.multipliers, coefficient = coefficients(profile);
   const measured = measurementsFor(request, actual, profile);
@@ -184,31 +182,45 @@ export function scorePracticalPenalties(request: PracticalRequest, actual: Pract
     preferences: sum(exactPreferences)
   };
   const total = sum(Object.values(exactComponents));
-  let components: PracticalPenaltyScore["components"] | undefined, preferences: PracticalPenaltyScore["preferences"] | undefined;
-  let exact: PracticalPenaltyScore["exact"] | undefined;
-  const score: PracticalPenaltyScore = { profile, total: toNumber(total), get exact() { return exact ??= encoded(total); }, complete: measured.missingComponents.length === 0,
-    get components() { return components ??= Object.fromEntries(Object.entries(exactComponents).map(([k, v]) => [k, toNumber(v)])) as PracticalPenaltyScore["components"]; },
-    get preferences() { return preferences ??= Object.fromEntries(measured.preferences.map((row, index) => [row.field, {
+  return { profile, measured, exactPreferences, exactComponents, total };
+}
+type NumericalPracticalScore = ReturnType<typeof numericalPracticalPenalties>;
+export type NumericalOverallScore = Readonly<{ profile: Profile; penalties: NumericalPracticalScore;
+  dosePenalty: number; overallPenalty: number; exactTotal: Rational }>;
+function displayPenalties(score: NumericalPracticalScore): PracticalPenaltyScore {
+  const { profile, measured, exactPreferences, exactComponents, total } = score, m = profile.multipliers;
+  return { profile, total: toNumber(total), exact: encoded(total), complete: measured.missingComponents.length === 0,
+    components: Object.fromEntries(Object.entries(exactComponents).map(([k, v]) => [k, toNumber(v)])) as PracticalPenaltyScore["components"],
+    preferences: Object.fromEntries(measured.preferences.map((row, index) => [row.field, {
       active: row.active, actual: row.actual, actualLowerBound: row.lower, preferred: row.preferred, complete: row.actual !== null,
       scale: row.scale, importance: profile.importance[row.field], multiplier: [m.pills, m.products, m.price][index]!, penalty: toNumber(exactPreferences[index]!)
-    }])) as Record<Field, PreferencePenalty>; }, missingComponents: measured.missingComponents };
-  practicalExact.set(score, total); return score;
+    }])) as Record<Field, PreferencePenalty>, missingComponents: measured.missingComponents };
 }
-
+export function scorePracticalPenalties(request: PracticalRequest, actual: PracticalActuals): PracticalPenaltyScore {
+  return displayPenalties(numericalPracticalPenalties(request, actual));
+}
+export function numericalOverallMatchingScore(request: CanonicalRequest, exposure: ReadonlyMap<string, bigint>, actual: PracticalActuals): NumericalOverallScore {
+  const penalties = numericalPracticalPenalties(request, actual), dose = numericalDoseFitScore(doseRequest.get(request) ?? request, exposure);
+  const nutrient = request.scoring ? numericalWeightedDoseFitScore(request, exposure) : dose;
+  const total = add(exactDoseFit(nutrient), penalties.total);
+  return { profile: penalties.profile, penalties, dosePenalty: dose.total, overallPenalty: toNumber(total), exactTotal: total };
+}
+const displayOverallScores = new WeakMap<NumericalOverallScore, OverallMatchingScore>();
+function displayOverall(score: NumericalOverallScore): OverallMatchingScore {
+  let value = displayOverallScores.get(score);
+  if (!value) {
+    value = { ...displayPenalties(score.penalties), dosePenalty: score.dosePenalty,
+      overallPenalty: score.overallPenalty, overallExact: encoded(score.exactTotal) };
+    displayOverallScores.set(score, value);
+  }
+  return value;
+}
 export function overallMatchingScore(request: CanonicalRequest, exposure: ReadonlyMap<string, bigint>, actual: PracticalActuals): OverallMatchingScore {
-  const penalties = scorePracticalPenalties(request, actual), dose = doseFitScore(doseRequest.get(request) ?? request, exposure);
-  const nutrient = request.scoring ? weightedDoseFitScore(request, exposure) : dose;
-  const total = add(exactDoseFit(nutrient), practicalExact.get(penalties)!);
-  // Complete this fresh score in place; copying it would allocate another DTO
-  // and force lazy detail getters during every profile comparison.
-  const score = Object.assign(penalties, { dosePenalty: dose.total, overallPenalty: toNumber(total) }) as OverallMatchingScore;
-  let exact: OverallMatchingScore["overallExact"] | undefined;
-  Object.defineProperty(score, "overallExact", { enumerable: true, get: () => exact ??= encoded(total) });
-  overallExact.set(score, total); return score;
+  return displayOverall(numericalOverallMatchingScore(request, exposure, actual));
 }
 
 const stateActuals = new WeakMap<SearchState, PracticalActuals>();
-const stateScores = new WeakMap<CanonicalRequest, WeakMap<SearchState["exposure"], { state: SearchState; score: OverallMatchingScore }[]>>();
+const stateScores = new WeakMap<CanonicalRequest, WeakMap<SearchState["exposure"], { state: SearchState; score: NumericalOverallScore }[]>>();
 function sameMeasurements(a: SearchState, b: SearchState) {
   return a.pills === b.pills && a.pillCountKnown === b.pillCountKnown && a.count === b.count && a.price === b.price &&
     a.uncertainAdministrationCount === b.uncertainAdministrationCount && a.monthlyPriceMinor === b.monthlyPriceMinor &&
@@ -216,7 +228,7 @@ function sameMeasurements(a: SearchState, b: SearchState) {
       ? a.servingBurden.num === b.servingBurden.num && a.servingBurden.den === b.servingBurden.den
       : a.routineServings === b.routineServings);
 }
-export function searchStateScore(request: CanonicalRequest, state: SearchState): OverallMatchingScore {
+export function numericalSearchStateScore(request: CanonicalRequest, state: SearchState): NumericalOverallScore {
   let cache = stateScores.get(request); if (!cache) { cache = new WeakMap(); stateScores.set(request, cache); }
   let bucket = cache.get(state.exposure);
   const found = bucket?.find(row => row.state === state || sameMeasurements(row.state, state));
@@ -226,15 +238,18 @@ export function searchStateScore(request: CanonicalRequest, state: SearchState):
       pillLowerBound: state.pills, productCount: state.count, priceMinor: state.price, currency: request.currency,
       servings: state.routineServings ?? [], servingBurdenExact: state.servingBurden, uncertainProductCount: state.uncertainAdministrationCount ?? state.count,
       monthlyPriceMinor: state.monthlyPriceMinor, monthlyPriceLowerBound: state.monthlyPriceLowerBound }; stateActuals.set(state, actual); }
-  const result = overallMatchingScore(request, state.exposure, actual);
+  const result = numericalOverallMatchingScore(request, state.exposure, actual);
   if (!bucket) { bucket = []; cache.set(state.exposure, bucket); }
   if (bucket.length >= 8) bucket.shift();
   bucket.push({ state, score: result });
   return result;
 }
-export function compareOverallScores(left: OverallMatchingScore, right: OverallMatchingScore) {
+export function searchStateScore(request: CanonicalRequest, state: SearchState): OverallMatchingScore {
+  return displayOverall(numericalSearchStateScore(request, state));
+}
+export function compareOverallScores(left: OverallMatchingScore | NumericalOverallScore, right: OverallMatchingScore | NumericalOverallScore) {
   if (left.profile.hash !== right.profile.hash) throw new Error("Cannot compare different matching profiles as one score");
-  return compare(overallExact.get(left) ?? decoded(left.overallExact), overallExact.get(right) ?? decoded(right.overallExact));
+  return compare("exactTotal" in left ? left.exactTotal : decoded(left.overallExact), "exactTotal" in right ? right.exactTotal : decoded(right.overallExact));
 }
 
 export function administrationBasisKnown(product: MatcherProduct) {

@@ -9,12 +9,13 @@ import type { CanonicalRequest, DoseDimension, DoseFitScore, MatcherUnit, Safety
 
 type Fraction = Readonly<{ num: bigint; den: bigint }>;
 const ZERO: Fraction = { num: BigInt(0), den: BigInt(1) };
-const exactTotals = new WeakMap<DoseFitScore, Fraction>();
-const exactParts = new WeakMap<DoseFitScore, { fitting: Fraction; safety: Fraction }>();
+export type NumericalDoseFitScore = Pick<DoseFitScore, "total" | "under" | "over" | "limit" | "weightedLimit" | "version" | "limitWeight">;
+const exactTotals = new WeakMap<NumericalDoseFitScore, Fraction>();
+const exactParts = new WeakMap<NumericalDoseFitScore, { fitting: Fraction; safety: Fraction }>();
 type TargetDeviation = Pick<DoseFitScore["perTarget"][number], "subjectId" | "under" | "over">;
-const targetDeviations = new WeakMap<DoseFitScore, readonly TargetDeviation[]>();
+const targetDeviations = new WeakMap<NumericalDoseFitScore, readonly TargetDeviation[]>();
 /** Frontier comparisons need deviations, not unit-converted display rows. */
-export function doseFitTargetDeviations(score: DoseFitScore) { return targetDeviations.get(score) ?? score.perTarget; }
+export function doseFitTargetDeviations(score: NumericalDoseFitScore) { return targetDeviations.get(score) ?? (score as DoseFitScore).perTarget; }
 const fixedWeights = new WeakMap<CanonicalRequest, number | null>();
 const scoreCache = new WeakMap<CanonicalRequest, WeakMap<object, DoseFitScore>>();
 const weightedCache = new WeakMap<CanonicalRequest, WeakMap<object, DoseFitScore>>();
@@ -184,12 +185,12 @@ function compareFractions(a: Fraction, b: Fraction) {
   return delta < BigInt(0) ? -1 : delta > BigInt(0) ? 1 : 0;
 }
 
-export function doseFitScore(request: CanonicalRequest, exposure: ReadonlyMap<string, bigint>): DoseFitScore {
+export function numericalDoseFitScore(request: CanonicalRequest, exposure: ReadonlyMap<string, bigint>): NumericalDoseFitScore {
   return calculateDoseFit(sharedInputs.get(request) ?? request, exposure, false);
 }
-export function weightedDoseFitScore(request: CanonicalRequest, exposure: ReadonlyMap<string, bigint>): DoseFitScore {
+export function numericalWeightedDoseFitScore(request: CanonicalRequest, exposure: ReadonlyMap<string, bigint>): NumericalDoseFitScore {
   const settings = request.scoring ? effectiveWeights(request.scoring) : null;
-  if (!settings || (settings.defaultNutrient === 1 && Object.values(settings.nutrients).every(weight => weight === 1))) return doseFitScore(request, exposure);
+  if (!settings || (settings.defaultNutrient === 1 && Object.values(settings.nutrients).every(weight => weight === 1))) return numericalDoseFitScore(request, exposure);
   // With one physical endpoint and uniform fitting weights >=1 there is no
   // endpoint choice. Reuse the exact fit/safety components.
   // Estimated ranges must always evaluate the complete weighted endpoints.
@@ -203,12 +204,12 @@ export function weightedDoseFitScore(request: CanonicalRequest, exposure: Readon
   if (uniform !== null) {
     let cache = weightedCache.get(request); if (!cache) { cache = new WeakMap(); weightedCache.set(request, cache); }
     const found = cache.get(exposure); if (found) return found;
-    const base = doseFitScore(request, exposure), parts = exactParts.get(base)!;
+    const base = numericalDoseFitScore(request, exposure), parts = exactParts.get(base)!;
     const exact = add(multiply(exactWeights(settings).defaultWeight, parts.fitting), parts.safety);
     const score: DoseFitScore = { version: base.version, limitWeight: base.limitWeight, under: base.under, over: base.over,
       limit: base.limit, weightedLimit: base.weightedLimit, total: value(exact),
-      get perTarget() { return base.perTarget; }, get perContinuedDose() { return base.perContinuedDose; }, get perLimit() { return base.perLimit; },
-      unknownSubjectIds: base.unknownSubjectIds, estimatedSubjectIds: base.estimatedSubjectIds };
+      perTarget: [], perContinuedDose: [], perLimit: [],
+      unknownSubjectIds: [], estimatedSubjectIds: [] };
     targetDeviations.set(score, doseFitTargetDeviations(base)); exactTotals.set(score, exact); cache.set(exposure, score); return score;
   }
   return calculateDoseFit(request, exposure, true);
@@ -234,11 +235,12 @@ function calculateDoseFit(request: CanonicalRequest, exposure: ReadonlyMap<strin
   }
   const subjects = fixed ?? [...new Set([...exposure.keys(), ...(request.dietaryIntake ?? []).map(row => row.subjectId), ...request.targets.map(row => row.subjectId)])].sort();
   for (const subjectId of subjects) {
-    const { target, ranges, dietary, referenceRows, reference, scale, bounds } = subjectInputs(request, subjectId);
+    const compiled = subjectInputs(request, subjectId);
+    const { target, dietary, referenceRows, reference, bounds } = compiled;
     if (!target && reference === BigInt(0) && bounds.length === 0) continue;
     const known = exposure.get(subjectId) ?? BigInt(0);
     const weight = weights ? weights.subjects.get(subjectId) ?? weights.defaultWeight : ONE;
-    const { minimum, maximum, added, continuedIncrease, worst } = cachedSubjectLoss(subjectInputs(request, subjectId), known, weight);
+    const { minimum, maximum, added, continuedIncrease, worst } = cachedSubjectLoss(compiled, known, weight);
     intentTotal = add(intentTotal, worst.total);
     under = add(under, worst.shortfall);
     over = add(over, worst.overshoot);
@@ -294,19 +296,31 @@ function calculateDoseFit(request: CanonicalRequest, exposure: ReadonlyMap<strin
   exactTotals.set(score, exact);
   exactParts.set(score, { fitting: add(under, over), safety: weighted });
   targetDeviations.set(score, deviations);
-  if (!materialize) {
-    let details: DoseFitScore | undefined;
-    for (const key of ["perTarget", "perContinuedDose", "perLimit"] as const) Object.defineProperty(score, key, {
-      enumerable: true, configurable: true,
-      get: () => (details ??= calculateDoseFit(request, exposure, applyWeights, true))[key]
-    });
-    cache.set(exposure, score);
-  }
+  if (!materialize) cache.set(exposure, score);
   return score;
 }
 
+// Only retained results need units, sources, certainty arrays and response fields.
+// Rendering reuses the same compiled endpoint evaluator; there is no second formula.
+const displayScores = new WeakMap<NumericalDoseFitScore, DoseFitScore>();
+function displayScore(request: CanonicalRequest, exposure: ReadonlyMap<string, bigint>, weighted: boolean): DoseFitScore {
+  const numerical = weighted ? numericalWeightedDoseFitScore(request, exposure) : numericalDoseFitScore(request, exposure);
+  let display = displayScores.get(numerical);
+  if (!display) {
+    display = calculateDoseFit(weighted ? request : sharedInputs.get(request) ?? request, exposure, weighted, true);
+    displayScores.set(numerical, display);
+  }
+  return display;
+}
+export function doseFitScore(request: CanonicalRequest, exposure: ReadonlyMap<string, bigint>): DoseFitScore {
+  return displayScore(request, exposure, false);
+}
+export function weightedDoseFitScore(request: CanonicalRequest, exposure: ReadonlyMap<string, bigint>): DoseFitScore {
+  return displayScore(request, exposure, true);
+}
+
 /** Compare rational sums, not rounded display scores: even a tiny excess counts. */
-export function compareDoseFit(left: DoseFitScore, right: DoseFitScore) {
+export function compareDoseFit(left: NumericalDoseFitScore, right: NumericalDoseFitScore) {
   const a = exactTotals.get(left);
   const b = exactTotals.get(right);
   if (!a || !b) return left.total - right.total;
@@ -315,7 +329,7 @@ export function compareDoseFit(left: DoseFitScore, right: DoseFitScore) {
 }
 
 /** Fresh scoring callers reuse the original exact sum, never a rounded DTO. */
-export function exactDoseFit(score: DoseFitScore): Fraction {
+export function exactDoseFit(score: NumericalDoseFitScore): Fraction {
   const exact = exactTotals.get(score);
   if (!exact) throw new Error("Exact dose-fit score must be calculated from immutable inputs");
   return exact;

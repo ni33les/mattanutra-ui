@@ -3,8 +3,8 @@ import { targetDoseTicks } from "@/lib/matcher/target-basis";
 import { servingIncrement } from "@/lib/matcher/serving-grid";
 import { comparePillCounts } from "@/lib/matcher/pill-burden";
 import { compileVariant, isDeferredConditional } from "@/lib/matcher/candidates";
-import { compareDoseFit, doseFitScore, doseFitTargetDeviations } from "@/lib/matcher/dose-fit";
-import { administrationBasisKnown, compareOverallScores, monthlyGoodsPrice, PRACTICAL_OBJECTIVES, requestForProfile, searchStateScore } from "@/lib/matcher/practical-scoring";
+import { compareDoseFit, numericalDoseFitScore, doseFitTargetDeviations } from "@/lib/matcher/dose-fit";
+import { administrationBasisKnown, compareOverallScores, monthlyGoodsPrice, PRACTICAL_OBJECTIVES, requestForProfile, numericalSearchStateScore } from "@/lib/matcher/practical-scoring";
 import { DEFAULT_MATCHER_CONFIG } from "@/lib/matcher/config";
 import { fingerprintState } from "@/lib/matcher/dominance";
 import { aggregateDailyExposure, isDoseError } from "@/lib/matcher/dose";
@@ -139,9 +139,9 @@ function skipGroup(state: SearchState): SearchState {
 }
 
 export function compareSearchStates(a: SearchState, b: SearchState, request: CanonicalRequest) {
-  const practical = compareOverallScores(searchStateScore(request, a), searchStateScore(request, b));
+  const practical = compareOverallScores(numericalSearchStateScore(request, a), numericalSearchStateScore(request, b));
   if (practical !== 0) return practical;
-  const fit = compareDoseFit(doseFitScore(request, a.exposure), doseFitScore(request, b.exposure));
+  const fit = compareDoseFit(numericalDoseFitScore(request, a.exposure), numericalDoseFitScore(request, b.exposure));
   if (fit !== 0) return fit;
   // Use the final dose-first routine ordering during retention and repair.
   // Independent price extrema remain in reviewFrontier for cheaper choices.
@@ -153,7 +153,7 @@ export function compareSearchStates(a: SearchState, b: SearchState, request: Can
 export function profileLeaders(states: readonly SearchState[], request: CanonicalRequest, limit: number): SearchState[] {
   const chosen = new Set<SearchState>();
   const closest = states.reduce<SearchState | undefined>((best, state) => !best ||
-    (compareDoseFit(doseFitScore(request, state.exposure), doseFitScore(request, best.exposure)) || compareSearchStates(state, best, request)) < 0 ? state : best, undefined);
+    (compareDoseFit(numericalDoseFitScore(request, state.exposure), numericalDoseFitScore(request, best.exposure)) || compareSearchStates(state, best, request)) < 0 ? state : best, undefined);
   if (closest) chosen.add(closest);
   for (const objective of [request.optimization, ...PRACTICAL_OBJECTIVES.filter(value => value !== request.optimization)]) {
     const profile = requestForProfile(request, objective);
@@ -425,13 +425,13 @@ export function revalidateState(
 export function reviewFrontier(states: readonly SearchState[], request: CanonicalRequest, incumbents: readonly SearchState[], order = (a: SearchState, b: SearchState) => compareSearchStates(a, b, request), groups: readonly ProductGroup[] = []) {
   if (states.length <= 192) return [...states];
   const fitOrder = [...states].sort((a, b) => order(a, b));
-  const doseOrder = (a: SearchState, b: SearchState) => compareDoseFit(doseFitScore(request, a.exposure), doseFitScore(request, b.exposure)) || order(a, b);
+  const doseOrder = (a: SearchState, b: SearchState) => compareDoseFit(numericalDoseFitScore(request, a.exposure), numericalDoseFitScore(request, b.exposure)) || order(a, b);
   const chosen = new Set<SearchState>([...incumbents, ...smallest(states, 16, doseOrder)]);
   // A close fit on one target can become the best complete basket after a
   // complementary addition, despite losing every aggregate/profile ranking.
-  const additiveBases = states.filter(state => doseFitTargetDeviations(doseFitScore(request,state.exposure)).every(row=>row.over===0));
+  const additiveBases = states.filter(state => doseFitTargetDeviations(numericalDoseFitScore(request,state.exposure)).every(row=>row.over===0));
   for (const target of request.targets.filter(row => !isDeferredConditional(row)).slice(0, 32)) {
-    const deviation = (state: SearchState) => { const row = doseFitTargetDeviations(doseFitScore(request,state.exposure)).find(row=>row.subjectId===target.subjectId); return row ? row.under + row.over : Infinity; };
+    const deviation = (state: SearchState) => { const row = doseFitTargetDeviations(numericalDoseFitScore(request,state.exposure)).find(row=>row.subjectId===target.subjectId); return row ? row.under + row.over : Infinity; };
     const reference = smallest(additiveBases, 1, (a,b)=>deviation(a)-deviation(b) || doseOrder(a,b))[0];
     if (reference) chosen.add(reference);
   }
@@ -454,7 +454,7 @@ export function reviewFrontier(states: readonly SearchState[], request: Canonica
   ]) for (const state of smallest(nonempty, 24, compare)) chosen.add(state);
   const protectedIds = new Set(request.targets.filter(row => row.importance === "core" || row.importance === "required").map(row => row.subjectId));
   if (protectedIds.size && request.targets.some(row => row.importance === "optional")) {
-    const protectedFit = (state: SearchState) => doseFitTargetDeviations(doseFitScore(request, state.exposure)).filter(row => protectedIds.has(row.subjectId)).reduce((sum, row) => sum + row.under + row.over, 0);
+    const protectedFit = (state: SearchState) => doseFitTargetDeviations(numericalDoseFitScore(request, state.exposure)).filter(row => protectedIds.has(row.subjectId)).reduce((sum, row) => sum + row.under + row.over, 0);
     for (const state of smallest(states, 48, (a, b) => protectedFit(a) - protectedFit(b) || order(a, b))) chosen.add(state);
   }
   const patterns = new Set<string>();
