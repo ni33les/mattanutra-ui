@@ -484,7 +484,7 @@
     },
     {
       "file": "test/service-efficiency/numeric-scoring.test.ts",
-      "expectedCases": 11,
+      "expectedCases": 12,
       "reason": "Exact ranking must avoid allocating human display conversions while preserving complete serialized score facts and weighted penalties",
       "slice": "numeric"
     }

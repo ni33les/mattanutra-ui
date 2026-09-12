@@ -129,3 +129,18 @@ test('REF-CPU-11 losing numerical candidates do not encode exact-score response 
   assert.ok(exactEncodings > 0); const count = exactEncodings;
   assert.deepEqual(structuredClone(first), saved); assert.equal(exactEncodings, count);
 });
+
+test('REF-CPU-12 frontier numerical records contain no response getters or display trees', async () => {
+  const scoring = await import('../../lib/matcher/practical-scoring.ts');
+  const { seedState } = await import('../../lib/matcher/search.ts');
+  const input = request(), state = { ...seedState(input), price: 50000 };
+  const evaluate = ('numericalSearchStateScore' in scoring ? scoring.numericalSearchStateScore : scoring.searchStateScore) as typeof scoring.searchStateScore;
+  const score = evaluate(input, state);
+  assert.equal(Object.values(Object.getOwnPropertyDescriptors(score)).filter(row => row.get).length, 0,
+    'Losing states must be plain numerical records, not lazy response objects');
+  assert.equal(Object.hasOwn(score, 'components'), false);
+  assert.equal(Object.hasOwn(score, 'preferences'), false);
+  assert.equal(Object.hasOwn(score, 'overallExact'), false);
+  assert.equal(scoring.compareOverallScores(score, score), 0);
+  assert.equal(scoring.searchStateScore(input, state).overallPenalty, score.overallPenalty);
+});
