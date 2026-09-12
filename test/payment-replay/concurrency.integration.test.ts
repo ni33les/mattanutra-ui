@@ -59,3 +59,19 @@ test("PAY-RACE-05 payment reads complete while the payment row is held by a writ
   try { await ready; const result = await Promise.race([getPayment(id), new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error("Ordinary payment read waited on writer")), 1500); })]); assert.equal(result?.fulfillmentStatus, "complete"); }
   finally { if (timer) clearTimeout(timer); release(); await writer; await sql`delete from payment_versions where payment_id=${id}::uuid`; await sql`delete from payments where id=${id}::uuid`; }
 });
+test("PAY-RACE-06 prepared admission cannot overwrite a concurrently completed payment", async () => {
+  await isolated(async tx => {
+    const p = await paidFixture(tx, { receipt: false }); const prepared = await preparePaymentFulfillment(tx, p);
+    await tx`update payments set fulfillment_status='complete' where id=${p.id}::uuid`;
+    assert.equal(await enqueueWebPaymentFulfillment(tx, p, prepared), null);
+    assert.equal((await tx`select fulfillment_status from payments where id=${p.id}::uuid`)[0].fulfillment_status, 'complete');
+  });
+});
+test("PAY-RACE-07 prepared admission revalidates the persisted binding before task creation", async () => {
+  await isolated(async tx => {
+    const p = await paidFixture(tx, { receipt: false }); const prepared = await preparePaymentFulfillment(tx, p);
+    await tx`update payments set plan_id=null where id=${p.id}::uuid`;
+    await assert.rejects(enqueueWebPaymentFulfillment(tx, p, prepared), /Payment changed/);
+    assert.equal((await tx`select count(*)::int as n from tasks where payload->>'paymentId'=${p.id}`)[0].n, 0);
+  });
+});
