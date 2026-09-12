@@ -3,9 +3,9 @@ import test, { mock } from 'node:test';
 const dose = await import('../../lib/matcher/dose.ts');
 const fractions = await import('../../lib/matcher/rational.ts');
 let conversions = 0;
-let multiplications = 0;
+let multiplications = 0; let measurements = 0;
 mock.module('../../lib/matcher/dose.ts', { namedExports: { ...dose, amountFromScaled: (...args: Parameters<typeof dose.amountFromScaled>) => { conversions++; return dose.amountFromScaled(...args); } } });
-mock.module('../../lib/matcher/rational.ts', { namedExports: { ...fractions, multiply: (...args: Parameters<typeof fractions.multiply>) => { multiplications++; return fractions.multiply(...args); } } });
+mock.module('../../lib/matcher/rational.ts', { namedExports: { ...fractions, fromDecimal: (...args: Parameters<typeof fractions.fromDecimal>) => { measurements++; return fractions.fromDecimal(...args); }, multiply: (...args: Parameters<typeof fractions.multiply>) => { multiplications++; return fractions.multiply(...args); } } });
 const { request } = await import('../matcher/flexible-v5-fixtures.ts');
 const { doseFitScore, exactDoseFit, compareDoseFit, weightedDoseFitScore } = await import('../../lib/matcher/dose-fit.ts');
 
@@ -68,4 +68,20 @@ test('REF-CPU-06 repeated archive reads reuse immutable basket state within one 
   const restored = structuredClone(cursor);
   assert.deepEqual([...archivedSearchStates(restored)], first);
   assert.notStrictEqual([...archivedSearchStates(restored)][0], first[0]);
+});
+
+test('REF-CPU-07 profile representatives share immutable quantity measurements', async () => {
+  const { seedState } = await import('../../lib/matcher/search.ts');
+  const { searchStateScore, requestForProfile } = await import('../../lib/matcher/practical-scoring.ts');
+  const input = request({ maxDailyPills: 3, maxPriceMinor: 200000 });
+  const alternate = requestForProfile(input, 'fewest_pills');
+  // Compile both profile coefficients using a separate state first.
+  searchStateScore(input, seedState(input)); searchStateScore(alternate, seedState(input));
+  const basket = { ...seedState(input), pills: 16, count: 2, price: 259400, uncertainAdministrationCount: 0 };
+  measurements = 0; const ordinary = searchStateScore(input, basket); assert.ok(measurements > 0);
+  measurements = 0; const simpler = searchStateScore(alternate, basket);
+  assert.equal(measurements, 0, 'Profile comparison changes exact coefficients, not the basket measurements');
+  assert.ok(simpler.overallPenalty > ordinary.overallPenalty);
+  assert.equal(ordinary.preferences.maxDailyPills.penalty, 169 / 36);
+  assert.equal(simpler.preferences.maxDailyPills.penalty, 169 / 9);
 });
