@@ -74,3 +74,24 @@ test('REF-IO-02 admission replay returns its receipt while the sole durable exec
   assert.ok(reply, 'A paused colocated worker must not hold the HTTP admission receipt');
   assert.equal(reply.status, 'processing'); assert.equal(reply.revision, 2);
 });
+
+test('REF-MET-01 acknowledgement and retrieval measurements are request-scoped, not fabricated search timings', async () => {
+  const { withServiceMeasurements, serviceMeasurements } = await import('../../lib/service-metrics.ts');
+  const app = runtime();
+  const first = await withServiceMeasurements(async () => {
+    const result = await plan(app, create());
+    const measured = serviceMeasurements();
+    assert.equal(measured['mcp.admission_ms']?.count, 1);
+    assert.equal(measured['mcp.retrieval_ms']?.count, 1);
+    assert.ok(measured['mcp.admission_ms']!.total >= 0);
+    const operation = await app.store.getPlanOperationByKey(owner(app), create().idempotencyKey); assert.ok(operation);
+    const revision = await app.store.getPlanRevision(operation.planId, result.revision); assert.ok(revision);
+    assert.equal((revision.result as {matcherTelemetry: {ackMs?: number}}).matcherTelemetry.ackMs, undefined, 'A stored search duration is not a measured HTTP acknowledgement');
+    return result;
+  });
+  await withServiceMeasurements(async () => {
+    const read = await value(app, { planHandle: first.planHandle }); assert.equal(read.status, 'ready');
+    assert.equal(serviceMeasurements()['mcp.admission_ms'], undefined);
+    assert.equal(serviceMeasurements()['mcp.retrieval_ms']?.count, 1);
+  });
+});
