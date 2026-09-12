@@ -481,6 +481,12 @@
       "slice": "matcher-frontier-hot-path",
       "expectedCases": 2,
       "reason": "Bounded candidate retention matches a stable full sort, preserves ties and inputs, and demonstrably reduces comparison calls"
+    },
+    {
+      "file": "test/service-efficiency/numeric-scoring.test.ts",
+      "expectedCases": 2,
+      "reason": "Exact ranking must avoid allocating human display conversions while preserving complete serialized score facts and weighted penalties",
+      "slice": "numeric"
     }
   ],
   "inputs": [
