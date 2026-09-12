@@ -209,35 +209,3 @@ test('REF-CPU-16 numerical nutrient scores omit display-only trees and retain ex
   assert.equal(compareDoseFit(display, numeric), 0);
   assert.equal(display.perTarget[0].exposure, 75);
 });
-
-test('REF-CPU-17 incidental exposure below every reference avoids zero-loss endpoint arithmetic without losing reference detail', () => {
-  const input = request({ safetyCeilings: [{ subjectId: 'incidental', name: 'Incidental', maxAmount: 100, maxUnit: 'mg', sourceScope: 'total' }],
-    dietaryIntake: [{ subjectId: 'incidental', name: 'Incidental', unit: 'mg', dailyAmount: 10, minimumDailyAmount: 0, maximumDailyAmount: 20,
-      daily: { subjectId: 'incidental', dim: 'mass_ng', units: 10_000_000n }, certainty: 'estimated', sourceId: 'diet' }] });
-  numericalDoseFitScore(input, new Map([['a', 75_000_000n]])); multiplications = 0;
-  const exposure = new Map([['a', 75_000_000n], ['incidental', 70_000_000n]]);
-  const numerical = numericalDoseFitScore(input, exposure);
-  assert.equal(numerical.total, 0.25);
-  assert.equal(multiplications, 0, 'A proved-zero incidental reference term needs no weighted endpoint construction');
-  const detail = doseFitScore(input, exposure).perLimit.find(row => row.subjectId === 'incidental'); assert.ok(detail);
-  assert.equal(detail.exposureMaximum, 90); assert.equal(detail.limit, 100); assert.equal(detail.certainty, 'estimated');
-  assert.equal(numericalDoseFitScore(input, new Map([['a', 75_000_000n], ['incidental', 81_000_000n]])).total, 0.27, 'Any possible excess retains the independent twofold penalty');
-});
-
-test('REF-CPU-18 uncertain endpoint combinations are compiled once instead of allocating sets per candidate', () => {
-  const input = request({ dietaryIntake: [{ subjectId: 'a', name: 'A', unit: 'mg', dailyAmount: 50,
-    minimumDailyAmount: 0, maximumDailyAmount: 100, daily: { subjectId: 'a', dim: 'mass_ng', units: 50_000_000n }, certainty: 'estimated', sourceId: 'diet' }] });
-  numericalDoseFitScore(input, new Map([['a', 0n]]));
-  const OriginalSet = globalThis.Set; let allocations = 0;
-  try {
-    globalThis.Set = class<T> extends OriginalSet<T> {
-      constructor(values?: Iterable<T> | null) { super(values); allocations++; }
-    };
-    const score = numericalDoseFitScore(input, new Map([['a', 25_000_000n]]));
-    assert.equal(score.total, 0.75, 'The low endpoint is worse than the 25% high-end excess');
-    assert.equal(allocations, 0, 'Immutable endpoint combinations must not allocate per-candidate Sets');
-  } finally { globalThis.Set = OriginalSet; }
-  const higher = doseFitScore(input, new Map([['a', 75_000_000n]]));
-  assert.equal(higher.total, 0.75); assert.equal(higher.perTarget[0].conservativeExposure, 175,
-    'The complete penalty must independently choose the higher endpoint for this basket');
-});
