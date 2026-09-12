@@ -27,7 +27,7 @@
     },
     {
       "file": "test/healthscore-performance/availability.test.ts",
-      "expectedCases": 3,
+      "expectedCases": 5,
       "slice": "web",
       "reason": "Strict AI whitelist and completed empty results without retries"
     },

@@ -12,3 +12,9 @@ Release baseline: 815bb210e38b2809b9aba32260693c70c048005c. DEV and UAT only.
 RED evidence is retained outside the checkout in /root/.codex/deploy/availability-20260912: mcp-red.log (five failures), web-red.log (three), presentation-red.log (three), web-boundary-red.log (two). Product fixes follow committed failing cases. Focused and final execution logs retain failures rather than overwriting them.
 
 No full application or full MCP coverage is claimed. The impact inventory selects changed protocol, formulation, projection and directly affected commerce/readiness consumers. Browser execution covers the existing count/retry journey in three locales without repeating AI matching.
+
+## User correction after b7c1cc84
+
+- AVAIL-COPY-04: zero basket contribution displays `0%`, including when an eligible product exists but was not selected. Any positive coverage below one percent displays `1%`; underlying quantities and the >12% count are unchanged. Unknown/pending remain distinct.
+- AVAIL-WEB-10–11: web-only formulas contain at most the eight highest-impact permitted ingredients. No minimum, padding, product-count restriction or MCP limit. Enforced in the provider prompt/schema and before publication; dependent copy follows the retained ingredients. Existing saved formulas/orders remain historical.
+- RED: reveal-correction/red.log records three meaningful failures on b7c1cc84 implementation (zero label, unbounded publication, provider schema).
