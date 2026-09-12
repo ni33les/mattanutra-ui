@@ -386,7 +386,9 @@ export function advanceSearchCursor(cursor: SearchCursor, request: CanonicalRequ
           const loss = (state: SearchState) => { const row = doseFitTargetDeviations(numericalDoseFitScore(request,state.exposure)).find(row=>row.subjectId===target.subjectId); return row ? row.under + row.over : Infinity; };
           return [...additiveBases].sort((a,b)=>loss(a)-loss(b) || compareDoseFit(numericalDoseFitScore(request,a.exposure),numericalDoseFitScore(request,b.exposure)) || compareSearchStates(a,b,request))[0];
         }).filter((row): row is SearchState => Boolean(row));
-        cursor.second=[...new Set([...references.slice(0,Math.ceil(width(cursor)/4)), ...profileLeaders(ranked,request,width(cursor))])];
+        // Complete the practical incumbent before the raw-dose lane can spend
+        // the remaining allowance on an already excessive routine.
+        cursor.second=[...new Set([...ranked.slice(0,1), ...profileLeaders(ranked,request,width(cursor)), ...references.slice(0,Math.ceil(width(cursor)/4))])];
         for (const row of rawDoseLeaders(ranked,request,Math.ceil(width(cursor)/2))) {
           if (cursor.second.length >= width(cursor)) break;
           if (!cursor.second.includes(row)) cursor.second.push(row);
@@ -424,7 +426,19 @@ export function advanceSearchCursor(cursor: SearchCursor, request: CanonicalRequ
       if (base.selectedProductIds?.includes(cursor.groups[cursor.group]!.productId)) { cursor.group++; cursor.variants=null; cursor.groupLimit=-1; continue; }
       if (cursor.groupLimit < 0) cursor.groupLimit=cursor.expansionAttempts + Math.max(1,Math.floor((cursor.expansionBudget-cursor.expansionAttempts)/(cursor.groups.length-cursor.group)));
       if (cursor.expansionAttempts >= cursor.groupLimit) { cursor.group++; cursor.variants=null; cursor.groupLimit=-1; continue; }
-      if (!cursor.variants) { cursor.variants=variantsFor(cursor,cursor.group,base,request,Math.min(stop,cursor.groupLimit)); cursor.variant=0; if (!cursor.variants) continue; }
+      if (!cursor.variants) {
+        // Try the already-compiled labelled quantities before interior probes
+        // can consume this group's small repair allowance. Completed edges are
+        // reused after a yield, so these attempts remain checkpoint-safe.
+        const initial=cursor.baseline[cursor.group]!.map(id=>variant(cursor,cursor.group,id));
+        const labelled=[...new Set([initial[0], ...[1,2,3].map(amount=>initial.find(row=>row.dailyUnits===amount))].filter((row): row is DoseVariant=>Boolean(row)))];
+        for (const row of labelled) {
+          if (cursor.expansionAttempts >= Math.min(stop,cursor.groupLimit)) break;
+          add(cursor,base,cursor.group,row.variantId,request);
+        }
+        if (cursor.expansionAttempts >= Math.min(stop,cursor.groupLimit)) continue;
+        cursor.variants=variantsFor(cursor,cursor.group,base,request,Math.min(stop,cursor.groupLimit)); cursor.variant=0; if (!cursor.variants) continue;
+      }
       if (cursor.variant >= cursor.variants.length) { cursor.group++; cursor.variants=null; cursor.groupLimit=-1; continue; }
       add(cursor,base,cursor.group,cursor.variants[cursor.variant++]!,request);
     } else cursor.done=true;

@@ -1,0 +1,20 @@
+{
+  "releaseBase": "9294c22a3bcaff975f6df41998cc602620b4e996",
+  "scope": "uat_gap_search_aliases_and_relacza_active_b12",
+  "contractVersion": "11.1.0",
+  "files": [
+    {"file":"test/matcher-gap-repair/regressions.test.ts","expectedCases":3,"reason":"Frozen UAT search witnesses, exact score reproduction and resolved diagnostic aliases"},
+    {"file":"test/matcher-gap-repair/data.test.ts","expectedCases":2,"reason":"Reviewed active B12 correction, environment protection and already-correct DEV preservation"},
+    {"file":"test/ax-refinement/search.test.ts","expectedCases":7,"reason":"Changed cursor continuation, exact checkpoints, budgets, expansions and exclusions"},
+    {"file":"test/matcher/flexible-v5-coordinated-repair.test.ts","expectedCases":3,"reason":"Preserve coordinated repair witnesses, catalogue-order invariance and expanded incumbents"},
+    {"file":"test/matcher/advisory-dose-fit.test.ts","expectedCases":36,"reason":"Direct matcher selection, safety arithmetic and nonblocking preference invariants"},
+    {"file":"test/matcher/anna-v6-diagnostics.test.ts","expectedCases":5,"reason":"Diagnostic counts, exclusions, empty purchases and truthful cause projections"},
+    {"file":"test/matcher-web-adapter.test.ts","expectedCases":21,"reason":"Direct web consumer of changed search, projections, quantities and shared scores"},
+    {"file":"test/product-matcher-worker.test.ts","expectedCases":3,"reason":"Actual threaded matcher, reference identity, cancellation and responsiveness"},
+    {"file":"test/simple-plan/response.test.ts","expectedCases":2,"reason":"Single recommendation response from shared matcher and exact ingredient facts"},
+    {"file":"test/simple-plan/transport.test.ts","expectedCases":3,"reason":"Current contract transport retains six-tool compatible single payload"},
+    {"file":"test/catalogue-corrections.integration.test.ts","expectedCases":2,"database":true,"reason":"Existing audited correction transaction, rollback, replay and unchanged financial fields"}
+  ],
+  "versionExpectationEdits": ["test/agentic-cv-r2-pack.test.ts","test/agentic-cv-r3-pack.test.ts","test/agentic-cv-r4-pack.test.ts","test/agentic-cv-impl-pack.test.ts"],
+  "inputs": ["test/matcher-gap-repair/reported-input.json.gz","test/fixtures/availability/uat-catalogue.json.gz","db-rollout/relacza-active-b12-20260912-uat.json","test/matcher-gap-repair/dev-preserved-fact.json"]
+}
