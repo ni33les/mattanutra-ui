@@ -5,7 +5,7 @@ import { resolve, relative } from "node:path";
 import { runBatch, sourceManifest } from "./run-full-test-suite.mjs";
 import { testSourceHygiene, nodeExecutionProof } from "./test-execution-proof.mjs";
 import { payloadHash, compiledBuildIdentity } from "./mcp-payload/proof.mjs";
-import { MCP_PACKAGES, mcp721Identity, checkMcp721Proof } from "./mcp-721-proof.mjs";
+import { MCP_PACKAGES, mcp721Identity, checkMcp721Proof, verifyVersionExpectationEdit } from "./mcp-721-proof.mjs";
 
 const [mode, ...rawArgs] = process.argv.slice(2);
 const packageId = rawArgs[0]?.startsWith("--package=") ? rawArgs[0].slice("--package=".length) : "721";
@@ -32,8 +32,14 @@ const git = (...args) => execFileSync("git", args, { encoding: "utf8" }).trim();
 const commit = git("rev-parse", "HEAD"), files = inventory.files.map(row => row.file);
 assert.equal(new Set(files).size, files.length); assert.ok(files.length > 0);
 const discovered = readdirSync(definition.directory, { recursive: true }).filter(file => file.endsWith(".test.ts")).map(file => `${definition.directory}/${file}`);
+const expectationEdits = inventory.versionExpectationEdits ?? [];
+assert.ok(expectationEdits.length === 0 || packageId === "web-matching");
+for (const file of expectationEdits) {
+  assert.ok(!files.includes(file));
+  verifyVersionExpectationEdit(git("show", `${MCP721_BASE}:${file}`), readFileSync(file, "utf8").trim());
+}
 for (const file of discovered.filter(file => !slice || files.includes(file))) assert.ok(maintainedFiles.some(row => row.file === file), `Undeclared package test ${file}`);
-for (const file of (slice ? [] : git("diff", "--name-only", "--diff-filter=ACMR", MCP721_BASE, "--", "test").split("\n").filter(file => file.endsWith(".test.ts")))) assert.ok(files.includes(file) || (["discovery", "practical"].includes(packageId) && inventory.regressionFiles.includes(file)), `Changed test omitted ${file}`);
+for (const file of (slice ? [] : git("diff", "--name-only", "--diff-filter=ACMR", MCP721_BASE, "--", "test").split("\n").filter(file => file.endsWith(".test.ts")))) assert.ok(files.includes(file) || expectationEdits.includes(file) || (["discovery", "practical"].includes(packageId) && inventory.regressionFiles.includes(file)), `Changed test omitted ${file}`);
 for (const row of inventory.files) {
   assert.ok(row.reason.length > 20 && row.expectedCases > 0 && existsSync(row.file));
   assert.deepEqual(testSourceHygiene(readFileSync(row.file, "utf8"), row.file), []);
@@ -43,6 +49,7 @@ if (mode === "validate") { assert.ok(git("branch", "--show-current") === "dev" |
 mkdirSync(output, { recursive: true, mode: 0o700 });
 const save = (name, value) => writeFileSync(resolve(output, name), JSON.stringify(value, null, 2) + "\n", { flag: "wx", mode: 0o600 });
 const source = sourceManifest(); save("source-before.json", source); save("inventory.json", inventory);
+if (packageId === "web-matching") save("version-expectation-edits.json", expectationEdits.map(file => ({ file, passed: true })));
 const safe = Object.fromEntries(["PATH", "HOME", "TMPDIR", "LANG", "LC_ALL", "TZ"].flatMap(key => process.env[key] ? [[key, process.env[key]]] : []));
 Object.assign(safe, { NODE_ENV: "test", MATTANUTRA_ENV: "dev", AGENTIC_BUILD_ID: commit, AGENTIC_PAYMENT_PROVIDER: "mock", STRIPE_PAYMENT_MODE: "mock",
   NEXT_TELEMETRY_DISABLED: "1", NEXT_BUILD_CPUS: "2", NODE_OPTIONS: "--max-old-space-size=6144", [`MCP_${packageId}_EVIDENCE_DIR`]: output });

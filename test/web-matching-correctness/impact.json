@@ -12,7 +12,11 @@
     "lib/nutrient-identity.ts",
     "lib/product-food-allergens.ts",
     "test/payment-return/next-loader.mjs",
-    "test/fixtures/mcp-evidence-images/manifest.json"
+    "test/fixtures/mcp-evidence-images/manifest.json",
+    "test/agentic-cv-r3-pack.test.ts",
+    "test/agentic-cv-r2-pack.test.ts",
+    "test/agentic-cv-r4-pack.test.ts",
+    "test/agentic-cv-impl-pack.test.ts"
   ],
   "files": [
     {
@@ -31,7 +35,7 @@
     },
     {
       "file": "test/web-matching-correctness/release.test.ts",
-      "expectedCases": 2,
+      "expectedCases": 3,
       "database": false,
       "slice": "release",
       "reason": "Code-only deployment source binding and rejected invalid proofs"
@@ -107,34 +111,6 @@
       "reason": "Slim formulation readers remain nonlocking and avoid heavy product payloads"
     },
     {
-      "file": "test/agentic-cv-r3-pack.test.ts",
-      "expectedCases": 1,
-      "database": false,
-      "slice": "matching",
-      "reason": "Commercial and order invariants under advanced matcher identity"
-    },
-    {
-      "file": "test/agentic-cv-r2-pack.test.ts",
-      "expectedCases": 1,
-      "database": false,
-      "slice": "matching",
-      "reason": "Shared matcher consumer expectations under advanced identity"
-    },
-    {
-      "file": "test/agentic-cv-r4-pack.test.ts",
-      "expectedCases": 2,
-      "database": false,
-      "slice": "matching",
-      "reason": "Supply and payment consistency under advanced matcher identity"
-    },
-    {
-      "file": "test/agentic-cv-impl-pack.test.ts",
-      "expectedCases": 1,
-      "database": false,
-      "slice": "matching",
-      "reason": "Shared matcher target and safety behavior under advanced identity"
-    },
-    {
       "file": "test/payment-return/page.test.ts",
       "expectedCases": 14,
       "reason": "Actual return-page rendering and redirects after provider, database and concurrent-confirmation errors, in all three locales",
@@ -155,5 +131,11 @@
       "database": false,
       "slice": "payment-return"
     }
+  ],
+  "versionExpectationEdits": [
+    "test/agentic-cv-r3-pack.test.ts",
+    "test/agentic-cv-r2-pack.test.ts",
+    "test/agentic-cv-r4-pack.test.ts",
+    "test/agentic-cv-impl-pack.test.ts"
   ]
 }

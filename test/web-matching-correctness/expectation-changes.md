@@ -16,3 +16,5 @@ The reported catalogue fixture retains original product prices and incorporates 
 Validation selects the reviewed impacted inventory and rejects incomplete or skipped execution. This is not a full application or full MCP acceptance claim.
 
 The collateral-dose regression still requires the exact zero-dose-loss basket to be retained. With unknown administration for both products, web fewest-pills may recommend the one-product practical basket at a disclosed 0.8 dose penalty. This is a preference trade-off, not a change to dose arithmetic. Prompt compactness remains below its original 90% size gate.
+
+Four customer-value files only change their exact matcher-version assertion from 2 to 3. The gate compares each complete file with the control and permits only that literal assertion replacement; a named regression rejects changed behavior. These unchanged financial journeys are outside the executed inventory. Broad exploratory runs were interrupted and are not acceptance evidence.

@@ -8,6 +8,14 @@ import { validateRolloutBinding, verifyLockExecution } from "./service-efficienc
 import {validateUatResources} from "./service-efficiency/runtime-resources.mjs";
 
 export const MCP721_BASE = "22f3ce60f17158c68a251abe4070f582dd39253a";
+/** Only the approved version assertion may change in unselected large suites.
+ * Their functional cases remain untouched and are not claimed as executed. */
+export function verifyVersionExpectationEdit(before, after) {
+  const original = 'assert.equal(MATCHER_VERSION, "importance-matching-2");';
+  const replacement = 'assert.equal(MATCHER_VERSION, "importance-matching-3");';
+  assert.ok(before.includes(original), "Missing original matcher-version assertion");
+  assert.equal(after, before.replaceAll(original, replacement), "Unexpected behavioral test change");
+}
 export const MCP_PACKAGES = {
   "web-matching": { version: "11.0.0", directory: "test/web-matching-correctness", base: "e46e16016fe0544d48da37224dde614bc153ee15", scope: "web_matching_correctness" },
   "payment-replay": { version: "11.0.0", directory: "test/payment-replay", base: "3161c4592a050d303efd374266324a7547d2139c", scope: "payment_replay_compatibility" },
@@ -70,6 +78,7 @@ export function checkMcp721Proof(file, expected, packageId = "721") {
     assert.deepEqual(inventory, JSON.parse(readFileSync(`${definition.directory}/impact.json`)));
     assert.equal(build.sourceCommit, expected.sourceCommit);
     assert.ok(json("executed-cases.json").length >= tests.execution.cases);
+    assert.deepEqual(json("version-expectation-edits.json"), inventory.versionExpectationEdits.map(file => ({ file, passed: true })));
   }
   if (packageId === "payment-replay") {
     const restored = json("restored-payment-preservation.json"), locks = json("no-new-locks.json");
