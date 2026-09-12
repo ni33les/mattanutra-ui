@@ -26,7 +26,7 @@ export async function existingPaymentAccounting(sql: Db, input: PaymentAccountin
     where source='stripe' and source_ref=${input.sourceRef}`;
   if (!row) return null;
   const matches = row.amount === expectedAmount && row.amount_unit === "micros" && row.currency === input.currency.toUpperCase()
-    && row.category === input.category && row.entry_type === input.entryType && row.provider === "stripe"
+    && row.category === input.category && row.entry_type === input.entryType && (row.provider == null || row.provider === "stripe")
     && identityFields.every(field => row.metadata?.[field] == null || input.metadata?.[field] == null || row.metadata[field] === input.metadata[field]);
   if (!matches) throw new PaymentAccountingConflict(input.sourceRef);
   return row.id;

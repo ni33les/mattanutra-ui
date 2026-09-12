@@ -1,3 +1,4 @@
+import { existingPaymentAccounting } from "@/lib/payment-accounting";
 import type postgres from "postgres";
 import type { PaymentRow } from "@/lib/stripe-payments";
 
@@ -15,14 +16,12 @@ export type PaymentFulfillmentEvidence = Readonly<{
 export async function paymentFulfillmentEvidence(sql: Db, payment: FulfillmentPayment): Promise<PaymentFulfillmentEvidence> {
   if (payment.fulfillment_status === "complete") return { status: "complete", accountingRecorded: true, planStarted: Boolean(payment.plan_id), historicalComplete: false };
   if (!["paid", "bound"].includes(payment.status)) return { status: payment.fulfillment_status, accountingRecorded: false, planStarted: false, historicalComplete: false };
+  const accountingRecorded = Boolean(await existingPaymentAccounting(sql, {
+    amount: payment.amount, currency: payment.currency, category: "revenue", entryType: "nominal",
+    sourceRef: `stripe:payment:${payment.id}:nominal-revenue`, metadata: { paymentId: payment.id,
+      stripeCheckoutSessionId: payment.stripe_checkout_session_id, stripePaymentIntentId: payment.stripe_payment_intent_id }
+  }));
   const [facts] = await sql`select
-    exists (select 1 from public.finance_transactions f
-      where f.source='stripe' and f.source_ref=${`stripe:payment:${payment.id}:nominal-revenue`}
-        and f.amount=${String(payment.amount)}::bigint and f.amount_unit='micros' and f.currency=${payment.currency}
-        and f.category='revenue' and f.entry_type='nominal' and f.provider='stripe'
-        and (f.metadata->>'paymentId' is null or f.metadata->>'paymentId'=${payment.id})
-        and (f.metadata->>'stripeCheckoutSessionId' is null or ${payment.stripe_checkout_session_id}::text is null or f.metadata->>'stripeCheckoutSessionId'=${payment.stripe_checkout_session_id})
-        and (f.metadata->>'stripePaymentIntentId' is null or ${payment.stripe_payment_intent_id}::text is null or f.metadata->>'stripePaymentIntentId'=${payment.stripe_payment_intent_id})) as accounting,
     exists (select 1 from public.bpm b where b.properties->>'paymentId'=${payment.id}
       and b.event_name='payment_fulfillment_succeeded' and b.event_status='paid'
       and b.plan_id is not distinct from ${payment.plan_id}::uuid and b.selected_plan=${payment.selected_plan}::public.assessment_plan
@@ -37,7 +36,6 @@ export async function paymentFulfillmentEvidence(sql: Db, payment: FulfillmentPa
             and (f.model_version is null or f.model_version not like '%:example')))
           or exists (select 1 from public.tasks t where t.id::text=v.metadata->>'formulationTaskId'
             and t.plan_id=a.plan_id and t.task_type='generate_supplement_guidance' and t.created_at <= v.created_at))) as plan_started`;
-  const accountingRecorded = facts?.accounting === true;
   const planStarted = facts?.plan_started === true;
   const historicalComplete = accountingRecorded && facts?.completed_receipt === true && (!payment.plan_id || planStarted);
   return { status: historicalComplete ? "complete" : payment.fulfillment_status, accountingRecorded, planStarted, historicalComplete };
@@ -48,4 +46,19 @@ export async function effectivePayment(sql: Db, payment: PaymentRow): Promise<Pa
   return evidence.status === "complete" && payment.fulfillment_status !== "complete"
     ? { ...payment, fulfillment_status: "complete", fulfillment_error: null }
     : payment;
+}
+
+export function paymentFulfillmentIdentity(payment: FulfillmentPayment) {
+  const date = (value: string | Date | null) => value ? new Date(value).toISOString() : null;
+  return JSON.stringify([payment.id, payment.plan_id, payment.selected_plan, String(payment.amount), payment.currency,
+    payment.stripe_checkout_session_id, payment.stripe_payment_intent_id, date(payment.paid_at), date(payment.bound_at)]);
+}
+export type PreparedPaymentFulfillment = Readonly<{ identity: string; evidence: PaymentFulfillmentEvidence }>;
+export async function preparePaymentFulfillment(sql: Db, payment: FulfillmentPayment): Promise<PreparedPaymentFulfillment> {
+  return { identity: paymentFulfillmentIdentity(payment), evidence: await paymentFulfillmentEvidence(sql, payment) };
+}
+/** Only a just-committed-to-this-transaction confirmation or new binding can use this path. */
+export function newlyConfirmedFulfillment(payment: FulfillmentPayment): PreparedPaymentFulfillment {
+  return { identity: paymentFulfillmentIdentity(payment), evidence: { status: payment.fulfillment_status,
+    accountingRecorded: false, planStarted: false, historicalComplete: false } };
 }

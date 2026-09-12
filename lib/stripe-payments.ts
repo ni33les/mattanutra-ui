@@ -1,5 +1,5 @@
 import { existingPaymentAccounting, recordPaymentAccountingOnce } from "@/lib/payment-accounting";
-import { effectivePayment } from "@/lib/payment-fulfillment-evidence";
+import { effectivePayment, preparePaymentFulfillment, newlyConfirmedFulfillment } from "@/lib/payment-fulfillment-evidence";
 import { claimFunnelRequest } from "@/lib/funnel-idempotency";
 import { FunnelError } from "@/lib/funnel-errors";
 import { enqueueWebPaymentFulfillment } from "@/lib/web-payment-fulfillment";
@@ -277,7 +277,8 @@ async function fulfillMockCheckoutSession(
     };
   }
 
-  await withDatabaseTransaction(sql, tx => enqueueWebPaymentFulfillment(tx, payment));
+  const prepared = await preparePaymentFulfillment(sql, payment);
+  await withDatabaseTransaction(sql, tx => enqueueWebPaymentFulfillment(tx, payment, prepared));
   return {
     payment: await mapPayment((await getPaymentRowById(sql, payment.id)) ?? payment),
     status: payment.plan_id
@@ -622,6 +623,29 @@ function priceIdFromSession(session: Stripe.Checkout.Session) {
   return price && typeof price === "object" ? price.id : null;
 }
 
+function paymentBalanceTransaction(session: Stripe.Checkout.Session | null) {
+  const intent = session ? paymentIntentFromSession(session) as unknown as {
+    latest_charge?: { balance_transaction?: { fee?: number | null; id?: string | null } | string | null } | string | null
+  } | null : null;
+  return intent?.latest_charge && typeof intent.latest_charge === "object"
+    && intent.latest_charge.balance_transaction && typeof intent.latest_charge.balance_transaction === "object"
+    ? intent.latest_charge.balance_transaction : null;
+}
+
+/** Read-only preparation. A replay never resolves a new rate for an existing booking. */
+export async function stripePaymentAccountingNeedsFx(sql: Db, payment: PaymentRow, session: Stripe.Checkout.Session | null) {
+  const revenue = await existingPaymentAccounting(sql, { amount: payment.amount, currency: payment.currency,
+    category: "revenue", entryType: "nominal", sourceRef: `stripe:payment:${payment.id}:nominal-revenue`,
+    metadata: { paymentId: payment.id, stripeCheckoutSessionId: session?.id ?? payment.stripe_checkout_session_id,
+      stripePaymentIntentId: (session ? stringId(session.payment_intent) : null) ?? payment.stripe_payment_intent_id } });
+  const balance = paymentBalanceTransaction(session), fee = amountMicrosFromStripeAmount(balance?.fee);
+  const feeExists = balance?.id && fee ? await existingPaymentAccounting(sql, { amount: fee, currency: payment.currency,
+    category: "payment_fee", entryType: "actual", sourceRef: `stripe:balance_transaction:${balance.id}:fee`,
+    metadata: { paymentId: payment.id, stripeBalanceTransactionId: balance.id,
+      stripeCheckoutSessionId: session?.id ?? payment.stripe_checkout_session_id } }) : true;
+  return !revenue || !feeExists;
+}
+
 export async function recordStripePaymentAccounting(
   sql: Db,
   payment: PaymentRow,
@@ -646,21 +670,7 @@ export async function recordStripePaymentAccounting(
       stripePaymentIntentId: paymentIntentId
     }, fxOverride);
 
-    const intent = session ? paymentIntentFromSession(session) as unknown as {
-      latest_charge?: {
-        balance_transaction?: {
-          fee?: number | null;
-          id?: string | null;
-        } | string | null;
-      } | string | null;
-    } | null : null;
-    const balanceTransaction =
-      intent?.latest_charge &&
-      typeof intent.latest_charge === "object" &&
-      intent.latest_charge.balance_transaction &&
-      typeof intent.latest_charge.balance_transaction === "object"
-        ? intent.latest_charge.balance_transaction
-        : null;
+    const balanceTransaction = paymentBalanceTransaction(session);
     const feeMicros = amountMicrosFromStripeAmount(balanceTransaction?.fee);
 
     if (balanceTransaction?.id && feeMicros) {
@@ -668,33 +678,33 @@ export async function recordStripePaymentAccounting(
         category: "payment_fee", entryType: "actual", sourceRef: `stripe:balance_transaction:${balanceTransaction.id}:fee`,
         metadata: { paymentId: payment.id, stripeBalanceTransactionId: balanceTransaction.id, stripeCheckoutSessionId: checkoutSessionId } });
       if (!existingFee) {
-      if (!fxOverride) throw new Error("Prepare payment FX before the accounting transaction");
-      const fx = fxOverride;
-      await recordPaymentAccountingOnce(sql, {
-        amount: feeMicros,
-        category: "payment_fee",
-        currency: payment.currency,
-        description: `Stripe fee for ${payment.selected_plan} payment`,
-        entryType: "actual",
-        from: "mattanutra:stripe-clearing",
-        fromAccountId: FINANCE_ACCOUNT_IDS.stripeClearing,
-        metadata: {
-          ...fxMetadata(fx),
-          accountingBasis: "cash_fee",
-          paymentId: payment.id,
-          selectedPlan: payment.selected_plan,
-          stripeBalanceTransactionId: balanceTransaction.id,
-          stripeCheckoutSessionId: checkoutSessionId
-        },
-        provider: "stripe",
-        source: "stripe",
-        sourceRef: `stripe:balance_transaction:${balanceTransaction.id}:fee`,
-        sql,
-        to: "stripe:fees",
-        toAccountId: FINANCE_ACCOUNT_IDS.stripe,
-        fxRateId: fx.fxRateId,
-        usdRate: fx.usdRate
-      });
+        if (!fxOverride) throw new Error("Prepare payment FX before the accounting transaction");
+        const fx = fxOverride;
+        await recordPaymentAccountingOnce(sql, {
+          amount: feeMicros,
+          category: "payment_fee",
+          currency: payment.currency,
+          description: `Stripe fee for ${payment.selected_plan} payment`,
+          entryType: "actual",
+          from: "mattanutra:stripe-clearing",
+          fromAccountId: FINANCE_ACCOUNT_IDS.stripeClearing,
+          metadata: {
+            ...fxMetadata(fx),
+            accountingBasis: "cash_fee",
+            paymentId: payment.id,
+            selectedPlan: payment.selected_plan,
+            stripeBalanceTransactionId: balanceTransaction.id,
+            stripeCheckoutSessionId: checkoutSessionId
+          },
+          provider: "stripe",
+          source: "stripe",
+          sourceRef: `stripe:balance_transaction:${balanceTransaction.id}:fee`,
+          sql,
+          to: "stripe:fees",
+          toAccountId: FINANCE_ACCOUNT_IDS.stripe,
+          fxRateId: fx.fxRateId,
+          usdRate: fx.usdRate
+        });
       }
     }
 
@@ -1322,7 +1332,7 @@ export async function markPaymentCheckoutOpened(input: Readonly<{
     });
   }
 
-  return await mapPayment((await getPaymentRowById(sql, input.paymentId)) ?? currentPayment);
+  return mapPayment((await getPaymentRowById(sql, input.paymentId)) ?? currentPayment);
 }
 
 export async function recordPaymentPregenerationProgress(input: Readonly<{
@@ -1354,7 +1364,7 @@ export async function recordPaymentPregenerationProgress(input: Readonly<{
       ? "pregenerationCompletedAt"
       : `${input.status}At`;
 
-  return await mapPayment(await updatePaymentState(sql, {
+  return mapPayment(await updatePaymentState(sql, {
     action: "payment_pregeneration_progress",
     actor: "system",
     metadata: {
@@ -1383,7 +1393,7 @@ export async function markPaymentCancelled(input: Readonly<{
 
   const before = await getPaymentRowById(sql, input.paymentId);
   if (!before) return null;
-  if (before.status === "paid" || before.status === "bound" || before.paid_at) return await mapPayment(before);
+  if (before.status === "paid" || before.status === "bound" || before.paid_at) return mapPayment(before);
   if (before.stripe_mode !== "mock" && before.stripe_checkout_session_id) {
     const stripe = stripeClientForConfig(stripePaymentConfig(input.request));
     let session = await stripe.checkout.sessions.retrieve(before.stripe_checkout_session_id);
@@ -1432,7 +1442,7 @@ export async function markPaymentCancelled(input: Readonly<{
     valueCurrency: payment.currency
   });
 
-  return await mapPayment(updated ?? payment);
+  return mapPayment(updated ?? payment);
 }
 
 export async function completeMockPayment(input: Readonly<{ paymentId: string; request?: Request }>) {
@@ -1440,6 +1450,8 @@ export async function completeMockPayment(input: Readonly<{ paymentId: string; r
   const sql = await sqlOrThrow();
   await assertPaymentSchema(sql);
   if (stripePaymentConfig(input.request).mode !== "mock") throw new Error("Mock payment completion is only available in dev mock mode");
+  const previous = await getPaymentRowById(sql, input.paymentId);
+  const prepared = previous ? await preparePaymentFulfillment(sql, previous) : undefined;
   const payment = await withDatabaseTransaction(sql, async tx => {
     const [current] = await tx<PaymentRow[]>`select * from public.payments where id = ${input.paymentId}::uuid for update`;
     if (!current || current.stripe_mode !== "mock") return null;
@@ -1448,7 +1460,7 @@ export async function completeMockPayment(input: Readonly<{ paymentId: string; r
       stripeCustomerId: "mock_customer", stripePaymentIntentId: `mock_pi_${current.id}`, metadata: { mock: true }
     });
     if (!paid) return null;
-    await enqueueWebPaymentFulfillment(tx, paid);
+    await enqueueWebPaymentFulfillment(tx, paid, current.status === "paid" || current.status === "bound" ? prepared : newlyConfirmedFulfillment(paid));
     return (await getPaymentRowById(tx, paid.id))!;
   });
   return payment ? { payment: await mapPayment(payment), destination: paymentReturnPath(payment.locale, payment.stripe_checkout_session_id ?? `mock_cs_${payment.id}`) } : null;
@@ -1877,6 +1889,10 @@ export async function fulfillCheckoutSession(
 ) {
   const sql = await sqlOrThrow();
   await assertPaymentSchema(sql);
+  const previous = await getPaymentRowBySessionId(sql, sessionId);
+  if (previous && (await effectivePayment(sql, previous)).fulfillment_status === "complete") {
+    return { payment: await mapPayment(previous), status: previous.plan_id ? "paid_with_plan" as const : "paid_reservation" as const };
+  }
   const config = stripePaymentConfig(input.request);
   if (sessionId.startsWith("mock_cs_")) return fulfillMockCheckoutSession(sql, sessionId, input);
   const session = await stripeClientForConfig(config).checkout.sessions.retrieve(sessionId, {
@@ -1890,6 +1906,7 @@ export async function fulfillCheckoutSession(
     void writePaymentBpmEvent({ eventName: "payment_checkout_returned", eventStatus: "received", paymentId: payment.id,
       planId: payment.plan_id, locale: payment.locale, stripeSessionId: session.id }).catch(() => undefined);
   }
+  const prepared = await preparePaymentFulfillment(sql, payment);
   const current = await withDatabaseTransaction(sql, async tx => {
     let [row] = await tx<PaymentRow[]>`select * from public.payments where id = ${payment.id}::uuid for update`;
     const confirmed = row.status === "paid" || row.status === "bound" || Boolean(row.paid_at);
@@ -1901,7 +1918,7 @@ export async function fulfillCheckoutSession(
           stripePaymentIntentId: stringId(session.payment_intent), metadata: { source: input.source }
         }) ?? row;
       }
-      await enqueueWebPaymentFulfillment(tx, row);
+      await enqueueWebPaymentFulfillment(tx, row, confirmed ? prepared : newlyConfirmedFulfillment(row));
     } else if (!confirmed) {
       const status = session.status === "expired" ? "expired" : "processing";
       if (row.status !== status) row = await updatePaymentState(tx, {
@@ -1934,6 +1951,8 @@ export async function bindPaidReservationToAssessment(input: Readonly<{
 
   await assertPaymentSchema(sql);
 
+  const previous = await getPaymentRowById(sql, input.paymentId);
+  const prepared = previous ? await preparePaymentFulfillment(sql, previous) : undefined;
   return withDatabaseTransaction(sql, async tx => {
     const claim = await claimPaidReservation(tx, input.paymentId!, input.planId);
     if (!claim) {
@@ -1947,8 +1966,8 @@ export async function bindPaidReservationToAssessment(input: Readonly<{
       await tx`update public.payments set fulfillment_status = 'pending', fulfillment_completed_at = null where id = ${input.paymentId!}::uuid`;
     }
     const payment = { ...claim.payment, ...(!claim.replayed ? { fulfillment_status: "pending" as const } : {}) };
-    await enqueueWebPaymentFulfillment(tx, payment);
-    return await mapPayment(payment);
+    await enqueueWebPaymentFulfillment(tx, payment, claim.replayed ? prepared : newlyConfirmedFulfillment(payment));
+    return mapPayment(payment);
   });
 }
 
