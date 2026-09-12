@@ -2,9 +2,9 @@ import assert from 'node:assert/strict';
 import test, { mock } from 'node:test';
 const dose = await import('../../lib/matcher/dose.ts');
 const fractions = await import('../../lib/matcher/rational.ts');
-let conversions = 0;
+let conversions = 0, unitCompilations = 0;
 let multiplications = 0; let measurements = 0;
-mock.module('../../lib/matcher/dose.ts', { namedExports: { ...dose, amountFromScaled: (...args: Parameters<typeof dose.amountFromScaled>) => { conversions++; return dose.amountFromScaled(...args); } } });
+mock.module('../../lib/matcher/dose.ts', { namedExports: { ...dose, scaleAmount: (...args: Parameters<typeof dose.scaleAmount>) => { unitCompilations++; return dose.scaleAmount(...args); }, amountFromScaled: (...args: Parameters<typeof dose.amountFromScaled>) => { conversions++; return dose.amountFromScaled(...args); } } });
 mock.module('../../lib/matcher/rational.ts', { namedExports: { ...fractions, fromDecimal: (...args: Parameters<typeof fractions.fromDecimal>) => { measurements++; return fractions.fromDecimal(...args); }, multiply: (...args: Parameters<typeof fractions.multiply>) => { multiplications++; return fractions.multiply(...args); } } });
 const { request } = await import('../matcher/flexible-v5-fixtures.ts');
 const { doseFitScore, exactDoseFit, compareDoseFit, weightedDoseFitScore } = await import('../../lib/matcher/dose-fit.ts');
@@ -84,4 +84,16 @@ test('REF-CPU-07 profile representatives share immutable quantity measurements',
   assert.ok(simpler.overallPenalty > ordinary.overallPenalty);
   assert.equal(ordinary.preferences.maxDailyPills.penalty, 169 / 36);
   assert.equal(simpler.preferences.maxDailyPills.penalty, 169 / 9);
+});
+
+test('REF-CPU-08 supported quantity probes reuse compiled subject and unit facts', async () => {
+  const { compileVariant } = await import('../../lib/matcher/candidates.ts');
+  const { product } = await import('../matcher/flexible-v5-fixtures.ts');
+  const input = request(), listing = product('quantity-basis', { a: 100 });
+  const first = compileVariant({ product: listing, request: input, dailyUnits: 1 }); assert.ok(first);
+  unitCompilations = 0;
+  const next = compileVariant({ product: listing, request: input, dailyUnits: 2 }); assert.ok(next);
+  assert.equal(next.contributions.get('a')?.units, 200_000_000n);
+  assert.equal(next.safetyExposure?.get('a')?.units, 200_000_000n);
+  assert.equal(unitCompilations, 0, 'Changing supported quantities multiplies compiled units without resolving names again');
 });
