@@ -441,6 +441,12 @@
       "expectedCases": 5,
       "slice": "requests",
       "reason": "Direct checkout without confirmation revision, no queued plan work and generated service-feedback protocol"
+    },
+    {
+      "file": "test/simple-plan/refinement-consistency.test.ts",
+      "expectedCases": 5,
+      "reason": "Accepted refinement revision remains visible during processing, terminal failure and recovery without publishing the old basket under a new revision",
+      "slice": "refinement"
     }
   ],
   "inputs": [
@@ -488,6 +494,7 @@
     "test/simple-plan/importance.test.ts",
     "test/simple-plan/zero-scales.test.ts",
     "test/simple-plan/direct-checkout.test.ts",
-    "test/simple-plan/no-option-ids.test.ts"
+    "test/simple-plan/no-option-ids.test.ts",
+    "test/simple-plan/refinement-consistency.test.ts"
   ]
 }
