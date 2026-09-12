@@ -231,8 +231,9 @@ function sameMeasurements(a: SearchState, b: SearchState) {
 export function numericalSearchStateScore(request: CanonicalRequest, state: SearchState): NumericalOverallScore {
   let cache = stateScores.get(request); if (!cache) { cache = new WeakMap(); stateScores.set(request, cache); }
   let bucket = cache.get(state.exposure);
-  const found = bucket?.find(row => row.state === state || sameMeasurements(row.state, state));
-  if (found) return found.score;
+  if (bucket) for (const row of bucket) {
+    if (row.state === state || sameMeasurements(row.state, state)) return row.score;
+  }
   let actual = stateActuals.get(state);
   if (!actual) { actual = { dailyPills: state.pillCountKnown === false ? null : state.pills,
       pillLowerBound: state.pills, productCount: state.count, priceMinor: state.price, currency: request.currency,
@@ -248,6 +249,7 @@ export function searchStateScore(request: CanonicalRequest, state: SearchState):
   return displayOverall(numericalSearchStateScore(request, state));
 }
 export function compareOverallScores(left: OverallMatchingScore | NumericalOverallScore, right: OverallMatchingScore | NumericalOverallScore) {
+  if (left === right) return 0;
   if (left.profile.hash !== right.profile.hash) throw new Error("Cannot compare different matching profiles as one score");
   return compare("exactTotal" in left ? left.exactTotal : decoded(left.overallExact), "exactTotal" in right ? right.exactTotal : decoded(right.overallExact));
 }

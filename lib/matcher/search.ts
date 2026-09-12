@@ -139,6 +139,7 @@ function skipGroup(state: SearchState): SearchState {
 }
 
 export function compareSearchStates(a: SearchState, b: SearchState, request: CanonicalRequest) {
+  if (a === b) return 0;
   const practical = compareOverallScores(numericalSearchStateScore(request, a), numericalSearchStateScore(request, b));
   if (practical !== 0) return practical;
   const fit = compareDoseFit(numericalDoseFitScore(request, a.exposure), numericalDoseFitScore(request, b.exposure));

@@ -210,6 +210,12 @@
       "expectedCases": 3,
       "reason": "Hard fresh native timing gate rejects cache hits, incomplete trials, changed semantics and stale evidence",
       "slice": "consumers"
+    },
+    {
+      "file": "test/agentic/value/continued-inventory.test.ts",
+      "slice": "consumers",
+      "expectedCases": 13,
+      "reason": "Shared immutable catalogue identity in goods economics and continued-inventory ledgers preserves exact pack, replenishment and money semantics."
     }
   ],
   "inputs": [
