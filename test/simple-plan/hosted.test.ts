@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import { toolList } from "../../lib/agentic/mcp/rpc.ts";
 import { validateInstalledConnectorProjection } from "../../scripts/validate-installed-connector-projection.mjs";
 
-const published = { contractVersion: "11.0.0", schemaChecksum: "fixture-checksum", tools: toolList() };
+const published = { contractVersion: "11.1.0", schemaChecksum: "fixture-checksum", tools: toolList() };
 const installed = () => ({ ...structuredClone(published), source: "installed_connector", connectorId: "dev-host", environment: "dev", observedAt: "2026-09-10T10:00:00Z" });
 
 test("M721-HOST-01 current six-tool exports pass while missing retained tools and native-only evidence fail", () => {

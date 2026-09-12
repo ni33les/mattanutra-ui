@@ -33,13 +33,13 @@ test('NOID-02 direct checkout preserves the recommendation and replays after a l
 });
 
 test('NOID-03 generated cards, downloadable schemas and hosted projections publish the exact current protocol', () => {
-  const listing = JSON.parse(readFileSync('contract/mcp/11.0.0/tools.json','utf8'));
-  const schema = JSON.parse(readFileSync('contract/mcp/11.0.0/schema.json','utf8'));
+  const listing = JSON.parse(readFileSync('contract/mcp/11.1.0/tools.json','utf8'));
+  const schema = JSON.parse(readFileSync('contract/mcp/11.1.0/schema.json','utf8'));
   const wellKnown = JSON.parse(readFileSync('public/.well-known/mcp.json','utf8'));
   assert.deepEqual(listing.tools, toolList('dev'));
   assert.deepEqual(schema.planSchema, JSON.parse(JSON.stringify(AGENTIC_TOOL_SCHEMAS.plan)));
   assert.deepEqual(wellKnown.tools, listing.tools);
-  assert.equal(readFileSync('contract/mcp/11.0.0/README.md','utf8'), clientGuideMarkdown('en','dev'));
+  assert.equal(readFileSync('contract/mcp/11.1.0/README.md','utf8'), clientGuideMarkdown('en','dev'));
   for (const provider of ['openai','anthropic','xai']) {
     const adapter = JSON.parse(readFileSync(`lib/agentic/adapters/${provider}.json`,'utf8'));
     assert.equal(adapter.contractVersion, listing.contractVersion);

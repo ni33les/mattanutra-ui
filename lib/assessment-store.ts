@@ -422,7 +422,7 @@ function productNeedCoverageFromDiagnostics(
         item.itemType === "food" || item.itemType === "supplement"
           ? item.itemType
           : null;
-      const coveragePercent = Number(item.coveragePercent);
+      const coveragePercent = typeof item.coveragePercent === 'number' ? item.coveragePercent : NaN;
       const bestRejectedProductId =
         typeof item.bestRejectedProductId === "string"
           ? item.bestRejectedProductId
@@ -439,7 +439,7 @@ function productNeedCoverageFromDiagnostics(
       return {
         bestRejectedProductId,
         bestRejectedReason,
-        coveragePercent: Math.min(100, Math.max(0, Math.round(coveragePercent))),
+        coveragePercent: Math.min(100, Math.max(0, coveragePercent)),
         displayName,
         id,
         itemType

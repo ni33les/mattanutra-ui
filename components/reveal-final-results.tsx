@@ -638,6 +638,7 @@ export function RevealFinalResultsPage({
       ) : null}
 
       <RevealFormulaFinalSection
+        activeProductRecommendations={activeProductRecommendations}
         catalogueSupplementCount={catalogueSupplementCount}
         copy={copy}
         finalCopy={finalCopy}
@@ -870,6 +871,7 @@ function RevealDistillationSection({
 }
 
 function RevealFormulaFinalSection({
+  activeProductRecommendations,
   catalogueSupplementCount,
   copy,
   finalCopy,
@@ -880,6 +882,7 @@ function RevealFormulaFinalSection({
   productCoveragePending,
   result,
 }: Readonly<{
+  activeProductRecommendations?: FormulationResult["productRecommendations"];
   catalogueSupplementCount: number;
   copy: typeof revealCopy.en;
   finalCopy: typeof revealFinalCopy.en;
@@ -1001,7 +1004,10 @@ function RevealFormulaFinalSection({
                 );
                 const coverage = productCoveragePending
                   ? null
-                  : productCoverageBySupplementId.get(ingredient.id) ?? 0;
+                  : productCoverageBySupplementId.get(ingredient.id);
+                const coverageReason = activeProductRecommendations?.needCoverage?.find(row => row.id === `supplement:${ingredient.id}`)?.bestRejectedReason;
+                const coverageLabel = productCoveragePending ? copy.productsPendingBadge : coverage == null || coverageReason === 'unknown' ? copy.coverageUnknown
+                  : coverage === 0 ? copy.currentlyUnavailable : coverage < 0.01 ? '<0.01%' : `${Number(coverage.toFixed(2))}%`;
                 const benefit = supplementBenefitTags(ingredient)[0];
                 const benefitLabel = benefit
                   ? localizedBenefitTagLabel(benefit, locale)
@@ -1074,7 +1080,7 @@ function RevealFormulaFinalSection({
                         {dailyDose}
                       </span>
                       <span className="nutrient-coverage hidden whitespace-nowrap text-right mn-reveal-font-mono text-sm font-semibold text-[var(--mn-teal-deep)] md:block">
-                        {coverage === null ? copy.productsPendingBadge : `${coverage}%`}
+                        {coverageLabel}
                       </span>
                       <span aria-hidden={true} className="expand-icon" />
                     </label>
@@ -1094,6 +1100,7 @@ function RevealFormulaFinalSection({
                           </h5>
                           <p className="mt-2.5 text-sm leading-[1.65] text-[var(--mn-ink)]">
                             {decisionCopy}
+                            {coverage === 0 ? ` ${coverageReason === 'not_selected' ? copy.notIncludedInRoutine : coverageReason === 'unavailable' ? copy.noEligibleProduct : copy.unavailableInRoutine}` : ''}
                           </p>
                         </div>
                         <div className="mn-reveal-nutrient-safety flex gap-3.5 rounded-r-md border-l-[3px] border-[var(--mn-gold)] bg-[var(--mn-cream)] px-[18px] py-3.5 text-[13px] leading-[1.6] text-[var(--mn-ink-soft)] md:col-span-2">

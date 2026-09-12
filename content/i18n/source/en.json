@@ -9398,5 +9398,50 @@
     "surface": "email",
     "translatable": true,
     "variables": []
+  },
+  "customer.revealCopy.currentlyUnavailable": {
+    "defaultMessage": "Currently unavailable",
+    "description": "Product contribution availability in the selected routine.",
+    "namespace": "customer.revealCopy",
+    "audience": "customer",
+    "surface": "reveal",
+    "variables": [],
+    "translatable": true
+  },
+  "customer.revealCopy.coverageUnknown": {
+    "defaultMessage": "Coverage unknown",
+    "description": "Product contribution availability in the selected routine.",
+    "namespace": "customer.revealCopy",
+    "audience": "customer",
+    "surface": "reveal",
+    "variables": [],
+    "translatable": true
+  },
+  "customer.revealCopy.notIncludedInRoutine": {
+    "defaultMessage": "An eligible product exists, but is not included in this routine.",
+    "description": "Product contribution availability in the selected routine.",
+    "namespace": "customer.revealCopy",
+    "audience": "customer",
+    "surface": "reveal",
+    "variables": [],
+    "translatable": true
+  },
+  "customer.revealCopy.noEligibleProduct": {
+    "defaultMessage": "No eligible product currently supplies this ingredient.",
+    "description": "Product contribution availability in the selected routine.",
+    "namespace": "customer.revealCopy",
+    "audience": "customer",
+    "surface": "reveal",
+    "variables": [],
+    "translatable": true
+  },
+  "customer.revealCopy.unavailableInRoutine": {
+    "defaultMessage": "This routine currently supplies none of this ingredient.",
+    "description": "Product contribution availability in the selected routine.",
+    "namespace": "customer.revealCopy",
+    "audience": "customer",
+    "surface": "reveal",
+    "variables": [],
+    "translatable": true
   }
 }

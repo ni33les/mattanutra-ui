@@ -1024,5 +1024,10 @@
   "seo.routes.terms.title": "เงื่อนไขการใช้บริการ | MattaNutra",
   "outbound.healthscoreReadyEmail.subject": "HealthScore ของคุณพร้อมแล้ว",
   "outbound.healthscoreReadyEmail.body": "คำแนะนำ HealthScore ฉบับสมบูรณ์ของคุณพร้อมแล้ว เปิดผลส่วนตัวผ่านลิงก์ด้านล่าง",
-  "outbound.healthscoreReadyEmail.cta": "ดู HealthScore ของฉัน"
+  "outbound.healthscoreReadyEmail.cta": "ดู HealthScore ของฉัน",
+  "customer.revealCopy.currentlyUnavailable": "ขณะนี้ไม่มีผลิตภัณฑ์ที่รองรับ",
+  "customer.revealCopy.coverageUnknown": "ยังไม่ทราบความครอบคลุม",
+  "customer.revealCopy.notIncludedInRoutine": "มีผลิตภัณฑ์ที่ใช้ได้ แต่ไม่ได้รวมอยู่ในคำแนะนำนี้",
+  "customer.revealCopy.noEligibleProduct": "ขณะนี้ไม่มีผลิตภัณฑ์ที่เข้าเกณฑ์ให้ส่วนผสมนี้",
+  "customer.revealCopy.unavailableInRoutine": "คำแนะนำนี้ยังไม่ได้ให้ส่วนผสมนี้"
 }

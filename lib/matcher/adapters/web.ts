@@ -18,7 +18,7 @@ import type { CanonicalRequest, CatalogSnapshot, ProductGroup } from "@/lib/matc
 import { compareBaskets, hasFewerConcerns, selectOptions } from "@/lib/matcher/selector";
 import { ratioForSupportedServings } from "@/lib/matcher/serving-grid";
 import { matcherSafetyCeilings } from "@/lib/matcher/safety-ceilings";
-import { displayCoveragePercent, marketingCoveragePercentFromNeedCoverage } from "@/lib/marketing-coverage";
+import { marketingCoveragePercentFromNeedCoverage } from "@/lib/marketing-coverage";
 import { whyProductMatches } from "@/lib/product-recommendation-metrics";
 import { productContainsFoodAllergen } from "@/lib/product-food-allergens";
 import type {
@@ -198,7 +198,7 @@ export function matcherNeedCoveragePercent(
     units = Math.max(units, coverageBySubject.get(subjectId) ?? 0);
   }
 
-  return displayCoveragePercent(units / (COVERAGE_SCALE / 100));
+  return Math.max(0, Math.min(100, units / (COVERAGE_SCALE / 100)));
 }
 
 export function matcherProductCoversNeed(
@@ -315,12 +315,15 @@ function matcherProductOwnCoveragePercent(
 
 function needDiagnosticsFromBasket(
   needs: readonly ProductRecommendationNeed[],
-  selected: ScoredBasket | null
+  selected: ScoredBasket | null,
+  available?: ReturnType<typeof productContributionAvailability>
 ): ProductRecommendationNeedDiagnostic[] {
   return needs.map((need) => ({
     targetBasis: need.itemType === "supplement" || need.itemType === "nutrient" ? "supplemental" as const : undefined,
     bestRejectedProductId: null,
-    bestRejectedReason: null,
+    bestRejectedReason: matcherNeedCoveragePercent(selected?.coverageBySubject, need) > 0 || !available ? null
+      : needSubjectIds(need).some(id => available.supplied.has(id)) ? 'not_selected'
+        : needSubjectIds(need).some(id => available.unknown.has(id)) ? 'unknown' : 'unavailable',
     coveragePercent: matcherNeedCoveragePercent(
       selected?.coverageBySubject,
       need
@@ -376,7 +379,7 @@ export function recommendWithMatcher(
 
   const request = webMatcherRequest(input);
   if (!request) return empty;
-  return recommendPreparedWeb(input, request, empty);
+  return recommendPreparedWeb(input, request);
 }
 
 /** Shared preparation for actual matching and the pre-formulation allow-list. */
@@ -448,7 +451,7 @@ export function webIngredientAvailability(input: ProductRecommendationInput) {
   return productContributionAvailability(request, input.candidates.map(toMatcherProduct));
 }
 
-function recommendPreparedWeb(input: ProductRecommendationInput, request: CanonicalRequest, empty: ProductRecommendationResult): ProductRecommendationResult {
+function recommendPreparedWeb(input: ProductRecommendationInput, request: CanonicalRequest): ProductRecommendationResult {
   const supplementNeeds = input.needs.filter(need => need.itemType === 'supplement' || need.itemType === 'nutrient');
   const compileStartedAt = Date.now();
   // Eligibility and variants depend on the full request, including safety ceilings.
@@ -495,9 +498,11 @@ function recommendPreparedWeb(input: ProductRecommendationInput, request: Canoni
     trimmed: result.trimmed,
     variants: variantCount
   });
+  const available = productContributionAvailability(request, compiled.catalog.products);
   const needDiagnostics = needDiagnosticsFromBasket(
     supplementNeeds,
-    result.selected
+    result.selected,
+    available
   );
   const coverage = marketingCoveragePercentFromNeedCoverage(needDiagnostics);
   const byId = new Map(input.candidates.map((item) => [item.id, item]));
