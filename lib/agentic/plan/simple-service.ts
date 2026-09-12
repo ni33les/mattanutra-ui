@@ -10,6 +10,7 @@ import { canonicalRequestHash } from "@/lib/agentic/idempotency";
 import { planTool, commitPlanNoop, type PlanToolInput } from "@/lib/agentic/plan/service";
 import type { PlanResult } from "@/lib/agentic/plan/types";
 import { AGENTIC_CONTRACT_VERSION } from "@/lib/agentic/config";
+import { visiblePlanRevision } from "@/lib/agentic/presentation/status-projection";
 
 export async function simplePlanTool(runtime: AgenticRuntime, params: Record<string, unknown>) {
   const now = runtime.now ?? new Date().toISOString();
@@ -18,8 +19,8 @@ export async function simplePlanTool(runtime: AgenticRuntime, params: Record<str
   const state = handle ? await readPlanState(runtime, handle) : null;
   if (isAgenticErrorResult(state)) return state;
   if (kind === "get" && state) {
-    if (state.operation && ["queued", "running", "retryable"].includes(state.operation.status)) return processingDecision(handle!, state.revision, state.projection.locale);
-    if (state.operation && ["failed", "cancelled"].includes(state.operation.status)) return failedDecision(handle!, state.revision, state.projection.locale);
+    if (state.operation && ["queued", "running", "retryable"].includes(state.operation.status)) return processingDecision(handle!, visiblePlanRevision(state), state.projection.locale);
+    if (state.operation && ["failed", "cancelled"].includes(state.operation.status)) return failedDecision(handle!, visiblePlanRevision(state), state.projection.locale);
     const complete = await readPlanPresentation(runtime, handle!);
     return isAgenticErrorResult(complete) ? complete : presentDecision(complete.result, handle!, complete.revision.revision);
   }
@@ -36,10 +37,13 @@ export async function simplePlanTool(runtime: AgenticRuntime, params: Record<str
     const complete = await readPlanPresentation(runtime, internal.planHandle, internal.revision);
     return isAgenticErrorResult(complete) ? complete : presentDecision(complete.result, internal.planHandle, internal.revision);
   }
-  if (state && state.plan.currentRevision !== params.expectedRevision) return businessError({ reasonCode: "stale_revision", fieldPath: "expectedRevision", currentRevision: state.plan.currentRevision, requestedRevision: Number(params.expectedRevision), message: "Read the current plan and retry this change with its revision." });
+  if (state && (visiblePlanRevision(state) !== params.expectedRevision || state.operation && ["queued", "running", "retryable"].includes(state.operation.status))) return businessError({ reasonCode: "stale_revision", fieldPath: "expectedRevision", currentRevision: visiblePlanRevision(state), requestedRevision: Number(params.expectedRevision), message: "Read the current plan and wait for any pending refinement before changing it." });
   const prior = handle ? await readPlanPresentation(runtime, handle) : null;
   if (isAgenticErrorResult(prior)) return prior;
-  const payload: PlanToolInput = { operation: kind, publicInput: params, idempotencyKey: key, ...(handle ? { planHandle: handle, expectedRevision: Number(params.expectedRevision) } : {}) };
+  const payload: PlanToolInput = { operation: kind, publicInput: params, idempotencyKey: key, ...(handle && state ? {
+    planHandle: handle, expectedRevision: state.plan.currentRevision,
+    ...(state.operation && ["failed", "cancelled"].includes(state.operation.status) ? { recoveryOperationId: state.operation.id } : {})
+  } : {}) };
   let request;
   if (kind === "create" || kind === "revise") {
     const countryCode = String(params.destinationCountry ?? prior?.result.requestSnapshot.destinationCountry ?? "TH");

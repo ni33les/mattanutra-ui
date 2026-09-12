@@ -35,8 +35,8 @@ for (const status of ['failed', 'cancelled'] as const) test(`REF-REV-03 ${status
   const { app, first, operation } = await pending();
   assert.equal(await app.store.updatePlanOperation({ ...operation, status, version: operation.version + 1 }, operation.version), true);
   const failed = await value(app, { planHandle: first.planHandle }); assert.equal(failed.status, 'failed'); assert.equal(failed.revision, 2);
-  const recovered = await value(app, { planHandle: first.planHandle, expectedRevision: failed.revision, idempotencyKey: `recover-${status}`, scoring: {} });
-  assert.equal(recovered.ok, true); assert.equal(recovered.revision, 2); assert.equal(recovered.status, 'processing');
+  const recovered = await value(app, { planHandle: first.planHandle, expectedRevision: failed.revision, idempotencyKey: `refinement-recover-${status}`, scoring: {} });
+  assert.equal(recovered.ok, true, JSON.stringify(recovered)); assert.equal(recovered.revision, 2); assert.equal(recovered.status, 'processing');
   assert.equal((await app.store.getPlan(operation.planId))?.currentRevision, 1);
 });
 test('REF-REV-04 expired work is presented without changing its durable record', async () => {

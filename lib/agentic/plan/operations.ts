@@ -81,6 +81,11 @@ export async function admitPlanOperation(store: AgenticStore, input: Readonly<{
     const pending = await tx.getActivePlanOperation(input.planId);
     // Only explicit mutation admission retires expired ownership. Reads stay read-only.
     if (pending && !await expirePlanOperation(tx, pending.id, input.now)) throw new Error("stale_revision");
+    const recoveryId = (input.payload as { recoveryOperationId?: string }).recoveryOperationId;
+    if (recoveryId) {
+      const recovery = tx.getPlanOperationHeader ? await tx.getPlanOperationHeader(recoveryId) : await tx.getPlanOperation(recoveryId, { includeCursor: false });
+      if (!recovery || !["failed", "cancelled"].includes(recovery.status)) throw new Error("stale_revision");
+    }
     await tx.insertPlanOperation(record, preparedJson);
     return record;
   });

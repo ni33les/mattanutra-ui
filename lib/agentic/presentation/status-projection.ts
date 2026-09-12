@@ -17,6 +17,11 @@ export type PlanReadState = {
   operation: PlanOperationRead | null; frozen: boolean; catalogueRevision: number | null;
 };
 
+/** Accepted work has its own revision; its predecessor is never that revision's basket. */
+export function visiblePlanRevision(state: Pick<PlanReadState, "revision" | "operation">) {
+  return Math.max(state.revision, state.operation?.revision ?? state.revision);
+}
+
 /** Called at write boundaries; search diagnostics never affect public identity. */
 export function planStatusProjection(value: unknown): PlanStatusProjection | null {
   const result = value as PlanResult | null;
