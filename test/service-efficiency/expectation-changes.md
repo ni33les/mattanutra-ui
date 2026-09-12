@@ -35,3 +35,5 @@ are retained. Stable top-K selection must return the same ordered prefix as the
 previous complete sort. Full result equality is independently recorded against
 the frozen D3 control. The scoped consumer inventory is
 `matcher-hot-path-impact.json`; this is not full-application acceptance.
+
+- REF-CPU-03 experiment (2026-09-12): retain the independent arithmetic-reuse assertion; withdraw the added whole-score object-identity assertion. Its bounded value-key memo increased the uncached Daniel diagnostic from 3404ms to 3660ms, with unchanged result identity. The experiment and RED evidence remain in git and the external refinement-speed evidence; this cache is not retained.
