@@ -1,3 +1,4 @@
+import { visiblePlanRevision } from "@/lib/agentic/presentation/status-projection";
 import { planContractCompatible } from "@/lib/agentic/presentation/compatibility";
 import { catalogueSnapshotId } from "@/lib/agentic/catalogue/freeze";
 import type { AgenticConfig } from "@/lib/agentic/config";
@@ -417,24 +418,13 @@ async function executeFresh(
     return executeError("en", "not_found");
   }
 
-  const peekedPlan = await input.store.getPlan(peeked.resourceId);
-
-  if (!peekedPlan) {
-    return executeError("en", "not_found");
-  }
-
+  const peekedState = await input.store.getPlanReadState(peeked.resourceId, undefined, true);
+  if (!peekedState) return executeError("en", "not_found");
+  const peekedPlan = peekedState.plan;
   if (peekedPlan.currentRevision !== input.expectedRevision) {
-    return revisionConflict("en", input.expectedRevision, peekedPlan.currentRevision);
+    return revisionConflict("en", input.expectedRevision, visiblePlanRevision(peekedState));
   }
-
-  const peekedRevision = await input.store.getPlanRevision(
-    peekedPlan.id,
-    peekedPlan.currentRevision
-  );
-
-  if (!peekedRevision) {
-    return executeError("en", "plan_not_ready");
-  }
+  const peekedRevision = { result: peekedState.result, status: (peekedState.result as PlanResult).status };
 
   const namespace =
     peekedPlan.principalScope?.startsWith(QA_NAMESPACE_PREFIX)
@@ -465,6 +455,7 @@ async function executeFresh(
   // Existing frozen checkout work must remain resumable even when old plan
   // policy or current catalogue availability differs.
   const peekedOrder = await input.store.getActiveOrderForPlanRevision(peekedPlan.id, peekedPlan.currentRevision);
+  if (!peekedOrder && peekedState.operation) return revisionConflict("en", input.expectedRevision, visiblePlanRevision(peekedState));
   const snapshot = !peekedOrder && planContractCompatible(peekedResult.contractVersion) && peekedRevision.status === "ready"
     ? await ensureCatalogueSnapshot(input.config.environment, peekedResult.requestSnapshot.destinationCountry)
     : null;
@@ -499,7 +490,8 @@ async function executeFresh(
       return revisionConflict("en", input.expectedRevision, plan.currentRevision);
     }
 
-    const revision = await store.getPlanRevision(plan.id, plan.currentRevision);
+    const currentState = await store.getPlanReadState(plan.id, plan.currentRevision, true);
+    const revision = currentState ? { result: currentState.result, status: (currentState.result as PlanResult).status } : null;
 
     if (!revision) {
       return executeError("en", "plan_not_ready");
@@ -536,6 +528,7 @@ async function executeFresh(
       return stored;
     }
 
+    if (currentState?.operation) return revisionConflict(locale, input.expectedRevision, visiblePlanRevision(currentState));
     if (!planContractCompatible(result.contractVersion)) return businessError({ reasonCode: "not_found", message: "Not found.", fieldPath: "planHandle" });
     if (revision.status !== "ready" || !snapshot) return executeError(locale, "plan_not_ready");
 
