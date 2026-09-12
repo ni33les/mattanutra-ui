@@ -38,14 +38,26 @@ export function catalogueSnapshotId(snapshot: CatalogueSnapshot) {
   return `snap_${hash.digest("hex").slice(0, 16)}`;
 }
 
+// Matching inputs are immutable for a request/session. Keep the identity with
+// that object, including presentation consumers; mutable writers use the fresh
+// catalogueSnapshotId function above and must never reuse this memo.
+const matchingIdentities = new WeakMap<CatalogueSnapshot, string>();
+export function matchingSnapshotId(snapshot: CatalogueSnapshot): string {
+  let id = matchingIdentities.get(snapshot);
+  if (!id) { id = catalogueSnapshotId(snapshot); matchingIdentities.set(snapshot, id); }
+  return id;
+}
+
 export function freezeCatalogueSnapshot(
   snapshot: CatalogueSnapshot
 ): CatalogueSnapshot {
-  return Object.freeze({
+  const frozen = Object.freeze({
     ...(snapshot.runtimeRevision === undefined ? {} : { runtimeRevision: snapshot.runtimeRevision }),
     availabilityAsOf: snapshot.availabilityAsOf,
     catalogueVersion: snapshot.catalogueVersion,
     products: Object.freeze([...snapshot.products]),
     supplements: Object.freeze([...snapshot.supplements])
   });
+  matchingIdentities.set(frozen, matchingSnapshotId(snapshot));
+  return frozen;
 }

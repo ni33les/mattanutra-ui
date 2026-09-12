@@ -1,4 +1,4 @@
-import { catalogueSnapshotId } from "@/lib/agentic/catalogue/freeze";
+import { matchingSnapshotId } from "@/lib/agentic/catalogue/freeze";
 import type { CatalogueProduct, CatalogueSnapshot } from "@/lib/agentic/catalogue/types";
 import type {
   BasketItem,
@@ -288,7 +288,7 @@ function comparisonBasisFor(
 ): EconomicsComparisonBasis {
   return {
     baselineType: state.baseline?.type ?? "separate_direct_products",
-    catalogueSnapshotId: catalogueSnapshotId(snapshot),
+    catalogueSnapshotId: matchingSnapshotId(snapshot),
     costHorizonsDays: [...DEFAULT_HORIZONS],
     currency: state.currency,
     currentInventory: state.currentSupplements.map((item) => ({

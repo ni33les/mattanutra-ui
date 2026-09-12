@@ -87,7 +87,8 @@ function width(cursor: SearchCursor) { return Math.max(1, Math.min(cursor.passSt
 function explorationLimit(cursor: SearchCursor) { return cursor.expansionBudget - Math.floor((cursor.expansionBudget - cursor.passStart) / 5); }
 
 export function createSearchCursor(groups: readonly ProductGroup[], request: CanonicalRequest, config: MatcherConfig): SearchCursor {
-  const copy = structuredClone([...groups]);
+  // Product and variant facts are immutable; only each group's quantity list grows.
+  const copy = groups.map(group => ({ ...group, variants: [...group.variants] }));
   const identity = sha256Hex(JSON.stringify(serializeExactValue({ version: "search-cursor-1", scoringProfileHash: resolvePracticalProfile(request).hash, groups, request: { ...request, searchEffort: undefined }, config: { ...config, expansionBudget: undefined } })));
   const exact = groups.length <= config.exactGroupLimit && groups.reduce((sum, group) => sum + group.variants.length, 0) <= config.exactVariantLimit;
   const seed = seedState(request);

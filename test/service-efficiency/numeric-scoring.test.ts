@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict';
 import test, { mock } from 'node:test';
-const freeze = await import('../../lib/agentic/catalogue/freeze.ts');
-let snapshotHashes = 0;
-mock.module('../../lib/agentic/catalogue/freeze.ts', { namedExports: { ...freeze, catalogueSnapshotId: (...args: Parameters<typeof freeze.catalogueSnapshotId>) => { snapshotHashes++; return freeze.catalogueSnapshotId(...args); } } });
+const canonical = await import('../../lib/agentic/value/canonical.ts');
+let canonicalWrites = 0;
+mock.module('../../lib/agentic/value/canonical.ts', { namedExports: { ...canonical,
+  canonicalJson: (...args: Parameters<typeof canonical.canonicalJson>) => { canonicalWrites++; return canonical.canonicalJson(...args); } } });
 const dose = await import('../../lib/matcher/dose.ts');
 const fractions = await import('../../lib/matcher/rational.ts');
 let conversions = 0, unitCompilations = 0, exactEncodings = 0;
@@ -173,11 +174,14 @@ test('REF-CPU-14 complete resident matching hashes its immutable catalogue only 
   const { uninstallGoldCatalogue } = await import('../helpers/gold-catalogue.ts');
   const matching = await import('../../lib/agentic/plan/matching.ts');
   try {
-    const value = await input(); matching.resetMatchPlanCache(); snapshotHashes = 0;
+    const value = await input(); matching.resetMatchPlanCache();
+    const { catalogueSnapshotId } = await import('../../lib/agentic/catalogue/freeze.ts');
+    canonicalWrites = 0; catalogueSnapshotId(value.snapshot); const oneHash = canonicalWrites; assert.ok(oneHash > 0);
+    canonicalWrites = 0;
     const session = matching.createResidentPlanSession(value);
     let step = matching.advanceResidentPlanSession(session, { chunkBudget: 4000 });
     while (!step.done) step = matching.advanceResidentPlanSession(session, { chunkBudget: 4000 });
     assert.ok(step.result?.selected); assert.ok(step.expansionAttempts > 0);
-    assert.equal(snapshotHashes, 1, 'Compilation, checkpoint identity and all retained response baskets share one catalogue identity');
+    assert.equal(canonicalWrites, oneHash, 'Compilation, checkpoint identity and all retained response baskets share one catalogue identity');
   } finally { uninstallGoldCatalogue(); }
 });

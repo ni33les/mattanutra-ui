@@ -3,7 +3,7 @@ import { nutrientWeightEvidence } from "@/lib/matcher/scoring-policy";
 import { decodeMatchCursor, encodeMatchCursor, encodeMatchCursorBytes } from "@/lib/matcher/cursor-codec-server";
 import { createHash } from "node:crypto";
 import type { CatalogueProduct, CatalogueSnapshot } from "@/lib/agentic/catalogue/types";
-import { catalogueSnapshotId, freezeCatalogueSnapshot } from "@/lib/agentic/catalogue/freeze";
+import { matchingSnapshotId, freezeCatalogueSnapshot } from "@/lib/agentic/catalogue/freeze";
 import { classifySnapshotTargets } from "@/lib/agentic/plan/classify";
 import { toMatcherProduct } from "@/lib/agentic/plan/to-matcher-product";
 import {
@@ -82,25 +82,14 @@ import { ByteBoundedCache } from "@/lib/match-work-cache";
 
 const matchPlanCache = new ByteBoundedCache<ReturnType<typeof computeMatchPlan>>(16 * 1024 * 1024);
 const matcherProductCache = new ByteBoundedCache<ReturnType<typeof toMatcherProduct>[]>(8 * 1024 * 1024, true);
-const snapshotIdCache = new WeakMap<CatalogueSnapshot, string>();
 
 export function resetMatchPlanCache() {
   matchPlanCache.clear();
   matcherProductCache.clear();
 }
 
-function snapshotIdCached(snapshot: CatalogueSnapshot) {
-  const hit = snapshotIdCache.get(snapshot);
-  if (hit) {
-    return hit;
-  }
-  const id = catalogueSnapshotId(snapshot);
-  snapshotIdCache.set(snapshot, id);
-  return id;
-}
-
 function matcherProductsFor(snapshot: CatalogueSnapshot) {
-  const id = snapshotIdCached(snapshot);
+  const id = matchingSnapshotId(snapshot);
   const hit = matcherProductCache.get(id);
   if (hit) {
     return hit;
@@ -117,7 +106,7 @@ function matchPlanCacheKey(
   const hash = createHash("sha256");
   hash.update(planRematchFingerprint(state));
   hash.update("\0");
-  hash.update(snapshotIdCached(snapshot));
+  hash.update(matchingSnapshotId(snapshot));
   hash.update("\0");
   hash.update(GUIDANCE_RULES_VERSION);
   hash.update(MATCHER_VERSION);
@@ -897,7 +886,7 @@ function toStackOption(
     ...(basket.optionRole ? { role: basket.optionRole } : {}),
     roles: basket.roles,
     purchaseEligible: basket.purchaseEligible,
-    snapshotId: catalogueSnapshotId(snapshot),
+    snapshotId: matchingSnapshotId(snapshot),
     // Daily serving variants determine dose; checkout purchases the packs above.
     totalPriceMinor: items.reduce((sum, item) => sum + item.lineTotalMinor, 0),
     tradeOff: {
@@ -1063,7 +1052,7 @@ export function matcherTelemetryFor(input: Readonly<{
       const snapshotId =
         input.selected?.snapshotId ??
         (input.snapshot
-          ? catalogueSnapshotId(input.snapshot)
+          ? matchingSnapshotId(input.snapshot)
           : undefined);
 
       return input.snapshot
@@ -1121,7 +1110,7 @@ export function matcherTelemetryFor(input: Readonly<{
     ...(() => {
       const catalogueId =
         input.selected?.snapshotId ??
-        (input.snapshot ? catalogueSnapshotId(input.snapshot) : "");
+        (input.snapshot ? matchingSnapshotId(input.snapshot) : "");
       const ledger = factLedgerFor({
         catalogueId,
         selected: input.selected,

@@ -1,5 +1,5 @@
 import { payableSnapshot } from "@/lib/agentic/money";
-import { catalogueSnapshotId } from "@/lib/agentic/catalogue/freeze";
+import { matchingSnapshotId } from "@/lib/agentic/catalogue/freeze";
 import type { CatalogueProduct, CatalogueSnapshot } from "@/lib/agentic/catalogue/types";
 import type { BasketItem, CanonicalPlanState, EconomicsUnavailableReason, HorizonOrder } from "@/lib/agentic/plan/types";
 import { toMatcherProduct } from "@/lib/agentic/plan/to-matcher-product";
@@ -360,6 +360,6 @@ export function buildHorizonPlan(input: Readonly<{
         : nextReplenishmentDay != null
           ? "current_inventory_covers_now"
           : null,
-    snapshotId: catalogueSnapshotId(input.snapshot)
+    snapshotId: matchingSnapshotId(input.snapshot)
   };
 }
