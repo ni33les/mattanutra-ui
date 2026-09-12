@@ -36,7 +36,9 @@ test("PAY-RECOVER-03 paid and accounting or telemetry alone never proves plan co
 });
 test("PAY-RECOVER-04 reservation evidence cannot complete a newly bound assessment", async () => {
   await isolated(async sql => {
-    const p = await paidFixture(sql, { plan: false }); assert.equal((await paymentFulfillmentEvidence(sql, p)).status, "complete");
+    const p = await paidFixture(sql, { plan: false });
+    await sql`insert into tasks(id,title,task_type,status,payload,completed_at) values (${randomUUID()}::uuid,'Completed reservation','fulfill_web_payment','completed',${sql.json({ paymentId: p.id })},now())`;
+    assert.equal((await paymentFulfillmentEvidence(sql, p)).status, "complete");
     const planId = randomUUID(); await sql`insert into assessments(plan_id,locale,status,answers,answer_summary) values (${planId}::uuid,'en','captured','{}','{}')`;
     const bound = await bindPaidReservationToAssessment({ paymentId: p.id, planId, locale: "en" });
     assert.equal(bound?.fulfillmentStatus, "pending");
@@ -85,5 +87,13 @@ test("PAY-RECOVER-08 stale worker failure cannot downgrade a newer binding", asy
     const [current] = await sql`select plan_id,fulfillment_status from payments where id=${p.id}::uuid`;
     assert.deepEqual(current, { plan_id: nextPlan, fulfillment_status: "not_started" });
     assert.equal((await sql`select count(*)::int as n from finance_transactions where source_ref=${`stripe:payment:${p.id}:nominal-revenue`}`)[0].n, 0);
+  });
+});
+
+test("PAY-RECOVER-09 unbound reservation telemetry cannot replace durable completed work", async () => {
+  await isolated(async sql => {
+    const p = await paidFixture(sql, { plan: false });
+    assert.notEqual((await paymentFulfillmentEvidence(sql, p)).status, "complete");
+    assert.ok(await enqueueWebPaymentFulfillment(sql, p));
   });
 });
