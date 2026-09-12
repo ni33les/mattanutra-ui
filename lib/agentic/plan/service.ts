@@ -1,7 +1,7 @@
 import { measureService, recordServiceMetric } from "@/lib/service-metrics";
 import { refinementDecisionSummary } from "@/lib/agentic/presentation/decision";
 import { withServiceMeasurements } from "@/lib/service-metrics";
-import { planStatusProjection } from "@/lib/agentic/presentation/status-projection";
+import { planStatusProjection, visiblePlanRevision } from "@/lib/agentic/presentation/status-projection";
 import {preparePlanRevisionRecord} from "@/lib/agentic/store/prepared-revision";
 import { readPlanPresentation } from "@/lib/agentic/presentation/plan-read";
 import { planContractCompatible } from "@/lib/agentic/presentation/compatibility";
@@ -1006,8 +1006,8 @@ export async function runAdmittedPlanOperation(input: Readonly<{
 
 function operationFailureResponse(operation: PlanOperationRecord, currentRevision = operation.expectedRevision) {
   const failure = isAgenticErrorResult(operation.error) ? operation.error : businessError({
-    reasonCode: "stale_revision", message: "This refinement did not complete. Revise the last committed plan with a new idempotency key." });
-  return { ...failure, error: { ...failure.error, currentRevision,
+    reasonCode: "stale_revision", message: "This refinement did not complete. Read the plan, then revise its returned revision with a new idempotency key." });
+  return { ...failure, error: { ...failure.error, currentRevision: visiblePlanRevision({ revision: currentRevision, operation }),
     requestedRevision: operation.revision, nextActions: failure.error.nextActions ?? ["refresh_plan"] } };
 }
 

@@ -11,7 +11,7 @@ import { canonicalRequestHash } from "@/lib/agentic/idempotency";
 import { planTool, commitPlanNoop, type PlanToolInput } from "@/lib/agentic/plan/service";
 import type { PlanResult } from "@/lib/agentic/plan/types";
 import { AGENTIC_CONTRACT_VERSION } from "@/lib/agentic/config";
-import { visiblePlanRevision } from "@/lib/agentic/presentation/status-projection";
+import { visiblePlanRevision, operationForRead } from "@/lib/agentic/presentation/status-projection";
 
 export async function simplePlanTool(runtime: AgenticRuntime, params: Record<string, unknown>) {
   const end = measureService(typeof params.planHandle === "string" && Object.keys(params).length === 1 ? "mcp.retrieval_ms" : "mcp.admission_ms");
@@ -36,6 +36,10 @@ async function runSimplePlanTool(runtime: AgenticRuntime, params: Record<string,
   const receipt = await runtime.store.getIdempotency("plan", ownerScope, key);
   if (existing && existing.requestHash !== hash || receipt && receipt.requestHash !== hash) return businessError({ reasonCode: "idempotency_conflict", fieldPath: "idempotencyKey", message: "This key belongs to a different input." });
   if (existing || receipt) {
+    const observed = existing && operationForRead(existing);
+    if (existing && observed && ["failed", "cancelled"].includes(observed.status)) {
+      return failedDecision(String(existing.command.prepared.planHandle), visiblePlanRevision({ revision: existing.expectedRevision, operation: observed }), existing.command.prepared.locale as string | undefined);
+    }
     const internal = existing ? await planTool({ ...runtime, now, payload: existing.command.payload as PlanToolInput }) : JSON.parse(receipt!.responseJson);
     if (isAgenticErrorResult(internal)) return internal;
     if (internal.status === "processing") return processingDecision(internal.planHandle, internal.revision, existing?.command.prepared.locale as string | undefined);
