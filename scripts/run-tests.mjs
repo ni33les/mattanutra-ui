@@ -9,6 +9,7 @@ import {
 } from "./dev-cycle-utils.mjs";
 
 const TEST_ARGS = [
+  "--experimental-test-module-mocks",
   "--test",
   "--test-concurrency=1",
   "--experimental-strip-types",
