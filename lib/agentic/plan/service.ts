@@ -1,3 +1,4 @@
+import { refinementDecisionSummary } from "@/lib/agentic/presentation/decision";
 import { withServiceMeasurements } from "@/lib/service-metrics";
 import { planStatusProjection } from "@/lib/agentic/presentation/status-projection";
 import {preparePlanRevisionRecord} from "@/lib/agentic/store/prepared-revision";
@@ -329,7 +330,7 @@ function composeResult(input: Readonly<{
   }
 
   pinCatalogueSnapshot(input.snapshot, GUIDANCE_RULES_VERSION);
-  return {
+  const result: PlanResult = {
     contractVersion: AGENTIC_CONTRACT_VERSION,
     ...(input.alternativeSearch ? { alternativeSearch: input.alternativeSearch } : {}),
     ...(input.searchSummary ? { searchSummary: input.searchSummary } : {}),
@@ -400,6 +401,8 @@ function composeResult(input: Readonly<{
         }
       : {})
   };
+  const comparison = refinementDecisionSummary(input.previous, result);
+  return comparison ? { ...result, changeSummary: [...changeSummary, `decision:${comparison}`] } : result;
 }
 
 function targetNameGroups(

@@ -1,3 +1,4 @@
+import { boundedDecisionCopy, requestFitCopy, refinementCopy } from "@/lib/agentic/presentation/decision-copy";
 import { isUuid, publicSupplementId } from "@/lib/agentic/contract/ids";
 import { sha256Hex } from "@/lib/sha256";
 import { convertAmount } from "@/lib/matcher/dose";
@@ -160,7 +161,7 @@ export function presentDecision(result: PlanResult, planHandle: string, revision
   const status = refresh || questions.length || (!recommended?.basket.length && !noPurchase) ? "needs_input" : noPurchase ? "no_purchase" : "ready";
   const nextAction = refresh ? "change_request" : questions.length ? "answer_questions" : noPurchase && !alreadyCovered ? "change_request" : noPurchase ? result.horizon?.nextReplenishmentDay && result.horizon?.nextReplenishmentDay > 0 ? "replenish_later" : "no_purchase" : recommended?.basket.length ? "execute" : "change_request";
   const summary: string = refresh ? text.stale : questions.length ? text.question : noTargets ? text.noTargets : noPurchase ? alreadyCovered ? text.none : text.review : recommended?.basket.length ? text.ready : text.review;
-  return { ok: true, planHandle, revision, status, summary, scoring: publicScoring(state.scoring ?? patchScoring(undefined)), currency: state.currency,
+  const decision: SimplePlanDecision = { ok: true, planHandle, revision, status, summary, scoring: publicScoring(state.scoring ?? patchScoring(undefined)), currency: state.currency,
     nextAction,
     ...(refresh ? { refreshRequired: true } : {}), ...(result.horizon?.nextReplenishmentDay && result.horizon?.nextReplenishmentDay > 0 ? { nextReplenishmentDay: result.horizon?.nextReplenishmentDay } : {}),
     ...(questions.length ? { questions: questions.map(row => ({ questionId: row.questionId, prompt: row.prompt, choices: row.choices.map(choice => ({ choice: choice.choice, label: choice.label })) })) } : {}),
@@ -177,8 +178,23 @@ export function presentDecision(result: PlanResult, planHandle: string, revision
       const knownPills = pills.reduce<number>((n, count) => n + (count ?? 0), 0), pillsKnown = pills.every(n => n !== null);
       const complete = option.basket.every(row => !row.incompleteCommercialFacts);
       return { roles: [...(option.roles ?? (option.role ? [option.role] : []))],
-        summary: { text: option.reason, pillCount: pillsKnown ? knownPills : null, ...(!pillsKnown ? { pillCountAtLeast: knownPills } : {}), productCount: option.basket.length,
+        summary: { text: boundedDecisionCopy([result.changeSummary?.find(row => row.startsWith("decision:"))?.slice(9) ?? option.reason ?? ""]), pillCount: pillsKnown ? knownPills : null, ...(!pillsKnown ? { pillCountAtLeast: knownPills } : {}), productCount: option.basket.length,
           goodsPrice: complete ? option.basket.reduce((n, row) => n + row.lineTotalMinor, 0) / 100 : null,
           coveragePercent: coverageComplete ? coverage : null, ...(!coverageComplete ? { coverageAtLeastPercent: coverage } : {}), ingredientDataComplete: ingredients.every(row => row.supplied !== null) }, ingredients, products: option.basket.map(productDecision) };
     }) };
+  return status === "ready" && decision.choices[0] ? { ...decision,
+    summary: boundedDecisionCopy([summary, ...requestFitCopy(state, decision.choices[0])]) } : decision;
+}
+
+/** Prepare once before publication; terminal reads never fetch the previous revision. */
+export function refinementDecisionSummary(previous: PlanResult | null, current: PlanResult) {
+  if (!previous?.selected || !current.selected) return "";
+  const facts = (result: PlanResult) => {
+    const selected = result.selected!;
+    return { ingredients: choiceIngredients(result, selected), summary: {
+      productCount: selected.basket.length,
+      goodsPrice: selected.basket.every(row => !row.incompleteCommercialFacts)
+        ? selected.basket.reduce((sum, row) => sum + row.lineTotalMinor, 0) / 100 : null } };
+  };
+  return refinementCopy(facts(previous), facts(current), previous.requestSnapshot.currency, current.requestSnapshot);
 }
