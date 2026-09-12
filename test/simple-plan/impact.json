@@ -444,7 +444,7 @@
     },
     {
       "file": "test/simple-plan/refinement-consistency.test.ts",
-      "expectedCases": 11,
+      "expectedCases": 12,
       "reason": "Accepted refinement revision remains visible during processing, terminal failure and recovery without publishing the old basket under a new revision",
       "slice": "refinement"
     },

@@ -106,3 +106,10 @@ for (const terminal of ['failed', 'cancelled', 'expired'] as const) test(`REF-RE
   assert.equal(replay.status, 'failed'); assert.equal(replay.revision, 2); assert.equal(replay.planHandle, first.planHandle);
   assert.deepEqual(await app.store.getPlanOperation(operation.id), before);
 });
+
+test('REF-REV-06 a pending refinement cannot be bypassed by checking out its previous revision', async () => {
+  const { app, first } = await pending();
+  const checkout = (await rpc(app, 'execute', { planHandle: first.planHandle, expectedRevision: first.revision, idempotencyKey: 'unfinished-previous-checkout' }))!.result!.structuredContent as { ok: boolean; error?: {currentRevision?: number} };
+  assert.equal(checkout.ok, false, 'Last committed data is retained for recovery, not offered as the pending recommendation');
+  assert.equal(checkout.error?.currentRevision, 2);
+});
