@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { frozenMatchingInput } from './refinement-input.mjs';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { resolve, relative } from 'node:path';
 import { createHash } from 'node:crypto';
@@ -7,7 +8,7 @@ import { createResidentPlanSession, advanceResidentPlanSession } from '../../lib
 import { setMatcherSafetyCeilings, setMatcherSafetyCeilingsUnavailable } from '../../lib/matcher/safety-ceilings.ts';
 const [inputPath, outputPath, profileFlag] = process.argv.slice(2);
 assert.ok(inputPath?.startsWith('/') && outputPath?.startsWith('/') && relative(process.cwd(), resolve(outputPath)).startsWith('..'));
-const raw = readFileSync(inputPath), frozen = JSON.parse(raw.toString());
+const raw = readFileSync(inputPath), frozen = frozenMatchingInput(JSON.parse(raw.toString()));
 assert.ok(frozen.state && frozen.snapshot && frozen.references, 'Frozen request, catalogue and reference inputs required');
 setMatcherSafetyCeilings(frozen.references.ceilings, frozen.references.identity);
 if (frozen.references.unavailable) setMatcherSafetyCeilingsUnavailable();
@@ -22,6 +23,7 @@ do {
   chunks.push({ durationMs: performance.now() - t, attempts: result.expansionAttempts, checkpointBytes: result.checkpoint.cursor.byteLength });
   assert.ok(chunks.length <= 17, 'Unexpected extra continuation');
 } while (!result.done);
+assert.equal(result.expansionAttempts, frozen.state.searchEffort === 'expanded' ? 64000 : 8000, 'Incomplete frozen search budget');
 assert.ok(result.result); const durationMs = performance.now() - start, usage = process.cpuUsage(cpu);
 let profile;
 if (profiler) { profile = (await profiler.post('Profiler.stop')).profile; profiler.disconnect(); }
