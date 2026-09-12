@@ -1,3 +1,4 @@
+import { measureService } from "@/lib/service-metrics";
 import { nutrientWeightEvidence } from "@/lib/matcher/scoring-policy";
 import { decodeMatchCursor, encodeMatchCursor, encodeMatchCursorBytes } from "@/lib/matcher/cursor-codec-server";
 import { createHash } from "node:crypto";
@@ -1316,6 +1317,8 @@ export function matchPlanChunk(input: Parameters<typeof matchPlan>[0], options: 
 }
 
 export function createResidentPlanSession(input: Parameters<typeof matchPlan>[0], checkpoint?: PlanSearchCheckpoint | BinaryPlanSearchCheckpoint) {
+  const endCompilation = measureService("match.compilation_ms");
+  try {
   const request = toCanonicalRequest(input.state);
   if ("error" in request) throw new Error(request.error);
   const catalog = { availabilityAsOf: input.snapshot.availabilityAsOf, catalogueVersion: input.snapshot.catalogueVersion, products: matcherProductsFor(input.snapshot) };
@@ -1331,6 +1334,7 @@ export function createResidentPlanSession(input: Parameters<typeof matchPlan>[0]
     : createMatchCursor(request, catalog, DEFAULT_MATCHER_CONFIG, compiledGroups);
   if (input.state.searchEffort === "expanded" && cursor.effort !== "expanded") expandMatchCursor(cursor);
   return { input, request, cursor, inputIdentity, compiledGroups };
+  } finally { endCompilation(); }
 }
 type ResidentSession = ReturnType<typeof createResidentPlanSession>;
 function sessionCheckpoint(session: ResidentSession) {
@@ -1348,7 +1352,8 @@ function advanceResidentSearch(session: ResidentSession, options: { chunkBudget:
     if (seller.cursor.expansionAttempts >= seller.cursor.expansionBudget) { seller.cursor.done = true; seller.cursor.trimmed = true; }
   }
   if (lost > 0) throw new Error("Lost work exceeds the operation search budget");
-  advanceMatchCursor(cursor, request, options.chunkBudget);
+  const endSearch = measureService("match.search_ms");
+  try { advanceMatchCursor(cursor, request, options.chunkBudget); } finally { endSearch(); }
   const expansionAttempts = matchCursorAttempts(cursor);
   return { done: cursor.done, expansionAttempts };
 }

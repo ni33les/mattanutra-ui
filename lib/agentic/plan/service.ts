@@ -1,3 +1,4 @@
+import { measureService, recordServiceMetric } from "@/lib/service-metrics";
 import { refinementDecisionSummary } from "@/lib/agentic/presentation/decision";
 import { withServiceMeasurements } from "@/lib/service-metrics";
 import { planStatusProjection } from "@/lib/agentic/presentation/status-projection";
@@ -90,7 +91,6 @@ import type {
 } from "@/lib/agentic/plan/types";
 
 export const PLAN_FEEDBACK_AFTER_REVISIONS = 3;
-export const PLAN_MATCH_RETURN_BUDGET_MS = 3_000;
 export const PLAN_PROCESSING_POLL_AFTER_SECONDS = 1;
 
 let matcherGate: Promise<void> | null = null;
@@ -538,12 +538,7 @@ async function buildResult(input: Readonly<{
   const searchMs = Math.max(0, Date.now() - searchStartedAt);
   const matchMs =
     input.matchStartedAt != null ? Math.max(0, Date.now() - input.matchStartedAt) : searchMs;
-  const ackMs =
-    matchMs == null
-      ? undefined
-      : Math.min(matchMs, PLAN_MATCH_RETURN_BUDGET_MS);
   return composeResult({
-    ackMs,
     alternatives: matched.alternatives,
     alternativeSearch: "alternativeSearch" in matched ? matched.alternativeSearch : undefined,
     searchSummary: "searchSummary" in matched ? matched.searchSummary : undefined,
@@ -1658,6 +1653,7 @@ async function completePreparedPlan(
     return gatedDeadline;
   }
   const catalogueMs = Math.max(0, Date.now() - catalogueStartedAt);
+  recordServiceMetric("match.catalogue_ms", catalogueMs);
 
   const pendingInput = prepared.resume ? prepared.processing.pendingInput : undefined;
   const replacingPendingRequest = prepared.resume && Boolean(input.payload.planHandle) && hasFullRequest(input.payload);
@@ -1969,6 +1965,7 @@ async function persistTerminalPlan(input: Readonly<{
     payload:input.input.payload.publicInput ?? input.input.payload,resourceIds:{planId:input.planId},response:projectedSuccess}):undefined;
   const terminalChanges={status:"complete" as const,response:projectedSuccess,error:null};
   const terminalChangesJson=JSON.stringify(terminalChanges);
+  const endPublication = measureService("match.publication_ms");
   const response = await input.input.store.transaction(async (store) => {
     const plan = await store.getPlanForUpdate(input.planId);
     if (!plan) return businessError({ message: "Not found.", reasonCode: "not_found" });
@@ -2039,7 +2036,7 @@ async function persistTerminalPlan(input: Readonly<{
     throwIfAborted(planCorrelationId(key));
     committedResult = result;
     return success;
-  });
+  }).finally(endPublication);
 
   if (!isAgenticErrorResult(response) && committedResult && !input.skipSideEffects) {
     if (planCompactApplicable(response.status)) {

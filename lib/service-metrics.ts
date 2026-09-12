@@ -1,7 +1,7 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import { performance, monitorEventLoopDelay } from "node:perf_hooks";
 
-const METRIC_NAMES = ["db.acquire_begin_ms", "db.setup_ms", "db.sql_ms", "db.statements", "db.lock_timeouts", "db.lock_statement_client_ms", "db.transaction_client_ms",
+const METRIC_NAMES = ["mcp.admission_ms", "mcp.retrieval_ms", "match.catalogue_ms", "match.compilation_ms", "match.search_ms", "match.publication_ms", "db.acquire_begin_ms", "db.setup_ms", "db.sql_ms", "db.statements", "db.lock_timeouts", "db.lock_statement_client_ms", "db.transaction_client_ms",
   "worker.unstarted_cleanup_failures", "worker.queue_ms", "worker.execute_ms", "worker.input_bytes", "worker.sampled_input_bytes", "checkpoint.encode_ms", "checkpoint.decode_ms",
   "checkpoint.bytes", "serialization.ms", "cache.hit", "cache.miss", "cache.eviction", "cache.bytes"] as const;
 export type ServiceMetric = typeof METRIC_NAMES[number];

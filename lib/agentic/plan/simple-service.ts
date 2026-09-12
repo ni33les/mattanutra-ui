@@ -1,3 +1,4 @@
+import { measureService } from "@/lib/service-metrics";
 import { resolveMarket } from "@/lib/agentic/catalogue/market";
 import type { AgenticRuntime } from "@/lib/agentic/runtime";
 import { businessError, isAgenticErrorResult } from "@/lib/agentic/contract/errors";
@@ -13,6 +14,10 @@ import { AGENTIC_CONTRACT_VERSION } from "@/lib/agentic/config";
 import { visiblePlanRevision } from "@/lib/agentic/presentation/status-projection";
 
 export async function simplePlanTool(runtime: AgenticRuntime, params: Record<string, unknown>) {
+  const end = measureService(typeof params.planHandle === "string" && Object.keys(params).length === 1 ? "mcp.retrieval_ms" : "mcp.admission_ms");
+  try { return await runSimplePlanTool(runtime, params); } finally { end(); }
+}
+async function runSimplePlanTool(runtime: AgenticRuntime, params: Record<string, unknown>) {
   const now = runtime.now ?? new Date().toISOString();
   const handle = typeof params.planHandle === "string" ? params.planHandle : undefined;
   const kind = !handle ? "create" : "answers" in params ? "answer" : Object.keys(params).length === 1 ? "get" : "revise";
