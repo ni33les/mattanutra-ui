@@ -465,7 +465,7 @@ export async function executeTaskWorkItem(
       taskId: workItem.taskId
     });
 
-    return { analysis };
+    return { analysis, ...(workItem.formulationAvailability ? { formulationAvailabilityIdentity: workItem.formulationAvailability.inputIdentity } : {}) };
   }
 
   if (workItem.taskType === "generate_food_guidance") {

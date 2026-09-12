@@ -22,7 +22,7 @@ export const FORMULATION_RESPONSE_SCHEMA = {
       id, ...textFields(["category", "supplement", "dailyDose", "decision", "rationale", "whyThisIsForYou"]),
       effectivenessRank: { type: "integer", minimum: 1 },
       status: { type: "string", enum: ["covered", "add", "review"] }, cautions: array(caution)
-    }), { minItems: 1, maxItems: 30 }),
+    }), { minItems: 0, maxItems: 30 }),
     marketingPoints: array(object({ id, title: text, body: text }), { minItems: 3, maxItems: 3 }),
     cautions: array(caution)
   })

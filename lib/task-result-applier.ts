@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { publishedFormulation } from '@/lib/formulation-availability';
 import { healthScoreReadProjection } from "@/lib/healthscore-readiness";
 import { matchesSafetyReferenceIdentity } from "@/lib/agentic/catalogue/reference-job";
 import { getAssessmentProductPreferences } from "@/lib/assessment-product-preferences";
@@ -497,7 +498,7 @@ async function applyPaidFormulationResult(
         addWorkEvent(task, eventType, level ?? "low", payload)
       ),
     answers: row.answers,
-    formulation: analysis.formulation,
+    formulation: publishedFormulation(analysis.formulation, task.payload, resultPayload),
     locale,
     plan: plan === "pro" ? "pro" : "precision",
     planId,
@@ -911,7 +912,7 @@ async function applyExampleFormulationResult(
         addWorkEvent(task, eventType, level ?? "low", { ...payload, requestId })
       ),
     answers: row.answers,
-    formulation: analysis.formulation,
+    formulation: publishedFormulation(analysis.formulation, task.payload, resultPayload),
     locale,
     plan,
     planId,
@@ -2112,7 +2113,7 @@ export async function prepareTaskCompletionResult({ task, resultPayload, sql: sq
       } };
     if (task.taskType === "generate_supplement_guidance") {
       const requested = payloadText(task.payload,"plan") || textValue(row.selected_plan);
-      const value = await applyFormulationSafety(sql, { ...common, formulation: analysisPayload(resultPayload).formulation, plan: requested === "pro" ? "pro" : "precision" });
+      const value = await applyFormulationSafety(sql, { ...common, formulation: publishedFormulation(analysisPayload(resultPayload).formulation, task.payload, resultPayload), plan: requested === "pro" ? "pro" : "precision" });
       return { formulation: { value, json: JSON.stringify(toJsonValue(value)), locale, afterCommit: effects } };
     }
     const value = await applyFoodGuidanceSafety(sql, { ...common, foodGuidance: foodGuidanceAnalysisPayload(resultPayload).foodGuidance });

@@ -21,6 +21,7 @@ import {
 } from "@/lib/grok-client";
 import { grokTaskReasoningDefault } from "@/lib/grok-task-config";
 import { FORMULATION_RESPONSE_SCHEMA } from "@/lib/ai-generation-schema";
+import { constrainFormulation, FORMULATION_AVAILABILITY_POLICY } from '@/lib/formulation-availability';
 
 type AnalysisAuditEvent = {
   eventType: string;
@@ -279,11 +280,11 @@ function userMessages({
         "Marketing copy must be truthful, benefit-led, and calm. Do not invent discounts, urgency, guarantees, cures, diagnosis, treatment claims, or product availability.",
         "Use marketingPoints to explain why the full bespoke plan is more useful than the free preview: for example prioritization, dose checks, cautions, and food-plus-supplement fit.",
         "When currentPlanContext.planFeedback is present, treat it as client-stated preferences and constraints for this new version.",
-        "Use canonicalSupplementCatalogue as preferred naming vocabulary and safety metadata, not as an exhaustive allow-list. You may recommend useful supplements that are not in the catalogue when they fit the assessment.",
+        "Recommend only justified ingredients from canonicalSupplementCatalogue, the complete permitted list. Return an empty supplementBreakdown if none fits. Never pad or add unlisted ingredients.",
         "Use canonicalSupplementCatalogue safetyFlags and safetyNotes before recommending a supplement. Advisory concerns include pregnancy_caution or hormone_caution with pregnancy, breastfeeding, or trying-to-conceive context; bleeding_risk or medication_interaction with blood-thinner/anticoagulant context; kidney_caution with active kidney issues; and liver_caution with active liver issues.",
         "Do not treat stale raw medication classes as active when assessmentSafetyContext.medications.answer is not yes. Medication and condition flags must become clear advisory cautions. They must not exclude an ingredient, reduce its target, or require an acknowledgement.",
         "Use canonical aliases only to recognize equivalent ingredients; do not output aliases when a canonical name exists.",
-        "When a listed canonical supplement fits, set supplement exactly to its name as a plain string. If a useful supplement is not in canonicalSupplementCatalogue, still include it using a plain English ingredient name and set status=review so it can be checked.",
+        "Use the exact canonical supplement name in every locale; localize other copy. Unlisted ingredients are forbidden, including status=review.",
         "Do not output manufacturer product names, brand names, raw material concentrations, or label-strength text such as 100000 IU/g as supplement names.",
         "Never reintroduce supplements the client explicitly asked to remove or avoid.",
         "Use previousSupplementGuidance only as context; this response must be a fresh full version, not a patch.",
@@ -598,9 +599,6 @@ function validateFormulation(value: unknown) {
     cautions.push(...readCautionsAt(rawCautions, "cautions", errors));
   }
 
-  if (rawItems.length < 1) {
-    errors.push("supplementBreakdown must contain at least one item");
-  }
 
   if (rawItems.length > 30) {
     errors.push("supplementBreakdown must contain no more than 30 items");
@@ -743,6 +741,9 @@ function validateFormulation(value: unknown) {
 export async function analyzeFormulationWithGrok(
   input: AnalysisInput
 ): Promise<AnalysisResult> {
+  if (!input.canonicalSupplements) throw new Error('Formulation requires its permitted ingredient list');
+  if (!input.canonicalSupplements.length) return { attempts: 0, formulation: { supplementBreakdown: [], cautions: [], marketingPoints: [] },
+    model: 'deterministic-empty', promptVersion: FORMULATION_AVAILABILITY_POLICY, reasoningEffort: 'none' };
   const config = getGrokConfig();
   const messages: Array<{
     content: string;
@@ -803,7 +804,7 @@ export async function analyzeFormulationWithGrok(
 
         return {
           attempts: attempt,
-          formulation: validation.formulation,
+          formulation: constrainFormulation(validation.formulation, input.canonicalSupplements),
           model: completion.model ?? config.model,
           promptVersion: config.promptVersion,
           reasoningEffort: config.reasoningEffort,

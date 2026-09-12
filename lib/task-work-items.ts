@@ -5,6 +5,7 @@ import { valueCatalogueFingerprint } from "@/lib/agentic/value/fingerprint";
 import { administrationDailyPills } from "@/lib/product-administration";
 import { assessmentFieldKnown } from "@/lib/assessment-input-provenance";
 import { ASSESSMENT_GENERATION_TASKS, generationInput, withGenerationInput, generationLocale, FUNNEL_GENERATOR_VERSION } from "@/lib/assessment-revisions";
+import { FORMULATION_AVAILABILITY_POLICY, formulationAvailabilityIdentity, productBackedSupplements, type FormulationAvailability } from '@/lib/formulation-availability';
 import { computeHealthScore } from "@/lib/health-score";
 import { normalizeAssessmentPlan, type AssessmentPlan } from "@/lib/assessment-snapshot";
 import {
@@ -108,6 +109,7 @@ export type HealthScoreWorkItem = Readonly<{
 }>;
 
 export type FormulationWorkItem = Readonly<{
+  formulationAvailability?: FormulationAvailability;
   answers: unknown;
   canonicalSupplements: CanonicalSupplementOption[];
   chatMessages: PlanChatMessage[];
@@ -721,10 +723,35 @@ async function buildFormulationWorkItem(task: TaskRecord) {
   if (!sql || !task.planId) {
     throw new Error("Formulation work item is missing a plan");
   }
-  const [context, canonicalSupplements] = await Promise.all([
+  const [context, options] = await Promise.all([
     loadPlanGenerationContext(sql, task.planId, taskPlanOverride(task)),
     loadCanonicalSupplementOptions(sql)
   ]);
+  let formulationAvailability = payloadRecord(task.payload).formulationAvailability as FormulationAvailability | undefined;
+  if (!formulationAvailability) {
+    const countryCode = productCountryCodeFromAnswers(context.answers);
+    const retailers = await retailerCandidateSetsFromLiveSnapshot(countryCode, inStorePharmacyFromAnswers(context.answers)?.id ?? null);
+    const snapshot = requireCachedLiveRetailSnapshot(countryCode);
+    const permittedOptions = options.filter(option => snapshot.supplements.some(row => row.uuid === option.id));
+    const needs = buildProductNeeds({ foodGuidance: null, formulation: { supplementBreakdown: permittedOptions.map((option,index) => ({
+      id: option.normalizedName, category: option.category, supplement: option.name, dailyDose: `1 ${option.maxUnit ?? 'mg'}/day`,
+      effectivenessRank: index+1, status: 'add', rationale: '' })) } });
+    const preferences = await sql`select excluded_product_ids from public.assessment_product_preferences where plan_id=${task.planId}::uuid`;
+    const clientContext = { ...productRecommendationClientContextFromPlan(context.answers, [], []), excludeProductIds: preferences[0]?.excluded_product_ids ?? [] };
+    const permitted = productBackedSupplements(permittedOptions, { candidates: retailers.flatMap(row => row.candidates), needs, clientContext,
+      clientSex: productClientSexFromAnswers(context.answers), countryCode });
+    const prepared = formulationAvailabilityIdentity(valueCatalogueFingerprint(snapshot), { clientContext, countryCode }, permitted);
+    const rows = await sql`update public.tasks set payload=jsonb_set(coalesce(payload,'{}'::jsonb),'{formulationAvailability}',${JSON.stringify(prepared)}::jsonb), updated_at=now()
+      where id=${task.id}::uuid and status in ('reserved','running') and lease_until > now()
+        and reserved_by_agent_id=${task.reservedByAgentId}::uuid and not coalesce(payload,'{}'::jsonb) ? 'formulationAvailability'
+      returning payload->'formulationAvailability' as availability`;
+    const winner = rows[0] ?? (await sql`select payload->'formulationAvailability' as availability from public.tasks where id=${task.id}::uuid
+      and status in ('reserved','running') and lease_until > now() and reserved_by_agent_id=${task.reservedByAgentId}::uuid`)[0];
+    if (!winner?.availability) throw new Error('Formulation task ownership was lost before input preparation');
+    formulationAvailability = winner.availability as FormulationAvailability;
+  }
+  if (formulationAvailability.policy !== FORMULATION_AVAILABILITY_POLICY) throw new Error('Formulation availability policy is incompatible');
+  const canonicalSupplements = formulationAvailability.supplements;
   const isBackgroundPregeneration = isPregenerationSource(taskSource(task));
 
   if (task.taskType === "generate_supplement_guidance" && !isBackgroundPregeneration) {
@@ -758,6 +785,7 @@ async function buildFormulationWorkItem(task: TaskRecord) {
   return {
     answers: context.answers,
     canonicalSupplements,
+    formulationAvailability,
     chatMessages: context.chatMessages,
     locale: context.locale,
     plan: context.plan,

@@ -1,3 +1,4 @@
+import { FORMULATION_AVAILABILITY_POLICY } from '@/lib/formulation-availability';
 import { loadAdminSafetyReferenceSnapshot } from "@/lib/agentic/catalogue/load-safety-ceilings";
 import { getAssessmentProductPreferences } from "@/lib/assessment-product-preferences";
 import { generationLocale, ASSESSMENT_GENERATION_TASKS, loadGenerationInput, FUNNEL_GENERATOR_VERSION } from "@/lib/assessment-revisions";
@@ -516,9 +517,9 @@ export async function enqueueAssessmentPregenerationTasks({
     businessValue: TASK_BUSINESS_VALUES.precision,
     groupLabel: "Pre-generate nutrition guidance",
     id: deterministicUuid(
-      `mattanutra:task:assessment-pregeneration:formulation:${planId}:${inputHash}`
+      `mattanutra:task:assessment-pregeneration:formulation:${planId}:${inputHash}:${FORMULATION_AVAILABILITY_POLICY}`
     ),
-    idempotencyKey: `assessment-pregeneration:formulation:${planId}:${inputHash}`,
+    idempotencyKey: `assessment-pregeneration:formulation:${planId}:${inputHash}:${FORMULATION_AVAILABILITY_POLICY}`,
     idempotencyScope: "successful",
     idempotencyScopeKey: `assessment-pregeneration:${planId}`,
     payload: sharedPayload,
@@ -621,8 +622,8 @@ export async function enqueueNutritionPlanTasks({
         actorType: "ai",
         businessValue: businessValueForPlan(plan),
         groupLabel: "Prepare nutrition plan",
-        id: deterministicUuid(`mattanutra:task:formulation:${planId}:${inputHash}`),
-        idempotencyKey: `formulation:${planId}:${inputHash}`,
+        id: deterministicUuid(`mattanutra:task:formulation:${planId}:${inputHash}:${FORMULATION_AVAILABILITY_POLICY}`),
+        idempotencyKey: `formulation:${planId}:${inputHash}:${FORMULATION_AVAILABILITY_POLICY}`,
         idempotencyScope: "successful",
         idempotencyScopeKey: `formulation:${planId}`,
         payload: { answers, inputHash, locale, plan },
@@ -833,9 +834,9 @@ export async function enqueuePaymentCheckoutPregenerationTasks({
         businessValue: businessValueForPlan(plan),
         groupLabel: "Prepare plan during checkout",
         id: deterministicUuid(
-          `mattanutra:task:checkout-pregeneration:formulation:${planId}:${paymentId}:${inputHash}`
+          `mattanutra:task:checkout-pregeneration:formulation:${planId}:${paymentId}:${inputHash}:${FORMULATION_AVAILABILITY_POLICY}`
         ),
-        idempotencyKey: `checkout-pregeneration:formulation:${planId}:${plan}:${paymentId}:${inputHash}`,
+        idempotencyKey: `checkout-pregeneration:formulation:${planId}:${plan}:${paymentId}:${inputHash}:${FORMULATION_AVAILABILITY_POLICY}`,
         idempotencyScope: "successful",
         idempotencyScopeKey: `checkout-pregeneration:formulation:${planId}:${plan}:${paymentId}`,
         payload: {
@@ -1923,8 +1924,8 @@ async function enqueueExampleFormulationTask(
     actorType: "ai",
     businessValue: TASK_BUSINESS_VALUES.exampleFormulation,
     groupLabel: "Prepare Free nutrition plan email",
-    id: deterministicUuid(`mattanutra:task:example-formulation:${requestId}`),
-    idempotencyKey: `example-formulation:${requestId}`,
+    id: deterministicUuid(`mattanutra:task:example-formulation:${requestId}:${FORMULATION_AVAILABILITY_POLICY}`),
+    idempotencyKey: `example-formulation:${requestId}:${FORMULATION_AVAILABILITY_POLICY}`,
     idempotencyScope: "successful",
     idempotencyScopeKey: `free-example:${requestId}`,
     payload: { businessValueClass: "free_example", requestId },

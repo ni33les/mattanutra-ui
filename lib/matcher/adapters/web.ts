@@ -1,4 +1,5 @@
 import { assessPreferences, verifiedPillLowerBound } from "@/lib/matcher/preferences";
+import { productContributionAvailability } from '@/lib/matcher/product-availability';
 import { administrationDailyPills } from "@/lib/product-administration";
 import { sha256Hex } from "@/lib/sha256";
 import { webHealthAdvice } from "@/lib/web-health-advice";
@@ -348,10 +349,6 @@ export function webTargetsForNeeds(needs: readonly ProductRecommendationNeed[]) 
 export function recommendWithMatcher(
   input: ProductRecommendationInput
 ): ProductRecommendationResult {
-  const supplementNeeds = input.needs.filter(
-    (need) => need.itemType === "supplement" || need.itemType === "nutrient"
-  );
-  const targets = webTargetsForNeeds(supplementNeeds);
   const empty: ProductRecommendationResult = {
     clientNeeds: input.needs,
     diagnostics: {
@@ -377,10 +374,18 @@ export function recommendWithMatcher(
     totalPlanCoveragePercent: 0
   };
 
+  const request = webMatcherRequest(input);
+  if (!request) return empty;
+  return recommendPreparedWeb(input, request, empty);
+}
+
+/** Shared preparation for actual matching and the pre-formulation allow-list. */
+export function webMatcherRequest(input: ProductRecommendationInput): CanonicalRequest | null {
+  const targets = webTargetsForNeeds(input.needs.filter(need => need.itemType === 'supplement' || need.itemType === 'nutrient'));
   const currents = canonicalizeCurrents(input.clientContext?.continuedIntake ?? []);
 
   if ("error" in currents) {
-    return empty;
+    return null;
   }
 
   const dietary = input.clientContext?.dietaryPreference ?? "any";
@@ -434,6 +439,17 @@ export function recommendWithMatcher(
     selectorMode: "web_single",
     targets: targets.targets
   } as const;
+  return request;
+}
+
+export function webIngredientAvailability(input: ProductRecommendationInput) {
+  const request = webMatcherRequest(input);
+  if (!request) throw new Error('Invalid continued intake in formulation input');
+  return productContributionAvailability(request, input.candidates.map(toMatcherProduct));
+}
+
+function recommendPreparedWeb(input: ProductRecommendationInput, request: CanonicalRequest, empty: ProductRecommendationResult): ProductRecommendationResult {
+  const supplementNeeds = input.needs.filter(need => need.itemType === 'supplement' || need.itemType === 'nutrient');
   const compileStartedAt = Date.now();
   // Eligibility and variants depend on the full request, including safety ceilings.
   // Retain only the most recent compilation per weakly held candidate array.
@@ -585,7 +601,7 @@ export function recommendWithMatcher(
     return {
       preferences: assessPreferences(request, { productCount: basket.productCount, dailyPills,
         dailyPillsLowerBound: verifiedPillLowerBound((basket.variantDoses ?? []).map(dose => ({ dailyPills: dose.dailyPills, pillCountKnown: byId.has(dose.productId) && toMatcherProduct(byId.get(dose.productId)!).pillCountKnown !== false }))), firstOrderGoodsPriceMinor: completePrice ? basket.priceMinor : null,
-        monthlyGoodsPriceMinor: monthlyBasis ? basket.overallScore?.preferences.maxPriceMinor.actual ?? null : undefined, currency: request.currency }),
+        monthlyGoodsPriceMinor: request.pricePreferenceBasis === 'monthly_30_days' ? basket.overallScore?.preferences.maxPriceMinor.actual ?? null : undefined, currency: request.currency }),
       overallScore: basket.overallScore,
       roles: basket.roles, purchaseEligible: basket.productIds.length > 0,
       candidateKey: `webopt_${sha256Hex([...basket.variantIds].sort().join("|")).slice(0, 20)}`,
