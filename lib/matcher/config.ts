@@ -1,6 +1,6 @@
 import type { MatcherConfig } from "@/lib/matcher/types";
 
-export const MATCHER_VERSION = "importance-matching-2";
+export const MATCHER_VERSION = "importance-matching-3";
 export const DOSE_FIT_VERSION = "dose-fit-1";
 export const UPPER_LIMIT_EXTRA_WEIGHT = 2;
 

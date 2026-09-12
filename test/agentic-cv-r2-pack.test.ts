@@ -1413,7 +1413,7 @@ describe("Customer value implementation pack v1.2", () => {
     );
     assert.equal(first.snapshotId, second.snapshotId);
     assert.equal(canonicalR2Report(first), canonicalR2Report(second), "All non-latency request and response evidence must match across runs");
-    assert.equal(MATCHER_VERSION, "importance-matching-2");
+    assert.equal(MATCHER_VERSION, "importance-matching-3");
     assert.equal(CUSTOMER_VALUE_PACK_VERSION, "dev-customer-value-v4.0");
   });
 });

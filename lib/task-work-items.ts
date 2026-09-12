@@ -542,6 +542,9 @@ export function productRecommendationClientContextFromPlan(
     },
     ageYears: assessmentFieldKnown(record, "age") ? ageYearsFromQuestionnaire(textFromRecord(record, "age")) : null,
     budgetPreference: textFromRecord(record, "budget"),
+    dietaryPreference: textFromRecord(record, "diet") === "vegan" ? "vegan"
+      : textFromRecord(record, "diet") === "vegetarian" ? "plant_based" : "any",
+    foodAllergies: stringArrayFromRecord(record, "allergies").filter(value => value !== "none"),
     conditions: cautions,
     currentSupplements: assessmentFieldKnown(record, "supplements") ? textFromRecord(record, "supplements") : null,
     guidanceAdjustmentCount: guidanceAdjustments.length,

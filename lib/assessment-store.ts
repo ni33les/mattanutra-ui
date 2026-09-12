@@ -1,3 +1,4 @@
+import { formulationPlanCopy } from "@/lib/formulation-plan-copy";
 import { readStoredMatching } from "@/lib/recommendation-storage";
 import { hasHealthScoreAiCopy } from "@/lib/healthscore-readiness";
 export { hasHealthScoreAiCopy } from "@/lib/healthscore-readiness";
@@ -24,7 +25,6 @@ import {
   type FormulationCaution,
   type FormulationIngredient,
   type FormulationResult,
-  type MarketingPoint,
   type NutritionReport,
   type ProductNeedCoverage,
   type ProductRecommendationOption,
@@ -1636,9 +1636,7 @@ function mapSlimFormulationResult(
   const supplementBreakdown = asArray<FormulationIngredient>(
     storedFormulation.supplementBreakdown ?? storedFormulation.formula
   );
-  const marketingPoints = asArray<MarketingPoint>(
-    storedFormulation.marketingPoints
-  );
+  const marketingPoints = formulationPlanCopy(locale);
   const cautions = asArray<FormulationCaution>(storedFormulation.cautions);
   const foodGuidance = asArray<FoodGuidanceItem>(
     storedFoodGuidanceRecord.foodGuidance
@@ -2043,9 +2041,7 @@ export async function getStoredFormulationResult(
   const storedSupplementBreakdown = asArray<FormulationIngredient>(
     storedFormulation.supplementBreakdown ?? storedFormulation.formula
   );
-  const marketingPoints = asArray<MarketingPoint>(
-    storedFormulation.marketingPoints
-  );
+  const marketingPoints = formulationPlanCopy(locale);
   const cautions = asArray<FormulationCaution>(storedFormulation.cautions);
   const storedFoodGuidance = asArray<FoodGuidanceItem>(
     storedFoodGuidanceRecord.foodGuidance

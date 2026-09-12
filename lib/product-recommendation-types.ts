@@ -114,6 +114,7 @@ export type ProductRecommendationNeedDiagnostic = Readonly<{
 }>;
 
 export type ProductRecommendationAlgorithmVersion =
+  | "importance-matching-3"
   | "importance-matching-2"
   | "practical-matching-1"
   | "flexible-dose-fit-9"
@@ -207,6 +208,8 @@ export type ProductRecommendationResult = Readonly<{
 }>;
 
 export type ProductRecommendationClientContext = Readonly<{
+  dietaryPreference?: "any" | "plant_based" | "vegan";
+  foodAllergies?: readonly string[];
   profileKnown?: Readonly<{ ageYears: boolean; lifeStage: boolean; sex: boolean }>;
   excludeProductIds?: readonly string[];
   excludeSupplementIds?: readonly string[];

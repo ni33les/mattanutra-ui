@@ -329,16 +329,16 @@ export function whyProductMatches(
   const servingPrefix = servingMultiplier > 0 && servingMultiplier !== 1
     ? `Use ${servingMultiplier} servings; `
     : "";
-  const prefix = `${servingPrefix}Strong match`;
+  const prefix = `${servingPrefix}Contributes`;
   const contribution = safePercent(stackContributionPercent);
 
   if (names.length < 1) {
     return contribution > 0
-      ? `${prefix}; accounts for ${contribution}% of the selected stack.`
-      : `${prefix}; fills an otherwise uncovered need.`;
+      ? `${prefix} to the requested targets; estimated target coverage ${contribution}%.`
+      : "No quantified contribution to the requested targets.";
   }
 
   return contribution > 0
-    ? `${prefix} for ${names.join(", ")}; accounts for ${contribution}% of the selected stack.`
-    : `${prefix} for ${names.join(", ")}; fills an otherwise uncovered need.`;
+    ? `${prefix} ${names.join(", ")}; estimated target coverage ${contribution}%.`
+    : `${prefix} ${names.join(", ")}; check the amounts against your targets.`;
 }

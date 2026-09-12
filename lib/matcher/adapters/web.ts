@@ -19,10 +19,7 @@ import { ratioForSupportedServings } from "@/lib/matcher/serving-grid";
 import { matcherSafetyCeilings } from "@/lib/matcher/safety-ceilings";
 import { displayCoveragePercent, marketingCoveragePercentFromNeedCoverage } from "@/lib/marketing-coverage";
 import { whyProductMatches } from "@/lib/product-recommendation-metrics";
-import {
-  normalizeProductFactKey,
-  productKeysMatch
-} from "@/lib/product-key-matching";
+import { productContainsFoodAllergen } from "@/lib/product-food-allergens";
 import type {
   LifeStage,
   MatcherProduct,
@@ -66,6 +63,12 @@ function unitFromNeed(unit: string | null | undefined): MatcherUnit {
   }
 
   return "mg";
+}
+
+function amountFromNeed(need: ProductRecommendationNeed) {
+  const amount = need.targetDose?.amount ?? need.targetComparableAmount ?? 0;
+  const unit = need.targetDose?.unit;
+  return amount * (unit === "billion_cfu" ? 1_000_000_000 : unit === "million_cfu" ? 1_000_000 : 1);
 }
 
 const matcherProductByCandidate = new WeakMap<ProductCandidate, MatcherProduct>();
@@ -201,34 +204,7 @@ export function matcherProductCoversNeed(
   product: MatcherProduct,
   need: ProductRecommendationNeed
 ) {
-  const subjectIds = new Set(needSubjectIds(need));
-
-  if (product.contributionSubjectIds.some((id) => subjectIds.has(id))) {
-    return true;
-  }
-
-  for (const contribution of product.labelledContributions) {
-    if (!contribution.amount || contribution.amount <= 0) {
-      continue;
-    }
-
-    if (contribution.subjectId && subjectIds.has(contribution.subjectId)) {
-      return true;
-    }
-
-    const factKey = normalizeProductFactKey(contribution.name);
-    const aliases = need.aliasKeys ?? [];
-
-    if (
-      factKey === need.normalizedName ||
-      aliases.includes(factKey) ||
-      productKeysMatch(need.normalizedName, factKey, aliases)
-    ) {
-      return true;
-    }
-  }
-
-  return false;
+  return contributionFor(product, need.displayName, need.normalizedName || need.sourceId || need.id).length > 0;
 }
 
 function matcherLifeStage(value: string | null | undefined): LifeStage {
@@ -286,7 +262,7 @@ function matcherProductOwnCoveragePercent(
   for (const need of needs) {
     const weight = need.weight > 0 ? need.weight : 1;
     totalWeight += weight;
-    const amount = need.targetDose?.amount ?? need.targetComparableAmount ?? 0;
+    const amount = amountFromNeed(need);
     const unit = need.targetDose ? unitFromNeed(need.targetDose.unit) : "mcg";
     const subjectId = need.normalizedName || need.sourceId || need.id;
     const requested = scaleAmount({
@@ -357,10 +333,7 @@ function needDiagnosticsFromBasket(
 export function webTargetsForNeeds(needs: readonly ProductRecommendationNeed[]) {
   return canonicalizeTargets({
     targets: needs.filter(need => need.itemType === "supplement" || need.itemType === "nutrient").map((need) => ({
-      amount:
-        need.targetDose?.amount ??
-        need.targetComparableAmount ??
-        0,
+      amount: amountFromNeed(need),
       basis: "supplemental",
       importance: /(?:add[ -]?on|optional)/i.test(need.category) ? "optional" : /^foundation$/i.test(need.category.trim()) ? "core" : "required",
       name: need.displayName,
@@ -410,8 +383,12 @@ export function recommendWithMatcher(
     return empty;
   }
 
-  const dietary =
-    input.clientContext?.preferredForm === "vegan" ? "vegan" : "any";
+  const dietary = input.clientContext?.dietaryPreference ?? "any";
+  const excludedProductIds = [...new Set([
+    ...(input.clientContext?.excludeProductIds ?? []),
+    ...input.candidates.filter(product => (input.clientContext?.foodAllergies ?? [])
+      .some(allergen => productContainsFoodAllergen(product, allergen))).map(product => product.id)
+  ])].sort();
   const monthlyBudget = ({ u1000: 1000, "1000-2500": 2500, "2500-5000": 5000, low: 1000, mid: 2500, good: 5000 } as Record<string, number>)[input.clientContext?.budgetPreference ?? ""] ?? null;
   const monthlyBasis = input.budgetAmount == null && monthlyBudget !== null;
   const request = {
@@ -423,7 +400,7 @@ export function recommendWithMatcher(
     destinationCountry: (input.countryCode ?? "TH").toUpperCase(),
     dietaryPreference: dietary,
     excludeSubjectIds: [...(input.clientContext?.excludeSupplementIds ?? [])],
-    excludeProductIds: [...(input.clientContext?.excludeProductIds ?? [])],
+    excludeProductIds: excludedProductIds,
     profileKnown: input.clientContext?.profileKnown ?? { ageYears: input.clientContext?.ageYears != null, lifeStage: Boolean(input.clientContext?.lifestage), sex: Boolean(input.clientSex) },
     unknownIntakeSubjectIds: input.clientContext?.unknownIntakeSubjectIds ?? (input.clientContext?.currentSupplements === "none" || input.clientContext?.continuedIntake ? [] : targets.targets.map(target => target.subjectId)),
     estimatedIntakeSubjectIds: input.clientContext?.estimatedIntakeSubjectIds ?? [],

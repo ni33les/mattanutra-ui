@@ -40,6 +40,12 @@ export function nutrientNameMatchesTarget(targetName: string, factName: string) 
   const target = key(targetName).replace(/^(?:algae|algal)_omega_?3$/, "omega_3");
   const fact = key(factName).replace(/^(?:algae|algal)_omega_?3$/, "omega_3");
   if (target === fact) return true;
+  // Quantified active content is distinct from the mass of its source botanical.
+  // Evaluate before catalogue aliases, which may group those names for discovery.
+  const curcumin = ["curcumin", "curacumin"];
+  const curcuminoids = ["curcuminoid", "curcuminoids"];
+  if (curcumin.includes(target)) return curcumin.includes(fact);
+  if (curcuminoids.includes(target)) return curcuminoids.includes(fact) || curcumin.includes(fact);
   if (["vitamin_k2", "k2", "menaquinone"].includes(target) &&
       ["mk_4", "mk4", "menaquinone_4", "mk_7", "mk7", "menaquinone_7"].includes(fact)) return true;
   const requestedForm = FORMS.find(group => (group as readonly string[]).includes(target));

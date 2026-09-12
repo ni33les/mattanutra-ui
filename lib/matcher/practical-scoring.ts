@@ -6,7 +6,7 @@ import { add, compare, divide, fromDecimal, multiply, positive, rational, serial
 import type { CanonicalRequest, MatcherProduct, OptimizationMode, PreferenceImportance, SearchState } from "@/lib/matcher/types";
 
 export const PRACTICAL_SCORING_VERSION = "practical-penalties-1";
-const WEB_PRACTICAL_SCORING_VERSION = "web-practical-penalties-3";
+const WEB_PRACTICAL_SCORING_VERSION = "web-practical-penalties-4";
 const WEB_PRODUCT_PENALTY_MULTIPLIER = 5;
 const PROFILES = Object.freeze({
   balanced: Object.freeze({ pills: 1, products: 1, price: 1, servings: 1 }),
@@ -60,7 +60,8 @@ function compilePracticalProfile(request: ProfileRequest): Profile {
   const baseMultipliers = PROFILES[request.optimization];
   const multipliers = web ? Object.freeze({ ...baseMultipliers, products: baseMultipliers.products * WEB_PRODUCT_PENALTY_MULTIPLIER }) : baseMultipliers;
   const config = { id: request.optimization, version: web ? WEB_PRACTICAL_SCORING_VERSION : PRACTICAL_SCORING_VERSION, multipliers, importance, pricePreferenceBasis,
-    importanceFactors: IMPORTANCE, fallbackObjectives: "only_when_corresponding_preference_is_absent", coefficients: { preference: "0.25", routine: "0.05", uncertainty: "0.25", pillsScale: 3, priceScaleMinor: 100000, zeroPriceScaleMinor: 10000, currency: "THB" } };
+    importanceFactors: IMPORTANCE, fallbackObjectives: web ? "absent_preference_or_unavailable_monthly_cost" : "only_when_corresponding_preference_is_absent",
+    ...(web ? { quantityUncertainty: "quarter_times_max_one_pill_profile_importance" } : {}), coefficients: { preference: "0.25", routine: "0.05", uncertainty: "0.25", pillsScale: 3, priceScaleMinor: 100000, zeroPriceScaleMinor: 10000, currency: "THB" } };
   const key = JSON.stringify(config);
   let value = profiles.get(key);
   if (!value) { value = Object.freeze({ id: config.id, version: config.version, hash: sha256Hex(key), multipliers: config.multipliers,
@@ -162,9 +163,16 @@ export function scorePracticalPenalties(request: Pick<CanonicalRequest, "currenc
   const exactComponents = {
     pills: request.maxDailyPills == null ? multiply(coefficient.objectives.pills, divide(pills, THREE)) : ZERO,
     products: request.maxProductCount == null ? multiply(coefficient.objectives.products, products) : ZERO,
-    price: request.maxPriceMinor == null ? multiply(coefficient.objectives.price, divide(price, PRICE_SCALE)) : ZERO,
+    // An unavailable monthly assessment is not a free pass on known first-order cost.
+    // This remains a separate objective, never a fabricated monthly budget overrun.
+    price: request.maxPriceMinor == null || (profile.version === WEB_PRACTICAL_SCORING_VERSION && preferencePrice === null)
+      ? multiply(coefficient.objectives.price, divide(price, PRICE_SCALE)) : ZERO,
     servings: multiply(coefficient.objectives.servings, actual.servingBurdenExact ?? sum(actual.servings.map((n, i) => square(positive(subtract(measurement(n, `servings[${i}]`), ONE)))))),
-    uncertainty: multiply(QUARTER, uncertain),
+    // Weight missing quantity evidence when the web customer expresses a pill preference.
+    // The actual pill amount and its lower bound remain unchanged and explicitly incomplete.
+    uncertainty: multiply(multiply(QUARTER, uncertain), fromDecimal(
+      profile.version === WEB_PRACTICAL_SCORING_VERSION && request.maxDailyPills != null
+        ? Math.max(1, m.pills * IMPORTANCE[profile.importance.maxDailyPills]) : 1)),
     preferences: sum(exactPreferences)
   };
   const total = sum(Object.values(exactComponents));
