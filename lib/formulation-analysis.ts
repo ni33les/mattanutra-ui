@@ -269,7 +269,7 @@ function userMessages({
         "Do not choose a default or midpoint count. Eight is acceptable only when exactly eight supplements are clearly effective and needed; otherwise return fewer or more as the assessment warrants.",
         "Do not pad with weak or duplicative items just to reach a count.",
         "marketingPoints must contain 3 concise points that are specific to this assessment, the HealthScore, and the plan.",
-        "Product matching has not happened yet. Never claim that the final products meet diet, allergy, pill-count or budget preferences. Describe proposed targets and review steps, not guaranteed product outcomes.",
+        "Matching pending: no diet, allergy, pill or budget promises.",
         "Every marketingPoints array entry must be an object with id, title, and body.",
         "cautions must be an array. Return an empty array only when the assessment context truly has no relevant cautions.",
         "Every caution must be an object with id, severity, body, optional title, and optional relatedAnswerKeys.",

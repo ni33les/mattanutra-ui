@@ -13,7 +13,7 @@ assert.ok(MCP_PACKAGES[packageId], "Unknown work package");
 const args = rawArgs[0]?.startsWith("--package=") ? rawArgs.slice(1) : [...rawArgs];
 const sliceIndex = args.indexOf("--slice");
 const slice = sliceIndex < 0 ? null : args.splice(sliceIndex, 2)[1];
-assert.ok(!slice || (mode === "test" && ["efficiency", "practical", "simple-plan", "boundaries", "payment-replay"].includes(packageId)), "Slices are limited to efficiency development tests");
+assert.ok(!slice || (mode === "test" && ["efficiency", "practical", "simple-plan", "boundaries", "payment-replay", "web-matching"].includes(packageId)), "Slices are limited to efficiency development tests");
 const definition = MCP_PACKAGES[packageId], MCP721_BASE = definition.base;
 assert.ok(["test", "validate"].includes(mode));
 const inventory = JSON.parse(readFileSync(definition.inventory ?? `${definition.directory}/impact.json`, "utf8"));
@@ -92,7 +92,7 @@ for (const database of (packageId === "practical" && mode === "validate" ? [] : 
     const migration = await runBatch("lock-boundaries-schema", ["--experimental-strip-types", "--import", "./scripts/register-ts-path-loader.mjs", "scripts/apply-matching-lock-boundaries.ts"], env, output);
     assert.ok(migration.passed, "Isolated lock migration failed");
   }
-  batches.push(await runBatch(label, ["--test", "--test-concurrency=1", "--experimental-strip-types", ...(!database || packageId === "payment-replay" ? ["--import", "./test/helpers/offline-network.mjs"] : []), "--import", "./scripts/register-ts-path-loader.mjs", ...selected], env, output));
+  batches.push(await runBatch(label, ["--test", "--test-concurrency=1", "--experimental-test-module-mocks", "--experimental-strip-types", ...(packageId === "web-matching" ? ["--loader", "./test/payment-return/next-loader.mjs"] : []), ...(!database || packageId === "payment-replay" ? ["--import", "./test/helpers/offline-network.mjs"] : []), "--import", "./scripts/register-ts-path-loader.mjs", ...selected], env, output));
   assert.ok(batches.at(-1).passed, `${label} failed; later stages were not started`);
   events.push(...readFileSync(resolve(output, `${label}-events.jsonl`), "utf8").trim().split("\n").filter(Boolean).map(line => JSON.parse(line)));
 }
@@ -128,6 +128,15 @@ if (mode === "validate") {
     if (!existsSync(control)) git("worktree", "add", "--detach", control, MCP721_BASE);
     assert.equal(execFileSync("git", ["rev-parse", "HEAD"], { cwd: control, encoding: "utf8" }).trim(), MCP721_BASE);
     assert.equal(execFileSync("git", ["status", "--porcelain"], { cwd: control, encoding: "utf8" }).trim(), "");
+    save("no-new-locks.json", verifyPracticalLocks(control)); stages.push({ label: "no-new-locks", passed: true });
+  }
+  if (packageId === "web-matching") {
+    const { verifyPracticalLocks } = await import("./practical-matching/comparison.mjs");
+    const control = resolve(output, "../web-matching-control-" + MCP721_BASE.slice(0, 12));
+    if (!existsSync(control)) git("worktree", "add", "--detach", control, MCP721_BASE);
+    assert.equal(execFileSync("git", ["rev-parse", "HEAD"], { cwd: control, encoding: "utf8" }).trim(), MCP721_BASE);
+    assert.equal(execFileSync("git", ["status", "--porcelain"], { cwd: control, encoding: "utf8" }).trim(), "");
+    save("executed-cases.json", events);
     save("no-new-locks.json", verifyPracticalLocks(control)); stages.push({ label: "no-new-locks", passed: true });
   }
   if (packageId === "efficiency") {

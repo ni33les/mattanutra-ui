@@ -21,7 +21,7 @@ test('WM-16 formula copy in every locale avoids unverified pre-match routine pro
   assert.doesNotMatch(JSON.stringify(rows),/vegan|1[-–]3|within your budget/i);
  }
  const store=readFileSync('lib/assessment-store.ts','utf8');assert.equal((store.match(/const marketingPoints = formulationPlanCopy\(locale\)/g)??[]).length,2);
- assert.match(readFileSync('lib/formulation-analysis.ts','utf8'),/Product matching has not happened/);
+ assert.match(readFileSync('lib/formulation-analysis.ts','utf8'),/Matching pending: no diet, allergy, pill or budget promises/);
 });
 test('WM-17 exposure accounting cannot turn a mislabelled botanical into active curcumin',()=>{
  const p=product('raw',{},100,{labelledContributions:[{subjectId:'curcumin',name:'Turmeric',amount:400,unit:'mg',confidence:'high'}]});

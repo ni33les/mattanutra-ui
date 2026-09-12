@@ -1,0 +1,158 @@
+{
+  "releaseBase": "e46e16016fe0544d48da37224dde614bc153ee15",
+  "deploymentBases": {
+    "dev": "ab0a2e7bd3d84c7fbd12417c2b91cfc4ccbb7ecc",
+    "uat": "ab0a2e7bd3d84c7fbd12417c2b91cfc4ccbb7ecc"
+  },
+  "scope": "web_matching_correctness",
+  "inputs": [
+    "test/web-matching-correctness/reported-catalogue.json",
+    "test/web-matching-correctness/expectation-changes.md",
+    "lib/matcher/practical-scoring.ts",
+    "lib/nutrient-identity.ts",
+    "lib/product-food-allergens.ts",
+    "test/payment-return/next-loader.mjs"
+  ],
+  "files": [
+    {
+      "file": "test/web-matching-correctness/regressions.test.ts",
+      "expectedCases": 14,
+      "database": false,
+      "slice": "matching",
+      "reason": "Reported dietary, probiotic units, botanical identity and incomplete routine scoring regressions"
+    },
+    {
+      "file": "test/web-matching-correctness/presentation.test.ts",
+      "expectedCases": 3,
+      "database": false,
+      "slice": "matching",
+      "reason": "Allergen label evidence, honest localized formula copy and incidental exposure identity"
+    },
+    {
+      "file": "test/web-matching-correctness/release.test.ts",
+      "expectedCases": 2,
+      "database": false,
+      "slice": "release",
+      "reason": "Code-only deployment source binding and rejected invalid proofs"
+    },
+    {
+      "file": "test/nutrient-identity.test.ts",
+      "expectedCases": 1,
+      "database": false,
+      "slice": "matching",
+      "reason": "Shared nutrient identity and distinct forms remain correctly resolved"
+    },
+    {
+      "file": "test/matcher-web-adapter.test.ts",
+      "expectedCases": 21,
+      "database": false,
+      "slice": "matching",
+      "reason": "Affected web target mapping, dietary eligibility and contribution projections"
+    },
+    {
+      "file": "test/matcher-v5-web.test.ts",
+      "expectedCases": 8,
+      "database": false,
+      "slice": "matching",
+      "reason": "Unrestricted web baskets, matching identity and advisory constraints"
+    },
+    {
+      "file": "test/practical-matching/scoring.test.ts",
+      "expectedCases": 11,
+      "database": false,
+      "slice": "matching",
+      "reason": "Independent dose and practical penalty arithmetic remains intact"
+    },
+    {
+      "file": "test/practical-matching/adapters.test.ts",
+      "expectedCases": 10,
+      "database": false,
+      "slice": "matching",
+      "reason": "Web and MCP profile identity, distinct budget bases and revision context"
+    },
+    {
+      "file": "test/web-reveal-tidy.test.ts",
+      "expectedCases": 4,
+      "database": false,
+      "slice": "matching",
+      "reason": "Unchanged reveal design and concise advisory presentation"
+    },
+    {
+      "file": "test/matcher/advisory-dose-fit.test.ts",
+      "expectedCases": 36,
+      "database": false,
+      "slice": "matching",
+      "reason": "Symmetric dose penalties and independent additional safety penalty"
+    },
+    {
+      "file": "test/web-advisory.test.ts",
+      "expectedCases": 8,
+      "database": false,
+      "slice": "matching",
+      "reason": "Questionnaire preference mapping and nonblocking purchase behavior"
+    },
+    {
+      "file": "test/healthscore-performance/prompts.test.ts",
+      "expectedCases": 9,
+      "database": false,
+      "slice": "matching",
+      "reason": "Affected formulation prompt preserves schema, deterministic formula and reasoning settings"
+    },
+    {
+      "file": "test/consistency-r2-formulation-read.test.ts",
+      "expectedCases": 5,
+      "database": false,
+      "slice": "matching",
+      "reason": "Slim formulation readers remain nonlocking and avoid heavy product payloads"
+    },
+    {
+      "file": "test/agentic-cv-r3-pack.test.ts",
+      "expectedCases": 1,
+      "database": false,
+      "slice": "matching",
+      "reason": "Commercial and order invariants under advanced matcher identity"
+    },
+    {
+      "file": "test/agentic-cv-r2-pack.test.ts",
+      "expectedCases": 1,
+      "database": false,
+      "slice": "matching",
+      "reason": "Shared matcher consumer expectations under advanced identity"
+    },
+    {
+      "file": "test/agentic-cv-r4-pack.test.ts",
+      "expectedCases": 3,
+      "database": false,
+      "slice": "matching",
+      "reason": "Supply and payment consistency under advanced matcher identity"
+    },
+    {
+      "file": "test/agentic-cv-impl-pack.test.ts",
+      "expectedCases": 1,
+      "database": false,
+      "slice": "matching",
+      "reason": "Shared matcher target and safety behavior under advanced identity"
+    },
+    {
+      "file": "test/payment-return/page.test.ts",
+      "expectedCases": 14,
+      "reason": "Actual return-page rendering and redirects after provider, database and concurrent-confirmation errors, in all three locales",
+      "database": false,
+      "slice": "payment-return"
+    },
+    {
+      "file": "test/payment-confirmation-return.test.ts",
+      "expectedCases": 8,
+      "reason": "Existing confirmation layout, localization, receipt and reservation compatibility",
+      "database": false,
+      "slice": "payment-return"
+    },
+    {
+      "file": "test/stripe-payments.test.ts",
+      "expectedCases": 11,
+      "reason": "Read-only session recovery shares the existing payment store; preserve confirmation, accounting and checkout invariants",
+      "database": false,
+      "slice": "payment-return"
+    }
+  ]
+}

@@ -242,13 +242,21 @@ describe("advisory dose fit", () => {
     assert.ok(result.selected?.safety.findings.some((row) => row.code === "dose_review_required" && row.action === "inform"));
   });
 
-  it("scores collateral excess before price, pills, or another covered target", () => {
+  it("preserves collateral dose loss separately from the practical routine recommendation", () => {
     const targets = canonicalizeTargets({ targets: [{ subjectId: "a", name: "A", amount: 100, unit: "mg" }, { subjectId: "b", name: "B", amount: 100, unit: "mg" }] }).targets;
     for (const optimization of ["lowest_cost", "fewest_pills", "best_coverage"] as const) {
       for (const selectorMode of ["agentic", "web_single"] as const) {
         const result = run(request({ targets, optimization, selectorMode }), [product("cheap-multi", 180, 100, 1), product("a-right", 100, 0, 30), product("b-right", 0, 100, 30)]);
-        assert.deepEqual(result.selected?.productIds, ["a-right", "b-right"]);
-        assert.equal(result.selected?.doseFit?.total, 0);
+        const closest = [result.selected, ...result.alternatives].find(row => row?.roles?.includes("closest_dose"));
+        assert.ok(closest);
+        assert.deepEqual(closest.productIds, ["a-right", "b-right"]);
+        assert.equal(closest.doseFit?.total, 0);
+        // These fixtures have no verified administration basis. Only the web
+        // fewest-pills policy values avoiding a second unknown routine enough
+        // to outweigh the multi's unchanged 0.8 collateral dose penalty.
+        const practical = selectorMode === "web_single" && optimization === "fewest_pills";
+        assert.deepEqual(result.selected?.productIds, practical ? ["cheap-multi"] : ["a-right", "b-right"]);
+        assert.equal(result.selected?.doseFit?.total, practical ? 0.8 : 0);
       }
     }
   });

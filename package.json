@@ -168,7 +168,9 @@
     "test:matching-lock-boundaries": "node scripts/mcp-721.mjs test --package=boundaries",
     "validate:dev:matching-lock-boundaries": "node scripts/mcp-721.mjs validate --package=boundaries",
     "test:payment-return": "node scripts/test-payment-return.mjs test",
-    "validate:payment-return": "node scripts/test-payment-return.mjs validate"
+    "validate:payment-return": "node scripts/test-payment-return.mjs validate",
+    "test:web-matching": "node scripts/mcp-721.mjs test --package=web-matching",
+    "validate:dev:web-matching": "node scripts/mcp-721.mjs validate --package=web-matching"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1045.0",
