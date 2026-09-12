@@ -62,9 +62,10 @@ export function prepareSimpleRequest(input: Row, snapshot: CatalogueSnapshot, pr
       amount = converted;
     }
     if (amount === 0 && !zeroTargetScale(known?.name ?? name, identity)) return failure(`${field}.amount`, "No reviewed zero-target normalization scale is available for this ingredient. Agree a positive target or use an explicit exclusion for categorical avoidance.");
-    const next: PlanRequestTarget = { ...(old ?? {}), ingredientId: identity, name, amount, unit,
+    let next: PlanRequestTarget = { ...(old ?? {}), ingredientId: identity, name, amount, unit,
       basis: (row.basis ?? old?.basis ?? "total_daily") as PlanRequestTarget["basis"],
       ...(known && !snapshot.disallowedSupplements?.some(row => row.supplementId === known.supplementId) ? { supplementId: known.supplementId } : {}), ...(row.acceptableRange ? { acceptableRange: row.acceptableRange as PlanRequestTarget["acceptableRange"] } : {}) };
+    if (!known || snapshot.disallowedSupplements?.some(row => row.supplementId === known.supplementId)) next = { ...next, supplementId: undefined };
     if (old) targets[existingIndex] = next; else targets.push(next);
   }
   if (targets.length > 30) return failure("targets", "At most 30 requested targets are supported; remove a target before adding another.");

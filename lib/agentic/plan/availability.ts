@@ -30,8 +30,8 @@ export function preparePlanAvailability(state: CanonicalPlanState, snapshot: Cat
   const ingredients: Record<string, IngredientAvailability> = {};
   const possible = productContributionAvailability(canonical, products);
   for (const [index, target] of (state.originalRequest?.targets ?? []).entries()) {
-    const id = target.ingredientId ?? target.supplementId!;
-    const resolved = state.targets.find(row => row.supplementId === target.supplementId);
+    const resolved = state.targets.find(row => target.supplementId ? row.supplementId === target.supplementId : row.requestedName === target.name);
+    const id = target.ingredientId ?? resolved?.supplementId ?? target.name!;
     const code: IngredientAvailability = snapshot.disallowedSupplements?.some(row => row.supplementId === id) ? 'not_allowed'
       : !resolved ? 'not_on_list' : possible.supplied.has(resolved.supplementId) ? 'not_selected' : possible.unknown.has(resolved.supplementId) ? 'unknown' : 'unavailable';
     ingredients[id] = code;

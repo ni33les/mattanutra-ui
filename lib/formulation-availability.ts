@@ -11,7 +11,7 @@ const texts = (value: LocalizedText | undefined) => typeof value === 'string' ? 
 function keys(row: CanonicalSupplementOption) { return new Set([row.name, row.normalizedName, row.id, ...row.aliases].map(words)); }
 export function constrainFormulation(formula: FormulationBlueprint, permitted: readonly CanonicalSupplementOption[]): FormulationBlueprint {
   const allowed = permitted.map(keys);
-  const included = formula.supplementBreakdown.filter(row => [row.id, ...texts(row.supplement)].some(name => allowed.some(set => set.has(words(name)))));
+  const included = formula.supplementBreakdown.filter(row => texts(row.supplement).some(name => allowed.some(set => set.has(words(name)))));
   const removed = formula.supplementBreakdown.filter(row => !included.includes(row));
   const removedNames = removed.flatMap(row => [row.id, ...texts(row.supplement)]).map(words).filter(Boolean);
   const dependsOnRemoved = (row: { id: string; title?: LocalizedText; body?: LocalizedText }) => [row.id, ...texts(row.title), ...texts(row.body)].some(value => removedNames.some(name => ` ${words(value)} `.includes(` ${name} `)));
@@ -31,6 +31,7 @@ export function productBackedSupplements(options: readonly CanonicalSupplementOp
 }
 export function publishedFormulation(formula: FormulationBlueprint, payload: unknown, resultPayload: unknown) {
   const permitted = (payload as {formulationAvailability?: FormulationAvailability})?.formulationAvailability;
+  if (!permitted && (payload as {formulationPolicy?: string})?.formulationPolicy) throw new Error('Missing frozen permitted ingredient input');
   if (!permitted) return formula; // Already-running tasks from the previous build retain their frozen inputs.
   if (permitted.policy !== FORMULATION_AVAILABILITY_POLICY || (resultPayload as {formulationAvailabilityIdentity?: string})?.formulationAvailabilityIdentity !== permitted.inputIdentity) {
     throw new Error('Formulation result does not match its permitted ingredient input');

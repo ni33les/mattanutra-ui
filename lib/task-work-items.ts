@@ -10,6 +10,7 @@ import { computeHealthScore } from "@/lib/health-score";
 import { normalizeAssessmentPlan, type AssessmentPlan } from "@/lib/assessment-snapshot";
 import {
   isUuid,
+  toJsonValue,
   reconcileResolvedSafetyReviewFlags
 } from "@/lib/assessment-store";
 import type { CanonicalSupplementOption } from "@/lib/canonical-supplements";
@@ -741,7 +742,7 @@ async function buildFormulationWorkItem(task: TaskRecord) {
     const permitted = productBackedSupplements(permittedOptions, { candidates: retailers.flatMap(row => row.candidates), needs, clientContext,
       clientSex: productClientSexFromAnswers(context.answers), countryCode });
     const prepared = formulationAvailabilityIdentity(valueCatalogueFingerprint(snapshot), { clientContext, countryCode }, permitted);
-    const rows = await sql`update public.tasks set payload=jsonb_set(coalesce(payload,'{}'::jsonb),'{formulationAvailability}',${JSON.stringify(prepared)}::jsonb), updated_at=now()
+    const rows = await sql`update public.tasks set payload=jsonb_set(coalesce(payload,'{}'::jsonb),'{formulationAvailability}',${sql.json(toJsonValue(prepared))}::jsonb), updated_at=now()
       where id=${task.id}::uuid and status in ('reserved','running') and lease_until > now()
         and reserved_by_agent_id=${task.reservedByAgentId}::uuid and not coalesce(payload,'{}'::jsonb) ? 'formulationAvailability'
       returning payload->'formulationAvailability' as availability`;
