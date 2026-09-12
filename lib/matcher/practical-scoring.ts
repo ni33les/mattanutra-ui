@@ -120,12 +120,9 @@ function coefficients(profile: Profile) {
   return value;
 }
 
-/** Exact ranking estimate, with incomplete observations explicitly distinct from known zero. */
-export function scorePracticalPenalties(request: Pick<CanonicalRequest, "currency" | "maxDailyPills" | "maxProductCount" | "maxPriceMinor"> & ProfileRequest,
-  actual: PracticalActuals): PracticalPenaltyScore {
-  if (actual.currency !== request.currency || actual.currency !== "THB") throw new Error("currency must match the THB profile normalization currency");
-  const profile = resolvePracticalProfile(request), m = profile.multipliers;
-  const coefficient = coefficients(profile);
+type PracticalRequest = Pick<CanonicalRequest, "currency" | "maxDailyPills" | "maxProductCount" | "maxPriceMinor"> & ProfileRequest;
+const measuredActuals = new WeakMap<PracticalRequest, WeakMap<PracticalActuals, ReturnType<typeof compileMeasurements>>>();
+function compileMeasurements(request: PracticalRequest, actual: PracticalActuals, profile: Profile) {
   const pills = measurement(actual.pillLowerBound, "pillLowerBound"), products = measurement(actual.productCount, "productCount", true);
   if (actual.dailyPills !== null) {
     measurement(actual.dailyPills, "dailyPills");
@@ -143,50 +140,66 @@ export function scorePracticalPenalties(request: Pick<CanonicalRequest, "currenc
   const preferencePriceLower = preferencePrice ?? (profile.pricePreferenceBasis === "monthly_30_days" ? actual.monthlyPriceLowerBound ?? 0 : priceValue);
   if (profile.pricePreferenceBasis === "monthly_30_days") measurement(preferencePriceLower, "monthlyPriceMinor", true);
   const values = [
-    { field: "maxDailyPills", actual: actual.dailyPills, lower: actual.pillLowerBound, zeroScale: 1, multiplier: m.pills },
-    { field: "maxProductCount", actual: actual.productCount, lower: actual.productCount, zeroScale: 1, multiplier: m.products },
-    { field: "maxPriceMinor", actual: preferencePrice, lower: preferencePriceLower, zeroScale: 10000, multiplier: m.price }
+    { field: "maxDailyPills", actual: actual.dailyPills, lower: actual.pillLowerBound, zeroScale: 1 },
+    { field: "maxProductCount", actual: actual.productCount, lower: actual.productCount, zeroScale: 1 },
+    { field: "maxPriceMinor", actual: preferencePrice, lower: preferencePriceLower, zeroScale: 10000 }
   ] as const;
-  const exactPreferences: Rational[] = [];
-  const preferences = Object.fromEntries(values.map(row => {
+  const preferences = values.map(row => {
     const preferred = request[row.field] ?? null;
     const target = preferred === null ? null : measurement(preferred, row.field, row.field !== "maxDailyPills");
     const scale = preferred === null ? null : preferred > 0 ? preferred : row.zeroScale;
     const active = preferred !== null;
     const ratio = target && scale !== null ? divide(positive(subtract(fromDecimal(row.lower), target)), fromDecimal(scale)) : ZERO;
-    const penalty = multiply(coefficient.preferences[row.field], square(ratio));
-    exactPreferences.push(penalty);
     if (active && row.actual === null) missing.add(row.field);
-    return [row.field, { active, actual: row.actual, actualLowerBound: row.lower, preferred, complete: row.actual !== null,
-      scale, importance: profile.importance[row.field], multiplier: row.multiplier, penalty: toNumber(penalty) }];
-  })) as Record<Field, PreferencePenalty>;
+    return { ...row, preferred, scale, active, squaredOverrun: square(ratio) };
+  });
+  const servings = actual.servingBurdenExact ?? sum(actual.servings.map((n, i) => square(positive(subtract(measurement(n, `servings[${i}]`), ONE)))));
+  return { pills: divide(pills, THREE), products, price: divide(price, PRICE_SCALE), uncertainty: multiply(QUARTER, uncertain),
+    preferencePrice, preferences, servings, missingComponents: [...missing].sort() };
+}
+function measurementsFor(request: PracticalRequest, actual: PracticalActuals, profile: Profile) {
+  const source = doseRequest.get(request as CanonicalRequest) ?? request;
+  let cache = measuredActuals.get(source); if (!cache) { cache = new WeakMap(); measuredActuals.set(source, cache); }
+  let result = cache.get(actual);
+  if (!result) { result = compileMeasurements(request, actual, profile); cache.set(actual, result); }
+  return result;
+}
+/** Exact ranking estimate, with incomplete observations explicitly distinct from known zero. */
+export function scorePracticalPenalties(request: PracticalRequest, actual: PracticalActuals): PracticalPenaltyScore {
+  if (actual.currency !== request.currency || actual.currency !== "THB") throw new Error("currency must match the THB profile normalization currency");
+  const profile = resolvePracticalProfile(request), m = profile.multipliers, coefficient = coefficients(profile);
+  const measured = measurementsFor(request, actual, profile);
+  const exactPreferences = measured.preferences.map(row => multiply(coefficient.preferences[row.field], row.squaredOverrun));
   const exactComponents = {
-    pills: request.maxDailyPills == null ? multiply(coefficient.objectives.pills, divide(pills, THREE)) : ZERO,
-    products: request.maxProductCount == null ? multiply(coefficient.objectives.products, products) : ZERO,
-    // An unavailable monthly assessment is not a free pass on known first-order cost.
-    // This remains a separate objective, never a fabricated monthly budget overrun.
-    price: request.maxPriceMinor == null || (profile.version === WEB_PRACTICAL_SCORING_VERSION && preferencePrice === null)
-      ? multiply(coefficient.objectives.price, divide(price, PRICE_SCALE)) : ZERO,
-    servings: multiply(coefficient.objectives.servings, actual.servingBurdenExact ?? sum(actual.servings.map((n, i) => square(positive(subtract(measurement(n, `servings[${i}]`), ONE)))))),
-    // Weight missing quantity evidence when the web customer expresses a pill preference.
-    // The actual pill amount and its lower bound remain unchanged and explicitly incomplete.
-    uncertainty: multiply(multiply(QUARTER, uncertain), fromDecimal(
-      profile.version === WEB_PRACTICAL_SCORING_VERSION && request.maxDailyPills != null
-        ? Math.max(1, m.pills * IMPORTANCE[profile.importance.maxDailyPills]) : 1)),
+    pills: request.maxDailyPills == null ? multiply(coefficient.objectives.pills, measured.pills) : ZERO,
+    products: request.maxProductCount == null ? multiply(coefficient.objectives.products, measured.products) : ZERO,
+    price: request.maxPriceMinor == null || (profile.version === WEB_PRACTICAL_SCORING_VERSION && measured.preferencePrice === null)
+      ? multiply(coefficient.objectives.price, measured.price) : ZERO,
+    servings: multiply(coefficient.objectives.servings, measured.servings),
+    uncertainty: profile.version === WEB_PRACTICAL_SCORING_VERSION && request.maxDailyPills != null
+      ? multiply(measured.uncertainty, fromDecimal(Math.max(1, m.pills * IMPORTANCE[profile.importance.maxDailyPills]))) : measured.uncertainty,
     preferences: sum(exactPreferences)
   };
   const total = sum(Object.values(exactComponents));
-  return { profile, total: toNumber(total), exact: encoded(total), complete: missing.size === 0,
-    components: Object.fromEntries(Object.entries(exactComponents).map(([k, v]) => [k, toNumber(v)])) as PracticalPenaltyScore["components"], preferences, missingComponents: [...missing].sort() };
+  let components: PracticalPenaltyScore["components"] | undefined, preferences: PracticalPenaltyScore["preferences"] | undefined;
+  return { profile, total: toNumber(total), exact: encoded(total), complete: measured.missingComponents.length === 0,
+    get components() { return components ??= Object.fromEntries(Object.entries(exactComponents).map(([k, v]) => [k, toNumber(v)])) as PracticalPenaltyScore["components"]; },
+    get preferences() { return preferences ??= Object.fromEntries(measured.preferences.map((row, index) => [row.field, {
+      active: row.active, actual: row.actual, actualLowerBound: row.lower, preferred: row.preferred, complete: row.actual !== null,
+      scale: row.scale, importance: profile.importance[row.field], multiplier: [m.pills, m.products, m.price][index]!, penalty: toNumber(exactPreferences[index]!)
+    }])) as Record<Field, PreferencePenalty>; }, missingComponents: measured.missingComponents };
 }
 
 export function overallMatchingScore(request: CanonicalRequest, exposure: ReadonlyMap<string, bigint>, actual: PracticalActuals): OverallMatchingScore {
   const penalties = scorePracticalPenalties(request, actual), dose = doseFitScore(doseRequest.get(request) ?? request, exposure);
   const nutrient = request.scoring ? weightedDoseFitScore(request, exposure) : dose;
   const total = add(exactDoseFit(nutrient), decoded(penalties.exact));
-  return { ...penalties, dosePenalty: dose.total, overallPenalty: toNumber(total), overallExact: encoded(total) };
+  return { profile: penalties.profile, total: penalties.total, exact: penalties.exact, complete: penalties.complete,
+    get components() { return penalties.components; }, get preferences() { return penalties.preferences; }, missingComponents: penalties.missingComponents,
+    dosePenalty: dose.total, overallPenalty: toNumber(total), overallExact: encoded(total) };
 }
 
+const stateActuals = new WeakMap<SearchState, PracticalActuals>();
 const stateScores = new WeakMap<CanonicalRequest, WeakMap<SearchState["exposure"], { state: SearchState; score: OverallMatchingScore }[]>>();
 function sameMeasurements(a: SearchState, b: SearchState) {
   return a.pills === b.pills && a.pillCountKnown === b.pillCountKnown && a.count === b.count && a.price === b.price &&
@@ -200,10 +213,12 @@ export function searchStateScore(request: CanonicalRequest, state: SearchState):
   let bucket = cache.get(state.exposure);
   const found = bucket?.find(row => row.state === state || sameMeasurements(row.state, state));
   if (found) return found.score;
-  const result = overallMatchingScore(request, state.exposure, { dailyPills: state.pillCountKnown === false ? null : state.pills,
+  let actual = stateActuals.get(state);
+  if (!actual) { actual = { dailyPills: state.pillCountKnown === false ? null : state.pills,
       pillLowerBound: state.pills, productCount: state.count, priceMinor: state.price, currency: request.currency,
       servings: state.routineServings ?? [], servingBurdenExact: state.servingBurden, uncertainProductCount: state.uncertainAdministrationCount ?? state.count,
-      monthlyPriceMinor: state.monthlyPriceMinor, monthlyPriceLowerBound: state.monthlyPriceLowerBound });
+      monthlyPriceMinor: state.monthlyPriceMinor, monthlyPriceLowerBound: state.monthlyPriceLowerBound }; stateActuals.set(state, actual); }
+  const result = overallMatchingScore(request, state.exposure, actual);
   if (!bucket) { bucket = []; cache.set(state.exposure, bucket); }
   if (bucket.length >= 8) bucket.shift();
   bucket.push({ state, score: result });
