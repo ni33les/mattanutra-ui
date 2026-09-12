@@ -11,6 +11,10 @@ type Fraction = Readonly<{ num: bigint; den: bigint }>;
 const ZERO: Fraction = { num: BigInt(0), den: BigInt(1) };
 const exactTotals = new WeakMap<DoseFitScore, Fraction>();
 const exactParts = new WeakMap<DoseFitScore, { fitting: Fraction; safety: Fraction }>();
+type TargetDeviation = Pick<DoseFitScore["perTarget"][number], "subjectId" | "under" | "over">;
+const targetDeviations = new WeakMap<DoseFitScore, readonly TargetDeviation[]>();
+/** Frontier comparisons need deviations, not unit-converted display rows. */
+export function doseFitTargetDeviations(score: DoseFitScore) { return targetDeviations.get(score) ?? score.perTarget; }
 const fixedWeights = new WeakMap<CanonicalRequest, number | null>();
 const scoreCache = new WeakMap<CanonicalRequest, WeakMap<object, DoseFitScore>>();
 const weightedCache = new WeakMap<CanonicalRequest, WeakMap<object, DoseFitScore>>();
@@ -37,6 +41,8 @@ function gcd(a: bigint, b: bigint): bigint {
 }
 
 function add(a: Fraction, b: Fraction): Fraction {
+  if (a.num === BigInt(0)) return b;
+  if (b.num === BigInt(0)) return a;
   const common = gcd(a.den, b.den);
   const num = a.num * (b.den / common) + b.num * (a.den / common);
   const den = a.den * (b.den / common);
@@ -125,12 +131,51 @@ function compileSubject(request: CanonicalRequest, subjectId: string) {
   const zeroScale = request.scoring && target?.requested.units === BigInt(0) ? zeroTargetScale(target.name, subjectId) : null;
   if (request.scoring && target?.requested.units === BigInt(0) && (!zeroScale || zeroScale.dim !== target.requested.dim)) throw new Error(`No reviewed zero-target normalization scale for ${target.name}`);
   const scale = zeroScale?.units;
-  return { requested, target, ranges, dietary, referenceRows, reference, scale, bounds: limitsFor(request, subjectId) };
+  return { requested, target, ranges, dietary, referenceRows, reference, scale, bounds: limitsFor(request, subjectId), losses: new Map<Fraction, Map<bigint, ReturnType<typeof subjectLoss>>>() };
 }
 function subjectInputs(request: CanonicalRequest, subjectId: string) {
   request = sharedInputs.get(request) ?? request;
   let compiled = subjectCache.get(request); if (!compiled) { compiled = new Map(); subjectCache.set(request, compiled); }
   let value = compiled.get(subjectId); if (!value) { value = compileSubject(request, subjectId); compiled.set(subjectId, value); } return value;
+}
+
+/** Request-local exact endpoint terms. Different baskets commonly supply the
+ * same amount of one nutrient; profile weights and uncertain endpoints stay isolated. */
+function subjectLoss(input: { target: CanonicalRequest["targets"][number] | undefined; ranges: ReturnType<typeof rangeOffsets>; dietary: ReturnType<typeof rangeOffsets>; reference: bigint; scale: bigint | undefined; bounds: readonly Limit[] }, known: bigint, weight: Fraction) {
+  const { target, ranges, dietary, reference, scale, bounds } = input;
+    const minimum = known + ranges.minimum - ranges.base, maximum = known + ranges.maximum - ranges.base;
+    const added = known > ranges.base ? known - ranges.base : BigInt(0);
+    const continuedIncrease = reference > BigInt(0) ? { num: added, den: reference } : ZERO;
+    const cases = [...new Set([minimum, maximum])].flatMap((supplemental) =>
+      [...new Set([dietary.minimum, dietary.maximum])].map((food) => {
+        const want = target?.requested.units ?? BigInt(0);
+        const targetExposure = supplemental + (target && targetBasis(target) === "total_daily" ? food : BigInt(0));
+        const shortfall = want > BigInt(0) && targetExposure < want ? { num: want - targetExposure, den: want } : ZERO;
+        const overshoot = add(target && want === BigInt(0) && scale ? { num: targetExposure, den: scale } : excess(targetExposure, want), continuedIncrease);
+        const limits = bounds.map((row) => {
+          const sourceScope = row.ceiling.sourceScope ?? "supplemental";
+          const total = supplemental + (sourceScope === "total" ? food : BigInt(0));
+          return { row, total, sourceScope, excess: excess(total, row.units) };
+        });
+        const limitLoss = limits.reduce((sum, row) => add(sum, row.excess), ZERO);
+        const total = add(multiply(weight, add(shortfall, overshoot)), { num: limitLoss.num * BigInt(UPPER_LIMIT_EXTRA_WEIGHT), den: limitLoss.den });
+        return { supplemental, food, targetExposure, shortfall, overshoot, limits, limitLoss, total };
+      }));
+    // Convex absolute deviation plus hinge penalties attains its worst value at
+    // an interval endpoint. Choose the whole penalty, not max intake alone.
+    const worst = cases.reduce((a, b) => compareFractions(b.total, a.total) > 0 ? b : a);
+  return { minimum, maximum, added, continuedIncrease, worst };
+}
+function cachedSubjectLoss(input: ReturnType<typeof compileSubject>, known: bigint, weight: Fraction) {
+  let cache = input.losses.get(weight);
+  if (!cache) { cache = new Map(); input.losses.set(weight, cache); }
+  let value = cache.get(known);
+  if (!value) {
+    value = subjectLoss(input, known, weight);
+    if (cache.size >= 256) cache.delete(cache.keys().next().value!);
+    cache.set(known, value);
+  }
+  return value;
 }
 
 function compareFractions(a: Fraction, b: Fraction) {
@@ -159,54 +204,42 @@ export function weightedDoseFitScore(request: CanonicalRequest, exposure: Readon
     const found = cache.get(exposure); if (found) return found;
     const base = doseFitScore(request, exposure), parts = exactParts.get(base)!;
     const exact = add(multiply(fromDecimal(uniform), parts.fitting), parts.safety);
-    const score = { ...base, total: value(exact) }; exactTotals.set(score, exact); cache.set(exposure, score); return score;
+    const score = Object.defineProperties({}, { ...Object.getOwnPropertyDescriptors(base), total: { value: value(exact), enumerable: true, configurable: true, writable: true } }) as DoseFitScore;
+    targetDeviations.set(score, doseFitTargetDeviations(base)); exactTotals.set(score, exact); cache.set(exposure, score); return score;
   }
   return calculateDoseFit(request, exposure, true);
 }
-function calculateDoseFit(request: CanonicalRequest, exposure: ReadonlyMap<string, bigint>, applyWeights: boolean): DoseFitScore {
+function calculateDoseFit(request: CanonicalRequest, exposure: ReadonlyMap<string, bigint>, applyWeights: boolean, materialize = false): DoseFitScore {
   const memo = applyWeights ? weightedCache : scoreCache;
   let cache = memo.get(request);
   if (!cache) { cache = new WeakMap(); memo.set(request, cache); }
   const previous = cache.get(exposure);
-  if (previous) return previous;
+  if (previous && !materialize) return previous;
   let under = ZERO, over = ZERO, limit = ZERO, intentTotal = ZERO;
   const settings = applyWeights && request.scoring ? effectiveWeights(request.scoring) : null;
   const weights = settings ? exactWeights(settings) : null;
   const perTarget: DoseFitScore["perTarget"][number][] = [];
   const perContinuedDose: NonNullable<DoseFitScore["perContinuedDose"]>[number][] = [];
   const perLimit: DoseFitScore["perLimit"][number][] = [];
+  const deviations: TargetDeviation[] = [], estimatedTargets: string[] = [];
   const subjects = new Set([...exposure.keys(), ...(request.dietaryIntake ?? []).map((row) => row.subjectId), ...request.targets.map((row) => row.subjectId)]);
   for (const subjectId of [...subjects].sort()) {
     const { target, ranges, dietary, referenceRows, reference, scale, bounds } = subjectInputs(request, subjectId);
+    if (!target && reference === BigInt(0) && bounds.length === 0) continue;
     const known = exposure.get(subjectId) ?? BigInt(0);
-    const minimum = known + ranges.minimum - ranges.base, maximum = known + ranges.maximum - ranges.base;
-    const added = known > ranges.base ? known - ranges.base : BigInt(0);
-    const continuedIncrease = reference > BigInt(0) ? { num: added, den: reference } : ZERO;
     const weight = weights ? weights.subjects.get(subjectId) ?? weights.defaultWeight : ONE;
-    const cases = [...new Set([minimum, maximum])].flatMap((supplemental) =>
-      [...new Set([dietary.minimum, dietary.maximum])].map((food) => {
-        const want = target?.requested.units ?? BigInt(0);
-        const targetExposure = supplemental + (target && targetBasis(target) === "total_daily" ? food : BigInt(0));
-        const shortfall = want > BigInt(0) && targetExposure < want ? { num: want - targetExposure, den: want } : ZERO;
-        const overshoot = add(target && want === BigInt(0) && scale ? { num: targetExposure, den: scale } : excess(targetExposure, want), continuedIncrease);
-        const limits = bounds.map((row) => {
-          const sourceScope = row.ceiling.sourceScope ?? "supplemental";
-          const total = supplemental + (sourceScope === "total" ? food : BigInt(0));
-          return { row, total, sourceScope, excess: excess(total, row.units) };
-        });
-        const limitLoss = limits.reduce((sum, row) => add(sum, row.excess), ZERO);
-        const total = add(multiply(weight, add(shortfall, overshoot)), { num: limitLoss.num * BigInt(UPPER_LIMIT_EXTRA_WEIGHT), den: limitLoss.den });
-        return { supplemental, food, targetExposure, shortfall, overshoot, limits, limitLoss, total };
-      }));
-    // Convex absolute deviation plus hinge penalties attains its worst value at
-    // an interval endpoint. Choose the whole penalty, not max intake alone.
-    const worst = cases.reduce((a, b) => compareFractions(b.total, a.total) > 0 ? b : a);
+    const { minimum, maximum, added, continuedIncrease, worst } = cachedSubjectLoss(subjectInputs(request, subjectId), known, weight);
     intentTotal = add(intentTotal, worst.total);
     under = add(under, worst.shortfall);
     over = add(over, worst.overshoot);
     limit = add(limit, worst.limitLoss);
     const estimated = minimum !== maximum || dietary.minimum !== dietary.maximum;
     const rowCertainty = certainty(request, subjectId) === "unknown" ? "unknown" : estimated ? "estimated" : certainty(request, subjectId);
+    if (target) {
+      deviations.push({ subjectId, under: value(worst.shortfall), over: value(worst.overshoot) });
+      if (rowCertainty === "estimated") estimatedTargets.push(subjectId);
+    }
+    if (!materialize) continue;
     if (target) {
       const amount = (units: bigint) => amountFromScaled({ ...target.requested, units }, target.requestedUnit, target.name) ?? 0;
       const includeFood = targetBasis(target) === "total_daily";
@@ -247,10 +280,18 @@ function calculateDoseFit(request: CanonicalRequest, exposure: ReadonlyMap<strin
   const score: DoseFitScore = { version: DOSE_FIT_VERSION, limitWeight: 2, under: value(under), over: value(over),
     limit: value(limit), weightedLimit: value(weighted), total: value(exact), perTarget, perContinuedDose, perLimit,
     unknownSubjectIds: [...new Set(request.unknownIntakeSubjectIds ?? [])].sort(),
-    estimatedSubjectIds: [...new Set([...(request.estimatedIntakeSubjectIds ?? []), ...perTarget.filter((row) => row.certainty === "estimated").map((row) => row.subjectId)])].sort() };
+    estimatedSubjectIds: [...new Set([...(request.estimatedIntakeSubjectIds ?? []), ...estimatedTargets])].sort() };
   exactTotals.set(score, exact);
   exactParts.set(score, { fitting: add(under, over), safety: weighted });
-  cache.set(exposure, score);
+  targetDeviations.set(score, deviations);
+  if (!materialize) {
+    let details: DoseFitScore | undefined;
+    for (const key of ["perTarget", "perContinuedDose", "perLimit"] as const) Object.defineProperty(score, key, {
+      enumerable: true, configurable: true,
+      get: () => (details ??= calculateDoseFit(request, exposure, applyWeights, true))[key]
+    });
+    cache.set(exposure, score);
+  }
   return score;
 }
 

@@ -5,6 +5,8 @@ export type Decimal = string | number;
 export function rational(num: bigint, den = BigInt(1)): Rational {
   if (den === BigInt(0)) throw new Error("Rational denominator is zero");
   if (den < BigInt(0)) { num = -num; den = -den; }
+  if (den === BigInt(1)) return Object.freeze({ num, den });
+  if (num === BigInt(0)) return Object.freeze({ num, den: BigInt(1) });
   let a = num < BigInt(0) ? -num : num, b = den;
   while (b !== BigInt(0)) [a, b] = [b, a % b];
   const divisor = a || BigInt(1);
@@ -13,10 +15,10 @@ export function rational(num: bigint, den = BigInt(1)): Rational {
 
 export const ZERO = rational(BigInt(0));
 export const ONE = rational(BigInt(1));
-export const add = (a: Rational, b: Rational): Rational => rational(a.num * b.den + b.num * a.den, a.den * b.den);
-export const subtract = (a: Rational, b: Rational): Rational => rational(a.num * b.den - b.num * a.den, a.den * b.den);
-export const multiply = (a: Rational, b: Rational): Rational => rational(a.num * b.num, a.den * b.den);
-export const divide = (a: Rational, b: Rational): Rational => rational(a.num * b.den, a.den * b.num);
+export const add = (a: Rational, b: Rational): Rational => a.num === BigInt(0) ? b : b.num === BigInt(0) ? a : rational(a.num * b.den + b.num * a.den, a.den * b.den);
+export const subtract = (a: Rational, b: Rational): Rational => b.num === BigInt(0) ? a : rational(a.num * b.den - b.num * a.den, a.den * b.den);
+export const multiply = (a: Rational, b: Rational): Rational => a.num === BigInt(0) || b.num === BigInt(0) ? ZERO : a.num === a.den ? b : b.num === b.den ? a : rational(a.num * b.num, a.den * b.den);
+export const divide = (a: Rational, b: Rational): Rational => b.num !== BigInt(0) && b.num === b.den ? a : rational(a.num * b.den, a.den * b.num);
 export function compare(a: Rational, b: Rational): number {
   const delta = a.num * b.den - b.num * a.den;
   return delta < BigInt(0) ? -1 : delta > BigInt(0) ? 1 : 0;
@@ -29,6 +31,7 @@ export const serialize = (value: Rational) => ({ numerator: String(value.num), d
 export function fromDecimal(value: unknown): Rational {
   if (typeof value !== "string" && typeof value !== "number") throw new Error("Expected a finite decimal coefficient");
   if (typeof value === "number" && !Number.isFinite(value)) throw new Error("Expected a finite decimal coefficient");
+  if (typeof value === "number" && Number.isSafeInteger(value)) return rational(BigInt(value));
   const text = String(value);
   if (text.length > 256) throw new Error("Decimal representation exceeds 256 characters");
   const match = /^([+-]?)(\d+)(?:\.(\d*))?(?:e([+-]?\d+))?$/i.exec(text);

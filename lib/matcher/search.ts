@@ -3,7 +3,7 @@ import { targetDoseTicks } from "@/lib/matcher/target-basis";
 import { servingIncrement } from "@/lib/matcher/serving-grid";
 import { comparePillCounts } from "@/lib/matcher/pill-burden";
 import { compileVariant, isDeferredConditional } from "@/lib/matcher/candidates";
-import { compareDoseFit, doseFitScore } from "@/lib/matcher/dose-fit";
+import { compareDoseFit, doseFitScore, doseFitTargetDeviations } from "@/lib/matcher/dose-fit";
 import { administrationBasisKnown, compareOverallScores, monthlyGoodsPrice, PRACTICAL_OBJECTIVES, requestForProfile, searchStateScore } from "@/lib/matcher/practical-scoring";
 import { DEFAULT_MATCHER_CONFIG } from "@/lib/matcher/config";
 import { fingerprintState } from "@/lib/matcher/dominance";
@@ -429,9 +429,9 @@ export function reviewFrontier(states: readonly SearchState[], request: Canonica
   const chosen = new Set<SearchState>([...incumbents, ...smallest(states, 16, doseOrder)]);
   // A close fit on one target can become the best complete basket after a
   // complementary addition, despite losing every aggregate/profile ranking.
-  const additiveBases = states.filter(state => doseFitScore(request,state.exposure).perTarget.every(row=>row.over===0));
+  const additiveBases = states.filter(state => doseFitTargetDeviations(doseFitScore(request,state.exposure)).every(row=>row.over===0));
   for (const target of request.targets.filter(row => !isDeferredConditional(row)).slice(0, 32)) {
-    const deviation = (state: SearchState) => { const row = doseFitScore(request,state.exposure).perTarget.find(row=>row.subjectId===target.subjectId); return row ? row.under + row.over : Infinity; };
+    const deviation = (state: SearchState) => { const row = doseFitTargetDeviations(doseFitScore(request,state.exposure)).find(row=>row.subjectId===target.subjectId); return row ? row.under + row.over : Infinity; };
     const reference = smallest(additiveBases, 1, (a,b)=>deviation(a)-deviation(b) || doseOrder(a,b))[0];
     if (reference) chosen.add(reference);
   }
@@ -454,7 +454,7 @@ export function reviewFrontier(states: readonly SearchState[], request: Canonica
   ]) for (const state of smallest(nonempty, 24, compare)) chosen.add(state);
   const protectedIds = new Set(request.targets.filter(row => row.importance === "core" || row.importance === "required").map(row => row.subjectId));
   if (protectedIds.size && request.targets.some(row => row.importance === "optional")) {
-    const protectedFit = (state: SearchState) => doseFitScore(request, state.exposure).perTarget.filter(row => protectedIds.has(row.subjectId)).reduce((sum, row) => sum + row.under + row.over, 0);
+    const protectedFit = (state: SearchState) => doseFitTargetDeviations(doseFitScore(request, state.exposure)).filter(row => protectedIds.has(row.subjectId)).reduce((sum, row) => sum + row.under + row.over, 0);
     for (const state of smallest(states, 48, (a, b) => protectedFit(a) - protectedFit(b) || order(a, b))) chosen.add(state);
   }
   const patterns = new Set<string>();
