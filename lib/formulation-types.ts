@@ -1,5 +1,7 @@
 import type { LocaleCode } from "@/lib/i18n";
 
+export const WEB_FORMULATION_INGREDIENT_LIMIT = 8;
+
 export type FormulationStatus = "covered" | "add" | "review";
 export type FormulationSafetyAction =
   | "advisory"

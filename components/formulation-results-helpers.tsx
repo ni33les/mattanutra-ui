@@ -219,6 +219,6 @@ export function selectedStackCoverage(
 export function revealCoverageLabel(coverage: number | null | undefined, pending: boolean, copy: Readonly<Record<string, string>>) {
   if (pending) return copy.productsPendingBadge;
   if (coverage == null || !Number.isFinite(coverage)) return copy.coverageUnknown;
-  if (coverage === 0) return copy.currentlyUnavailable;
-  return coverage < 0.01 ? '<0.01%' : `${Number(coverage.toFixed(2))}%`;
+  if (coverage === 0) return '0%';
+  return coverage > 0 && coverage < 1 ? '1%' : `${Number(coverage.toFixed(2))}%`;
 }

@@ -22,6 +22,7 @@ import {
 import { grokTaskReasoningDefault } from "@/lib/grok-task-config";
 import { FORMULATION_RESPONSE_SCHEMA } from "@/lib/ai-generation-schema";
 import { constrainFormulation, FORMULATION_AVAILABILITY_POLICY } from '@/lib/formulation-availability';
+import { WEB_FORMULATION_INGREDIENT_LIMIT } from '@/lib/formulation-types';
 
 type AnalysisAuditEvent = {
   eventType: string;
@@ -264,10 +265,8 @@ function userMessages({
       },
       instructions: [
         "Return a JSON object with exactly three top-level keys: supplementBreakdown, marketingPoints, and cautions.",
-        "First identify and rank every supplement that is clearly effective and needed for this assessment.",
-        "supplementBreakdown should contain the complete ranked set of assessment-justified items, usually 6 to 12.",
-        "If more than 12 supplements are clearly justified, return the top 12 by expected impact and safety fit.",
-        "Do not choose a default or midpoint count. Eight is acceptable only when exactly eight supplements are clearly effective and needed; otherwise return fewer or more as the assessment warrants.",
+        `Return at most ${WEB_FORMULATION_INGREDIENT_LIMIT} justified ingredients, ranked by expected impact for this assessment.`,
+        "Keep only the highest-impact ingredients. Return fewer when fewer are justified; there is no minimum count.",
         "Do not pad with weak or duplicative items just to reach a count.",
         "marketingPoints must contain 3 concise points that are specific to this assessment, the HealthScore, and the plan.",
         "Matching pending: no diet, allergy, pill or budget promises.",

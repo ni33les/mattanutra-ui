@@ -1,4 +1,5 @@
 import type { HealthScoreResult } from "@/lib/health-score";
+import { WEB_FORMULATION_INGREDIENT_LIMIT } from "@/lib/formulation-types";
 
 // Provider shape constraints supplement (never replace) the existing semantic
 // validators. Cached/historical results continue through their existing readers.
@@ -22,7 +23,7 @@ export const FORMULATION_RESPONSE_SCHEMA = {
       id, ...textFields(["category", "supplement", "dailyDose", "decision", "rationale", "whyThisIsForYou"]),
       effectivenessRank: { type: "integer", minimum: 1 },
       status: { type: "string", enum: ["covered", "add", "review"] }, cautions: array(caution)
-    }), { minItems: 0, maxItems: 30 }),
+    }), { minItems: 0, maxItems: WEB_FORMULATION_INGREDIENT_LIMIT }),
     marketingPoints: array(object({ id, title: text, body: text }), { minItems: 3, maxItems: 3 }),
     cautions: array(caution)
   })

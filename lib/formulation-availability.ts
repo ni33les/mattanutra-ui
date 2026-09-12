@@ -3,6 +3,7 @@ import { webIngredientAvailability } from '@/lib/matcher/adapters/web';
 import type { ProductRecommendationInput } from '@/lib/product-recommendation-types';
 import type { CanonicalSupplementOption } from '@/lib/canonical-supplements';
 import type { FormulationBlueprint, LocalizedText } from '@/lib/formulation-types';
+import { WEB_FORMULATION_INGREDIENT_LIMIT } from '@/lib/formulation-types';
 
 export const FORMULATION_AVAILABILITY_POLICY = 'product-backed-v1';
 export type FormulationAvailability = Readonly<{ policy: typeof FORMULATION_AVAILABILITY_POLICY; catalogueIdentity: string; inputIdentity: string; supplements: CanonicalSupplementOption[] }>;
@@ -11,7 +12,10 @@ const texts = (value: LocalizedText | undefined) => typeof value === 'string' ? 
 function keys(row: CanonicalSupplementOption) { return new Set([row.name, row.normalizedName, row.id, ...row.aliases].map(words)); }
 export function constrainFormulation(formula: FormulationBlueprint, permitted: readonly CanonicalSupplementOption[]): FormulationBlueprint {
   const allowed = permitted.map(keys);
-  const included = formula.supplementBreakdown.filter(row => texts(row.supplement).some(name => allowed.some(set => set.has(words(name)))));
+  const included = formula.supplementBreakdown
+    .filter(row => texts(row.supplement).some(name => allowed.some(set => set.has(words(name)))))
+    .sort((a, b) => a.effectivenessRank - b.effectivenessRank)
+    .slice(0, WEB_FORMULATION_INGREDIENT_LIMIT);
   const removed = formula.supplementBreakdown.filter(row => !included.includes(row));
   const removedNames = removed.flatMap(row => [row.id, ...texts(row.supplement)]).map(words).filter(Boolean);
   const dependsOnRemoved = (row: { id: string; title?: LocalizedText; body?: LocalizedText }) => [row.id, ...texts(row.title), ...texts(row.body)].some(value => removedNames.some(name => ` ${words(value)} `.includes(` ${name} `)));
@@ -22,7 +26,7 @@ export function constrainFormulation(formula: FormulationBlueprint, permitted: r
 }
 export function formulationAvailabilityIdentity(catalogueIdentity: string, input: unknown, supplements: CanonicalSupplementOption[]): FormulationAvailability {
   return { policy: FORMULATION_AVAILABILITY_POLICY, catalogueIdentity,
-    inputIdentity: sha256Hex(JSON.stringify({ policy: FORMULATION_AVAILABILITY_POLICY, catalogueIdentity, input, supplements })), supplements };
+    inputIdentity: sha256Hex(JSON.stringify({ policy: FORMULATION_AVAILABILITY_POLICY, ingredientLimit: WEB_FORMULATION_INGREDIENT_LIMIT, catalogueIdentity, input, supplements })), supplements };
 }
 export function productBackedSupplements(options: readonly CanonicalSupplementOption[], input: ProductRecommendationInput) {
   const available = webIngredientAvailability(input);
