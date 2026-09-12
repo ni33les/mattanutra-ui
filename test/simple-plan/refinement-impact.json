@@ -1,0 +1,229 @@
+{
+  "releaseBase": "26e90472b0d23c9904eb1cf625ce70197384ac4e",
+  "deploymentBases": {
+    "dev": "26e90472b0d23c9904eb1cf625ce70197384ac4e",
+    "uat": "26e90472b0d23c9904eb1cf625ce70197384ac4e"
+  },
+  "scope": "consistent_refinement_and_fresh_standard_matching",
+  "testPolicy": "Affected-code checks only; no full application or MCP pack. Every selected case must execute once with no skips, focus, retries or missing prerequisites. Release requires all fresh native standard trials under 1000ms.",
+  "maintainedInventories": [
+    "test/simple-plan/impact.json",
+    "test/service-efficiency/impact.json"
+  ],
+  "files": [
+    {
+      "file": "test/service-efficiency/scoring-hot-path.test.ts",
+      "slice": "matching",
+      "expectedCases": 4,
+      "reason": "Exact scoring comparison reuse, immutable profile identity, raw nutrient sharing and independent weighted uncertainty endpoints"
+    },
+    {
+      "file": "test/service-efficiency/checkpoint-hot-path.test.ts",
+      "slice": "matching",
+      "expectedCases": 3,
+      "reason": "Completion without redundant checkpoint continuation, historical cursor recovery and standard-to-expanded attempt accounting"
+    },
+    {
+      "file": "test/service-efficiency/frontier-hot-path.test.ts",
+      "slice": "matching",
+      "expectedCases": 2,
+      "reason": "Bounded candidate retention matches a stable full sort, preserves ties and inputs, and demonstrably reduces comparison calls"
+    },
+    {
+      "file": "test/practical-matching/scoring.test.ts",
+      "expectedCases": 11,
+      "reason": "Directly affected shared matching, publication, durable recovery or commerce consumer assertions",
+      "slice": "matching"
+    },
+    {
+      "file": "test/practical-matching/search.test.ts",
+      "expectedCases": 13,
+      "reason": "Directly affected shared matching, publication, durable recovery or commerce consumer assertions",
+      "slice": "matching"
+    },
+    {
+      "file": "test/practical-matching/oracle.test.ts",
+      "expectedCases": 4,
+      "reason": "Directly affected shared matching, publication, durable recovery or commerce consumer assertions",
+      "slice": "matching"
+    },
+    {
+      "file": "test/simple-plan/weights.test.ts",
+      "expectedCases": 7,
+      "reason": "Conversational v9 protocol, state, response, policy and release boundary assertions",
+      "slice": "matching"
+    },
+    {
+      "file": "test/simple-plan/importance.test.ts",
+      "expectedCases": 10,
+      "reason": "Pure importance and explicit zero-target arithmetic, precision, scale provenance and shared search outcomes",
+      "slice": "matching"
+    },
+    {
+      "file": "test/matcher/advisory-dose-fit.test.ts",
+      "expectedCases": 36,
+      "reason": "Preserved raw proportional dose fit and twofold safety excess",
+      "slice": "matching"
+    },
+    {
+      "file": "test/matcher/flexible-v5-priority.test.ts",
+      "expectedCases": 4,
+      "reason": "Required-target protection under shared search ranking",
+      "slice": "matching"
+    },
+    {
+      "file": "test/service-efficiency/sessions.test.ts",
+      "slice": "matching",
+      "expectedCases": 4,
+      "reason": "Resident worker continuation, binary checkpoint restart and exact synchronous result/attempt parity"
+    },
+    {
+      "file": "test/service-efficiency/affinity.test.ts",
+      "slice": "matching",
+      "expectedCases": 4,
+      "reason": "Audits 26/30: acknowledged resident cursor eviction prevents idle affinity stranding productive work; exact attempt/result recovery"
+    },
+    {
+      "file": "test/ax-refinement/checkpoints.test.ts",
+      "slice": "matching",
+      "expectedCases": 3,
+      "reason": "Preserve legacy checkpoint readers, restart equivalence and all prior identity/cache-isolation assertions"
+    },
+    {
+      "file": "test/service-efficiency/reference-browser.test.ts",
+      "slice": "matching",
+      "expectedCases": 1,
+      "reason": "The shared web/admin matcher must compile and execute in a browser without importing Node async context; server reference isolation remains independently covered"
+    },
+    {
+      "file": "test/service-efficiency/numeric-scoring.test.ts",
+      "expectedCases": 10,
+      "reason": "Exact ranking must avoid allocating human display conversions while preserving complete serialized score facts and weighted penalties",
+      "slice": "matching"
+    },
+    {
+      "file": "test/simple-plan/refinement-consistency.test.ts",
+      "expectedCases": 12,
+      "reason": "Accepted refinement revision remains visible during processing, terminal failure and recovery without publishing the old basket under a new revision",
+      "slice": "refinement"
+    },
+    {
+      "file": "test/simple-plan/refinement-summary.test.ts",
+      "expectedCases": 7,
+      "reason": "Captured Daniel and Maya request fit, first-order budget deviation and revision comparisons remain concise, localized and nonblocking",
+      "slice": "refinement"
+    },
+    {
+      "file": "test/simple-plan/refinement.test.ts",
+      "expectedCases": 6,
+      "reason": "Conversational v9 protocol, state, response, policy and release boundary assertions",
+      "slice": "consumers"
+    },
+    {
+      "file": "test/simple-plan/state.test.ts",
+      "expectedCases": 4,
+      "reason": "Conversational v9 protocol, state, response, policy and release boundary assertions",
+      "slice": "consumers"
+    },
+    {
+      "file": "test/simple-plan/response.test.ts",
+      "expectedCases": 2,
+      "reason": "Conversational v9 protocol, state, response, policy and release boundary assertions",
+      "slice": "consumers"
+    },
+    {
+      "file": "test/simple-plan/single-recommendation.test.ts",
+      "expectedCases": 5,
+      "reason": "One current recommendation, default best_match, hidden candidate fencing and conversational publication",
+      "slice": "consumers"
+    },
+    {
+      "file": "test/simple-plan/no-option-ids.test.ts",
+      "reason": "Identifier-free direct checkout, removed confirmation, publication alignment and frozen recovery.",
+      "expectedCases": 9,
+      "slice": "consumers"
+    },
+    {
+      "file": "test/simple-plan/direct-checkout.test.ts",
+      "expectedCases": 5,
+      "slice": "consumers",
+      "reason": "Direct checkout without confirmation revision, no queued plan work and generated service-feedback protocol"
+    },
+    {
+      "file": "test/simple-plan/publication.test.ts",
+      "expectedCases": 4,
+      "reason": "Conversational v9 protocol, state, response, policy and release boundary assertions",
+      "slice": "consumers"
+    },
+    {
+      "file": "test/simple-plan/hosted.test.ts",
+      "expectedCases": 3,
+      "reason": "Conversational v9 protocol, state, response, policy and release boundary assertions",
+      "slice": "consumers"
+    },
+    {
+      "file": "test/simple-plan/transport.test.ts",
+      "expectedCases": 3,
+      "reason": "Conversational v9 protocol, state, response, policy and release boundary assertions",
+      "slice": "consumers"
+    },
+    {
+      "file": "test/simple-plan/hygiene.test.ts",
+      "expectedCases": 2,
+      "reason": "Conversational v9 protocol, state, response, policy and release boundary assertions",
+      "slice": "consumers"
+    },
+    {
+      "file": "test/service-efficiency/reads.test.ts",
+      "slice": "consumers",
+      "expectedCases": 6,
+      "reason": "Lockless projection reads, unchanged versions, preserved expiry state and full conversation compatibility"
+    },
+    {
+      "file": "test/service-efficiency/reads.integration.test.ts",
+      "slice": "postgres",
+      "database": true,
+      "expectedCases": 6,
+      "reason": "Actual PostgreSQL locks retained for mutations, nonblocking status and two small SELECTs"
+    },
+    {
+      "file": "test/service-efficiency/operations.integration.test.ts",
+      "slice": "postgres",
+      "database": true,
+      "expectedCases": 4,
+      "reason": "Bounded atomic lease and checkpoint statements with preserved commands, cursor and stale-owner rejection"
+    },
+    {
+      "file": "test/service-efficiency/measurements.test.ts",
+      "slice": "consumers",
+      "expectedCases": 5,
+      "reason": "Concurrent request attribution, bounded aggregation and startup wiring in application and external worker processes"
+    },
+    {
+      "file": "test/service-efficiency/duplicate-admission.test.ts",
+      "slice": "consumers",
+      "expectedCases": 2,
+      "reason": "Audits 31/35: concurrent preparation without process Promise chains, one database-owned plan/checkout receipt"
+    },
+    {
+      "file": "test/simple-plan/refinement-gate.test.ts",
+      "expectedCases": 3,
+      "reason": "Hard fresh native timing gate rejects cache hits, incomplete trials, changed semantics and stale evidence",
+      "slice": "consumers"
+    }
+  ],
+  "inputs": [
+    "test/simple-plan/refinement-fixture.json",
+    "test/fixtures/mcp-evidence-images/dev-20260911.json.gz",
+    "test/fixtures/mcp-evidence-images/manifest.json",
+    "lib/matcher/scoring-policy.ts",
+    "lib/matcher/config.ts"
+  ],
+  "benchmarkFixtures": [
+    "d3",
+    "daniel-create",
+    "daniel-refine",
+    "maya-create"
+  ],
+  "expandedFixture": "maya-expanded"
+}
