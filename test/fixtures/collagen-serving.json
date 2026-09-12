@@ -1,0 +1,164 @@
+{
+  "provenance": "Allowlisted DEV retail products, 2026-09-12; original catalogue prices and facts; artificial two-target profile.",
+  "needs": [
+    {
+      "id": "supplement:collagen",
+      "weight": 7,
+      "category": "Longevity",
+      "itemType": "supplement",
+      "sourceId": "collagen",
+      "aliasKeys": [
+        "collagen",
+        "hydrolysate_collagen",
+        "hydrolysed_collagen"
+      ],
+      "targetDose": {
+        "unit": "mg",
+        "amount": 5000,
+        "originalText": "5000 mg/day"
+      },
+      "targetText": "5000 mg/day",
+      "displayName": "Collagen",
+      "normalizedName": "collagen",
+      "targetComparableAmount": 5000000
+    },
+    {
+      "id": "supplement:vitamin-c",
+      "weight": 6,
+      "category": "Vitamins",
+      "itemType": "supplement",
+      "sourceId": "vitamin-c",
+      "aliasKeys": [
+        "vitamin_c",
+        "ascorbic_acid",
+        "calcium_ascorbate",
+        "sodium_ascorbate"
+      ],
+      "targetDose": {
+        "unit": "mg",
+        "amount": 500,
+        "originalText": "500 mg/day"
+      },
+      "targetText": "500 mg/day",
+      "displayName": "Vitamin C",
+      "normalizedName": "vitamin_c",
+      "targetComparableAmount": 500000
+    }
+  ],
+  "candidates": [
+    {
+      "administration": null,
+      "automatedSafetyPassed": true,
+      "availabilityStatus": "out_of_stock",
+      "availableCountryCodes": [
+        "TH"
+      ],
+      "brandStatus": "approved",
+      "currency": "THB",
+      "facts": [
+        {
+          "amount": 2500,
+          "comparableAmount": 2500000,
+          "confidence": "high",
+          "source": "admin",
+          "sourceUrl": null,
+          "sourceText": "page_text: ไฮโดรไลเซต คอลลาเจน 2,500 มิลลิกรัม",
+          "mappingStatus": "verified",
+          "itemType": "supplement",
+          "name": "Collagen",
+          "normalizedName": "collagen",
+          "servingLabel": null,
+          "supplementId": "f2ecd858-ff2a-5dff-b225-68d615a69b1f",
+          "unit": "mg"
+        }
+      ],
+      "id": "8e72318a-5355-4333-8607-6108d997177c",
+      "imageUrl": "https://mattanutra.sgp1.cdn.digitaloceanspaces.com/uat/products/8e72318a-5355-4333-8607-6108d997177c/25d31dbc1ba48482b099b1d73c5087468b1a4763730e7ff59a45dce5370a2c25.jpg",
+      "labelStatus": "parsed",
+      "platform": "manual",
+      "priceAmount": 683,
+      "priceSource": "retail_override",
+      "productAudience": "both",
+      "productKind": "supplement",
+      "productUrl": "https://www.megawecare.co.th/product/glow/",
+      "region": "TH",
+      "retailAvailabilityStatus": "backorder",
+      "retailSellableProductId": "a6788783-31a3-48fb-bb1b-82dec46cc7df",
+      "selectedRetailerName": "Delight Pharmacy",
+      "selectedRetailerOrganisationId": "6052e03e-6619-409b-8767-02806b3df016",
+      "status": "approved",
+      "title": "Glow Collagen",
+      "unitPriceAmount": 683,
+      "validation": {
+        "checkedAt": "1970-01-01T00:00:00.000Z",
+        "matchableFactCount": 1,
+        "reasons": [],
+        "status": "pass",
+        "summary": ""
+      }
+    },
+    {
+      "administration": {
+        "route": "oral",
+        "physicalUnit": "tablet",
+        "unitsPerServing": 1,
+        "doseIncrement": 1,
+        "packQuantity": 30,
+        "provenance": {
+          "status": "verified",
+          "sourceUrl": "https://www.blackmores.co.th/en/products/supplement/2128--blackmores-bio-c-500-mg-daily-imu-chewable",
+          "sourceText": "Manufacturer confirms 500 mg vitamin C per chewable tablet and available 30- and 60-tablet packs. This stored seller variant explicitly identifies 30 tablets in both its title and original Delight product-sheet row 10; select the 30-tablet variant, not the 60-tablet variant.",
+          "verifiedAt": "2026-09-12T03:45:06.746Z"
+        }
+      },
+      "automatedSafetyPassed": true,
+      "availabilityStatus": "out_of_stock",
+      "availableCountryCodes": [
+        "TH"
+      ],
+      "brandStatus": "approved",
+      "currency": "THB",
+      "facts": [
+        {
+          "amount": 500,
+          "comparableAmount": 500000,
+          "confidence": "high",
+          "source": "admin",
+          "sourceUrl": "https://www.blackmores.co.th/en/products/supplement/2128--blackmores-bio-c-500-mg-daily-imu-chewable",
+          "sourceText": "Manufacturer active composition per tablet: vitamin C 500 mg, comprising 225 mg from ascorbic acid and 275 mg from sodium ascorbate. Total is 500 mg; do not add components again.",
+          "mappingStatus": "verified",
+          "itemType": "supplement",
+          "name": "Vitamin C",
+          "normalizedName": "vitamin_c",
+          "servingLabel": "per 1 chewable tablet",
+          "supplementId": "a34da45e-fcf0-5dbd-8a0e-7d4f9fc7b71c",
+          "unit": "mg"
+        }
+      ],
+      "id": "ec278e48-ab6d-4a12-a385-3aa62d22c378",
+      "imageUrl": "https://mattanutra.sgp1.cdn.digitaloceanspaces.com/uat/products/ec278e48-ab6d-4a12-a385-3aa62d22c378/2fdef35b619e876e59a095542cfb34ee6ccefb7f6e2e9b9a3ff4ecb20f3746d7.png",
+      "labelStatus": "parsed",
+      "platform": "manual",
+      "priceAmount": 281,
+      "priceSource": "retail_override",
+      "productAudience": "both",
+      "productKind": "supplement",
+      "productUrl": "https://mattanutra.com/internal/delight-product-sheet/row-10-blackmores-bio-c-500mg-daily-imu-chewable-30-s",
+      "region": "TH",
+      "retailAvailabilityStatus": "backorder",
+      "retailSellableProductId": "08dee045-4259-48b5-b140-a8fd772a0d3b",
+      "selectedRetailerName": "Delight Pharmacy",
+      "selectedRetailerOrganisationId": "6052e03e-6619-409b-8767-02806b3df016",
+      "status": "approved",
+      "title": "BLACKMORES BIO C 500MG DAILY IMU+ CHEWABLE 30'S",
+      "unitPriceAmount": 281,
+      "validation": {
+        "checkedAt": "1970-01-01T00:00:00.000Z",
+        "matchableFactCount": 1,
+        "reasons": [],
+        "status": "pass",
+        "summary": ""
+      }
+    }
+  ]
+}

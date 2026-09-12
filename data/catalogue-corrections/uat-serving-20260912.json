@@ -1,0 +1,438 @@
+{
+  "version": 1,
+  "environment": "uat",
+  "corrections": [
+    {
+      "correctionId": "uat-serving-20260912-0f0905ec-d925-5ab2-8406-38edee67de16",
+      "entityTable": "products",
+      "entityId": "0f0905ec-d925-5ab2-8406-38edee67de16",
+      "before": {
+        "id": "0f0905ec-d925-5ab2-8406-38edee67de16",
+        "title": "VISTRA ELASTIN COLLAGEN",
+        "product_url": "https://www.vistra.co.th/product/vistra-nutribeau-advanced-elastin-peptide-plus-collagen-5000-mg/",
+        "administration": {
+          "route": "oral",
+          "provenance": {
+            "status": "verified",
+            "sourceUrl": "https://www.vistra.co.th/product/vistra-nutribeau-advanced-elastin-peptide-plus-collagen-5000-mg/",
+            "sourceText": "Manufacturer composition and oral directions support physical unit sachet. Composition basis per labelled serving is not explicit, so no nutrient-to-unit conversion is asserted. Pack quantity for this SKU is not independently established.",
+            "verifiedAt": "2026-09-07T11:30:03.539452+00:00"
+          },
+          "packQuantity": null,
+          "physicalUnit": "sachet",
+          "doseIncrement": 1,
+          "unitsPerServing": null
+        }
+      },
+      "after": {
+        "id": "0f0905ec-d925-5ab2-8406-38edee67de16",
+        "title": "VISTRA ELASTIN COLLAGEN",
+        "product_url": "https://www.vistra.co.th/product/vistra-nutribeau-advanced-elastin-peptide-plus-collagen-5000-mg/",
+        "administration": {
+          "route": "oral",
+          "provenance": {
+            "status": "verified",
+            "sourceUrl": "https://www.vistra.co.th/product/vistra-nutribeau-advanced-elastin-peptide-plus-collagen-5000-mg/",
+            "sourceText": "Manufacturer composition and oral directions support physical unit sachet. Composition basis per labelled serving is not explicit, so no nutrient-to-unit conversion is asserted. Pack quantity for this SKU is not independently established.",
+            "verifiedAt": "2026-09-07T11:30:03.539452+00:00"
+          },
+          "packQuantity": null,
+          "physicalUnit": "sachet",
+          "doseIncrement": 1,
+          "unitsPerServing": null
+        }
+      },
+      "beforeFingerprint": "85315edb209501ba30a045d110bdda047c96ae4bf5acc6f4504a8286516f31e6",
+      "afterFingerprint": "85315edb209501ba30a045d110bdda047c96ae4bf5acc6f4504a8286516f31e6",
+      "evidence": {
+        "sourceUrl": "https://www.vistra.co.th/product/vistra-nutribeau-advanced-elastin-peptide-plus-collagen-5000-mg/",
+        "checkedAt": "2026-09-12",
+        "summary": "The manufacturer lists collagen components totalling 5 g and instructs one sachet per serving, mixed in 150 ml water. One whole sachet is the labelled serving; pack count is not established."
+      }
+    },
+    {
+      "correctionId": "uat-serving-20260912-2ed6b86e-1e07-486d-8ad6-5d1f15c6c6b4",
+      "entityTable": "products",
+      "entityId": "2ed6b86e-1e07-486d-8ad6-5d1f15c6c6b4",
+      "before": {
+        "id": "2ed6b86e-1e07-486d-8ad6-5d1f15c6c6b4",
+        "title": "Collagen Type II 1000 mg Plus Turmeric Extract",
+        "product_url": "https://www.vistra.co.th/product/vistra-collagen-type-ii-1000-mg-plus-turmeric-extract/",
+        "administration": {
+          "route": "oral",
+          "provenance": {
+            "status": "verified",
+            "sourceUrl": "https://www.vistra.co.th/product/vistra-collagen-type-ii-1000-mg-plus-turmeric-extract/",
+            "sourceText": "Manufacturer composition and oral directions support physical unit sachet. Composition basis per labelled serving is not explicit, so no nutrient-to-unit conversion is asserted. Pack quantity for this SKU is not independently established.",
+            "verifiedAt": "2026-09-07T11:30:06.023582+00:00"
+          },
+          "packQuantity": null,
+          "physicalUnit": "sachet",
+          "doseIncrement": 1,
+          "unitsPerServing": null
+        }
+      },
+      "after": {
+        "id": "2ed6b86e-1e07-486d-8ad6-5d1f15c6c6b4",
+        "title": "Collagen Type II 1000 mg Plus Turmeric Extract",
+        "product_url": "https://www.vistra.co.th/product/vistra-collagen-type-ii-1000-mg-plus-turmeric-extract/",
+        "administration": {
+          "route": "oral",
+          "provenance": {
+            "status": "verified",
+            "sourceUrl": "https://www.vistra.co.th/product/vistra-collagen-type-ii-1000-mg-plus-turmeric-extract/",
+            "sourceText": "Manufacturer composition and oral directions support physical unit sachet. Composition basis per labelled serving is not explicit, so no nutrient-to-unit conversion is asserted. Pack quantity for this SKU is not independently established.",
+            "verifiedAt": "2026-09-07T11:30:06.023582+00:00"
+          },
+          "packQuantity": null,
+          "physicalUnit": "sachet",
+          "doseIncrement": 1,
+          "unitsPerServing": null
+        }
+      },
+      "beforeFingerprint": "d78659ce64c1a10c7853208e76ade527805c23c3a2586bdf2eb0c6c34ab65ca7",
+      "afterFingerprint": "d78659ce64c1a10c7853208e76ade527805c23c3a2586bdf2eb0c6c34ab65ca7",
+      "evidence": {
+        "sourceUrl": "https://www.vistra.co.th/product/vistra-collagen-type-ii-1000-mg-plus-turmeric-extract/",
+        "checkedAt": "2026-09-12",
+        "summary": "The manufacturer lists 960 mg hydrolysed type-II collagen and 40 mg curcuminoids, and directs one 10 g sachet in 180 ml water. One sachet is the composition serving. Pack count is not established."
+      }
+    },
+    {
+      "correctionId": "uat-serving-20260912-57669f54-739d-5970-b320-ce4ffbd61fe3",
+      "entityTable": "products",
+      "entityId": "57669f54-739d-5970-b320-ce4ffbd61fe3",
+      "before": {
+        "id": "57669f54-739d-5970-b320-ce4ffbd61fe3",
+        "title": "BLACKMORES CO-Q10 50MG 30'S",
+        "product_url": "https://vcare-plus.com/blackmores-coq10-50mg-30tab/",
+        "administration": null
+      },
+      "after": {
+        "id": "57669f54-739d-5970-b320-ce4ffbd61fe3",
+        "title": "BLACKMORES CO-Q10 50MG 30'S",
+        "product_url": "https://vcare-plus.com/blackmores-coq10-50mg-30tab/",
+        "administration": null
+      },
+      "beforeFingerprint": "f66af21aeeec36588761ab2d8129652c4113c0b142f8b6d6c6e7f05ab7c84bd4",
+      "afterFingerprint": "f66af21aeeec36588761ab2d8129652c4113c0b142f8b6d6c6e7f05ab7c84bd4",
+      "evidence": {
+        "sourceUrl": "https://www.blackmores.co.th/ค้นหา/e?page=7",
+        "checkedAt": "2026-09-12",
+        "summary": "Blackmores Thailand identifies the Thai Co-Q10 formulation as 50 mg in one capsule, distinct from the overseas 300 mg product. Oral whole capsules establish one capsule per labelled 50 mg serving. Seller pack count is not independently established."
+      }
+    },
+    {
+      "correctionId": "uat-serving-20260912-8a023f8f-007f-4f7a-bd84-27a4b6653e2e",
+      "entityTable": "products",
+      "entityId": "8a023f8f-007f-4f7a-bd84-27a4b6653e2e",
+      "before": {
+        "id": "8a023f8f-007f-4f7a-bd84-27a4b6653e2e",
+        "title": "VISTRA SESAMIN NIGHT TIME",
+        "product_url": "https://www.vistra.co.th/product/vistra-sesamin-night-time/",
+        "administration": {
+          "route": "oral",
+          "provenance": {
+            "status": "verified",
+            "sourceUrl": "https://www.vistra.co.th/product/vistra-sesamin-night-time/",
+            "sourceText": "Manufacturer composition and oral directions support physical unit capsule. Composition basis per labelled serving is not explicit, so no nutrient-to-unit conversion is asserted. Pack quantity for this SKU is not independently established.",
+            "verifiedAt": "2026-09-07T11:30:10.744264+00:00"
+          },
+          "packQuantity": null,
+          "physicalUnit": "capsule",
+          "doseIncrement": 1,
+          "unitsPerServing": null
+        }
+      },
+      "after": {
+        "id": "8a023f8f-007f-4f7a-bd84-27a4b6653e2e",
+        "title": "VISTRA SESAMIN NIGHT TIME",
+        "product_url": "https://www.vistra.co.th/product/vistra-sesamin-night-time/",
+        "administration": {
+          "route": "oral",
+          "provenance": {
+            "status": "verified",
+            "sourceUrl": "https://www.vistra.co.th/product/vistra-sesamin-night-time/",
+            "sourceText": "Manufacturer composition and oral directions support physical unit capsule. Composition basis per labelled serving is not explicit, so no nutrient-to-unit conversion is asserted. Pack quantity for this SKU is not independently established.",
+            "verifiedAt": "2026-09-07T11:30:10.744264+00:00"
+          },
+          "packQuantity": null,
+          "physicalUnit": "capsule",
+          "doseIncrement": 1,
+          "unitsPerServing": null
+        }
+      },
+      "beforeFingerprint": "f421986928df5072382745ffa690b9b0a4d5b34d51d326126bc8c6ed08401acc",
+      "afterFingerprint": "f421986928df5072382745ffa690b9b0a4d5b34d51d326126bc8c6ed08401acc",
+      "evidence": {
+        "sourceUrl": "https://www.vistra.co.th/product/vistra-sesamin-night-time/",
+        "checkedAt": "2026-09-12",
+        "summary": "The manufacturer lists theanine 200 mg with sesamin 10 mg and directs one capsule daily. Composition and the labelled serving are one oral capsule. Pack count is not established."
+      }
+    },
+    {
+      "correctionId": "uat-serving-20260912-8e72318a-5355-4333-8607-6108d997177c",
+      "entityTable": "products",
+      "entityId": "8e72318a-5355-4333-8607-6108d997177c",
+      "before": {
+        "id": "8e72318a-5355-4333-8607-6108d997177c",
+        "title": "Glow Collagen",
+        "product_url": "https://www.megawecare.co.th/product/glow/",
+        "administration": null
+      },
+      "after": {
+        "id": "8e72318a-5355-4333-8607-6108d997177c",
+        "title": "Glow Collagen",
+        "product_url": "https://www.megawecare.co.th/product/glow/",
+        "administration": null
+      },
+      "beforeFingerprint": "6b5670f822a5d3138ae14649c9e6d79f2d538ffa29577c7cd45aadd4a6ac2ec0",
+      "afterFingerprint": "6b5670f822a5d3138ae14649c9e6d79f2d538ffa29577c7cd45aadd4a6ac2ec0",
+      "evidence": {
+        "sourceUrl": "https://www.megawecare.co.th/product/glow/",
+        "checkedAt": "2026-09-12",
+        "summary": "The Thai manufacturer explicitly lists 2500 mg hydrolysed collagen per sachet, a 30-sachet pack, and one sachet mixed in water. One sachet is the composition basis."
+      }
+    },
+    {
+      "correctionId": "uat-serving-20260912-a0c11439-ec98-411d-b1f7-c06b2310433a",
+      "entityTable": "products",
+      "entityId": "a0c11439-ec98-411d-b1f7-c06b2310433a",
+      "before": {
+        "id": "a0c11439-ec98-411d-b1f7-c06b2310433a",
+        "title": "AB Pre&Pro",
+        "product_url": "https://www.megawecare.co.th/product/ab-prepro/",
+        "administration": null
+      },
+      "after": {
+        "id": "a0c11439-ec98-411d-b1f7-c06b2310433a",
+        "title": "AB Pre&Pro",
+        "product_url": "https://www.megawecare.co.th/product/ab-prepro/",
+        "administration": null
+      },
+      "beforeFingerprint": "ff81863578796776791f7c45a496a26a0e040047267dcb4a960d6cc671a7b005",
+      "afterFingerprint": "ff81863578796776791f7c45a496a26a0e040047267dcb4a960d6cc671a7b005",
+      "evidence": {
+        "sourceUrl": "https://www.megawecare.co.th/product/ab-prepro/",
+        "checkedAt": "2026-09-12",
+        "summary": "The Thai manufacturer specifies composition per one sachet: inulin 2240 mg and two probiotic strains totalling 2 billion organisms, with a 10-sachet pack. Two sachets per day is label advice, not the per-serving composition basis."
+      }
+    },
+    {
+      "correctionId": "uat-serving-20260912-b64a615a-3f11-5aff-8cc9-667f60e16a9b",
+      "entityTable": "products",
+      "entityId": "b64a615a-3f11-5aff-8cc9-667f60e16a9b",
+      "before": {
+        "id": "b64a615a-3f11-5aff-8cc9-667f60e16a9b",
+        "title": "VISTRA VITAL-PRO DAILY PROBIOTICS 30'S",
+        "product_url": "https://www.vistra.co.th/product/vistra-vital-pro-daily-complete-probiotics/",
+        "administration": {
+          "route": "oral",
+          "provenance": {
+            "status": "verified",
+            "sourceUrl": "https://www.vistra.co.th/product/vistra-vital-pro-daily-complete-probiotics/",
+            "sourceText": "Manufacturer composition and oral directions support physical unit capsule. Composition basis per labelled serving is not explicit, so no nutrient-to-unit conversion is asserted. Pack quantity for this SKU is not independently established.",
+            "verifiedAt": "2026-09-07T11:30:11.373244+00:00"
+          },
+          "packQuantity": null,
+          "physicalUnit": "capsule",
+          "doseIncrement": 1,
+          "unitsPerServing": null
+        }
+      },
+      "after": {
+        "id": "b64a615a-3f11-5aff-8cc9-667f60e16a9b",
+        "title": "VISTRA VITAL-PRO DAILY PROBIOTICS 30'S",
+        "product_url": "https://www.vistra.co.th/product/vistra-vital-pro-daily-complete-probiotics/",
+        "administration": {
+          "route": "oral",
+          "provenance": {
+            "status": "verified",
+            "sourceUrl": "https://www.vistra.co.th/product/vistra-vital-pro-daily-complete-probiotics/",
+            "sourceText": "Manufacturer composition and oral directions support physical unit capsule. Composition basis per labelled serving is not explicit, so no nutrient-to-unit conversion is asserted. Pack quantity for this SKU is not independently established.",
+            "verifiedAt": "2026-09-07T11:30:11.373244+00:00"
+          },
+          "packQuantity": null,
+          "physicalUnit": "capsule",
+          "doseIncrement": 1,
+          "unitsPerServing": null
+        }
+      },
+      "beforeFingerprint": "b20ad71f423a457d00c3fb281d41a60b3b6d5d888d9a7c4dcef81415e275b6f6",
+      "afterFingerprint": "b20ad71f423a457d00c3fb281d41a60b3b6d5d888d9a7c4dcef81415e275b6f6",
+      "evidence": {
+        "sourceUrl": "https://www.vistra.co.th/product/vistra-vital-pro-daily-complete-probiotics/",
+        "checkedAt": "2026-09-12",
+        "summary": "The manufacturer ingredient list and daily directions identify one capsule as the serving. This verifies physical administration only; bacterial mass is not converted into CFU, and nutrient confidence is unchanged. Pack count is not established."
+      }
+    },
+    {
+      "correctionId": "uat-serving-20260912-b682e829-ac20-5de2-990e-b04b8e4c59d8",
+      "entityTable": "products",
+      "entityId": "b682e829-ac20-5de2-990e-b04b8e4c59d8",
+      "before": {
+        "id": "b682e829-ac20-5de2-990e-b04b8e4c59d8",
+        "title": "Vistra Collagen 4000mg ชง ส้ม",
+        "product_url": "https://www.vistra.co.th/product/vistra-collagen-peptide-4000-mg/",
+        "administration": {
+          "route": "oral",
+          "provenance": {
+            "status": "verified",
+            "sourceUrl": "https://www.vistra.co.th/product/vistra-collagen-peptide-4000-mg/",
+            "sourceText": "Manufacturer composition and oral directions support physical unit sachet. Composition basis per labelled serving is not explicit, so no nutrient-to-unit conversion is asserted. Pack quantity for this SKU is not independently established.",
+            "verifiedAt": "2026-09-07T11:30:11.396012+00:00"
+          },
+          "packQuantity": null,
+          "physicalUnit": "sachet",
+          "doseIncrement": 1,
+          "unitsPerServing": null
+        }
+      },
+      "after": {
+        "id": "b682e829-ac20-5de2-990e-b04b8e4c59d8",
+        "title": "Vistra Collagen 4000mg ชง ส้ม",
+        "product_url": "https://www.vistra.co.th/product/vistra-collagen-peptide-4000-mg/",
+        "administration": {
+          "route": "oral",
+          "provenance": {
+            "status": "verified",
+            "sourceUrl": "https://www.vistra.co.th/product/vistra-collagen-peptide-4000-mg/",
+            "sourceText": "Manufacturer composition and oral directions support physical unit sachet. Composition basis per labelled serving is not explicit, so no nutrient-to-unit conversion is asserted. Pack quantity for this SKU is not independently established.",
+            "verifiedAt": "2026-09-07T11:30:11.396012+00:00"
+          },
+          "packQuantity": null,
+          "physicalUnit": "sachet",
+          "doseIncrement": 1,
+          "unitsPerServing": null
+        }
+      },
+      "beforeFingerprint": "075972b3ab2b755d799a7b78cbeb3dbd72e6b9e82439fdf99211bc7eea0dab81",
+      "afterFingerprint": "075972b3ab2b755d799a7b78cbeb3dbd72e6b9e82439fdf99211bc7eea0dab81",
+      "evidence": {
+        "sourceUrl": "https://www.vistra.co.th/product/vistra-collagen-peptide-4000-mg/",
+        "checkedAt": "2026-09-12",
+        "summary": "The manufacturer specifies one 8 g sachet, with collagen at 50%: 4 g collagen per sachet. Whole-sachet increments are supported; pack count is not established."
+      }
+    },
+    {
+      "correctionId": "uat-serving-20260912-d4823f19-ff68-4351-9751-50e39f549179",
+      "entityTable": "products",
+      "entityId": "d4823f19-ff68-4351-9751-50e39f549179",
+      "before": {
+        "id": "d4823f19-ff68-4351-9751-50e39f549179",
+        "title": "VISTRA Astaxanthin 6 mg Advanced Plus CoQ10",
+        "product_url": "https://www.vistra.co.th/product/vistra-astaxanthin-6-mg-advanced-plus-coq10-dietary-supplement-product/",
+        "administration": {
+          "route": "oral",
+          "provenance": {
+            "status": "verified",
+            "sourceUrl": "https://www.vistra.co.th/product/vistra-astaxanthin-6-mg-advanced-plus-coq10-dietary-supplement-product/",
+            "sourceText": "Manufacturer composition and oral directions support physical unit capsule. Composition basis per labelled serving is not explicit, so no nutrient-to-unit conversion is asserted. Pack quantity for this SKU is not independently established.",
+            "verifiedAt": "2026-09-07T11:30:12.309230+00:00"
+          },
+          "packQuantity": null,
+          "physicalUnit": "capsule",
+          "doseIncrement": 1,
+          "unitsPerServing": null
+        }
+      },
+      "after": {
+        "id": "d4823f19-ff68-4351-9751-50e39f549179",
+        "title": "VISTRA Astaxanthin 6 mg Advanced Plus CoQ10",
+        "product_url": "https://www.vistra.co.th/product/vistra-astaxanthin-6-mg-advanced-plus-coq10-dietary-supplement-product/",
+        "administration": {
+          "route": "oral",
+          "provenance": {
+            "status": "verified",
+            "sourceUrl": "https://www.vistra.co.th/product/vistra-astaxanthin-6-mg-advanced-plus-coq10-dietary-supplement-product/",
+            "sourceText": "Manufacturer composition and oral directions support physical unit capsule. Composition basis per labelled serving is not explicit, so no nutrient-to-unit conversion is asserted. Pack quantity for this SKU is not independently established.",
+            "verifiedAt": "2026-09-07T11:30:12.309230+00:00"
+          },
+          "packQuantity": null,
+          "physicalUnit": "capsule",
+          "doseIncrement": 1,
+          "unitsPerServing": null
+        }
+      },
+      "beforeFingerprint": "2c86a93bafe9bed10860d01ab3bdbaa06274060e80909d87e89491808e07d117",
+      "afterFingerprint": "2c86a93bafe9bed10860d01ab3bdbaa06274060e80909d87e89491808e07d117",
+      "evidence": {
+        "sourceUrl": "https://www.vistra.co.th/product/vistra-astaxanthin-6-mg-advanced-plus-coq10-dietary-supplement-product/",
+        "checkedAt": "2026-09-12",
+        "summary": "The manufacturer lists astaxanthin 6 mg and CoQ10 30 mg and directs one capsule with food. Composition is one labelled capsule serving; pack count is not established."
+      }
+    },
+    {
+      "correctionId": "uat-serving-20260912-e69796f5-87f9-4ff5-b5a2-8c7dbdd5335c",
+      "entityTable": "products",
+      "entityId": "e69796f5-87f9-4ff5-b5a2-8c7dbdd5335c",
+      "before": {
+        "id": "e69796f5-87f9-4ff5-b5a2-8c7dbdd5335c",
+        "title": "Prodefenz Sachets",
+        "product_url": "https://www.megawecare.co.th/product/prodefenz-sachets/",
+        "administration": null
+      },
+      "after": {
+        "id": "e69796f5-87f9-4ff5-b5a2-8c7dbdd5335c",
+        "title": "Prodefenz Sachets",
+        "product_url": "https://www.megawecare.co.th/product/prodefenz-sachets/",
+        "administration": null
+      },
+      "beforeFingerprint": "535a2c4464651b9da2ee8a43e9afbd5e1cca7d5833e8cac7cba8f5f9dc72d5a6",
+      "afterFingerprint": "535a2c4464651b9da2ee8a43e9afbd5e1cca7d5833e8cac7cba8f5f9dc72d5a6",
+      "evidence": {
+        "sourceUrl": "https://www.megawecare.co.th/product/prodefenz-sachets/",
+        "checkedAt": "2026-09-12",
+        "summary": "The Thai manufacturer identifies a 30-sachet pack and one 2.991 g sachet per preparation, supplying 1 billion L. acidophilus and 2 billion B. lactis organisms. One sachet is the composition basis."
+      }
+    },
+    {
+      "correctionId": "uat-serving-20260912-f172802d-12f6-55ca-90d2-457451371c00",
+      "entityTable": "products",
+      "entityId": "f172802d-12f6-55ca-90d2-457451371c00",
+      "before": {
+        "id": "f172802d-12f6-55ca-90d2-457451371c00",
+        "title": "VISTRA PURE COLLAGEN DIPEPTIDE",
+        "product_url": "https://www.vistra.co.th/product/vistra-pure-collagen-dipeptide/",
+        "administration": {
+          "route": "oral",
+          "provenance": {
+            "status": "verified",
+            "sourceUrl": "https://www.vistra.co.th/product/vistra-pure-collagen-dipeptide/",
+            "sourceText": "Manufacturer composition and oral directions support physical unit sachet. Composition basis per labelled serving is not explicit, so no nutrient-to-unit conversion is asserted. Pack quantity for this SKU is not independently established.",
+            "verifiedAt": "2026-09-07T11:30:13.923985+00:00"
+          },
+          "packQuantity": null,
+          "physicalUnit": "sachet",
+          "doseIncrement": 1,
+          "unitsPerServing": null
+        }
+      },
+      "after": {
+        "id": "f172802d-12f6-55ca-90d2-457451371c00",
+        "title": "VISTRA PURE COLLAGEN DIPEPTIDE",
+        "product_url": "https://www.vistra.co.th/product/vistra-pure-collagen-dipeptide/",
+        "administration": {
+          "route": "oral",
+          "provenance": {
+            "status": "verified",
+            "sourceUrl": "https://www.vistra.co.th/product/vistra-pure-collagen-dipeptide/",
+            "sourceText": "Manufacturer composition and oral directions support physical unit sachet. Composition basis per labelled serving is not explicit, so no nutrient-to-unit conversion is asserted. Pack quantity for this SKU is not independently established.",
+            "verifiedAt": "2026-09-07T11:30:13.923985+00:00"
+          },
+          "packQuantity": null,
+          "physicalUnit": "sachet",
+          "doseIncrement": 1,
+          "unitsPerServing": null
+        }
+      },
+      "beforeFingerprint": "05bbdeea53d6180de04f4f0e08ecfbeef7bdcac26b75297e6ef2a57b2e0236d6",
+      "afterFingerprint": "05bbdeea53d6180de04f4f0e08ecfbeef7bdcac26b75297e6ef2a57b2e0236d6",
+      "evidence": {
+        "sourceUrl": "https://www.vistra.co.th/product/vistra-pure-collagen-dipeptide/",
+        "checkedAt": "2026-09-12",
+        "summary": "The manufacturer lists 5 g pure collagen dipeptide (100%) and instructs one sachet per serving mixed into food or drink. The labelled 5 g contribution belongs to one sachet; pack count is not established."
+      }
+    }
+  ]
+}
