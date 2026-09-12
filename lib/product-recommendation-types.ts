@@ -115,6 +115,7 @@ export type ProductRecommendationNeedDiagnostic = Readonly<{
 
 export type ProductRecommendationAlgorithmVersion =
   | "importance-matching-3"
+  | "importance-matching-4"
   | "importance-matching-2"
   | "practical-matching-1"
   | "flexible-dose-fit-9"

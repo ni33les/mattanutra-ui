@@ -1,4 +1,5 @@
 import { productRejectionReason } from "@/lib/matcher/eligibility";
+import { contributionFor } from "@/lib/matcher/candidates";
 import { knownCurrentTargetExposure } from "@/lib/matcher/target-basis";
 import type { CanonicalRequest, CatalogSnapshot, MatchResult, ProductGroup, RejectedCandidate, ScoredBasket } from "@/lib/matcher/types";
 
@@ -49,7 +50,7 @@ export function matchingDiagnosticsFor(input: Readonly<{
     supportedDoseVariants, evaluatedNonemptyBaskets, reasonCode,
     rejectionCounts: [...counts].sort(([a], [b]) => a.localeCompare(b)).map(([reason, count]) => ({ reason, count })),
     targets: request.targets.map(target => {
-      const mentions = (product: CatalogSnapshot["products"][number]) => product.contributionSubjectIds.includes(target.subjectId) || product.labelledContributions.some(fact => fact.subjectId === target.subjectId);
+      const mentions = (product: CatalogSnapshot["products"][number]) => contributionFor(product, target.name, target.subjectId).length > 0;
       return { subjectId: target.subjectId, name: target.name,
         candidateProducts: distinct(catalog.products.filter(mentions).map(product => product.productId)),
         eligibleProducts: distinct(eligible.filter(mentions).map(product => product.productId)),

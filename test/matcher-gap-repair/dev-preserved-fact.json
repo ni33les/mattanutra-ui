@@ -1,0 +1,12 @@
+{
+  "id": "35ef675e-2290-4c79-bbde-095cd88efbe5",
+  "product_id": "44f3a282-8c3e-4f9d-898a-a68d9b27ccbc",
+  "name": "Vitamin B12",
+  "normalized_name": "vitamin_b12",
+  "amount": 1,
+  "unit": "mcg",
+  "confidence": "high",
+  "source": "admin",
+  "source_url": "https://www.vistra.co.th/product/vistra-relacza-plus/",
+  "source_text": "Manufacturer composition per capsule: vitamin B12 preparation (0.1%) 1 mg supplies active vitamin B12 1 mcg."
+}

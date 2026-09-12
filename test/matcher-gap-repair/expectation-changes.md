@@ -9,3 +9,7 @@ Control: 9294c22a; catalogue/reference revision 99. Original captured catalogue 
 - DEV already contains the correct Relacza B12 fact and must not be rewritten. UAT's independent audited manifest corrects mg to mcg and records the manufacturer evidence. Prices, clinical references and frozen orders are untouched.
 
 RED evidence: /root/.codex/deploy/uat-match-repair-20260912/red-behaviour.log (all three named cases fail on control).
+
+Confirmed cause: the fixed witness was never explored. Final repair put the raw-dose lane before the practical incumbent, and interior probes consumed a group's allowance before its compiled one-/two-serving quantities. Try those existing quantities first, account for every new edge, and preserve continuation/checkpoint identity. Retain all other quantities and the existing total budget.
+
+Matcher identity advances to importance-matching-4 so task/cache/cursor results do not reuse the previous search policy. The four customer-value files change only their current version assertion; their other tests and historical fixtures remain unchanged and are not claimed as executed by this scoped run. No public contract change.
