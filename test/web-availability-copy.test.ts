@@ -22,3 +22,14 @@ test('AVAIL-COPY-03 missing persisted diagnostic remains unknown through the rev
   assert.equal(result.needCoverage.length,1);assert.equal(result.needCoverage[0].coveragePercent,null);
   assert.ok(!supplementProductCoverageById({needCoverage:result.needCoverage} as FormulationResult['productRecommendations']).has('d3'));
 });
+test('AVAIL-COPY-04 reveal uses distinct pending, unknown, zero and raw-positive labels in every locale',async()=>{
+  const {revealCoverageLabel}=await import('../components/formulation-results-helpers.tsx');
+  for(const locale of ['en','th','zh-CN'] as const){const copy=revealCopy[locale];
+    assert.equal(revealCoverageLabel(0,false,copy),copy.currentlyUnavailable);
+    assert.equal(revealCoverageLabel(0.004,false,copy),'<0.01%');
+    assert.equal(revealCoverageLabel(0.4,false,copy),'0.4%');
+    assert.equal(revealCoverageLabel(null,false,copy),copy.coverageUnknown);
+    assert.equal(revealCoverageLabel(undefined,false,copy),copy.coverageUnknown);
+    assert.equal(revealCoverageLabel(0,true,copy),copy.productsPendingBadge);
+  }
+});
