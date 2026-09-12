@@ -204,14 +204,10 @@ function contributionForFresh(
   return collapseDuplicateLabelledFacts(explicitOmegaTotal.length ? explicitOmegaTotal : hits);
 }
 
-export function compileVariant(input: Readonly<{
-  dailyUnits: number;
-  dailyUnitsRatio?: ServingRatio;
-  product: MatcherProduct;
-  request: CanonicalRequest;
-}>): DoseVariant | null {
-  const ratio = input.dailyUnitsRatio ?? ratioForSupportedServings(input.product, input.dailyUnits);
-  if (!ratio) return null;
+// Immutable request/product facts are compiled once. Supported quantities only
+// multiply these exact units; unknown/conflicting label evidence is preserved.
+const variantBasis = new WeakMap<CanonicalRequest, WeakMap<MatcherProduct, ReturnType<typeof compileVariantBasis>>>();
+function compileVariantBasis(input: Readonly<{ product: MatcherProduct; request: CanonicalRequest }>) {
   const amountPerUnit = new Map<string, ScaledAmount>();
   const unknownSubjectIds = uncertainProductSubjects(input.product, input.request);
   let unknown = input.product.unknownSafetyAmount || unknownSubjectIds.length > 0;
@@ -264,6 +260,25 @@ export function compileVariant(input: Readonly<{
       );
     }
   }
+
+  return { amountPerUnit, unknownSubjectIds, unknown };
+}
+function variantBasisFor(input: Readonly<{ product: MatcherProduct; request: CanonicalRequest }>) {
+  let cache = variantBasis.get(input.request); if (!cache) { cache = new WeakMap(); variantBasis.set(input.request, cache); }
+  let result = cache.get(input.product);
+  if (!result) { result = compileVariantBasis(input); cache.set(input.product, result); }
+  return result;
+}
+
+export function compileVariant(input: Readonly<{
+  dailyUnits: number;
+  dailyUnitsRatio?: ServingRatio;
+  product: MatcherProduct;
+  request: CanonicalRequest;
+}>): DoseVariant | null {
+  const ratio = input.dailyUnitsRatio ?? ratioForSupportedServings(input.product, input.dailyUnits);
+  if (!ratio) return null;
+  const { amountPerUnit, unknownSubjectIds, unknown } = variantBasisFor(input);
 
   const safetyExposure = labelledSafetyExposure(input.product, input.dailyUnits, input.request, ratio);
   const declaredTarget = unknown && input.request.targets.some(row => input.product.contributionSubjectIds.includes(row.subjectId) || unknownSubjectIds.includes(row.subjectId)) &&

@@ -203,8 +203,11 @@ export function weightedDoseFitScore(request: CanonicalRequest, exposure: Readon
     let cache = weightedCache.get(request); if (!cache) { cache = new WeakMap(); weightedCache.set(request, cache); }
     const found = cache.get(exposure); if (found) return found;
     const base = doseFitScore(request, exposure), parts = exactParts.get(base)!;
-    const exact = add(multiply(fromDecimal(uniform), parts.fitting), parts.safety);
-    const score = Object.defineProperties({}, { ...Object.getOwnPropertyDescriptors(base), total: { value: value(exact), enumerable: true, configurable: true, writable: true } }) as DoseFitScore;
+    const exact = add(multiply(exactWeights(settings).defaultWeight, parts.fitting), parts.safety);
+    const score: DoseFitScore = { version: base.version, limitWeight: base.limitWeight, under: base.under, over: base.over,
+      limit: base.limit, weightedLimit: base.weightedLimit, total: value(exact),
+      get perTarget() { return base.perTarget; }, get perContinuedDose() { return base.perContinuedDose; }, get perLimit() { return base.perLimit; },
+      unknownSubjectIds: base.unknownSubjectIds, estimatedSubjectIds: base.estimatedSubjectIds };
     targetDeviations.set(score, doseFitTargetDeviations(base)); exactTotals.set(score, exact); cache.set(exposure, score); return score;
   }
   return calculateDoseFit(request, exposure, true);

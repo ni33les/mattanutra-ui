@@ -194,9 +194,9 @@ export function overallMatchingScore(request: CanonicalRequest, exposure: Readon
   const penalties = scorePracticalPenalties(request, actual), dose = doseFitScore(doseRequest.get(request) ?? request, exposure);
   const nutrient = request.scoring ? weightedDoseFitScore(request, exposure) : dose;
   const total = add(exactDoseFit(nutrient), decoded(penalties.exact));
-  return { profile: penalties.profile, total: penalties.total, exact: penalties.exact, complete: penalties.complete,
-    get components() { return penalties.components; }, get preferences() { return penalties.preferences; }, missingComponents: penalties.missingComponents,
-    dosePenalty: dose.total, overallPenalty: toNumber(total), overallExact: encoded(total) };
+  // Complete this fresh score in place; copying it would allocate another DTO
+  // and force lazy detail getters during every profile comparison.
+  return Object.assign(penalties, { dosePenalty: dose.total, overallPenalty: toNumber(total), overallExact: encoded(total) });
 }
 
 const stateActuals = new WeakMap<SearchState, PracticalActuals>();
