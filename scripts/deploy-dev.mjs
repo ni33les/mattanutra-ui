@@ -117,6 +117,7 @@ async function main() {
   }
 
   console.log(`[deploy:dev] Branch: ${branch}`);
+  const paymentReplayIndex = process.argv.indexOf("--payment-replay-attestation");
   const boundariesIndex = process.argv.indexOf("--matching-lock-boundaries-attestation");
   let matchingBuild, matchingProofFile, matchingBuildHash;
   const simplePlanIndex = process.argv.indexOf("--mcp-simple-plan-attestation");
@@ -130,16 +131,16 @@ async function main() {
   const toolCardIndex = process.argv.indexOf("--mcp-tool-card-attestation");
   const latestPatchIndex = process.argv.indexOf("--mcp-723-attestation");
   const currentPatchIndex = process.argv.indexOf("--mcp-722-attestation");
-  if ([boundariesIndex, simplePlanIndex, practicalIndex, discoveryIndex, efficiencyIndex, scopedIndex, payloadIndex, patchIndex, currentPatchIndex, latestPatchIndex, toolCardIndex, conversationIndex].filter(index => index >= 0).length > 1) throw new Error("Choose exactly one release attestation path");
-  if (boundariesIndex >= 0 || simplePlanIndex >= 0 || practicalIndex >= 0 || discoveryIndex >= 0 || efficiencyIndex >= 0 || patchIndex >= 0 || currentPatchIndex >= 0 || latestPatchIndex >= 0 || toolCardIndex >= 0 || conversationIndex >= 0) {
-    const packageId = boundariesIndex >= 0 ? "boundaries" : simplePlanIndex >= 0 ? "simple-plan" : practicalIndex >= 0 ? "practical" : discoveryIndex >= 0 ? "discovery" : efficiencyIndex >= 0 ? "efficiency" : conversationIndex >= 0 ? "conversation" : toolCardIndex >= 0 ? "724" : latestPatchIndex >= 0 ? "723" : currentPatchIndex >= 0 ? "722" : "721";
+  if ([paymentReplayIndex, boundariesIndex, simplePlanIndex, practicalIndex, discoveryIndex, efficiencyIndex, scopedIndex, payloadIndex, patchIndex, currentPatchIndex, latestPatchIndex, toolCardIndex, conversationIndex].filter(index => index >= 0).length > 1) throw new Error("Choose exactly one release attestation path");
+  if (paymentReplayIndex >= 0 || boundariesIndex >= 0 || simplePlanIndex >= 0 || practicalIndex >= 0 || discoveryIndex >= 0 || efficiencyIndex >= 0 || patchIndex >= 0 || currentPatchIndex >= 0 || latestPatchIndex >= 0 || toolCardIndex >= 0 || conversationIndex >= 0) {
+    const packageId = paymentReplayIndex >= 0 ? "payment-replay" : boundariesIndex >= 0 ? "boundaries" : simplePlanIndex >= 0 ? "simple-plan" : practicalIndex >= 0 ? "practical" : discoveryIndex >= 0 ? "discovery" : efficiencyIndex >= 0 ? "efficiency" : conversationIndex >= 0 ? "conversation" : toolCardIndex >= 0 ? "724" : latestPatchIndex >= 0 ? "723" : currentPatchIndex >= 0 ? "722" : "721";
     if (branch !== "dev" || process.env.MATTANUTRA_ENV !== "dev") throw new Error("MCP work-package proof is DEV-only");
-    const file = process.argv[(boundariesIndex >= 0 ? boundariesIndex : simplePlanIndex >= 0 ? simplePlanIndex : practicalIndex >= 0 ? practicalIndex : discoveryIndex >= 0 ? discoveryIndex : efficiencyIndex >= 0 ? efficiencyIndex : conversationIndex >= 0 ? conversationIndex : toolCardIndex >= 0 ? toolCardIndex : latestPatchIndex >= 0 ? latestPatchIndex : currentPatchIndex >= 0 ? currentPatchIndex : patchIndex) + 1];
+    const file = process.argv[(paymentReplayIndex >= 0 ? paymentReplayIndex : boundariesIndex >= 0 ? boundariesIndex : simplePlanIndex >= 0 ? simplePlanIndex : practicalIndex >= 0 ? practicalIndex : discoveryIndex >= 0 ? discoveryIndex : efficiencyIndex >= 0 ? efficiencyIndex : conversationIndex >= 0 ? conversationIndex : toolCardIndex >= 0 ? toolCardIndex : latestPatchIndex >= 0 ? latestPatchIndex : currentPatchIndex >= 0 ? currentPatchIndex : patchIndex) + 1];
     if (!file?.startsWith("/")) throw new Error("Pass the absolute MCP work-package attestation path");
     if (await runCapture("git", ["status", "--porcelain"])) throw new Error("Validated source must remain clean");
     const identity=mcp721Identity(sourceManifest().sha256, await runCapture("git", ["rev-parse", "HEAD"]), packageId);
     checkMcp721Proof(file, identity, packageId);
-    if (["practical", "simple-plan", "boundaries"].includes(packageId)) {
+    if (["practical", "simple-plan", "boundaries", "payment-replay"].includes(packageId)) {
       const active = await fetch("http://127.0.0.1:3000/api/mcp", { method: "HEAD", signal: AbortSignal.timeout(5000) });
       const base = active.headers.get("x-agentic-build-id");
       if (base !== identity.deploymentBases.dev && base !== identity.sourceCommit) throw new Error("DEV changed since practical matching qualification");
@@ -149,8 +150,8 @@ async function main() {
       validateRolloutBinding(JSON.parse(await readFile(resolve(dirname(file),"rollout.json"),"utf8")),identity,"dev",active.headers.get("x-agentic-build-id"));
     }
     const build = JSON.parse(await readFile(resolve(dirname(file), "build.json"), "utf8"));
-    if (packageId === "boundaries") {
-      const buildIndex = process.argv.indexOf("--matching-lock-build");
+    if (packageId === "boundaries" || packageId === "payment-replay") {
+      const buildIndex = process.argv.indexOf(packageId === "payment-replay" ? "--payment-replay-build" : "--matching-lock-build");
       matchingBuild = buildIndex >= 0 ? process.argv[buildIndex + 1] : undefined;
       if (!matchingBuild?.startsWith("/")) throw new Error("Pass the absolute attested --matching-lock-build directory");
       matchingProofFile = file;
@@ -183,7 +184,18 @@ async function main() {
   } else {
     await npmRun("verify:dev");
   }
-  if (boundariesIndex >= 0) {
+  if (paymentReplayIndex >= 0) {
+    // This package is code only. Verify schema without executing any apply/backfill path.
+    await npmRun("dev-runtime-schema:verify");
+    const staged = resolve("tmp", `payment-replay-build-${await runCapture("git", ["rev-parse", "HEAD"])}`);
+    await cp(matchingBuild, staged, { recursive: true, errorOnExist: true, force: false,
+      filter: source => source !== resolve(matchingBuild, "cache") });
+    if (compiledBuildIdentity(staged) !== matchingBuildHash) throw new Error("Staged payment build changed");
+    await cp("/etc/systemd/system/mattanutra-ui-dev.service.d", resolve(dirname(matchingProofFile), "systemd-before"), { recursive: true, errorOnExist: true, force: false });
+    await run("systemctl", ["stop", serviceName]);
+    await rename(".next", resolve(dirname(matchingProofFile), "next-before"));
+    await rename(staged, ".next");
+  } else if (boundariesIndex >= 0) {
     // Stage the attested build while the old application still serves requests.
     // Stop every child worker before changing the dependency guard: old/global
     // and new/graph-scoped guard implementations must never execute together.
@@ -211,7 +223,8 @@ async function main() {
     `[Service]\nEnvironment=AGENTIC_BUILD_ID=${sha}\nEnvironment=AGENTIC_WORKER_VERSION=${sha}\n`,
     "utf8"
   );
-  if (boundariesIndex >= 0 || simplePlanIndex >= 0 || practicalIndex >= 0 || discoveryIndex >= 0 || efficiencyIndex >= 0 || payloadIndex >= 0 || patchIndex >= 0 || currentPatchIndex >= 0 || latestPatchIndex >= 0 || toolCardIndex >= 0 || conversationIndex >= 0) await writeFile(`${dropInDir}/mcp-payload-worker-version.conf`, `[Service]\nEnvironment=WORKER_VERSION=${sha}\nEnvironment=AGENTIC_WORKER_VERSION=${sha}\n`, "utf8");
+  if (paymentReplayIndex >= 0 || boundariesIndex >= 0 || simplePlanIndex >= 0 || practicalIndex >= 0 || discoveryIndex >= 0 || efficiencyIndex >= 0 || payloadIndex >= 0 || patchIndex >= 0 || currentPatchIndex >= 0 || latestPatchIndex >= 0 || toolCardIndex >= 0 || conversationIndex >= 0) await writeFile(`${dropInDir}/mcp-payload-worker-version.conf`, `[Service]\nEnvironment=WORKER_VERSION=${sha}\nEnvironment=AGENTIC_WORKER_VERSION=${sha}\n`, "utf8");
+  if (paymentReplayIndex >= 0) await writeFile(`${dropInDir}/zz-payment-replay-identity.conf`, `[Service]\nEnvironment=AGENTIC_BUILD_ID=${sha}\nEnvironment=AGENTIC_WORKER_VERSION=${sha}\nEnvironment=WORKER_VERSION=${sha}\n`, "utf8");
   await run("systemctl", ["daemon-reload"]);
   console.log(`[deploy:dev] AGENTIC_BUILD_ID=${sha}`);
   console.log(`[deploy:dev] Restarting ${serviceName}...`);

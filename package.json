@@ -150,6 +150,8 @@
     "test:matcher:experiments": "node scripts/run-matcher-experiment-tests.mjs",
     "test:ax-refinement": "node scripts/run-ax-refinement-tests.mjs",
     "validate:dev:ax-refinement": "node scripts/run-dev-ax-refinement-validation.mjs",
+    "test:payment-replay": "node scripts/mcp-721.mjs test --package=payment-replay",
+    "validate:dev:payment-replay": "node scripts/mcp-721.mjs validate --package=payment-replay",
     "test:mcp-payload": "node scripts/mcp-payload/run-tests.mjs",
     "validate:dev:mcp-payload": "node scripts/mcp-payload/validate.mjs",
     "mcp:payload-profile": "node scripts/mcp-payload/profile.mjs",

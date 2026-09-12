@@ -1,0 +1,99 @@
+{
+  "releaseBase": "3161c4592a050d303efd374266324a7547d2139c",
+  "deploymentBases": {
+    "dev": "3161c4592a050d303efd374266324a7547d2139c"
+  },
+  "scope": "payment_replay_compatibility",
+  "backupSha256": "9e3af54fb5274012ca370694d7b4132e72107c777090b5f0639ad6ee2093b335",
+  "inputs": [
+    "test/payment-replay/helpers.ts",
+    "test/payment-replay/expectation-changes.md",
+    "scripts/payment-replay/restored-prd.integration.test.ts"
+  ],
+  "files": [
+    {
+      "file": "test/payment-replay/release.test.ts",
+      "expectedCases": 4,
+      "database": false,
+      "slice": "release",
+      "reason": "DEV-only proof identity, preservation and unchanged general finance caller"
+    },
+    {
+      "file": "test/payment-replay/accounting.integration.test.ts",
+      "expectedCases": 5,
+      "database": true,
+      "slice": "accounting",
+      "reason": "Write-once revenue and fee accounting, exact conflicts and FX preservation"
+    },
+    {
+      "file": "test/payment-replay/concurrency.integration.test.ts",
+      "expectedCases": 7,
+      "database": true,
+      "slice": "accounting",
+      "reason": "Concurrent unique booking, prepared admission and nonlocking ordinary reads"
+    },
+    {
+      "file": "test/payment-replay/recovery.integration.test.ts",
+      "expectedCases": 9,
+      "database": true,
+      "slice": "recovery",
+      "reason": "Same-payment historical recovery, webhook replay, binding and stale workers"
+    },
+    {
+      "file": "scripts/payment-replay/restored-prd.integration.test.ts",
+      "expectedCases": 4,
+      "database": true,
+      "slice": "historical",
+      "reason": "Both original PRD regressions on independently restored encrypted PG18 backup"
+    },
+    {
+      "file": "test/stripe-payments.test.ts",
+      "expectedCases": 11,
+      "database": false,
+      "slice": "consumers",
+      "reason": "Affected checkout, fulfillment admission and frozen payment response consumers"
+    },
+    {
+      "file": "test/finance-ledger.test.ts",
+      "expectedCases": 4,
+      "database": false,
+      "slice": "consumers",
+      "reason": "General finance upsert remains unchanged for unrelated finance callers"
+    },
+    {
+      "file": "test/payment-confirmation-return.test.ts",
+      "expectedCases": 8,
+      "database": false,
+      "slice": "consumers",
+      "reason": "Return-page confirmation and retry consumer compatibility"
+    },
+    {
+      "file": "test/web-payment-fulfillment.integration.test.ts",
+      "expectedCases": 4,
+      "database": true,
+      "slice": "consumers",
+      "reason": "Atomic confirmation, interrupted scheduling and duplicate checkout recovery"
+    },
+    {
+      "file": "test/web-payment-transitions.integration.test.ts",
+      "expectedCases": 4,
+      "database": true,
+      "slice": "consumers",
+      "reason": "Cancellation versus confirmation and atomic reservation binding"
+    },
+    {
+      "file": "test/web-payment-webhooks.integration.test.ts",
+      "expectedCases": 1,
+      "database": true,
+      "slice": "consumers",
+      "reason": "Duplicate webhook event resumes incomplete confirmation"
+    },
+    {
+      "file": "test/funnel-readiness.integration.test.ts",
+      "expectedCases": 6,
+      "database": true,
+      "slice": "consumers",
+      "reason": "Effective fulfillment readiness with unchanged generation and payment gating"
+    }
+  ]
+}

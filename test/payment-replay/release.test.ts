@@ -4,6 +4,7 @@ import { readFileSync, mkdtempSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { MCP_PACKAGES, packageStages, mcp721Identity, checkMcp721Proof } from "../../scripts/mcp-721-proof.mjs";
+import { verifiedRestore, verifyOriginalPayments } from "../../scripts/payment-replay/release.mjs";
 test("PAY-RELEASE-01 scoped payment release uses existing runner and leaves full gates intact", () => {
   assert.equal(MCP_PACKAGES["payment-replay"]?.version, "11.0.0");
   assert.equal(MCP_PACKAGES["payment-replay"]?.base, "3161c4592a050d303efd374266324a7547d2139c");
@@ -26,4 +27,13 @@ test("PAY-RELEASE-02 wrong environment, changed source and incomplete proofs are
 test("PAY-RELEASE-03 original ledger upsert remains available to unrelated finance callers", () => {
   assert.match(readFileSync("lib/finance-ledger.ts", "utf8"), /on conflict \(source, source_ref\)[\s\S]*do update set/);
   assert.match(readFileSync("lib/payment-accounting.ts", "utf8"), /on conflict \(source,source_ref\)[\s\S]*do nothing returning id/);
+});
+test("PAY-RELEASE-04 changed original values fail preservation even when row counts match", () => {
+  const columns = Object.fromEntries(Array.from({ length: 128 }, (_, n) => [`fixture_${n}`, ["id", "amount"]]));
+  const tables = Object.fromEntries(Object.keys(columns).map(name => [name, ["exact-original-row-hash"]]));
+  const before = { columns, tables };
+  assert.equal(verifyOriginalPayments(before, before).passed, true);
+  const changed = structuredClone(before); changed.tables.fixture_0 = ["same-count-different-amount"];
+  assert.throws(() => verifyOriginalPayments(before, changed), /row changed or disappeared/);
+  assert.throws(() => verifiedRestore(undefined, "postgres://127.0.0.1/anything", "hash"), /Private restore proof/);
 });
