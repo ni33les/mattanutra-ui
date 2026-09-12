@@ -95,3 +95,14 @@ test('REF-MET-01 acknowledgement and retrieval measurements are request-scoped, 
     assert.equal(serviceMeasurements()['mcp.retrieval_ms']?.count, 1);
   });
 });
+
+for (const terminal of ['failed', 'cancelled', 'expired'] as const) test(`REF-REV-05 same-key ${terminal} replay preserves the attempted revision and durable identity`, async () => {
+  const { app, args, first, operation } = await pending();
+  const changed = { ...operation, version: operation.version + 1,
+    ...(terminal === 'expired' ? { deadlineAt: '2000-01-01T00:00:00Z' } : { status: terminal }) };
+  assert.equal(await app.store.updatePlanOperation(changed, operation.version), true);
+  const before = await app.store.getPlanOperation(operation.id);
+  const replay = await value(app, args);
+  assert.equal(replay.status, 'failed'); assert.equal(replay.revision, 2); assert.equal(replay.planHandle, first.planHandle);
+  assert.deepEqual(await app.store.getPlanOperation(operation.id), before);
+});
