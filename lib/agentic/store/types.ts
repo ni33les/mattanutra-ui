@@ -234,7 +234,7 @@ export type AgenticStore = {
   getPlanOperationHeader?(id:string):Promise<Pick<PlanOperationRecord,"status"|"leaseToken"|"leaseExpiresAt">|null>;
   releaseUnstartedOperationAttempts?(id: string, token: string, attempts: number, reserved: number, restore: number, now: string): Promise<boolean>;
   /** Coherent MVCC presentation read; never locks rows or includes commands/cursors. */
-  getPlanReadState(planId: string, revision?: number, includeResult?: boolean): Promise<import("@/lib/agentic/presentation/status-projection").PlanReadState | null>;
+  getPlanReadState(planId: string, revision?: number, includeResult?: boolean | "terminal"): Promise<import("@/lib/agentic/presentation/status-projection").PlanReadState | null>;
   getPlanOperation(id: string, options?: { includeCursor: boolean }): Promise<PlanOperationRecord | null>;
   getPlanOperationByKey(ownerScope: string, key: string): Promise<PlanOperationRecord | null>;
   getActivePlanOperation(planId: string): Promise<PlanOperationRecord | null>;

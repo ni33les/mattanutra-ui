@@ -6,7 +6,6 @@ import { readPlanPresentation } from "@/lib/agentic/presentation/plan-read";
 import { planContractCompatible } from "@/lib/agentic/presentation/compatibility";
 import { withoutOperationCursor } from "@/lib/agentic/store/operation-checkpoint";
 import { expirePlanOperation, operationDeadlineRemaining, planOperationDeadlineError } from "@/lib/agentic/plan/operations";
-import { planReturnWaitMs } from "@/lib/agentic/plan/operations";
 import { catalogueSnapshotId } from "@/lib/agentic/catalogue/freeze";
 import { validateProductDoseProposals } from "@/lib/matcher/serving-grid";
 import { toMatcherProduct } from "@/lib/agentic/plan/to-matcher-product";
@@ -77,7 +76,6 @@ import {
   serviceDeadlineError,
   waitUntilDeadline
 } from "@/lib/agentic/qa/service-clock";
-import { requestElapsedMs, waitForServiceDelay } from "@/lib/agentic/qa/service-clock";
 import { buildHorizonPlan } from "@/lib/agentic/value/inventory-ledger";
 import { DEFAULT_MATCHER_CONFIG } from "@/lib/matcher/config";
 import { isDoseError, scaleAmount } from "@/lib/matcher/dose";
@@ -1026,17 +1024,8 @@ async function admittedResponse(input: PlanExecutionInput, operation: PlanOperat
     const current = await input.store.getPlan(operation.planId);
     return operationFailureResponse(operation, current?.currentRevision);
   }
-  // Only the durable task executor starts work. A colocated executor may already
-  // be completing it; otherwise admission returns its existing processing view.
-  const work = inflightDurableOperations.get(operation.id);
-  if (!work) return operationProcessingResponse(operation);
-  if (input.payload.operation === "get") {
-    void work.catch(() => undefined);
-    return operationProcessingResponse(operation);
-  }
-  const handoff = waitForServiceDelay(Math.min(PLAN_MATCH_RETURN_BUDGET_MS, planReturnWaitMs(requestElapsedMs(planCorrelationId(input.payload.idempotencyKey)))));
-  try { return await Promise.race([work, handoff.then(() => operationProcessingResponse(operation))]); }
-  finally { handoff.cancel(); }
+  // Admission returns its durable receipt independently of the executor's lifetime.
+  return operationProcessingResponse(operation);
 }
 
 export async function planTool(input: PlanExecutionInput): Promise<PlanToolSuccess | AgenticErrorResult> {

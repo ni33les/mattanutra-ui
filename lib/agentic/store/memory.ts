@@ -73,7 +73,7 @@ export function createMemoryStore(): AgenticStore {
         !["expired", "cancelled"].includes(row.orderStatus) && !row.cancelledAt && !row.expiredAt)
         .sort((a,b) => b.createdAt.localeCompare(a.createdAt) || b.id.localeCompare(a.id))[0];
       return clone({ plan, revision: revision.revision, projection,
-        result: includeResult || !projection ? revision.result : null,
+        result: includeResult === true || includeResult === "terminal" && !op || !projection ? revision.result : null,
         operation: op ? { id: op.id, revision: op.revision, status: op.status, error: op.error, createdAt: op.createdAt, deadlineAt: op.deadlineAt } : null,
         frozen: Boolean(order), payment: order ? { orderId: order.id, paymentStatus: order.paymentStatus,
           fulfilmentStatus: order.fulfilmentStatus, orderStatus: order.orderStatus, stateVersion: order.stateVersion } : null,

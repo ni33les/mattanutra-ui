@@ -84,7 +84,7 @@ export function createPostgresStore(inputSql: Sql, inTransaction = false): Agent
       const [row] = await sql<DatabaseRow<PlanRecord> & { revision: number; projection: PlanStatusProjection | null;
         result: unknown; operation: PlanOperationRead | null; payment: PlanReadState["payment"]; frozen: boolean; catalogue_revision: number | null }>`
         select p.*,r.revision,r.status_projection as projection,
-          case when ${includeResult} or r.status_projection is null then r.result else null end as result,
+          case when ${includeResult === true} or (${includeResult === "terminal"} and op.read_projection is null) or r.status_projection is null then r.result else null end as result,
           op.read_projection as operation,
           payment.state as payment,(payment.state is not null) as frozen,
           epoch.revision as catalogue_revision

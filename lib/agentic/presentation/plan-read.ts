@@ -3,11 +3,11 @@ import { resolveCapability } from "@/lib/agentic/capabilities";
 import { businessError, isAgenticErrorResult } from "@/lib/agentic/contract/errors";
 import { AGENTIC_CONTRACT_VERSION } from "@/lib/agentic/config";
 import type { PlanResult } from "@/lib/agentic/plan/types";
-import { operationForRead, planStatusProjection, projectedResultVersion } from "@/lib/agentic/presentation/status-projection";
+import { operationForRead, planStatusProjection, projectedResultVersion, type PlanReadState } from "@/lib/agentic/presentation/status-projection";
 import { getPinnedCatalogueSnapshot } from "@/lib/agentic/catalogue/pin";
 type ReadRuntime = Pick<AgenticRuntime, "config" | "scope" | "store" | "now">;
 
-export async function readPlanState(runtime: ReadRuntime, planHandle: string, requestedRevision?: number, includeResult = false) {
+export async function readPlanState(runtime: ReadRuntime, planHandle: string, requestedRevision?: number, includeResult: boolean | "terminal" = false) {
   const capability = await resolveCapability({ action: "plan.read", config: runtime.config, handle: planHandle,
     now: runtime.now ?? new Date().toISOString(), resourceType: "plan", scope: runtime.scope, store: runtime.store });
   if (!capability) return businessError({ reasonCode: "not_found", message: "Not found." });
@@ -32,6 +32,10 @@ export async function readPlanState(runtime: ReadRuntime, planHandle: string, re
 export async function readPlanPresentation(runtime: ReadRuntime, planHandle: string, requestedRevision?: number) {
   const state = await readPlanState(runtime, planHandle, requestedRevision, true);
   if (isAgenticErrorResult(state)) return state;
+  return planPresentation(state);
+}
+/** Presentation reuses the already authorised coherent read; no additional I/O. */
+export function planPresentation<T extends PlanReadState & { refreshRequired: boolean }>(state: T) {
   const saved = state.result as PlanResult;
   const result: PlanResult = state.refreshRequired ? { ...saved, refreshRequired: true,
     status: "needs_input", questions: [] } : saved;
