@@ -20,7 +20,8 @@
   ],
   "inputs": [
     "test/payment-return/next-loader.mjs",
-    "scripts/run-full-test-suite.mjs"
+    "scripts/run-full-test-suite.mjs",
+    "scripts/run-tests.mjs"
   ],
   "expectationChanges": [
     "A return exception no longer claims a review was requested or sends a known-session customer home.",
