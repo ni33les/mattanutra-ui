@@ -510,6 +510,15 @@ export function RevealFinalResultsPage({
   return (
     <section className="mn-reveal-final mn-reveal-font-body w-full">
       <LandingReveal />
+      {pharmacy && <div className="mn-reveal-final-wrap flex justify-center pt-6">
+        <a
+          data-testid="pharmacy-deep-dive-link"
+          href={pharmacy.planHref}
+          className="inline-flex items-center justify-center rounded-full bg-[var(--mn-teal-deep)] px-6 py-3 text-sm font-semibold text-white transition hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--mn-teal-deep)]"
+        >
+          {pharmacyCopy[locale].details} →
+        </a>
+      </div>}
 
       <section
         aria-label={copy.heroTitle}
