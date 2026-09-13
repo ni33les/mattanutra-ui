@@ -1,0 +1,16 @@
+{
+  "releaseBase": "e588c405473480ef5e0796c6f48d195365d450fc",
+  "scope": "Read-only historical paid-result compatibility; no data backfill or generation",
+  "files": [
+    {"file":"scripts/payment-replay/historical-read.integration.test.ts","cases":7,"reason":"Exact restored historical HealthScore/formula/product reads, provenance fences, no writes"},
+    {"file":"test/funnel-readiness.integration.test.ts","cases":6,"reason":"Current revision/locale gates, pending responses, capture and payment readiness"},
+    {"file":"test/service-efficiency/funnel-reads.integration.test.ts","cases":2,"reason":"Reads remain nonblocking and small under a held assessment writer"},
+    {"file":"test/consistency-r2-formulation-read.test.ts","cases":5,"reason":"Bounded formula/product payload reads and read-only reveal"},
+    {"file":"scripts/payment-replay/restored-prd.integration.test.ts","cases":4,"reason":"Original historical payment, ledger and worker replay regressions unchanged"},
+    {"file":"test/formulation-read-first.test.ts","cases":3,"reason":"Opening/retrieving saved and empty results does not regenerate; explicit retry still recovers"},
+    {"file":"test/product-recommendation-freshness.test.ts","cases":6,"reason":"Existing explicit refresh and freshness policy remains available"},
+    {"file":"test/formulation-poll-static.test.ts","cases":1,"reason":"Completed results and cancellation remain intact"}
+  ],
+  "browser": "Existing restored EN and TH paid journeys: HealthScore and reveal remain readable, integer coverage visible, all browser mutations blocked. Chinese discovery retains unchanged release evidence; missing historical translation remains pending.",
+  "expectationChanges": ["Proven completed pre-revision paid results may be read in their saved locale without changing original data. Current revisions and incomplete evidence stay fenced.","Readiness database prerequisites now fail explicitly instead of skipping; the existing isolated-database convention remains required.","Opening reveal no longer admits a refresh. The existing browser recovery case expects one explicit retry, with the same completed result and payment assertions."]
+}

@@ -1,3 +1,4 @@
+import { historicalAssessmentReadJoin, historicalResult } from "@/lib/historical-assessment-read";
 import { formulationPlanCopy } from "@/lib/formulation-plan-copy";
 import { readStoredMatching } from "@/lib/recommendation-storage";
 import { hasHealthScoreAiCopy } from "@/lib/healthscore-readiness";
@@ -198,25 +199,21 @@ async function loadStoredRecommendationProductPayloads(
       status: string;
     }>
   >`
-    select distinct on (coalesce(diagnostics ->> 'stackPreference', 'balanced'))
-      id,
-      status,
-      stack_coverage_percent,
-      jsonb_array_length(client_needs) as client_needs_count,
-      diagnostics,
-      coalesce(diagnostics ->> 'stackPreference', 'balanced') as stack_preference,
-      notes,
-      generated_at
-    from product_recommendation_runs
-    where catalogue_revision = (select revision from public.catalogue_runtime_revision where singleton=true)
-      and plan_id = ${planId}::uuid
-      and assessment_revision = (select input_revision from public.assessments where plan_id = ${planId}::uuid)
-      and selection_revision = coalesce((select revision from public.assessment_product_preferences where plan_id = ${planId}::uuid), 0)
-      and generation_locale = ${locale} and generator_version = ${FUNNEL_GENERATOR_VERSION}
-      and coalesce(diagnostics ->> 'stackPreference', 'balanced') in ('compact', 'balanced')
-    order by
-      coalesce(diagnostics ->> 'stackPreference', 'balanced'),
-      generated_at desc
+    select distinct on (coalesce(r.diagnostics ->> 'stackPreference', 'balanced'))
+      r.id, r.status, r.stack_coverage_percent,
+      jsonb_array_length(r.client_needs) as client_needs_count,
+      r.diagnostics, coalesce(r.diagnostics ->> 'stackPreference', 'balanced') as stack_preference,
+      r.notes, r.generated_at
+    from public.assessments a
+    ${historicalAssessmentReadJoin(sql, "a", locale)}
+    join public.product_recommendation_runs r on r.plan_id = a.plan_id
+    where a.plan_id = ${planId}::uuid
+      and ((r.catalogue_revision = (select revision from public.catalogue_runtime_revision where singleton=true)
+        and r.assessment_revision = a.input_revision and r.generation_locale = ${locale}
+        and r.generator_version = ${FUNNEL_GENERATOR_VERSION}) or ${historicalResult(sql, "r")})
+      and r.selection_revision = coalesce((select revision from public.assessment_product_preferences where plan_id = a.plan_id), 0)
+      and coalesce(r.diagnostics ->> 'stackPreference', 'balanced') in ('compact', 'balanced')
+    order by coalesce(r.diagnostics ->> 'stackPreference', 'balanced'), r.generated_at desc
   `;
 
   if (runs.length < 1) {
@@ -1723,12 +1720,13 @@ async function loadStoredFormulationFormulaRead(
       food_guidance.generated_at as food_guidance_generated_at,
       food_guidance.model_version as food_guidance_model_version
     from assessments
+    ${historicalAssessmentReadJoin(sql, "assessments", resultLocale)}
     left join lateral (
       select formulation, generated_at, model_version
       from formulations
       where formulations.plan_id = assessments.plan_id
-        and formulations.assessment_revision = assessments.input_revision
-        and formulations.generation_locale = ${resultLocale} and formulations.generator_version = ${FUNNEL_GENERATOR_VERSION}
+        and ((formulations.assessment_revision = assessments.input_revision
+        and formulations.generation_locale = ${resultLocale} and formulations.generator_version = ${FUNNEL_GENERATOR_VERSION}) or ${historicalResult(sql, "formulations", true)})
         and (
           case
             when assessments.selected_plan is not null then
@@ -1747,8 +1745,8 @@ async function loadStoredFormulationFormulaRead(
       select guidance, generated_at, model_version
       from food_guidance
       where food_guidance.plan_id = assessments.plan_id
-        and food_guidance.assessment_revision = assessments.input_revision
-        and food_guidance.generation_locale = ${resultLocale} and food_guidance.generator_version = ${FUNNEL_GENERATOR_VERSION}
+        and ((food_guidance.assessment_revision = assessments.input_revision
+        and food_guidance.generation_locale = ${resultLocale} and food_guidance.generator_version = ${FUNNEL_GENERATOR_VERSION}) or ${historicalResult(sql, "food_guidance")})
         and (
           case
             when assessments.selected_plan is not null then
@@ -1873,12 +1871,13 @@ export async function getStoredFormulationResult(
       supplement_catalogue.active_supplement_count,
       product_catalogue.approved_product_count
     from assessments
+    ${historicalAssessmentReadJoin(sql, "assessments", resultLocale)}
     left join lateral (
       select formulation, generated_at, model_version
       from formulations
       where formulations.plan_id = assessments.plan_id
-        and formulations.assessment_revision = assessments.input_revision
-        and formulations.generation_locale = ${resultLocale} and formulations.generator_version = ${FUNNEL_GENERATOR_VERSION}
+        and ((formulations.assessment_revision = assessments.input_revision
+        and formulations.generation_locale = ${resultLocale} and formulations.generator_version = ${FUNNEL_GENERATOR_VERSION}) or ${historicalResult(sql, "formulations", true)})
         ${formulationModeFilter}
       order by version desc, generated_at desc
       limit 1
@@ -1887,8 +1886,8 @@ export async function getStoredFormulationResult(
       select guidance, generated_at, model_version
       from food_guidance
       where food_guidance.plan_id = assessments.plan_id
-        and food_guidance.assessment_revision = assessments.input_revision
-        and food_guidance.generation_locale = ${resultLocale} and food_guidance.generator_version = ${FUNNEL_GENERATOR_VERSION}
+        and ((food_guidance.assessment_revision = assessments.input_revision
+        and food_guidance.generation_locale = ${resultLocale} and food_guidance.generator_version = ${FUNNEL_GENERATOR_VERSION}) or ${historicalResult(sql, "food_guidance")})
         ${foodGuidanceModeFilter}
       order by version desc, generated_at desc
       limit 1
@@ -1897,8 +1896,8 @@ export async function getStoredFormulationResult(
       select report, version, generated_at
       from nutrition_reports
       where nutrition_reports.plan_id = assessments.plan_id
-        and nutrition_reports.assessment_revision = assessments.input_revision
-        and nutrition_reports.generation_locale = ${resultLocale} and nutrition_reports.generator_version = ${FUNNEL_GENERATOR_VERSION}
+        and ((nutrition_reports.assessment_revision = assessments.input_revision
+        and nutrition_reports.generation_locale = ${resultLocale} and nutrition_reports.generator_version = ${FUNNEL_GENERATOR_VERSION}) or ${historicalResult(sql, "nutrition_reports")})
       order by version desc, generated_at desc
       limit 1
     ) nutrition_reports on true
@@ -1934,8 +1933,8 @@ export async function getStoredFormulationResult(
       select recommendations
       from recommendations
       where recommendations.plan_id = assessments.plan_id
-        and recommendations.assessment_revision = assessments.input_revision
-        and recommendations.generation_locale = ${resultLocale} and recommendations.generator_version = ${FUNNEL_GENERATOR_VERSION}
+        and ((recommendations.assessment_revision = assessments.input_revision
+        and recommendations.generation_locale = ${resultLocale} and recommendations.generator_version = ${FUNNEL_GENERATOR_VERSION}) or ${historicalResult(sql, "recommendations")})
       order by version desc, generated_at desc
       limit 1
     ) recommendations on true
@@ -1950,11 +1949,12 @@ export async function getStoredFormulationResult(
         notes,
         generated_at
       from product_recommendation_runs
-      where product_recommendation_runs.catalogue_revision = (select revision from public.catalogue_runtime_revision where singleton=true)
-        and product_recommendation_runs.plan_id = assessments.plan_id
+      where product_recommendation_runs.plan_id = assessments.plan_id
+        and ((product_recommendation_runs.catalogue_revision = (select revision from public.catalogue_runtime_revision where singleton=true)
         and product_recommendation_runs.assessment_revision = assessments.input_revision
+        and product_recommendation_runs.generation_locale = ${resultLocale} and product_recommendation_runs.generator_version = ${FUNNEL_GENERATOR_VERSION})
+          or ${historicalResult(sql, "product_recommendation_runs")})
         and product_recommendation_runs.selection_revision = coalesce((select revision from public.assessment_product_preferences where plan_id = assessments.plan_id), 0)
-        and product_recommendation_runs.generation_locale = ${resultLocale} and product_recommendation_runs.generator_version = ${FUNNEL_GENERATOR_VERSION}
         and coalesce(diagnostics ->> 'stackPreference', 'balanced') in ('compact', 'balanced')
       order by
         case coalesce(diagnostics ->> 'stackPreference', 'balanced')

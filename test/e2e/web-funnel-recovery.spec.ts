@@ -258,7 +258,7 @@ test("progress and reveal expose working recovery actions without another captur
   fullFailed = false;
   await page.getByTestId("formulation-retry").click();
   await expect(page.locator(".mn-reveal-final")).toBeVisible();
-  expect(refreshes).toBeGreaterThanOrEqual(2);
+  expect(refreshes).toBe(1); // Only the explicit retry admits recovery; opening reveal is read-only.
   const stored = await fixture({ action: "state", planId: capture.planId });
   expect(stored.payments).toBe(1); expect(stored.revenues).toBe(1); expect(Number(stored.input_revision)).toBe(1);
   await page.goto(`/en/nutrition/quiz?plan=${capture.planId}&reassessment=1`);

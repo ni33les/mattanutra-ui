@@ -15,7 +15,8 @@ import { GET } from "../app/api/assessment/[planId]/formulation/route.ts";
 import type { Locale } from "../lib/i18n.ts";
 
 const databaseUrl = process.env.TEST_DB_URL;
-describe("shared revision and locale readiness", { skip: !databaseUrl }, () => {
+assert.ok(databaseUrl, "Readiness tests require isolated PostgreSQL");
+describe("shared revision and locale readiness", () => {
   const plans: string[] = [];
   const answers = { firstName: "Fixture", sex: "male", age: "36-45", goals: ["energy"], activity: "light" };
   before(() => {

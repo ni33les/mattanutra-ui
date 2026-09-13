@@ -38,7 +38,8 @@ export function useFormulationPolling(planId: string, locale: Locale, initialRes
     const controller = new AbortController();
     lifecycle.current = controller;
     async function wait() {
-      await fetchFunnelJson(`${root}/formulation/refresh`, { method: "POST", signal: controller.signal,
+      // Opening a saved result is read-only. Only the explicit retry action admits recovery work.
+      if (attempt > 0) await fetchFunnelJson(`${root}/formulation/refresh`, { method: "POST", signal: controller.signal,
         headers: { "Content-Type": "application/json" }, body: JSON.stringify({ locale }) });
       const outcome = await pollFunnelStatus({
         subscriptionKey: assessmentPollKey(planId, locale),
