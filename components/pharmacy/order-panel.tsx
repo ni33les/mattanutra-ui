@@ -6,7 +6,7 @@ import { SafeImage } from "@/components/safe-image";
 import { pharmacyCopy } from "@/lib/pharmacy-copy";
 import { pharmacyPath } from "@/lib/pharmacy-journey";
 import { formatCurrencyAmount } from "@/lib/currencies";
-import { fetchFunnelJson } from "@/lib/funnel-polling";
+import { fetchFunnelJson, PollHttpError } from "@/lib/funnel-polling";
 import type { PharmacyOrderProduct } from "@/lib/pharmacy-order-input";
 import type { PharmacyOrderReceipt } from "@/lib/pharmacy-orders";
 import type { Locale } from "@/lib/i18n";
@@ -61,7 +61,7 @@ export function PharmacyOrderPanel({ planId, slug, locale, revision, pharmacyNam
         body: JSON.stringify({ planId, pharmacy: slug, locale, expectedRevision: revision, productIds: selected, customerName: name }) });
       setReceipt(data); try { sessionStorage.removeItem(draftKey); } catch { /* receipt is durable */ }
       window.history.replaceState(null, "", pharmacyPath(locale, slug, "reveal", { plan: planId, order: data.id }));
-    } catch { setError(c.error); } finally { setBusy(false); }
+    } catch (error) { setError(error instanceof PollHttpError && error.status === 409 ? c.refresh : c.error); } finally { setBusy(false); }
   }
   return <section id="order" data-testid="pharmacy-order" className="mt-12 grid gap-8 lg:grid-cols-[1.5fr_1fr]">
     <div>

@@ -132,7 +132,7 @@ export async function readPharmacyAnalysis(planId: string, slug: string, orderId
   const locale = order?.locale ?? assessment.locale;
   const sql = getSql()!;
   const [row] = await sql`select result from public.assessment_healthscore_results
-    where plan_id=${planId}::uuid and revision=${revision} and locale=${locale} order by updated_at desc limit 1`;
+    where plan_id=${planId}::uuid and revision=${revision} and locale=${locale} order by created_at desc limit 1`;
   const [task] = await sql`select status from public.tasks where plan_id=${planId}::uuid and task_type='analyze_healthscore'
     and payload #>> '{generation,revision}'=${String(revision)} and payload #>> '{generation,locale}'=${locale}
     order by created_at desc limit 1`;
