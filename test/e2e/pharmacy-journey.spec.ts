@@ -42,7 +42,7 @@ for (const locale of ["en", "th", "zh-CN"] as const) {
     await expect(page.getByRole("heading", { name: c.details, exact: true })).toBeVisible();
     await expect(page.getByRole("heading", { name: c.ordered, exact: true })).toBeVisible();
     await expect(page.getByText(c.explanationPending, { exact: true })).toBeVisible();
-    await page.screenshot({ path: `${process.env.MCP_pharmacy_EVIDENCE_DIR}/pharmacy-${locale}.png`, fullPage: true });
+    await page.screenshot({ path: test.info().outputPath(`pharmacy-${locale}.png`), fullPage: true });
   });
 }
 test("PHARM-BROWSER food support arriving after an order is displayed without changing its formula", async ({page}) => {
