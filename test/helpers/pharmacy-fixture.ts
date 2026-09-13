@@ -1,14 +1,16 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
-import { getSql } from "../../lib/db.ts";
+import { getSql, withDatabaseTransaction } from "../../lib/db.ts";
 import { captureAssessment } from "../../lib/assessment-capture.ts";
 import { loadLiveRetailSnapshot } from "../../lib/agentic/catalogue/live.ts";
 import { valueCatalogueFingerprint } from "../../lib/agentic/value/fingerprint.ts";
-import { loadGenerationInput, FUNNEL_GENERATOR_VERSION } from "../../lib/assessment-revisions.ts";
+import { loadGenerationInput } from "../../lib/assessment-revisions.ts";
 import { insertFormulationVersion } from "../../lib/plan-version-writes.ts";
 import { buildProductNeeds } from "../../lib/product-recommendation-needs.ts";
 import { recommendWithMatcher } from "../../lib/matcher/adapters/web.ts";
-import { toJsonValue } from "../../lib/assessment-store.ts";
+import { getTaskBundle } from "../../lib/task-service.ts";
+import { prepareTaskCompletionResult, applyTaskCompletionResult } from "../../lib/task-result-applier.ts";
+import { loadAdminSafetyReferenceSnapshot } from "../../lib/agentic/catalogue/load-safety-ceilings.ts";
 import { fixtureDatabaseUrl } from "./fixture-teardown.ts";
 import type { Locale } from "../../lib/i18n.ts";
 import type { FormulationBlueprint } from "../../lib/formulation-types.ts";
@@ -35,16 +37,16 @@ export async function seedPharmacyFixture(locale: Locale = "en", ready = true) {
   const generation = (await loadGenerationInput(sql, captured.planId, locale))!;
   await insertFormulationVersion(sql, { planId: captured.planId, generation, modelVersion: "pharmacy-isolated-fixture", formulation: formula });
   await sql`update public.tasks set status='completed' where plan_id=${captured.planId}::uuid and task_type in ('generate_supplement_guidance','generate_product_recommendations')`;
-  const run = randomUUID();
-  const retailer = { organisationId: pharmacy.id, organisationName: "Synthetic Matcher Acceptance Retailer", currency: "THB", subtotalAmount: 17 };
-  await sql`insert into public.product_recommendation_runs (id,plan_id,assessment_revision,generation_locale,generator_version,selection_revision,catalogue_revision,catalogue_fingerprint,search_effort,
-    stack_coverage_percent,supplement_product_coverage_percent,total_coverage_percent,client_needs,diagnostics)
-    values (${run}::uuid,${captured.planId}::uuid,${captured.revision},${locale},${FUNNEL_GENERATOR_VERSION},0,${snapshot.runtimeRevision},${match.diagnostics.catalogueFingerprint},'standard',
-      ${match.stackCoveragePercent},${match.supplementProductCoveragePercent},${match.totalPlanCoveragePercent},${sql.json(toJsonValue(needs))},
-      ${sql.json(toJsonValue({ ...match.diagnostics, selectedRetailer: retailer, retailerOptions: [retailer] }))})`;
-  for (const item of match.recommendations) await sql`insert into public.product_recommendation_items
-    (run_id,product_id,rank,score,product_coverage_percent,stack_contribution_percent,serving_multiplier,covered_needs,why,url_used,price_amount,currency,selected_retailer_organisation_id,retail_sellable_product_id,availability_status,unit_price_amount,image_url)
-    values (${run}::uuid,${item.product.id}::uuid,${item.rank},${item.score},${item.productCoveragePercent},${item.stackContributionPercent},${item.servingMultiplier},
-      ${sql.json(toJsonValue(item.coveredNeeds))},${item.why},${item.url},17,'THB',${pharmacy.id}::uuid,${item.retailSellableProductId ?? null}::uuid,'available_now',17,${item.product.imageUrl ?? null})`;
+  const [taskRow] = await sql`select id::text from public.tasks where plan_id=${captured.planId}::uuid and task_type='generate_product_recommendations'`;
+  const original = (await getTaskBundle({ taskId: taskRow.id })).task;
+  const { runtimeRevision, fingerprint } = await loadAdminSafetyReferenceSnapshot(sql);
+  assert.equal(runtimeRevision, snapshot.runtimeRevision);
+  const safetyReferenceIdentity = { runtimeRevision, fingerprint };
+  const task = { ...original, payload: { ...(original.payload as Record<string, unknown>), catalogueRevision: runtimeRevision, safetyReferenceIdentity,
+    productPreferences: { revision: 0, excludedProductIds: [], searchEffort: "standard" } } };
+  const resultPayload = { catalogueRevision: runtimeRevision, safetyReferenceIdentity, recommendations: match,
+    recommendationVariants: [{ stackPreference: "balanced", maxProducts: null, recommendations: match }] };
+  const preparedResult = await prepareTaskCompletionResult({task,resultPayload,sql});
+  await withDatabaseTransaction(sql, tx => applyTaskCompletionResult({task,taskId:task.id,resultPayload,preparedResult,sql:tx,afterCommit:()=>{}}));
   return { planId: captured.planId, pharmacyId: pharmacy.id, slug: pharmacy.slug, revision: captured.revision, productIds: [candidate.id], locale };
 }
