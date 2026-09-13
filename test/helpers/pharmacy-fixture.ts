@@ -30,8 +30,11 @@ export async function seedPharmacyFixture(locale: Locale = "en", ready = true, e
   assert.equal(candidate.retailRrpPriceAmount, 17, "Do not alter historical fixture prices");
   const formula: FormulationBlueprint = { supplementBreakdown: [{ id: "vitamin_d3", supplement: { en: "Vitamin D3", th: "วิตามินดี 3", "zh-CN": "维生素 D3" },
     category: "foundation", dailyDose: "1000 IU/day", effectivenessRank: 1, rationale: "Explicit isolated fixture", status: "add",
-    whyThisIsForYou: "Saved personalised nutrient reasoning", decision: "Saved explanation of the chosen dose",
-    cautions: [{ id: "fixture-caution", severity: "caution", body: "Saved ingredient-specific precaution" }] }] };
+    whyThisIsForYou: { en: "Saved personalised nutrient reasoning", th: "เหตุผลเฉพาะบุคคลที่บันทึกไว้", "zh-CN": "已保存的个性化营养素说明" },
+    decision: { en: "Saved explanation of the chosen dose", th: "คำอธิบายขนาดที่เลือกซึ่งบันทึกไว้", "zh-CN": "已保存的剂量选择说明" },
+    cautions: [{ id: "fixture-caution", severity: "caution", body: {
+      en: "Saved ingredient-specific precaution", th: "ข้อควรระวังของสารอาหารที่บันทึกไว้", "zh-CN": "已保存的营养素注意事项"
+    } }] }] };
   const needs = buildProductNeeds({ formulation: formula, foodGuidance: null });
   const match = recommendWithMatcher({ candidates: [candidate], needs, countryCode: "TH", clientContext: { ageYears: 40, lifestage: "adult" },
     stackPreference: "balanced", catalogueFingerprint: valueCatalogueFingerprint(snapshot) });

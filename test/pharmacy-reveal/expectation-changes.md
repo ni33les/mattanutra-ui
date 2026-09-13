@@ -11,6 +11,7 @@ No automatic retries, excluded failures or unrelated full-suite claims.
 
 ## Full pharmacy deep dive
 
-- PHARM-BROWSER now opens the linked deep dive before and after ordering, checks all seven chapters, saved nutrient reasoning/decision/cautions, original desktop dimensions, receipt prices and the explicit LINE share link. The original simplified-page expectation failed against DEV build 4d111887; evidence is preserved at /root/pharmacy-deep-dive-evidence/red.
+- PHARM-BROWSER now opens the linked deep dive before and after ordering, checks all seven chapters, saved nutrient reasoning/decision/cautions, original desktop dimensions, receipt prices and the explicit LINE share action. The original simplified-page expectation failed against DEV build 4d111887; evidence is preserved at /root/pharmacy-deep-dive-evidence/red.
 - The ordered-products heading is now the supplied chapter heading, with the existing localized label in its eyebrow. The ownership, unpaid-receipt, food-arrival and price assertions remain intact.
 - The controlled fixture gains explanation and caution text only; its nutrient amount, product, price and matching inputs are unchanged. Late food arrival also verifies completed saved analysis. Sample customer health details, blanket clear-check claims, and automatic LINE delivery claims from the handoff are not presented as real customer data.
+- Thai/Chinese checks use authored saved copy in those languages. English-only fixture prose was correctly suppressed by the existing locale guard; the failed run is preserved under acceptance-final. The saved explanation, dose-decision and caution assertions remain mandatory in each language.

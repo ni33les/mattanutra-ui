@@ -6,6 +6,11 @@ const execute = promisify(execFile);
 for (const locale of ["en", "th", "zh-CN"] as const) {
   test(`PHARM-BROWSER ${locale} landing, questionnaire, unpaid order and deep dive`, async ({ page }) => {
     const c = pharmacyCopy[locale];
+    const savedCopy = {
+      en: ["Saved personalised nutrient reasoning", "Saved explanation of the chosen dose", "Saved ingredient-specific precaution"],
+      th: ["เหตุผลเฉพาะบุคคลที่บันทึกไว้", "คำอธิบายขนาดที่เลือกซึ่งบันทึกไว้", "ข้อควรระวังของสารอาหารที่บันทึกไว้"],
+      "zh-CN": ["已保存的个性化营养素说明", "已保存的剂量选择说明", "已保存的营养素注意事项"]
+    }[locale];
     const { stdout } = await execute(process.execPath, ["--experimental-strip-types", "--import", "./test/helpers/offline-network.mjs", "--import", "./scripts/register-ts-path-loader.mjs", "--input-type=module", "-e",
       `import {seedPharmacyFixture} from './test/helpers/pharmacy-fixture.ts';import {closeSqlPool} from './lib/db.ts';try{console.log('FIXTURE:'+JSON.stringify(await seedPharmacyFixture(process.argv[1])));}finally{await closeSqlPool();}`, locale], { env: process.env, timeout: 30000 });
     const fixture = JSON.parse(stdout.split("\n").find(line => line.startsWith("FIXTURE:"))!.slice(8));
@@ -34,9 +39,9 @@ for (const locale of ["en", "th", "zh-CN"] as const) {
     await expect(deepDive.locator('section[id^="s0"]')).toHaveCount(7);
     await expect(deepDive.locator(".wrap").first()).toHaveCSS("max-width", "1080px");
     await expect(deepDive.locator(".opening h1")).toHaveCSS("font-size", "84px");
-    await expect(deepDive.getByTestId("nutrient-why")).toContainText("Saved personalised nutrient reasoning");
-    await expect(deepDive.getByTestId("nutrient-decision")).toContainText("Saved explanation of the chosen dose");
-    await expect(deepDive.getByTestId("nutrient-safety")).toContainText("Saved ingredient-specific precaution");
+    await expect(deepDive.getByTestId("nutrient-why")).toContainText(savedCopy[0]);
+    await expect(deepDive.getByTestId("nutrient-decision")).toContainText(savedCopy[1]);
+    await expect(deepDive.getByTestId("nutrient-safety")).toContainText(savedCopy[2]);
     await expect(deepDive.getByTestId("deep-dive-product")).toHaveCount(1);
     await expect(deepDive).not.toContainText("Seven interaction screens ran");
     await expect(deepDive).not.toContainText("Your complete plan is in your LINE");
