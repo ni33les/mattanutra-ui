@@ -15,12 +15,12 @@ import { fixtureDatabaseUrl } from "./fixture-teardown.ts";
 import type { Locale } from "../../lib/i18n.ts";
 import type { FormulationBlueprint } from "../../lib/formulation-types.ts";
 
-export async function seedPharmacyFixture(locale: Locale = "en", ready = true) {
+export async function seedPharmacyFixture(locale: Locale = "en", ready = true, existing?: { planId: string; revision: number }) {
   fixtureDatabaseUrl();
   const sql = getSql()!;
   const [pharmacy] = await sql`select id::text, slug from public.organisations where slug='matcher-v5-isolated-fixture-retailer'`;
   assert.ok(pharmacy, "Controlled public matcher fixtures must be prepared first");
-  const captured = await captureAssessment({ answers: { firstName: "Pharmacy Fixture", sex: "male", age: "36-45", goals: ["energy"] },
+  const captured = existing ?? await captureAssessment({ answers: { firstName: "Pharmacy Fixture", sex: "male", age: "36-45", goals: ["energy"] },
     pharmacyId: pharmacy.slug, locale, sessionId: randomUUID() }, { idempotencyKey: randomUUID() });
   if (!ready) return { planId: captured.planId, pharmacyId: pharmacy.id, slug: pharmacy.slug, revision: captured.revision, productIds: [] as string[], locale };
   const snapshot = await loadLiveRetailSnapshot("TH");

@@ -16,7 +16,9 @@ for (const locale of ["en", "th", "zh-CN"] as const) {
     await expect(page.locator(".mn-titlebar--quiz")).toBeVisible();
     await page.goto(`/${locale}/retail/${fixture.slug}/reveal?plan=${fixture.planId}`);
     await expect(page.getByTestId("pharmacy-order")).toBeVisible();
-    await expect(page.getByText(`${c.coverage}: 100%`, { exact: true })).toBeVisible();
+    await expect(page.locator(".mn-reveal-final")).toBeVisible();
+    await expect(page.locator("#formula")).toContainText("100%");
+    await expect(page.locator('a[href*="/basket/checkout"],a[href*="/nutrition/quiz"]')).toHaveCount(0);
     await expect(page.getByRole("checkbox")).toHaveCount(1);
     await expect(page.getByLabel(c.name, { exact: true })).toBeVisible();
     await expect(page.locator('input[autocomplete="street-address"],iframe[src*="stripe"]')).toHaveCount(0);
