@@ -3,7 +3,8 @@
   "scope": "pharmacy_standard_reveal_and_progress",
   "inputs": [
     "test/helpers/pharmacy-fixture.ts",
-    "test/pharmacy-landing/reference.json"
+    "test/pharmacy-landing/reference.json",
+    "test/pharmacy-reveal/deep-dive-reference.json"
   ],
   "files": [
     {
@@ -35,6 +36,11 @@
       "file": "test/pharmacy-landing/reference.test.ts",
       "expectedCases": 2,
       "reason": "Shared reveal, frozen receipts, read-only polling and pharmacy navigation consumers"
+    },
+    {
+      "file": "test/pharmacy-reveal/deep-dive-reference.test.ts",
+      "expectedCases": 1,
+      "reason": "Preserve the supplied deep-dive artwork exactly while rendering personalised saved facts"
     }
   ],
   "browser": [

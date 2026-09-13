@@ -1,0 +1,245 @@
+/* Supplied deep-dive layout, scoped to pharmacy content. Fonts come from the standard site shell. */
+
+  .deep{
+    --cream:#FAF6EC; --cream-deep:#F2EBD8; --paper:#FEFCF7;
+    --ink:#0A2540; --ink-soft:#1E3A5F; --ash:#6B7280; --ash-soft:#9CA3AF;
+    --forest:#2D8F72; --forest-deep:#1F6E58; --forest-glow:#B8E0CF;
+    --gold:#B8943D; --gold-soft:#D4B871; --gold-tint:#F5EBC9;
+    --mint:#EAF3EC; --sand:#E8DCC1; --line:#E5E1D4;
+  }
+  .deep :global(*){box-sizing:border-box}
+  .deep{scroll-behavior:smooth}
+  .deep{
+    margin:0; background:var(--cream); color:var(--ink);
+    font-family:var(--mn-font-body),-apple-system,var(--mn-font-thai),sans-serif;
+    font-size:17px; line-height:1.75; font-weight:400;
+    -webkit-font-smoothing:antialiased;
+  }
+  .deep :global(.wrap){max-width:1080px;margin:0 auto;padding:0 28px}
+  .deep :global(.measure){max-width:640px}
+  .deep :global(.measure-wide){max-width:760px}
+
+  .deep :global(h1),
+.deep :global(h2),
+.deep :global(h3){font-family:var(--mn-font-display),Georgia,serif;font-weight:400;letter-spacing:-.02em;margin:0}
+  .deep :global(h1){font-size:clamp(38px,7vw,68px);line-height:1.04}
+  .deep :global(h2){font-size:clamp(28px,4.6vw,42px);line-height:1.14;text-wrap:balance}
+  .deep :global(h3){font-size:clamp(21px,2.6vw,26px);line-height:1.28}
+  .deep :global(em){font-style:italic;color:var(--forest-deep)}
+  .deep :global(p){margin:0 0 1.15em}
+  .deep :global(p:last-child){margin-bottom:0}
+
+  .deep :global(.ch-num){
+    font-family:var(--mn-font-display),Georgia,serif;font-style:italic;font-weight:300;
+    font-size:15px;color:var(--gold);letter-spacing:.04em;
+  }
+  .deep :global(.ch-label){
+    font-size:12px;letter-spacing:.18em;text-transform:uppercase;
+    color:var(--ash);font-weight:500;
+  }
+  .deep :global(.dose){font-family:ui-monospace,'SF Mono',Menlo,monospace;font-variant-numeric:tabular-nums}
+
+  .deep :global(section){padding:88px 0}
+  .deep :global(.rule){height:1px;background:var(--line);border:0;margin:0}
+  .deep :global(.rule-short){width:64px;height:2px;background:var(--gold-soft);border:0;margin:0}
+
+  /* opening */
+  .deep :global(.opening){padding:clamp(64px,12vh,140px) 0 96px;text-align:center}
+  .deep :global(.opening img){width:clamp(140px,22vw,190px);height:auto;display:block;margin:0 auto 34px}
+  .deep :global(.kicker){font-size:12px;letter-spacing:.24em;text-transform:uppercase;color:var(--forest);margin-bottom:22px}
+  .deep :global(.thainame){font-family:var(--mn-font-display),Georgia,serif;font-size:clamp(46px,9vw,84px);line-height:1;color:var(--ink)}
+  .deep :global(.thainame span){color:var(--gold)}
+
+  /* chapter head */
+  .deep :global(.ch){display:flex;align-items:flex-start;gap:clamp(20px,4vw,52px);margin-bottom:44px}
+  .deep :global(.ch-fig){flex:0 0 auto;width:clamp(76px,11vw,120px)}
+  .deep :global(.ch-fig img){width:100%;height:auto;display:block}
+  .deep :global(.ch-text){flex:1;min-width:0;padding-top:6px}
+  .deep :global(.ch-meta){display:flex;align-items:baseline;gap:14px;margin-bottom:14px}
+
+  /* observations */
+  .deep :global(.obs){padding:38px 0;border-top:1px solid var(--line)}
+  .deep :global(.obs:first-of-type){border-top:0;padding-top:8px}
+  .deep :global(.obs h3){margin-bottom:14px}
+  .deep :global(.obs p){color:var(--ink-soft);font-size:17.5px}
+  .deep :global(.obs-mark){
+    font-family:var(--mn-font-display),serif;font-style:italic;font-size:14px;
+    color:var(--gold);display:block;margin-bottom:10px;letter-spacing:.05em;
+  }
+
+  /* method */
+  .deep :global(.method){display:grid;gap:30px;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));margin-top:6px}
+  .deep :global(.method h3){font-size:20px;margin-bottom:9px}
+  .deep :global(.method p){font-size:15.5px;color:var(--ink-soft);line-height:1.7}
+  .deep :global(.method .n){font-family:var(--mn-font-display),serif;font-style:italic;color:var(--gold);font-size:14px;display:block;margin-bottom:8px}
+
+  .deep :global(.aside){
+    background:var(--mint);border-left:2px solid var(--forest);
+    padding:26px 30px;margin-top:44px;
+  }
+  .deep :global(.aside h3){font-size:21px;margin-bottom:10px}
+  .deep :global(.aside p){font-size:16px;color:var(--ink-soft);margin:0}
+
+  /* nutrients */
+  .deep :global(.tier-head){display:flex;align-items:baseline;justify-content:space-between;gap:20px;
+    padding-bottom:12px;border-bottom:1px solid var(--sand);margin:64px 0 8px}
+  .deep :global(.tier-head:first-of-type){margin-top:20px}
+  .deep :global(.tier-name){font-family:var(--mn-font-display),serif;font-style:italic;font-size:19px;color:var(--gold)}
+  .deep :global(.tier-count){font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:var(--ash-soft)}
+
+  .deep :global(.nut){padding:42px 0;border-bottom:1px solid var(--line)}
+  .deep :global(.nut-top){display:flex;align-items:baseline;justify-content:space-between;gap:24px;flex-wrap:wrap;margin-bottom:6px}
+  .deep :global(.nut-name){font-family:var(--mn-font-display),serif;font-size:27px;line-height:1.2}
+  .deep :global(.nut-form){font-size:13.5px;color:var(--ash);letter-spacing:.02em}
+  .deep :global(.nut-dose){font-size:19px;color:var(--forest-deep);white-space:nowrap}
+  .deep :global(.nut-body){margin-top:20px}
+  .deep :global(.nut-body p){color:var(--ink-soft);font-size:16.5px}
+  .deep :global(.lede){font-size:18px;color:var(--ink);margin-bottom:18px}
+  .deep :global(.why-label){
+    font-size:11.5px;letter-spacing:.18em;text-transform:uppercase;
+    color:var(--forest-deep);font-weight:500;display:block;margin-bottom:8px;
+  }
+  .deep :global(.safety){
+    margin-top:20px;padding:16px 20px;background:var(--gold-tint);
+    border-left:2px solid var(--gold-soft);
+  }
+  .deep :global(.safety p){font-size:15px;color:var(--ink-soft);margin:0}
+  .deep :global(.safety .why-label){color:var(--gold)}
+
+  /* cupboard */
+  .deep :global(.shelf){display:grid;gap:clamp(18px,3vw,34px);grid-template-columns:repeat(auto-fit,minmax(210px,1fr));margin-top:8px}
+  .deep :global(.bottle){text-align:center}
+  .deep :global(.bottle img){width:100%;max-width:190px;height:auto;display:block;margin:0 auto 18px;mix-blend-mode:multiply}
+  .deep :global(.nophoto){
+    width:100%;max-width:190px;aspect-ratio:1/1.12;margin:0 auto 18px;
+    background:var(--paper);border:1px solid var(--sand);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:18px;
+  }
+  .deep :global(.nophoto b){font-size:11.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--ash-soft);font-weight:500}
+  .deep :global(.nophoto em){font-family:var(--mn-font-display),serif;font-style:italic;font-size:21px;color:var(--forest-deep);line-height:1.2;text-align:center}
+  .deep :global(.bottle .bn){font-family:var(--mn-font-display),serif;font-size:17px;line-height:1.3;margin-bottom:8px;display:block}
+  .deep :global(.bottle .bc){font-size:13.5px;color:var(--ash);line-height:1.55}
+
+  /* chapter nav */
+  .deep :global(.nav){border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:22px 0}
+  .deep :global(.nav ul){list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:8px 26px;justify-content:center}
+  .deep :global(.nav a){
+    font-size:14px;color:var(--ink-soft);text-decoration:none;
+    border-bottom:1px solid transparent;padding-bottom:2px;transition:border-color .2s,color .2s;
+  }
+  .deep :global(.nav a:hover){color:var(--forest-deep);border-bottom-color:var(--forest-glow)}
+
+  /* how to read */
+  .deep :global(.howto){background:var(--paper);border:1px solid var(--line);padding:clamp(26px,4vw,38px);margin-top:12px}
+  .deep :global(.howto h3){font-size:20px;margin-bottom:6px}
+  .deep :global(.howto dl){margin:22px 0 0;display:grid;gap:20px}
+  .deep :global(.howto dt){font-family:var(--mn-font-display),serif;font-style:italic;font-size:19px;color:var(--gold);margin-bottom:5px}
+  .deep :global(.howto dd){margin:0;font-size:16px;color:var(--ink-soft);line-height:1.7}
+  .deep :global(.howto .note){margin-top:24px;padding-top:20px;border-top:1px solid var(--line);font-size:15px;color:var(--ash)}
+
+  /* food */
+  .deep :global(.food){padding:34px 0;border-top:1px solid var(--line)}
+  .deep :global(.food:first-of-type){border-top:0}
+  .deep :global(.food-h){display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:10px}
+  .deep :global(.food-th){font-family:var(--mn-font-thai),sans-serif;font-size:16px;color:var(--ash)}
+  .deep :global(.food ul){list-style:none;margin:18px 0 0;padding:0;display:grid;gap:12px}
+  .deep :global(.food li){display:flex;gap:13px;align-items:baseline}
+  .deep :global(.food li::before){content:'';flex:0 0 auto;width:5px;height:5px;border-radius:50%;background:var(--forest-glow);transform:translateY(-3px)}
+  .deep :global(.food li b){font-weight:500}
+  .deep :global(.food li span){display:block;font-family:var(--mn-font-thai),sans-serif;font-size:14px;color:var(--ash)}
+  /* food photography — two-column editorial, alternating */
+  .deep :global(.foodrow){display:grid;gap:clamp(24px,4vw,44px);align-items:start;margin-bottom:12px}
+  @media (min-width:760px){
+    .deep :global(.foodrow){grid-template-columns:minmax(0,4fr) minmax(0,6fr)}
+    .deep :global(.foodrow.flip .foodfig){order:2}
+    .deep :global(.foodrow.flip .foodtext){order:1}
+  }
+  .deep :global(.foodfig){margin:0}
+  .deep :global(.foodfig img){
+    width:100%;height:auto;display:block;aspect-ratio:4/5;object-fit:cover;
+    border:1px solid var(--sand);
+  }
+  .deep :global(.foodfig figcaption){
+    font-family:var(--mn-font-thai),sans-serif;font-size:15px;color:var(--ash);
+    margin-top:12px;line-height:1.5;
+  }
+  .deep :global(.foodfig figcaption b){
+    display:block;font-family:var(--mn-font-body),sans-serif;font-size:11.5px;
+    letter-spacing:.18em;text-transform:uppercase;color:var(--gold);
+    margin-bottom:5px;font-weight:500;
+  }
+
+  /* safety review */
+  .deep :global(.checks){list-style:none;margin:26px 0 0;padding:0;display:grid;gap:0}
+  .deep :global(.checks li){display:flex;gap:16px;align-items:baseline;padding:13px 0;border-bottom:1px solid var(--line);font-size:16px;color:var(--ink-soft)}
+  .deep :global(.checks li:first-child){border-top:1px solid var(--line)}
+  .deep :global(.checks .tick){flex:0 0 auto;color:var(--forest);font-size:13px;letter-spacing:.14em;text-transform:uppercase;width:64px}
+
+  /* close */
+  .deep :global(.close){text-align:center;padding:110px 0 84px}
+  .deep :global(.close img){width:clamp(120px,18vw,164px);height:auto;display:block;margin:0 auto 38px}
+  .deep :global(.pali){font-family:var(--mn-font-display),serif;font-style:italic;font-size:clamp(34px,6vw,54px);line-height:1.15;margin-bottom:26px}
+  .deep :global(.close p){color:var(--ink-soft);font-size:18px;margin-left:auto;margin-right:auto}
+
+  /* keep */
+  .deep :global(.keep){background:var(--paper);border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:56px 0}
+  .deep :global(.keep-row){display:flex;flex-wrap:wrap;gap:36px;align-items:center;justify-content:space-between}
+  .deep :global(.btn){
+    display:inline-flex;align-items:center;gap:11px;background:var(--forest-deep);color:#fff;
+    font-size:16px;font-weight:600;padding:15px 30px;border-radius:999px;text-decoration:none;
+    box-shadow:0 14px 30px -12px rgba(31,110,88,.6);transition:background .2s;
+  }
+  .deep :global(.btn:hover){background:var(--forest)}
+  .deep :global(.code){
+    font-family:ui-monospace,Menlo,monospace;font-size:19px;letter-spacing:.02em;
+    color:var(--ink);background:var(--cream);border:1px solid var(--sand);
+    padding:12px 18px;display:inline-block;
+  }
+
+  .deep :global(footer){padding:44px 0 72px}
+  .deep :global(footer p){font-size:13px;line-height:1.65;color:var(--ash);max-width:74ch}
+
+  .deep :global(a){color:var(--forest-deep)}
+  .deep :global(:focus-visible){outline:2px solid var(--forest);outline-offset:4px}
+  @media (prefers-reduced-motion:reduce){.deep{scroll-behavior:auto}}
+  @media (max-width:640px){
+    .deep{font-size:16.5px}
+    .deep :global(section){padding:64px 0}
+    .deep :global(.ch){gap:18px}
+    .deep :global(.bottle img){mix-blend-mode:normal}
+  }
+
+.deep { width:100%;font-family:var(--mn-font-body),var(--mn-font-thai),sans-serif; }
+.deep :global(h1),.deep :global(h2),.deep :global(h3),.deep :global(.thainame),.deep :global(.nut-name) {font-family:var(--mn-font-display),var(--mn-font-thai-serif),Georgia,serif;}
+.deep :global(section[id]) {scroll-margin-top:160px;}
+.deep :global(.opening h1) {margin:0;}
+.deep :global(.opening .measure) {margin:30px auto 0;font-size:18.5px;color:var(--ink-soft);}
+.deep :global(.opening .back) {display:inline-block;margin-top:24px;font-size:14px;}
+.deep :global(.chapter-label) {font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:var(--ash);font-weight:500;font-family:inherit;}
+.deep :global(.profile-facts) {display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:24px;margin-top:30px;}
+.deep :global(.profile-facts dt) {font-size:11.5px;text-transform:uppercase;letter-spacing:.14em;color:var(--ash);}
+.deep :global(.profile-facts dd) {margin:6px 0 0;}
+.deep :global(.prose) {white-space:pre-line;}
+.deep :global(.nut .why-label) {font-family:inherit;}
+.deep :global(.nut .prose + .why-label) {margin-top:24px;}
+.deep :global(.nut .coverage) {margin-top:12px;font-size:13px;color:var(--ash);}
+.deep :global(.bottle .product-name) {font-family:inherit;font-size:16px;font-weight:500;letter-spacing:0;line-height:1.5;}
+.deep :global(.bottle .product-photo) {height:210px;object-fit:contain;}
+.deep :global(.bottle .product-facts) {font-size:14px;color:var(--ash);margin-top:12px;}
+.deep :global(.receipt) {margin-top:40px;background:var(--paper);border:1px solid var(--sand);padding:24px;}
+.deep :global(.receipt p) {margin-bottom:6px;}
+.deep :global(.foodfig:empty) {display:none;}
+.deep :global(.foodrow.no-image) {grid-template-columns:1fr;}
+.deep :global(.checks .finding) {color:var(--ink-soft);white-space:pre-line;}
+.deep :global(.checks .mark) {flex:0 0 auto;color:var(--gold);}
+.deep :global(.close .pali) {margin:0 auto 26px;}
+.deep :global(.keep .keep-actions) {display:flex;flex-wrap:wrap;gap:16px;align-items:center;margin-top:22px;}
+.deep :global(button) {cursor:pointer;font:inherit;}
+.deep :global(.link-button) {background:none;border:0;padding:0;color:var(--forest-deep);text-decoration:underline;}
+.deep :global(.notice) {background:var(--mint);padding:20px 24px;border-left:2px solid var(--forest);margin-top:28px;}
+.deep :global(.notice button) {margin-left:12px;}
+.deep :global(.metadata) {padding-top:36px;border-top:1px solid var(--line);font-size:13px;color:var(--ash);}
+@media(max-width:640px){.deep :global(.wrap){padding:0 20px;}.deep :global(.ch-fig){width:76px;}.deep :global(.tier-head){gap:12px;}.deep :global(.howto){padding:24px;}.deep :global(.method){grid-template-columns:1fr;}.deep :global(.nut-dose){white-space:normal;}.deep :global(.shelf){grid-template-columns:repeat(auto-fit,minmax(145px,1fr));}.deep :global(.bottle .product-photo){height:170px;}.deep :global(.keep-row){gap:24px;}}
+
+.deep :global(.nut-body > div + div) {margin-top:24px;}
+.deep :global(.safety p + p) {margin-top:12px;}

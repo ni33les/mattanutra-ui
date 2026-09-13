@@ -32,12 +32,20 @@ for (const locale of ["en", "th", "zh-CN"] as const) {
     await expect(deepDive).toBeVisible();
     await expect(deepDive.locator('nav a[href^="#s"]')).toHaveCount(7);
     await expect(deepDive.locator('section[id^="s0"]')).toHaveCount(7);
+    await expect(deepDive.locator(".wrap").first()).toHaveCSS("max-width", "1080px");
+    await expect(deepDive.locator(".opening h1")).toHaveCSS("font-size", "84px");
     await expect(deepDive.getByTestId("nutrient-why")).toContainText("Saved personalised nutrient reasoning");
     await expect(deepDive.getByTestId("nutrient-decision")).toContainText("Saved explanation of the chosen dose");
     await expect(deepDive.getByTestId("nutrient-safety")).toContainText("Saved ingredient-specific precaution");
     await expect(deepDive.getByTestId("deep-dive-product")).toHaveCount(1);
     await expect(deepDive).not.toContainText("Seven interaction screens ran");
     await expect(deepDive).not.toContainText("Your complete plan is in your LINE");
+    const desktop = page.viewportSize()!;
+    await page.setViewportSize({ width: 390, height: 844 });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+    await deepDive.locator("#s04").scrollIntoViewIfNeeded();
+    await page.screenshot({ path: test.info().outputPath(`deep-dive-${locale}-mobile.png`) });
+    await page.setViewportSize(desktop);
     await page.getByRole("link", { name: c.back, exact: true }).first().click();
     await expect(page.getByTestId("pharmacy-order")).toBeVisible();
     await page.getByTestId("pharmacy-order").getByRole("checkbox").uncheck();
@@ -58,7 +66,7 @@ for (const locale of ["en", "th", "zh-CN"] as const) {
     }
     await page.getByRole("link", { name: `${c.details} →`, exact: true }).click();
     await expect(page.getByRole("heading", { name: c.details, exact: true })).toBeVisible();
-    await expect(page.getByRole("heading", { name: c.ordered, exact: true })).toBeVisible();
+    await expect(page.locator("#s05 .ch-label")).toHaveText(c.ordered);
     await expect(page.getByText(c.explanationPending, { exact: true })).toBeVisible();
     await expect(page.getByTestId("deep-dive-receipt")).toContainText("17");
     await expect(page.getByTestId("deep-dive-receipt")).toContainText(c.unpaid);
@@ -79,8 +87,19 @@ test("PHARM-BROWSER food support arriving after an order is displayed without ch
     expect(result.assessmentRevision).toBe(fixture.revision);
     await route.fulfill({response,json:{...result,foodGapSupport:{version:'food-gap:v1',variants:{balanced:{body:'Late food support fixture',items:[]}}}}});
   });
+  await page.route("**/api/retail/orders?view=analysis&*", route => route.fulfill({ json: {
+    revision: fixture.revision, generationStatus: "ready", retryAllowed: false,
+    healthScore: { score: 64, summary: "Saved analysis summary", pageContent: { aiCopy: {
+      overview: "Saved profile narrative", findings: [{ title: "Saved observation", body: "Personalised observation body" }],
+      methodCards: [{ title: "Saved method", body: "Personalised method explanation" }]
+    } } }
+  } }));
   await page.getByRole('link',{name:`${pharmacyCopy.en.details} →`,exact:true}).click();
   await expect(page.getByText('Late food support fixture',{exact:true})).toBeVisible();
   await expect(page.getByRole('heading',{name:'Vitamin D3',exact:true})).toBeVisible();
   await expect(page.getByText('1000 IU/day',{exact:true})).toBeVisible();
+  await expect(page.locator('#s01')).toContainText('Saved profile narrative');
+  await expect(page.locator('#s02')).toContainText('Personalised observation body');
+  await expect(page.locator('#s03')).toContainText('Personalised method explanation');
+  await page.unrouteAll({ behavior: "wait" });
 });

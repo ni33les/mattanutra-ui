@@ -8,3 +8,9 @@ Baseline: c3651f350ef5c511a0b7fcd574124972067736a2.
 - Existing web reveal and HealthScore waiting behaviour remain covered by their maintained scoped tests. Frozen pharmacy receipts disable current-result polling; prices, orders, safety and matcher arithmetic are unchanged.
 
 No automatic retries, excluded failures or unrelated full-suite claims.
+
+## Full pharmacy deep dive
+
+- PHARM-BROWSER now opens the linked deep dive before and after ordering, checks all seven chapters, saved nutrient reasoning/decision/cautions, original desktop dimensions, receipt prices and the explicit LINE share link. The original simplified-page expectation failed against DEV build 4d111887; evidence is preserved at /root/pharmacy-deep-dive-evidence/red.
+- The ordered-products heading is now the supplied chapter heading, with the existing localized label in its eyebrow. The ownership, unpaid-receipt, food-arrival and price assertions remain intact.
+- The controlled fixture gains explanation and caution text only; its nutrient amount, product, price and matching inputs are unchanged. Late food arrival also verifies completed saved analysis. Sample customer health details, blanket clear-check claims, and automatic LINE delivery claims from the handoff are not presented as real customer data.

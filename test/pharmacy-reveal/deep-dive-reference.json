@@ -1,0 +1,30 @@
+{
+  "sourceName": "HS and Reveal Deep Dive.html",
+  "sourceSha256": "0a854be243fbe6f5ddd8e7cb801c42b3b1dd1fe5fe5bd896d9a76186dfcac19f",
+  "assets": [
+    {
+      "file": "public/assets/pharmacy/deep-dive/coffee.webp",
+      "sha256": "a3df2b10cdbd7c70bcad7649eb2202dc78296f8cfe665e15cdb009eb3a08d348"
+    },
+    {
+      "file": "public/assets/pharmacy/deep-dive/picture.webp",
+      "sha256": "7481d14cd9c49267f48ad9e509a2def09ec6716277f90bdd6cb46732f7d2c447"
+    },
+    {
+      "file": "public/assets/pharmacy/deep-dive/noticed.webp",
+      "sha256": "8634dc0facd6e05d5f6d3a47e01a00568e857d29f23936f0b8987dc27e7f7189"
+    },
+    {
+      "file": "public/assets/pharmacy/deep-dive/thinking.webp",
+      "sha256": "f899f8689f8dd7235cf1fc3530174994a15fe4c97110a5bce8bd470906fc49bb"
+    },
+    {
+      "file": "public/assets/pharmacy/deep-dive/food.webp",
+      "sha256": "a2e9a79dc73ccb7b142bf180f4abd88f33daa099029ac26f4a475d769140146b"
+    },
+    {
+      "file": "public/assets/pharmacy/deep-dive/close.webp",
+      "sha256": "d4e99fd98a8d5c81cbc8ce576548a0d90587bce67a5c5485b02a303fa644a76a"
+    }
+  ]
+}
