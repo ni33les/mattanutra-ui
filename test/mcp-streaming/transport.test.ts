@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { setImmediate } from "node:timers/promises";
-import { completionResponse } from "../../lib/agentic/mcp/completion-stream.ts";
+import { completionResponse, PLAN_STREAM_WAIT_MS, PLAN_STREAM_FINISH_MS } from "../../lib/agentic/mcp/completion-stream.ts";
 import { mcpOneShotResponse } from "../../lib/agentic/mcp/transport.ts";
 import type { JsonRpcResponse } from "../../lib/agentic/mcp/rpc.ts";
 
@@ -55,4 +55,28 @@ test("STREAM-HTTP-08 JSON-only and text-result clients preserve complete respons
   assert.deepEqual(await mcpOneShotResponse("application/json", processing).json(), processing);
   const textOnly = { ...response("ready"), result: { content: [{ type: "text", text: JSON.stringify({ status: "ready", revision: 2 }) }] } };
   const h = harness(); h.finish(textOnly); assert.deepEqual(messages(await h.stream.text()), [textOnly]);
+});
+test("STREAM-HTTP-09 heartbeats contain no interim result and the final read has reserved time", async t => {
+  t.mock.timers.enable({ apis: ["setInterval", "setTimeout"] });
+  const h = harness(14_000), reader = h.stream.body!.getReader();
+  assert.match(new TextDecoder().decode((await reader.read()).value), /^:/);
+  await setImmediate();
+  t.mock.timers.tick(5_000);
+  assert.equal(new TextDecoder().decode((await reader.read()).value), ": waiting\n\n");
+  h.finish();
+  const body = new TextDecoder().decode((await reader.read()).value);
+  assert.deepEqual(messages(body), [response("ready")]);
+  assert.equal((await reader.read()).done, true);
+  assert.equal(PLAN_STREAM_WAIT_MS, 15_000); assert.equal(PLAN_STREAM_FINISH_MS, 1_000);
+});
+test("STREAM-HTTP-10 request abort closes observers and ignores late completion", async () => {
+  const h = harness(), reader = h.stream.body!.getReader(); await reader.read();
+  h.abort.abort(); h.finish();
+  assert.equal((await reader.read()).done, true); assert.equal(h.counters().closed, 1);
+});
+test("STREAM-HTTP-11 a failed status dependency returns recoverable processing and releases observation", async () => {
+  let closed = 0;
+  const stream = completionResponse({ initial: processing, signal: new AbortController().signal,
+    subscribe: () => () => { closed++; }, read: async () => { throw new Error("Temporary read failure"); } });
+  assert.ok(stream); assert.deepEqual(messages(await stream.text()), [processing]); assert.equal(closed, 1);
 });
