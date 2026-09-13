@@ -20,6 +20,11 @@ for (const locale of ["en", "th", "zh-CN"] as const) {
     await expect(page.locator("#formula")).toContainText("100%");
     await expect(page.locator(".mn-reveal-final").locator('a[href*="/basket/checkout"],a[href*="/nutrition/quiz"]')).toHaveCount(0);
     await expect(page.getByTestId("pharmacy-order").getByRole("checkbox")).toHaveCount(1);
+    const firstProduct = page.getByTestId("pharmacy-order").getByRole("checkbox").first().locator("..");
+    const summary = page.getByRole("heading", { name: c.orderSummary, exact: true }).locator("../..");
+    const firstProductTop = await firstProduct.evaluate(el => el.getBoundingClientRect().top);
+    const summaryTop = await summary.evaluate(el => el.getBoundingClientRect().top);
+    expect(Math.abs(firstProductTop - summaryTop)).toBeLessThanOrEqual(1);
     await expect(page.getByLabel(c.name, { exact: true })).toBeVisible();
     await expect(page.locator('input[autocomplete="street-address"],iframe[src*="stripe"]')).toHaveCount(0);
     await page.getByTestId("pharmacy-order").getByRole("checkbox").uncheck();
