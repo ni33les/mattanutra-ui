@@ -48,6 +48,16 @@ for (const locale of ["en", "th", "zh-CN"]) {
 
 test("PHARM-PROGRESS capture displays pharmacy progress before the receipt, then hands off without HealthScore waiting", async ({ page }) => {
   const saved = await fixture("en");
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  let leafBursts = 0;
+  await page.exposeFunction("recordLeafBurst", () => { leafBursts++; });
+  await page.addInitScript(() => {
+    new MutationObserver(records => {
+      if (records.some(record => [...record.addedNodes].some(node => node instanceof Element && node.matches(".mn-quiz-leaf")))) {
+        void (window as unknown as { recordLeafBurst: () => Promise<void> }).recordLeafBurst();
+      }
+    }).observe(document, { childList: true, subtree: true });
+  });
   let release!: () => void;
   const barrier = new Promise<void>(resolve => { release = resolve; });
   await page.route("**/api/assessment", async route => {
@@ -62,6 +72,7 @@ test("PHARM-PROGRESS capture displays pharmacy progress before the receipt, then
     await expect(page.locator(".mn-quiz-calc")).toHaveCount(0);
   } finally { release(); }
   await expect(page).toHaveURL(new RegExp(`/retail/${saved.slug}/progress\\?plan=${saved.planId}`));
+  expect(leafBursts).toBe(0);
 });
 
 test("PHARM-PROGRESS failures provide an explicit retry and continue observing the same assessment", async ({ page }) => {
