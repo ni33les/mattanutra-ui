@@ -40,8 +40,11 @@ test("EFF-FUNNEL-PG-02 persisted readiness is small, localized and invalidates w
   await sql`insert into public.assessment_healthscore_results(plan_id,revision,locale,generator_version,result,read_projection)
     values(${id}::uuid,1,'en',${FUNNEL_GENERATOR_VERSION},${sql.json(toJsonValue(result))},${sql.json(ready)})`;
   let captured: Record<string, unknown>[] = [];
-  const observed = new Proxy(sql, { apply: async (target, receiver, args) => {
-    const rows = await Reflect.apply(target, receiver, args); captured = rows; return rows;
+  const observed = new Proxy(sql, { apply: (target, receiver, args) => {
+    const query = Reflect.apply(target, receiver, args);
+    // SQL fragments and identifiers must stay composable; observe only execution.
+    return Array.isArray(args[0]) && /^\s*select a\.input_revision/.test(args[0][0])
+      ? query.then((rows: Record<string, unknown>[]) => { captured = rows; return rows; }) : query;
   } });
   assert.equal((await getFunnelReadiness(id, "en", observed))?.copyReady, true);
   assert.equal(captured[0].health_score, null); assert.equal(captured[0].copy_ready, true);

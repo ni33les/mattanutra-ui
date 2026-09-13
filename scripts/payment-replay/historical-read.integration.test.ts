@@ -1,13 +1,13 @@
 import assert from "node:assert/strict";
 import { after, test } from "node:test";
-import { getSql, closeSqlPool, withDatabaseTransaction } from "../lib/db.ts";
-import { getFunnelReadiness } from "../lib/funnel-readiness.ts";
-import { getStoredFormulationRead } from "../lib/assessment-store.ts";
-import { getRevisionHealthScore, getRevisionFormulationNutrientCount } from "../lib/assessment-revisions.ts";
-import type { Locale } from "../lib/i18n.ts";
-import { hasHealthScoreAiCopy } from "../lib/healthscore-readiness.ts";
+import { getSql, closeSqlPool, withDatabaseTransaction } from "../../lib/db.ts";
+import { getFunnelReadiness } from "../../lib/funnel-readiness.ts";
+import { getStoredFormulationRead } from "../../lib/assessment-store.ts";
+import { getRevisionHealthScore, getRevisionFormulationNutrientCount } from "../../lib/assessment-revisions.ts";
+import type { Locale } from "../../lib/i18n.ts";
+import { hasHealthScoreAiCopy } from "../../lib/healthscore-readiness.ts";
 const uri=new URL(process.env.TEST_DB_URL!);
-assert.equal(uri.hostname,"127.0.0.1");assert.match(uri.pathname,/^\/prd_rehearsal_/);
+assert.equal(uri.hostname,"127.0.0.1");assert.match(uri.pathname,/^\/mattanutra_lock_review_ax_prd_/);
 const sql=getSql()!;assert.ok(sql);after(closeSqlPool);
 async function fixtures(){
  const rows=await sql`select a.plan_id,a.locale,a.health_score from assessments a where a.input_revision=0 and a.input_hash is null and a.status='ready'
@@ -21,3 +21,5 @@ test("PRD-READ-02 changed answers cannot inherit historical results",async()=>{c
 test("PRD-READ-03 a current revision never falls back to pre-revision output",async()=>{const [f]=await fixtures();const rollback=new Error("rollback");await assert.rejects(withDatabaseTransaction(sql,async tx=>{await tx`update assessments set input_revision=1,input_hash='changed' where plan_id=${f.plan_id}::uuid`;assert.equal((await getFunnelReadiness(f.plan_id,f.locale,tx))?.readyForReveal,false);throw rollback;}),e=>e===rollback);});
 test("PRD-READ-04 missing historical completion evidence stays pending",async()=>{const [f]=await fixtures();const rollback=new Error("rollback");await assert.rejects(withDatabaseTransaction(sql,async tx=>{await tx`update tasks set status='failed' where plan_id=${f.plan_id}::uuid and task_type='generate_supplement_guidance'`;assert.equal((await getFunnelReadiness(f.plan_id,f.locale,tx))?.readyForReveal,false);throw rollback;}),e=>e===rollback);});
 test("PRD-READ-05 historical copy is never invented for another locale",async()=>{for(const f of await fixtures()){const locale=f.locale==='en'?'th':'en';assert.equal((await getFunnelReadiness(f.plan_id,locale))?.readyForHealthScore,false);assert.equal(await getRevisionHealthScore(f.plan_id,locale),null);}});
+test("PRD-READ-06 changed HealthScore audit identity cannot become complete advice",async()=>{const [f]=await fixtures();const rollback=new Error("rollback");await assert.rejects(withDatabaseTransaction(sql,async tx=>{await tx`update assessments set health_score=health_score||'{"version":"changed"}'::jsonb where plan_id=${f.plan_id}::uuid`;assert.equal((await getFunnelReadiness(f.plan_id,f.locale,tx))?.readyForHealthScore,false);throw rollback;}),e=>e===rollback);});
+test("PRD-READ-07 a changed selected plan cannot borrow another completed generation",async()=>{const [f]=await fixtures();const rollback=new Error("rollback");await assert.rejects(withDatabaseTransaction(sql,async tx=>{await tx`update assessments set selected_plan=null where plan_id=${f.plan_id}::uuid`;assert.equal((await getFunnelReadiness(f.plan_id,f.locale,tx))?.readyForReveal,false);throw rollback;}),e=>e===rollback);});

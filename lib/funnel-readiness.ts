@@ -1,3 +1,4 @@
+import { historicalAssessmentReadJoin, historicalResult } from "@/lib/historical-assessment-read";
 import { paymentFulfillmentEvidence, type FulfillmentPayment } from "@/lib/payment-fulfillment-evidence";
 import { getSql } from "@/lib/db";
 import { isUuid, hasHealthScoreAiCopy } from "@/lib/assessment-store";
@@ -11,7 +12,7 @@ export async function getFunnelReadiness(planId: string, localeOption?: string |
   const requestedLocale = isLocale(localeOption) ? localeOption : null;
   const [row] = await sql`select a.input_revision, a.input_hash, coalesce(${requestedLocale}, a.locale) as requested_locale,
       a.selected_plan, a.status as assessment_status, coalesce(a.funnel_skip_healthscore, a.answers ? 'inStorePharmacy') as skip_healthscore,
-      case when score.read_projection->>'version' = '1' then null else score.result end as health_score,
+      case when score.read_projection->>'version' = '1' then null else coalesce(score.result, case when historical.formula_version is not null then a.health_score end) end as health_score,
       case when score.read_projection->>'version' = '1' then (score.read_projection->'ready'->>coalesce(${requestedLocale}, a.locale))::boolean else null end as copy_ready,
       score.created_at as score_version,
       formula.version as formula_version, formula.visible_count, formula.section_status,
@@ -27,6 +28,7 @@ export async function getFunnelReadiness(planId: string, localeOption?: string |
       tasks.statuses, tasks.copy_status, tasks.formula_status, tasks.product_task_status,
       food.version as food_version, report.version as report_version
     from public.assessments a
+    ${historicalAssessmentReadJoin(sql, "a", requestedLocale)}
     left join public.assessment_healthscore_results score on score.plan_id = a.plan_id and score.revision = a.input_revision
       and score.locale = coalesce(${requestedLocale}, a.locale) and score.generator_version = ${FUNNEL_GENERATOR_VERSION}
     left join lateral (
@@ -34,8 +36,8 @@ export async function getFunnelReadiness(planId: string, localeOption?: string |
         case when f.read_projection->>'version' = '1' then (f.read_projection->>'visibleCount')::int else
         (select count(*)::int from jsonb_array_elements(coalesce(f.formulation->'supplementBreakdown', '[]'::jsonb)) item
           where coalesce(item #>> '{safety,visibility}', 'visible') <> 'hidden') end as visible_count
-      from public.formulations f where f.plan_id = a.plan_id and f.assessment_revision = a.input_revision
-        and f.generation_locale = coalesce(${requestedLocale}, a.locale) and f.generator_version = ${FUNNEL_GENERATOR_VERSION}
+      from public.formulations f where f.plan_id = a.plan_id and ((f.assessment_revision = a.input_revision
+        and f.generation_locale = coalesce(${requestedLocale}, a.locale) and f.generator_version = ${FUNNEL_GENERATOR_VERSION}) or ${historicalResult(sql, "f", true)})
         and (case when a.selected_plan is null then f.model_version like '%:example'
           else (f.model_version is null or f.model_version not like '%:example') end) order by f.version desc limit 1
     ) formula on true
@@ -43,16 +45,16 @@ export async function getFunnelReadiness(planId: string, localeOption?: string |
       select f.version, case when f.read_projection->>'version' = '1' then (f.read_projection->>'visibleCount')::int else
         (select count(*)::int from jsonb_array_elements(coalesce(f.formulation->'supplementBreakdown', '[]'::jsonb)) item
           where coalesce(item #>> '{safety,visibility}', 'visible') <> 'hidden') end as visible_count
-      from public.formulations f where f.plan_id = a.plan_id and f.assessment_revision = a.input_revision
-        and f.generation_locale = coalesce(${requestedLocale}, a.locale) and f.generator_version = ${FUNNEL_GENERATOR_VERSION}
+      from public.formulations f where f.plan_id = a.plan_id and ((f.assessment_revision = a.input_revision
+        and f.generation_locale = coalesce(${requestedLocale}, a.locale) and f.generator_version = ${FUNNEL_GENERATOR_VERSION}) or ${historicalResult(sql, "f", true)})
         and (f.model_version is null or f.model_version not like '%:example')
       order by f.version desc limit 1
     ) prepared_formula on true
     left join lateral (
       select r.id, r.generated_at, r.status, r.stack_coverage_percent,
         (select count(*)::int from public.product_recommendation_items i where i.run_id = r.id) as product_count
-      from public.product_recommendation_runs r where r.catalogue_revision = (select revision from public.catalogue_runtime_revision where singleton=true) and r.plan_id = a.plan_id and r.assessment_revision = a.input_revision
-        and r.generation_locale = coalesce(${requestedLocale}, a.locale) and r.generator_version = ${FUNNEL_GENERATOR_VERSION}
+      from public.product_recommendation_runs r where r.plan_id = a.plan_id and ((r.catalogue_revision = (select revision from public.catalogue_runtime_revision where singleton=true) and r.assessment_revision = a.input_revision
+        and r.generation_locale = coalesce(${requestedLocale}, a.locale) and r.generator_version = ${FUNNEL_GENERATOR_VERSION}) or ${historicalResult(sql, "r")})
         and r.selection_revision = coalesce((select revision from public.assessment_product_preferences where plan_id = a.plan_id), 0)
       order by r.generated_at desc limit 1
     ) products on true
@@ -72,10 +74,10 @@ export async function getFunnelReadiness(planId: string, localeOption?: string |
         and t.payload #>> '{generation,generatorVersion}' = ${FUNNEL_GENERATOR_VERSION}
         order by t.task_type, t.created_at desc) latest
     ) tasks on true
-    left join lateral (select f.version from public.food_guidance f where f.plan_id = a.plan_id and f.assessment_revision = a.input_revision
-      and f.generation_locale = coalesce(${requestedLocale}, a.locale) and f.generator_version = ${FUNNEL_GENERATOR_VERSION} order by f.version desc limit 1) food on true
-    left join lateral (select r.version from public.nutrition_reports r where r.plan_id = a.plan_id and r.assessment_revision = a.input_revision
-      and r.generation_locale = coalesce(${requestedLocale}, a.locale) and r.generator_version = ${FUNNEL_GENERATOR_VERSION} order by r.version desc limit 1) report on true
+    left join lateral (select f.version from public.food_guidance f where f.plan_id = a.plan_id and ((f.assessment_revision = a.input_revision
+      and f.generation_locale = coalesce(${requestedLocale}, a.locale) and f.generator_version = ${FUNNEL_GENERATOR_VERSION}) or ${historicalResult(sql, "f")}) order by f.version desc limit 1) food on true
+    left join lateral (select r.version from public.nutrition_reports r where r.plan_id = a.plan_id and ((r.assessment_revision = a.input_revision
+      and r.generation_locale = coalesce(${requestedLocale}, a.locale) and r.generator_version = ${FUNNEL_GENERATOR_VERSION}) or ${historicalResult(sql, "r")}) order by r.version desc limit 1) report on true
     where a.plan_id = ${planId}::uuid`;
   if (!row) return null;
   const locale = row.requested_locale as Locale;

@@ -1,3 +1,4 @@
+import { historicalAssessmentReadJoin, historicalResult } from "@/lib/historical-assessment-read";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { createHash } from "node:crypto";
 import type postgres from "postgres";
@@ -71,10 +72,12 @@ export async function getRevisionHealthScore(planId: string, locale: Locale): Pr
   const sql = getSql();
   if (!sql) return null;
   const [row] = await sql`
-    select results.result from public.assessment_healthscore_results results
-    join public.assessments a on a.plan_id = results.plan_id and a.input_revision = results.revision
-    where results.plan_id = ${planId}::uuid and results.locale = ${locale}
-      and results.generator_version = ${FUNNEL_GENERATOR_VERSION}
+    select coalesce(results.result, case when historical.formula_version is not null then a.health_score end) as result
+    from public.assessments a
+    ${historicalAssessmentReadJoin(sql, "a", locale)}
+    left join public.assessment_healthscore_results results on a.plan_id = results.plan_id and a.input_revision = results.revision
+      and results.locale = ${locale} and results.generator_version = ${FUNNEL_GENERATOR_VERSION}
+    where a.plan_id = ${planId}::uuid
   `;
   return row?.result ?? null;
 }
@@ -86,10 +89,12 @@ export async function getRevisionFormulationNutrientCount(planId: string, locale
     select case when f.read_projection->>'version' = '1' then (f.read_projection->>'visibleCount')::int else
       (select count(*)::int from jsonb_array_elements(coalesce(f.formulation->'supplementBreakdown', '[]'::jsonb)) item
         where coalesce(item #>> '{safety,visibility}', 'visible') <> 'hidden') end as count
-    from public.formulations f
-    join public.assessments a on a.plan_id=f.plan_id and a.input_revision=f.assessment_revision
-    where f.plan_id=${planId}::uuid and f.assessment_revision=${revision}
-      and f.generation_locale=${locale} and f.generator_version=${FUNNEL_GENERATOR_VERSION}
+    from public.assessments a
+    ${historicalAssessmentReadJoin(sql, "a", locale)}
+    join public.formulations f on a.plan_id=f.plan_id
+    where a.plan_id=${planId}::uuid and a.input_revision=${revision}
+      and ((f.assessment_revision=${revision} and f.generation_locale=${locale} and f.generator_version=${FUNNEL_GENERATOR_VERSION})
+        or ${historicalResult(sql, "f", true)})
       and (f.model_version is null or f.model_version not like '%:example')
     order by f.version desc, f.generated_at desc limit 1
   `;
