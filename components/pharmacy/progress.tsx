@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Check, ArrowRight } from "lucide-react";
+import { Check, ArrowRight, LoaderCircle } from "lucide-react";
 import { SafeImage } from "@/components/safe-image";
 import { pharmacyPath } from "@/lib/pharmacy-journey";
 import { assessmentPollKey, fetchFunnelJson, pollFunnelStatus } from "@/lib/funnel-polling";
@@ -26,7 +26,7 @@ export function PharmacyProgressView({ locale, stage = 0, failed = false, onRetr
   locale: Locale; stage?: number; failed?: boolean; onRetry?: () => void;
 }) {
   const c = copy[locale];
-  return <section data-testid="pharmacy-progress" className="mx-auto w-full max-w-3xl px-6 py-8 text-center sm:py-20" aria-busy={!failed}>
+  return <section data-testid="pharmacy-progress" className="mx-auto w-full max-w-3xl px-6 py-8 text-center sm:py-20" aria-busy={!failed && stage < 3}>
     <SafeImage src="/assets/library/nong/nong-thinking.webp" alt="" width={128} height={150} className="mx-auto size-24 object-contain sm:h-36 sm:w-32" />
     <p className="mt-3 text-xs font-semibold sm:mt-5 uppercase tracking-[.18em] text-[var(--mn-teal-deep)]">{c.kicker}</p>
     <h1 className="mt-4 font-serif text-3xl leading-tight text-[var(--mn-ink)] sm:text-5xl">{c.title}</h1>
@@ -35,7 +35,9 @@ export function PharmacyProgressView({ locale, stage = 0, failed = false, onRetr
       {c.steps.map((label, index) => <li key={label} aria-current={index === stage ? "step" : undefined}
         className={`flex items-center gap-3 rounded-2xl border p-3 sm:flex-col sm:p-5 ${index <= stage ? "border-[var(--mn-teal)]/30 bg-[var(--mn-mint)]" : "border-[var(--mn-line)] bg-white/50"}`}>
         <span className={`grid size-8 shrink-0 place-items-center rounded-full text-sm ${index < stage ? "bg-[var(--mn-teal-deep)] text-white" : "border border-[var(--mn-line)] text-[var(--mn-ink-soft)]"}`}>
-          {index < stage ? <Check aria-hidden="true" className="size-4" /> : index + 1}
+          {index < stage ? <Check aria-hidden="true" className="size-4" />
+            : index === stage && index > 0 && !failed ? <LoaderCircle aria-hidden="true" className="size-5 motion-safe:animate-spin" />
+            : index + 1}
         </span><span className="text-sm font-semibold">{label}</span>
       </li>)}
     </ol>
@@ -73,6 +75,6 @@ export function PharmacyProgress({ locale, sourceLocale, slug, planId, initial }
     void observe().catch(() => { if (!controller.signal.aborted) setFailed(true); });
     return () => controller.abort();
   }, [attempt, locale, planId, router, slug, sourceLocale]);
-  return <PharmacyProgressView locale={locale} stage={current.stages.formulation === "complete" ? 2 : 1} failed={failed}
+  return <PharmacyProgressView locale={locale} stage={current.readyForReveal ? 3 : current.stages.formulation === "complete" ? 2 : 1} failed={failed}
     onRetry={() => { setFailed(false); setAttempt(n => n + 1); }} />;
 }
