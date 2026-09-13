@@ -4,6 +4,12 @@ import { expect, test } from "../helpers/offline-browser";
 // Measured from the supplied, unmodified HTML in Chromium, not from application CSS.
 const reference = JSON.parse(readFileSync("test/pharmacy-landing/reference.json", "utf8"));
 const slug = "matcher-v5-isolated-fixture-retailer";
+// Production minification omits default gradient endpoints. Private family names
+// change CSS quoting only; the independently verified font bytes stay identical.
+const canonicalCss = (css: Record<string, string>) => ({ ...css,
+  fontFamily: css.fontFamily.replaceAll("Pharmacy ", "").replaceAll('"', ""),
+  backgroundImage: css.backgroundImage.replace(/\) 0%,/g, "),").replace(/\) 100%\)$/g, "))")
+});
 for (const view of reference.views) {
   test(`PHARM-LANDING ${view.locale} ${view.width}px matches the supplied content and geometry`, async ({ page }, info) => {
     await page.setViewportSize({ width: view.width, height: 1000 });
@@ -25,12 +31,11 @@ for (const view of reference.views) {
       const box = (await el.boundingBox())!;
       const actual = { x: box.x - bounds.x, y: box.y - bounds.y, width: box.width, height: box.height };
       for (const key of ["x", "y", "width", "height"] as const) expect(Math.abs(actual[key] - expected.rect[key]), `${expected.selector} ${key}`).toBeLessThan(1);
-      expect(await el.evaluate(e => {
+      const css = await el.evaluate(e => {
         const s = getComputedStyle(e);
-        return Object.fromEntries(["fontFamily", "fontSize", "fontWeight", "fontStyle", "lineHeight", "letterSpacing", "color", "backgroundImage", "borderRadius", "textAlign"].map(k => [k,
-          // Private family names protect the standard header/footer; asset bytes are verified separately.
-          k === "fontFamily" ? s.fontFamily.replaceAll("Pharmacy ", "") : s[k as keyof CSSStyleDeclaration]]));
-      }), expected.selector).toEqual(expected.css);
+        return Object.fromEntries(["fontFamily", "fontSize", "fontWeight", "fontStyle", "lineHeight", "letterSpacing", "color", "backgroundImage", "borderRadius", "textAlign"].map(k => [k, String(s[k as keyof CSSStyleDeclaration])]));
+      });
+      expect(canonicalCss(css), expected.selector).toEqual(canonicalCss(expected.css));
     }
     await expect(hero.locator(".primary-cta")).toHaveAttribute("href", `/${view.locale}/retail/${slug}/quiz`);
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(view.width);
