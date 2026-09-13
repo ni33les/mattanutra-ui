@@ -25,11 +25,6 @@ for (const locale of ["en", "th", "zh-CN"] as const) {
     const planLink = page.getByTestId("pharmacy-deep-dive-link");
     await expect(planLink).toHaveText(`${c.details} →`);
     await expect(planLink).toHaveAttribute("href", `/${locale}/retail/${fixture.slug}/plan?plan=${fixture.planId}`);
-    await expect(planLink).toBeInViewport();
-    const initialViewport = page.viewportSize()!;
-    await page.setViewportSize({ width: 390, height: 844 });
-    await expect(planLink).toBeInViewport();
-    await page.setViewportSize(initialViewport);
     await expect(page.locator("#formula")).toContainText("100%");
     await expect(page.locator(".mn-reveal-final").locator('a[href*="/basket/checkout"],a[href*="/nutrition/quiz"]')).toHaveCount(0);
     await expect(page.getByTestId("pharmacy-order").getByRole("checkbox")).toHaveCount(1);
@@ -38,6 +33,20 @@ for (const locale of ["en", "th", "zh-CN"] as const) {
     const firstProductTop = await firstProduct.evaluate(el => el.getBoundingClientRect().top);
     const summaryTop = await summary.evaluate(el => el.getBoundingClientRect().top);
     expect(Math.abs(firstProductTop - summaryTop)).toBeLessThanOrEqual(1);
+    await expect(page.getByTestId("pharmacy-order-summary").getByTestId("pharmacy-deep-dive-link")).toHaveCount(1);
+    await expect(planLink).toHaveCount(1);
+    const assertLinkBelowSummary = async () => {
+      const card = (await summary.boundingBox())!, link = (await planLink.boundingBox())!;
+      expect(link.y - (card.y + card.height)).toBeGreaterThanOrEqual(12);
+      expect(link.y - (card.y + card.height)).toBeLessThanOrEqual(24);
+      expect(Math.abs(link.x - card.x)).toBeLessThanOrEqual(1);
+      expect(Math.abs(link.width - card.width)).toBeLessThanOrEqual(1);
+    };
+    await assertLinkBelowSummary();
+    const initialViewport = page.viewportSize()!;
+    await page.setViewportSize({ width: 390, height: 844 });
+    await assertLinkBelowSummary();
+    await page.setViewportSize(initialViewport);
     await expect(page.getByLabel(c.name, { exact: true })).toBeVisible();
     await expect(page.locator('input[autocomplete="street-address"],iframe[src*="stripe"]')).toHaveCount(0);
     await planLink.click();
