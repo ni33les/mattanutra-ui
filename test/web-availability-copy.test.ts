@@ -27,7 +27,9 @@ test('AVAIL-COPY-04 reveal uses distinct pending, unknown, zero and raw-positive
   for(const locale of ['en','th','zh-CN'] as const){const copy=revealCopy[locale];
     assert.equal(revealCoverageLabel(0,false,copy),'0%');
     for (const positive of [0.004, 0.4, 0.999]) assert.equal(revealCoverageLabel(positive,false,copy),'1%');
-    assert.equal(revealCoverageLabel(1.2,false,copy),'1.2%');
+    for (const [coverage, label] of [[1, '1%'], [1.2, '2%'], [12.01, '13%'], [55.15, '56%'], [99.01, '100%'], [100, '100%']] as const) {
+      assert.equal(revealCoverageLabel(coverage,false,copy),label);
+    }
     assert.equal(revealCoverageLabel(null,false,copy),copy.coverageUnknown);
     assert.equal(revealCoverageLabel(undefined,false,copy),copy.coverageUnknown);
     assert.equal(revealCoverageLabel(0,true,copy),copy.productsPendingBadge);
