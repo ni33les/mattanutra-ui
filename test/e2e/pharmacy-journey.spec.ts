@@ -16,6 +16,7 @@ for (const locale of ["en", "th", "zh-CN"] as const) {
     await expect(page.locator(".mn-titlebar--quiz")).toBeVisible();
     await page.goto(`/${locale}/retail/${fixture.slug}/reveal?plan=${fixture.planId}`);
     await expect(page.getByTestId("pharmacy-order")).toBeVisible();
+    await expect(page.getByText(`${c.coverage}: 100%`, { exact: true })).toBeVisible();
     await expect(page.getByRole("checkbox")).toHaveCount(1);
     await expect(page.getByLabel(c.name, { exact: true })).toBeVisible();
     await expect(page.locator('input[autocomplete="street-address"],iframe[src*="stripe"]')).toHaveCount(0);
@@ -42,3 +43,21 @@ for (const locale of ["en", "th", "zh-CN"] as const) {
     await page.screenshot({ path: `${process.env.MCP_pharmacy_EVIDENCE_DIR}/pharmacy-${locale}.png`, fullPage: true });
   });
 }
+test("PHARM-BROWSER food support arriving after an order is displayed without changing its formula", async ({page}) => {
+  const {stdout}=await execute(process.execPath,["--experimental-strip-types","--import","./test/helpers/offline-network.mjs","--import","./scripts/register-ts-path-loader.mjs","--input-type=module","-e",
+    `import {seedPharmacyFixture} from './test/helpers/pharmacy-fixture.ts';import {closeSqlPool} from './lib/db.ts';try{console.log('FIXTURE:'+JSON.stringify(await seedPharmacyFixture('en')));}finally{await closeSqlPool();}`],{env:process.env,timeout:30000});
+  const fixture=JSON.parse(stdout.split('\n').find(line=>line.startsWith('FIXTURE:'))!.slice(8));
+  await page.goto(`/en/retail/${fixture.slug}/reveal?plan=${fixture.planId}`);
+  await page.getByLabel(pharmacyCopy.en.name,{exact:true}).fill('Late Explanation');
+  await page.getByRole('button',{name:pharmacyCopy.en.confirm,exact:true}).click();
+  await expect(page.getByRole('heading',{name:pharmacyCopy.en.confirmed})).toBeVisible();
+  await page.route(`**/api/assessment/${fixture.planId}/formulation?*`,async route=>{
+    const response=await route.fetch(); const result=await response.json();
+    expect(result.assessmentRevision).toBe(fixture.revision);
+    await route.fulfill({response,json:{...result,foodGapSupport:{version:'food-gap:v1',variants:{balanced:{body:'Late food support fixture',items:[]}}}}});
+  });
+  await page.getByRole('link',{name:`${pharmacyCopy.en.details} →`,exact:true}).click();
+  await expect(page.getByText('Late food support fixture',{exact:true})).toBeVisible();
+  await expect(page.getByRole('heading',{name:'Vitamin D3',exact:true})).toBeVisible();
+  await expect(page.getByText('1000 IU/day',{exact:true})).toBeVisible();
+});
