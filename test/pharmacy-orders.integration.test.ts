@@ -9,6 +9,7 @@ import { getFunnelReadiness } from "../lib/funnel-readiness.ts";
 import { getStoredHealthScoreAnalysisSnapshot } from "../lib/assessment-store.ts";
 import { seedPharmacyFixture } from "./helpers/pharmacy-fixture.ts";
 import { fixtureDatabaseUrl } from "./helpers/fixture-teardown.ts";
+import { markRetailOrderSettlementDue } from "../lib/admin-retail-financials.ts";
 fixtureDatabaseUrl();
 const sql = getSql()!;
 before(async () => { const migration = await readFile("db-rollout/pharmacy-orders.sql", "utf8"); await sql.begin(tx => tx.unsafe(migration)); });
@@ -66,4 +67,21 @@ it("PHARM-PG-04 order reads finish while an order writer is locked and do not ch
     assert.deepEqual(result?.receipt,receipt);
   });
   assert.deepEqual(await sql`select * from public.retail_customer_orders where id=${receipt.id}::uuid`,before);
+});
+it("PHARM-PG-05 pharmacy orders never enter online settlement during later workflow replay", async () => {
+  const fixture=await seedPharmacyFixture();
+  const receipt=await createPharmacyOrder({planId:fixture.planId,pharmacy:fixture.slug,locale:"en",expectedRevision:fixture.revision,productIds:fixture.productIds,customerName:"Till"},randomUUID());
+  const before=await counters();
+  assert.equal(await markRetailOrderSettlementDue(sql,{orderId:receipt.id}),null);
+  assert.deepEqual(await counters(),before);
+});
+it("PHARM-PG-06 schema replay preserves every existing order and line", async () => {
+  const before=await sql`select id, to_jsonb(o) as value from public.retail_customer_orders o order by id`;
+  assert.ok(before.length);
+  const lines=await sql`select id,to_jsonb(l) as value from public.retail_customer_order_lines l order by id`;
+  assert.ok(lines.length);
+  const migration=await readFile("db-rollout/pharmacy-orders.sql","utf8");
+  await sql.begin(tx=>tx.unsafe(migration));
+  assert.deepEqual(await sql`select id,to_jsonb(o) as value from public.retail_customer_orders o order by id`,before);
+  assert.deepEqual(await sql`select id,to_jsonb(l) as value from public.retail_customer_order_lines l order by id`,lines);
 });
