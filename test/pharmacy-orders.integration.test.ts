@@ -10,6 +10,9 @@ import { getStoredHealthScoreAnalysisSnapshot } from "../lib/assessment-store.ts
 import { seedPharmacyFixture } from "./helpers/pharmacy-fixture.ts";
 import { fixtureDatabaseUrl } from "./helpers/fixture-teardown.ts";
 import { markRetailOrderSettlementDue } from "../lib/admin-retail-financials.ts";
+import { createAssessmentResumeDraft, getAssessmentResumeDraft } from "../lib/assessment-resume-store.ts";
+import { buildAssessmentResumeUrl } from "../lib/assessment-resume-email.ts";
+import { inStorePharmacyFromAnswers } from "../lib/pharmacy-in-store.ts";
 fixtureDatabaseUrl();
 const sql = getSql()!;
 before(async () => { const migration = await readFile("db-rollout/pharmacy-orders.sql", "utf8"); await sql.begin(tx => tx.unsafe(migration)); });
@@ -84,4 +87,15 @@ it("PHARM-PG-06 schema replay preserves every existing order and line", async ()
   await sql.begin(tx=>tx.unsafe(migration));
   assert.deepEqual(await sql`select id,to_jsonb(o) as value from public.retail_customer_orders o order by id`,before);
   assert.deepEqual(await sql`select id,to_jsonb(l) as value from public.retail_customer_order_lines l order by id`,lines);
+});
+it("PHARM-PG-07 a fresh resume link retains its pharmacy and cannot capture into another store", async () => {
+  const fixture = await seedPharmacyFixture();
+  const draft = await createAssessmentResumeDraft({ answers: {sex:"male",age:"36-45",goals:["energy"]}, contactEmail:"resume@example.test", locale:"th", pharmacyId:fixture.slug });
+  const saved = await getAssessmentResumeDraft(draft.token);
+  assert.equal(inStorePharmacyFromAnswers(saved?.answers)?.id, fixture.pharmacyId);
+  assert.ok(buildAssessmentResumeUrl("th", draft.token, draft.pharmacySlug).includes(`/th/retail/${fixture.slug}/quiz?resume=`));
+  const [other] = await sql`select slug from public.organisations where organisation_type='tenant' and status='active' and id<>${fixture.pharmacyId}::uuid limit 1`;
+  assert.ok(other,"Cross-store resume fixture prerequisite");
+  await assert.rejects(captureAssessment({answers:saved!.answers,locale:"th",pharmacyId:other.slug,resumeToken:draft.token}, {idempotencyKey:randomUUID()}), {code:"pharmacy_conflict"});
+  assert.equal((await sql`select count(*)::int as n from public.assessments where plan_id=${draft.planId}::uuid`)[0].n,0);
 });
