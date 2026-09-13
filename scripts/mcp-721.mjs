@@ -189,7 +189,7 @@ if (mode === "validate") {
       TEST_DB_URL: process.env.TEST_DB_URL, DB_URL: process.env.TEST_DB_URL, DB_WORKER_URL: process.env.TEST_DB_URL,
       DB_ALLOW_DIRECT_CONNECTION: "true", MATCHER_TEST_EVIDENCE_DIR: resolve(output, "mcp-regression") });
   }
-  if (["efficiency", "practical", "availability", "pharmacy"].includes(packageId)) {
+  if (["efficiency", "practical", "availability", "pharmacy", "pharmacy-landing"].includes(packageId)) {
     const { runEfficiencyBrowser } = await import("./service-efficiency/release-stages.mjs");
     await runEfficiencyBrowser(output, isolated ?? { ...safe, TEST_DB_URL: process.env.TEST_DB_URL, DB_URL: process.env.TEST_DB_URL, DB_WORKER_URL: process.env.TEST_DB_URL, DB_ALLOW_DIRECT_CONNECTION: "true", DB_POOL_MAX: "3" }, inventory.browser);
     stages.push({ label: "affected-browser-tests", passed: true });

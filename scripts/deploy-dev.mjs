@@ -126,8 +126,11 @@ async function main() {
     if (!file?.startsWith("/") || !buildPath?.startsWith("/")) throw new Error("Provide absolute pharmacy attestation and build paths");
     if (await runCapture("git", ["status", "--porcelain"])) throw new Error("Validated source must remain clean");
     const sha = await runCapture("git", ["rev-parse", "HEAD"]);
-    const identity = mcp721Identity(sourceManifest().sha256, sha, "pharmacy");
-    checkMcp721Proof(file, identity, "pharmacy");
+    const proof = JSON.parse(await readFile(file, "utf8"));
+    const landingOnly = proof.scope === "pharmacy_landing_reference_fidelity";
+    const packageId = landingOnly ? "pharmacy-landing" : "pharmacy";
+    const identity = mcp721Identity(sourceManifest().sha256, sha, packageId);
+    checkMcp721Proof(file, identity, packageId);
     const build = JSON.parse(await readFile(resolve(dirname(file), "build.json"), "utf8"));
     if (compiledBuildIdentity(buildPath) !== build.buildSha256) throw new Error("Pharmacy compiled build changed");
     const staged = resolve("tmp", `pharmacy-build-${sha}`);
@@ -136,7 +139,7 @@ async function main() {
     const dropIns = "/etc/systemd/system/mattanutra-ui-dev.service.d";
     await cp(dropIns, resolve(dirname(file), "systemd-before"), { recursive: true, errorOnExist: true, force: false });
     // Only this package's additive constraint change. No seeds, correction manifests or backfills.
-    await run(process.execPath, ["--experimental-strip-types", "--import", "./scripts/register-ts-path-loader.mjs", "scripts/apply-pharmacy-orders-schema.ts"], { env: schemaEnv() });
+    if (!landingOnly) await run(process.execPath, ["--experimental-strip-types", "--import", "./scripts/register-ts-path-loader.mjs", "scripts/apply-pharmacy-orders-schema.ts"], { env: schemaEnv() });
     await npmRun("dev-runtime-schema:verify");
     await run("systemctl", ["stop", serviceName]);
     await rename(".next", resolve(dirname(file), "next-before"));

@@ -27,7 +27,9 @@ for (const view of reference.views) {
       for (const key of ["x", "y", "width", "height"] as const) expect(Math.abs(actual[key] - expected.rect[key]), `${expected.selector} ${key}`).toBeLessThan(1);
       expect(await el.evaluate(e => {
         const s = getComputedStyle(e);
-        return Object.fromEntries(["fontFamily", "fontSize", "fontWeight", "fontStyle", "lineHeight", "letterSpacing", "color", "backgroundImage", "borderRadius", "textAlign"].map(k => [k, s[k as keyof CSSStyleDeclaration]]));
+        return Object.fromEntries(["fontFamily", "fontSize", "fontWeight", "fontStyle", "lineHeight", "letterSpacing", "color", "backgroundImage", "borderRadius", "textAlign"].map(k => [k,
+          // Private family names protect the standard header/footer; asset bytes are verified separately.
+          k === "fontFamily" ? s.fontFamily.replaceAll("Pharmacy ", "") : s[k as keyof CSSStyleDeclaration]]));
       }), expected.selector).toEqual(expected.css);
     }
     await expect(hero.locator(".primary-cta")).toHaveAttribute("href", `/${view.locale}/retail/${slug}/quiz`);
