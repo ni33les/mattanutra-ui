@@ -17,6 +17,7 @@ export function verifyVersionExpectationEdit(before, after) {
   assert.equal(after, before.replaceAll(original, replacement), "Unexpected behavioral test change");
 }
 export const MCP_PACKAGES = {
+  streaming: { version: "11.1.0", directory: "test/mcp-streaming", base: "e588c405473480ef5e0796c6f48d195365d450fc", scope: "streaming_matching_completion" },
   availability: { version: "11.1.0", directory: "test/availability", base: "815bb210e38b2809b9aba32260693c70c048005c", scope: "clear_availability_and_product_backed_formulation" },
   refinement: { version: "11.0.0", directory: "test/simple-plan", inventory: "test/simple-plan/refinement-impact.json", base: "26e90472b0d23c9904eb1cf625ce70197384ac4e", scope: "consistent_refinement_and_fresh_standard_matching" },
   "web-matching": { version: "11.0.0", directory: "test/web-matching-correctness", base: "e46e16016fe0544d48da37224dde614bc153ee15", scope: "web_matching_correctness" },
@@ -34,6 +35,7 @@ export const MCP_PACKAGES = {
 };
 export const MCP721_STAGES = ["affected-tests", "typecheck", "release-diff-lint", "production-build", "unchanged-source-and-inputs"];
 export function packageStages(packageId) {
+  if (packageId === "streaming") return ["affected-tests", "no-new-locks", "completion-comparison", ...MCP721_STAGES.slice(1)];
   if (packageId === "availability") return ["affected-tests", "no-new-locks", ...MCP721_STAGES.slice(1,4), "affected-browser-tests", "unchanged-source-and-inputs"];
   if (packageId === "refinement") return ["affected-tests", "fresh-standard-performance", "no-new-locks", ...MCP721_STAGES.slice(1)];
   if (packageId === "web-matching") return ["affected-tests", "no-new-locks", ...MCP721_STAGES.slice(1)];
@@ -75,6 +77,15 @@ export function checkMcp721Proof(file, expected, packageId = "721") {
   assert.equal(tests.execution.cases, inventory.files.reduce((sum, row) => sum + row.expectedCases, 0));
   assert.ok(tests.execution.cases > 0 && build.buildSha256 && build.nextBuildId);
   assert.equal(json("source-after.json").sha256, expected.sourceSha256);
+  if (packageId === "streaming") {
+    assert.equal(json("no-new-locks.json").passed, true);
+    const comparison = json("completion-comparison.json");
+    assert.equal(comparison.passed, true); assert.equal(comparison.sourceCommit, expected.sourceCommit);
+    assert.equal(comparison.releaseBase, expected.releaseBase);
+    assert.equal(comparison.rows[1].planCalls, 1); assert.equal(comparison.rows[1].followUpPolls, 0);
+    assert.ok(comparison.semanticSha256 && comparison.fixtureSha256);
+    assert.equal(build.sourceCommit, expected.sourceCommit);
+  }
   if (packageId === "availability") {
     const locks = json("no-new-locks.json");
     assert.equal(locks.passed, true); assert.ok(locks.candidateCount <= locks.controlCount);

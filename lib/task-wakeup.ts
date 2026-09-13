@@ -135,8 +135,7 @@ export async function subscribeTaskQueue() {
     try {
       handle = await sql.listen(TASK_QUEUE_CHANNEL, (payload) => {
         onPayload(typeof payload === "string" ? payload : "");
-      });
-      signalPlanObserverReconnect();
+      }, signalPlanObserverReconnect);
       wakeupLog.info("task_queue_listening", { channel: TASK_QUEUE_CHANNEL });
     } catch (error) {
       wakeupLog.warn("task_queue_listen_failed", {

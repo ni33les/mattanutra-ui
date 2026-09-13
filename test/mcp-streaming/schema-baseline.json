@@ -1,0 +1,36 @@
+{
+  "sourceCommit": "e588c405473480ef5e0796c6f48d195365d450fc",
+  "contractVersion": "11.1.0",
+  "schemas": [
+    {
+      "name": "info",
+      "inputSha256": "4ac6d33a2f95a8ba0c4cac3b2e3e2f2c51bbf8db54791faae3c14e61429a69d7",
+      "outputSha256": "096ccfe153b56d5a650922375fe7775d54bccfb94df3d5f313f0ab0cc35d3df4"
+    },
+    {
+      "name": "plan",
+      "inputSha256": "c1dbc1167d1f82fbadedc8dad4af576c774af5302abf05e2a01be7e800c0cb1d",
+      "outputSha256": "6129d62f1b161d8ce15ee12c60c8769d18b29c36ac63b46a0166c320c2ef3bd6"
+    },
+    {
+      "name": "execute",
+      "inputSha256": "5e9b21d9469b27a0aada396dabedbfb2d440195dac6cebf6329de5e12c779979",
+      "outputSha256": "30478f542ca108f0603ac606a161a321e8be8aeb270cfab5f72ac8c9548bc1e8"
+    },
+    {
+      "name": "order",
+      "inputSha256": "9ba20313a530fdd9388a0a1aaf007eea792465461e306e7ec40bf950fad3af6c",
+      "outputSha256": "fcf9cc0a6601f07d15baafa297bc047d8fe6fca576fb59d97ad2d6f2f150ed26"
+    },
+    {
+      "name": "support",
+      "inputSha256": "ed475e2f608564d637cebe19234f2fdb87cb09a26001a5fbfa98f03262e5ae3d",
+      "outputSha256": "242ce8874b2e42c6cd93c178474a41d96d58c725edeef5e98c0eb546b23bc604"
+    },
+    {
+      "name": "feedback",
+      "inputSha256": "4230af2772854cde993594c966ecf534dbe5caf0ab8dffd41fb4064ef2b41cbf",
+      "outputSha256": "f3703d82906706f18a6428117ab2b3ee7dcb375692c5e8be44ba1bd3a533fd66"
+    }
+  ]
+}

@@ -11,14 +11,14 @@ async function listen() {
   subscription = await sql.listen('mattanutra_tasks', payload => {
     const work = parseTaskQueuePayload(payload);
     if (work) process.send({ type: 'work', work });
-  });
+  }, signalPlanObserverReconnect);
 }
 process.on('message', async message => {
   if (message.type === 'observe') {
     close?.(); close = observePlanOperation(message.id, () => process.send({ type: 'changed', id: message.id }));
     assert.ok(close); process.send({ type: 'observing' });
   } else if (message.type === 'reconnect') {
-    await subscription.unlisten(); await listen(); signalPlanObserverReconnect(); process.send({ type: 'reconnected' });
+    await subscription.unlisten(); await listen(); process.send({ type: 'reconnected' });
   } else if (message.type === 'stop') {
     close?.(); await subscription.unlisten(); await sql.end(); process.exit(0);
   }

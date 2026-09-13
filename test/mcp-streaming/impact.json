@@ -1,0 +1,110 @@
+{
+  "version": 1,
+  "scope": "streaming_matching_completion",
+  "releaseBase": "e588c405473480ef5e0796c6f48d195365d450fc",
+  "environment": "dev",
+  "inputs": [
+    "test/fixtures/mcp-evidence-images/manifest.json",
+    "test/fixtures/mcp-evidence-images/dev-20260911.json.gz",
+    "contract/mcp/11.1.0/tools.json",
+    "contract/mcp/11.1.0/schema.json",
+    "test/mcp-streaming/schema-baseline.json"
+  ],
+  "expectationChanges": [
+    "SSE plan responses may await committed completion; JSON clients still return immediate admission. No input or output schema change.",
+    "Observed revision, products, quantities, advice and money remain identical to ordinary authorized reads."
+  ],
+  "files": [
+    {
+      "file": "test/mcp-streaming/publication.test.ts",
+      "expectedCases": 7,
+      "slice": "signals",
+      "database": false,
+      "reason": "Terminal operation writes and expiration publish once after commit; rollback and lost ownership emit nothing."
+    },
+    {
+      "file": "test/mcp-streaming/observers.test.ts",
+      "expectedCases": 5,
+      "slice": "signals",
+      "database": false,
+      "reason": "Bounded operation-specific fanout, duplicate suppression, reconnect and shutdown cleanup."
+    },
+    {
+      "file": "test/mcp-streaming/notifications.integration.test.ts",
+      "expectedCases": 3,
+      "slice": "signals",
+      "database": true,
+      "reason": "Actual PostgreSQL commit and rollback notifications between separate processes; completion never dispatches work."
+    },
+    {
+      "file": "test/mcp-streaming/transport.test.ts",
+      "expectedCases": 11,
+      "slice": "transport",
+      "database": false,
+      "reason": "Single SSE result, initial and heartbeat comments, boundary recovery, deadline reserve, disconnect and JSON compatibility."
+    },
+    {
+      "file": "test/mcp-streaming/journey.test.ts",
+      "expectedCases": 7,
+      "slice": "journey",
+      "database": false,
+      "reason": "Real admitted matching and refinement return identical decisions in three locales; durable ownership and replay preserved."
+    },
+    {
+      "file": "test/mcp-streaming/contract.test.ts",
+      "expectedCases": 4,
+      "slice": "contract",
+      "database": false,
+      "reason": "Six-tool shared descriptions and discovery instruct waiting for the current call; unchanged contract version."
+    },
+    {
+      "file": "test/simple-plan/refinement-consistency.test.ts",
+      "expectedCases": 14,
+      "slice": "journey",
+      "database": false,
+      "reason": "Directly affected shared plan-read renderer preserves pending revisions, failure recovery, replay and frozen checkout access."
+    },
+    {
+      "file": "test/simple-plan/transport.test.ts",
+      "expectedCases": 3,
+      "slice": "transport",
+      "database": false,
+      "reason": "Existing single substantive payload, structured and text-only clients remain compatible."
+    },
+    {
+      "file": "test/agentic-mcp-transport-reliability.test.ts",
+      "expectedCases": 6,
+      "slice": "transport",
+      "database": false,
+      "reason": "Existing HTTP negotiation, request-body cancellation, discovery and validation remain compatible."
+    },
+    {
+      "file": "test/service-efficiency/wakeup.test.ts",
+      "expectedCases": 8,
+      "slice": "signals",
+      "database": false,
+      "reason": "Shared notification listener preserves coalesced bounded worker signals and no duplicate worker dispatch."
+    },
+    {
+      "file": "test/service-efficiency/transactions.test.ts",
+      "expectedCases": 4,
+      "slice": "signals",
+      "database": false,
+      "reason": "Shared transaction context, rollback and dependency retries preserve after-commit effect ownership."
+    },
+    {
+      "file": "test/service-efficiency/reads.integration.test.ts",
+      "expectedCases": 6,
+      "slice": "reads",
+      "database": true,
+      "reason": "Shared read projections remain nonlocking under held writer locks and retain two-small-SELECT behaviour."
+    },
+    {
+      "file": "test/mcp-streaming/release.test.ts",
+      "expectedCases": 3,
+      "slice": "contract",
+      "database": false,
+      "reason": "Scoped release proof rejects wrong source and environment, incomplete evidence and unhygienic tests."
+    }
+  ]
+}

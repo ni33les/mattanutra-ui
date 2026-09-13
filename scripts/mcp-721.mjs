@@ -13,7 +13,7 @@ assert.ok(MCP_PACKAGES[packageId], "Unknown work package");
 const args = rawArgs[0]?.startsWith("--package=") ? rawArgs.slice(1) : [...rawArgs];
 const sliceIndex = args.indexOf("--slice");
 const slice = sliceIndex < 0 ? null : args.splice(sliceIndex, 2)[1];
-assert.ok(!slice || (mode === "test" && ["efficiency", "practical", "simple-plan", "boundaries", "payment-replay", "web-matching", "refinement", "availability"].includes(packageId)), "Slices are limited to efficiency development tests");
+assert.ok(!slice || (mode === "test" && ["efficiency", "practical", "simple-plan", "boundaries", "payment-replay", "web-matching", "refinement", "availability", "streaming"].includes(packageId)), "Slices are limited to efficiency development tests");
 const definition = MCP_PACKAGES[packageId], MCP721_BASE = definition.base;
 assert.ok(["test", "validate"].includes(mode));
 const inventory = JSON.parse(readFileSync(definition.inventory ?? `${definition.directory}/impact.json`, "utf8"));
@@ -45,7 +45,7 @@ for (const row of inventory.files) {
   assert.deepEqual(testSourceHygiene(readFileSync(row.file, "utf8"), row.file), []);
 }
 for (const row of inventory.browser ?? []) { assert.deepEqual(testSourceHygiene(readFileSync(row.file, "utf8"), row.file), []); assert.ok(row.expectedCases > 0 && row.reason); }
-if (mode === "validate") { assert.ok(git("branch", "--show-current") === "dev" || (packageId === "boundaries" && git("branch", "--show-current") === "codex/matching-lock-boundaries")); assert.equal(git("status", "--porcelain"), ""); git("merge-base", "--is-ancestor", MCP721_BASE, commit); }
+if (mode === "validate") { assert.ok(git("branch", "--show-current") === "dev" || (packageId === "boundaries" && git("branch", "--show-current") === "codex/matching-lock-boundaries") || (packageId === "streaming" && git("branch", "--show-current") === "codex/mcp-completion-stream")); assert.equal(git("status", "--porcelain"), ""); git("merge-base", "--is-ancestor", MCP721_BASE, commit); }
 mkdirSync(output, { recursive: true, mode: 0o700 });
 const save = (name, value) => writeFileSync(resolve(output, name), JSON.stringify(value, null, 2) + "\n", { flag: "wx", mode: 0o600 });
 const source = sourceManifest(); save("source-before.json", source); save("inventory.json", inventory);
@@ -124,6 +124,13 @@ async function prepareCompiledBuild() {
 }
 if (mode === "validate") {
   const identity = mcp721Identity(source.sha256, commit, packageId);
+  if (packageId === "streaming") {
+    const control = process.env.STREAMING_CONTROL_WORKTREE;
+    assert.ok(control, "A clean pinned baseline checkout is required for streaming comparison");
+    const { verifyPracticalLocks } = await import("./practical-matching/comparison.mjs");
+    save("no-new-locks.json", verifyPracticalLocks(control)); stages.push({ label: "no-new-locks", passed: true });
+    await command("completion-comparison", ["scripts/mcp-streaming-comparison.mjs", output, control]);
+  }
   if (packageId === "payment-replay") {
     const { paymentPreservationSnapshot, verifyOriginalPayments } = await import("./payment-replay/release.mjs");
     const after = await paymentPreservationSnapshot(process.env.TEST_DB_URL, preservationBefore.columns);

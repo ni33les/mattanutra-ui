@@ -4,6 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "test:mcp:streaming": "node scripts/mcp-721.mjs test --package=streaming",
+    "validate:dev:mcp:streaming": "node scripts/mcp-721.mjs validate --package=streaming",
     "test:availability": "node scripts/mcp-721.mjs test --package=availability",
     "validate:dev:availability": "node scripts/mcp-721.mjs validate --package=availability",
     "dev": "next dev",
