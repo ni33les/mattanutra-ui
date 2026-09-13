@@ -63,12 +63,14 @@ export function PharmacyOrderPanel({ planId, slug, locale, revision, pharmacyNam
       window.history.replaceState(null, "", pharmacyPath(locale, slug, "reveal", { plan: planId, order: data.id }));
     } catch (error) { setError(error instanceof PollHttpError && error.status === 409 ? c.refresh : c.error); } finally { setBusy(false); }
   }
-  return <section id="order" data-testid="pharmacy-order" className="mt-12 grid gap-8 lg:grid-cols-[1.5fr_1fr]">
-    <div>
+  return <section id="order" data-testid="pharmacy-order" className="mt-12 grid gap-x-8 gap-y-5 lg:grid-cols-[1.5fr_1fr]">
+    <header>
       <h2 className="font-serif text-3xl">{receipt ? c.confirmed : c.products}</h2>
       {receipt ? <div role="status" className="mt-5 rounded-2xl bg-[var(--mn-mint)] p-6"><p>{c.reference}: <strong>{receipt.reference}</strong></p><p className="mt-2">{receipt.customerName} · {c.unpaid}</p></div>
         : <p className="mt-3 text-[var(--mn-ink-soft)]">{c.removeHint}</p>}
-      <div className="mt-5 space-y-3">{(receipt ? receipt.lines : lines).map(p => <label key={p.productId} className="flex items-center gap-4 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-[var(--mn-line)]">
+    </header>
+    <div className="lg:col-start-1">
+      <div className="space-y-3">{(receipt ? receipt.lines : lines).map(p => <label key={p.productId} className="flex items-center gap-4 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-[var(--mn-line)]">
         {!receipt && <input type="checkbox" aria-label={p.name} checked={selected.includes(p.productId)} disabled={busy}
           onChange={e => { setSelected(ids => e.target.checked ? [...ids, p.productId] : ids.filter(id => id !== p.productId)); setKey(crypto.randomUUID()); }} />}
         <SafeImage src={p.imageUrl} alt="" width={64} height={64} className="size-16 object-contain" fallback={<span className="size-16">MN</span>} />
@@ -90,7 +92,7 @@ export function PharmacyOrderPanel({ planId, slug, locale, revision, pharmacyNam
         <button className="underline" onClick={() => { window.open(`https://line.me/R/share?text=${encodeURIComponent(new URL(deepLink, window.location.origin).href)}`, "_blank", "noopener,noreferrer"); }}>{c.line}</button></div>
       <p className="mt-3 text-sm text-[var(--mn-ink-soft)]">{c.lineHint}</p>
     </div>
-    <div><OrderSummary locale={locale} labels={{ ...c, free: c.free }} productsById={new Map(basket.map(p => [p.id, p]))}
+    <div className="mt-3 lg:col-start-2 lg:row-start-2 lg:mt-0"><OrderSummary locale={locale} labels={{ ...c, free: c.free }} productsById={new Map(basket.map(p => [p.id, p]))}
       selectedProducts={basket.filter(p => active.some(line => line.productId === p.id))} quotePreview={loaded ? quote : null}
       selectedRetailerName={pharmacyName} currency={currency} subtotal={total} total={total} shippingAmount={0} removedItemCount={0} hideShipping /></div>
   </section>;
