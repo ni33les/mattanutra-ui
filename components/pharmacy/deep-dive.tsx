@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { SafeImage } from "@/components/safe-image";
 import { getLocalizedText, localizedCategoryLabel, localizedCategoryExplanation, localizedContextChip } from "@/components/formulation-reveal-copy";
 import { groupedFormulaIngredients, visibleFormulaIngredients, localizedDoseText, localizedSupplementName } from "@/components/formulation-support-helpers";
@@ -57,9 +57,7 @@ export function PharmacyDeepDive({ locale, slug, pharmacyName, planId, result, h
   const chapterLabels = [c.picture, c.noticed, c.thinking, c.ingredients, receipt ? c.ordered : c.products, c.foods, c.safety];
   const path = pharmacyPath(locale, slug, "plan", { plan: planId, order: receipt?.id });
   const back = pharmacyPath(locale, slug, "reveal", { plan: planId, order: receipt?.id });
-  const [shareUrl, setShareUrl] = useState("");
   const [copied, setCopied] = useState(false), [copyFailed, setCopyFailed] = useState(false);
-  useEffect(() => { setShareUrl(new URL(path, window.location.origin).href); }, [path]);
   const date = new Date(result.generatedAt);
   const ingredientAdvice = (id: string, label: string): WebHealthAdvice[] => medical.filter(a =>
     [normalized(id), normalized(label)].includes(normalized(a.ingredient)));
@@ -179,8 +177,8 @@ export function PharmacyDeepDive({ locale, slug, pharmacyName, planId, result, h
         <div className="pali">Mattaññutā</div><div className="measure" style={{ margin: "0 auto" }}><p>{d.meaning}</p><p>{d.closing}</p></div></div>
     </div>
     <section className="keep" data-testid="deep-dive-save"><div className="wrap keep-row"><div className="measure"><h3>{d.keep}</h3><p>{d.keepBody}</p>
-      <div className="keep-actions"><a className="btn" href={shareUrl ? `https://line.me/R/share?text=${encodeURIComponent(shareUrl)}` : undefined} target="_blank" rel="noopener noreferrer">{c.line} <span aria-hidden="true">↗</span></a>
-        <button className="link-button" disabled={!shareUrl} onClick={() => { void navigator.clipboard.writeText(shareUrl).then(() => { setCopied(true); setCopyFailed(false); }).catch(() => setCopyFailed(true)); }}>{copied ? c.copied : c.copyLink}</button>
+      <div className="keep-actions"><button className="btn" onClick={() => { window.open(`https://line.me/R/share?text=${encodeURIComponent(new URL(path, window.location.origin).href)}`, "_blank", "noopener,noreferrer"); }}>{c.line} <span aria-hidden="true">↗</span></button>
+        <button className="link-button" onClick={() => { void navigator.clipboard.writeText(new URL(path, window.location.origin).href).then(() => { setCopied(true); setCopyFailed(false); }).catch(() => setCopyFailed(true)); }}>{copied ? c.copied : c.copyLink}</button>
         <a href={back}>{c.back}</a></div><p role="status">{copyFailed ? d.copyError : copied ? c.copied : c.lineHint}</p>
     </div></div></section>
     <div className="wrap"><footer><p>{pharmacyName}{Number.isFinite(date.getTime()) ? ` · ${d.composed} ${new Intl.DateTimeFormat(localeHtmlLang(locale), { dateStyle: "long", timeZone: "Asia/Bangkok" }).format(date)}` : ""}</p><p>{d.wellness}</p></footer></div>

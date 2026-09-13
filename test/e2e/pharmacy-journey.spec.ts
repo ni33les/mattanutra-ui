@@ -70,7 +70,14 @@ for (const locale of ["en", "th", "zh-CN"] as const) {
     await expect(page.getByText(c.explanationPending, { exact: true })).toBeVisible();
     await expect(page.getByTestId("deep-dive-receipt")).toContainText("17");
     await expect(page.getByTestId("deep-dive-receipt")).toContainText(c.unpaid);
-    await expect(page.getByTestId("deep-dive-save").getByRole("link", { name: c.line, exact: true })).toHaveAttribute("href", /https:\/\/line\.me\/R\/share\?text=/);
+    await page.evaluate(() => { window.open = url => { sessionStorage.setItem("fixture-line-share", String(url)); return null; }; });
+    await page.getByTestId("deep-dive-save").getByRole("button", { name: c.line, exact: true }).click();
+    const shared = new URL((await page.evaluate(() => sessionStorage.getItem("fixture-line-share")))!);
+    expect(shared.origin + shared.pathname).toBe("https://line.me/R/share");
+    const sharedPlan = new URL(shared.searchParams.get("text")!);
+    expect(sharedPlan.pathname).toBe(`/${locale}/retail/${fixture.slug}/plan`);
+    expect(sharedPlan.searchParams.get("plan")).toBe(fixture.planId);
+    expect(sharedPlan.searchParams.get("order")).toBe(new URL(page.url()).searchParams.get("order"));
     await page.screenshot({ path: test.info().outputPath(`pharmacy-${locale}.png`), fullPage: true });
   });
 }
