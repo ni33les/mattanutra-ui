@@ -1,0 +1,82 @@
+{
+  "version": 1,
+  "environment": "dev",
+  "corrections": [
+    {
+      "correctionId": "dev-coverage-serving-20260913-52b0c7fd-e344-49a2-9cf6-c65d8616b789",
+      "entityTable": "products",
+      "entityId": "52b0c7fd-e344-49a2-9cf6-c65d8616b789",
+      "before": {
+        "id": "52b0c7fd-e344-49a2-9cf6-c65d8616b789",
+        "title": "Nat Mag",
+        "product_url": "https://www.megawecare.co.th/product/nat-mag/",
+        "administration": null,
+        "price_amount": "315"
+      },
+      "after": {
+        "id": "52b0c7fd-e344-49a2-9cf6-c65d8616b789",
+        "title": "Nat Mag",
+        "product_url": "https://www.megawecare.co.th/product/nat-mag/",
+        "administration": null,
+        "price_amount": "315"
+      },
+      "beforeFingerprint": "a06ff6e4bdb45407adfa1aea75fe61e667258e64540f2e600aa599bc3fcbe4e7",
+      "afterFingerprint": "a06ff6e4bdb45407adfa1aea75fe61e667258e64540f2e600aa599bc3fcbe4e7",
+      "evidence": {
+        "sourceUrl": "https://www.megawecare.co.th/product/nat-mag/",
+        "checkedAt": "2026-09-13",
+        "summary": "Manufacturer confirms 350 mg elemental magnesium per tablet and a 30-tablet pack; stored product form is tablet."
+      }
+    },
+    {
+      "correctionId": "dev-coverage-serving-20260913-617d8373-80b3-4ada-99c0-769d502b5b1c",
+      "entityTable": "products",
+      "entityId": "617d8373-80b3-4ada-99c0-769d502b5b1c",
+      "before": {
+        "id": "617d8373-80b3-4ada-99c0-769d502b5b1c",
+        "title": "Blackmores Vitamin D3 1000 IU",
+        "product_url": "https://www.blackmores.com.au/products/vitamin-d3-1000-iu",
+        "administration": {
+          "route": "oral",
+          "provenance": {
+            "status": "verified",
+            "sourceUrl": "https://www.blackmores.com.au/products/vitamin-d3-1000-iu",
+            "sourceText": "Manufacturer composition is 1000 IU vitamin D3 per capsule, taken orally. The catalogue image identifies the same Vitamin D3 1000 IU capsule variant. Pack quantity remains unset because the manufacturer page mixes 60-tablet and 200-capsule variants. Nutrient facts, confidence, prices and dietary evidence are unchanged.",
+            "verifiedAt": "2026-09-08T12:00:00Z"
+          },
+          "packQuantity": null,
+          "physicalUnit": "capsule",
+          "doseIncrement": 1,
+          "unitsPerServing": 1
+        },
+        "price_amount": "441"
+      },
+      "after": {
+        "id": "617d8373-80b3-4ada-99c0-769d502b5b1c",
+        "title": "Blackmores Vitamin D3 1000 IU",
+        "product_url": "https://www.blackmores.com.au/products/vitamin-d3-1000-iu",
+        "administration": {
+          "route": "oral",
+          "provenance": {
+            "status": "verified",
+            "sourceUrl": "https://www.blackmores.com.au/products/vitamin-d3-1000-iu",
+            "sourceText": "Manufacturer composition is 1000 IU vitamin D3 per capsule, taken orally. The catalogue image identifies the same Vitamin D3 1000 IU capsule variant. Pack quantity remains unset because the manufacturer page mixes 60-tablet and 200-capsule variants. Nutrient facts, confidence, prices and dietary evidence are unchanged.",
+            "verifiedAt": "2026-09-08T12:00:00Z"
+          },
+          "packQuantity": null,
+          "physicalUnit": "capsule",
+          "doseIncrement": 1,
+          "unitsPerServing": 1
+        },
+        "price_amount": "441"
+      },
+      "beforeFingerprint": "3287b3286fd98a53a583ea05f04826320a4ba9eddafcf65b09bf4cc879c678b5",
+      "afterFingerprint": "3287b3286fd98a53a583ea05f04826320a4ba9eddafcf65b09bf4cc879c678b5",
+      "evidence": {
+        "sourceUrl": "https://www.blackmores.com.au/products/vitamin-d3-1000-iu",
+        "checkedAt": "2026-09-13",
+        "summary": "Manufacturer identifies EAN 9300807243763 as 200 capsules, with 1000 IU per capsule. Stored master product has the same EAN."
+      }
+    }
+  ]
+}

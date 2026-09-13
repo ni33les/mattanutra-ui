@@ -1,0 +1,58 @@
+{
+  "version": 1,
+  "environment": "uat",
+  "corrections": [
+    {
+      "correctionId": "uat-coverage-serving-20260913-52b0c7fd-e344-49a2-9cf6-c65d8616b789",
+      "entityTable": "products",
+      "entityId": "52b0c7fd-e344-49a2-9cf6-c65d8616b789",
+      "before": {
+        "id": "52b0c7fd-e344-49a2-9cf6-c65d8616b789",
+        "title": "Nat Mag",
+        "product_url": "https://www.megawecare.co.th/product/nat-mag/",
+        "administration": null,
+        "price_amount": "315"
+      },
+      "after": {
+        "id": "52b0c7fd-e344-49a2-9cf6-c65d8616b789",
+        "title": "Nat Mag",
+        "product_url": "https://www.megawecare.co.th/product/nat-mag/",
+        "administration": null,
+        "price_amount": "315"
+      },
+      "beforeFingerprint": "a06ff6e4bdb45407adfa1aea75fe61e667258e64540f2e600aa599bc3fcbe4e7",
+      "afterFingerprint": "a06ff6e4bdb45407adfa1aea75fe61e667258e64540f2e600aa599bc3fcbe4e7",
+      "evidence": {
+        "sourceUrl": "https://www.megawecare.co.th/product/nat-mag/",
+        "checkedAt": "2026-09-13",
+        "summary": "Manufacturer confirms 350 mg elemental magnesium per tablet and a 30-tablet pack; stored product form is tablet."
+      }
+    },
+    {
+      "correctionId": "uat-coverage-serving-20260913-617d8373-80b3-4ada-99c0-769d502b5b1c",
+      "entityTable": "products",
+      "entityId": "617d8373-80b3-4ada-99c0-769d502b5b1c",
+      "before": {
+        "id": "617d8373-80b3-4ada-99c0-769d502b5b1c",
+        "title": "Blackmores Vitamin D3 1000 IU",
+        "product_url": "https://www.blackmores.com.au/products/vitamin-d3-1000-iu",
+        "administration": null,
+        "price_amount": "441"
+      },
+      "after": {
+        "id": "617d8373-80b3-4ada-99c0-769d502b5b1c",
+        "title": "Blackmores Vitamin D3 1000 IU",
+        "product_url": "https://www.blackmores.com.au/products/vitamin-d3-1000-iu",
+        "administration": null,
+        "price_amount": "441"
+      },
+      "beforeFingerprint": "4efba437b38de702f1755530864e42281fc8d7167c4ab6eb87b15f05f6fcddf0",
+      "afterFingerprint": "4efba437b38de702f1755530864e42281fc8d7167c4ab6eb87b15f05f6fcddf0",
+      "evidence": {
+        "sourceUrl": "https://www.blackmores.com.au/products/vitamin-d3-1000-iu",
+        "checkedAt": "2026-09-13",
+        "summary": "Manufacturer identifies EAN 9300807243763 as 200 capsules, with 1000 IU per capsule. Stored master product has the same EAN."
+      }
+    }
+  ]
+}

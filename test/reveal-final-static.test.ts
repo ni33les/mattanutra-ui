@@ -378,6 +378,10 @@ describe("final reveal UX", () => {
     assert.doesNotMatch(css, /\.mn-reveal-final \.mn-reveal-nutrient-drawer-card/);
   });
 
+  it("rounds the displayed basket percentage upward without rounding calculation inputs", () => {
+    assert.match(reveal, /value=\{Math\.ceil\(selectedBasketCoverage\)\}/);
+  });
+
   it("keeps product coverage grammar from duplicating the total", () => {
     assert.doesNotMatch(reveal, /function countOfText/);
     assert.match(reveal, /coveredProductNeedText/);
