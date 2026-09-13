@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { observePlanOperation, signalPlanOperationChange, signalPlanObserverReconnect, PLAN_OBSERVER_LIMIT } from "../../lib/agentic/plan/completion-signals.ts";
+import { observePlanOperation, signalPlanOperationChange, signalPlanObserverReconnect, closePlanObservers, PLAN_OBSERVER_LIMIT } from "../../lib/agentic/plan/completion-signals.ts";
 
 test("STREAM-OBS-01 all observers for one operation wake without consuming another operation's event", () => {
   const calls = [0, 0, 0];
@@ -27,4 +27,10 @@ test("STREAM-OBS-04 capacity is bounded and cleanup immediately restores capacit
     stops[0]!();
     const replacement = observePlanOperation("replacement", () => undefined); assert.ok(replacement); replacement();
   } finally { stops.forEach(stop => stop?.()); }
+});
+test("STREAM-OBS-05 stopping the shared listener closes observers and releases their timers", () => {
+  let stopped = 0, woken = 0;
+  observePlanOperation("shutdown", () => woken++, () => stopped++);
+  closePlanObservers(); closePlanObservers(); signalPlanObserverReconnect();
+  assert.equal(stopped, 1); assert.equal(woken, 0);
 });
