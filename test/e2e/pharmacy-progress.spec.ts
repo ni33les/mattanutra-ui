@@ -63,4 +63,7 @@ test("PHARM-PROGRESS failures provide an explicit retry and continue observing t
   await fixture("en", true, saved);
   await expect(page.locator(".mn-reveal-final")).toBeVisible({ timeout: 15000 });
   expect(retries).toBe(1);
+  // The reveal starts its own readiness read. Drain that intercepted request
+  // before Playwright closes the page so teardown cannot cancel route.fetch.
+  await page.unrouteAll({ behavior: "wait" });
 });
