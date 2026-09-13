@@ -9,6 +9,19 @@
   ],
   "files": [
     {
+      "file": "test/service-efficiency/result-preparation.test.ts",
+      "expectedCases": 5,
+      "reason": "Seller facts are prepared outside the existing publication transaction; batched writes stay protected",
+      "slice": "orders"
+    },
+    {
+      "file": "test/web-advisory.integration.test.ts",
+      "expectedCases": 9,
+      "reason": "Shared result publication preserves ordinary web revisions, stale snapshot handling and no-purchase results",
+      "slice": "orders",
+      "database": true
+    },
+    {
       "file": "test/pharmacy-journey.test.ts",
       "expectedCases": 4,
       "reason": "Store routes, immutable RRP pricing and canonical seller identity",

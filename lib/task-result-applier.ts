@@ -2151,6 +2151,10 @@ export async function prepareTaskCompletionResult({ task, resultPayload, sql: sq
         product_coverage_percent: item.productCoveragePercent, stack_contribution_percent: item.stackContributionPercent,
         serving_multiplier: Math.max(1, Math.round(item.servingMultiplier || 1)), covered_needs: toJsonValue(item.coveredNeeds),
         why: item.why, url_used: item.url, price_amount: item.product.priceAmount ?? null, currency: item.product.currency || "THB",
+        selected_retailer_organisation_id: item.selectedRetailerOrganisationId ?? item.product.selectedRetailerOrganisationId ?? null,
+        retail_sellable_product_id: item.retailSellableProductId ?? item.product.retailSellableProductId ?? null,
+        unit_price_amount: item.unitPriceAmount ?? item.product.unitPriceAmount ?? item.product.priceAmount ?? null,
+        availability_status: item.availabilityStatus ?? item.product.retailAvailabilityStatus ?? null,
         image_url: item.product.imageUrl ?? null, unknown_at_recommendation: item.unknownAtRecommendation }))) };
   });
   const selected = variants.find(item => item.stackPreference === stackPreference) ?? variants.find(item => item.stackPreference === "balanced") ?? variants[0];
@@ -2226,10 +2230,13 @@ async function insertProductRecommendationResult({
     ), inserted_items as (
     insert into public.product_recommendation_items (
       run_id, product_id, rank, score, product_coverage_percent, stack_contribution_percent,
-      serving_multiplier, covered_needs, why, url_used, price_amount, currency, image_url, unknown_at_recommendation, created_at)
+      serving_multiplier, covered_needs, why, url_used, price_amount, currency,
+      selected_retailer_organisation_id, retail_sellable_product_id, unit_price_amount, availability_status,
+      image_url, unknown_at_recommendation, created_at)
     select inserted_run.id, item.*, now() from inserted_run cross join jsonb_to_recordset(${prepared.itemsJson}::text::jsonb) as item(
       product_id uuid, rank integer, score numeric, product_coverage_percent numeric, stack_contribution_percent numeric,
       serving_multiplier integer, covered_needs jsonb, why text, url_used text, price_amount numeric, currency text,
+      selected_retailer_organisation_id uuid, retail_sellable_product_id uuid, unit_price_amount numeric, availability_status text,
       image_url text, unknown_at_recommendation boolean)
     on conflict (run_id, product_id) do nothing returning run_id
     ) select id::text from inserted_run`;

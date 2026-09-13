@@ -33,6 +33,11 @@ it("PHARM-PG-01 explanation work is durable but never gates reveal or orders", a
   const quote = await pharmacyOrderQuote(fixture.planId, fixture.slug, "en");
   assert.equal(quote.lines[0].unitPrice, 17); assert.equal(quote.lines[0].quantity, 1);
   assert.equal(quote.lines[0].productId, fixture.productIds[0]);
+  const [stored] = await sql`select i.selected_retailer_organisation_id::text, i.unit_price_amount, i.retail_sellable_product_id::text
+    from public.product_recommendation_items i join public.product_recommendation_runs r on r.id=i.run_id where r.plan_id=${fixture.planId}::uuid limit 1`;
+  assert.equal(stored.selected_retailer_organisation_id,fixture.pharmacyId);
+  assert.equal(Number(stored.unit_price_amount),17);
+  assert.ok(stored.retail_sellable_product_id,"The captured seller offer survives completion");
 });
 it("PHARM-PG-02 concurrent replay saves one unpaid order, notification and no accounting", async () => {
   const fixture = await seedPharmacyFixture();
