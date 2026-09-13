@@ -1841,7 +1841,7 @@ function RevealProductsFinalSection({
             </div>
             <div className="group relative text-center">
               <p className="mn-reveal-font-display text-[32px] font-medium italic leading-none text-[var(--mn-teal-deep)]">
-                <CountUpNumber active={true} value={selectedBasketCoverage} />%
+                <CountUpNumber active={true} value={Math.ceil(selectedBasketCoverage)} />%
               </p>
               <p className="mt-2 inline-flex items-center gap-1 mn-reveal-font-mono text-[10px] uppercase tracking-[0.14em] text-[var(--mn-ash)]">
                 {finalCopy.formulaMatch}

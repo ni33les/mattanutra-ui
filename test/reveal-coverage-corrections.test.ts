@@ -5,6 +5,8 @@ import { catalogueCorrectionState, type CatalogueCorrectionManifest } from '../l
 import { administrationDailyPills, parseProductAdministration } from '../lib/product-administration.ts';
 import { monthlyGoodsPrice } from '../lib/matcher/practical-scoring.ts';
 import { product } from './matcher/flexible-v5-fixtures.ts';
+import { recommendWithMatcher } from '../lib/matcher/adapters/web.ts';
+import type { ProductCandidate, ProductRecommendationNeed } from '../lib/product-recommendation-types.ts';
 
 const d3 = '617d8373-80b3-4ada-99c0-769d502b5b1c';
 const magnesium = '52b0c7fd-e344-49a2-9cf6-c65d8616b789';
@@ -47,5 +49,26 @@ for (const environment of ['dev', 'uat']) {
       assert.deepEqual(unchanged(row.before), unchanged(row.after));
       assert.throws(() => catalogueCorrectionState(row, { ...row.before, title: 'Different product' }), /changed since review/);
     }
+  });
+  test(`REVEAL-COVERAGE-DATA-04 ${environment}: the retail adapter matches 2000 IU with two known D3 capsules`, () => {
+    const fixture = JSON.parse(readFileSync('test/fixtures/reveal-d3-magnesium.json', 'utf8')) as { needs: ProductRecommendationNeed[]; candidates: ProductCandidate[] };
+    assert.equal(fixture.needs.length, 1);
+    assert.equal(fixture.candidates.length, 2);
+    const originals = structuredClone(fixture.candidates);
+    for (const candidate of fixture.candidates) {
+      const correction = manifest.corrections.find(c => c.entityId === candidate.id);
+      assert.ok(correction);
+      candidate.administration = parseProductAdministration(correction.after.administration);
+    }
+    const result = recommendWithMatcher({ needs: fixture.needs, candidates: fixture.candidates, countryCode: 'TH', stackPreference: 'balanced', clientContext: { pillLimit: '1-3', currentSupplements: 'none' } });
+    const selected = result.diagnostics.matching?.options.find(o => o.candidateKey === result.diagnostics.matching?.selectedCandidateKey);
+    assert.ok(selected);
+    assert.equal(selected.dailyPills, 2);
+    assert.equal(result.recommendations.length, 1);
+    assert.equal(result.recommendations[0].product.id, d3);
+    assert.equal(result.recommendations[0].servingMultiplier, 2);
+    assert.equal(selected.doseFit.perTarget[0].exposure, 2000);
+    assert.equal(selected.doseFit.perTarget[0].under, 0);
+    assert.deepEqual(fixture.candidates.map(c => [c.id, c.facts, c.unitPriceAmount]), originals.map(c => [c.id, c.facts, c.unitPriceAmount]));
   });
 }

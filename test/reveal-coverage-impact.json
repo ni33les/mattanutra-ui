@@ -1,0 +1,15 @@
+{
+  "releaseBase": "04aa5c1ad90f391183b090c4ef970ab2045ec086",
+  "scope": "Whole-percent reveal display and reviewed D3/Nat Mag serving metadata",
+  "files": [
+    {"file":"test/web-availability-copy.test.ts","expectedCases":4,"reason":"Upward whole-percent labels in English, Thai and Chinese; preserve raw positive, zero, unknown and pending states."},
+    {"file":"test/reveal-coverage-corrections.test.ts","expectedCases":8,"reason":"Environment-specific reviewed manufacturer facts, unchanged prices, monthly pack arithmetic and actual retail D3 matching."},
+    {"file":"test/reveal-final-static.test.ts","expectedCases":25,"reason":"Round basket display only; retain layout, controls and removal of noisy matching details."},
+    {"file":"test/catalogue-corrections.integration.test.ts","expectedCases":2,"database":true,"reason":"Real correction CLI: stale-data rollback, idempotent replay and immutable audit originals."}
+  ],
+  "browser": [{"file":"test/e2e/practical-matching.spec.ts","expectedCases":3,"reason":"Reveal and checkout remain usable in all three locales with medical findings preserved."}],
+  "intentionalChanges": [
+    "AVAIL-COPY-04 now requires 1.2% to display 2%, and every finite displayed percentage to round upward to the next integer. Raw coverage and the strictly-above-12% nutrient count are unchanged.",
+    "Blackmores D3 and Nat Mag gain verified physical serving and exact pack metadata in separate reviewed DEV/UAT manifests. Prices, nutrient quantities, confidence, scoring weights and eligibility are unchanged."
+  ]
+}

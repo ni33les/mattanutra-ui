@@ -1,0 +1,162 @@
+{
+  "provenance": "Allowlisted UAT product records captured 2026-09-13; original nutrient facts and retail prices. No customer answers.",
+  "needs": [
+    {
+      "id": "supplement:vitamin-d3",
+      "weight": 3,
+      "category": "Vitamins",
+      "itemType": "supplement",
+      "sourceId": "vitamin-d3",
+      "aliasKeys": [
+        "vitamin_d",
+        "vitamin_d3",
+        "d3",
+        "cholecalciferol",
+        "colecalciferol"
+      ],
+      "targetDose": {
+        "unit": "iu",
+        "amount": 2000,
+        "originalText": "2000 IU/day"
+      },
+      "targetText": "2000 IU/day",
+      "displayName": "Vitamin D3",
+      "normalizedName": "vitamin_d3",
+      "targetComparableAmount": 50
+    }
+  ],
+  "candidates": [
+    {
+      "administration": null,
+      "automatedSafetyPassed": true,
+      "availabilityStatus": "out_of_stock",
+      "availableCountryCodes": [
+        "TH"
+      ],
+      "brandStatus": "approved",
+      "currency": "THB",
+      "facts": [
+        {
+          "amount": 1000,
+          "comparableAmount": 25,
+          "confidence": "high",
+          "source": "admin",
+          "sourceUrl": null,
+          "sourceText": null,
+          "mappingStatus": "verified",
+          "itemType": "supplement",
+          "name": "Vitamin D3",
+          "normalizedName": "vitamin_d3",
+          "servingLabel": null,
+          "supplementId": "927083fb-b90a-5a24-b4c5-5067b06ead5f",
+          "unit": "IU"
+        }
+      ],
+      "id": "617d8373-80b3-4ada-99c0-769d502b5b1c",
+      "imageUrl": "https://mattanutra.sgp1.cdn.digitaloceanspaces.com/uat/products/617d8373-80b3-4ada-99c0-769d502b5b1c/1e25b3e82fc73b84b84ced7757015bd6e33e191b53acd4cef54fb91026210c40.webp",
+      "labelStatus": "parsed",
+      "platform": "manual",
+      "priceAmount": 485,
+      "priceSource": "retail_override",
+      "productAudience": "both",
+      "productKind": "supplement",
+      "productUrl": "https://www.blackmores.com.au/products/vitamin-d3-1000-iu",
+      "region": "TH",
+      "retailAvailabilityStatus": "backorder",
+      "retailSellableProductId": "cf9fd5c8-8749-4c09-835e-fd3f0b0cb18a",
+      "selectedRetailerName": "Enchanted Pharmacy",
+      "selectedRetailerOrganisationId": "3542b35b-9a67-4913-a512-7cc115873693",
+      "status": "approved",
+      "title": "Blackmores Vitamin D3 1000 IU",
+      "unitPriceAmount": 485,
+      "validation": {
+        "checkedAt": "1970-01-01T00:00:00.000Z",
+        "matchableFactCount": 1,
+        "reasons": [],
+        "status": "pass",
+        "summary": ""
+      }
+    },
+    {
+      "administration": null,
+      "automatedSafetyPassed": true,
+      "availabilityStatus": "out_of_stock",
+      "availableCountryCodes": [
+        "TH"
+      ],
+      "brandStatus": "approved",
+      "currency": "THB",
+      "facts": [
+        {
+          "amount": 350,
+          "comparableAmount": 350000,
+          "confidence": "high",
+          "source": "admin",
+          "sourceUrl": null,
+          "sourceText": "page_text: ให้แมกนีเซียม 350 มิลลิกรัม",
+          "mappingStatus": "verified",
+          "itemType": "supplement",
+          "name": "Magnesium",
+          "normalizedName": "magnesium",
+          "servingLabel": null,
+          "supplementId": "199df5c4-8921-5c37-b85b-6bcb14b443fa",
+          "unit": "mg"
+        },
+        {
+          "amount": 1.5,
+          "comparableAmount": 1500,
+          "confidence": "high",
+          "source": "admin",
+          "sourceUrl": null,
+          "sourceText": "page_text: วิตามินบี 1 (ไทอะมีน ไฮโดรคลอไรด์) 1.5 มิลลิกรัม",
+          "mappingStatus": "verified",
+          "itemType": "supplement",
+          "name": "Vitamin B1",
+          "normalizedName": "vitamin_b1",
+          "servingLabel": null,
+          "supplementId": "28975384-9c60-577e-a9c1-47ec63597b8d",
+          "unit": "mg"
+        },
+        {
+          "amount": 2,
+          "comparableAmount": 2000,
+          "confidence": "high",
+          "source": "admin",
+          "sourceUrl": null,
+          "sourceText": "page_text: วิตามินบี 6 2.0 มิลลิกรัม",
+          "mappingStatus": "verified",
+          "itemType": "supplement",
+          "name": "Vitamin B6",
+          "normalizedName": "vitamin_b6",
+          "servingLabel": null,
+          "supplementId": "ccc3e67b-d753-5315-a8cb-a8aefa8b2fd8",
+          "unit": "mg"
+        }
+      ],
+      "id": "52b0c7fd-e344-49a2-9cf6-c65d8616b789",
+      "imageUrl": "https://mattanutra.sgp1.cdn.digitaloceanspaces.com/uat/products/52b0c7fd-e344-49a2-9cf6-c65d8616b789/5b6d19efeee109b5dba5894323bef37e2fe30c66a7e4209cbc086b5b0a81a992.jpg",
+      "labelStatus": "parsed",
+      "platform": "manual",
+      "priceAmount": 347,
+      "priceSource": "retail_override",
+      "productAudience": "both",
+      "productKind": "supplement",
+      "productUrl": "https://www.megawecare.co.th/product/nat-mag/",
+      "region": "TH",
+      "retailAvailabilityStatus": "backorder",
+      "retailSellableProductId": "efe69679-68f3-4f53-a94b-51499d25c946",
+      "selectedRetailerName": "Delight Pharmacy",
+      "selectedRetailerOrganisationId": "6052e03e-6619-409b-8767-02806b3df016",
+      "status": "approved",
+      "title": "Nat Mag",
+      "unitPriceAmount": 347,
+      "validation": {
+        "checkedAt": "1970-01-01T00:00:00.000Z",
+        "matchableFactCount": 3,
+        "reasons": [],
+        "status": "pass",
+        "summary": ""
+      }
+    }
+  ]
+}

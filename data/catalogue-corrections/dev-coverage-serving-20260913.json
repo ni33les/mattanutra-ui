@@ -17,11 +17,23 @@
         "id": "52b0c7fd-e344-49a2-9cf6-c65d8616b789",
         "title": "Nat Mag",
         "product_url": "https://www.megawecare.co.th/product/nat-mag/",
-        "administration": null,
+        "administration": {
+          "route": "oral",
+          "physicalUnit": "tablet",
+          "unitsPerServing": 1,
+          "doseIncrement": 1,
+          "packQuantity": 30,
+          "provenance": {
+            "status": "verified",
+            "sourceUrl": "https://www.megawecare.co.th/product/nat-mag/",
+            "sourceText": "Manufacturer composition is per tablet: 350 mg elemental magnesium, vitamin B1 1.5 mg and B6 2 mg; pack size 30. The stored product master identifies tablet form. This correction supplies physical serving and pack metadata without changing nutrient facts or daily-dose advice.",
+            "verifiedAt": "2026-09-13T00:00:00.000Z"
+          }
+        },
         "price_amount": "315"
       },
       "beforeFingerprint": "a06ff6e4bdb45407adfa1aea75fe61e667258e64540f2e600aa599bc3fcbe4e7",
-      "afterFingerprint": "a06ff6e4bdb45407adfa1aea75fe61e667258e64540f2e600aa599bc3fcbe4e7",
+      "afterFingerprint": "2e6e7dd4f705fe867eeba260e0e0e985dc7a254194b7cb20925c6d04d2a6e0f6",
       "evidence": {
         "sourceUrl": "https://www.megawecare.co.th/product/nat-mag/",
         "checkedAt": "2026-09-13",
@@ -57,21 +69,21 @@
         "product_url": "https://www.blackmores.com.au/products/vitamin-d3-1000-iu",
         "administration": {
           "route": "oral",
+          "physicalUnit": "capsule",
+          "unitsPerServing": 1,
+          "doseIncrement": 1,
+          "packQuantity": 200,
           "provenance": {
             "status": "verified",
             "sourceUrl": "https://www.blackmores.com.au/products/vitamin-d3-1000-iu",
-            "sourceText": "Manufacturer composition is 1000 IU vitamin D3 per capsule, taken orally. The catalogue image identifies the same Vitamin D3 1000 IU capsule variant. Pack quantity remains unset because the manufacturer page mixes 60-tablet and 200-capsule variants. Nutrient facts, confidence, prices and dietary evidence are unchanged.",
-            "verifiedAt": "2026-09-08T12:00:00Z"
-          },
-          "packQuantity": null,
-          "physicalUnit": "capsule",
-          "doseIncrement": 1,
-          "unitsPerServing": 1
+            "sourceText": "The manufacturer explicitly maps variant-select-9300807243763 to 200 capsules. This matches the EAN in the stored master product. Active composition is 25 mcg / 1000 IU D3 per capsule. Oral instructions are one capsule daily; the instructions are advisory and do not cap physically valid quantities.",
+            "verifiedAt": "2026-09-13T00:00:00.000Z"
+          }
         },
         "price_amount": "441"
       },
       "beforeFingerprint": "3287b3286fd98a53a583ea05f04826320a4ba9eddafcf65b09bf4cc879c678b5",
-      "afterFingerprint": "3287b3286fd98a53a583ea05f04826320a4ba9eddafcf65b09bf4cc879c678b5",
+      "afterFingerprint": "44f1670cd4a5c00d0e0ebf01d58899dcc17b4117bd07de508a3cb80460ecc955",
       "evidence": {
         "sourceUrl": "https://www.blackmores.com.au/products/vitamin-d3-1000-iu",
         "checkedAt": "2026-09-13",
