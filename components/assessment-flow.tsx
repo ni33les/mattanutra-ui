@@ -1,5 +1,6 @@
 "use client";
 
+import { pharmacyPath } from "@/lib/pharmacy-journey";
 import { retryHealthScoreCopy, waitForHealthScoreCopy } from "@/lib/healthscore-copy-client";
 import { fetchWithBodyDeadline } from "@/lib/funnel-polling";
 import { funnelRequestKey } from "@/lib/funnel-request-key";
@@ -1213,7 +1214,7 @@ export function AssessmentFlow({
       setShowHealthScore(!skipHealthScoreStep);
       router.replace(
         paymentId || skipHealthScoreStep
-          ? nutritionRevealPath(locale, readyStatus.planId)
+          ? pharmacyId ? pharmacyPath(locale, pharmacyId, "reveal", { plan: readyStatus.planId }) : nutritionRevealPath(locale, readyStatus.planId)
           : nutritionHealthScorePath(locale, readyStatus.planId)
       );
     } catch {

@@ -1,5 +1,6 @@
 "use client";
 
+import { pharmacyPath } from "@/lib/pharmacy-journey";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -94,8 +95,10 @@ function resultsPath(
   locale: Locale,
   planId: string,
   paymentId?: string,
-  skipHealthScore?: boolean
+  skipHealthScore?: boolean,
+  pharmacyId?: string
 ) {
+  if (pharmacyId) return pharmacyPath(locale, pharmacyId, "reveal", { plan: planId });
   return paymentId || skipHealthScore
     ? nutritionRevealPath(locale, planId)
     : nutritionHealthScorePath(locale, planId);
@@ -151,7 +154,7 @@ export function ChatQuestionnaire({
     draftRef.current = null;
   }
   const capture = useQuestionnaireCapture({ locale, paymentId, pharmacyId, resumeToken, returningPlanId, skipHealthScore: skipHealthScoreStep,
-    draft: draftRef, save: saveDraft, onReady: id => router.replace(resultsPath(locale, id, paymentId || draftRef.current?.paymentId || undefined, skipHealthScoreStep)) });
+    draft: draftRef, save: saveDraft, onReady: id => router.replace(resultsPath(locale, id, paymentId || draftRef.current?.paymentId || undefined, skipHealthScoreStep, pharmacyId)) });
   const calcStatus = capture.status;
   const runCapture = capture.run;
 
@@ -1387,7 +1390,7 @@ export function ChatQuestionnaire({
           }
 
           router.replace(
-            resultsPath(locale, planId, paymentId, skipHealthScoreStep)
+            resultsPath(locale, planId, paymentId, skipHealthScoreStep, pharmacyId)
           );
         }}
         onEmailSubmit={onFallbackEmail}

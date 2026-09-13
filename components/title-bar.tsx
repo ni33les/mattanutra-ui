@@ -8,6 +8,7 @@ import { getNamespace } from "@/lib/i18n-messages";
 import { nutritionQuizPath } from "@/lib/nutrition-paths";
 
 type TitleBarProps = Readonly<{
+  assessmentHref?: string;
   currentLocale: Locale;
   currentPath?: string;
   localizedPaths?: Partial<Record<LocaleCode, string>>;
@@ -56,11 +57,13 @@ function isAssessmentStartedPath(currentPath: string, locale: Locale) {
     pathname === `/${locale}/nutrition/reveal` ||
     pathname === `/${locale}/order/track` ||
     pathname.startsWith(`/${locale}/order/track/`) ||
+    (/\/retail\/[^/]+\/(quiz|reveal|plan)$/.test(pathname)) ||
     pathname === `/${locale}/p` ||
     pathname.startsWith(`/${locale}/p/`);
 }
 
 export function TitleBar({
+  assessmentHref,
   currentLocale,
   currentPath = `/${currentLocale}`,
   localizedPaths,
@@ -70,7 +73,7 @@ export function TitleBar({
   const copy = getNamespace<TitleBarCopy>(currentLocale, "customer.titleBar", {
     "customer.titleBar.homeAria": { title }
   });
-  const assessmentPath = nutritionQuizPath(currentLocale);
+  const assessmentPath = assessmentHref ?? nutritionQuizPath(currentLocale);
   const titleCtaHref = assessmentPath;
   const showAssessmentCta = !isAssessmentStartedPath(currentPath, currentLocale);
   const isLanding = variant === "landing";

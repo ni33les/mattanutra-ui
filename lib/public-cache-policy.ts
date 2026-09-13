@@ -19,7 +19,8 @@ export const noStoreLocaleRootSegments = [
   "basket",
   "nutrition",
   "order",
-  "p"
+  "p",
+  "retail"
 ] as const;
 
 export type NoStoreLocaleRootSegment =
@@ -58,6 +59,8 @@ export function robotsDisallowPaths(): string[] {
     "/admin",
     "/admin/",
     "/api/",
+    "/retail/",
+    "/*/retail/",
     "/p",
     "/p/",
     "/*/admin",

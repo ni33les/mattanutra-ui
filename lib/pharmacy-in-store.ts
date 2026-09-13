@@ -1,3 +1,5 @@
+import { pharmacyAnalysisPolicy } from "@/lib/pharmacy-journey";
+import { FunnelError } from "@/lib/funnel-errors";
 import type postgres from "postgres";
 import { isUuid } from "@/lib/assessment-store";
 import { getSql } from "@/lib/db";
@@ -77,6 +79,7 @@ export function mergeInStorePharmacyAnswers(
   return {
     ...record,
     [IN_STORE_PHARMACY_ANSWERS_KEY]: {
+      pricingBasis: pharmacyAnalysisPolicy.pricingBasis,
       countryCode: pharmacy.countryCode,
       currency: pharmacy.currency,
       name: pharmacy.name,
@@ -142,6 +145,10 @@ export async function resolveCapturePharmacy(
   if (typeof pharmacyId === "string" && pharmacyId.trim()) {
     const pharmacy = await resolvePharmacyOrganisation(pharmacyId);
 
+    const previous = inStorePharmacyFromAnswers(existingAnswers);
+    if (previous && pharmacy && previous.id !== pharmacy.id) {
+      throw new FunnelError("This assessment belongs to another pharmacy", 409, "pharmacy_conflict");
+    }
     return {
       invalidRequested: !pharmacy,
       pharmacy

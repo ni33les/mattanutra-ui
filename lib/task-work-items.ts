@@ -1,3 +1,4 @@
+import { pharmacyCandidatePrice } from "@/lib/pharmacy-journey";
 import { loadAdminSafetyReferenceSnapshot, refreshAdminSafetyCeilings } from "@/lib/agentic/catalogue/load-safety-ceilings";
 import { matchesSafetyReferenceIdentity } from "@/lib/agentic/catalogue/reference-job";
 import { matcherSafetyReferenceIdentity, type SafetyReferenceIdentity } from "@/lib/matcher/safety-ceilings";
@@ -1930,7 +1931,11 @@ async function retailerCandidateSetsFromLiveSnapshot(
       continue;
     }
 
-    const candidate = product.candidate;
+    const rrp = organisationId ? pharmacyCandidatePrice(product.candidate) : null;
+    if (organisationId && rrp === null) continue;
+    const candidate = organisationId
+      ? { ...product.candidate, priceAmount: rrp, unitPriceAmount: rrp }
+      : product.candidate;
     const retailerId =
       candidate.selectedRetailerOrganisationId || product.sellerId;
     const retailerName =

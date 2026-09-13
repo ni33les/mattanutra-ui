@@ -78,6 +78,8 @@ export type ProductCandidate = Readonly<{
   productAudience?: ProductAudience | null;
   productKind?: ProductKind | null;
   validation?: ValidationResult | null;
+  /** Captured seller RRP for pay-at-counter matching. */
+  retailRrpPriceAmount?: number | null;
   priceAmount?: number | null;
   priceSource?: "master_list_country_rrp_margin" | "retail_override" | null;
   productDataExpiresAt?: string | null;

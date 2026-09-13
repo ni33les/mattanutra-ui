@@ -386,6 +386,7 @@ function candidateFromSnapshotRow(
     labelStatus: facts.length > 0 ? "parsed" : "missing",
     platform: snapshotPlatform(row.platform),
     priceAmount: customerPrice,
+    retailRrpPriceAmount: rrp,
     priceSource: "retail_override",
     productAudience:
       row.product_audience === "female" || row.product_audience === "male"

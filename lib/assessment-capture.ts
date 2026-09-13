@@ -14,7 +14,7 @@ import { FunnelError } from "@/lib/funnel-errors";
 import { getSql, withDatabaseTransaction } from "@/lib/db";
 import { computeHealthScore } from "@/lib/health-score";
 import { isLocale } from "@/lib/i18n";
-import { IN_STORE_PHARMACY_ANSWERS_KEY, mergeInStorePharmacyAnswers, resolveCapturePharmacy } from "@/lib/pharmacy-in-store";
+import { IN_STORE_PHARMACY_ANSWERS_KEY, inStorePharmacyFromAnswers, mergeInStorePharmacyAnswers, resolveCapturePharmacy } from "@/lib/pharmacy-in-store";
 import { bindPaidReservationToAssessment } from "@/lib/stripe-payments";
 import { enqueueAssessmentPregenerationTasks, enqueueNutritionPlanTasks, scheduleReassessmentAction } from "@/lib/task-worker";
 import { cachedEvaluatedIngredientCatalogueCount } from "@/lib/supplement-catalogue-count";
@@ -88,14 +88,18 @@ export async function captureAssessment(bodyValue: unknown, options: { planId?: 
     if (claimed.response) return claimed.response as CaptureReceipt;
     const planId = requestedPlanId ?? session?.resourceId ?? claimed.resourceId;
     await tx`update public.funnel_requests set resource_id = ${planId}::uuid where scope = 'assessment-capture' and request_key = ${options.idempotencyKey}`;
-    const [current] = await tx`select selected_plan, input_revision from public.assessments where plan_id = ${planId}::uuid for no key update`;
+    const [current] = await tx`select selected_plan, input_revision, answers from public.assessments where plan_id = ${planId}::uuid for no key update`;
     if (requestedPlanId && !current && resume?.planId !== planId) throw new FunnelError("Assessment not found", 404, "assessment_not_found");
     if (current && body.expectedRevision !== undefined && Number(body.expectedRevision) !== Number(current.input_revision)) {
       throw new FunnelError("Assessment answers changed. Reload the saved assessment before editing.", 409, "assessment_changed");
     }
+    const currentPharmacy = inStorePharmacyFromAnswers(current?.answers);
+    if (current && (currentPharmacy?.id ?? null) !== (pharmacy?.id ?? null)) {
+      throw new FunnelError("Assessment pharmacy cannot be changed", 409, "pharmacy_conflict");
+    }
     const selectedPlan = current?.selected_plan ?? (skipHealthScore ? DEFAULT_ASSESSMENT_PLAN : null);
     const snapshot = createAssessmentSnapshot({ planId, plan: selectedPlan ?? DEFAULT_ASSESSMENT_PLAN, status: "queued",
-      healthScore: skipHealthScore ? undefined : computeHealthScore(answers, locale, { evaluatedIngredientCount: cachedEvaluatedIngredientCatalogueCount() }) });
+      healthScore: computeHealthScore(answers, locale, { evaluatedIngredientCount: cachedEvaluatedIngredientCatalogueCount() }) });
     const identity = await persistAssessmentSubmission({ answers, contactEmail, locale, selectedPlan, skipHealthScore, snapshot, status: "captured" });
     if (body.questionnaireState !== undefined) {
       const state = deserializeState(JSON.stringify(body.questionnaireState));

@@ -327,10 +327,6 @@ export async function enqueueHealthScoreAnalysisTask({
     return null;
   }
 
-  if (assessmentSkipsHealthScore(rows[0].answers)) {
-    return null;
-  }
-
   const generation = await loadGenerationInput(sql, planId, locale);
   if (!generation) return null;
   if (!force) {
@@ -504,9 +500,7 @@ export async function enqueueAssessmentPregenerationTasks({
     plan,
     pregeneration: true
   };
-  const healthScoreTaskId = assessmentSkipsHealthScore(answers)
-    ? null
-    : await enqueueHealthScoreAnalysisTask({
+  const healthScoreTaskId = await enqueueHealthScoreAnalysisTask({
         planId,
         taskGroupId
       });
