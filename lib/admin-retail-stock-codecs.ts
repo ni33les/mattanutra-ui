@@ -138,8 +138,8 @@ export function customerOrderStatus(value: unknown): RetailCustomerOrderStatus {
     : "draft";
 }
 
-export function customerOrderSource(value: unknown): "checkout" | "manual" {
-  return value === "checkout" ? "checkout" : "manual";
+export function customerOrderSource(value: unknown): "checkout" | "manual" | "pharmacy" {
+  return value === "pharmacy" ? "pharmacy" : value === "checkout" ? "checkout" : "manual";
 }
 
 export function priorityBand(score: number): RetailTaskPriorityBand {

@@ -1,0 +1,71 @@
+{
+  "releaseBase": "6bd0542f7bc1d1d9b93fa67ac02dfa15146005c5",
+  "scope": "pharmacy_qr_unpaid_journey",
+  "inputs": [
+    "lib/pharmacy-journey.ts",
+    "lib/pharmacy-copy.ts",
+    "db-rollout/pharmacy-orders.sql",
+    "test/helpers/pharmacy-fixture.ts"
+  ],
+  "files": [
+    {
+      "file": "test/pharmacy-journey.test.ts",
+      "expectedCases": 4,
+      "reason": "Store routes, immutable RRP pricing and canonical seller identity",
+      "slice": "routes"
+    },
+    {
+      "file": "test/pharmacy-orders.test.ts",
+      "expectedCases": 3,
+      "reason": "Selected products, exact quantities and money validation",
+      "slice": "orders"
+    },
+    {
+      "file": "test/pharmacy-orders.integration.test.ts",
+      "expectedCases": 6,
+      "reason": "Unpaid persistence, concurrent replay, scope and nonblocking reads",
+      "slice": "orders",
+      "database": true
+    },
+    {
+      "file": "test/phase4-t09-t15-t16-static.test.ts",
+      "expectedCases": 3,
+      "reason": "Existing pharmacy plumbing and shared reveal copy compatibility",
+      "slice": "routes"
+    },
+    {
+      "file": "test/assessment-capture.integration.test.ts",
+      "expectedCases": 5,
+      "reason": "Shared capture recovery, validation, revision and context preservation",
+      "slice": "capture",
+      "database": true
+    },
+    {
+      "file": "test/formulation-read-first.test.ts",
+      "expectedCases": 3,
+      "reason": "Existing completed reveal polling must remain read-only",
+      "slice": "reads"
+    },
+    {
+      "file": "test/retail-checkout-session.integration.test.ts",
+      "expectedCases": 9,
+      "reason": "Existing online checkout session replay remains intact beside unpaid pharmacy orders",
+      "database": true,
+      "slice": "orders"
+    },
+    {
+      "file": "test/retail-financials.test.ts",
+      "expectedCases": 10,
+      "reason": "Preserve existing online and manual financial rules while excluding pharmacy settlements",
+      "slice": "orders"
+    }
+  ],
+  "browser": [
+    {
+      "file": "test/e2e/pharmacy-journey.spec.ts",
+      "expectedCases": 3,
+      "grep": "PHARM-BROWSER",
+      "reason": "All three pharmacy journeys reuse quiz and order styling without online payment"
+    }
+  ]
+}

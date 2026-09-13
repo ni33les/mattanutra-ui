@@ -1553,7 +1553,7 @@ export async function getStoredHealthScoreAnalysisSnapshot(planId: string, local
   const readiness = await getFunnelReadiness(planId, localeOption);
   if (!readiness) return null;
   const score = await getRevisionHealthScore(planId, readiness.locale);
-  const status = readiness.copyReady ? "ready" : readiness.copyFailed ? "failed" : "preparing";
+  const status = hasHealthScoreAiCopy(score, readiness.locale) ? "ready" : readiness.copyFailed ? "failed" : "preparing";
   return { ...createAssessmentSnapshot({ planId, status, healthScore: score ?? undefined }),
     revision: readiness.revision, generationStatus: status, resultVersion: readiness.resultVersion };
 }

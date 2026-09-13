@@ -1,4 +1,4 @@
-import { pharmacyCandidatePrice } from "@/lib/pharmacy-journey";
+import { pharmacyCandidatePrice, belongsToPharmacy } from "@/lib/pharmacy-journey";
 import { loadAdminSafetyReferenceSnapshot, refreshAdminSafetyCeilings } from "@/lib/agentic/catalogue/load-safety-ceilings";
 import { matchesSafetyReferenceIdentity } from "@/lib/agentic/catalogue/reference-job";
 import { matcherSafetyReferenceIdentity, type SafetyReferenceIdentity } from "@/lib/matcher/safety-ceilings";
@@ -1927,7 +1927,7 @@ async function retailerCandidateSetsFromLiveSnapshot(
       continue;
     }
 
-    if (organisationId && product.sellerId !== organisationId) {
+    if (organisationId && !belongsToPharmacy(product, organisationId)) {
       continue;
     }
 

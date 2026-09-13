@@ -372,6 +372,10 @@ export async function currentWebCheckoutSelection(sql: RetailCheckoutDb, input: 
 export async function currentWebCheckoutRecommendations(sql: RetailCheckoutDb, input: WebCheckoutSelectionInput) {
   return (await currentWebCheckoutSelection(sql, input)).recommendations;
 }
+/** Shared short assessment revision fence for creation of a new order/checkout. */
+export async function lockWebCheckoutAssessment(sql: RetailCheckoutDb, planId: string) {
+  await sql`select plan_id from public.assessments where plan_id = ${planId}::uuid for no key update`;
+}
 /** Existing new-checkout publication fence: retain current commercial facts until the intent commits. */
 export async function lockCurrentWebCheckoutRecommendations(sql: RetailCheckoutDb, input: WebCheckoutSelectionInput) {
   const [catalogue] = await sql<Array<{ revision: number | string }>>`
@@ -957,7 +961,7 @@ export async function createRetailCheckoutSession(input: RetailCheckoutQuoteInpu
   const config = stripePaymentConfig(input.request);
   const payment = await withDatabaseTransaction(sql, async tx => {
     // Both web and MCP retries serialize intent creation before contacting the provider.
-    await tx`select plan_id from public.assessments where plan_id = ${input.planId}::uuid for no key update`;
+    await lockWebCheckoutAssessment(tx, input.planId);
     const existing = await tx<CheckoutPaymentRow[]>`
       select *
       from public.retail_checkout_payments

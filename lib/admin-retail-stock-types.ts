@@ -400,7 +400,7 @@ export type AdminRetailCustomerOrder = Readonly<{
   shippedAt: string | null;
   shippedUnits: number;
   shipment: AdminRetailCustomerOrderShipment | null;
-  source: "checkout" | "manual";
+  source: "checkout" | "manual" | "pharmacy";
   status: RetailCustomerOrderStatus;
   stuckReason: string | null;
   taskCount: number;

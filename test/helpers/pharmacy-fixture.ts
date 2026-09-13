@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { getSql } from "../../lib/db.ts";
 import { captureAssessment } from "../../lib/assessment-capture.ts";
-import { warmLiveRetailSnapshot } from "../../lib/agentic/catalogue/live.ts";
+import { loadLiveRetailSnapshot } from "../../lib/agentic/catalogue/live.ts";
 import { valueCatalogueFingerprint } from "../../lib/agentic/value/fingerprint.ts";
 import { loadGenerationInput, FUNNEL_GENERATOR_VERSION } from "../../lib/assessment-revisions.ts";
 import { insertFormulationVersion } from "../../lib/plan-version-writes.ts";
@@ -21,8 +21,8 @@ export async function seedPharmacyFixture(locale: Locale = "en", ready = true) {
   const captured = await captureAssessment({ answers: { firstName: "Pharmacy Fixture", sex: "male", age: "36-45", goals: ["energy"] },
     pharmacyId: pharmacy.slug, locale, sessionId: randomUUID() }, { idempotencyKey: randomUUID() });
   if (!ready) return { planId: captured.planId, pharmacyId: pharmacy.id, slug: pharmacy.slug, revision: captured.revision, productIds: [] as string[], locale };
-  const snapshot = await warmLiveRetailSnapshot("TH");
-  const product = snapshot.products.find(p => p.sellerId === pharmacy.id && p.candidate.title.includes("Vitamin D3 1000"));
+  const snapshot = await loadLiveRetailSnapshot("TH");
+  const product = snapshot.products.find(p => p.candidate.selectedRetailerOrganisationId === pharmacy.id && p.candidate.title.includes("Vitamin D3 1000"));
   assert.ok(product, "Frozen D3 product must be orderable");
   const candidate = { ...product.candidate, priceAmount: 17, unitPriceAmount: 17 };
   assert.equal(candidate.retailRrpPriceAmount, 17, "Do not alter historical fixture prices");

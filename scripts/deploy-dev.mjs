@@ -117,6 +117,41 @@ async function main() {
   }
 
   console.log(`[deploy:dev] Branch: ${branch}`);
+  const pharmacyIndex = process.argv.indexOf("--pharmacy-attestation");
+  if (pharmacyIndex >= 0) {
+    if (branch !== "dev" || process.env.MATTANUTRA_ENV !== "dev") throw new Error("Pharmacy deployment is DEV-only");
+    const file = process.argv[pharmacyIndex + 1];
+    const buildIndex = process.argv.indexOf("--pharmacy-build");
+    const buildPath = buildIndex >= 0 ? process.argv[buildIndex + 1] : null;
+    if (!file?.startsWith("/") || !buildPath?.startsWith("/")) throw new Error("Provide absolute pharmacy attestation and build paths");
+    if (await runCapture("git", ["status", "--porcelain"])) throw new Error("Validated source must remain clean");
+    const sha = await runCapture("git", ["rev-parse", "HEAD"]);
+    const identity = mcp721Identity(sourceManifest().sha256, sha, "pharmacy");
+    checkMcp721Proof(file, identity, "pharmacy");
+    const build = JSON.parse(await readFile(resolve(dirname(file), "build.json"), "utf8"));
+    if (compiledBuildIdentity(buildPath) !== build.buildSha256) throw new Error("Pharmacy compiled build changed");
+    const staged = resolve("tmp", `pharmacy-build-${sha}`);
+    await cp(buildPath, staged, { recursive: true, errorOnExist: true, force: false, filter: source => source !== resolve(buildPath, "cache") });
+    if (compiledBuildIdentity(staged) !== build.buildSha256) throw new Error("Staged pharmacy build changed");
+    const dropIns = "/etc/systemd/system/mattanutra-ui-dev.service.d";
+    await cp(dropIns, resolve(dirname(file), "systemd-before"), { recursive: true, errorOnExist: true, force: false });
+    // Only this package's additive constraint change. No seeds, correction manifests or backfills.
+    await run(process.execPath, ["--experimental-strip-types", "--import", "./scripts/register-ts-path-loader.mjs", "scripts/apply-pharmacy-orders-schema.ts"], { env: schemaEnv() });
+    await npmRun("dev-runtime-schema:verify");
+    await run("systemctl", ["stop", serviceName]);
+    await rename(".next", resolve(dirname(file), "next-before"));
+    await rename(staged, ".next");
+    await writeFile(`${dropIns}/zzzzz-pharmacy-identity.conf`, `[Service]\nEnvironment=AGENTIC_BUILD_ID=${sha}\nEnvironment=AGENTIC_WORKER_VERSION=${sha}\nEnvironment=WORKER_VERSION=${sha}\n`, "utf8");
+    await run("systemctl", ["daemon-reload"]);
+    await run("systemctl", ["restart", serviceName]);
+    await run("systemctl", ["is-active", "--quiet", serviceName]);
+    for (const url of [...smokeUrls, "https://dev.mattanutra.com/en/retail/delight/landing"]) await smokeCheck(url);
+    const response = await fetch("http://127.0.0.1:3000/api/mcp", { method: "HEAD", signal: AbortSignal.timeout(5000) });
+    if (response.headers.get("x-agentic-build-id") !== sha) throw new Error("Deployed pharmacy identity mismatch");
+    console.log(`[deploy:dev] Verified pharmacy release ${sha}`);
+    return;
+  }
+
   const webMatchingIndex = process.argv.indexOf("--web-matching-attestation");
   const paymentReplayIndex = process.argv.indexOf("--payment-replay-attestation");
   const boundariesIndex = process.argv.indexOf("--matching-lock-boundaries-attestation");

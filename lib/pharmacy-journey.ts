@@ -19,3 +19,7 @@ export function pharmacyCandidatePrice(candidate: { retailRrpPriceAmount?: numbe
   const value = candidate.retailRrpPriceAmount;
   return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : null;
 }
+
+export function belongsToPharmacy(product: { sellerId: string; candidate: { selectedRetailerOrganisationId?: string | null } }, organisationId: string) {
+  return product.candidate.selectedRetailerOrganisationId === organisationId;
+}

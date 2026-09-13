@@ -19,6 +19,7 @@ type OrderSummaryLabels = Readonly<{
 }>;
 
 export function OrderSummary({
+  hideShipping = false,
   currency,
   labels,
   locale,
@@ -31,6 +32,7 @@ export function OrderSummary({
   subtotal,
   total
 }: Readonly<{
+  hideShipping?: boolean;
   currency: string;
   labels: OrderSummaryLabels;
   locale: Locale;
@@ -128,7 +130,7 @@ export function OrderSummary({
             {quotePreview ? formatCurrencyAmount(locale, subtotal, currency) : "-"}
           </dd>
         </div>
-        <div className="flex justify-between gap-4">
+        {!hideShipping && <div className="flex justify-between gap-4">
           <dt className="text-[var(--mn-ink-soft)]">{labels.shipping}</dt>
           <dd className="font-bold text-[var(--mn-ink)]">
             {quotePreview
@@ -137,7 +139,7 @@ export function OrderSummary({
                 : labels.free
               : "-"}
           </dd>
-        </div>
+        </div>}
         <div className="flex justify-between gap-4">
           <dt className="text-[var(--mn-ink-soft)]">{labels.tax}</dt>
           <dd className="font-bold text-[var(--mn-ink)]">{labels.included}</dd>

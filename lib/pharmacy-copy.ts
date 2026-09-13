@@ -1,0 +1,34 @@
+import type { Locale } from "@/lib/i18n";
+const en = {
+  eyebrow: "Your personalised supplement assessment", hero: "Stop guessing. Start knowing.",
+  intro: "Tell us about your health, lifestyle, medications and goals.",
+  body: "MattaNutra considers your answers alongside scientific evidence, built-in safety checks, thoughtfully designed algorithms and AI-assisted analysis. The result is a supplement plan built around you.",
+  start: "Find What’s Right for Me", thorough: "Thorough by design", free: "FREE",
+  privacy: "Private and secure · Your information is never sold", founded: "Physician-founded", science: "Science-led", registered: "Thai FDA–registered products only",
+  preparing: "Building your personalised supplement plan", preparingBody: "Your answers, formulation and this pharmacy’s products are being brought together.", retry: "Try again",
+  title: "Your personalised supplement plan", introResults: "Review your recommendation, then choose what to order at this pharmacy.",
+  products: "Your products", ingredients: "Your nutrients", removeHint: "Untick anything you already have or don’t wish to order.",
+  name: "Name or nickname", nameHint: "The pharmacist will use this name at the counter.", pay: "Pay at the pharmacy counter", paymentHint: "No online payment. The pharmacist will discuss any unavailable items and arrange collection with you.",
+  confirm: "Confirm my order", sending: "Saving your order…", confirmed: "Your order has been sent to the pharmacy", reference: "Order reference", unpaid: "Unpaid · Pay at till",
+  details: "Your plan, in full", copyLink: "Copy private plan link", copied: "Link copied", line: "Share my plan to LINE", lineHint: "Choose your LINE chat and tap Send to save the link.",
+  orderSummary: "Order summary", subtotal: "Subtotal", total: "Total", quantity: "Packs", unitPrice: "Price per pack", tax: "Tax", included: "Included", shipping: "Delivery", removed: "Excluded from this order",
+  unknown: "Unknown", noProducts: "No products are recommended for purchase now. You can still read your plan.", error: "We could not complete this step. Please try again.", refresh: "Products or prices have changed. Refresh the recommendation before ordering.",
+  picture: "Your picture", noticed: "What we noticed", thinking: "How we thought", foods: "Food support", safety: "Safety review", back: "Back to your recommendation", explanationPending: "Your detailed explanation is still being prepared. Your recommendation and order remain available.",
+  ordered: "Products in your order", adviceEmpty: "No additional findings are recorded here. This does not establish medical clearance.",
+  servings: "Labelled servings per day", coverage: "Coverage", foodPending: "Food support is still being prepared.", score: "HealthScore"
+};
+type Copy = { [K in keyof typeof en]: string };
+const th: Copy = {
+  eyebrow: "การประเมินอาหารเสริมเฉพาะคุณ", hero: "เลิกเดา เริ่มรู้จริง", intro: "ไม่แน่ใจว่าจะเลือกอาหารเสริมตัวไหนดี? ตอบคำถามเกี่ยวกับสุขภาพและการใช้ชีวิตของคุณ",
+  body: "MattaNutra จะช่วยเลือกอาหารเสริมที่เหมาะกับคุณโดยเฉพาะ โดยพิจารณาคำตอบของคุณร่วมกับหลักฐานทางวิทยาศาสตร์ การตรวจสอบความปลอดภัย อัลกอริทึม และการวิเคราะห์ด้วย AI",
+  start: "มาดูกันว่าอาหารเสริมอะไรบ้างที่เหมาะกับคุณ", thorough: "ละเอียดเพื่อความแม่นยำ", free: "ฟรี", privacy: "เป็นส่วนตัวและปลอดภัย · เราไม่ขายข้อมูลของคุณ", founded: "ก่อตั้งโดยแพทย์", science: "ยึดหลักวิทยาศาสตร์", registered: "เฉพาะผลิตภัณฑ์ที่ขึ้นทะเบียน อย.",
+  preparing: "กำลังจัดแผนอาหารเสริมเฉพาะคุณ", preparingBody: "กำลังประมวลผลคำตอบ สูตร และผลิตภัณฑ์ของร้านยานี้", retry: "ลองอีกครั้ง", title: "แผนอาหารเสริมเฉพาะคุณ", introResults: "ดูคำแนะนำ แล้วเลือกผลิตภัณฑ์ที่ต้องการสั่งจากร้านยานี้", products: "ผลิตภัณฑ์ของคุณ", ingredients: "สารอาหารของคุณ", removeHint: "นำเครื่องหมายออกจากรายการที่มีอยู่แล้วหรือไม่ต้องการสั่ง",
+  name: "ชื่อหรือชื่อเล่น", nameHint: "เภสัชกรจะใช้ชื่อนี้เรียกคุณที่เคาน์เตอร์", pay: "ชำระเงินที่เคาน์เตอร์ร้านยา", paymentHint: "ไม่ต้องชำระเงินออนไลน์ เภสัชกรจะแจ้งหากมีสินค้าที่ต้องรอและนัดรับกับคุณ", confirm: "ยืนยันรายการสั่งซื้อ", sending: "กำลังบันทึกรายการ…", confirmed: "ส่งรายการของคุณไปยังร้านยาแล้ว", reference: "เลขอ้างอิงรายการ", unpaid: "ยังไม่ชำระเงิน · ชำระที่เคาน์เตอร์",
+  details: "แผนของคุณแบบละเอียด", copyLink: "คัดลอกลิงก์ส่วนตัวของแผน", copied: "คัดลอกลิงก์แล้ว", line: "แชร์แผนไปที่ LINE", lineHint: "เลือกแชตใน LINE แล้วกดส่งเพื่อเก็บลิงก์", orderSummary: "สรุปรายการ", subtotal: "รวมค่าสินค้า", total: "ยอดรวม", quantity: "จำนวนบรรจุภัณฑ์", unitPrice: "ราคาต่อบรรจุภัณฑ์", tax: "ภาษี", included: "รวมแล้ว", shipping: "การจัดส่ง", removed: "ไม่นับรวมในรายการนี้", unknown: "ไม่ทราบ", noProducts: "ขณะนี้ไม่มีผลิตภัณฑ์ที่แนะนำให้ซื้อ คุณยังอ่านแผนได้", error: "ไม่สามารถดำเนินการขั้นตอนนี้ได้ โปรดลองอีกครั้ง", refresh: "ผลิตภัณฑ์หรือราคาเปลี่ยนแปลง โปรดปรับคำแนะนำให้เป็นปัจจุบันก่อนสั่ง",
+  picture: "ภาพรวมของคุณ", noticed: "สิ่งที่เราสังเกต", thinking: "แนวทางที่เราใช้", foods: "อาหารที่ช่วยเสริม", safety: "ข้อมูลด้านความปลอดภัย", back: "กลับไปที่คำแนะนำ", explanationPending: "คำอธิบายแบบละเอียดยังอยู่ระหว่างจัดทำ คุณดูคำแนะนำและสั่งสินค้าได้ตามปกติ", ordered: "ผลิตภัณฑ์ในรายการสั่งซื้อ", adviceEmpty: "ไม่มีข้อสังเกตเพิ่มเติมที่บันทึกไว้ในส่วนนี้ ไม่ได้หมายถึงการรับรองความปลอดภัยทางการแพทย์", servings: "จำนวนหน่วยบริโภคตามฉลากต่อวัน", coverage: "ความครอบคลุม", foodPending: "กำลังจัดทำข้อมูลอาหารที่ช่วยเสริม", score: "HealthScore"
+};
+const zh: Copy = {
+  eyebrow: "您的个性化营养补充评估", hero: "不再猜测，开始了解。", intro: "告诉我们您的健康状况、生活方式、用药和目标。", body: "MattaNutra 结合您的回答、科学证据、安全信息、算法及 AI 辅助分析，为您制定个性化营养补充方案。", start: "找到适合我的方案", thorough: "细致评估，为您考虑", free: "免费", privacy: "私密安全 · 我们绝不出售您的信息", founded: "由医生创立", science: "以科学为基础", registered: "仅使用泰国 FDA 注册产品",
+  preparing: "正在制定您的个性化方案", preparingBody: "正在综合您的回答、配方和这家药房的产品。", retry: "重试", title: "您的个性化营养补充方案", introResults: "查看建议，然后选择要在这家药房订购的产品。", products: "您的产品", ingredients: "您的营养成分", removeHint: "取消勾选您已有或不想订购的产品。", name: "姓名或昵称", nameHint: "药剂师会在柜台使用这个名字。", pay: "在药房柜台付款", paymentHint: "无需在线付款。如有暂时缺货的产品，药剂师会与您商量并安排领取。", confirm: "确认订单", sending: "正在保存订单…", confirmed: "您的订单已提交给药房", reference: "订单编号", unpaid: "未付款 · 到柜台付款", details: "查看完整方案", copyLink: "复制私人方案链接", copied: "链接已复制", line: "将方案分享到 LINE", lineHint: "选择 LINE 聊天并点击发送以保存链接。", orderSummary: "订单摘要", subtotal: "商品小计", total: "总计", quantity: "包装数量", unitPrice: "每包装价格", tax: "税费", included: "已包含", shipping: "配送", removed: "未包含在此订单中", unknown: "未知", noProducts: "目前没有建议购买的产品。您仍可查看完整方案。", error: "无法完成此步骤，请重试。", refresh: "产品或价格已变更，请更新建议后再订购。", picture: "您的情况", noticed: "我们的观察", thinking: "分析思路", foods: "饮食支持", safety: "安全信息", back: "返回建议", explanationPending: "详细解释仍在生成中。您仍可查看建议并提交订单。", ordered: "订单中的产品", adviceEmpty: "此处未记录其他发现。这并不代表已获得医疗安全确认。", servings: "每日标签份数", coverage: "覆盖率", foodPending: "饮食支持信息仍在生成中。", score: "HealthScore"
+};
+export const pharmacyCopy: Record<Locale, Copy> = { en, th, "zh-CN": zh };

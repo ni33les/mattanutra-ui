@@ -1,3 +1,4 @@
+import { pharmacyCopy } from "@/lib/pharmacy-copy";
 "use client";
 
 import Link from "next/link";
@@ -3155,7 +3156,7 @@ export function AdminRetailStockView({
                       >
                         {order.orderNumber}
                       </Link>
-                      {order.source === "checkout" ? (
+                      {order.source === "pharmacy" ? <div className="mt-1 text-xs font-normal text-gray-500">{pharmacyCopy[locale].unpaid}</div> : order.source === "checkout" ? (
                         <div className="mt-1 text-xs font-normal text-gray-500">
                           {labels.stock.mockPaidOrder}
                         </div>

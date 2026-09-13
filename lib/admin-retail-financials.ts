@@ -680,6 +680,10 @@ export async function createPendingRetailOrderSettlement(
     shippingAmountMicros?: number | null;
   }>
 ) {
+  // Counter payments belong to the pharmacy; they never create platform settlement entries.
+  const [orderSource] = await sql`select source from public.retail_customer_orders where id=${input.orderId}::uuid`;
+  if (orderSource?.source === "pharmacy") return null;
+
   if (!(await retailFinancialTablesAvailable(sql))) {
     return null;
   }
@@ -988,6 +992,10 @@ export async function markRetailOrderSettlementDue(
     orderId: string;
   }>
 ) {
+  // Counter payments belong to the pharmacy; they never create platform settlement entries.
+  const [orderSource] = await sql`select source from public.retail_customer_orders where id=${input.orderId}::uuid`;
+  if (orderSource?.source === "pharmacy") return null;
+
   if (!(await retailFinancialTablesAvailable(sql))) {
     return null;
   }

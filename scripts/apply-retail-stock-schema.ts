@@ -743,7 +743,7 @@ try {
       created_at timestamptz not null default now(),
       updated_at timestamptz not null default now(),
       constraint retail_customer_orders_org_order_number_key unique (organisation_id, order_number),
-      constraint retail_customer_orders_source_check check (source in ('manual', 'checkout')),
+      constraint retail_customer_orders_source_check check (source in ('manual', 'checkout', 'pharmacy')),
       constraint retail_customer_orders_status_check check (
         status in (
           'draft',

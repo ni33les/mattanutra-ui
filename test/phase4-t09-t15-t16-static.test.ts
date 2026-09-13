@@ -69,7 +69,7 @@ describe("Phase 4 T09/T15/T16", () => {
     assert.match(pharmacy, /export async function loadInStorePharmacyOrganisationId/);
     assert.match(captureRoute, /captureAssessment\(body/);
     assert.match(capture, /skipHealthScore/);
-    assert.match(capture, /healthScore: skipHealthScore/);
+    assert.match(capture, /healthScore: computeHealthScore/);
     assert.match(capture, /selectedPlan = current\?\.selected_plan \?\? \(skipHealthScore \? DEFAULT_ASSESSMENT_PLAN : null\)/);
     assert.match(quiz, /skipHealthScoreStep/);
     assert.match(quiz, /nutritionRevealPath/);

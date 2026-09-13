@@ -176,7 +176,10 @@
     "test:web-matching": "node scripts/mcp-721.mjs test --package=web-matching",
     "validate:dev:web-matching": "node scripts/mcp-721.mjs validate --package=web-matching",
     "test:service-efficiency:refinement": "node scripts/mcp-721.mjs test --package=refinement",
-    "validate:dev:refinement": "node scripts/mcp-721.mjs validate --package=refinement"
+    "validate:dev:refinement": "node scripts/mcp-721.mjs validate --package=refinement",
+    "test:pharmacy": "node scripts/mcp-721.mjs test --package=pharmacy",
+    "validate:dev:pharmacy": "node scripts/mcp-721.mjs validate --package=pharmacy",
+    "pharmacy-orders:schema:apply": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/apply-pharmacy-orders-schema.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1045.0",
