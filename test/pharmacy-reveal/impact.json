@@ -1,0 +1,60 @@
+{
+  "releaseBase": "c3651f350ef5c511a0b7fcd574124972067736a2",
+  "scope": "pharmacy_standard_reveal_and_progress",
+  "inputs": [
+    "test/helpers/pharmacy-fixture.ts",
+    "test/pharmacy-landing/reference.json"
+  ],
+  "files": [
+    {
+      "file": "test/formulation-read-first.test.ts",
+      "expectedCases": 4,
+      "reason": "Shared reveal, frozen receipts, read-only polling and pharmacy navigation consumers"
+    },
+    {
+      "file": "test/formulation-poll-static.test.ts",
+      "expectedCases": 1,
+      "reason": "Shared reveal, frozen receipts, read-only polling and pharmacy navigation consumers"
+    },
+    {
+      "file": "test/reveal-final-static.test.ts",
+      "expectedCases": 25,
+      "reason": "Shared reveal, frozen receipts, read-only polling and pharmacy navigation consumers"
+    },
+    {
+      "file": "test/nutrition-journey-progress-static.test.ts",
+      "expectedCases": 5,
+      "reason": "Shared reveal, frozen receipts, read-only polling and pharmacy navigation consumers"
+    },
+    {
+      "file": "test/pharmacy-journey.test.ts",
+      "expectedCases": 4,
+      "reason": "Shared reveal, frozen receipts, read-only polling and pharmacy navigation consumers"
+    },
+    {
+      "file": "test/pharmacy-landing/reference.test.ts",
+      "expectedCases": 2,
+      "reason": "Shared reveal, frozen receipts, read-only polling and pharmacy navigation consumers"
+    }
+  ],
+  "browser": [
+    {
+      "file": "test/e2e/pharmacy-journey.spec.ts",
+      "expectedCases": 4,
+      "grep": "PHARM-BROWSER",
+      "reason": "Shared reveal, payment at till, immutable receipts and deep dive in all three locales"
+    },
+    {
+      "file": "test/e2e/pharmacy-progress.spec.ts",
+      "expectedCases": 5,
+      "grep": "PHARM-PROGRESS",
+      "reason": "Capture handoff, actual pending/ready stages, reload, explicit recovery and no HealthScore wait"
+    },
+    {
+      "file": "test/e2e/pharmacy-landing.spec.ts",
+      "expectedCases": 5,
+      "grep": "PHARM-LANDING",
+      "reason": "Shared route extension preserves supplied landing and standard site chrome"
+    }
+  ]
+}

@@ -10,7 +10,7 @@ describe("reveal preserves completed results during version polling", () => {
     );
 
     const polling = await readFile("components/nutrition-flow/use-formulation-polling.ts", "utf8");
-    assert.match(source, /useFormulationPolling\([\s\S]*effectivePlanId, locale, initialResult/);
+    assert.match(source, /useFormulationPolling\([\s\S]*effectivePlanId, pharmacy\?\.sourceLocale \?\? locale, initialResult/);
     assert.match(polling, /useState\(initialResult\)/);
     assert.match(polling, /snapshot\.resultVersion !== version\.current/);
     assert.match(polling, /formulationStatus === "ready"/);

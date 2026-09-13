@@ -7,7 +7,7 @@ import type { NutritionJourneySnapshot } from "@/lib/nutrition-journey-read";
 import { assessmentPollKey, fetchFunnelJson, pollFunnelStatus } from "@/lib/funnel-polling";
 
 export function useFormulationPolling(planId: string, locale: Locale, initialResult: FormulationResult | null,
-  productPollingPreference: ProductStackPreference | null, onPollingComplete: () => void) {
+  productPollingPreference: ProductStackPreference | null, onPollingComplete: () => void, enabled = true) {
   const [result, setResult] = useState(initialResult);
   const [failed, setFailed] = useState(false);
   const [attempt, setAttempt] = useState(0);
@@ -35,6 +35,7 @@ export function useFormulationPolling(planId: string, locale: Locale, initialRes
   }, [locale, root]);
 
   useEffect(() => {
+    if (!enabled) return; // Frozen pharmacy receipts never follow a newer recommendation.
     const controller = new AbortController();
     lifecycle.current = controller;
     async function wait() {
@@ -55,7 +56,7 @@ export function useFormulationPolling(planId: string, locale: Locale, initialRes
     }
     void wait().catch(() => { if (!controller.signal.aborted) setFailed(true); });
     return () => controller.abort();
-  }, [attempt, locale, onPollingComplete, planId, productPollingPreference, refresh, root]);
+  }, [attempt, enabled, locale, onPollingComplete, planId, productPollingPreference, refresh, root]);
 
   const retry = useCallback(() => { setFailed(false); setAttempt(value => value + 1); }, []);
   return { result, failed, retry, refresh: () => refresh(), loadState: result ? "ready" : failed ? "error" : "loading" };

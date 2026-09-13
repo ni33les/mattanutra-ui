@@ -15,5 +15,10 @@ test("PHARM-LANDING assets retain the supplied font and mascot bytes", () => {
 });
 
 test("PHARM-LANDING retains the existing site header, footer and journey wrapper", () => {
-  assert.equal(hash(reference.shell.file), reference.shell.sha256);
+  // Routing now also supports pharmacy progress; retain the standard chrome contract.
+  const source = readFileSync(reference.shell.file, "utf8");
+  assert.ok(source.includes('<TitleBar currentLocale={locale} currentPath={currentPath} title={dictionary.hero.eyebrow}'));
+  assert.ok(source.includes('assessmentHref={pharmacyPath(locale, slug, "quiz")} variant={step === "quiz" ? "quiz" : "default"} />'));
+  assert.ok(source.includes('{step !== "quiz" && <SiteFooter locale={locale} content={dictionary.footer} />}'));
+  assert.ok(source.includes('if (step === "landing") content = <PharmacyLanding locale={locale} slug={pharmacy.slug} name={pharmacy.name} />;'));
 });

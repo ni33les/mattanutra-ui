@@ -1,5 +1,6 @@
 "use client";
 
+import { PharmacyProgressView } from "@/components/pharmacy/progress";
 import { pharmacyPath } from "@/lib/pharmacy-journey";
 import { retryHealthScoreCopy, waitForHealthScoreCopy } from "@/lib/healthscore-copy-client";
 import { fetchWithBodyDeadline } from "@/lib/funnel-polling";
@@ -214,12 +215,12 @@ export function AssessmentFlow({
         setAnswers(buildInitialAnswers(saved.answers)); setContactEmail(saved.contactEmail || "");
         setSectionIndex(saved.sectionIndex || 0); setResumePlanId(saved.planId || returningPlanId || "");
         if (saved.receipt) { capturedAnswers.current = JSON.stringify(buildInitialAnswers(saved.answers)); setCapturedStatus(saved.receipt); }
-        if (saved.processing && saved.receipt?.planId) router.replace(nutritionHealthScorePath(locale, saved.receipt.planId));
+        if (saved.processing && saved.receipt?.planId) router.replace(pharmacyId ? pharmacyPath(locale, pharmacyId, "progress", { plan: saved.receipt.planId }) : nutritionHealthScorePath(locale, saved.receipt.planId));
       }
     } catch { /* Ignore drafts from another format. */ }
     setDraftReady(true);
     return () => flowController.current?.abort();
-  }, [assessmentRevision, classicDraftKey, locale, returningPlanId, router, serverUpdatedAt]);
+  }, [assessmentRevision, classicDraftKey, locale, pharmacyId, returningPlanId, router, serverUpdatedAt]);
   useEffect(() => {
     if (!draftReady) return;
     const matchingReceipt = capturedAnswers.current === JSON.stringify(answers) ? capturedStatus : null;
@@ -1215,7 +1216,7 @@ export function AssessmentFlow({
       setShowHealthScore(!skipHealthScoreStep);
       router.replace(
         paymentId || skipHealthScoreStep
-          ? pharmacyId ? pharmacyPath(locale, pharmacyId, "reveal", { plan: readyStatus.planId }) : nutritionRevealPath(locale, readyStatus.planId)
+          ? pharmacyId ? pharmacyPath(locale, pharmacyId, "progress", { plan: readyStatus.planId }) : nutritionRevealPath(locale, readyStatus.planId)
           : nutritionHealthScorePath(locale, readyStatus.planId)
       );
     } catch {
@@ -1315,8 +1316,8 @@ export function AssessmentFlow({
 
   return (
     <main className="mx-auto w-full max-w-6xl px-6 pb-[calc(7rem+env(safe-area-inset-bottom))] pt-10 sm:px-8 sm:pb-16 lg:pt-14">
-        {processingStatus ? (
-          <ProcessingPanel
+        {processingStatus ? (pharmacyId ? <PharmacyProgressView locale={locale} failed={processingStatus.status === "failed"}
+          onRetry={() => void prepareHealthScoreGate()} /> : <ProcessingPanel
             error={
               processingStatus.status === "failed"
                 ? ui.processingError

@@ -38,9 +38,10 @@ test("PHARM-PROGRESS capture displays pharmacy progress before the receipt, then
   });
   await page.goto(`/en/retail/${saved.slug}/quiz`);
   await page.getByTestId("dev-fill-questionnaire").click();
-  await expect(page.getByTestId("pharmacy-progress")).toBeVisible({ timeout: 15000 });
-  await expect(page.locator(".mn-quiz-calc")).toHaveCount(0);
-  release();
+  try {
+    await expect(page.getByTestId("pharmacy-progress")).toBeVisible({ timeout: 15000 });
+    await expect(page.locator(".mn-quiz-calc")).toHaveCount(0);
+  } finally { release(); }
   await expect(page).toHaveURL(new RegExp(`/retail/${saved.slug}/progress\\?plan=${saved.planId}`));
 });
 

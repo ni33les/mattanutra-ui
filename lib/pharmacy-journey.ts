@@ -7,7 +7,7 @@ export function pharmacyOrganisationSlug(slug: string) {
   return slug === "delight" ? "delight-pharmacy" : slug;
 }
 
-export function pharmacyPath(locale: Locale, slug: string, page: "landing" | "quiz" | "reveal" | "plan",
+export function pharmacyPath(locale: Locale, slug: string, page: "landing" | "quiz" | "progress" | "reveal" | "plan",
   query: Record<string, string | undefined> = {}) {
   const publicSlug = slug === "delight-pharmacy" ? "delight" : slug;
   const params = new URLSearchParams(Object.entries(query).filter((row): row is [string, string] => Boolean(row[1])));

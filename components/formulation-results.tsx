@@ -19,6 +19,9 @@ import {
   selectProductRecommendationOption,
   supplementProductCoverageById,
 } from "@/components/formulation-results-helpers";
+import { PharmacyOrderPanel } from "@/components/pharmacy/order-panel";
+import { pharmacyPath } from "@/lib/pharmacy-journey";
+import type { PharmacyOrderReceipt } from "@/lib/pharmacy-orders";
 import { RevealFinalResultsPage } from "@/components/reveal-final-results";
 import type {
   FormulationResult,
@@ -31,6 +34,7 @@ type FormulationResultsProps = Readonly<{
   initialStackPreference?: ProductStackPreference | null;
   locale: Locale;
   planId: string;
+  pharmacy?: { slug: string; name: string; revision: number; sourceLocale: Locale; receipt: PharmacyOrderReceipt | null };
 }>;
 
 export function FormulationResults({
@@ -38,6 +42,7 @@ export function FormulationResults({
   initialResult = null,
   locale,
   planId,
+  pharmacy,
 }: FormulationResultsProps) {
   const labels = formulationResultsCopy[locale];
   const effectivePlanId = planId;
@@ -53,7 +58,7 @@ export function FormulationResults({
 
   const pollingComplete = useCallback(() => setProductPollingPreference(null), []);
   const { result, loadState, failed, retry, refresh: refreshFormulationResult } = useFormulationPolling(
-    effectivePlanId, locale, initialResult, productPollingPreference, pollingComplete);
+    effectivePlanId, pharmacy?.sourceLocale ?? locale, initialResult, productPollingPreference, pollingComplete, !pharmacy?.receipt);
   const startProductStackPolling = useCallback((preference: ProductStackPreference) => {
     setProductPollingPreference(preference);
   }, []);
@@ -108,7 +113,7 @@ export function FormulationResults({
     timeStyle: "short",
   }).format(new Date(result.generatedAt));
   const effectiveResultPlanId = result.planId || effectivePlanId;
-  const isPreview = result.access === "preview";
+  const isPreview = !pharmacy && result.access === "preview";
   const unlockHref = planPaywallHref(locale, effectiveResultPlanId);
   const productRecommendationOptions =
     productRecommendationOptionsForResult(result);
@@ -172,6 +177,14 @@ export function FormulationResults({
         selectedProductStackPreference
       }
       unlockHref={unlockHref}
+      pharmacy={pharmacy ? {
+        name: pharmacy.name,
+        planHref: pharmacyPath(locale, pharmacy.slug, "plan", { plan: planId, order: pharmacy.receipt?.id }),
+        quizHref: pharmacyPath(locale, pharmacy.slug, "quiz"),
+        orderPanel: <PharmacyOrderPanel key={result.productRecommendations?.runId ?? pharmacy.revision}
+          planId={planId} slug={pharmacy.slug} locale={locale} revision={pharmacy.revision}
+          pharmacyName={pharmacy.name} initialReceipt={pharmacy.receipt} onRefresh={retry} />
+      } : undefined}
     />
     </>
   );

@@ -1,5 +1,6 @@
 "use client";
 
+import { PharmacyProgressView } from "@/components/pharmacy/progress";
 import { pharmacyPath } from "@/lib/pharmacy-journey";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -98,7 +99,7 @@ function resultsPath(
   skipHealthScore?: boolean,
   pharmacyId?: string
 ) {
-  if (pharmacyId) return pharmacyPath(locale, pharmacyId, "reveal", { plan: planId });
+  if (pharmacyId) return pharmacyPath(locale, pharmacyId, "progress", { plan: planId });
   return paymentId || skipHealthScore
     ? nutritionRevealPath(locale, planId)
     : nutritionHealthScorePath(locale, planId);
@@ -1378,6 +1379,8 @@ export function ChatQuestionnaire({
   }
 
   if (uiScreen === "calculating") {
+    if (pharmacyId) return <PharmacyProgressView locale={locale} failed={calcStatus === "error"}
+      onRetry={state ? () => { void capture.run(state, Boolean(capture.planId)); } : undefined} />;
     return (
       <QuestionnaireCalculating
         locale={locale}

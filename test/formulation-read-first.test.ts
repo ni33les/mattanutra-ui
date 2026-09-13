@@ -69,3 +69,12 @@ it("an accepted empty formulation completes without a regeneration loop", async 
   assert.deepEqual(hook.result?.supplementBreakdown, []);
   assert.equal(calls.filter(call => call.method === "POST").length, 0);
 });
+
+it("a frozen pharmacy receipt does not load a newer formula or start recovery", async () => {
+  stateIndex = refIndex = 0;
+  const hook = useFormulationPolling("historical-plan", "en", null, null, () => {}, false);
+  assert.equal(effect(), undefined);
+  await settle();
+  assert.deepEqual(calls, []);
+  assert.equal(hook.failed, false);
+});

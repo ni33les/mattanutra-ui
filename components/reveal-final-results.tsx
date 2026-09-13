@@ -1,5 +1,7 @@
 "use client";
 
+import type { ReactNode } from "react";
+import { pharmacyCopy } from "@/lib/pharmacy-copy";
 import { webMatchingCopy } from "@/lib/web-health-advice";
 import { WebMatchingAdvice } from "@/components/web-health-advice";
 import Image from "next/image";
@@ -75,6 +77,8 @@ import { localeHtmlLang, type Locale } from "@/lib/i18n";
 import { t } from "@/lib/i18n-messages";
 import { organisationDispatchCity } from "@/lib/organisation-dispatch";
 
+type PharmacyRevealContext = Readonly<{ name: string; orderPanel: ReactNode; planHref: string; quizHref: string }>;
+
 type RevealFinalResultsPageProps = Readonly<{
   activeProductRecommendations?: FormulationResult["productRecommendations"];
   formattedDate: string;
@@ -94,6 +98,7 @@ type RevealFinalResultsPageProps = Readonly<{
   result: FormulationResult;
   selectedProductStackPreference?: ProductStackPreference | null;
   unlockHref: string;
+  pharmacy?: PharmacyRevealContext;
 }>;
 
 type PanyaLineConnectState = Readonly<{
@@ -464,6 +469,7 @@ export function RevealFinalResultsPage({
   result,
   selectedProductStackPreference,
   unlockHref,
+  pharmacy,
 }: RevealFinalResultsPageProps) {
   const copy = revealCopy[locale];
   const finalCopy = revealFinalCopy[locale];
@@ -652,6 +658,7 @@ export function RevealFinalResultsPage({
       />
 
       <RevealProductsFinalSection
+        pharmacy={pharmacy}
         activeProductRecommendations={activeProductRecommendations}
         copy={copy}
         finalCopy={finalCopy}
@@ -669,7 +676,7 @@ export function RevealFinalResultsPage({
         supplementSelectedCount={supplementSelectedCount}
       />
 
-      <KhunDreamSection finalCopy={finalCopy} />
+      {!pharmacy && <KhunDreamSection finalCopy={finalCopy} />}
 
       <RevealFoodSupportFinalSection
         copy={copy}
@@ -683,12 +690,12 @@ export function RevealFinalResultsPage({
         }
       />
 
-      <RevealPanyaFinalSection
+      {!pharmacy && <RevealPanyaFinalSection
         finalCopy={finalCopy}
         locale={locale}
         planId={planId}
         result={result}
-      />
+      />}
 
       <RevealSafetyFinalSection
         copy={copy}
@@ -698,6 +705,7 @@ export function RevealFinalResultsPage({
       />
 
       <RevealClosingFinalSection
+        pharmacy={pharmacy}
         copy={copy}
         finalCopy={finalCopy}
         locale={locale}
@@ -1132,6 +1140,7 @@ function RevealFormulaFinalSection({
 }
 
 function RevealProductsFinalSection({
+  pharmacy,
   activeProductRecommendations,
   copy,
   finalCopy,
@@ -1148,6 +1157,7 @@ function RevealProductsFinalSection({
   selectedProductStackPreference,
   supplementSelectedCount,
 }: Readonly<{
+  pharmacy?: PharmacyRevealContext;
   activeProductRecommendations?: FormulationResult["productRecommendations"];
   copy: typeof revealCopy.en;
   finalCopy: typeof revealFinalCopy.en;
@@ -1508,13 +1518,12 @@ function RevealProductsFinalSection({
           </div>
           <div>
             <h3 className="mn-reveal-font-display text-lg font-medium italic leading-tight text-[var(--mn-gold-soft)]">
-              {finalCopy.pharmacyTitle}
+              {pharmacy?.name ?? finalCopy.pharmacyTitle}
             </h3>
             <p className="mt-1 text-[13px] leading-[1.6] text-[var(--mn-cream)]/82">
-              {finalCopy.pharmacyBody}{" "}
-              <strong className="font-semibold text-[var(--mn-cream)]">
-                {selectedRetailerDispatchNote}
-              </strong>
+              {pharmacy ? pharmacyCopy[locale].pay : <>{finalCopy.pharmacyBody}{" "}
+                <strong className="font-semibold text-[var(--mn-cream)]">{selectedRetailerDispatchNote}</strong>
+              </>}
             </p>
           </div>
         </div>
@@ -1522,12 +1531,12 @@ function RevealProductsFinalSection({
         {selectedMatchingOption ? <div className="mx-auto my-6 max-w-[880px]">
           <WebMatchingAdvice advice={selectedMatchingOption.advice} locale={locale} selected showDetails={false} />
         </div> : null}
-        {removedBasketIdList.length || result.excludedProductIds?.length ? <div className="mx-auto my-6 flex max-w-[880px] flex-wrap gap-4">
+        {!pharmacy && (removedBasketIdList.length || result.excludedProductIds?.length) ? <div className="mx-auto my-6 flex max-w-[880px] flex-wrap gap-4">
           {removedBasketIdList.length ? <button className="underline" disabled={replanning} onClick={() => void replanProducts()}>{matchingCopy.replan}</button> : null}
           {result.excludedProductIds?.length ? <button className="underline" disabled={replanning} onClick={() => void replanProducts(true)}>{matchingCopy.clear}</button> : null}
         </div> : null}
         {replanError ? <p className="mx-auto my-4 max-w-[880px]" role="alert">{replanError}</p> : null}
-        {controlPreferences.length > 1 ? (
+        {!pharmacy && controlPreferences.length > 1 ? (
           <div className="basket-tabs-wrap my-10 flex items-center justify-center gap-3 text-center" data-reveal>
             <div className="inline-flex rounded-full border border-[var(--mn-line)] bg-[var(--mn-paper)] p-1">
               {controlPreferences.map((preference) => {
@@ -1584,7 +1593,7 @@ function RevealProductsFinalSection({
           </div>
         ) : null}
 
-        {retailerOptions.length > 0 ? (
+        {!pharmacy && retailerOptions.length > 0 ? (
           <div className="mn-reveal-retailer-choices mx-auto mb-11 flex max-w-[860px] flex-col justify-center gap-3.5 sm:flex-row sm:flex-wrap" data-reveal>
             {retailerOptions.map((option) => {
               const selected =
@@ -1775,7 +1784,7 @@ function RevealProductsFinalSection({
                         </p>
                       ) : null;
                     })()}
-                    <button
+                    {!pharmacy && <button
                       className="product-remove-btn mt-6 w-fit rounded-full border border-[var(--mn-line)] bg-transparent px-3.5 py-1.5 mn-reveal-font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--mn-ink-soft)] transition hover:border-[var(--mn-reveal-caution-edge)] hover:bg-[var(--mn-reveal-caution-bg)] hover:text-[var(--mn-reveal-caution-ink)]"
                       onClick={() => {
                         updateSelectedBasketIds((current) => {
@@ -1791,7 +1800,7 @@ function RevealProductsFinalSection({
                       type="button"
                     >
                       {selected ? finalCopy.remove : finalCopy.addBack}
-                    </button>
+                    </button>}
                   </div>
                 </article>
               );
@@ -1856,7 +1865,7 @@ function RevealProductsFinalSection({
           </div>
         </div>
 
-        <div className="checkout-card mt-7 grid gap-7 rounded-2xl border border-[var(--mn-line)] bg-[var(--mn-paper)] px-8 py-7 md:grid-cols-[1fr_auto] md:items-center" data-reveal>
+        {pharmacy ? pharmacy.orderPanel : <div className="checkout-card mt-7 grid gap-7 rounded-2xl border border-[var(--mn-line)] bg-[var(--mn-paper)] px-8 py-7 md:grid-cols-[1fr_auto] md:items-center" data-reveal>
           <div>
             <div className="mn-reveal-font-mono text-[11px] uppercase tracking-[0.2em] text-[var(--mn-ash)]">
               {finalCopy.subtotal}
@@ -1882,7 +1891,7 @@ function RevealProductsFinalSection({
               {finalCopy.basketEmpty}
             </button>
           )}
-        </div>
+        </div>}
       </div>
     </section>
   );
@@ -2476,12 +2485,14 @@ function RevealSafetyFinalSection({
 }
 
 function RevealClosingFinalSection({
+  pharmacy,
   copy,
   finalCopy,
   locale,
   planId,
   result,
 }: Readonly<{
+  pharmacy?: PharmacyRevealContext;
   copy: typeof revealCopy.en;
   finalCopy: typeof revealFinalCopy.en;
   locale: Locale;
@@ -2528,13 +2539,13 @@ function RevealClosingFinalSection({
             </button>
             <Link
               className="inline-flex items-center justify-center rounded-full border border-[var(--mn-cream)]/30 px-7 py-4 text-sm font-semibold text-[var(--mn-cream)] transition hover:border-[var(--mn-gold-soft)] hover:text-[var(--mn-gold-soft)]"
-              href={`/${locale}/nutrition/reveal?plan=${encodeURIComponent(planId)}`}
+              href={pharmacy?.planHref ?? `/${locale}/nutrition/reveal?plan=${encodeURIComponent(planId)}`}
             >
               {copy.save}
             </Link>
             <Link
               className="inline-flex items-center justify-center rounded-full border border-[var(--mn-cream)]/30 px-7 py-4 text-sm font-semibold text-[var(--mn-cream)] transition hover:border-[var(--mn-gold-soft)] hover:text-[var(--mn-gold-soft)]"
-              href={`/${locale}/nutrition/quiz`}
+              href={pharmacy?.quizHref ?? `/${locale}/nutrition/quiz`}
             >
               {copy.reassess}
             </Link>
