@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { it } from "node:test";
-import { pharmacyPath, pharmacyOrganisationSlug, pharmacyCandidatePrice, pharmacyAnalysisPolicy } from "../lib/pharmacy-journey.ts";
+import { pharmacyPath, pharmacyOrganisationSlug, pharmacyCandidatePrice, pharmacyAnalysisPolicy, belongsToPharmacy } from "../lib/pharmacy-journey.ts";
 
 it("PHARM-01 routes the poster to landing and the questionnaire to quiz in each locale", () => {
   for (const locale of ["en", "th", "zh-CN"] as const) {
@@ -21,4 +21,10 @@ it("PHARM-02 prices pharmacy matching at RRP without mutating online candidates"
 
 it("PHARM-03 generates explanations without making pharmacy reveal wait for them", () => {
   assert.deepEqual(pharmacyAnalysisPolicy, { generateHealthScore: true, waitForHealthScore: false, waitForProducts: true, pricingBasis: "pharmacy-rrp-v1" });
+});
+
+it("PHARM-07 scopes retail matching by the stored organisation ID, not its public seller ID", () => {
+  assert.equal(belongsToPharmacy({ sellerId: "seller_public", candidate: { selectedRetailerOrganisationId: "database-id" } }, "database-id"), true);
+  assert.equal(belongsToPharmacy({ sellerId: "database-id", candidate: { selectedRetailerOrganisationId: "other-shop" } }, "database-id"), false);
+  assert.equal(belongsToPharmacy({ sellerId: "seller_public", candidate: {} }, "database-id"), false);
 });
