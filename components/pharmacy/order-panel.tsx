@@ -87,13 +87,21 @@ export function PharmacyOrderPanel({ planId, slug, locale, revision, pharmacyNam
         <button disabled={busy || !selected.length || !name.trim() || !key} className="w-full rounded-xl bg-[var(--mn-teal-deep)] px-6 py-4 font-semibold text-white disabled:opacity-50">{busy ? c.sending : c.confirm}</button>
       </form>}
       {error && <div role="alert" className="mt-4"><p>{error}</p><button className="mt-2 underline" onClick={() => { setError(""); setQuoteAttempt(n => n + 1); if (error === c.refresh) onRefresh(); }}>{c.retry}</button></div>}
-      <div className="mt-7 flex flex-wrap gap-5 text-sm font-semibold"><a className="underline" href={deepLink}>{c.details} →</a>
+      <div className="mt-7 flex flex-wrap gap-5 text-sm font-semibold">
         <button className="underline" onClick={() => { void navigator.clipboard.writeText(new URL(deepLink, window.location.origin).href).then(() => setCopied(true)).catch(() => setError(c.error)); }}>{copied ? c.copied : c.copyLink}</button>
         <button className="underline" onClick={() => { window.open(`https://line.me/R/share?text=${encodeURIComponent(new URL(deepLink, window.location.origin).href)}`, "_blank", "noopener,noreferrer"); }}>{c.line}</button></div>
       <p className="mt-3 text-sm text-[var(--mn-ink-soft)]">{c.lineHint}</p>
     </div>
-    <div className="mt-3 lg:col-start-2 lg:row-start-2 lg:mt-0"><OrderSummary locale={locale} labels={{ ...c, free: c.free }} productsById={new Map(basket.map(p => [p.id, p]))}
-      selectedProducts={basket.filter(p => active.some(line => line.productId === p.id))} quotePreview={loaded ? quote : null}
-      selectedRetailerName={pharmacyName} currency={currency} subtotal={total} total={total} shippingAmount={0} removedItemCount={0} hideShipping /></div>
+    <div className="mt-3 lg:col-start-2 lg:row-start-2 lg:mt-0">
+      <div className="sticky top-6 [&>section]:static" data-testid="pharmacy-order-summary">
+        <OrderSummary locale={locale} labels={{ ...c, free: c.free }} productsById={new Map(basket.map(p => [p.id, p]))}
+          selectedProducts={basket.filter(p => active.some(line => line.productId === p.id))} quotePreview={loaded ? quote : null}
+          selectedRetailerName={pharmacyName} currency={currency} subtotal={total} total={total} shippingAmount={0} removedItemCount={0} hideShipping />
+        <a data-testid="pharmacy-deep-dive-link" href={deepLink}
+          className="mt-4 flex w-full items-center justify-center rounded-full bg-[var(--mn-teal-deep)] px-6 py-3 text-sm font-semibold text-white transition hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--mn-teal-deep)]">
+          {c.details} →
+        </a>
+      </div>
+    </div>
   </section>;
 }
