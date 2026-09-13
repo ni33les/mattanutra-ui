@@ -48,7 +48,12 @@ export function PharmacyResults({ locale, sourceLocale = locale, slug, pharmacyN
   </section>;
   const ingredients = [...result.supplementBreakdown].sort((a, b) => a.effectivenessRank - b.effectivenessRank);
   const copy = health?.pageContent?.aiCopy;
-  const food = result.foodGapSupport?.variants.balanced;
+  // Food guidance may finish after the order. Reuse it only for the frozen
+  // recommendation; its formula, purchased products and prices stay unchanged.
+  const current = polling.result;
+  const sameRecommendation = current?.assessmentRevision === revision && current.selectionRevision === result.selectionRevision
+    && Boolean(result.productRecommendations?.runId) && current.productRecommendations?.runId === result.productRecommendations?.runId;
+  const food = (sameRecommendation ? current?.foodGapSupport ?? result.foodGapSupport : result.foodGapSupport)?.variants.balanced;
   const matching = result.productRecommendations?.matching;
   const advice = matching?.options.find(option => option.candidateKey === matching.selectedCandidateKey)?.advice
     ?? ingredients.flatMap(i => i.safety?.advice ?? []);
@@ -69,7 +74,7 @@ export function PharmacyResults({ locale, sourceLocale = locale, slug, pharmacyN
     </>}
     <section className="mt-10"><h2 className="font-serif text-3xl">{c.ingredients} <span className="text-[var(--mn-ink-soft)]">({ingredients.length})</span></h2>
       <div className="mt-5 grid gap-4 sm:grid-cols-2">{ingredients.map(i => {
-        const coverage = result.productRecommendations?.needCoverage?.find(row => row.id === i.id)?.coveragePercent;
+        const coverage = result.productRecommendations?.needCoverage?.find(row => row.id === `supplement:${i.id}`)?.coveragePercent;
         return <article key={i.id} className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-[var(--mn-line)]"><h3 className="font-semibold">{text(i.supplement)}</h3><p className="mt-1">{text(i.dailyDose)}</p>
           <p className="mt-2 text-sm text-[var(--mn-ink-soft)]">{c.coverage}: {coverage == null ? c.unknown : `${Math.ceil(coverage)}%`}</p>
           {deep && <p className="mt-3 leading-7">{text(i.forYou ?? i.rationale)}</p>}</article>;

@@ -63,9 +63,9 @@
   "browser": [
     {
       "file": "test/e2e/pharmacy-journey.spec.ts",
-      "expectedCases": 3,
+      "expectedCases": 4,
       "grep": "PHARM-BROWSER",
-      "reason": "All three pharmacy journeys reuse quiz and order styling without online payment"
+      "reason": "Three locales, known coverage, unpaid orders and delayed food guidance without changing frozen purchases"
     }
   ]
 }
