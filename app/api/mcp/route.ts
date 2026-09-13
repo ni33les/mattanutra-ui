@@ -45,13 +45,16 @@ function mcpReply(
   extraHeaders?: Record<string, string>
 ) {
   const accept = request.headers.get("accept");
-  const identity = assertReleaseManifestReady();
   return mcpOneShotResponse(accept, payload, status, {
-    "x-request-id": requestCorrelationId(request),
-    "x-agentic-build-id": identity.buildId,
-    "x-agentic-schema-checksum": identity.schemaChecksum,
+    ...mcpIdentityHeaders(request),
     ...extraHeaders
   });
+}
+
+function mcpIdentityHeaders(request: Request) {
+  const identity = assertReleaseManifestReady();
+  return { "x-request-id": requestCorrelationId(request), "x-agentic-build-id": identity.buildId,
+    "x-agentic-schema-checksum": identity.schemaChecksum };
 }
 
 function mcpNeedsRateLimit(body: unknown) {
@@ -198,6 +201,15 @@ async function handlePost(request: Request) {
       durationMs,
       tool: timed ?? "other"
     });
+    if (timed === "plan" && wantsMcpSse(request.headers.get("accept"))) {
+      const { planCompletionResponse } = await import("@/lib/agentic/mcp/plan-stream");
+      const stream = await withQaSessionSnapshot(qaNamespace || undefined, () => planCompletionResponse({
+        request, initial: result, runtime: { ...runtime, resultContent: request.headers.get("x-mattanutra-result-content") === "text" ? "text" : "structured" },
+        headers: { ...mcpIdentityHeaders(request), "x-mcp-handler-ms": String(durationMs) },
+        withinScope: work => withQaSessionSnapshot(qaNamespace || undefined, work)
+      }));
+      if (stream) return stream;
+    }
     return mcpReply(request, result, 200, { "x-mcp-handler-ms": String(durationMs) });
   } catch (error) {
     if (error instanceof QaRunInvalidError) {

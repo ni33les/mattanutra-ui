@@ -36,7 +36,7 @@ test("STREAM-HTTP-03 failure and newer pending revisions use one coherent result
   }
 });
 test("STREAM-HTTP-04 lost notifications are recovered by the boundary read", async () => {
-  const h = harness(15); await setImmediate(); h.loseNotification();
+  const h = harness(15); h.loseNotification();
   assert.deepEqual(messages(await h.stream.text()), [response("ready")]); assert.equal(h.counters().closed, 1);
 });
 test("STREAM-HTTP-05 unfinished work returns the original processing envelope at the boundary", async () => {

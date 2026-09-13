@@ -15,6 +15,7 @@ import {
   type TaskQueueSignal
 } from "@/lib/task-queue-signal";
 import { pingRegisteredWorkerWakes } from "@/lib/worker-wake";
+import { signalPlanOperationChange, signalPlanObserverReconnect, closePlanObservers } from "@/lib/agentic/plan/completion-signals";
 
 export const TASK_QUEUE_CHANNEL = "mattanutra_tasks";
 
@@ -66,15 +67,27 @@ export function notifyTaskQueueChanged(
   });
 }
 
-function parseTaskQueuePayload(payload: string): TaskQueueSignal {
+export function parseTaskQueuePayload(payload: string): TaskQueueSignal | null {
   const text = payload.trim();
 
   if (text.startsWith("{")) {
     try {
       const json = JSON.parse(text) as {
+        kind?: unknown;
+        operationId?: unknown;
+        version?: unknown;
         taskId?: unknown;
         taskType?: unknown;
       };
+      // Completion messages fan out to observers; they never consume worker
+      // wakeups, enter the task queue, or ping execution infrastructure.
+      if (json.kind === "plan_operation_changed") {
+        if (typeof json.operationId === "string" && json.operationId.length <= 128 &&
+          Number.isSafeInteger(json.version) && Number(json.version) >= 0) {
+          signalPlanOperationChange({ operationId: json.operationId, version: Number(json.version) });
+        }
+        return null;
+      }
       const taskType =
         typeof json.taskType === "string" ? json.taskType.trim() : "";
       const taskId = typeof json.taskId === "string" ? json.taskId.trim() : "";
@@ -105,6 +118,7 @@ export async function subscribeTaskQueue() {
 
   const onPayload = (payload: string) => {
     const signal = parseTaskQueuePayload(payload);
+    if (!signal) return;
     signalTaskQueue(signal);
     void pingRegisteredWorkerWakes(signal).catch((error) => {
       wakeupLog.warn("worker_wake_ping_failed", {
@@ -122,6 +136,7 @@ export async function subscribeTaskQueue() {
       handle = await sql.listen(TASK_QUEUE_CHANNEL, (payload) => {
         onPayload(typeof payload === "string" ? payload : "");
       });
+      signalPlanObserverReconnect();
       wakeupLog.info("task_queue_listening", { channel: TASK_QUEUE_CHANNEL });
     } catch (error) {
       wakeupLog.warn("task_queue_listen_failed", {
@@ -152,6 +167,7 @@ export async function subscribeTaskQueue() {
 
   return async () => {
     stopped = true;
+    closePlanObservers();
 
     if (reconnectTimer) {
       clearTimeout(reconnectTimer);

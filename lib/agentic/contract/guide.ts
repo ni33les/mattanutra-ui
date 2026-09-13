@@ -2,7 +2,7 @@ import { importanceInstructions } from "@/lib/agentic/contract/importance";
 import { LIMIT_ADVICE_POLICY } from "@/lib/agentic/presentation/limit-advice";
 import { positioning, environmentWarning } from "@/lib/agentic/discovery/positioning";
 import { AGENTIC_CONTRACT_VERSION, type AgenticEnvironment } from "@/lib/agentic/config";
-import { OVERVIEW_CARD } from "@/lib/agentic/contract/agent-card";
+import { OVERVIEW_CARD, PLAN_DELIVERY_INSTRUCTIONS } from "@/lib/agentic/contract/agent-card";
 import { AGENTIC_CONTRACT_REGISTRY } from "@/lib/agentic/contract/registry";
 import { PLAN_INPUT_SCHEMA } from "@/lib/agentic/contract/schemas";
 import { MCP_SCORING_PRESETS } from "@/lib/agentic/contract/scoring";
@@ -36,7 +36,7 @@ export const CLIENT_EXAMPLES = [
   { name: "recover-or-track-order", tool: "order", arguments: { orderHandle: "cap_replace_with_returned_order_handle" } }
 ] as const;
 export function publicContractBundle() { return { contractVersion: AGENTIC_CONTRACT_VERSION, planSchema: PLAN_INPUT_SCHEMA, examples: CLIENT_EXAMPLES, tools: AGENTIC_CONTRACT_REGISTRY }; }
-const RULES = `Illustrative amounts are protocol examples, not personal dose recommendations. Answer using the actual questionId and choice corresponding to the customer’s answer. Replace placeholder identifiers with returned values; each new mutation needs a new idempotencyKey and current expectedRevision. Retry a lost response with exactly the same key and input. Handle-only calls poll existing work at pollAfterSeconds; stop at a terminal result. Space automated requests at least one second apart and respect longer pollAfterSeconds or Retry-After delays. After a rate-limit response, retry only with the same idempotency key and unchanged payload when the call is a mutation; reads keep the same handle.
+const RULES = `Illustrative amounts are protocol examples, not personal dose recommendations. Answer using the actual questionId and choice corresponding to the customer’s answer. Replace placeholder identifiers with returned values; each new mutation needs a new idempotencyKey and current expectedRevision. Retry a lost response with exactly the same key and input. ${PLAN_DELIVERY_INSTRUCTIONS} Handle-only calls observe existing work; stop at a terminal result. Space automated requests at least one second apart and respect longer pollAfterSeconds or Retry-After delays. After a rate-limit response, retry only with the same idempotency key and unchanged payload when the call is a mutation; reads keep the same handle.
 
 Use one flat plan call repeatedly. Omit unchanged fields. Start with best_match by omitting scoring; it uses the existing balanced coefficients, all initially one. balanced remains an accepted input alias and is returned as best_match. Adjust weights conversationally to get one recommendation per round. Answers and refinements must be separate calls; execute opens checkout for the current recommendation. profile is reported customer context; scoring.profile is a preset of effective weights. Nothing requires exact diet labels or demographics merely to explore.
 

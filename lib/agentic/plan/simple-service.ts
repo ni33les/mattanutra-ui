@@ -17,6 +17,13 @@ export async function simplePlanTool(runtime: AgenticRuntime, params: Record<str
   const end = measureService(typeof params.planHandle === "string" && Object.keys(params).length === 1 ? "mcp.retrieval_ms" : "mcp.admission_ms");
   try { return await runSimplePlanTool(runtime, params); } finally { end(); }
 }
+/** Reuse an authorised coherent read for both ordinary and streamed delivery. */
+export function simplePlanReadDecision(state: Exclude<Awaited<ReturnType<typeof readPlanState>>, { ok: false }>, handle: string) {
+  if (state.operation && ["queued", "running", "retryable"].includes(state.operation.status)) return processingDecision(handle, visiblePlanRevision(state), state.projection.locale);
+  if (state.operation && ["failed", "cancelled"].includes(state.operation.status)) return failedDecision(handle, visiblePlanRevision(state), state.projection.locale);
+  const complete = planPresentation(state);
+  return presentDecision(complete.result, handle, complete.revision.revision);
+}
 async function runSimplePlanTool(runtime: AgenticRuntime, params: Record<string, unknown>) {
   const now = runtime.now ?? new Date().toISOString();
   const handle = typeof params.planHandle === "string" ? params.planHandle : undefined;
@@ -24,10 +31,7 @@ async function runSimplePlanTool(runtime: AgenticRuntime, params: Record<string,
   const state = handle ? await readPlanState(runtime, handle, undefined, kind === "get" ? "terminal" : true) : null;
   if (isAgenticErrorResult(state)) return state;
   if (kind === "get" && state) {
-    if (state.operation && ["queued", "running", "retryable"].includes(state.operation.status)) return processingDecision(handle!, visiblePlanRevision(state), state.projection.locale);
-    if (state.operation && ["failed", "cancelled"].includes(state.operation.status)) return failedDecision(handle!, visiblePlanRevision(state), state.projection.locale);
-    const complete = planPresentation(state);
-    return presentDecision(complete.result, handle!, complete.revision.revision);
+    return simplePlanReadDecision(state, handle!);
   }
   const ownerScope = `${runtime.scope.environment}:${runtime.scope.tenantScope}:${runtime.scope.principalScope ?? "anon"}`;
   const key = String(params.idempotencyKey), hash = canonicalRequestHash(params);

@@ -1,5 +1,6 @@
 import { operationCursor, operationCursorBytes, withoutOperationCursor, withOperationCursor } from "@/lib/agentic/store/operation-checkpoint";
 import { operationCommands } from "@/lib/agentic/store/operation-commands";
+import { notifyPlanOperationChanged } from "@/lib/agentic/plan/completion-notify";
 import { getSql, keepDatabaseWarm, withDatabaseTransaction } from "@/lib/db";
 import {preparePlanRevisionRecord} from "@/lib/agentic/store/prepared-revision";
 import type {
@@ -63,12 +64,12 @@ function asJson(value: unknown) {
   return JSON.parse(JSON.stringify(value ?? null)) as unknown;
 }
 
-export function createPostgresStore(inputSql: Sql, inTransaction = false): AgenticStore {
+export function createPostgresStore(inputSql: Sql, inTransaction = false, notificationSql = inputSql): AgenticStore {
   // PostgreSQL remains the trusted decoding boundary; each read names its row
   // shape rather than leaking untyped columns into the store interface.
   const sql = inputSql as unknown as StoreSql;
   const store: AgenticStore = {
-    ...operationCommands(inputSql),
+    ...operationCommands(inputSql, notificationSql),
     async getPlanRevisionHeader(planId,revision) {
       const [row]=await sql<{revision:number;status:PlanRevisionRecord["status"];created_at:DatabaseTimestamp}>`
         select revision,status,created_at from public.agentic_plan_revisions where plan_id=${planId}::uuid and revision=${revision}`;
@@ -158,6 +159,9 @@ export function createPostgresStore(inputSql: Sql, inTransaction = false): Agent
           record_json=${metadata},checkpoint_cursor=case when ${record.checkpoint === null} then null else
             coalesce(checkpoint_cursor,decode(record_json #>> '{checkpoint,search,cursor}','base64')) end,
           updated_at=${record.updatedAt}::timestamptz where id=${record.id}::uuid and version=${expectedVersion} returning id`;
+      if (rows.length === 1 && ["complete", "failed", "cancelled"].includes(record.status)) {
+        notifyPlanOperationChanged({ operationId: record.id, version: record.version }, notificationSql);
+      }
       return rows.length === 1;
     },
     async isCatalogueRevisionCurrent(expectedRevision) {
@@ -771,7 +775,7 @@ export function createPostgresStore(inputSql: Sql, inTransaction = false): Agent
     },
     async transaction<T>(work: (store: AgenticStore) => Promise<T>) {
       if (inTransaction) return work(store);
-      return withDatabaseTransaction(inputSql, tx => work(createPostgresStore(tx, true)));
+      return withDatabaseTransaction(inputSql, tx => work(createPostgresStore(tx, true, notificationSql)));
     },
     async updateCheckout(record) {
       await sql`
