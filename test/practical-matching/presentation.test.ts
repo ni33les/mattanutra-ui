@@ -65,3 +65,14 @@ test('PRACTICAL-WEB-06 practical empty-result copy preserves honest recovery in 
     assert.equal(explanation.recoveryActions[0], 'review_options');
   }
 });
+
+for (const locale of ['en', 'th', 'zh-CN'] as const) test(`PRACTICAL-WEB-07 ${locale} reveal omits matching detail bodies while retaining measured cautions`, () => {
+  const html = renderToStaticMarkup(createElement(components.WebMatchingAdvice, { advice: input, locale, selected: true, showDetails: false }));
+  assert.doesNotMatch(html, /<details|matching-advice-details/);
+  assert.doesNotMatch(html, /data-advice-code="(?:target_exceeded|intake_unknown)"/);
+  assert.match(html, /data-testid="medical-cautions"/);
+  assert.match(html, /data-advice-code="medication_interaction"/);
+  assert.match(html, /data-advice-code="reference_limit_exceeded"/);
+  assert.match(html, /Calcium/);
+  assert.doesNotMatch(html, /type="checkbox"|required=/);
+});

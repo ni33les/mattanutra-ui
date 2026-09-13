@@ -24,9 +24,9 @@ for (const locale of ['en', 'th', 'zh-CN']) test(`PRACTICAL-BROWSER-01 ${locale}
   await expect(cautions.locator('[data-advice-code="medication_interaction"]')).toHaveCount(1);
   await expect(cautions).toContainText('Selected fixture nutrient');
   await expect(cautions.locator('[data-advice-code="intake_unknown"]')).toHaveCount(0);
-  const details = page.getByTestId('matching-advice-details').first();
-  await expect(details).not.toHaveAttribute('open'); await details.locator('summary').click();
-  await expect(details.locator('[data-advice-code="intake_unknown"]')).toBeVisible();
+  await expect(page.getByTestId('matching-advice-details')).toHaveCount(0);
+  const pillCountLabels = { en: 'Daily pill count', th: 'จำนวนเม็ดต่อวัน', 'zh-CN': '每日粒数' };
+  await expect(page.getByText(pillCountLabels[locale as keyof typeof pillCountLabels], { exact: false })).toHaveCount(0);
   const alternative = page.locator(`[data-option-id="${seeded.preferenceScenario.alternative.candidateKey}"]`);
   await expect(alternative).toHaveCount(0);
   await expect(page.getByTestId('selected-matching-preferences')).toHaveCount(0);

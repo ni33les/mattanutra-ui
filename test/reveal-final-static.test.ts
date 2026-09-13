@@ -76,8 +76,8 @@ describe("final reveal UX", () => {
 
   it("omits preference advice boxes and Other options while retaining selected cautions and replan controls", () => {
     assert.doesNotMatch(reveal, /WebPreferenceAdvice|selected-matching-preferences|matchingCopy\.alternatives|data-testid="matching-option"/);
-    assert.match(reveal, /WebMatchingAdvice advice=\{selectedMatchingOption\.advice\} locale=\{locale\} selected/);
-    assert.match(reveal, /WebMatchingPillCount count=\{selectedMatchingOption\.dailyPills\}/);
+    assert.match(reveal, /WebMatchingAdvice advice=\{selectedMatchingOption\.advice\} locale=\{locale\} selected showDetails=\{false\}/);
+    assert.doesNotMatch(reveal, /WebMatchingPillCount/);
     assert.match(reveal, /replanProducts\(true\)/);
     assert.match(reveal, /basket\/checkout/);
   });
