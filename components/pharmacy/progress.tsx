@@ -26,14 +26,14 @@ export function PharmacyProgressView({ locale, stage = 0, failed = false, onRetr
   locale: Locale; stage?: number; failed?: boolean; onRetry?: () => void;
 }) {
   const c = copy[locale];
-  return <section data-testid="pharmacy-progress" className="mx-auto w-full max-w-3xl px-6 py-14 text-center sm:py-20" aria-busy={!failed}>
-    <SafeImage src="/assets/library/nong/nong-thinking.webp" alt="" width={128} height={150} className="mx-auto h-36 w-32 object-contain" />
-    <p className="mt-5 text-xs font-semibold uppercase tracking-[.18em] text-[var(--mn-teal-deep)]">{c.kicker}</p>
-    <h1 className="mt-4 font-serif text-4xl leading-tight text-[var(--mn-ink)] sm:text-5xl">{c.title}</h1>
-    <p className="mx-auto mt-5 max-w-xl leading-7 text-[var(--mn-ink-soft)]">{c.body}</p>
-    <ol className="my-10 grid gap-3 text-left sm:grid-cols-3 sm:text-center">
+  return <section data-testid="pharmacy-progress" className="mx-auto w-full max-w-3xl px-6 py-8 text-center sm:py-20" aria-busy={!failed}>
+    <SafeImage src="/assets/library/nong/nong-thinking.webp" alt="" width={128} height={150} className="mx-auto size-24 object-contain sm:h-36 sm:w-32" />
+    <p className="mt-3 text-xs font-semibold sm:mt-5 uppercase tracking-[.18em] text-[var(--mn-teal-deep)]">{c.kicker}</p>
+    <h1 className="mt-4 font-serif text-3xl leading-tight text-[var(--mn-ink)] sm:text-5xl">{c.title}</h1>
+    <p className="mx-auto mt-3 max-w-xl text-sm leading-6 sm:mt-5 sm:text-base sm:leading-7 text-[var(--mn-ink-soft)]">{c.body}</p>
+    <ol className="my-6 grid gap-2 sm:my-10 sm:gap-3 text-left sm:grid-cols-3 sm:text-center">
       {c.steps.map((label, index) => <li key={label} aria-current={index === stage ? "step" : undefined}
-        className={`flex items-center gap-3 rounded-2xl border p-5 sm:flex-col ${index <= stage ? "border-[var(--mn-teal)]/30 bg-[var(--mn-mint)]" : "border-[var(--mn-line)] bg-white/50"}`}>
+        className={`flex items-center gap-3 rounded-2xl border p-3 sm:flex-col sm:p-5 ${index <= stage ? "border-[var(--mn-teal)]/30 bg-[var(--mn-mint)]" : "border-[var(--mn-line)] bg-white/50"}`}>
         <span className={`grid size-8 shrink-0 place-items-center rounded-full text-sm ${index < stage ? "bg-[var(--mn-teal-deep)] text-white" : "border border-[var(--mn-line)] text-[var(--mn-ink-soft)]"}`}>
           {index < stage ? <Check aria-hidden="true" className="size-4" /> : index + 1}
         </span><span className="text-sm font-semibold">{label}</span>
@@ -44,7 +44,7 @@ export function PharmacyProgressView({ locale, stage = 0, failed = false, onRetr
     </div>
     {failed && onRetry && <button type="button" data-testid="pharmacy-progress-retry" onClick={onRetry}
       className="mx-auto mt-5 inline-flex items-center gap-3 rounded-full bg-[var(--mn-teal-deep)] px-6 py-3 font-semibold text-white">{c.retry}<ArrowRight className="size-4" aria-hidden="true" /></button>}
-    <p className="mx-auto mt-8 max-w-lg text-sm leading-6 text-[var(--mn-ink-soft)]">{c.note}</p>
+    <p className="mx-auto mt-5 max-w-lg text-xs leading-6 sm:mt-8 sm:text-sm text-[var(--mn-ink-soft)]">{c.note}</p>
   </section>;
 }
 

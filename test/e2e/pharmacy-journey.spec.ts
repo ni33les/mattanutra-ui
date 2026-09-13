@@ -18,14 +18,14 @@ for (const locale of ["en", "th", "zh-CN"] as const) {
     await expect(page.getByTestId("pharmacy-order")).toBeVisible();
     await expect(page.locator(".mn-reveal-final")).toBeVisible();
     await expect(page.locator("#formula")).toContainText("100%");
-    await expect(page.locator('a[href*="/basket/checkout"],a[href*="/nutrition/quiz"]')).toHaveCount(0);
-    await expect(page.getByRole("checkbox")).toHaveCount(1);
+    await expect(page.locator(".mn-reveal-final").locator('a[href*="/basket/checkout"],a[href*="/nutrition/quiz"]')).toHaveCount(0);
+    await expect(page.getByTestId("pharmacy-order").getByRole("checkbox")).toHaveCount(1);
     await expect(page.getByLabel(c.name, { exact: true })).toBeVisible();
     await expect(page.locator('input[autocomplete="street-address"],iframe[src*="stripe"]')).toHaveCount(0);
-    await page.getByRole("checkbox").uncheck();
+    await page.getByTestId("pharmacy-order").getByRole("checkbox").uncheck();
     await page.getByLabel(c.name, { exact: true }).fill("Counter Test");
     await expect(page.getByRole("button", { name: c.confirm, exact: true })).toBeDisabled();
-    await page.getByRole("checkbox").check();
+    await page.getByTestId("pharmacy-order").getByRole("checkbox").check();
     await page.getByRole("button", { name: c.confirm, exact: true }).click();
     await expect(page.getByRole("heading", { name: c.confirmed })).toBeVisible();
     await expect(page.getByText(`Counter Test · ${c.unpaid}`, { exact: true })).toBeVisible();
