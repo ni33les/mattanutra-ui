@@ -476,10 +476,11 @@ export function ChatQuestionnaire({
   }, [locale, showStageOverlay, state]);
 
   const finalize = useCallback(async (completed: QuestionnaireState) => {
-    runLeafBurst(10); setUiScreen("calculating"); setProcessingError("");
+    if (!pharmacyId) runLeafBurst(10);
+    setUiScreen("calculating"); setProcessingError("");
     saveLocalState(locale, completed);
     await runCapture(completed);
-  }, [runCapture, locale, saveLocalState]);
+  }, [runCapture, locale, saveLocalState, pharmacyId]);
 
   const commitState = useCallback(
     async (
