@@ -22,7 +22,7 @@
     },
     {
       "file": "test/pharmacy-orders.integration.test.ts",
-      "expectedCases": 6,
+      "expectedCases": 7,
       "reason": "Unpaid persistence, concurrent replay, scope and nonblocking reads",
       "slice": "orders",
       "database": true

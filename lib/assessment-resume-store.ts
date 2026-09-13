@@ -1,8 +1,9 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { getSql } from "@/lib/db";
 import { isLocale, type Locale } from "@/lib/i18n";
-import { isUuid, toJsonValue } from "@/lib/assessment-store";
+import { getStoredAssessmentPrefill, isUuid, toJsonValue } from "@/lib/assessment-store";
 import { normalizeAssessmentContactEmail } from "@/lib/assessment-contact";
+import { IN_STORE_PHARMACY_ANSWERS_KEY, mergeInStorePharmacyAnswers, resolveCapturePharmacy } from "@/lib/pharmacy-in-store";
 
 const RESUME_TOKEN_BYTES = 32;
 const RESUME_TTL_DAYS = 14;
@@ -120,6 +121,7 @@ export async function createAssessmentResumeDraft(input: Readonly<{
   contactEmail: unknown;
   locale?: unknown;
   paymentId?: unknown;
+  pharmacyId?: unknown;
   planId?: unknown;
   sectionIndex?: unknown;
   questionnaireState?: unknown;
@@ -143,10 +145,16 @@ export async function createAssessmentResumeDraft(input: Readonly<{
   const draftId = randomUUID();
   const locale = isLocale(input.locale) ? input.locale : "en";
   const sectionIndex = normalizedSectionIndex(input.sectionIndex);
-  const answers = normalizedAnswers(input.answers);
+  const rawAnswers = { ...normalizedAnswers(input.answers) };
+  delete rawAnswers[IN_STORE_PHARMACY_ANSWERS_KEY];
+  const existing = isUuid(String(input.planId ?? "")) ? await getStoredAssessmentPrefill(planId) : null;
+  const { pharmacy, invalidRequested } = await resolveCapturePharmacy(input.pharmacyId, existing?.answers);
+  if (invalidRequested) throw new Error("Pharmacy not found");
+  const answers = pharmacy ? mergeInStorePharmacyAnswers(rawAnswers, pharmacy) : rawAnswers;
   const paymentId = isUuid(String(input.paymentId ?? ""))
     ? String(input.paymentId)
     : null;
+  if (pharmacy && paymentId) throw new Error("Pharmacy orders are paid at the counter");
 
   await ensureAssessmentResumeDraftSchema();
 
@@ -188,6 +196,7 @@ export async function createAssessmentResumeDraft(input: Readonly<{
     contactEmail,
     draftId,
     planId,
+    pharmacySlug: pharmacy?.slug,
     sectionIndex,
     token
   };

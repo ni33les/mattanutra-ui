@@ -23,17 +23,18 @@ export function PharmacyResults({ locale, sourceLocale = locale, slug, pharmacyN
   const c = pharmacyCopy[locale];
   const [health, setHealth] = useState<HealthScoreResult | null>(null);
   const [healthFailed, setHealthFailed] = useState(false), [healthAttempt, setHealthAttempt] = useState(0);
+  const [healthRetryAllowed, setHealthRetryAllowed] = useState(false);
   useEffect(() => {
     if (!deep) return;
     const controller = new AbortController();
     async function observe() {
       if (healthAttempt) await fetchFunnelJson(`/api/assessment/${planId}/healthscore/retry`, { method: "POST", signal: controller.signal,
         headers: { "Content-Type": "application/json" }, body: JSON.stringify({ locale: sourceLocale }) });
-      const outcome = await pollFunnelStatus<{ generationStatus: string; healthScore?: HealthScoreResult; revision: number }>({
-        signal: controller.signal, read: async signal => (await fetchFunnelJson<{ generationStatus: string; healthScore?: HealthScoreResult; revision: number }>(
+      const outcome = await pollFunnelStatus<{ generationStatus: string; healthScore?: HealthScoreResult; revision: number; retryAllowed: boolean }>({
+        signal: controller.signal, read: async signal => (await fetchFunnelJson<{ generationStatus: string; healthScore?: HealthScoreResult; revision: number; retryAllowed: boolean }>(
           `/api/retail/orders?${new URLSearchParams({ view: "analysis", plan: planId, pharmacy: slug, ...(receipt ? { order: receipt.id } : {}) })}`, { signal })).data,
         ready: value => value.generationStatus === "ready", failed: value => value.generationStatus === "failed",
-        onValue: value => { if (value.revision === revision && value.generationStatus === "ready") setHealth(value.healthScore ?? null); }
+        onValue: value => { setHealthRetryAllowed(value.retryAllowed); if (value.revision === revision && value.generationStatus === "ready") setHealth(value.healthScore ?? null); }
       });
       if (outcome.status !== "ready") setHealthFailed(true);
     }
@@ -62,9 +63,9 @@ export function PharmacyResults({ locale, sourceLocale = locale, slug, pharmacyN
         {health && <p className="mt-4">{c.score}: <strong>{health.score}</strong> · {health.summary}</p>}
       </section>
       {!health && <div className="mt-5 rounded-xl bg-[var(--mn-cream)] p-5" role="status">{healthFailed ? c.error : c.explanationPending}
-        {healthFailed && <button className="ml-3 underline" onClick={() => { setHealthFailed(false); setHealthAttempt(n => n + 1); }}>{c.retry}</button>}</div>}
-      <section className="mt-10"><h2 className="font-serif text-3xl">{c.noticed}</h2>{copy?.findings?.map(card => <article className="mt-5" key={card.id}><h3 className="font-semibold">{text(card.title ?? card.headline)}</h3><p className="mt-2 leading-7">{text(card.body)}</p></article>)}</section>
-      <section className="mt-10"><h2 className="font-serif text-3xl">{c.thinking}</h2>{copy?.methodCards?.map(card => <article className="mt-5" key={card.id}><h3 className="font-semibold">{text(card.title ?? card.headline)}</h3><p className="mt-2 leading-7">{text(card.body)}</p></article>)}</section>
+        {healthFailed && healthRetryAllowed && <button className="ml-3 underline" onClick={() => { setHealthFailed(false); setHealthAttempt(n => n + 1); }}>{c.retry}</button>}</div>}
+      <section className="mt-10"><h2 className="font-serif text-3xl">{c.noticed}</h2>{copy?.findings?.map((card, index) => <article className="mt-5" key={index}><h3 className="font-semibold">{text(card.title ?? card.headline)}</h3><p className="mt-2 leading-7">{text(card.body)}</p></article>)}</section>
+      <section className="mt-10"><h2 className="font-serif text-3xl">{c.thinking}</h2>{copy?.methodCards?.map((card, index) => <article className="mt-5" key={index}><h3 className="font-semibold">{text(card.title ?? card.headline)}</h3><p className="mt-2 leading-7">{text(card.body)}</p></article>)}</section>
     </>}
     <section className="mt-10"><h2 className="font-serif text-3xl">{c.ingredients} <span className="text-[var(--mn-ink-soft)]">({ingredients.length})</span></h2>
       <div className="mt-5 grid gap-4 sm:grid-cols-2">{ingredients.map(i => {

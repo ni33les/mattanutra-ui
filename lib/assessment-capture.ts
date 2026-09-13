@@ -72,7 +72,7 @@ export async function captureAssessment(bodyValue: unknown, options: { planId?: 
   delete answerInput[IN_STORE_PHARMACY_ANSWERS_KEY];
   const rawAnswers = validateCaptureAnswers(answerInput);
   const existing = requestedPlanId ? await getStoredAssessmentPrefill(requestedPlanId) : null;
-  const { invalidRequested, pharmacy } = await resolveCapturePharmacy(body.pharmacyId, existing?.answers);
+  const { invalidRequested, pharmacy } = await resolveCapturePharmacy(body.pharmacyId, existing?.answers ?? resume?.answers);
   if (invalidRequested) throw new FunnelError("Pharmacy not found", 404, "pharmacy_not_found");
   const answers = pharmacy ? mergeInStorePharmacyAnswers(rawAnswers, pharmacy) : rawAnswers;
   const skipHealthScore = Boolean(pharmacy);

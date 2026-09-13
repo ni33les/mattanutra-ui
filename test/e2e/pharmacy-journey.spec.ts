@@ -28,6 +28,13 @@ for (const locale of ["en", "th", "zh-CN"] as const) {
     await expect(page.getByText(`Counter Test · ${c.unpaid}`, { exact: true })).toBeVisible();
     await page.reload();
     await expect(page.getByRole("heading", { name: c.confirmed })).toBeVisible();
+    if (locale === "en") {
+      const receiptUrl = page.url();
+      await page.goto(receiptUrl.replace('/en/retail/','/th/retail/'));
+      await expect(page.getByRole("heading",{ name:pharmacyCopy.th.confirmed })).toBeVisible();
+      await expect(page.getByText(`Counter Test · ${pharmacyCopy.th.unpaid}`, { exact:true })).toBeVisible();
+      await page.goto(receiptUrl);
+    }
     await page.getByRole("link", { name: `${c.details} →`, exact: true }).click();
     await expect(page.getByRole("heading", { name: c.details, exact: true })).toBeVisible();
     await expect(page.getByRole("heading", { name: c.ordered, exact: true })).toBeVisible();

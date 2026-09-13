@@ -36,6 +36,7 @@ export async function POST(request: Request) {
     contactEmail?: unknown;
     locale?: unknown;
     paymentId?: unknown;
+    pharmacyId?: unknown;
     planId?: unknown;
     sectionIndex?: unknown;
     questionnaireState?: unknown;
@@ -56,11 +57,12 @@ export async function POST(request: Request) {
       contactEmail: body.contactEmail,
       locale,
       paymentId: body.paymentId,
+      pharmacyId: body.pharmacyId,
       planId: body.planId,
       questionnaireState: body.questionnaireState,
       sectionIndex: body.sectionIndex
     });
-    const resumeUrl = buildAssessmentResumeUrl(locale, draft.token);
+    const resumeUrl = buildAssessmentResumeUrl(locale, draft.token, draft.pharmacySlug);
 
     await writeBpmEvent({
       actorType: "visitor",

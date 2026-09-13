@@ -1,6 +1,7 @@
 import type { Locale } from "@/lib/i18n";
 import { getNamespace } from "@/lib/i18n-messages";
 import { siteBaseUrl } from "@/lib/site-url";
+import { pharmacyPath } from "@/lib/pharmacy-journey";
 
 function escapeHtml(value: string) {
   return value
@@ -25,7 +26,8 @@ function labels(locale: Locale) {
   );
 }
 
-export function buildAssessmentResumeUrl(locale: Locale, token: string) {
+export function buildAssessmentResumeUrl(locale: Locale, token: string, pharmacySlug?: string) {
+  if (pharmacySlug) return `${siteBaseUrl()}${pharmacyPath(locale, pharmacySlug, "quiz", { resume: token })}`;
   return `${siteBaseUrl()}/${locale}/nutrition/quiz?resume=${encodeURIComponent(token)}`;
 }
 

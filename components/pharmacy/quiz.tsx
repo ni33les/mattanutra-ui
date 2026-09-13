@@ -12,6 +12,7 @@ import type { Locale } from "@/lib/i18n";
 export async function PharmacyQuiz({ locale, pharmacy, query }: { locale: Locale; pharmacy: PharmacyOrganisation; query: Record<string, string | undefined> }) {
   const resume = query.resume ? await getAssessmentResumeDraft(query.resume) : null;
   if (query.resume && !resume) notFound();
+  if (resume && inStorePharmacyFromAnswers(resume.answers)?.id !== pharmacy.id) notFound();
   const planId = query.plan || resume?.planId;
   if (planId && !isUuid(planId)) notFound();
   const prefill = planId ? await getStoredAssessmentPrefill(planId) : null;

@@ -324,6 +324,7 @@ export function AssessmentFlow({
           locale,
           paymentId,
           planId: effectiveReturningPlanId,
+          pharmacyId,
           sectionIndex
         }),
         cache: "no-store",

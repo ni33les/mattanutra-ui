@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { before, after, it } from "node:test";
 import { getSql, closeSqlPool } from "../lib/db.ts";
-import { createPharmacyOrder, readPharmacyOrder, pharmacyOrderQuote } from "../lib/pharmacy-orders.ts";
+import { createPharmacyOrder, readPharmacyOrder, pharmacyOrderQuote, readPharmacyAnalysis } from "../lib/pharmacy-orders.ts";
 import { captureAssessment } from "../lib/assessment-capture.ts";
 import { getFunnelReadiness } from "../lib/funnel-readiness.ts";
 import { getStoredHealthScoreAnalysisSnapshot } from "../lib/assessment-store.ts";
@@ -47,6 +47,9 @@ it("PHARM-PG-02 concurrent replay saves one unpaid order, notification and no ac
   await assert.rejects(createPharmacyOrder({...input,customerName:"Another"},key), {code:"idempotency_conflict"});
   await sql`update public.assessments set input_revision=input_revision+1 where plan_id=${fixture.planId}::uuid`;
   assert.deepEqual(await createPharmacyOrder(input,key),a,"replay survives a later revision");
+  const analysis = await readPharmacyAnalysis(fixture.planId,fixture.slug,a.id);
+  assert.equal(analysis.revision,fixture.revision);
+  assert.equal(analysis.retryAllowed,false,"A frozen order cannot regenerate the later assessment");
 });
 it("PHARM-PG-03 store rebinding and stale or injected products fail before an order exists", async () => {
   const fixture = await seedPharmacyFixture();
@@ -98,4 +101,5 @@ it("PHARM-PG-07 a fresh resume link retains its pharmacy and cannot capture into
   assert.ok(other,"Cross-store resume fixture prerequisite");
   await assert.rejects(captureAssessment({answers:saved!.answers,locale:"th",pharmacyId:other.slug,resumeToken:draft.token}, {idempotencyKey:randomUUID()}), {code:"pharmacy_conflict"});
   assert.equal((await sql`select count(*)::int as n from public.assessments where plan_id=${draft.planId}::uuid`)[0].n,0);
+  assert.ok(buildAssessmentResumeUrl("en",draft.token).includes('/en/nutrition/quiz?resume='),"ordinary web resume URL stays unchanged");
 });
