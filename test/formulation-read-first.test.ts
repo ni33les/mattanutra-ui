@@ -32,7 +32,7 @@ mock.module("../lib/funnel-polling.ts", { namedExports: {
 } });
 const { useFormulationPolling } = await import("../components/nutrition-flow/use-formulation-polling.ts");
 const settle = () => new Promise(resolve => setImmediate(resolve));
-function render(done: () => void) {
+function RenderHarness(done: () => void) {
   stateIndex = refIndex = 0;
   return useFormulationPolling("historical-plan", "en", null, null, done);
 }
@@ -40,7 +40,7 @@ beforeEach(() => { states = []; refs = []; calls = []; readFails = false; });
 
 it("opening a completed reveal reads its saved result without requesting regeneration", async () => {
   let completed = 0;
-  render(() => { completed++; });
+  RenderHarness(() => { completed++; });
   const cleanup = effect(); await settle(); cleanup();
   assert.equal(completed, 1);
   assert.ok(calls.some(call => call.url.includes("/formulation?")));
@@ -49,12 +49,12 @@ it("opening a completed reveal reads its saved result without requesting regener
 
 it("a failed reveal read remains read-only until the customer explicitly retries", async () => {
   readFails = true;
-  const hook = render(() => {});
+  const hook = RenderHarness(() => {});
   const cleanup = effect(); await settle(); cleanup();
   assert.ok(calls.every(call => call.method === "GET"));
-  assert.equal(render(() => {}).failed, true);
+  assert.equal(RenderHarness(() => {}).failed, true);
   hook.retry(); readFails = false;
-  let completed = 0; render(() => { completed++; });
+  let completed = 0; RenderHarness(() => { completed++; });
   const retryCleanup = effect(); await settle(); retryCleanup();
   assert.equal(completed, 1);
   assert.deepEqual(calls.filter(call => call.method === "POST").map(call => call.url),
@@ -62,9 +62,9 @@ it("a failed reveal read remains read-only until the customer explicitly retries
 });
 
 it("an accepted empty formulation completes without a regeneration loop", async () => {
-  render(() => {});
+  RenderHarness(() => {});
   const cleanup = effect(); await settle(); cleanup();
-  const hook = render(() => {});
+  const hook = RenderHarness(() => {});
   assert.equal(hook.loadState, "ready");
   assert.deepEqual(hook.result?.supplementBreakdown, []);
   assert.equal(calls.filter(call => call.method === "POST").length, 0);
