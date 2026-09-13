@@ -13,7 +13,6 @@ import {
   isUuid,
   toJsonValue
 } from "@/lib/assessment-store";
-import { assessmentSkipsHealthScore } from "@/lib/pharmacy-in-store";
 import { writeBpmEvent } from "@/lib/bpm";
 import { getSql, getWorkerSql } from "@/lib/db";
 import { textArray } from "@/lib/sql-arrays";

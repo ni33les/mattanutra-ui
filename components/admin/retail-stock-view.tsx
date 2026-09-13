@@ -1,6 +1,6 @@
-import { pharmacyCopy } from "@/lib/pharmacy-copy";
 "use client";
 
+import { pharmacyCopy } from "@/lib/pharmacy-copy";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import {
