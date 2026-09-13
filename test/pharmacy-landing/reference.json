@@ -1,0 +1,1100 @@
+{
+  "sources": [
+    {
+      "locale": "en",
+      "file": "Final_ENGLISH QR_Pharmacy_Landing_Page_EN (1).html",
+      "sha256": "25d025ad91b3523fddca6de27452ec033da4df96447c412c954b0deb618f890b"
+    },
+    {
+      "locale": "th",
+      "file": "Final Thai_QR_Pharmacy_Landing_Page_TH.html",
+      "sha256": "82c7f25642b8903f09ef0eed756b8bdf4079d2718e4bb7240ef1e22f04c79b1d"
+    }
+  ],
+  "assets": [
+    {
+      "file": "public/assets/pharmacy/fonts/dm-sans.ttf",
+      "sha256": "8cd08d97e89c24d0aa92edd2f0f4c8ee6195eee9b7c9f154865a58b02f0c1c0d"
+    },
+    {
+      "file": "public/assets/pharmacy/fonts/fraunces.ttf",
+      "sha256": "177ff6c0f14e5550a3c624247cd1189611d4eb65d000b14944c63d967958abbb"
+    },
+    {
+      "file": "public/assets/pharmacy/fonts/noto-sans-thai.ttf",
+      "sha256": "5a1c559bb539583c8a1fd99d1c5b9491e5e14478c9cd2bd0970d5c3096cc9ef8"
+    },
+    {
+      "file": "public/assets/pharmacy/fonts/noto-serif-thai.ttf",
+      "sha256": "34a7ad11647c845303aabdde639059806c56b84719e5d2ceb28eb038711bdf53"
+    },
+    {
+      "file": "public/assets/library/nong/nong-celebrate.webp",
+      "sha256": "d08c8510aff87ea1fe2613b048e34580e3c6e361e19dd679c203fd85c14228bf"
+    }
+  ],
+  "views": [
+    {
+      "locale": "en",
+      "width": 1280,
+      "hero": {
+        "width": 860,
+        "height": 757.75
+      },
+      "elements": [
+        {
+          "selector": ".nong-matta",
+          "text": "",
+          "rect": {
+            "x": 371,
+            "y": 24,
+            "width": 118,
+            "height": 118
+          },
+          "css": {
+            "fontFamily": "\"DM Sans\", Arial, sans-serif",
+            "fontSize": "16px",
+            "fontWeight": "400",
+            "fontStyle": "normal",
+            "lineHeight": "normal",
+            "letterSpacing": "normal",
+            "color": "rgb(11, 35, 65)",
+            "backgroundImage": "none",
+            "borderRadius": "0px",
+            "textAlign": "center"
+          }
+        },
+        {
+          "selector": ".eyebrow",
+          "text": "YOUR PERSONALISED SUPPLEMENT ASSESSMENT",
+          "rect": {
+            "x": 0,
+            "y": 148,
+            "width": 860,
+            "height": 14
+          },
+          "css": {
+            "fontFamily": "\"DM Sans\", Arial, sans-serif",
+            "fontSize": "11px",
+            "fontWeight": "780",
+            "fontStyle": "normal",
+            "lineHeight": "normal",
+            "letterSpacing": "2.09px",
+            "color": "rgb(31, 122, 85)",
+            "backgroundImage": "none",
+            "borderRadius": "0px",
+            "textAlign": "center"
+          }
+        },
+        {
+          "selector": "h1",
+          "text": "Stop guessing.\nStart knowing.",
+          "rect": {
+            "x": 0,
+            "y": 172,
+            "width": 860,
+            "height": 145.03125
+          },
+          "css": {
+            "fontFamily": "Fraunces, Georgia, serif",
+            "fontSize": "74px",
+            "fontWeight": "470",
+            "fontStyle": "normal",
+            "lineHeight": "72.52px",
+            "letterSpacing": "-2.96px",
+            "color": "rgb(11, 35, 65)",
+            "backgroundImage": "none",
+            "borderRadius": "0px",
+            "textAlign": "center"
+          }
+        },
+        {
+          "selector": "h1 em",
+          "text": "Start knowing.",
+          "rect": {
+            "x": 215.71875,
+            "y": 234.515625,
+            "width": 428.5625,
+            "height": 91
+          },
+          "css": {
+            "fontFamily": "Fraunces, Georgia, serif",
+            "fontSize": "74px",
+            "fontWeight": "520",
+            "fontStyle": "italic",
+            "lineHeight": "72.52px",
+            "letterSpacing": "-2.96px",
+            "color": "rgb(31, 122, 85)",
+            "backgroundImage": "none",
+            "borderRadius": "0px",
+            "textAlign": "center"
+          }
+        },
+        {
+          "selector": ".intro-copy",
+          "text": "Tell us about your health, lifestyle, medications and goals.",
+          "rect": {
+            "x": 105,
+            "y": 333.03125,
+            "width": 650,
+            "height": 70.1875
+          },
+          "css": {
+            "fontFamily": "Fraunces, Georgia, serif",
+            "fontSize": "27px",
+            "fontWeight": "430",
+            "fontStyle": "normal",
+            "lineHeight": "35.1px",
+            "letterSpacing": "-0.54px",
+            "color": "rgb(11, 35, 65)",
+            "backgroundImage": "none",
+            "borderRadius": "0px",
+            "textAlign": "center"
+          }
+        },
+        {
+          "selector": ".science-copy",
+          "text": "MattaNutra considers your answers alongside scientific evidence on 160+ supplement ingredients, built-in safety checks, thoughtfully designed algorithms and AI-assisted analysis.",
+          "rect": {
+            "x": 55,
+            "y": 421.21875,
+            "width": 750,
+            "height": 50.53125
+          },
+          "css": {
+            "fontFamily": "\"DM Sans\", Arial, sans-serif",
+            "fontSize": "16px",
+            "fontWeight": "400",
+            "fontStyle": "normal",
+            "lineHeight": "25.28px",
+            "letterSpacing": "normal",
+            "color": "rgb(49, 71, 96)",
+            "backgroundImage": "none",
+            "borderRadius": "0px",
+            "textAlign": "center"
+          }
+        },
+        {
+          "selector": ".result-copy",
+          "text": "The result is a supplement plan built around you.",
+          "rect": {
+            "x": 90,
+            "y": 479.75,
+            "width": 680,
+            "height": 24
+          },
+          "css": {
+            "fontFamily": "\"DM Sans\", Arial, sans-serif",
+            "fontSize": "16px",
+            "fontWeight": "650",
+            "fontStyle": "normal",
+            "lineHeight": "24px",
+            "letterSpacing": "normal",
+            "color": "rgb(11, 35, 65)",
+            "backgroundImage": "none",
+            "borderRadius": "0px",
+            "textAlign": "center"
+          }
+        },
+        {
+          "selector": ".primary-cta",
+          "text": "Find What’s Right for Me\n→",
+          "rect": {
+            "x": 185,
+            "y": 527.75,
+            "width": 490,
+            "height": 64
+          },
+          "css": {
+            "fontFamily": "\"DM Sans\", Arial, sans-serif",
+            "fontSize": "16px",
+            "fontWeight": "740",
+            "fontStyle": "normal",
+            "lineHeight": "normal",
+            "letterSpacing": "normal",
+            "color": "rgb(255, 255, 255)",
+            "backgroundImage": "linear-gradient(135deg, rgb(0, 167, 155) 0%, rgb(22, 130, 98) 46%, rgb(21, 95, 67) 100%)",
+            "borderRadius": "999px",
+            "textAlign": "center"
+          }
+        },
+        {
+          "selector": ".commitment-line",
+          "text": "Thorough by design\nFREE",
+          "rect": {
+            "x": 0,
+            "y": 607.75,
+            "width": 860,
+            "height": 16
+          },
+          "css": {
+            "fontFamily": "\"DM Sans\", Arial, sans-serif",
+            "fontSize": "12px",
+            "fontWeight": "620",
+            "fontStyle": "normal",
+            "lineHeight": "normal",
+            "letterSpacing": "normal",
+            "color": "rgb(49, 71, 96)",
+            "backgroundImage": "none",
+            "borderRadius": "0px",
+            "textAlign": "center"
+          }
+        },
+        {
+          "selector": ".privacy-line",
+          "text": "Private and secure · Your information is never sold",
+          "rect": {
+            "x": 0,
+            "y": 635.75,
+            "width": 860,
+            "height": 14
+          },
+          "css": {
+            "fontFamily": "\"DM Sans\", Arial, sans-serif",
+            "fontSize": "11px",
+            "fontWeight": "400",
+            "fontStyle": "normal",
+            "lineHeight": "normal",
+            "letterSpacing": "normal",
+            "color": "rgb(105, 119, 137)",
+            "backgroundImage": "none",
+            "borderRadius": "0px",
+            "textAlign": "center"
+          }
+        },
+        {
+          "selector": ".trust-line",
+          "text": "Physician-founded\nScience-led\nThai FDA–registered products only",
+          "rect": {
+            "x": 0,
+            "y": 671.75,
+            "width": 860,
+            "height": 34
+          },
+          "css": {
+            "fontFamily": "\"DM Sans\", Arial, sans-serif",
+            "fontSize": "11px",
+            "fontWeight": "720",
+            "fontStyle": "normal",
+            "lineHeight": "normal",
+            "letterSpacing": "0.385px",
+            "color": "rgb(11, 35, 65)",
+            "backgroundImage": "none",
+            "borderRadius": "0px",
+            "textAlign": "center"
+          }
+        }
+      ]
+    },
+    {
+      "locale": "en",
+      "width": 390,
+      "hero": {
+        "width": 360,
+        "height": 635.3125
+      },
+      "elements": [
+        {
+          "selector": ".nong-matta",
+          "text": "",
+          "rect": {
+            "x": 139,
+            "y": 13,
+            "width": 82,
+            "height": 82
+          },
+          "css": {
+            "fontFamily": "\"DM Sans\", Arial, sans-serif",
+            "fontSize": "16px",
+            "fontWeight": "400",
+            "fontStyle": "normal",
+            "lineHeight": "normal",
+            "letterSpacing": "normal",
+            "color": "rgb(11, 35, 65)",
+            "backgroundImage": "none",
+            "borderRadius": "0px",
+            "textAlign": "center"
+          }
+        },
+        {
+          "selector": ".eyebrow",
+          "text": "YOUR PERSONALISED SUPPLEMENT ASSESSMENT",
+          "rect": {
+            "x": 0,
+            "y": 100,
+            "width": 360,
+            "height": 12
+          },
+          "css": {
+            "fontFamily": "\"DM Sans\", Arial, sans-serif",
+            "fontSize": "9px",
+            "fontWeight": "780",
+            "fontStyle": "normal",
+            "lineHeight": "normal",
+            "letterSpacing": "1.305px",
+            "color": "rgb(31, 122, 85)",
+            "backgroundImage": "none",
+            "borderRadius": "0px",
+            "textAlign": "center"
+          }
+        },
+        {
+          "selector": "h1",
+          "text": "Stop guessing.\nStart knowing.",
+          "rect": {
+            "x": 0,
+            "y": 120,
+            "width": 360,
+            "height": 99.375
+          },
+          "css": {
+            "fontFamily": "Fraunces, Georgia, serif",
+            "fontSize": "50.7px",
+            "fontWeight": "470",
+            "fontStyle": "normal",
+            "lineHeight": "49.686px",
+            "letterSpacing": "-2.028px",
+            "color": "rgb(11, 35, 65)",
+            "backgroundImage": "none",
+            "borderRadius": "0px",
+            "textAlign": "center"
+          }
+        },
+        {
+          "selector": "h1 em",
+          "text": "Start knowing.",
+          "rect": {
+            "x": 23.1875,
+            "y": 162.6875,
+            "width": 313.609375,
+            "height": 63
+          },
+          "css": {
+            "fontFamily": "Fraunces, Georgia, serif",
+            "fontSize": "50.7px",
+            "fontWeight": "520",
+            "fontStyle": "italic",
+            "lineHeight": "49.686px",
+            "letterSpacing": "-2.028px",
+            "color": "rgb(31, 122, 85)",
+            "backgroundImage": "none",
+            "borderRadius": "0px",
+            "textAlign": "center"
+          }
+        },
+        {
+          "selector": ".intro-copy",
+          "text": "Tell us about your health, lifestyle, medications and goals.",
+          "rect": {
+            "x": 10,
+            "y": 231.375,
+            "width": 340,
+            "height": 50.375
+          },
+          "css": {
+            "fontFamily": "Fraunces, Georgia, serif",
+            "fontSize": "20px",
+            "fontWeight": "430",
+            "fontStyle": "normal",
+            "lineHeight": "25.2px",
+            "letterSpacing": "-0.4px",
+            "color": "rgb(11, 35, 65)",
+            "backgroundImage": "none",
+            "borderRadius": "0px",
+            "textAlign": "center"
+          }
+        },
+        {
+          "selector": ".science-copy",
+          "text": "MattaNutra considers your answers alongside scientific evidence on 160+ supplement ingredients, built-in safety checks, thoughtfully designed algorithms and AI-assisted analysis.",
+          "rect": {
+            "x": 0,
+            "y": 294.75,
+            "width": 360,
+            "height": 81
+          },
+          "css": {
+            "fontFamily": "\"DM Sans\", Arial, sans-serif",
+            "fontSize": "13.5px",
+            "fontWeight": "400",
+            "fontStyle": "normal",
+            "lineHeight": "20.25px",
+            "letterSpacing": "normal",
+            "color": "rgb(49, 71, 96)",
+            "backgroundImage": "none",
+            "borderRadius": "0px",
+            "textAlign": "center"
+          }
+        },
+        {
+          "selector": ".result-copy",
+          "text": "The result is a supplement plan built around you.",
+          "rect": {
+            "x": 0,
+            "y": 382.75,
+            "width": 360,
+            "height": 19.5625
+          },
+          "css": {
+            "fontFamily": "\"DM Sans\", Arial, sans-serif",
+            "fontSize": "13.5px",
+            "fontWeight": "650",
+            "fontStyle": "normal",
+            "lineHeight": "19.575px",
+            "letterSpacing": "normal",
+            "color": "rgb(11, 35, 65)",
+            "backgroundImage": "none",
+            "borderRadius": "0px",
+            "textAlign": "center"
+          }
+        },
+        {
+          "selector": ".primary-cta",
+          "text": "Find What’s Right for Me\n→",
+          "rect": {
+            "x": 0,
+            "y": 421.3125,
+            "width": 360,
+            "height": 58
+          },
+          "css": {
+            "fontFamily": "\"DM Sans\", Arial, sans-serif",
+            "fontSize": "14px",
+            "fontWeight": "740",
+            "fontStyle": "normal",
+            "lineHeight": "normal",
+            "letterSpacing": "normal",
+            "color": "rgb(255, 255, 255)",
+            "backgroundImage": "linear-gradient(135deg, rgb(0, 167, 155) 0%, rgb(22, 130, 98) 46%, rgb(21, 95, 67) 100%)",
+            "borderRadius": "999px",
+            "textAlign": "center"
+          }
+        },
+        {
+          "selector": ".commitment-line",
+          "text": "Thorough by design\nFREE",
+          "rect": {
+            "x": 0,
+            "y": 492.3125,
+            "width": 360,
+            "height": 14
+          },
+          "css": {
+            "fontFamily": "\"DM Sans\", Arial, sans-serif",
+            "fontSize": "11px",
+            "fontWeight": "620",
+            "fontStyle": "normal",
+            "lineHeight": "normal",
+            "letterSpacing": "normal",
+            "color": "rgb(49, 71, 96)",
+            "backgroundImage": "none",
+            "borderRadius": "0px",
+            "textAlign": "center"
+          }
+        },
+        {
+          "selector": ".privacy-line",
+          "text": "Private and secure · Your information is never sold",
+          "rect": {
+            "x": 0,
+            "y": 516.3125,
+            "width": 360,
+            "height": 13
+          },
+          "css": {
+            "fontFamily": "\"DM Sans\", Arial, sans-serif",
+            "fontSize": "10.5px",
+            "fontWeight": "400",
+            "fontStyle": "normal",
+            "lineHeight": "normal",
+            "letterSpacing": "normal",
+            "color": "rgb(105, 119, 137)",
+            "backgroundImage": "none",
+            "borderRadius": "0px",
+            "textAlign": "center"
+          }
+        },
+        {
+          "selector": ".trust-line",
+          "text": "Physician-founded\nScience-led\nThai FDA–registered products only",
+          "rect": {
+            "x": 0,
+            "y": 547.3125,
+            "width": 360,
+            "height": 54
+          },
+          "css": {
+            "fontFamily": "\"DM Sans\", Arial, sans-serif",
+            "fontSize": "10px",
+            "fontWeight": "720",
+            "fontStyle": "normal",
+            "lineHeight": "13.5px",
+            "letterSpacing": "0.35px",
+            "color": "rgb(11, 35, 65)",
+            "backgroundImage": "none",
+            "borderRadius": "0px",
+            "textAlign": "center"
+          }
+        }
+      ]
+    },
+    {
+      "locale": "th",
+      "width": 1280,
+      "hero": {
+        "width": 860,
+        "height": 853.796875
+      },
+      "elements": [
+        {
+          "selector": ".nong-matta",
+          "text": "",
+          "rect": {
+            "x": 371,
+            "y": 24,
+            "width": 118,
+            "height": 118
+          },
+          "css": {
+            "fontFamily": "\"Noto Sans Thai\", \"Leelawadee UI\", Tahoma, sans-serif",
+            "fontSize": "16px",
+            "fontWeight": "400",
+            "fontStyle": "normal",
+            "lineHeight": "27.2px",
+            "letterSpacing": "normal",
+            "color": "rgb(11, 35, 65)",
+            "backgroundImage": "none",
+            "borderRadius": "0px",
+            "textAlign": "center"
+          }
+        },
+        {
+          "selector": "h1",
+          "text": "เลิกเดา\nเริ่มรู้จริง",
+          "rect": {
+            "x": 0,
+            "y": 162.1875,
+            "width": 860,
+            "height": 183.5
+          },
+          "css": {
+            "fontFamily": "\"Noto Serif Thai\", Tahoma, serif",
+            "fontSize": "74px",
+            "fontWeight": "620",
+            "fontStyle": "normal",
+            "lineHeight": "91.76px",
+            "letterSpacing": "normal",
+            "color": "rgb(11, 35, 65)",
+            "backgroundImage": "none",
+            "borderRadius": "0px",
+            "textAlign": "center"
+          }
+        },
+        {
+          "selector": "h1 em",
+          "text": "เริ่มรู้จริง",
+          "rect": {
+            "x": 295,
+            "y": 239.9375,
+            "width": 270,
+            "height": 119
+          },
+          "css": {
+            "fontFamily": "\"Noto Serif Thai\", Tahoma, serif",
+            "fontSize": "74px",
+            "fontWeight": "650",
+            "fontStyle": "normal",
+            "lineHeight": "91.76px",
+            "letterSpacing": "normal",
+            "color": "rgb(31, 122, 85)",
+            "backgroundImage": "none",
+            "borderRadius": "0px",
+            "textAlign": "center"
+          }
+        },
+        {
+          "selector": ".intro-copy",
+          "text": "ไม่แน่ใจว่าจะเลือกอาหารเสริมตัวไหนดี?",
+          "rect": {
+            "x": 110,
+            "y": 387.6875,
+            "width": 640,
+            "height": 42.046875
+          },
+          "css": {
+            "fontFamily": "\"Noto Serif Thai\", Tahoma, serif",
+            "fontSize": "29px",
+            "fontWeight": "650",
+            "fontStyle": "normal",
+            "lineHeight": "42.05px",
+            "letterSpacing": "-0.58px",
+            "color": "rgb(11, 35, 65)",
+            "backgroundImage": "none",
+            "borderRadius": "0px",
+            "textAlign": "center"
+          }
+        },
+        {
+          "selector": ".promise-card",
+          "text": "ไม่แน่ใจว่าจะเลือกอาหารเสริมตัวไหนดี?\n\nตอบคำถามเกี่ยวกับสุขภาพและการใช้ชีวิตของคุณ\n\nMattaNutra จะช่วยเลือกอาหารเสริมที่เหมาะกับคุณโดยเฉพาะ\n\nฟรี",
+          "rect": {
+            "x": 70,
+            "y": 361.6875,
+            "width": 720,
+            "height": 231.484375
+          },
+          "css": {
+            "fontFamily": "\"Noto Sans Thai\", \"Leelawadee UI\", Tahoma, sans-serif",
+            "fontSize": "16px",
+            "fontWeight": "400",
+            "fontStyle": "normal",
+            "lineHeight": "27.2px",
+            "letterSpacing": "normal",
+            "color": "rgb(11, 35, 65)",
+            "backgroundImage": "linear-gradient(145deg, rgba(255, 255, 255, 0.92), rgba(239, 249, 244, 0.78))",
+            "borderRadius": "28px",
+            "textAlign": "center"
+          }
+        },
+        {
+          "selector": ".simple-step",
+          "text": "ตอบคำถามเกี่ยวกับสุขภาพและการใช้ชีวิตของคุณ",
+          "rect": {
+            "x": 105,
+            "y": 442.734375,
+            "width": 650,
+            "height": 29.6875
+          },
+          "css": {
+            "fontFamily": "\"Noto Sans Thai\", \"Leelawadee UI\", Tahoma, sans-serif",
+            "fontSize": "18px",
+            "fontWeight": "400",
+            "fontStyle": "normal",
+            "lineHeight": "29.7px",
+            "letterSpacing": "normal",
+            "color": "rgb(49, 71, 96)",
+            "backgroundImage": "none",
+            "borderRadius": "0px",
+            "textAlign": "center"
+          }
+        },
+        {
+          "selector": ".simple-result",
+          "text": "MattaNutra จะช่วยเลือกอาหารเสริมที่เหมาะกับคุณโดยเฉพาะ",
+          "rect": {
+            "x": 101,
+            "y": 479.421875,
+            "width": 658,
+            "height": 32
+          },
+          "css": {
+            "fontFamily": "\"Noto Sans Thai\", \"Leelawadee UI\", Tahoma, sans-serif",
+            "fontSize": "20px",
+            "fontWeight": "720",
+            "fontStyle": "normal",
+            "lineHeight": "32px",
+            "letterSpacing": "normal",
+            "color": "rgb(11, 35, 65)",
+            "backgroundImage": "none",
+            "borderRadius": "0px",
+            "textAlign": "center"
+          }
+        },
+        {
+          "selector": ".hero-free",
+          "text": "ฟรี",
+          "rect": {
+            "x": 391,
+            "y": 526.421875,
+            "width": 78,
+            "height": 43.75
+          },
+          "css": {
+            "fontFamily": "\"Noto Sans Thai\", \"Leelawadee UI\", Tahoma, sans-serif",
+            "fontSize": "27px",
+            "fontWeight": "850",
+            "fontStyle": "normal",
+            "lineHeight": "33.75px",
+            "letterSpacing": "normal",
+            "color": "rgb(21, 95, 67)",
+            "backgroundImage": "none",
+            "borderRadius": "999px",
+            "textAlign": "center"
+          }
+        },
+        {
+          "selector": ".primary-cta",
+          "text": "มาดูกันว่าอาหารเสริมอะไรบ้างที่เหมาะกับคุณ\n→",
+          "rect": {
+            "x": 170,
+            "y": 611.171875,
+            "width": 520,
+            "height": 64
+          },
+          "css": {
+            "fontFamily": "\"Noto Sans Thai\", \"Leelawadee UI\", Tahoma, sans-serif",
+            "fontSize": "17px",
+            "fontWeight": "720",
+            "fontStyle": "normal",
+            "lineHeight": "28.9px",
+            "letterSpacing": "normal",
+            "color": "rgb(255, 255, 255)",
+            "backgroundImage": "linear-gradient(135deg, rgb(0, 167, 155) 0%, rgb(22, 130, 98) 46%, rgb(21, 95, 67) 100%)",
+            "borderRadius": "999px",
+            "textAlign": "center"
+          }
+        },
+        {
+          "selector": ".commitment-line",
+          "text": "ละเอียดเพื่อความแม่นยำ",
+          "rect": {
+            "x": 0,
+            "y": 691.171875,
+            "width": 860,
+            "height": 19.796875
+          },
+          "css": {
+            "fontFamily": "\"Noto Sans Thai\", \"Leelawadee UI\", Tahoma, sans-serif",
+            "fontSize": "12px",
+            "fontWeight": "620",
+            "fontStyle": "normal",
+            "lineHeight": "19.8px",
+            "letterSpacing": "normal",
+            "color": "rgb(49, 71, 96)",
+            "backgroundImage": "none",
+            "borderRadius": "0px",
+            "textAlign": "center"
+          }
+        },
+        {
+          "selector": ".privacy-line",
+          "text": "เป็นส่วนตัวและปลอดภัย · เราไม่ขายข้อมูลของคุณ",
+          "rect": {
+            "x": 0,
+            "y": 722.96875,
+            "width": 860,
+            "height": 18.6875
+          },
+          "css": {
+            "fontFamily": "\"Noto Sans Thai\", \"Leelawadee UI\", Tahoma, sans-serif",
+            "fontSize": "11px",
+            "fontWeight": "400",
+            "fontStyle": "normal",
+            "lineHeight": "18.7px",
+            "letterSpacing": "normal",
+            "color": "rgb(105, 119, 137)",
+            "backgroundImage": "none",
+            "borderRadius": "0px",
+            "textAlign": "center"
+          }
+        },
+        {
+          "selector": ".trust-line",
+          "text": "ก่อตั้งโดยแพทย์\nยึดหลักวิทยาศาสตร์\nเฉพาะผลิตภัณฑ์ที่ขึ้นทะเบียน อย.",
+          "rect": {
+            "x": 0,
+            "y": 763.65625,
+            "width": 860,
+            "height": 38.140625
+          },
+          "css": {
+            "fontFamily": "\"Noto Sans Thai\", \"Leelawadee UI\", Tahoma, sans-serif",
+            "fontSize": "11px",
+            "fontWeight": "720",
+            "fontStyle": "normal",
+            "lineHeight": "18.15px",
+            "letterSpacing": "normal",
+            "color": "rgb(11, 35, 65)",
+            "backgroundImage": "none",
+            "borderRadius": "0px",
+            "textAlign": "center"
+          }
+        }
+      ]
+    },
+    {
+      "locale": "th",
+      "width": 390,
+      "hero": {
+        "width": 360,
+        "height": 702.78125
+      },
+      "elements": [
+        {
+          "selector": ".nong-matta",
+          "text": "",
+          "rect": {
+            "x": 139,
+            "y": 13,
+            "width": 82,
+            "height": 82
+          },
+          "css": {
+            "fontFamily": "\"Noto Sans Thai\", \"Leelawadee UI\", Tahoma, sans-serif",
+            "fontSize": "16px",
+            "fontWeight": "400",
+            "fontStyle": "normal",
+            "lineHeight": "27.2px",
+            "letterSpacing": "normal",
+            "color": "rgb(11, 35, 65)",
+            "backgroundImage": "none",
+            "borderRadius": "0px",
+            "textAlign": "center"
+          }
+        },
+        {
+          "selector": "h1",
+          "text": "เลิกเดา\nเริ่มรู้จริง",
+          "rect": {
+            "x": 0,
+            "y": 112.1875,
+            "width": 360,
+            "height": 128.6875
+          },
+          "css": {
+            "fontFamily": "\"Noto Serif Thai\", Tahoma, serif",
+            "fontSize": "51.48px",
+            "fontWeight": "620",
+            "fontStyle": "normal",
+            "lineHeight": "64.35px",
+            "letterSpacing": "normal",
+            "color": "rgb(11, 35, 65)",
+            "backgroundImage": "none",
+            "borderRadius": "0px",
+            "textAlign": "center"
+          }
+        },
+        {
+          "selector": "h1 em",
+          "text": "เริ่มรู้จริง",
+          "rect": {
+            "x": 86,
+            "y": 167.53125,
+            "width": 188,
+            "height": 82
+          },
+          "css": {
+            "fontFamily": "\"Noto Serif Thai\", Tahoma, serif",
+            "fontSize": "51.48px",
+            "fontWeight": "650",
+            "fontStyle": "normal",
+            "lineHeight": "64.35px",
+            "letterSpacing": "normal",
+            "color": "rgb(31, 122, 85)",
+            "backgroundImage": "none",
+            "borderRadius": "0px",
+            "textAlign": "center"
+          }
+        },
+        {
+          "selector": ".intro-copy",
+          "text": "ไม่แน่ใจว่าจะเลือกอาหารเสริมตัวไหนดี?",
+          "rect": {
+            "x": 16,
+            "y": 267.875,
+            "width": 328,
+            "height": 30
+          },
+          "css": {
+            "fontFamily": "\"Noto Serif Thai\", Tahoma, serif",
+            "fontSize": "20px",
+            "fontWeight": "650",
+            "fontStyle": "normal",
+            "lineHeight": "30px",
+            "letterSpacing": "-0.4px",
+            "color": "rgb(11, 35, 65)",
+            "backgroundImage": "none",
+            "borderRadius": "0px",
+            "textAlign": "center"
+          }
+        },
+        {
+          "selector": ".promise-card",
+          "text": "ไม่แน่ใจว่าจะเลือกอาหารเสริมตัวไหนดี?\n\nตอบคำถามเกี่ยวกับสุขภาพและการใช้ชีวิตของคุณ\n\nMattaNutra จะช่วยเลือกอาหารเสริมที่เหมาะกับคุณโดยเฉพาะ\n\nฟรี",
+          "rect": {
+            "x": 0,
+            "y": 247.875,
+            "width": 360,
+            "height": 210.921875
+          },
+          "css": {
+            "fontFamily": "\"Noto Sans Thai\", \"Leelawadee UI\", Tahoma, sans-serif",
+            "fontSize": "16px",
+            "fontWeight": "400",
+            "fontStyle": "normal",
+            "lineHeight": "27.2px",
+            "letterSpacing": "normal",
+            "color": "rgb(11, 35, 65)",
+            "backgroundImage": "linear-gradient(145deg, rgba(255, 255, 255, 0.92), rgba(239, 249, 244, 0.78))",
+            "borderRadius": "22px",
+            "textAlign": "center"
+          }
+        },
+        {
+          "selector": ".simple-step",
+          "text": "ตอบคำถามเกี่ยวกับสุขภาพและการใช้ชีวิตของคุณ",
+          "rect": {
+            "x": 16,
+            "y": 308.875,
+            "width": 328,
+            "height": 24.796875
+          },
+          "css": {
+            "fontFamily": "\"Noto Sans Thai\", \"Leelawadee UI\", Tahoma, sans-serif",
+            "fontSize": "15.5px",
+            "fontWeight": "400",
+            "fontStyle": "normal",
+            "lineHeight": "24.8px",
+            "letterSpacing": "normal",
+            "color": "rgb(49, 71, 96)",
+            "backgroundImage": "none",
+            "borderRadius": "0px",
+            "textAlign": "center"
+          }
+        },
+        {
+          "selector": ".simple-result",
+          "text": "MattaNutra จะช่วยเลือกอาหารเสริมที่เหมาะกับคุณโดยเฉพาะ",
+          "rect": {
+            "x": 16,
+            "y": 339.671875,
+            "width": 328,
+            "height": 51.125
+          },
+          "css": {
+            "fontFamily": "\"Noto Sans Thai\", \"Leelawadee UI\", Tahoma, sans-serif",
+            "fontSize": "16.5px",
+            "fontWeight": "720",
+            "fontStyle": "normal",
+            "lineHeight": "25.575px",
+            "letterSpacing": "normal",
+            "color": "rgb(11, 35, 65)",
+            "backgroundImage": "none",
+            "borderRadius": "0px",
+            "textAlign": "center"
+          }
+        },
+        {
+          "selector": ".hero-free",
+          "text": "ฟรี",
+          "rect": {
+            "x": 145,
+            "y": 402.796875,
+            "width": 70,
+            "height": 38
+          },
+          "css": {
+            "fontFamily": "\"Noto Sans Thai\", \"Leelawadee UI\", Tahoma, sans-serif",
+            "fontSize": "24px",
+            "fontWeight": "850",
+            "fontStyle": "normal",
+            "lineHeight": "30px",
+            "letterSpacing": "normal",
+            "color": "rgb(21, 95, 67)",
+            "backgroundImage": "none",
+            "borderRadius": "999px",
+            "textAlign": "center"
+          }
+        },
+        {
+          "selector": ".primary-cta",
+          "text": "มาดูกันว่าอาหารเสริมอะไรบ้างที่เหมาะกับคุณ\n→",
+          "rect": {
+            "x": 0,
+            "y": 473.796875,
+            "width": 360,
+            "height": 58
+          },
+          "css": {
+            "fontFamily": "\"Noto Sans Thai\", \"Leelawadee UI\", Tahoma, sans-serif",
+            "fontSize": "14.5px",
+            "fontWeight": "720",
+            "fontStyle": "normal",
+            "lineHeight": "24.65px",
+            "letterSpacing": "normal",
+            "color": "rgb(255, 255, 255)",
+            "backgroundImage": "linear-gradient(135deg, rgb(0, 167, 155) 0%, rgb(22, 130, 98) 46%, rgb(21, 95, 67) 100%)",
+            "borderRadius": "999px",
+            "textAlign": "center"
+          }
+        },
+        {
+          "selector": ".commitment-line",
+          "text": "ละเอียดเพื่อความแม่นยำ",
+          "rect": {
+            "x": 0,
+            "y": 544.796875,
+            "width": 360,
+            "height": 18.140625
+          },
+          "css": {
+            "fontFamily": "\"Noto Sans Thai\", \"Leelawadee UI\", Tahoma, sans-serif",
+            "fontSize": "11px",
+            "fontWeight": "620",
+            "fontStyle": "normal",
+            "lineHeight": "18.15px",
+            "letterSpacing": "normal",
+            "color": "rgb(49, 71, 96)",
+            "backgroundImage": "none",
+            "borderRadius": "0px",
+            "textAlign": "center"
+          }
+        },
+        {
+          "selector": ".privacy-line",
+          "text": "เป็นส่วนตัวและปลอดภัย · เราไม่ขายข้อมูลของคุณ",
+          "rect": {
+            "x": 0,
+            "y": 572.9375,
+            "width": 360,
+            "height": 17.84375
+          },
+          "css": {
+            "fontFamily": "\"Noto Sans Thai\", \"Leelawadee UI\", Tahoma, sans-serif",
+            "fontSize": "10.5px",
+            "fontWeight": "400",
+            "fontStyle": "normal",
+            "lineHeight": "17.85px",
+            "letterSpacing": "normal",
+            "color": "rgb(105, 119, 137)",
+            "backgroundImage": "none",
+            "borderRadius": "0px",
+            "textAlign": "center"
+          }
+        },
+        {
+          "selector": ".trust-line",
+          "text": "ก่อตั้งโดยแพทย์\nยึดหลักวิทยาศาสตร์\nเฉพาะผลิตภัณฑ์ที่ขึ้นทะเบียน อย.",
+          "rect": {
+            "x": 0,
+            "y": 608.78125,
+            "width": 360,
+            "height": 60
+          },
+          "css": {
+            "fontFamily": "\"Noto Sans Thai\", \"Leelawadee UI\", Tahoma, sans-serif",
+            "fontSize": "10px",
+            "fontWeight": "720",
+            "fontStyle": "normal",
+            "lineHeight": "16.5px",
+            "letterSpacing": "normal",
+            "color": "rgb(11, 35, 65)",
+            "backgroundImage": "none",
+            "borderRadius": "0px",
+            "textAlign": "center"
+          }
+        }
+      ]
+    }
+  ],
+  "shell": {
+    "file": "app/[locale]/retail/[pharmacy]/[step]/page.tsx",
+    "sha256": "9676e3e2b1e8a112bfa1c2a45cefeda3235490c3572e448c8ef2c2103c880a35"
+  },
+  "redEvidence": {
+    "sourceCommit": "bcd0384925d28980c6a0a39e308b4d702478adec",
+    "path": "/root/pharmacy-landing-evidence/red",
+    "failedCases": 4,
+    "passingCases": 1
+  }
+}

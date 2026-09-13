@@ -1,0 +1,7 @@
+{
+  "releaseBase": "bcd0384925d28980c6a0a39e308b4d702478adec",
+  "scope": "pharmacy_landing_reference_fidelity",
+  "inputs": ["test/pharmacy-landing/reference.json"],
+  "files": [{"file":"test/pharmacy-landing/reference.test.ts","expectedCases":2,"reason":"Original reference assets and unchanged standard header/footer wrapper"}],
+  "browser": [{"file":"test/e2e/pharmacy-landing.spec.ts","expectedCases":5,"grep":"PHARM-LANDING","reason":"Exact EN/TH desktop/mobile handoff typography, content and geometry; localized quiz links"}]
+}
