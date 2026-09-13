@@ -28,7 +28,7 @@ export function WebPreferenceAdvice({ preferences, locale }: Readonly<{ preferen
 }
 
 /** Alternative cards disclose details on demand; the selected basket exposes its medical cautions. */
-export function WebMatchingAdvice({ advice, locale, selected }: Readonly<{ advice: readonly WebHealthAdvice[]; locale: Locale; selected: boolean }>) {
+export function WebMatchingAdvice({ advice, locale, selected, showDetails = true }: Readonly<{ advice: readonly WebHealthAdvice[]; locale: Locale; selected: boolean; showDetails?: boolean }>) {
   const rows = partitionWebMatchingAdvice(advice), copy = webRoutineCopy[locale];
   const details = selected ? rows.details : [...rows.medical, ...rows.details];
   return <>
@@ -36,7 +36,7 @@ export function WebMatchingAdvice({ advice, locale, selected }: Readonly<{ advic
       <h3 className="font-semibold">{copy.medical}</h3>
       {rows.medical.map((row, index) => <WebHealthAdviceText key={`${row.code}:${index}`} advice={row} locale={locale} />)}
     </aside> : null}
-    {details.length > 0 ? <details className="my-3 text-sm" data-testid="matching-advice-details"><summary className="cursor-pointer underline">{copy.details} ({details.length})</summary>
+    {showDetails && details.length > 0 ? <details className="my-3 text-sm" data-testid="matching-advice-details"><summary className="cursor-pointer underline">{copy.details} ({details.length})</summary>
       {details.map((row, index) => <WebHealthAdviceText key={`${row.code}:${index}`} advice={row} locale={locale} />)}
     </details> : null}
   </>;

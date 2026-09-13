@@ -1,0 +1,16 @@
+{
+  "releaseBase": "9878aa603beab13d2234b38c5d84710426fdc248",
+  "scope": "Remove daily pill count and matching details from reveal presentation",
+  "files": [
+    { "file": "test/reveal-final-static.test.ts", "expectedCases": 24, "reason": "Reveal omits the pill-count component and opts out of matching details; existing layout and controls remain wired." },
+    { "file": "test/practical-matching/presentation.test.ts", "expectedCases": 11, "reason": "English, Thai and Chinese omit detail bodies on reveal; shared default and selected medical cautions remain intact." }
+  ],
+  "browser": [
+    { "file": "test/e2e/practical-matching.spec.ts", "expectedCases": 3, "reason": "Reveal removal and existing checkout advice in all three locales." }
+  ],
+  "intentionalChanges": [
+    "Retire the reveal-specific assertion requiring a daily pill count.",
+    "PRACTICAL-BROWSER-01 now requires matching-advice-details to be absent from reveal instead of expandable.",
+    "Shared checkout rendering, stored matching facts and medical-caution classification are unchanged."
+  ]
+}

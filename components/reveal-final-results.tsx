@@ -1,7 +1,7 @@
 "use client";
 
 import { webMatchingCopy } from "@/lib/web-health-advice";
-import { WebMatchingAdvice, WebMatchingPillCount } from "@/components/web-health-advice";
+import { WebMatchingAdvice } from "@/components/web-health-advice";
 import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -1520,8 +1520,7 @@ function RevealProductsFinalSection({
         </div>
 
         {selectedMatchingOption ? <div className="mx-auto my-6 max-w-[880px]">
-          <WebMatchingPillCount count={selectedMatchingOption.dailyPills} lowerBound={selectedMatchingOption.overallScore?.preferences.maxDailyPills.actualLowerBound ?? selectedMatchingOption.preferences?.find(row => row.kind === "daily_pills")?.actualLowerBound} locale={locale} />
-          <WebMatchingAdvice advice={selectedMatchingOption.advice} locale={locale} selected />
+          <WebMatchingAdvice advice={selectedMatchingOption.advice} locale={locale} selected showDetails={false} />
         </div> : null}
         {removedBasketIdList.length || result.excludedProductIds?.length ? <div className="mx-auto my-6 flex max-w-[880px] flex-wrap gap-4">
           {removedBasketIdList.length ? <button className="underline" disabled={replanning} onClick={() => void replanProducts()}>{matchingCopy.replan}</button> : null}
