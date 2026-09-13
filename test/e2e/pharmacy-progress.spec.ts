@@ -19,11 +19,30 @@ for (const locale of ["en", "th", "zh-CN"]) {
     await expect(page.getByTestId("pharmacy-progress").getByRole("listitem")).toHaveCount(3);
     await page.reload();
     await expect(page.getByTestId("pharmacy-progress")).toBeVisible();
+    const steps = page.getByTestId("pharmacy-progress").getByRole("listitem");
+    await expect(steps.nth(1).locator(".lucide-loader-circle")).toBeVisible();
+    await expect(steps.nth(2).locator(".lucide-loader-circle")).toHaveCount(0);
+    await page.route(`**/api/assessment/${saved.planId}/journey?*`, async route => {
+      const response = await route.fetch(); const status = await response.json();
+      await route.fulfill({ response, json: status.readyForReveal ? status : {
+        ...status, stages: { ...status.stages, formulation: "complete", products: "active" }
+      } });
+    });
+    await expect(steps.nth(1).locator(".lucide-check")).toBeVisible({ timeout: 15000 });
+    await expect(steps.nth(2).locator(".lucide-loader-circle")).toBeVisible();
+    let openReveal!: () => void;
+    const readyBarrier = new Promise<void>(resolve => { openReveal = resolve; });
+    await page.route(`**/retail/${saved.slug}/reveal?*`, async route => { await readyBarrier; await route.continue(); });
     await fixture(locale, true, saved);
+    try {
+      await expect(steps.nth(2).locator(".lucide-check")).toBeVisible({ timeout: 15000 });
+      await expect(steps.locator(".lucide-loader-circle")).toHaveCount(0);
+    } finally { openReveal(); }
     await expect(page.locator(".mn-reveal-final")).toBeVisible({ timeout: 15000 });
     await expect(page).toHaveURL(new RegExp(`/retail/${saved.slug}/reveal\\?plan=${saved.planId}`));
     await expect(page.getByTestId("pharmacy-order")).toBeVisible();
     expect(mutations).toEqual([]);
+    await page.unrouteAll({ behavior: "wait" });
   });
 }
 
