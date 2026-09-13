@@ -54,7 +54,8 @@ export function completionResponse(input: CompletionInput): Response | null {
       const run = async () => {
         while (!closed) {
           changed = false;
-          const remaining = Math.max(1, end + PLAN_STREAM_FINISH_MS - performance.now());
+          // AbortSignal.timeout requires an integer; performance.now is fractional.
+          const remaining = Math.max(1, Math.ceil(end + PLAN_STREAM_FINISH_MS - performance.now()));
           const readSignal = AbortSignal.any([lifetime.signal, AbortSignal.timeout(Math.min(PLAN_STREAM_FINISH_MS, remaining))]);
           let onAbort: (() => void) | undefined;
           try {

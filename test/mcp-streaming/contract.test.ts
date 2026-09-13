@@ -27,7 +27,14 @@ test("STREAM-DOC-publication generated tools and native schemas retain the basel
     const published = JSON.parse(readFileSync(file, "utf8"));
     assert.equal(published.contractVersion, baseline.contractVersion);
     assert.match(published.instructions, /Poll only if its final result says processing/);
-    const plan = published.tools.find((row: { name: string }) => row.name === "plan"); assert.ok(plan, file);
-    assert.match(plan.description, /Wait for the current tool call to finish/);
+    // Connector registries list tool names and obtain schemas at server_url;
+    // native discovery publishes the actual generated tool descriptors.
+    if (published.tools.every((row: unknown) => typeof row === "string")) {
+      assert.deepEqual(published.tools, native.map(row => row.name));
+      assert.equal(typeof published.server_url, "string");
+    } else {
+      const plan = published.tools.find((row: { name: string }) => row.name === "plan"); assert.ok(plan, file);
+      assert.match(plan.description, /Wait for the current tool call to finish/);
+    }
   }
 });
