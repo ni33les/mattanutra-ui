@@ -29,7 +29,9 @@ export async function seedPharmacyFixture(locale: Locale = "en", ready = true, e
   const candidate = { ...product.candidate, priceAmount: 17, unitPriceAmount: 17 };
   assert.equal(candidate.retailRrpPriceAmount, 17, "Do not alter historical fixture prices");
   const formula: FormulationBlueprint = { supplementBreakdown: [{ id: "vitamin_d3", supplement: { en: "Vitamin D3", th: "วิตามินดี 3", "zh-CN": "维生素 D3" },
-    category: "foundation", dailyDose: "1000 IU/day", effectivenessRank: 1, rationale: "Explicit isolated fixture", status: "add" }] };
+    category: "foundation", dailyDose: "1000 IU/day", effectivenessRank: 1, rationale: "Explicit isolated fixture", status: "add",
+    whyThisIsForYou: "Saved personalised nutrient reasoning", decision: "Saved explanation of the chosen dose",
+    cautions: [{ id: "fixture-caution", severity: "caution", body: "Saved ingredient-specific precaution" }] }] };
   const needs = buildProductNeeds({ formulation: formula, foodGuidance: null });
   const match = recommendWithMatcher({ candidates: [candidate], needs, countryCode: "TH", clientContext: { ageYears: 40, lifestage: "adult" },
     stackPreference: "balanced", catalogueFingerprint: valueCatalogueFingerprint(snapshot) });

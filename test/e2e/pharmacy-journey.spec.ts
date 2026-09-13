@@ -27,6 +27,19 @@ for (const locale of ["en", "th", "zh-CN"] as const) {
     expect(Math.abs(firstProductTop - summaryTop)).toBeLessThanOrEqual(1);
     await expect(page.getByLabel(c.name, { exact: true })).toBeVisible();
     await expect(page.locator('input[autocomplete="street-address"],iframe[src*="stripe"]')).toHaveCount(0);
+    await page.getByRole("link", { name: `${c.details} →`, exact: true }).click();
+    const deepDive = page.getByTestId("pharmacy-deep-dive");
+    await expect(deepDive).toBeVisible();
+    await expect(deepDive.locator('nav a[href^="#s"]')).toHaveCount(7);
+    await expect(deepDive.locator('section[id^="s0"]')).toHaveCount(7);
+    await expect(deepDive.getByTestId("nutrient-why")).toContainText("Saved personalised nutrient reasoning");
+    await expect(deepDive.getByTestId("nutrient-decision")).toContainText("Saved explanation of the chosen dose");
+    await expect(deepDive.getByTestId("nutrient-safety")).toContainText("Saved ingredient-specific precaution");
+    await expect(deepDive.getByTestId("deep-dive-product")).toHaveCount(1);
+    await expect(deepDive).not.toContainText("Seven interaction screens ran");
+    await expect(deepDive).not.toContainText("Your complete plan is in your LINE");
+    await page.getByRole("link", { name: c.back, exact: true }).first().click();
+    await expect(page.getByTestId("pharmacy-order")).toBeVisible();
     await page.getByTestId("pharmacy-order").getByRole("checkbox").uncheck();
     await page.getByLabel(c.name, { exact: true }).fill("Counter Test");
     await expect(page.getByRole("button", { name: c.confirm, exact: true })).toBeDisabled();
@@ -47,6 +60,9 @@ for (const locale of ["en", "th", "zh-CN"] as const) {
     await expect(page.getByRole("heading", { name: c.details, exact: true })).toBeVisible();
     await expect(page.getByRole("heading", { name: c.ordered, exact: true })).toBeVisible();
     await expect(page.getByText(c.explanationPending, { exact: true })).toBeVisible();
+    await expect(page.getByTestId("deep-dive-receipt")).toContainText("17");
+    await expect(page.getByTestId("deep-dive-receipt")).toContainText(c.unpaid);
+    await expect(page.getByTestId("deep-dive-save").getByRole("link", { name: c.line, exact: true })).toHaveAttribute("href", /https:\/\/line\.me\/R\/share\?text=/);
     await page.screenshot({ path: test.info().outputPath(`pharmacy-${locale}.png`), fullPage: true });
   });
 }
