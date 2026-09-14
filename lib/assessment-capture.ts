@@ -78,19 +78,20 @@ export async function captureAssessment(bodyValue: unknown, options: { planId?: 
   if (invalidRequested) throw new FunnelError("Pharmacy not found", 404, "pharmacy_not_found");
   const rayHash = createHash("sha256").update(`pharmacy-acquisition:${options.idempotencyKey}`).digest("hex");
   const fallbackRay = `${rayHash.slice(0,8)}-${rayHash.slice(8,12)}-5${rayHash.slice(13,16)}-a${rayHash.slice(17,20)}-${rayHash.slice(20,32)}`;
-  const acquisition = pharmacy ? resolvePharmacyAcquisition(body.bpm, existing?.answers ?? resume?.answers, requestedPlanId ?? (isUuid(String(body.sessionId)) ? String(body.sessionId) : fallbackRay)) : null;
-  const answers = pharmacy ? mergeInStorePharmacyAnswers(rawAnswers, pharmacy, acquisition!) : rawAnswers;
+  let acquisition = pharmacy ? resolvePharmacyAcquisition(body.bpm, existing?.answers ?? resume?.answers, requestedPlanId ?? (isUuid(String(body.sessionId)) ? String(body.sessionId) : fallbackRay)) : null;
+  let answers = pharmacy ? mergeInStorePharmacyAnswers(rawAnswers, pharmacy, acquisition!) : rawAnswers;
   const skipHealthScore = Boolean(pharmacy);
   const sql = getSql();
   if (!sql) throw new Error("Database is not configured");
   const sessionId = typeof body.sessionId === "string" ? body.sessionId : null;
   if (sessionId && !isUuid(sessionId)) throw new FunnelError("Invalid questionnaire session", 400, "invalid_session");
+  let replayed = false;
   const result = await withDatabaseTransaction(sql, async tx => {
     const session = sessionId ? await claimFunnelRequest(tx, "assessment-session", sessionId, {}, requestedPlanId ?? undefined) : null;
     const claimed = await claimFunnelRequest(tx, "assessment-capture", options.idempotencyKey, {
       planId: requestedPlanId, sessionId, answers, locale, contactEmail, paymentId, expectedRevision: body.expectedRevision ?? null
     });
-    if (claimed.response) return claimed.response as CaptureReceipt;
+    if (claimed.response) { replayed = true; return claimed.response as CaptureReceipt; }
     const planId = requestedPlanId ?? session?.resourceId ?? claimed.resourceId;
     await tx`update public.funnel_requests set resource_id = ${planId}::uuid where scope = 'assessment-capture' and request_key = ${options.idempotencyKey}`;
     const [current] = await tx`select selected_plan, input_revision, answers from public.assessments where plan_id = ${planId}::uuid for no key update`;
@@ -101,6 +102,12 @@ export async function captureAssessment(bodyValue: unknown, options: { planId?: 
     const currentPharmacy = inStorePharmacyFromAnswers(current?.answers);
     if (current && (currentPharmacy?.id ?? null) !== (pharmacy?.id ?? null)) {
       throw new FunnelError("Assessment pharmacy cannot be changed", 409, "pharmacy_conflict");
+    }
+    // Session idempotency may resolve an existing assessment after admission.
+    // Reuse its attribution inside the already-owned capture transaction.
+    if (pharmacy && current) {
+      acquisition = resolvePharmacyAcquisition(body.bpm, current.answers, planId);
+      answers = mergeInStorePharmacyAnswers(rawAnswers, pharmacy, acquisition);
     }
     const selectedPlan = current?.selected_plan ?? (skipHealthScore ? DEFAULT_ASSESSMENT_PLAN : null);
     const snapshot = createAssessmentSnapshot({ planId, plan: selectedPlan ?? DEFAULT_ASSESSMENT_PLAN, status: "queued",
@@ -129,7 +136,7 @@ export async function captureAssessment(bodyValue: unknown, options: { planId?: 
     return receipt;
   });
   const bpm = bpmContextFromBody(body);
-  void writeBpmEvent({ actorType: "visitor", attribution: { ...bpm.attribution, ...(pharmacy && acquisition ? pharmacyBpmAttribution(pharmacy.slug, acquisition) : {}) }, eventName: requestedPlanId ? "assessment_recaptured" : "assessment_captured",
+  if (!replayed) void writeBpmEvent({ actorType: "visitor", attribution: { ...bpm.attribution, ...(pharmacy && acquisition ? pharmacyBpmAttribution(pharmacy.slug, acquisition) : {}) }, eventName: requestedPlanId ? "assessment_recaptured" : "assessment_captured",
     eventType: "funnel", locale, planId: result.planId, ray: acquisition?.ray ?? (typeof bpm.ray === "string" ? bpm.ray : null),
     properties: { revision: result.revision } }).catch(() => undefined);
   return result;
