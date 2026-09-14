@@ -17,6 +17,7 @@ export function verifyVersionExpectationEdit(before, after) {
   assert.equal(after, before.replaceAll(original, replacement), "Unexpected behavioral test change");
 }
 export const MCP_PACKAGES = {
+  "pharmacy-source": { version: "11.1.0", directory: "test/pharmacy", inventory: "test/pharmacy/source-impact.json", base: "88b3a2353d4b69a7294ad86f23e5cc79dd302fff", scope: "pharmacy_source_attribution" },
   "pharmacy-reveal": { version: "11.1.0", directory: "test/pharmacy-reveal", base: "c3651f350ef5c511a0b7fcd574124972067736a2", scope: "pharmacy_standard_reveal_and_progress" },
   "pharmacy-landing": { version: "11.1.0", directory: "test/pharmacy-landing", base: "bcd0384925d28980c6a0a39e308b4d702478adec", scope: "pharmacy_landing_reference_fidelity" },
   pharmacy: { version: "11.1.0", directory: "test/pharmacy", base: "6bd0542f7bc1d1d9b93fa67ac02dfa15146005c5", scope: "pharmacy_qr_unpaid_journey" },
@@ -38,7 +39,7 @@ export const MCP_PACKAGES = {
 };
 export const MCP721_STAGES = ["affected-tests", "typecheck", "release-diff-lint", "production-build", "unchanged-source-and-inputs"];
 export function packageStages(packageId) {
-  if (["pharmacy", "pharmacy-landing", "pharmacy-reveal"].includes(packageId)) return [...MCP721_STAGES.slice(0,4), "affected-browser-tests", "unchanged-source-and-inputs"];
+  if (["pharmacy", "pharmacy-landing", "pharmacy-reveal", "pharmacy-source"].includes(packageId)) return [...MCP721_STAGES.slice(0,4), "affected-browser-tests", "unchanged-source-and-inputs"];
   if (packageId === "streaming") return ["affected-tests", "no-new-locks", "completion-comparison", ...MCP721_STAGES.slice(1)];
   if (packageId === "availability") return ["affected-tests", "no-new-locks", ...MCP721_STAGES.slice(1,4), "affected-browser-tests", "unchanged-source-and-inputs"];
   if (packageId === "refinement") return ["affected-tests", "fresh-standard-performance", "no-new-locks", ...MCP721_STAGES.slice(1)];
@@ -90,10 +91,10 @@ export function checkMcp721Proof(file, expected, packageId = "721") {
     assert.ok(comparison.semanticSha256 && comparison.fixtureSha256);
     assert.equal(build.sourceCommit, expected.sourceCommit);
   }
-  if (["pharmacy", "pharmacy-landing", "pharmacy-reveal"].includes(packageId)) {
+  if (["pharmacy", "pharmacy-landing", "pharmacy-reveal", "pharmacy-source"].includes(packageId)) {
     assert.equal(json("browser-results.json").passed, true);
     assert.equal(build.sourceCommit, expected.sourceCommit);
-    assert.deepEqual(inventory, JSON.parse(readFileSync(`${definition.directory}/impact.json`)));
+    assert.deepEqual(inventory, JSON.parse(readFileSync(definition.inventory ?? `${definition.directory}/impact.json`)));
   }
   if (packageId === "availability") {
     const locks = json("no-new-locks.json");

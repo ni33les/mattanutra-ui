@@ -1,3 +1,4 @@
+import type { PharmacyAcquisition } from "@/lib/pharmacy-acquisition";
 import { pharmacyAnalysisPolicy } from "@/lib/pharmacy-journey";
 import { FunnelError } from "@/lib/funnel-errors";
 import type postgres from "postgres";
@@ -69,7 +70,8 @@ export function assessmentSkipsHealthScore(answers: unknown) {
 
 export function mergeInStorePharmacyAnswers(
   answers: unknown,
-  pharmacy: PharmacyOrganisation
+  pharmacy: PharmacyOrganisation,
+  acquisition?: PharmacyAcquisition
 ) {
   const record =
     answers && typeof answers === "object" && !Array.isArray(answers)
@@ -79,6 +81,7 @@ export function mergeInStorePharmacyAnswers(
   return {
     ...record,
     [IN_STORE_PHARMACY_ANSWERS_KEY]: {
+      ...(acquisition ? { acquisition } : {}),
       pricingBasis: pharmacyAnalysisPolicy.pricingBasis,
       countryCode: pharmacy.countryCode,
       currency: pharmacy.currency,

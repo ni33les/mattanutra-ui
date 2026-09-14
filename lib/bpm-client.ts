@@ -1,3 +1,4 @@
+import { pharmacyBpmAttribution, pharmacySource } from "@/lib/pharmacy-acquisition";
 import type { Locale } from "@/lib/i18n";
 
 type BpmAttribution = Readonly<{
@@ -86,11 +87,20 @@ function storageSet(key: string, value: string) {
   }
 }
 
+function pharmacyContext() {
+  if (!browserReady()) return null;
+  const element = document.querySelector<HTMLElement>("[data-pharmacy-source]");
+  return element?.dataset.pharmacyRay && element.dataset.pharmacySlug ? {
+    slug: element.dataset.pharmacySlug, acquisition: {source: pharmacySource(element.dataset.pharmacySource, "unknown"), ray: element.dataset.pharmacyRay}
+  } : null;
+}
 export function getBpmRay() {
   if (!browserReady()) {
     return "";
   }
 
+  const pharmacy = pharmacyContext();
+  if (pharmacy) return pharmacy.acquisition.ray;
   const existing = storageGet(RAY_KEY);
 
   if (existing) {
@@ -294,6 +304,8 @@ export function getBpmAttribution() {
   }
 
   const params = new URLSearchParams(window.location.search);
+  const pharmacy = pharmacyContext();
+  if (pharmacy) return { ...currentAttribution(), ...pharmacyBpmAttribution(pharmacy.slug, pharmacy.acquisition) };
   const stored = storageGet(ATTRIBUTION_KEY);
 
   if (stored && !hasAttributionParams(params)) {

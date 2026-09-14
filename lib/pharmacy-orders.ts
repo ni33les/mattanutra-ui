@@ -2,6 +2,8 @@ import { hasHealthScoreAiCopy } from "@/lib/healthscore-readiness";
 import { randomUUID } from "node:crypto";
 import { getSql, withDatabaseTransaction } from "@/lib/db";
 import { getStoredAssessmentPrefill, getStoredFormulationRead, isUuid, toJsonValue } from "@/lib/assessment-store";
+import { pharmacyAcquisitionFromAnswers, pharmacyBpmAttribution } from "@/lib/pharmacy-acquisition";
+import { writeBpmEvent } from "@/lib/bpm";
 import { inStorePharmacyFromAnswers, resolvePharmacyOrganisation } from "@/lib/pharmacy-in-store";
 import { pharmacyOrganisationSlug } from "@/lib/pharmacy-journey";
 import { preparePharmacyOrder, type PharmacyOrderProduct } from "@/lib/pharmacy-order-input";
@@ -100,7 +102,8 @@ export async function createPharmacyOrder(value: unknown, key: string): Promise<
   const preparedReceipt: PharmacyOrderReceipt = { id: orderId, reference: `PH-${orderId.slice(0, 8).toUpperCase()}`,
     status: "unpaid", pharmacyName: quote.pharmacy.name, customerName: prepared.customerName,
     revision: quote.assessment.revision, currency: prepared.currency, total: prepared.total, lines: prepared.lines };
-  const metadata = toJsonValue({ planId, locale: quote.assessment.locale, paymentMethod: "pay_at_till", paymentStatus: "unpaid", receipt: preparedReceipt, result: quote.result });
+  const acquisition = pharmacyAcquisitionFromAnswers(quote.assessment.answers) ?? {source: "unknown" as const, ray: planId};
+  const metadata = toJsonValue({ acquisition, pharmacySlug: quote.pharmacy.slug, planId, locale: quote.assessment.locale, paymentMethod: "pay_at_till", paymentStatus: "unpaid", receipt: preparedReceipt, result: quote.result });
   const orderLines = prepared.lines.map(p => ({ customer_order_id: orderId, organisation_id: quote.pharmacy.id,
     product_id: p.productId, quantity_ordered: p.quantity, retail_price_amount: p.unitPrice }));
   const receipt = await withDatabaseTransaction(sql, async tx => {
@@ -121,6 +124,10 @@ export async function createPharmacyOrder(value: unknown, key: string): Promise<
       metadata: { source: "pharmacy", paymentStatus: "unpaid" } });
     return receipt;
   });
+  void writeBpmEvent({ eventName: "retail_order_created", eventType: "fulfillment", eventStatus: "placed",
+    actorType: "visitor", planId, locale, ray: acquisition.ray, attribution: pharmacyBpmAttribution(quote.pharmacy.slug, acquisition),
+    properties: { orderId: receipt.id, organisationId: quote.pharmacy.id, paymentStatus: "unpaid", source: "pharmacy" }
+  }).catch(() => undefined);
   return receipt;
 }
 

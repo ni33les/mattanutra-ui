@@ -37,7 +37,11 @@ for (const view of reference.views) {
       });
       expect(canonicalCss(css), expected.selector).toEqual(canonicalCss(expected.css));
     }
-    await expect(hero.locator(".primary-cta")).toHaveAttribute("href", `/${view.locale}/retail/${slug}/quiz`);
+    const href = await hero.locator(".primary-cta").getAttribute("href");
+    const target = new URL(href!, page.url());
+    expect(target.pathname).toBe(`/${view.locale}/retail/${slug}/quiz`);
+    expect(target.searchParams.get("session")).toBeTruthy();
+    expect(target.searchParams.get("source")).toBe("in_store");
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(view.width);
     await page.screenshot({ path: info.outputPath("landing.png"), fullPage: true });
   });

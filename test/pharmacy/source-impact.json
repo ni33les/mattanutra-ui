@@ -1,0 +1,80 @@
+{
+  "releaseBase": "88b3a2353d4b69a7294ad86f23e5cc79dd302fff",
+  "scope": "pharmacy_source_attribution",
+  "inputs": [
+    "lib/pharmacy-acquisition.ts",
+    "test/helpers/pharmacy-fixture.ts",
+    "test/pharmacy-landing/reference.json"
+  ],
+  "files": [
+    {
+      "file": "test/pharmacy/source.test.ts",
+      "expectedCases": 6,
+      "reason": "Source resolution, browser isolation, generation identity and funnel aggregation"
+    },
+    {
+      "file": "test/pharmacy/sources.integration.test.ts",
+      "expectedCases": 4,
+      "reason": "Capture/resume source persistence, durable unpaid-order counts and replay",
+      "database": true
+    },
+    {
+      "file": "test/assessment-capture.integration.test.ts",
+      "expectedCases": 5,
+      "reason": "Shared capture input validation, revision fencing and idempotent recovery",
+      "database": true
+    },
+    {
+      "file": "test/assessment-revisions.integration.test.ts",
+      "expectedCases": 7,
+      "reason": "Generation payload isolation and stale task fencing after metadata changes",
+      "database": true
+    },
+    {
+      "file": "test/pharmacy-orders.integration.test.ts",
+      "expectedCases": 7,
+      "reason": "Ownership, concurrent order replay, saved resume and frozen receipts",
+      "database": true
+    },
+    {
+      "file": "test/pharmacy-journey.test.ts",
+      "expectedCases": 4,
+      "reason": "Shared pharmacy routing and unchanged RRP price and seller rules"
+    },
+    {
+      "file": "test/pharmacy-orders.test.ts",
+      "expectedCases": 3,
+      "reason": "Unchanged selected product quantities and price validation"
+    },
+    {
+      "file": "test/customer-insights.test.ts",
+      "expectedCases": 7,
+      "reason": "Existing customer insight assembly and source export consumers"
+    },
+    {
+      "file": "test/facebook-pixel-static.test.ts",
+      "expectedCases": 12,
+      "reason": "Shared BPM/page tracking keeps existing Meta event and deduplication behaviour"
+    }
+  ],
+  "browser": [
+    {
+      "file": "test/e2e/pharmacy-source.spec.ts",
+      "expectedCases": 8,
+      "grep": "PHARM-SOURCE",
+      "reason": "Two explicit QR sources through redirects, capture context and reload in three locales"
+    },
+    {
+      "file": "test/e2e/pharmacy-journey.spec.ts",
+      "expectedCases": 4,
+      "grep": "PHARM-BROWSER",
+      "reason": "Unchanged quiz, ordinary web welcome, unpaid order and deep dive"
+    },
+    {
+      "file": "test/e2e/pharmacy-landing.spec.ts",
+      "expectedCases": 5,
+      "grep": "PHARM-LANDING",
+      "reason": "Supplied landing design remains pixel-consistent with source-carrying links"
+    }
+  ]
+}

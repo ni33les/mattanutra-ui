@@ -10,7 +10,7 @@ const headlines = {
   "zh-CN": ["不再猜测，", "开始了解。"]
 };
 
-export function PharmacyLanding({ locale, slug, name }: { locale: Locale; slug: string; name: string }) {
+export function PharmacyLanding({ locale, slug, name, query = {} }: { locale: Locale; slug: string; name: string; query?: Record<string, string | undefined> }) {
   const copy = pharmacyCopy[locale];
   const thai = locale === "th";
   return <div className={styles.landing} lang={locale} data-testid="pharmacy-landing" aria-label={name}>
@@ -35,7 +35,7 @@ export function PharmacyLanding({ locale, slug, name }: { locale: Locale; slug: 
           <p className="result-copy">The result is a supplement plan built around you.</p>
         </> : <p className="science-copy">{copy.body}</p>}
       </>}
-      <Link className="primary-cta" href={pharmacyPath(locale, slug, "quiz")}>
+      <Link className="primary-cta" href={pharmacyPath(locale, slug, "quiz", query)}>
         <span className="cta-label"><span>{copy.start}</span>{" "}<span>→</span></span>
       </Link>
       <div className="commitment-line" aria-label={thai ? "รายละเอียดแบบประเมิน" : locale === "en" ? "Assessment details" : "评估详情"}>

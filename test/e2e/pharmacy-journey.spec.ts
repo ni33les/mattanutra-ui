@@ -17,7 +17,9 @@ for (const locale of ["en", "th", "zh-CN"] as const) {
     await page.goto(`/${locale}/retail/${fixture.slug}/landing`);
     await expect(page.getByTestId("pharmacy-landing")).toBeVisible();
     await page.getByRole("link", { name: `${c.start} →`, exact: true }).click();
-    await expect(page).toHaveURL(new RegExp(`/retail/${fixture.slug}/quiz\\?session=`));
+    await expect(page).toHaveURL(new RegExp(`/retail/${fixture.slug}/quiz\\?`));
+    expect(new URL(page.url()).searchParams.get("session")).toBeTruthy();
+    expect(new URL(page.url()).searchParams.get("source")).toBe("in_store");
     await expect(page.locator(".mn-titlebar--quiz")).toBeVisible();
     const composer = page.getByTestId("question-answers");
     await expect(composer.getByRole("textbox")).toBeVisible();

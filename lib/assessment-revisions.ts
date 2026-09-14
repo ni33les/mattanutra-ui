@@ -1,3 +1,4 @@
+import { withoutPharmacyAcquisition } from "@/lib/pharmacy-acquisition";
 import { historicalAssessmentReadJoin, historicalResult } from "@/lib/historical-assessment-read";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { createHash } from "node:crypto";
@@ -25,7 +26,7 @@ export function generationTaskId(taskId: string, generation: GenerationInput) {
 
 const generationScope = new AsyncLocalStorage<{ planId: string; input: GenerationInput }>();
 export function withGenerationInput<T>(planId: string, input: GenerationInput, work: () => T): T {
-  return generationScope.run({ planId, input }, work);
+  return generationScope.run({ planId, input: { ...input, answers: withoutPharmacyAcquisition(input.answers) } }, work);
 }
 export function generationLocale(planId: string | null | undefined) {
   const scope = generationScope.getStore();
@@ -46,7 +47,7 @@ function canonical(value: unknown): unknown {
   return value;
 }
 export function assessmentInputHash(answers: unknown) {
-  return createHash("sha256").update(JSON.stringify(canonical(answers))).digest("hex");
+  return createHash("sha256").update(JSON.stringify(canonical(withoutPharmacyAcquisition(answers)))).digest("hex");
 }
 export function generationInput(payload: unknown): GenerationInput | null {
   if (!payload || typeof payload !== "object") return null;
@@ -64,7 +65,7 @@ export async function loadGenerationInput(sql: postgres.Sql | postgres.Transacti
     return scope.input;
   }
   return {
-    answers: row.answers, revision: Number(row.input_revision), inputHash: row.input_hash ?? assessmentInputHash(row.answers),
+    answers: withoutPharmacyAcquisition(row.answers), revision: Number(row.input_revision), inputHash: row.input_hash ?? assessmentInputHash(row.answers),
     locale: isLocale(locale) ? locale : isLocale(row.locale) ? row.locale : "en", generatorVersion: FUNNEL_GENERATOR_VERSION
   };
 }

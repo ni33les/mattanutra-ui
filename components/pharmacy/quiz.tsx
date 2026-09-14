@@ -1,3 +1,6 @@
+import type { ReactNode } from "react";
+import { PharmacyAcquisitionContext } from "./acquisition-context";
+import { pharmacyAcquisitionFromAnswers, pharmacySource } from "@/lib/pharmacy-acquisition";
 import { randomUUID } from "node:crypto";
 import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
@@ -20,17 +23,20 @@ export async function PharmacyQuiz({ locale, pharmacy, query }: { locale: Locale
   if (resume && query.plan && resume.planId !== query.plan) notFound();
   if (query.plan && !prefill && !resume) notFound();
   if (resume?.paymentId) notFound();
-  if (!query.session && !planId) redirect(pharmacyPath(locale, pharmacy.slug, "quiz", { ...query, session: randomUUID() }));
+  if (!query.session && !planId) redirect(pharmacyPath(locale, pharmacy.slug, "quiz", { ...query, session: randomUUID(), source: pharmacySource(query.source) }));
   if (query.session && !isUuid(query.session)) notFound();
   const sessionId = query.session || resume?.draftId || planId;
+  const savedAnswers = prefill?.answers ?? resume?.answers;
+  const acquisition = pharmacyAcquisitionFromAnswers(savedAnswers) ?? {source: savedAnswers ? "unknown" as const : pharmacySource(query.source), ray: sessionId!};
+  const wrap = (child: ReactNode) => <PharmacyAcquisitionContext slug={pharmacy.slug} acquisition={acquisition}>{child}</PharmacyAcquisitionContext>;
   const requestHeaders = await headers();
   const showDevShortcut = devShortcutsEnabledForHost(requestHeaders.get("x-forwarded-host") ?? requestHeaders.get("host"));
   const flag = process.env.NEXT_PUBLIC_CHAT_QUESTIONNAIRE_V6 ?? process.env.NEXT_PUBLIC_CHAT_QUESTIONNAIRE_V5;
-  if (flag === "0" || flag === "false") return <AssessmentFlow locale={locale} initialStage="quiz" pharmacyId={pharmacy.slug} skipHealthScore
+  if (flag === "0" || flag === "false") return wrap(<AssessmentFlow locale={locale} initialStage="quiz" pharmacyId={pharmacy.slug} skipHealthScore
     sessionId={sessionId} assessmentRevision={prefill?.revision ?? 0} serverUpdatedAt={prefill?.updatedAt ?? resume?.updatedAt}
     prefillAnswers={prefill?.answers ?? resume?.answers ?? null} prefillContactEmail={prefill?.contactEmail ?? resume?.contactEmail ?? null}
-    returningPlanId={planId} resumeToken={query.resume} showDevShortcut={showDevShortcut} />;
-  return <ChatQuestionnaire locale={locale} pharmacyId={pharmacy.slug} skipHealthScore sessionId={sessionId} returningPlanId={planId}
+    returningPlanId={planId} resumeToken={query.resume} showDevShortcut={showDevShortcut} />);
+  return wrap(<ChatQuestionnaire locale={locale} pharmacyId={pharmacy.slug} skipHealthScore sessionId={sessionId} returningPlanId={planId}
     resumeToken={query.resume} reviewRequested={query.edit === "1" || query.reassessment === "1"} showDevShortcut={showDevShortcut}
-    serverDraft={prefill ? { ...prefill, captured: true, paymentId: "" } : resume ? { ...resume, revision: 0, captured: false } : null} />;
+    serverDraft={prefill ? { ...prefill, captured: true, paymentId: "" } : resume ? { ...resume, revision: 0, captured: false } : null} />);
 }

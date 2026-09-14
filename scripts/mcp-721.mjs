@@ -13,7 +13,7 @@ assert.ok(MCP_PACKAGES[packageId], "Unknown work package");
 const args = rawArgs[0]?.startsWith("--package=") ? rawArgs.slice(1) : [...rawArgs];
 const sliceIndex = args.indexOf("--slice");
 const slice = sliceIndex < 0 ? null : args.splice(sliceIndex, 2)[1];
-assert.ok(!slice || (mode === "test" && ["efficiency", "practical", "simple-plan", "boundaries", "payment-replay", "web-matching", "refinement", "availability", "streaming", "pharmacy"].includes(packageId)), "Slices are limited to efficiency development tests");
+assert.ok(!slice || (mode === "test" && ["efficiency", "practical", "simple-plan", "boundaries", "payment-replay", "web-matching", "refinement", "availability", "streaming", "pharmacy", "pharmacy-source"].includes(packageId)), "Slices are limited to efficiency development tests");
 const definition = MCP_PACKAGES[packageId], MCP721_BASE = definition.base;
 assert.ok(["test", "validate"].includes(mode));
 const inventory = JSON.parse(readFileSync(definition.inventory ?? `${definition.directory}/impact.json`, "utf8"));
@@ -99,7 +99,7 @@ for (const database of (packageId === "practical" && mode === "validate" ? [] : 
     const migration = await runBatch("lock-boundaries-schema", ["--experimental-strip-types", "--import", "./scripts/register-ts-path-loader.mjs", "scripts/apply-matching-lock-boundaries.ts"], env, output);
     assert.ok(migration.passed, "Isolated lock migration failed");
   }
-  batches.push(await runBatch(label, ["--test", "--test-concurrency=1", "--experimental-test-module-mocks", "--experimental-strip-types", ...(packageId === "web-matching" ? ["--loader", "./test/payment-return/next-loader.mjs"] : []), ...(!database || ["payment-replay", "pharmacy"].includes(packageId) ? ["--import", "./test/helpers/offline-network.mjs"] : []), "--import", "./scripts/register-ts-path-loader.mjs", ...selected], env, output));
+  batches.push(await runBatch(label, ["--test", "--test-concurrency=1", "--experimental-test-module-mocks", "--experimental-strip-types", ...(packageId === "web-matching" ? ["--loader", "./test/payment-return/next-loader.mjs"] : []), ...(!database || ["payment-replay", "pharmacy", "pharmacy-source"].includes(packageId) ? ["--import", "./test/helpers/offline-network.mjs"] : []), "--import", "./scripts/register-ts-path-loader.mjs", ...selected], env, output));
   assert.ok(batches.at(-1).passed, `${label} failed; later stages were not started`);
   events.push(...readFileSync(resolve(output, `${label}-events.jsonl`), "utf8").trim().split("\n").filter(Boolean).map(line => JSON.parse(line)));
 }
@@ -189,7 +189,7 @@ if (mode === "validate") {
       TEST_DB_URL: process.env.TEST_DB_URL, DB_URL: process.env.TEST_DB_URL, DB_WORKER_URL: process.env.TEST_DB_URL,
       DB_ALLOW_DIRECT_CONNECTION: "true", MATCHER_TEST_EVIDENCE_DIR: resolve(output, "mcp-regression") });
   }
-  if (["efficiency", "practical", "availability", "pharmacy", "pharmacy-landing", "pharmacy-reveal"].includes(packageId)) {
+  if (["efficiency", "practical", "availability", "pharmacy", "pharmacy-landing", "pharmacy-reveal", "pharmacy-source"].includes(packageId)) {
     const { runEfficiencyBrowser } = await import("./service-efficiency/release-stages.mjs");
     await runEfficiencyBrowser(output, isolated ?? { ...safe, TEST_DB_URL: process.env.TEST_DB_URL, DB_URL: process.env.TEST_DB_URL, DB_WORKER_URL: process.env.TEST_DB_URL, DB_ALLOW_DIRECT_CONNECTION: "true", DB_POOL_MAX: "3" }, inventory.browser);
     stages.push({ label: "affected-browser-tests", passed: true });

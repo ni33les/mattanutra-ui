@@ -53,6 +53,7 @@ export async function POST(request: Request) {
 
   try {
     const draft = await createAssessmentResumeDraft({
+      bpm,
       answers: body.answers,
       contactEmail: body.contactEmail,
       locale,

@@ -1,4 +1,5 @@
 "use client";
+import { getBpmPayload } from "@/lib/bpm-client";
 import { useCallback, useEffect, useRef, useState, type MutableRefObject } from "react";
 import { finalizeAssessmentCapture } from "@/lib/questionnaire/agents/capture-agent";
 import type { QuestionnaireState } from "@/lib/questionnaire/types";
@@ -33,7 +34,7 @@ export function useQuestionnaireCapture(input: {
       if (!receipt) {
         draft = { ...draft, state: { ...state, phase: "completing" } };
         options.save(draft);
-        const captured = await finalizeAssessmentCapture({ state: draft.state, contactEmail: draft.contactEmail,
+        const captured = await finalizeAssessmentCapture({ bpm: getBpmPayload(), state: draft.state, contactEmail: draft.contactEmail,
           planId: options.returningPlanId || state.planId, expectedRevision: draft.revision || undefined,
           paymentId: options.paymentId || draft.paymentId, pharmacyId: options.pharmacyId, resumeToken: options.resumeToken,
           fetchImpl: (url, init) => fetchWithBodyDeadline(url, { ...init, signal: controller.signal }, 30_000) });

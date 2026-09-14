@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+import { resolvePharmacyAcquisition, pharmacyBpmAttribution } from "@/lib/pharmacy-acquisition";
 import { assessmentInputHash, loadGenerationInput, withGenerationInput } from "@/lib/assessment-revisions";
 import { captureInputProvenance, inputProvenance } from "@/lib/assessment-input-provenance";
 import { toAssessmentAnswers } from "@/lib/questionnaire/normalize";
@@ -74,7 +76,10 @@ export async function captureAssessment(bodyValue: unknown, options: { planId?: 
   const existing = requestedPlanId ? await getStoredAssessmentPrefill(requestedPlanId) : null;
   const { invalidRequested, pharmacy } = await resolveCapturePharmacy(body.pharmacyId, existing?.answers ?? resume?.answers);
   if (invalidRequested) throw new FunnelError("Pharmacy not found", 404, "pharmacy_not_found");
-  const answers = pharmacy ? mergeInStorePharmacyAnswers(rawAnswers, pharmacy) : rawAnswers;
+  const rayHash = createHash("sha256").update(`pharmacy-acquisition:${options.idempotencyKey}`).digest("hex");
+  const fallbackRay = `${rayHash.slice(0,8)}-${rayHash.slice(8,12)}-5${rayHash.slice(13,16)}-a${rayHash.slice(17,20)}-${rayHash.slice(20,32)}`;
+  const acquisition = pharmacy ? resolvePharmacyAcquisition(body.bpm, existing?.answers ?? resume?.answers, requestedPlanId ?? (isUuid(String(body.sessionId)) ? String(body.sessionId) : fallbackRay)) : null;
+  const answers = pharmacy ? mergeInStorePharmacyAnswers(rawAnswers, pharmacy, acquisition!) : rawAnswers;
   const skipHealthScore = Boolean(pharmacy);
   const sql = getSql();
   if (!sql) throw new Error("Database is not configured");
@@ -124,8 +129,8 @@ export async function captureAssessment(bodyValue: unknown, options: { planId?: 
     return receipt;
   });
   const bpm = bpmContextFromBody(body);
-  void writeBpmEvent({ actorType: "visitor", attribution: bpm.attribution, eventName: requestedPlanId ? "assessment_recaptured" : "assessment_captured",
-    eventType: "funnel", locale, planId: result.planId, ray: typeof bpm.ray === "string" ? bpm.ray : null,
+  void writeBpmEvent({ actorType: "visitor", attribution: { ...bpm.attribution, ...(pharmacy && acquisition ? pharmacyBpmAttribution(pharmacy.slug, acquisition) : {}) }, eventName: requestedPlanId ? "assessment_recaptured" : "assessment_captured",
+    eventType: "funnel", locale, planId: result.planId, ray: acquisition?.ray ?? (typeof bpm.ray === "string" ? bpm.ray : null),
     properties: { revision: result.revision } }).catch(() => undefined);
   return result;
 }

@@ -28,3 +28,16 @@ Only `db-rollout/pharmacy-orders.sql` is applied: it adds `pharmacy` to the sour
 - PHARM-07: shop filtering uses the candidate's actual organisation UUID, not the public encoded seller ID.
 - PHARM-PG-05: orders paid directly to a pharmacy are excluded from platform settlement replay.
 - Existing ordinary web captures, complete-advice gates and online checkout session replay remain maintained controls.
+
+## QR acquisition sources
+
+- Poster: `/retail/delight?source=in_store`
+- Business card: `/retail/delight?source=business_card`
+
+Use any existing pharmacy slug in place of `delight`. Both links use the same pharmacy flow and pay at the till. New untagged entries default to in-store; malformed explicit sources and historical entries without evidence are unknown. The initial redirect preserves query parameters and assigns a session for source correlation. Saved assessment/resume attribution wins over later URL or browser state.
+
+BPM uses `trafficSource=pharmacy`, the canonical pharmacy slug in `sourceChannel`, and `in_store|business_card|unknown` in `sourceDetail`. Acquisition is stored in `answers.inStorePharmacy.acquisition` and new order metadata; it is excluded from generation identity and worker inputs. No historical backfill or pricing change is performed.
+
+Conversions → Pharmacy QR journeys shows both sources and unknowns by pharmacy, respecting the selected period and locale. Orders are durable unpaid orders, not payment conversions. Repeated tracking events/retries count once. Customer Intelligence includes the pharmacy/source label in its source field and CSV export.
+
+Scoped validation: `node scripts/mcp-721.mjs validate --package=pharmacy-source --output /absolute/evidence/path` with the usual isolated `TEST_DB_URL`. Deploy with the existing `--pharmacy-attestation` and `--pharmacy-build` arguments. This source-only package verifies the existing schema without running migrations.

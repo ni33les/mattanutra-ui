@@ -1,5 +1,6 @@
 "use client";
 
+import { PharmacySourceFunnelTable } from "./pharmacy-source-funnel";
 import { useState } from "react";
 import type { AdminFlowData } from "@/lib/admin-flow-data";
 import type { Locale } from "@/lib/i18n";
@@ -102,6 +103,7 @@ export function AdminFlowView({
           showTargets={true}
         />
       </div>
+      <PharmacySourceFunnelTable rows={flowData.pharmacySources ?? []} locale={locale} />
     </>
   );
 }

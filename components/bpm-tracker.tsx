@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { trackBpmEvent } from "@/lib/bpm-client";
 import { localeRoutePattern, type Locale } from "@/lib/i18n";
 
@@ -10,6 +10,11 @@ const localePattern = localeRoutePattern();
 const revealPathPattern = "nutrition\\/reveal";
 
 function pageEventForPath(pathname: string) {
+  const pharmacyStep = pathname.match(new RegExp(`^/(${localePattern})/retail/[^/]+/(landing|quiz|progress|reveal|plan)$`))?.[2];
+  if (pharmacyStep) return {
+    eventName: ({landing: "pharmacy_landing_viewed", quiz: "assessment_viewed", progress: "pharmacy_processing_viewed", reveal: "formulation_page_viewed", plan: "pharmacy_deep_dive_viewed"} as Record<string, string>)[pharmacyStep],
+    eventType: "funnel"
+  };
   if (new RegExp(`^/(${localePattern})$`).test(pathname)) {
     return { eventName: "home_viewed", eventType: "traffic" };
   }
@@ -41,6 +46,7 @@ function pageEventForPath(pathname: string) {
 
 export function BpmTracker({ locale }: Readonly<{ locale: Locale }>) {
   const pathname = usePathname();
+  const search = useSearchParams().toString();
   const lastPageKey = useRef("");
   const isAdminPath = new RegExp(`^/(${localePattern})/admin(/|$)`).test(pathname);
 
@@ -55,18 +61,21 @@ export function BpmTracker({ locale }: Readonly<{ locale: Locale }>) {
       return;
     }
 
-    lastPageKey.current = pageKey;
-    const pageEvent = pageEventForPath(pathname);
-
-    trackBpmEvent(pageEvent.eventName, {
-      eventType: pageEvent.eventType,
-      locale,
-      properties: {
-        pageKey,
-        title: document.title
-      }
-    });
-  }, [isAdminPath, locale, pathname]);
+    const emit = () => {
+      // A streamed pharmacy page may arrive after the shared layout. Wait for its
+      // authoritative context instead of attributing it to a previous web visit.
+      if (/\/retail\/[^/]+\//.test(pathname) && !document.querySelector("[data-pharmacy-source]")) return false;
+      lastPageKey.current = pageKey;
+      const pageEvent = pageEventForPath(pathname);
+      trackBpmEvent(pageEvent.eventName, { eventType: pageEvent.eventType, locale,
+        properties: { pageKey, title: document.title } });
+      return true;
+    };
+    if (emit()) return;
+    const observer = new MutationObserver(() => { if (emit()) observer.disconnect(); });
+    observer.observe(document.body, { childList: true, subtree: true });
+    return () => observer.disconnect();
+  }, [isAdminPath, locale, pathname, search]);
 
   useEffect(() => {
     if (isAdminPath) {

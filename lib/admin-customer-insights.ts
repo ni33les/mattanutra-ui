@@ -1,3 +1,5 @@
+import { pharmacyAcquisitionFromAnswers, pharmacySourceLabels } from "@/lib/pharmacy-acquisition";
+import { inStorePharmacyFromAnswers } from "@/lib/pharmacy-in-store";
 import {
   adminDashboardRangeStart,
   type AdminDashboardRange
@@ -1190,16 +1192,21 @@ async function loadOrderInsights(
     plan_id: string;
     updated_at: Date | string | null;
   }>>`
-    select distinct on (retail_checkout_payments.plan_id)
-      retail_checkout_payments.plan_id::text,
-      retail_customer_orders.order_number,
-      coalesce(retail_customer_orders.status, retail_checkout_payments.status) as order_status,
-      coalesce(retail_customer_orders.updated_at, retail_checkout_payments.updated_at) as updated_at
-    from public.retail_checkout_payments
-    left join public.retail_customer_orders
-      on retail_customer_orders.id = retail_checkout_payments.retail_customer_order_id
-    where retail_checkout_payments.plan_id = any(${planIds}::uuid[])
-    order by retail_checkout_payments.plan_id, retail_checkout_payments.created_at desc
+    select distinct on (plan_id) plan_id, order_number, order_status, updated_at
+    from (
+      select p.plan_id::text, o.order_number,
+        coalesce(o.status, p.status) as order_status,
+        coalesce(o.updated_at, p.updated_at) as updated_at, p.created_at
+      from public.retail_checkout_payments p
+      left join public.retail_customer_orders o on o.id = p.retail_customer_order_id
+      where p.plan_id = any(${planIds}::uuid[])
+      union all
+      select o.metadata->>'planId', o.order_number,
+        'unpaid' as order_status, o.updated_at, o.created_at
+      from public.retail_customer_orders o
+      where o.source='pharmacy' and o.metadata->>'planId' = any(${planIds}::text[])
+    ) orders
+    order by plan_id, created_at desc
   `;
 
   return new Map(
@@ -1308,7 +1315,9 @@ function buildCustomerDrafts(input: Readonly<{
     const summary = answerSummary(row.answer_summary);
     const demographics = demographicsFromAnswers(row.answers);
     const healthScore = healthScoreInsight(row.health_score);
-    const entitlement = resolvePanyaEntitlement(row.selected_plan);
+    const pharmacy = inStorePharmacyFromAnswers(row.answers);
+    const selectedPlan = pharmacy ? null : row.selected_plan;
+    const entitlement = resolvePanyaEntitlement(selectedPlan);
     const archetype = archetypeFromCustomerSignals({
       demographics,
       entitlement,
@@ -1316,6 +1325,7 @@ function buildCustomerDrafts(input: Readonly<{
       goals: summary.goals
     });
     const panya = input.communications.get(row.plan_id) ?? emptyPanyaActivity;
+    const acquisition = pharmacyAcquisitionFromAnswers(row.answers);
     const lead = input.leads.get(row.plan_id);
     const order = input.orders.get(row.plan_id);
     const capturedAt = new Date(row.captured_at).toISOString();
@@ -1338,7 +1348,7 @@ function buildCustomerDrafts(input: Readonly<{
       entitlement,
       entitlementLabel: panyaEntitlementLabel(entitlement),
       firstName: row.first_name,
-      funnelStage: lead?.funnelStage ?? (row.selected_plan ? "paid" : "assessment"),
+      funnelStage: pharmacy ? (order ? "order_placed_unpaid" : "assessment") : lead?.funnelStage ?? (row.selected_plan ? "paid" : "assessment"),
       goals: summary.goals,
       healthScore,
       identifiable: Boolean(
@@ -1354,8 +1364,8 @@ function buildCustomerDrafts(input: Readonly<{
       productInterests: input.products.get(row.plan_id) ?? [],
       profile: summary.profile,
       region: summary.region,
-      selectedPlan: row.selected_plan,
-      source: lead?.source ?? null,
+      selectedPlan,
+      source: pharmacy ? `${pharmacy.name || pharmacy.slug} · ${pharmacySourceLabels[locale][acquisition?.source ?? "unknown"]}` : lead?.source ?? null,
       status: row.status,
       supplementInterests: input.supplements.get(row.plan_id) ?? [],
       updatedAt

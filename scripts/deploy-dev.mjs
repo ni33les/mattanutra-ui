@@ -127,7 +127,7 @@ async function main() {
     if (await runCapture("git", ["status", "--porcelain"])) throw new Error("Validated source must remain clean");
     const sha = await runCapture("git", ["rev-parse", "HEAD"]);
     const proof = JSON.parse(await readFile(file, "utf8"));
-    const presentationPackage = { pharmacy_landing_reference_fidelity: "pharmacy-landing", pharmacy_standard_reveal_and_progress: "pharmacy-reveal" }[proof.scope];
+    const presentationPackage = { pharmacy_source_attribution: "pharmacy-source", pharmacy_landing_reference_fidelity: "pharmacy-landing", pharmacy_standard_reveal_and_progress: "pharmacy-reveal" }[proof.scope];
     const packageId = presentationPackage ?? "pharmacy";
     const identity = mcp721Identity(sourceManifest().sha256, sha, packageId);
     checkMcp721Proof(file, identity, packageId);

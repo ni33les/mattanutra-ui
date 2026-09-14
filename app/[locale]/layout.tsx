@@ -112,7 +112,7 @@ export default async function LocaleLayout({
           thaiSerifFont.variable
         ].join(" ")}
       >
-        <BpmTracker locale={locale} />
+        <Suspense fallback={null}><BpmTracker locale={locale} /></Suspense>
         <Suspense fallback={null}>
           <FacebookPixel locale={locale} />
         </Suspense>

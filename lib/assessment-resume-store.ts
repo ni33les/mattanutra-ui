@@ -1,3 +1,4 @@
+import { resolvePharmacyAcquisition } from "@/lib/pharmacy-acquisition";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { getSql } from "@/lib/db";
 import { isLocale, type Locale } from "@/lib/i18n";
@@ -119,6 +120,7 @@ export type AssessmentResumeDraft = Readonly<{
 export async function createAssessmentResumeDraft(input: Readonly<{
   answers?: unknown;
   contactEmail: unknown;
+  bpm?: unknown;
   locale?: unknown;
   paymentId?: unknown;
   pharmacyId?: unknown;
@@ -150,7 +152,7 @@ export async function createAssessmentResumeDraft(input: Readonly<{
   const existing = isUuid(String(input.planId ?? "")) ? await getStoredAssessmentPrefill(planId) : null;
   const { pharmacy, invalidRequested } = await resolveCapturePharmacy(input.pharmacyId, existing?.answers);
   if (invalidRequested) throw new Error("Pharmacy not found");
-  const answers = pharmacy ? mergeInStorePharmacyAnswers(rawAnswers, pharmacy) : rawAnswers;
+  const answers = pharmacy ? mergeInStorePharmacyAnswers(rawAnswers, pharmacy, resolvePharmacyAcquisition(input.bpm, existing?.answers, planId)) : rawAnswers;
   const paymentId = isUuid(String(input.paymentId ?? ""))
     ? String(input.paymentId)
     : null;

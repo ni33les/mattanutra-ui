@@ -1,3 +1,4 @@
+import { getPharmacySourceFunnel, type PharmacySourceFunnel } from "@/lib/pharmacy-funnel";
 import { getSql } from "@/lib/db";
 import {
   adminDashboardFilterSql,
@@ -59,6 +60,7 @@ export type AdminFlowEdge = Readonly<{
 }>;
 
 export type AdminFlowData = Readonly<{
+  pharmacySources?: PharmacySourceFunnel[];
   databaseAvailable: boolean;
   edges: AdminFlowEdge[];
   generatedAt: string;
@@ -773,7 +775,9 @@ export async function getAdminFlowData(
             selected_plan::text,
             occurred_at
           from public.bpm
-          where occurred_at >= ${start}
+          where coalesce(traffic_source,'') <> 'pharmacy'
+            and not exists (select 1 from public.assessments a where a.plan_id=bpm.plan_id and a.answers ? 'inStorePharmacy')
+            and occurred_at >= ${start}
             and ${adminDashboardFilterSql(sql, filters)}
             and (
               event_name in (
@@ -832,7 +836,9 @@ export async function getAdminFlowData(
             selected_plan::text,
             occurred_at
           from public.bpm
-          where ${adminDashboardFilterSql(sql, filters)}
+          where coalesce(traffic_source,'') <> 'pharmacy'
+            and not exists (select 1 from public.assessments a where a.plan_id=bpm.plan_id and a.answers ? 'inStorePharmacy')
+            and ${adminDashboardFilterSql(sql, filters)}
             and (
               event_name in (
               'assessment_captured',
@@ -1078,6 +1084,7 @@ export async function getAdminFlowData(
 
     return {
       databaseAvailable: true,
+      pharmacySources: await getPharmacySourceFunnel(start, filters),
       edges,
       generatedAt: new Date().toISOString(),
       nodes: [...nodes, ...dropoffNodes],

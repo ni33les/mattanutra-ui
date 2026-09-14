@@ -21,6 +21,7 @@ import {
 } from "@/components/formulation-results-helpers";
 import { PharmacyOrderPanel } from "@/components/pharmacy/order-panel";
 import { pharmacyPath } from "@/lib/pharmacy-journey";
+import type { PharmacySource } from "@/lib/pharmacy-acquisition";
 import type { PharmacyOrderReceipt } from "@/lib/pharmacy-orders";
 import { RevealFinalResultsPage } from "@/components/reveal-final-results";
 import type {
@@ -34,7 +35,7 @@ type FormulationResultsProps = Readonly<{
   initialStackPreference?: ProductStackPreference | null;
   locale: Locale;
   planId: string;
-  pharmacy?: { slug: string; name: string; revision: number; sourceLocale: Locale; receipt: PharmacyOrderReceipt | null };
+  pharmacy?: { source?: PharmacySource; slug: string; name: string; revision: number; sourceLocale: Locale; receipt: PharmacyOrderReceipt | null };
 }>;
 
 export function FormulationResults({
@@ -180,7 +181,7 @@ export function FormulationResults({
       pharmacy={pharmacy ? {
         name: pharmacy.name,
         planHref: pharmacyPath(locale, pharmacy.slug, "plan", { plan: planId, order: pharmacy.receipt?.id }),
-        quizHref: pharmacyPath(locale, pharmacy.slug, "quiz"),
+        quizHref: pharmacyPath(locale, pharmacy.slug, "quiz", { source: pharmacy.source }),
         orderPanel: <PharmacyOrderPanel key={result.productRecommendations?.runId ?? pharmacy.revision}
           planId={planId} slug={pharmacy.slug} locale={locale} revision={pharmacy.revision}
           pharmacyName={pharmacy.name} initialReceipt={pharmacy.receipt} onRefresh={retry} />
