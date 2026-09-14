@@ -59,6 +59,13 @@ it("PHARM-SRC-PG-03 same-key capture without browser metadata stays idempotent a
   assert.equal(revised.revision,first.revision);
   const [after]=await sql`select input_hash, input_revision, answers from public.assessments where plan_id=${first.planId}::uuid`;
   assert.deepEqual(after,before);
+  const sessionId=randomUUID();
+  const entry={...body,sessionId,bpm:bpm("business_card",sessionId)};
+  const original=await captureAssessment(entry,{idempotencyKey:randomUUID()});
+  const replay=await captureAssessment({...entry,bpm:bpm("in_store",randomUUID())},{idempotencyKey:randomUUID()});
+  assert.equal(replay.planId,original.planId);
+  const [saved]=await sql`select answers from public.assessments where plan_id=${original.planId}::uuid`;
+  assert.deepEqual(saved.answers.inStorePharmacy.acquisition,{source:"business_card",ray:sessionId});
 });
 it("PHARM-SRC-PG-04 funnel uses durable source, locale and period while repeated paid-like browser events cannot count orders", async () => {
   const {writeBpmEvent}=await import("../../lib/bpm.ts");
