@@ -10,6 +10,9 @@ describe("assessment first name normalization", () => {
   it("keeps ordinary English and Thai names", () => {
     assert.equal(normalizeAssessmentFirstName("  Maya  "), "Maya");
     assert.equal(normalizeAssessmentFirstName("นิชา"), "นิชา");
+    for (const name of ["Test", "Nong", "Panya", "Test User", "Anonymous"]) {
+      assert.equal(normalizeAssessmentFirstName(name), name);
+    }
   });
 
   it("collapses spacing and clamps long values", () => {
@@ -20,17 +23,17 @@ describe("assessment first name normalization", () => {
     );
   });
 
-  it("returns null for missing, too-short, numeric, symbol, and joke values", () => {
+  it("returns null for missing, too-short, numeric, and symbol values", () => {
     assert.equal(normalizeAssessmentFirstName(""), null);
     assert.equal(normalizeAssessmentFirstName(" A "), null);
     assert.equal(normalizeAssessmentFirstName("Maya2"), null);
     assert.equal(normalizeAssessmentFirstName("Maya!"), null);
-    assert.equal(normalizeAssessmentFirstName("test"), null);
   });
 
   it("reads the canonical and legacy answer keys", () => {
     assert.equal(firstNameFromAssessmentAnswers({ firstName: "Niran" }), "Niran");
     assert.equal(firstNameFromAssessmentAnswers({ first_name: "Niran" }), "Niran");
-    assert.equal(firstNameFromAssessmentAnswers({ firstName: "null" }), null);
+    assert.equal(firstNameFromAssessmentAnswers({ firstName: "null" }), "null");
+    assert.equal(firstNameFromAssessmentAnswers({ firstName: null }), null);
   });
 });

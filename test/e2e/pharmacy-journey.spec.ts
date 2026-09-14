@@ -44,6 +44,7 @@ for (const locale of ["en", "th", "zh-CN"] as const) {
     await page.goto(`/${locale}/retail/${fixture.slug}/reveal?plan=${fixture.planId}`);
     await expect(page.getByTestId("pharmacy-order")).toBeVisible();
     await expect(page.locator(".mn-reveal-final")).toBeVisible();
+    await expect(page.locator(".mn-reveal-final h1")).toContainText("Test");
     const planLink = page.getByTestId("pharmacy-deep-dive-link");
     await expect(planLink).toHaveText(`${c.details} →`);
     await expect(planLink).toHaveAttribute("href", `/${locale}/retail/${fixture.slug}/plan?plan=${fixture.planId}`);
@@ -74,6 +75,7 @@ for (const locale of ["en", "th", "zh-CN"] as const) {
     await planLink.click();
     const deepDive = page.getByTestId("pharmacy-deep-dive");
     await expect(deepDive).toBeVisible();
+    await expect(deepDive.locator("h1")).toContainText("Test");
     await expect(deepDive.locator('nav a[href^="#s"]')).toHaveCount(7);
     await expect(deepDive.locator('section[id^="s0"]')).toHaveCount(7);
     await expect(deepDive.locator(".wrap").first()).toHaveCSS("max-width", "1080px");

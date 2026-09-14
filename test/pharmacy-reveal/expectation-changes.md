@@ -9,6 +9,11 @@ Baseline: c3651f350ef5c511a0b7fcd574124972067736a2.
 
 No automatic retries, excluded failures or unrelated full-suite claims.
 
+## Name blocklist removal
+
+- Names such as `Test`, `Nong` and `Panya` are now retained instead of silently discarded. Existing whitespace, character and length handling remains unchanged. The four normalization cases retain their other assertions; the literal name `null` is distinguished from a missing/null input.
+- The pharmacy fixture now uses `Test` to reproduce the reported rejected name. Existing PHARM-BROWSER cases verify it in both reveal and deep-dive headings across all three locales. Products, doses, prices, receipts and historical execution evidence are unchanged. Focused RED evidence is stored at /root/pharmacy-name-filter-evidence/red.log.
+
 ## Full pharmacy deep dive
 
 - PHARM-BROWSER now opens the linked deep dive before and after ordering, checks all seven chapters, saved nutrient reasoning/decision/cautions, original desktop dimensions, receipt prices and the explicit LINE share action. The original simplified-page expectation failed against DEV build 4d111887; evidence is preserved at /root/pharmacy-deep-dive-evidence/red.

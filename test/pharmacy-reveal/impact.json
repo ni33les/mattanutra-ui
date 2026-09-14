@@ -8,6 +8,11 @@
   ],
   "files": [
     {
+      "file": "test/assessment-first-name.test.ts",
+      "expectedCases": 4,
+      "reason": "Names are preserved without a word blocklist through shared assessment and reveal normalization"
+    },
+    {
       "file": "test/formulation-read-first.test.ts",
       "expectedCases": 4,
       "reason": "Shared reveal, frozen receipts, read-only polling and pharmacy navigation consumers"
