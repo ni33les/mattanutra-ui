@@ -48,7 +48,7 @@
       "file": "test/e2e/pharmacy-journey.spec.ts",
       "expectedCases": 4,
       "grep": "PHARM-BROWSER",
-      "reason": "Shared reveal, payment at till, immutable receipts and deep dive in all three locales"
+      "reason": "Direct pharmacy questionnaire entry, saved-answer recovery, ordinary web welcome, unpaid receipts and deep dive in all three locales"
     },
     {
       "file": "test/e2e/pharmacy-progress.spec.ts",

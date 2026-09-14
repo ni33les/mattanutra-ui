@@ -124,7 +124,7 @@ export function ChatQuestionnaire({
   const composerRef = useRef<HTMLDivElement | null>(null);
   const finalizing = useRef(false);
 
-  const [uiScreen, setUiScreen] = useState<UiScreen>("welcome");
+  const [uiScreen, setUiScreen] = useState<UiScreen>(pharmacyId ? "chat" : "welcome");
   const [state, setState] = useState<QuestionnaireState | null>(null);
   const [savedFlash, setSavedFlash] = useState(false);
 
@@ -303,6 +303,14 @@ export function ChatQuestionnaire({
     [locale, returningPlanId, saveLocalState]
   );
 
+  const startChat = useCallback((initial: QuestionnaireState) => {
+    const started = startQuestionnaire(initial);
+    setState(started.state);
+    setUiScreen("chat");
+    void track(started.events);
+    saveLocalState(locale, started.state);
+  }, [locale, saveLocalState, track]);
+
   useEffect(() => {
     const base = resolveChatDraft({ locale, sessionId: sessionRef.current, server: serverDraft });
     let local: ChatDraft | null = null;
@@ -317,9 +325,12 @@ export function ChatQuestionnaire({
       setUiScreen("calculating"); finalizing.current = true; void runCapture(saved);
     } else if (Object.keys(saved.answers).length) {
       setState({ ...saved, phase: "resume_prompt" }); setUiScreen("chat");
+    } else if (pharmacyId) {
+      // The pharmacy landing page already provided the start action.
+      startChat(saved);
     } else setUiScreen("welcome");
     trackBpmEvent("chat_view", { eventType: "funnel", locale, properties: { channel: "web", questionnaireVersion: "v6-conversational", uxVersion: UX_VERSION } });
-  }, [locale, serverDraft, saveDraft, runCapture, reviewRequested]);
+  }, [locale, serverDraft, saveDraft, runCapture, reviewRequested, pharmacyId, startChat]);
 
   useEffect(() => {
     if (uiScreen !== "chat") {
@@ -567,11 +578,7 @@ export function ChatQuestionnaire({
             channel: "web",
             planId: returningPlanId ?? null
           });
-    const started = startQuestionnaire(initial);
-    setState(started.state);
-    setUiScreen("chat");
-    void track(started.events);
-    saveLocalState(locale, started.state);
+    startChat(initial);
   }
 
   async function onAnswer(value: unknown, label?: string) {
@@ -616,15 +623,14 @@ export function ChatQuestionnaire({
     finalizing.current = false;
     capture.reset();
     if (draftRef.current) saveDraft({ ...draftRef.current, captured: null, contactEmail: null, updatedAt: Date.now() });
-    setState(
-      createInitialState({
-        locale,
-        channel: "web",
-        planId: returningPlanId ?? null,
-        sessionId: sessionRef.current
-      })
-    );
-    setUiScreen("welcome");
+    const initial = createInitialState({
+      locale,
+      channel: "web",
+      planId: returningPlanId ?? null,
+      sessionId: sessionRef.current
+    });
+    if (pharmacyId) startChat(initial);
+    else { setState(initial); setUiScreen("welcome"); }
   }
 
   function onReviewEdit(event: React.MouseEvent<HTMLButtonElement>) {

@@ -7,7 +7,7 @@ Web chat must never show **sex at birth** in any locale — always **sex**:
 - TH: “เพศของคุณคือ” (never เพศกำเนิด)
 - zh-CN: uses EN turns today; never 出生时的性别 / 出生性别
 
-Do not auto-start chat on page load; require the welcome CTA (no `/begin|start/i` auto-click).
+Ordinary web visits require the welcome CTA (no `/begin|start/i` auto-click). The pharmacy journey has its own landing-page CTA: its quiz opens the first question directly, including after an explicit restart. Preserve saved-answer resume and completed-draft recovery.
 
 Copy/emojis come only from definition JSON (extracted from the guide). Do not invent extra icons in chrome.
 
