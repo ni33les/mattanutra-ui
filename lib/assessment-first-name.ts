@@ -1,27 +1,5 @@
 export const ASSESSMENT_FIRST_NAME_MAX_LENGTH = 40;
 
-const FIRST_NAME_BLOCKLIST = new Set([
-  "anonymous",
-  "asdf",
-  "butt",
-  "demo",
-  "monkeyface",
-  "na",
-  "nil",
-  "nobody",
-  "none",
-  "nong",
-  "nongmata",
-  "noone",
-  "null",
-  "panya",
-  "poop",
-  "qwerty",
-  "test",
-  "undefined",
-  "xxx"
-]);
-
 function clampGraphemes(value: string, maxLength: number) {
   return Array.from(value).slice(0, maxLength).join("");
 }
@@ -45,13 +23,6 @@ export function normalizeAssessmentFirstName(value: unknown) {
   }
 
   if (/[^\p{L}\p{M}\s'’-]/u.test(normalized)) {
-    return null;
-  }
-
-  const compact = normalized.replace(/[\s'’-]/gu, "").toLowerCase();
-  const firstToken = normalized.split(" ")[0]?.toLowerCase() ?? "";
-
-  if (FIRST_NAME_BLOCKLIST.has(compact) || FIRST_NAME_BLOCKLIST.has(firstToken)) {
     return null;
   }
 
