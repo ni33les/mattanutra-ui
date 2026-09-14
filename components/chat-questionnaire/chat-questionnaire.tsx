@@ -1094,13 +1094,6 @@ export function ChatQuestionnaire({
           >
             {ui.precisionGo}
           </button>
-          <button
-            type="button"
-            className="mn-chat-q__ghost"
-            onClick={() => void onAnswer("skip", ui.precisionSkip)}
-          >
-            {ui.precisionSkip}
-          </button>
         </div>
       );
     }
