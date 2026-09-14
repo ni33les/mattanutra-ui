@@ -51,7 +51,10 @@ test("PHARM-LANDING Chinese retains localized content and pharmacy questionnaire
   await page.goto(`/zh-CN/retail/${slug}/landing`);
   const landing = page.getByTestId("pharmacy-landing");
   await expect(landing.getByRole("heading", { level: 1 })).toContainText("不再猜测");
-  await expect(landing.getByRole("link")).toHaveAttribute("href", `/zh-CN/retail/${slug}/quiz`);
+  const target = new URL((await landing.getByRole("link").getAttribute("href"))!, page.url());
+  expect(target.pathname).toBe(`/zh-CN/retail/${slug}/quiz`);
+  expect(target.searchParams.get("source")).toBe("in_store");
+  expect(target.searchParams.get("session")).toBe(new URL(page.url()).searchParams.get("session"));
   await expect(page.locator(".mn-titlebar")).toBeVisible();
   await expect(page.locator("footer")).toBeVisible();
 });
