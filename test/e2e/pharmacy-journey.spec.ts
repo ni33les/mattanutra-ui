@@ -19,6 +19,28 @@ for (const locale of ["en", "th", "zh-CN"] as const) {
     await page.getByRole("link", { name: `${c.start} →`, exact: true }).click();
     await expect(page).toHaveURL(new RegExp(`/retail/${fixture.slug}/quiz\\?session=`));
     await expect(page.locator(".mn-titlebar--quiz")).toBeVisible();
+    const composer = page.getByTestId("question-answers");
+    await expect(composer.getByRole("textbox")).toBeVisible();
+    await expect(page.getByTestId("questionnaire-welcome")).toHaveCount(0);
+    const quizUrl = page.url();
+    await composer.getByRole("textbox").fill("Pharmacy Browser");
+    await composer.getByRole("textbox").press("Enter");
+    await expect(composer.locator(".mn-chat-q__chip").first()).toBeVisible();
+    await page.reload();
+    await composer.getByRole("button", { name: locale === "th" ? "ทำต่อ" : "Continue", exact: true }).click();
+    await expect(composer.locator(".mn-chat-q__chip").first()).toBeVisible();
+    expect(page.url()).toBe(quizUrl);
+    await page.reload();
+    await composer.getByRole("button", { name: locale === "th" ? "เริ่มใหม่" : "Start over", exact: true }).click();
+    await expect(composer.getByRole("textbox")).toBeVisible();
+    await expect(composer.getByRole("textbox")).toHaveValue("");
+    await expect(page.getByTestId("questionnaire-welcome")).toHaveCount(0);
+    if (locale === "en") {
+      await page.goto("/en/nutrition/quiz");
+      await expect(page.getByTestId("questionnaire-welcome")).toBeVisible();
+      await page.getByTestId("questionnaire-welcome-cta").click();
+      await expect(composer.getByRole("textbox")).toBeVisible();
+    }
     await page.goto(`/${locale}/retail/${fixture.slug}/reveal?plan=${fixture.planId}`);
     await expect(page.getByTestId("pharmacy-order")).toBeVisible();
     await expect(page.locator(".mn-reveal-final")).toBeVisible();
