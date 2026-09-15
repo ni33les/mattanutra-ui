@@ -4,6 +4,7 @@ import { register } from "node:module";
 import { createElement, type ImgHTMLAttributes } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { chromium, type Browser } from "@playwright/test";
+import { positionPharmacyFlight } from "../../components/pharmacy/waiting-flight.ts";
 
 // Exercise the real progress view and its CSS without starting matching or a database.
 register("../payment-return/next-loader.mjs", import.meta.url);
@@ -19,11 +20,12 @@ async function view(locale: "en" | "th" | "zh-CN", stage = 1, failed = false, re
   const page = await browser.newPage({ viewport: { width: 375, height: 812 }, reducedMotion });
   await page.route("**/*", route => route.abort());
   await page.setContent("<style>body{margin:0}</style>" + renderToStaticMarkup(createElement(PharmacyProgressView, { locale, stage, failed, onRetry: () => {} })));
+  await page.locator("section").evaluate(positionPharmacyFlight);
   return page;
 }
 
 for (const [locale, phrase] of [["en", "about a minute"], ["th", "ประมาณ 1 นาที"], ["zh-CN", "大约需要一分钟"]] as const) {
-  test(`PHARM-WAIT-01 ${locale} shows page-wide word rain, a travelling Nong Matta and the wait estimate`, async () => {
+  test(`PHARM-WAIT-01 ${locale} shows page-wide rain and a spline flight that lands on steps then leaves`, async () => {
     const page = await view(locale);
     try {
       assert.match(await page.locator("section").innerText(), new RegExp(phrase));
@@ -47,13 +49,25 @@ for (const [locale, phrase] of [["en", "about a minute"], ["th", "ประม�
           return node.getBoundingClientRect();
         }
         const start = at(rain, .05, word), end = at(rain, .9, word);
-        const left = at(flight, .2, sprite), right = at(flight, .45, sprite);
-        return { width: box.width, height: box.height, fall: end.y - start.y, travel: right.x - left.x,
+        const first = at(flight, .30, sprite), held = at(flight, .36, sprite);
+        const second = at(flight, .66, sprite), exited = at(flight, .96, sprite);
+        const badges = [...el.closest('section')!.querySelectorAll('ol li > span:first-child')].map(node => node.getBoundingClientRect());
+        return { width: box.width, height: box.height, fall: end.y - start.y,
+          path: getComputedStyle(sprite).offsetPath, first: { x: first.x + first.width / 2, y: first.bottom },
+          held: { x: held.x + held.width / 2, y: held.bottom }, second: { x: second.x + second.width / 2, y: second.bottom },
+          badges: badges.map(b => ({ x: b.x + b.width / 2, y: b.top - 6 })), exited: exited.left,
           pointerEvents: getComputedStyle(el).pointerEvents };
       });
       assert.equal(motion.width, 375, "rain covers the page width, not the small portrait slot");
       assert.ok(motion.fall > motion.height * .75, "words fall down the full waiting region");
-      assert.ok(motion.travel > motion.width * .55, "Nong Matta travels across the page");
+      assert.match(motion.path, /^path\(/, "flight follows a geometric spline");
+      assert.ok((motion.path.match(/C/g) ?? []).length >= 3, "flight has curved arrival, landing and departure segments");
+      for (const [actual, expected] of [[motion.first, motion.badges[1]], [motion.second, motion.badges[2]]]) {
+        assert.ok(Math.abs(actual.x - expected.x) < 2, "sprite lands on the step marker horizontally");
+        assert.ok(Math.abs(actual.y - expected.y) < 2, "sprite feet land above the step marker");
+      }
+      assert.deepEqual(motion.first, motion.held, "landing includes a stationary pause");
+      assert.ok(motion.exited >= 375, "sprite leaves the screen after the landings");
       assert.equal(motion.pointerEvents, "none");
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), 375);
     } finally { await page.close(); }

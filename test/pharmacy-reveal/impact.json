@@ -10,7 +10,7 @@
     {
       "file": "test/pharmacy-reveal/progress-presentation.test.ts",
       "expectedCases": 6,
-      "reason": "Page-wide rain and sprite travel, localized estimate, reduced motion and unchanged completion/recovery stages"
+      "reason": "Page-wide rain; curved sprite arrivals, measured step landings, pauses and exit; localization, reduced motion and unchanged recovery"
     },
     {
       "file": "test/assessment-first-name.test.ts",

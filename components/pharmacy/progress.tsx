@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type CSSProperties } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { useRouter } from "next/navigation";
 import { Check, ArrowRight, LoaderCircle } from "lucide-react";
 import { SafeImage } from "@/components/safe-image";
@@ -8,6 +8,7 @@ import { pharmacyPath } from "@/lib/pharmacy-journey";
 import { assessmentPollKey, fetchFunnelJson, pollFunnelStatus } from "@/lib/funnel-polling";
 import type { NutritionJourneySnapshot } from "@/lib/nutrition-journey-read";
 import type { Locale } from "@/lib/i18n";
+import { positionPharmacyFlight } from "@/components/pharmacy/waiting-flight";
 
 const copy = {
   en: { kicker: "Your pharmacy plan", title: "Finding your right amount.", body: "We’re bringing your answers and this pharmacy’s products together into a plan for you.",
@@ -31,7 +32,10 @@ const waitingAnimationStyles = `
   .mn-pharmacy-waiting-content { position: relative; z-index: 1; }
   .mn-pharmacy-waiting-content > :is(p, h1, [role="status"], [role="alert"]) { background: var(--mn-cream); }
   .mn-pharmacy-waiting-placeholder { height: 6rem; }
-  .mn-pharmacy-waiting-art { position: absolute; inset: 0; container-type: size; overflow: hidden; pointer-events: none; z-index: 0; --start-y: 2rem; }
+  .mn-pharmacy-waiting-art { position: absolute; inset: 0; overflow: hidden; pointer-events: none; --start-y: 2rem; }
+  .mn-pharmacy-waiting-rain, .mn-pharmacy-waiting-flight { position: absolute; inset: 0; container-type: size; overflow: hidden; }
+  .mn-pharmacy-waiting-rain { z-index: 0; }
+  .mn-pharmacy-waiting-flight { z-index: 2; }
   .mn-pharmacy-waiting-nong { position: absolute; left: 0; top: 0; width: 6rem; height: 6rem; z-index: 1; transform: translate3d(calc(50cqw - 50%), var(--start-y), 0); }
   .mn-pharmacy-waiting-word { position: absolute; top: -3rem; left: clamp(0px, var(--x), calc(100% - 8rem)); padding: 4px 8px; border-radius: 999px; background: var(--mn-cream); color: var(--mn-teal-deep); font-size: .75rem; line-height: 1.4; white-space: nowrap; opacity: 0; }
   .mn-pharmacy-waiting-word:nth-of-type(3n) { color: var(--mn-gold); }
@@ -47,17 +51,17 @@ const waitingAnimationStyles = `
     .mn-pharmacy-waiting-word { font-size: .875rem; }
   }
   @media (prefers-reduced-motion: no-preference) {
-    .mn-pharmacy-waiting-art[data-active="true"] .mn-pharmacy-waiting-nong { animation: mn-pharmacy-nong-flight 14s ease-in-out infinite; filter: drop-shadow(0 0 8px var(--mn-gold-tint)); }
+    .mn-pharmacy-waiting-art[data-active="true"] .mn-pharmacy-waiting-nong { offset-path: var(--flight-path, none); offset-anchor: 50% 100%; offset-rotate: 0deg; animation: mn-pharmacy-nong-flight 18s ease-in-out infinite; filter: drop-shadow(0 0 8px var(--mn-gold-tint)); }
     .mn-pharmacy-waiting-word { animation: mn-pharmacy-word-rain var(--duration) var(--delay) linear infinite; }
     .mn-pharmacy-waiting-spark { animation-name: mn-pharmacy-spark; animation-duration: 1.5s; animation-timing-function: ease-out; animation-iteration-count: infinite; }
   }
   @media (prefers-reduced-motion: reduce) { .mn-pharmacy-waiting-word, .mn-pharmacy-waiting-spark { display: none; } }
   @keyframes mn-pharmacy-nong-flight {
-    0%, 100% { transform: translate3d(calc(50cqw - 50%), var(--start-y), 0) rotate(0deg); }
-    20% { transform: translate3d(2cqw, 26cqh, 0) rotate(-12deg); }
-    45% { transform: translate3d(calc(98cqw - 100%), 40cqh, 0) rotate(10deg); }
-    68% { transform: translate3d(calc(90cqw - 100%), calc(85cqh - 100%), 0) rotate(6deg); }
-    85% { transform: translate3d(5cqw, calc(72cqh - 100%), 0) rotate(-10deg); }
+    0% { offset-distance: 0%; opacity: 0; transform: rotate(-12deg); }
+    5% { opacity: 1; }
+    25%, 38% { offset-distance: var(--first-stop, 30%); opacity: 1; transform: rotate(0deg); }
+    60%, 72% { offset-distance: var(--second-stop, 65%); opacity: 1; transform: rotate(0deg); }
+    90%, 100% { offset-distance: 100%; opacity: 0; transform: rotate(12deg); }
   }
   @keyframes mn-pharmacy-word-rain {
     0% { opacity: 0; transform: translate3d(0, 0, 0) rotate(-5deg); }
@@ -78,16 +82,30 @@ export function PharmacyProgressView({ locale, stage = 0, failed = false, onRetr
 }) {
   const c = copy[locale];
   const working = !failed && stage < 3;
-  return <section data-testid="pharmacy-progress" className="mn-pharmacy-progress w-full text-center" aria-busy={working}>
+  const sectionRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const section = sectionRef.current;
+    if (!section || !working) return;
+    const position = () => positionPharmacyFlight(section);
+    position();
+    const observer = new ResizeObserver(position);
+    observer.observe(section);
+    return () => observer.disconnect();
+  }, [working, locale]);
+  return <section ref={sectionRef} data-testid="pharmacy-progress" className="mn-pharmacy-progress w-full text-center" aria-busy={working}>
     <style>{waitingAnimationStyles}</style>
     <div data-testid="pharmacy-waiting-art" className="mn-pharmacy-waiting-art" data-active={working} aria-hidden="true">
+      <div className="mn-pharmacy-waiting-flight">
       <div className="mn-pharmacy-waiting-nong">
         <SafeImage src="/assets/library/nong/nong-thinking.webp" alt="" width={128} height={150} className="mx-auto size-24 object-contain sm:h-36 sm:w-32" />
         {working && [0, 1, 2].map(index => <i key={index} className="mn-pharmacy-waiting-spark">✦</i>)}
       </div>
+      </div>
+      <div className="mn-pharmacy-waiting-rain">
       {working && [...c.words, ...c.words].map((word, index) => <span key={index} className="mn-pharmacy-waiting-word"
         style={{ "--x": `${3 + (index * 29) % 90}%`, "--delay": `${-(index * 2.37) % 10}s`,
           "--duration": `${8 + (index % 6) * .6}s`, "--drift": `${(index % 2 ? 1 : -1) * (8 + index % 4 * 4)}px` } as CSSProperties}>{word}</span>)}
+      </div>
     </div>
     <div className="mn-pharmacy-waiting-content mx-auto w-full max-w-3xl px-6 py-8 sm:py-20">
     <div className="mn-pharmacy-waiting-placeholder" aria-hidden="true" />
