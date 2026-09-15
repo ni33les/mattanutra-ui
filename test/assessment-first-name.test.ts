@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import * as nameHelpers from "../lib/assessment-first-name.ts";
 import {
   ASSESSMENT_FIRST_NAME_MAX_LENGTH,
   firstNameFromAssessmentAnswers,
@@ -35,5 +36,22 @@ describe("assessment first name normalization", () => {
     assert.equal(firstNameFromAssessmentAnswers({ first_name: "Niran" }), "Niran");
     assert.equal(firstNameFromAssessmentAnswers({ firstName: "null" }), "null");
     assert.equal(firstNameFromAssessmentAnswers({ firstName: null }), null);
+  });
+});
+
+
+describe("reveal recipient", () => {
+  it("REVEAL-NAME-01 never turns a demographic profile into a supplied name", () => {
+    assert.equal(typeof nameHelpers.firstNameFromFormulation, "function");
+    for (const profile of ["Male / 180 cm", "Female / 60 kg", "ชาย", "หญิง", "男性", "女性"]) {
+      assert.equal(nameHelpers.firstNameFromFormulation({ firstName: null, assessmentSummary: { firstName: null, profile } }), "");
+    }
+  });
+  it("REVEAL-NAME-02 retains an explicitly supplied name and its saved summary fallback", () => {
+    assert.equal(typeof nameHelpers.firstNameFromFormulation, "function");
+    for (const name of ["Maya", "นิชา", "小王", "Male"]) {
+      assert.equal(nameHelpers.firstNameFromFormulation({ firstName: ` ${name} `, assessmentSummary: { firstName: "Other" } }), name);
+      assert.equal(nameHelpers.firstNameFromFormulation({ firstName: " ", assessmentSummary: { firstName: name } }), name);
+    }
   });
 });

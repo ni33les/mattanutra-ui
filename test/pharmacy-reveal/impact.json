@@ -10,12 +10,12 @@
     {
       "file": "test/pharmacy-reveal/progress-presentation.test.ts",
       "expectedCases": 6,
-      "reason": "Localized pharmacy wait estimate, decorative animation, reduced motion and unchanged completion/recovery stages"
+      "reason": "Page-wide rain and sprite travel, localized estimate, reduced motion and unchanged completion/recovery stages"
     },
     {
       "file": "test/assessment-first-name.test.ts",
-      "expectedCases": 4,
-      "reason": "Names are preserved without a word blocklist through shared assessment and reveal normalization"
+      "expectedCases": 6,
+      "reason": "Explicit supplied names survive normalization; missing reveal names never come from demographic profile text"
     },
     {
       "file": "test/formulation-read-first.test.ts",
@@ -29,7 +29,7 @@
     },
     {
       "file": "test/reveal-final-static.test.ts",
-      "expectedCases": 25,
+      "expectedCases": 26,
       "reason": "Shared reveal, frozen receipts, read-only polling and pharmacy navigation consumers"
     },
     {

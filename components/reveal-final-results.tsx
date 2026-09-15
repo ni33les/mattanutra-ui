@@ -40,7 +40,7 @@ import {
   visibleFormulaIngredients,
   visibleSupplementRecommendationCount,
 } from "@/components/formulation-support-helpers";
-import { firstNameFromAssessmentAnswers } from "@/lib/assessment-first-name";
+import { firstNameFromFormulation } from "@/lib/assessment-first-name";
 import { formatCurrencyAmount } from "@/lib/currencies";
 import {
   formatTemplate,
@@ -416,25 +416,7 @@ function fallbackForYouCopy(
 }
 
 export function revealHeroFirstName(result: FormulationResult) {
-  const fromResult =
-    typeof result.firstName === "string" ? result.firstName.trim() : "";
-
-  if (fromResult) {
-    return fromResult;
-  }
-
-  const fromSummary =
-    typeof result.assessmentSummary.firstName === "string"
-      ? result.assessmentSummary.firstName.trim()
-      : "";
-
-  if (fromSummary) {
-    return fromSummary;
-  }
-
-  return firstNameFromAssessmentAnswers({
-    firstName: result.assessmentSummary.profile.split(" / ")[0]
-  }) ?? "";
+  return firstNameFromFormulation(result);
 }
 
 function fallbackDecisionCopy(
@@ -584,11 +566,9 @@ export function RevealFinalResultsPage({
           <div className="hero-rise hero-rise-d1 mb-9 mn-reveal-final-label mn-reveal-hero-eyebrow justify-center">
             {copy.heroEyebrow}
           </div>
-          {firstName ? (
-            <div className="hero-rise hero-rise-d2 mb-3 mn-reveal-font-display text-[clamp(22px,2.4vw,28px)] font-light italic text-[var(--mn-ink-soft)]">
-              {copy.heroFor}
-            </div>
-          ) : null}
+          <div className="hero-rise hero-rise-d2 mb-3 mn-reveal-font-display text-[clamp(22px,2.4vw,28px)] font-light italic text-[var(--mn-ink-soft)]">
+            {copy.heroFor}
+          </div>
           <h1
             className="hero-rise hero-rise-d3 mb-8 mn-reveal-font-display mn-reveal-track-hero-title text-[clamp(64px,10vw,132px)] font-normal italic leading-[0.98] text-[var(--mn-teal-deep)]"
             data-testid="reveal-hero-name"

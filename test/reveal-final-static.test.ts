@@ -232,7 +232,7 @@ describe("final reveal UX", () => {
     assert.match(reveal, /mn-reveal-track-hero-title/);
     assert.match(reveal, /export function revealHeroFirstName/);
     assert.match(reveal, /data-testid="reveal-hero-name"/);
-    assert.match(reveal, /result\.assessmentSummary\.firstName/);
+    assert.match(reveal, /firstNameFromFormulation\(result\)/);
     assert.match(reveal, /mn-reveal-track-hero-copy/);
     assert.match(css, /\.mn-reveal-final \.mn-reveal-track-hero-title\s*\{[\s\S]*letter-spacing:\s*-0\.03em/);
     assert.match(css, /\.mn-reveal-final \.mn-reveal-track-hero-copy\s*\{[\s\S]*letter-spacing:\s*-0\.015em/);
@@ -419,4 +419,14 @@ describe("final reveal UX", () => {
     assert.match(css, /\.mn-reveal-final \.mn-reveal-products\s*\{[\s\S]*var\(--mn-cream-deep\)/);
     assert.match(css, /\.mn-reveal-final \.mn-reveal-pharmacy-card\.mn-reveal-selected-pharmacy/);
   });
+});
+
+
+it("REVEAL-NAME-03 the unnamed reveal is For You in all three locales", () => {
+  assert.doesNotMatch(reveal, /assessmentSummary\.profile\.split/);
+  assert.doesNotMatch(reveal, /\{firstName \? \([\s\S]*?copy\.heroFor/);
+  const en = JSON.parse(i18nSource), th = JSON.parse(i18nThai), zh = JSON.parse(i18nChinese);
+  assert.equal(en["customer.revealCopy.heroTitle"].defaultMessage, "You");
+  assert.equal(th["customer.revealCopy.heroTitle"], "คุณ");
+  assert.equal(zh["customer.revealCopy.heroTitle"], "您");
 });

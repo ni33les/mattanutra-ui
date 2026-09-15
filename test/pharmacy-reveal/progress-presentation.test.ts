@@ -18,23 +18,43 @@ after(async () => { await browser?.close(); });
 async function view(locale: "en" | "th" | "zh-CN", stage = 1, failed = false, reducedMotion: "reduce" | "no-preference" = "no-preference") {
   const page = await browser.newPage({ viewport: { width: 375, height: 812 }, reducedMotion });
   await page.route("**/*", route => route.abort());
-  await page.setContent(renderToStaticMarkup(createElement(PharmacyProgressView, { locale, stage, failed, onRetry: () => {} })));
+  await page.setContent("<style>body{margin:0}</style>" + renderToStaticMarkup(createElement(PharmacyProgressView, { locale, stage, failed, onRetry: () => {} })));
   return page;
 }
 
 for (const [locale, phrase] of [["en", "about a minute"], ["th", "ประมาณ 1 นาที"], ["zh-CN", "大约需要一分钟"]] as const) {
-  test(`PHARM-WAIT-01 ${locale} shows the estimate and decorative words around the existing Nong Matta`, async () => {
+  test(`PHARM-WAIT-01 ${locale} shows page-wide word rain, a travelling Nong Matta and the wait estimate`, async () => {
     const page = await view(locale);
     try {
       assert.match(await page.locator("section").innerText(), new RegExp(phrase));
       assert.equal(await page.locator('[data-testid="pharmacy-waiting-art"][aria-hidden="true"]').count(), 1);
-      assert.equal(await page.locator('[data-testid="pharmacy-waiting-art"] span').count(), 6);
+      assert.equal(await page.locator('.mn-pharmacy-waiting-word').count(), 36);
       assert.equal(await page.locator('img[src="/assets/library/nong/nong-thinking.webp"]').count(), 1);
       assert.equal(await page.locator("ol li").count(), 3);
       assert.equal(await page.locator("ol li").nth(1).locator(".lucide-loader-circle").count(), 1);
       assert.equal(await page.locator("ol li").nth(2).locator(".lucide-check").count(), 0);
       const movement = await page.locator('[data-testid="pharmacy-waiting-art"]').evaluate(el => el.getAnimations({ subtree: true }).length);
-      assert.equal(movement, 7, "six words and Nong Matta move using bounded CSS animations");
+      assert.ok(movement >= 37 && movement <= 44, "bounded word rain and a travelling sprite");
+      const motion = await page.locator('[data-testid="pharmacy-waiting-art"]').evaluate(el => {
+        const box = el.getBoundingClientRect();
+        const word = el.querySelector('.mn-pharmacy-waiting-word')!;
+        const sprite = el.querySelector('.mn-pharmacy-waiting-nong')!;
+        const rain = word.getAnimations()[0], flight = sprite.getAnimations()[0];
+        function at(animation: Animation, fraction: number, node: Element) {
+          animation.pause();
+          const timing = animation.effect!.getTiming();
+          animation.currentTime = Number(timing.delay) + Number(timing.duration) * fraction;
+          return node.getBoundingClientRect();
+        }
+        const start = at(rain, .05, word), end = at(rain, .9, word);
+        const left = at(flight, .2, sprite), right = at(flight, .45, sprite);
+        return { width: box.width, height: box.height, fall: end.y - start.y, travel: right.x - left.x,
+          pointerEvents: getComputedStyle(el).pointerEvents };
+      });
+      assert.equal(motion.width, 375, "rain covers the page width, not the small portrait slot");
+      assert.ok(motion.fall > motion.height * .75, "words fall down the full waiting region");
+      assert.ok(motion.travel > motion.width * .55, "Nong Matta travels across the page");
+      assert.equal(motion.pointerEvents, "none");
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), 375);
     } finally { await page.close(); }
   });

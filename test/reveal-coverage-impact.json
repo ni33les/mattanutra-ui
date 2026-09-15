@@ -4,7 +4,7 @@
   "files": [
     {"file":"test/web-availability-copy.test.ts","expectedCases":4,"reason":"Upward whole-percent labels in English, Thai and Chinese; preserve raw positive, zero, unknown and pending states."},
     {"file":"test/reveal-coverage-corrections.test.ts","expectedCases":8,"reason":"Environment-specific reviewed manufacturer facts, unchanged prices, monthly pack arithmetic and actual retail D3 matching."},
-    {"file":"test/reveal-final-static.test.ts","expectedCases":25,"reason":"Round basket display only; retain layout, controls and removal of noisy matching details."},
+    {"file":"test/reveal-final-static.test.ts","expectedCases":26,"reason":"Round basket display only; retain layout, controls and removal of noisy matching details."},
     {"file":"test/catalogue-corrections.integration.test.ts","expectedCases":2,"database":true,"reason":"Real correction CLI: stale-data rollback, idempotent replay and immutable audit originals."}
   ],
   "browser": [{"file":"test/e2e/practical-matching.spec.ts","expectedCases":3,"reason":"Reveal and checkout remain usable in all three locales with medical findings preserved."}],

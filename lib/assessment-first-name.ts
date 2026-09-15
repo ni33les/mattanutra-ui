@@ -1,5 +1,14 @@
 export const ASSESSMENT_FIRST_NAME_MAX_LENGTH = 40;
 
+/** Only supplied name fields identify a customer; demographic summary text never does. */
+export function firstNameFromFormulation(result: {
+  firstName?: string | null;
+  assessmentSummary: { firstName?: string | null; profile?: string };
+}) {
+  return [result.firstName, result.assessmentSummary.firstName]
+    .find(value => typeof value === "string" && value.trim())?.trim() ?? "";
+}
+
 function clampGraphemes(value: string, maxLength: number) {
   return Array.from(value).slice(0, maxLength).join("");
 }

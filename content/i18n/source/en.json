@@ -6901,7 +6901,7 @@
     "translatable": true
   },
   "customer.revealCopy.heroTitle": {
-    "defaultMessage": "Your formula has arrived",
+    "defaultMessage": "You",
     "description": "Reveal page copy field heroTitle.",
     "namespace": "customer.revealCopy",
     "audience": "customer",
