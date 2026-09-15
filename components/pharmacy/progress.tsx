@@ -51,17 +51,15 @@ const waitingAnimationStyles = `
     .mn-pharmacy-waiting-word { font-size: .875rem; }
   }
   @media (prefers-reduced-motion: no-preference) {
-    .mn-pharmacy-waiting-art[data-active="true"] .mn-pharmacy-waiting-nong { offset-path: var(--flight-path, none); offset-anchor: 50% 100%; offset-rotate: 0deg; animation: mn-pharmacy-nong-flight 18s ease-in-out infinite; filter: drop-shadow(0 0 8px var(--mn-gold-tint)); }
+    .mn-pharmacy-waiting-art[data-flying="true"] .mn-pharmacy-waiting-nong { offset-path: var(--flight-path, none); offset-anchor: 50% 100%; offset-rotate: 0deg; animation: mn-pharmacy-nong-flight 10s ease-in-out infinite; filter: drop-shadow(0 0 8px var(--mn-gold-tint)); }
     .mn-pharmacy-waiting-word { animation: mn-pharmacy-word-rain var(--duration) var(--delay) linear infinite; }
     .mn-pharmacy-waiting-spark { animation-name: mn-pharmacy-spark; animation-duration: 1.5s; animation-timing-function: ease-out; animation-iteration-count: infinite; }
   }
   @media (prefers-reduced-motion: reduce) { .mn-pharmacy-waiting-word, .mn-pharmacy-waiting-spark { display: none; } }
   @keyframes mn-pharmacy-nong-flight {
-    0% { offset-distance: 0%; opacity: 0; transform: rotate(-12deg); }
-    5% { opacity: 1; }
-    25%, 38% { offset-distance: var(--first-stop, 30%); opacity: 1; transform: rotate(0deg); }
-    60%, 72% { offset-distance: var(--second-stop, 65%); opacity: 1; transform: rotate(0deg); }
-    90%, 100% { offset-distance: 100%; opacity: 0; transform: rotate(12deg); }
+    0%, 12% { offset-distance: 0%; transform: rotate(0deg); }
+    40%, 60% { offset-distance: var(--active-stop, 50%); transform: rotate(0deg); }
+    90%, 100% { offset-distance: 100%; transform: rotate(0deg); }
   }
   @keyframes mn-pharmacy-word-rain {
     0% { opacity: 0; transform: translate3d(0, 0, 0) rotate(-5deg); }
@@ -91,12 +89,12 @@ export function PharmacyProgressView({ locale, stage = 0, failed = false, onRetr
     const observer = new ResizeObserver(position);
     observer.observe(section);
     return () => observer.disconnect();
-  }, [working, locale]);
+  }, [working, locale, stage]);
   return <section ref={sectionRef} data-testid="pharmacy-progress" className="mn-pharmacy-progress w-full text-center" aria-busy={working}>
     <style>{waitingAnimationStyles}</style>
-    <div data-testid="pharmacy-waiting-art" className="mn-pharmacy-waiting-art" data-active={working} aria-hidden="true">
+    <div data-testid="pharmacy-waiting-art" className="mn-pharmacy-waiting-art" data-active={working} data-flying={working && stage > 0} aria-hidden="true">
       <div className="mn-pharmacy-waiting-flight">
-      <div className="mn-pharmacy-waiting-nong">
+      <div key={stage} className="mn-pharmacy-waiting-nong">
         <SafeImage src="/assets/library/nong/nong-thinking.webp" alt="" width={128} height={150} className="mx-auto size-24 object-contain sm:h-36 sm:w-32" />
         {working && [0, 1, 2].map(index => <i key={index} className="mn-pharmacy-waiting-spark">✦</i>)}
       </div>

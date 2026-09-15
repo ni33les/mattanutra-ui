@@ -25,7 +25,7 @@ async function view(locale: "en" | "th" | "zh-CN", stage = 1, failed = false, re
 }
 
 for (const [locale, phrase] of [["en", "about a minute"], ["th", "ประมาณ 1 นาที"], ["zh-CN", "大约需要一分钟"]] as const) {
-  test(`PHARM-WAIT-01 ${locale} shows page-wide rain and a spline flight that lands on steps then leaves`, async () => {
+  test(`PHARM-WAIT-01 ${locale} shows page-wide rain and a spline flight that visits the active spinner then returns home`, async () => {
     const page = await view(locale);
     try {
       assert.match(await page.locator("section").innerText(), new RegExp(phrase));
@@ -49,25 +49,27 @@ for (const [locale, phrase] of [["en", "about a minute"], ["th", "ประม�
           return node.getBoundingClientRect();
         }
         const start = at(rain, .05, word), end = at(rain, .9, word);
-        const first = at(flight, .30, sprite), held = at(flight, .36, sprite);
-        const second = at(flight, .66, sprite), exited = at(flight, .96, sprite);
+        const first = at(flight, .45, sprite), held = at(flight, .55, sprite);
+        const returned = at(flight, .96, sprite);
+        const home = el.closest('section')!.querySelector('.mn-pharmacy-waiting-placeholder')!.getBoundingClientRect();
         const badges = [...el.closest('section')!.querySelectorAll('ol li > span:first-child')].map(node => node.getBoundingClientRect());
         return { width: box.width, height: box.height, fall: end.y - start.y,
           path: getComputedStyle(sprite).offsetPath, first: { x: first.x + first.width / 2, y: first.bottom },
-          held: { x: held.x + held.width / 2, y: held.bottom }, second: { x: second.x + second.width / 2, y: second.bottom },
-          badges: badges.map(b => ({ x: b.x + b.width / 2, y: b.top - 6 })), exited: exited.left,
+          held: { x: held.x + held.width / 2, y: held.bottom }, returned: { x: returned.x + returned.width / 2, y: returned.bottom },
+          home: { x: home.x + home.width / 2, y: home.bottom },
+          badges: badges.map(b => ({ x: b.x + b.width / 2, y: b.top - 6 })),
           pointerEvents: getComputedStyle(el).pointerEvents };
       });
       assert.equal(motion.width, 375, "rain covers the page width, not the small portrait slot");
       assert.ok(motion.fall > motion.height * .75, "words fall down the full waiting region");
       assert.match(motion.path, /^path\(/, "flight follows a geometric spline");
-      assert.ok((motion.path.match(/C/g) ?? []).length >= 3, "flight has curved arrival, landing and departure segments");
-      for (const [actual, expected] of [[motion.first, motion.badges[1]], [motion.second, motion.badges[2]]]) {
-        assert.ok(Math.abs(actual.x - expected.x) < 2, "sprite lands on the step marker horizontally");
-        assert.ok(Math.abs(actual.y - expected.y) < 2, "sprite feet land above the step marker");
+      assert.ok((motion.path.match(/C/g) ?? []).length >= 2, "flight has a curved visit and return");
+      for (const [actual, expected] of [[motion.first, motion.badges[1]], [motion.returned, motion.home]]) {
+        assert.ok(Math.abs(actual.x - expected.x) < 2, "sprite reaches the active spinner or home horizontally");
+        assert.ok(Math.abs(actual.y - expected.y) < 2, "sprite feet reach the active spinner or home");
       }
       assert.deepEqual(motion.first, motion.held, "landing includes a stationary pause");
-      assert.ok(motion.exited >= 375, "sprite leaves the screen after the landings");
+      assert.ok(motion.returned.x > 0 && motion.returned.x < 375, "sprite stays visible at home");
       assert.equal(motion.pointerEvents, "none");
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), 375);
     } finally { await page.close(); }
@@ -106,5 +108,40 @@ test("PHARM-WAIT-04 completion stops animation immediately and keeps all three r
     assert.equal(await page.locator('section[aria-busy="false"]').count(), 1);
     assert.equal(await page.locator("ol .lucide-check").count(), 3);
     assert.doesNotMatch(await page.locator("section").innerText(), /about a minute/);
+  } finally { await page.close(); }
+});
+
+
+test("PHARM-WAIT-05 saving without an active spinner keeps Nong Matta at the top", async () => {
+  const page = await view("en", 0);
+  try {
+    assert.equal(await page.locator(".lucide-loader-circle").count(), 0);
+    assert.equal(await page.locator(".mn-pharmacy-waiting-nong").evaluate(el => el.getAnimations().length), 0);
+    assert.equal(await page.locator(".mn-pharmacy-waiting-word").count(), 36);
+  } finally { await page.close(); }
+});
+
+test("PHARM-WAIT-06 product matching visits spinner three and returns home, not the completed step", async () => {
+  const page = await view("en", 2);
+  try {
+    const motion = await page.locator("section").evaluate(section => {
+      const sprite = section.querySelector(".mn-pharmacy-waiting-nong")!;
+      const animation = sprite.getAnimations()[0];
+      animation.pause();
+      const duration = Number(animation.effect!.getTiming().duration);
+      const at = (fraction: number) => {
+        animation.currentTime = duration * fraction;
+        const r = sprite.getBoundingClientRect();
+        return { x: r.x + r.width / 2, y: r.bottom };
+      };
+      const active = section.querySelector('li[aria-current="step"] > span')!.getBoundingClientRect();
+      const home = section.querySelector(".mn-pharmacy-waiting-placeholder")!.getBoundingClientRect();
+      return { visit: at(.45), returned: at(.96), active: {x: active.x + active.width / 2, y: active.top - 6}, home: {x: home.x + home.width / 2, y: home.bottom} };
+    });
+    for (const [actual, expected] of [[motion.visit, motion.active], [motion.returned, motion.home]]) {
+      assert.ok(Math.abs(actual.x - expected.x) < 2 && Math.abs(actual.y - expected.y) < 2);
+    }
+    assert.equal(await page.locator('ol li').nth(1).locator('.lucide-check').count(), 1);
+    assert.equal(await page.locator('ol li').nth(2).locator('.lucide-loader-circle').count(), 1);
   } finally { await page.close(); }
 });

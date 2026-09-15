@@ -9,8 +9,8 @@
   "files": [
     {
       "file": "test/pharmacy-reveal/progress-presentation.test.ts",
-      "expectedCases": 6,
-      "reason": "Page-wide rain; curved sprite arrivals, measured step landings, pauses and exit; localization, reduced motion and unchanged recovery"
+      "expectedCases": 8,
+      "reason": "Page-wide rain; curved visits to the active spinner and return home; no flight without a spinner; localization, reduced motion and recovery"
     },
     {
       "file": "test/assessment-first-name.test.ts",
