@@ -8,6 +8,11 @@
   ],
   "files": [
     {
+      "file": "test/pharmacy-reveal/progress-presentation.test.ts",
+      "expectedCases": 6,
+      "reason": "Localized pharmacy wait estimate, decorative animation, reduced motion and unchanged completion/recovery stages"
+    },
+    {
       "file": "test/assessment-first-name.test.ts",
       "expectedCases": 4,
       "reason": "Names are preserved without a word blocklist through shared assessment and reveal normalization"
