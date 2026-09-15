@@ -10,7 +10,7 @@
     {
       "file": "test/pharmacy-reveal/progress-presentation.test.ts",
       "expectedCases": 8,
-      "reason": "Page-wide rain; curved visits to the active spinner and return home; no flight without a spinner; localization, reduced motion and recovery"
+      "reason": "Page-wide rain; small stationary idle movement throughout waiting; mobile/desktop, localization, reduced motion and recovery"
     },
     {
       "file": "test/assessment-first-name.test.ts",

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import { useRouter } from "next/navigation";
 import { Check, ArrowRight, LoaderCircle } from "lucide-react";
 import { SafeImage } from "@/components/safe-image";
@@ -8,7 +8,6 @@ import { pharmacyPath } from "@/lib/pharmacy-journey";
 import { assessmentPollKey, fetchFunnelJson, pollFunnelStatus } from "@/lib/funnel-polling";
 import type { NutritionJourneySnapshot } from "@/lib/nutrition-journey-read";
 import type { Locale } from "@/lib/i18n";
-import { positionPharmacyFlight } from "@/components/pharmacy/waiting-flight";
 
 const copy = {
   en: { kicker: "Your pharmacy plan", title: "Finding your right amount.", body: "We’re bringing your answers and this pharmacy’s products together into a plan for you.",
@@ -25,7 +24,7 @@ const copy = {
     error: "此步骤比预期更久。已保存的回答仍然保留，请重试以继续。", retry: "重试" }
 };
 
-// A bounded, decorative rain and flight inspired by the supplied mockup.
+// A bounded, decorative rain and subtle idle inspired by the supplied mockup.
 // Only real readiness advances the steps; no timers, particle allocation or extra polling.
 const waitingAnimationStyles = `
   .mn-pharmacy-progress { position: relative; isolation: isolate; }
@@ -33,10 +32,9 @@ const waitingAnimationStyles = `
   .mn-pharmacy-waiting-content > :is(p, h1, [role="status"], [role="alert"]) { background: var(--mn-cream); }
   .mn-pharmacy-waiting-placeholder { height: 6rem; }
   .mn-pharmacy-waiting-art { position: absolute; inset: 0; overflow: hidden; pointer-events: none; --start-y: 2rem; }
-  .mn-pharmacy-waiting-rain, .mn-pharmacy-waiting-flight { position: absolute; inset: 0; container-type: size; overflow: hidden; }
+  .mn-pharmacy-waiting-rain { position: absolute; inset: 0; container-type: size; overflow: hidden; }
   .mn-pharmacy-waiting-rain { z-index: 0; }
-  .mn-pharmacy-waiting-flight { z-index: 2; }
-  .mn-pharmacy-waiting-nong { position: absolute; left: 0; top: 0; width: 6rem; height: 6rem; z-index: 1; transform: translate3d(calc(50cqw - 50%), var(--start-y), 0); }
+  .mn-pharmacy-waiting-nong { position: absolute; left: 50%; top: var(--start-y); width: 6rem; height: 6rem; z-index: 2; transform: translateX(-50%); }
   .mn-pharmacy-waiting-word { position: absolute; top: -3rem; left: clamp(0px, var(--x), calc(100% - 8rem)); padding: 4px 8px; border-radius: 999px; background: var(--mn-cream); color: var(--mn-teal-deep); font-size: .75rem; line-height: 1.4; white-space: nowrap; opacity: 0; }
   .mn-pharmacy-waiting-word:nth-of-type(3n) { color: var(--mn-gold); }
   .mn-pharmacy-waiting-word:nth-of-type(3n + 1) { color: var(--mn-ink-soft); }
@@ -51,15 +49,14 @@ const waitingAnimationStyles = `
     .mn-pharmacy-waiting-word { font-size: .875rem; }
   }
   @media (prefers-reduced-motion: no-preference) {
-    .mn-pharmacy-waiting-art[data-flying="true"] .mn-pharmacy-waiting-nong { offset-path: var(--flight-path, none); offset-anchor: 50% 100%; offset-rotate: 0deg; animation: mn-pharmacy-nong-flight 10s ease-in-out infinite; filter: drop-shadow(0 0 8px var(--mn-gold-tint)); }
+    .mn-pharmacy-waiting-art[data-active="true"] .mn-pharmacy-waiting-nong img { animation: mn-pharmacy-nong-idle 4.8s ease-in-out infinite; transform-origin: 50% 80%; }
     .mn-pharmacy-waiting-word { animation: mn-pharmacy-word-rain var(--duration) var(--delay) linear infinite; }
     .mn-pharmacy-waiting-spark { animation-name: mn-pharmacy-spark; animation-duration: 1.5s; animation-timing-function: ease-out; animation-iteration-count: infinite; }
   }
   @media (prefers-reduced-motion: reduce) { .mn-pharmacy-waiting-word, .mn-pharmacy-waiting-spark { display: none; } }
-  @keyframes mn-pharmacy-nong-flight {
-    0%, 12% { offset-distance: 0%; transform: rotate(0deg); }
-    40%, 60% { offset-distance: var(--active-stop, 50%); transform: rotate(0deg); }
-    90%, 100% { offset-distance: 100%; transform: rotate(0deg); }
+  @keyframes mn-pharmacy-nong-idle {
+    0%, 100% { transform: translateY(0) rotate(-.4deg); }
+    50% { transform: translateY(-3px) rotate(.4deg); }
   }
   @keyframes mn-pharmacy-word-rain {
     0% { opacity: 0; transform: translate3d(0, 0, 0) rotate(-5deg); }
@@ -80,24 +77,12 @@ export function PharmacyProgressView({ locale, stage = 0, failed = false, onRetr
 }) {
   const c = copy[locale];
   const working = !failed && stage < 3;
-  const sectionRef = useRef<HTMLElement>(null);
-  useEffect(() => {
-    const section = sectionRef.current;
-    if (!section || !working) return;
-    const position = () => positionPharmacyFlight(section);
-    position();
-    const observer = new ResizeObserver(position);
-    observer.observe(section);
-    return () => observer.disconnect();
-  }, [working, locale, stage]);
-  return <section ref={sectionRef} data-testid="pharmacy-progress" className="mn-pharmacy-progress w-full text-center" aria-busy={working}>
+  return <section data-testid="pharmacy-progress" className="mn-pharmacy-progress w-full text-center" aria-busy={working}>
     <style>{waitingAnimationStyles}</style>
-    <div data-testid="pharmacy-waiting-art" className="mn-pharmacy-waiting-art" data-active={working} data-flying={working && stage > 0} aria-hidden="true">
-      <div className="mn-pharmacy-waiting-flight">
-      <div key={stage} className="mn-pharmacy-waiting-nong">
+    <div data-testid="pharmacy-waiting-art" className="mn-pharmacy-waiting-art" data-active={working} aria-hidden="true">
+      <div className="mn-pharmacy-waiting-nong">
         <SafeImage src="/assets/library/nong/nong-thinking.webp" alt="" width={128} height={150} className="mx-auto size-24 object-contain sm:h-36 sm:w-32" />
         {working && [0, 1, 2].map(index => <i key={index} className="mn-pharmacy-waiting-spark">✦</i>)}
-      </div>
       </div>
       <div className="mn-pharmacy-waiting-rain">
       {working && [...c.words, ...c.words].map((word, index) => <span key={index} className="mn-pharmacy-waiting-word"
