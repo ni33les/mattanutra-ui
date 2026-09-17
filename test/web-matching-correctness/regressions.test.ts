@@ -15,10 +15,11 @@ const named = (id: string) => { const row=frozen.candidates.find(p=>p.id===id); 
 const fish=()=>named('5c7c94ab-ea40-4f7e-81be-849c96e8dbca');
 const context=()=>productRecommendationClientContextFromPlan({diet:'vegan',form:'capsules',allergies:['milk'],maxPills:'1-3',budget:'2500-5000',age:'40',sex:'male',supplements:'none'},[],[]);
 
-test('WM-01 real questionnaire vegan answer excludes fish oil while preserving capsule preference',()=>{
+test('WM-01 web vegan answer excludes fish oil independently of the retired format question',()=>{
  const result=recommendWithMatcher({needs:[need('Omega-3')],candidates:[fish()],clientContext:context(),clientSex:'male'});
  assert.equal(result.recommendations.length,0);
- assert.equal(context().preferredForm,'capsules');
+ assert.equal(context().preferredForm,null);
+ assert.equal(productRecommendationClientContextFromPlan({form:'capsules'},[],[],'agent').preferredForm,'capsules');
 });
 test('WM-02 food milk allergy excludes a labelled whey product independently of dietary preference',()=>{
  const p=fish();p.title='Whey protein with Omega-3';p.matchingFacts={...p.matchingFacts!,omegaSource:'none',dietarySource:'any'};

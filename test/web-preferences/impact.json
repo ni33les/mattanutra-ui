@@ -49,6 +49,24 @@
       "expectedCases": 1,
       "reason": "Capture/replay and generation isolation for each channel and locale",
       "database": true
+    },
+    {
+      "file": "test/web-advisory.test.ts",
+      "expectedCases": 8,
+      "reason": "Affected input provenance, generation identities and nonblocking web safety",
+      "database": false
+    },
+    {
+      "file": "test/web-matching-correctness/regressions.test.ts",
+      "expectedCases": 15,
+      "reason": "Changed questionnaire adapter retains exclusions and factual matching",
+      "database": false
+    },
+    {
+      "file": "test/funnel-readiness.integration.test.ts",
+      "expectedCases": 6,
+      "reason": "Generation task identity, stale revisions, complete advice and read-only readiness",
+      "database": true
     }
   ],
   "browser": [
@@ -61,6 +79,7 @@
   ],
   "expectationChanges": [
     "Only web hides budget/maxPills/form and excludes these answers from generated inputs. Agent definitions and MCP contract remain available.",
-    "Existing stored answers, results and checkouts are not rewritten."
+    "Existing stored answers, results and checkouts are not rewritten.",
+    "WM-01 keeps its vegan exclusion assertion; web preferredForm is now unspecified, while agent capsule preference is explicitly preserved."
   ]
 }
