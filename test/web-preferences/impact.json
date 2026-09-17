@@ -46,7 +46,7 @@
     },
     {
       "file": "test/web-preferences/capture.integration.test.ts",
-      "expectedCases": 1,
+      "expectedCases": 2,
       "reason": "Capture/replay and generation isolation for each channel and locale",
       "database": true
     },
@@ -67,6 +67,12 @@
       "expectedCases": 6,
       "reason": "Generation task identity, stale revisions, complete advice and read-only readiness",
       "database": true
+    },
+    {
+      "file": "test/assessment-capture.integration.test.ts",
+      "expectedCases": 5,
+      "reason": "Shared classic/chat admission, revision, reservation and contact correctness",
+      "database": true
     }
   ],
   "browser": [
@@ -80,6 +86,7 @@
   "expectationChanges": [
     "Only web hides budget/maxPills/form and excludes these answers from generated inputs. Agent definitions and MCP contract remain available.",
     "Existing stored answers, results and checkouts are not rewritten.",
-    "WM-01 keeps its vegan exclusion assertion; web preferredForm is now unspecified, while agent capsule preference is explicitly preserved."
+    "WM-01 keeps its vegan exclusion assertion; web preferredForm is now unspecified, while agent capsule preference is explicitly preserved.",
+    "Assessment capture integration requires its isolated database; missing prerequisites fail rather than skip."
   ]
 }

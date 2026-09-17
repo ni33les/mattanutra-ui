@@ -75,7 +75,7 @@ export async function captureAssessment(bodyValue: unknown, options: { planId?: 
   if (paymentId && (typeof paymentId !== "string" || !isUuid(paymentId))) throw new FunnelError("Invalid payment reservation", 400, "invalid_payment");
   const answerInput = { ...record(body.answers) };
   delete answerInput[IN_STORE_PHARMACY_ANSWERS_KEY];
-  const channel = questionnaireChannel(record(body.questionnaireState).channel);
+  const channel = questionnaireChannel(body.questionnaireState === undefined ? undefined : record(body.questionnaireState).channel);
   const rawAnswers = validateCaptureAnswers(answerInput, channel);
   const existing = requestedPlanId ? await getStoredAssessmentPrefill(requestedPlanId) : null;
   const { invalidRequested, pharmacy } = await resolveCapturePharmacy(body.pharmacyId, existing?.answers ?? resume?.answers);

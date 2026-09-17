@@ -9,7 +9,8 @@ import { createServerQuestionnaireCoordinator } from "../lib/questionnaire/serve
 import { createInitialState, fastForwardQuestionnaire, serializeState } from "../lib/questionnaire/engine.ts";
 
 const databaseUrl = process.env.TEST_DB_URL;
-describe("shared assessment capture on PostgreSQL", { skip: !databaseUrl }, () => {
+assert.ok(databaseUrl, "Assessment capture tests require isolated PostgreSQL");
+describe("shared assessment capture on PostgreSQL", () => {
   const plans: string[] = [], payments: string[] = [], keys: string[] = [], drafts: string[] = [];
   const body = { answers: { firstName: "Fixture", age: "36-45", sex: "male", goals: ["energy"] }, locale: "en", intent: "capture" };
   const request = (planId?: string) => { const idempotencyKey = randomUUID(); keys.push(idempotencyKey); return { idempotencyKey, planId }; };
