@@ -1,3 +1,5 @@
+import { effectiveQuestionnaireAnswers, questionnaireChannel } from "@/lib/web-purchase-preferences";
+import type { QuestionnaireChannel } from "@/lib/questionnaire/types";
 import { sha256Hex } from '@/lib/sha256';
 import { pharmacyCandidatePrice, belongsToPharmacy } from "@/lib/pharmacy-journey";
 import { loadAdminSafetyReferenceSnapshot, refreshAdminSafetyCeilings } from "@/lib/agentic/catalogue/load-safety-ceilings";
@@ -112,6 +114,7 @@ export type HealthScoreWorkItem = Readonly<{
 }>;
 
 export type FormulationWorkItem = Readonly<{
+  questionnaireChannel?: QuestionnaireChannel;
   formulationAvailability?: FormulationAvailability;
   answers: unknown;
   canonicalSupplements: CanonicalSupplementOption[];
@@ -520,9 +523,10 @@ function ageYearsFromQuestionnaire(value: string | null) {
 export function productRecommendationClientContextFromPlan(
   answers: unknown,
   planFeedback: readonly PlanFeedbackItem[],
-  guidanceAdjustments: readonly PlanGuidanceAdjustment[]
+  guidanceAdjustments: readonly PlanGuidanceAdjustment[],
+  channel: QuestionnaireChannel = "web"
 ): ProductRecommendationClientContext {
-  const record = payloadRecord(answers);
+  const record = effectiveQuestionnaireAnswers(answers, channel);
   const kidney = textFromRecord(record, "kidney");
   const cautions = [
     ...stringArrayFromRecord(record, "suppAllergies"),
@@ -2081,7 +2085,7 @@ async function buildProductRecommendationsWorkItem(task: TaskRecord) {
     safetyReferenceIdentity,
     catalogueFingerprint: valueCatalogueFingerprint(requireCachedLiveRetailSnapshot(countryCode)),
     searchEffort: payloadRecord(payloadRecord(task.payload).productPreferences).searchEffort === "expanded" ? "expanded" : "standard",
-    clientContext: { ...productRecommendationClientContextFromPlan(row.answers, [], []),
+    clientContext: { ...productRecommendationClientContextFromPlan(generationInput(task.payload)?.answers ?? row.answers, [], [], generationInput(task.payload)?.channel),
       excludeProductIds: Array.isArray(payloadRecord(payloadRecord(task.payload).productPreferences).excludedProductIds)
         ? payloadRecord(payloadRecord(task.payload).productPreferences).excludedProductIds as string[] : [] },
     clientSex: productClientSexFromAnswers(row.answers),
@@ -2350,14 +2354,16 @@ const taskWorkItemHandlers: Readonly<Record<string, TaskWorkItemBuilder>> = {
 };
 
 export async function buildTaskWorkItem(task: TaskRecord): Promise<TaskWorkItem> {
-  const generation = generationInput(task.payload);
+  let generation = generationInput(task.payload);
   if (task.planId && ASSESSMENT_GENERATION_TASKS.has(task.taskType)) {
     const sql = getSql();
     if (!sql) throw new Error("Database is not configured");
-    const [row] = await sql`select input_revision from public.assessments where plan_id = ${task.planId}::uuid`;
+    const [row] = await sql`select input_revision, questionnaire_state->>'channel' as channel from public.assessments where plan_id = ${task.planId}::uuid`;
     if (!generation || !row || generation.generatorVersion !== FUNNEL_GENERATOR_VERSION || Number(row.input_revision) !== generation.revision) {
       return { taskId: task.id, taskType: "superseded_generation" };
     }
+    generation = { ...generation, channel: questionnaireChannel(generation.channel ?? row.channel),
+      answers: effectiveQuestionnaireAnswers(generation.answers, questionnaireChannel(generation.channel ?? row.channel)) };
     if (task.taskType === "generate_product_recommendations") {
       const reference = await loadAdminSafetyReferenceSnapshot(sql);
       if (Number(payloadRecord(task.payload).catalogueRevision) !== reference.runtimeRevision ||
@@ -2373,9 +2379,9 @@ export async function buildTaskWorkItem(task: TaskRecord): Promise<TaskWorkItem>
   const handler = taskWorkItemHandlers[task.taskType];
 
   if (handler) {
-    const item = await (generation && task.planId ? withGenerationInput(task.planId, generation, () => handler(task)) : handler(task));
+    const item = await (generation && task.planId ? withGenerationInput(task.planId, generation, () => handler({ ...task, payload: { ...payloadRecord(task.payload), generation } })) : handler(task));
     if (generation && "answers" in item) {
-      return { ...item, answers: generation.answers, locale: generation.locale,
+      return { ...item, answers: generation.answers, locale: generation.locale, questionnaireChannel: generation.channel,
         ...(item.taskType === "analyze_healthscore" ? { healthScore: computeHealthScore(generation.answers, generation.locale) } : {}) } as TaskWorkItem;
     }
     return item;

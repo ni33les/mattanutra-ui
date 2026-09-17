@@ -205,7 +205,6 @@ export function buildRandomDevAnswers(): Answers {
     alcohol: randomItem(["none", "1-3", "4-7"]),
     antibiotics: randomItem(["no", "yes"]),
     activity: randomItem(["sitting", "light", "moderate", "active"]),
-    budget: randomItem(["1000-2500", "2500-5000", "5000+"]),
     caffeine: randomItem(["1", "2-3", "4+"]),
     country: "TH",
     diet: randomItem(["balanced", "whole", "mediterranean", "plant"]),
@@ -224,14 +223,12 @@ export function buildRandomDevAnswers(): Answers {
       legumes: randomItem(["weekly", "most"]),
       redmeat: randomItem(["never", "1-2", "3+"])
     },
-    form: randomItem(["capsules", "powder", "mixed"]),
     goals: randomSubset(["energy", "sleep", "focus", "longevity", "fitness", "mood"], 3),
     heightCm: String(Math.round(155 + Math.random() * 38)),
     hrv: String(Math.round(42 + Math.random() * 36)),
     kidney: "normal",
     labs: { b12: "520", ferritin: "80", hba1c: "5.3", o3: "6.2", vitd: "42" },
     liver: "normal",
-    maxPills: randomItem(["4-6", "7-10", "nolimit"]),
     meds: randomItem(["none", "yes"]),
     medTypes: ["statin"],
     menopause: sex === "female" ? randomItem(["pre", "peri", "post", "unsure"]) : "",
@@ -303,9 +300,6 @@ function reachableEssentialChecks(answers: Answers) {
     { id: "surgery", answered: hasText(answers.surgery) },
     { id: "antibiotics", answered: hasText(answers.antibiotics) },
     { id: "supplements", answered: hasText(answers.supplements) },
-    { id: "budget", answered: hasText(answers.budget) },
-    { id: "maxPills", answered: hasText(answers.maxPills) },
-    { id: "form", answered: hasText(answers.form) }
   ];
 
   if (answers.sex === "female") {

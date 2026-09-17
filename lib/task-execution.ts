@@ -453,6 +453,7 @@ export async function executeTaskWorkItem(
   ) {
     const analysis = await analyzeFormulationWithGrok({
       answers: workItem.answers,
+      questionnaireChannel: workItem.questionnaireChannel,
       audit: async () => undefined,
       canonicalSupplements: workItem.canonicalSupplements,
       chatMessages: workItem.chatMessages,

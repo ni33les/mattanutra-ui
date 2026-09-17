@@ -1,3 +1,5 @@
+import { effectiveQuestionnaireAnswers, questionnaireChannel } from "@/lib/web-purchase-preferences";
+import type { QuestionnaireChannel } from "@/lib/questionnaire/types";
 import { createHash } from "node:crypto";
 import { resolvePharmacyAcquisition, pharmacyBpmAttribution } from "@/lib/pharmacy-acquisition";
 import { assessmentInputHash, loadGenerationInput, withGenerationInput } from "@/lib/assessment-revisions";
@@ -33,7 +35,7 @@ function record(value: unknown): Record<string, unknown> {
 }
 
 /** Validate the existing answer shape without changing scoring values or optional questions. */
-export function validateCaptureAnswers(value: unknown) {
+export function validateCaptureAnswers(value: unknown, channel: QuestionnaireChannel = "web") {
   const answers = record(value);
   if (!Object.keys(answers).length || JSON.stringify(answers).length > 65_536) throw new FunnelError("Assessment answers are required", 400, "invalid_answers");
   const shape = { ...buildInitialAnswers(), reassessmentEmail: "" } as Record<string, unknown>;
@@ -51,7 +53,8 @@ export function validateCaptureAnswers(value: unknown) {
         : typeof answer === typeof expected && (typeof answer !== "string" || answer.length <= 5000);
     if (!valid) throw new FunnelError(`Invalid assessment answer: ${key}`, 400, "invalid_answers");
   }
-  return { ...buildInitialAnswers(answers), inputProvenance: inputProvenance(answers.inputProvenance) ?? captureInputProvenance(answers), ...(answers.reassessmentEmail ? { reassessmentEmail: answers.reassessmentEmail } : {}) };
+  const effective = effectiveQuestionnaireAnswers(answers, channel);
+  return { ...buildInitialAnswers(effective), inputProvenance: inputProvenance(effective.inputProvenance) ?? captureInputProvenance(effective), ...(answers.reassessmentEmail ? { reassessmentEmail: answers.reassessmentEmail } : {}) };
 }
 
 /** Shared HTTP and server-coordinator capture. The receipt, revision, binding and jobs commit together. */
@@ -72,7 +75,8 @@ export async function captureAssessment(bodyValue: unknown, options: { planId?: 
   if (paymentId && (typeof paymentId !== "string" || !isUuid(paymentId))) throw new FunnelError("Invalid payment reservation", 400, "invalid_payment");
   const answerInput = { ...record(body.answers) };
   delete answerInput[IN_STORE_PHARMACY_ANSWERS_KEY];
-  const rawAnswers = validateCaptureAnswers(answerInput);
+  const channel = questionnaireChannel(record(body.questionnaireState).channel);
+  const rawAnswers = validateCaptureAnswers(answerInput, channel);
   const existing = requestedPlanId ? await getStoredAssessmentPrefill(requestedPlanId) : null;
   const { invalidRequested, pharmacy } = await resolveCapturePharmacy(body.pharmacyId, existing?.answers ?? resume?.answers);
   if (invalidRequested) throw new FunnelError("Pharmacy not found", 404, "pharmacy_not_found");
@@ -115,7 +119,7 @@ export async function captureAssessment(bodyValue: unknown, options: { planId?: 
     const identity = await persistAssessmentSubmission({ answers, contactEmail, locale, selectedPlan, skipHealthScore, snapshot, status: "captured" });
     if (body.questionnaireState !== undefined) {
       const state = deserializeState(JSON.stringify(body.questionnaireState));
-      if (!state || state.locale !== locale || assessmentInputHash(validateCaptureAnswers(toAssessmentAnswers(state.answers))) !== assessmentInputHash(rawAnswers)) throw new FunnelError("Invalid questionnaire state", 400, "invalid_questionnaire_state");
+      if (!state || state.locale !== locale || assessmentInputHash(validateCaptureAnswers(toAssessmentAnswers(state.answers), channel)) !== assessmentInputHash(rawAnswers)) throw new FunnelError("Invalid questionnaire state", 400, "invalid_questionnaire_state");
       await tx`update public.assessments set questionnaire_state = ${tx.json(toJsonValue({ ...state, planId, assessmentRevision: identity.revision }))}
         where plan_id = ${planId}::uuid`;
     } else {

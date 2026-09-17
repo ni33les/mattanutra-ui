@@ -1,3 +1,4 @@
+import { effectiveQuestionnaireAnswers, isWebPurchaseQuestion, questionnaireChannel } from "@/lib/web-purchase-preferences";
 /**
  * Headless conversation engine for the chat questionnaire (v6-conversational).
  * Pure functions — no DOM, no I/O. Safe for web, LINE, agent tools.
@@ -90,8 +91,10 @@ export function getTurn(
 export function isVisibleTurn(
   definition: QuestionnaireDefinition,
   turn: TurnDef,
-  answers: QuestionnaireAnswers
+  answers: QuestionnaireAnswers,
+  channel: QuestionnaireChannel = "agent"
 ): boolean {
+  if (channel === "web" && isWebPurchaseQuestion(turn.k)) return false;
   if (
     answers.precisionGate === "skip" &&
     turn.opt &&
@@ -131,7 +134,7 @@ export function nextOpenIndex(
   while (j < definition.turns.length) {
     const turn = definition.turns[j]!;
 
-    if (isVisibleTurn(definition, turn, state.answers) && !isAnswered(state, turn)) {
+    if (isVisibleTurn(definition, turn, state.answers, state.channel) && !isAnswered(state, turn)) {
       return j;
     }
 
@@ -151,7 +154,7 @@ export function computePrecision(
   let optionalMax = 0;
 
   for (const turn of definition.turns) {
-    if (!turn.pts || !isVisibleTurn(definition, turn, state.answers)) {
+    if (!turn.pts || !isVisibleTurn(definition, turn, state.answers, state.channel)) {
       continue;
     }
 
@@ -203,7 +206,7 @@ export function remainingInSection(
     }
 
     if (
-      isVisibleTurn(definition, turn, state.answers) &&
+      isVisibleTurn(definition, turn, state.answers, state.channel) &&
       !isAnswered(state, turn)
     ) {
       count += 1;
@@ -240,7 +243,7 @@ function pruneInvisibleAnswers(
   for (const turn of definition.turns) {
     if (
       turn.cond &&
-      !isVisibleTurn(definition, turn, answers) &&
+      !isVisibleTurn(definition, turn, answers, state.channel) &&
       answers[turn.k] !== undefined
     ) {
       delete answers[turn.k];
@@ -436,7 +439,7 @@ function maybeHalfway(
   let answered = 0;
 
   for (const turn of definition.turns) {
-    if (turn.req && isVisibleTurn(definition, turn, state.answers)) {
+    if (turn.req && isVisibleTurn(definition, turn, state.answers, state.channel)) {
       total += 1;
       if (state.answers[turn.k] !== undefined) {
         answered += 1;
@@ -1251,7 +1254,7 @@ export function isQuestionnaireComplete(state: QuestionnaireState): boolean {
   const definition = getDefinition(state);
 
   for (const turn of definition.turns) {
-    if (!isVisibleTurn(definition, turn, state.answers)) {
+    if (!isVisibleTurn(definition, turn, state.answers, state.channel)) {
       continue;
     }
 
@@ -1274,7 +1277,7 @@ export function reopenTurn(
   const definition = getDefinition(state);
   const turnIndex = definition.turns.findIndex((t) => t.k === turnKey);
 
-  if (turnIndex < 0) {
+  if (turnIndex < 0 || !isVisibleTurn(definition, definition.turns[turnIndex]!, state.answers, state.channel)) {
     return { ok: false, error: "Unknown question", state };
   }
 
@@ -1386,7 +1389,7 @@ export function summarizeAnswer(
 ): string | null {
   const definition = getDefinition(state);
   const turn = definition.turns.find((t) => t.k === turnKey);
-  if (!turn || state.answers[turnKey] === undefined) {
+  if (!turn || !isVisibleTurn(definition, turn, state.answers, state.channel) || state.answers[turnKey] === undefined) {
     return null;
   }
 
@@ -1414,12 +1417,23 @@ export function deserializeState(raw: string): QuestionnaireState | null {
     }
 
     // Backfill v6 fields if restoring older drafts
-    return {
+    const restored: QuestionnaireState = {
       ...parsed,
+      channel: questionnaireChannel(parsed.channel),
       autoFilled: Array.isArray(parsed.autoFilled) ? parsed.autoFilled : [],
       halfwayDone: Boolean(parsed.halfwayDone),
       sinceAck: typeof parsed.sinceAck === "number" ? parsed.sinceAck : 0
     };
+    if (restored.channel !== "web") return restored;
+    const next = { ...restored, answers: effectiveQuestionnaireAnswers(restored.answers),
+      earned: Object.fromEntries(Object.entries(restored.earned).filter(([key]) => !isWebPurchaseQuestion(key))),
+      log: restored.log.filter(row => !("turnKey" in row && isWebPurchaseQuestion(row.turnKey))) };
+    const definition = getDefinition(next);
+    if ((next.phase === "active" || next.phase === "resume_prompt") && isWebPurchaseQuestion(definition.turns[next.turnIndex]?.k ?? "")) {
+      const turnIndex = nextOpenIndex(definition, next, next.turnIndex);
+      return turnIndex < definition.turns.length ? { ...next, turnIndex } : completeQuestionnaire(next).state;
+    }
+    return next;
   } catch {
     return null;
   }

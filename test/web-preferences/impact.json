@@ -1,0 +1,66 @@
+{
+  "releaseBase": "76a434e5965182a6613fbb48503b9efc37ea5019",
+  "scope": "web_purchase_preferences_omitted",
+  "files": [
+    {
+      "file": "test/web-preferences/questionnaire.test.ts",
+      "expectedCases": 8,
+      "reason": "Web/agent traversal, stable resume, classic completion and copy",
+      "database": false
+    },
+    {
+      "file": "test/web-preferences/generation.test.ts",
+      "expectedCases": 4,
+      "reason": "Capture identity, web matcher context and provider payload",
+      "database": false
+    },
+    {
+      "file": "test/questionnaire-engine.test.ts",
+      "expectedCases": 16,
+      "reason": "Directly affected shared turn engine and agent coordinator",
+      "database": false
+    },
+    {
+      "file": "test/questionnaire-browser-draft.test.ts",
+      "expectedCases": 4,
+      "reason": "Resume ownership, language and capture receipt preservation",
+      "database": false
+    },
+    {
+      "file": "test/healthscore-performance/formula-cache.test.ts",
+      "expectedCases": 7,
+      "reason": "Provider routing, retry and locale context",
+      "database": false
+    },
+    {
+      "file": "test/simple-plan/cost-weight.test.ts",
+      "expectedCases": 4,
+      "reason": "Retained MCP cost/pill controls and advertised semantics",
+      "database": false
+    },
+    {
+      "file": "test/practical-matching/scoring.test.ts",
+      "expectedCases": 11,
+      "reason": "Unchanged general burden and advisory preference arithmetic",
+      "database": false
+    },
+    {
+      "file": "test/web-preferences/capture.integration.test.ts",
+      "expectedCases": 1,
+      "reason": "Capture/replay and generation isolation for each channel and locale",
+      "database": true
+    }
+  ],
+  "browser": [
+    {
+      "file": "test/e2e/web-preferences.spec.ts",
+      "expectedCases": 6,
+      "grep": "WEB-PREF-BROWSER",
+      "reason": "Both questionnaire routes resume and capture in three locales"
+    }
+  ],
+  "expectationChanges": [
+    "Only web hides budget/maxPills/form and excludes these answers from generated inputs. Agent definitions and MCP contract remain available.",
+    "Existing stored answers, results and checkouts are not rewritten."
+  ]
+}

@@ -55,3 +55,9 @@ test('WEB-PREF-05 browser server resume remains web-scoped and preserves receipt
   const definition = getDefinition(draft.state);
   assert.ok(definition.turns.filter(t => keys.includes(t.k)).every(t => !isVisibleTurn(definition, t, draft.state.answers, draft.state.channel)));
 });
+test('WEB-PREF-09 section introduction no longer promises budget or format personalisation', () => {
+  for (const locale of ['en', 'th'] as const) {
+    const definition = getDefinition(createInitialState({ locale, channel: 'web' }));
+    assert.doesNotMatch(definition.sections[5]!.desc, /budget|งบประมาณ/);
+  }
+});

@@ -202,7 +202,7 @@ export function ChatQuestionnaire({
         turn.req &&
         !turn.opt &&
         turn.kind !== "gate" &&
-        isVisibleTurn(definition, turn, state.answers)
+        isVisibleTurn(definition, turn, state.answers, state.channel)
     );
     const answered = core.filter(
       (turn) => state.answers[turn.k] !== undefined
@@ -212,7 +212,7 @@ export function ChatQuestionnaire({
       currentTurn ??
       definition.turns.find(
         (turn) =>
-          isVisibleTurn(definition, turn, state.answers) &&
+          isVisibleTurn(definition, turn, state.answers, state.channel) &&
           state.answers[turn.k] === undefined
       ) ??
       definition.turns[definition.turns.length - 1];
@@ -223,7 +223,7 @@ export function ChatQuestionnaire({
         turn.req &&
         !turn.opt &&
         turn.kind !== "gate" &&
-        isVisibleTurn(definition, turn, state.answers)
+        isVisibleTurn(definition, turn, state.answers, state.channel)
     );
     const sectionAnswered = sectionTurns.filter(
       (turn) => state.answers[turn.k] !== undefined
@@ -660,7 +660,7 @@ export function ChatQuestionnaire({
     const items: Array<{ key: string; question: string; answer: string }> = [];
 
     for (const turn of def.turns) {
-      if (!isVisibleTurn(def, turn, state.answers)) {
+      if (!isVisibleTurn(def, turn, state.answers, state.channel)) {
         continue;
       }
 

@@ -1,3 +1,5 @@
+import { effectiveQuestionnaireAnswers, questionnaireChannel, WEB_PREFERENCE_POLICY } from "@/lib/web-purchase-preferences";
+import type { QuestionnaireChannel } from "@/lib/questionnaire/types";
 import { withoutPharmacyAcquisition } from "@/lib/pharmacy-acquisition";
 import { historicalAssessmentReadJoin, historicalResult } from "@/lib/historical-assessment-read";
 import { AsyncLocalStorage } from "node:async_hooks";
@@ -9,6 +11,7 @@ import type { HealthScoreResult } from "@/lib/health-score";
 
 export const FUNNEL_GENERATOR_VERSION = "web-funnel-v3-flexible";
 export type GenerationInput = Readonly<{
+  channel?: QuestionnaireChannel;
   revision: number;
   inputHash: string;
   answers: Record<string, unknown>;
@@ -19,14 +22,15 @@ export type GenerationInput = Readonly<{
 /** A new input, language or generator must never collide with a historical task ID. */
 export function generationTaskId(taskId: string, generation: GenerationInput) {
   const hex = createHash("sha256").update(JSON.stringify([
-    taskId, generation.revision, generation.inputHash, generation.locale, generation.generatorVersion
+    taskId, generation.revision, generation.inputHash, generation.locale, generation.generatorVersion,
+    ...(questionnaireChannel(generation.channel) === "web" ? [WEB_PREFERENCE_POLICY] : [])
   ])).digest("hex");
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-5${hex.slice(13, 16)}-a${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
 }
 
 const generationScope = new AsyncLocalStorage<{ planId: string; input: GenerationInput }>();
 export function withGenerationInput<T>(planId: string, input: GenerationInput, work: () => T): T {
-  return generationScope.run({ planId, input: { ...input, answers: withoutPharmacyAcquisition(input.answers) } }, work);
+  return generationScope.run({ planId, input: { ...input, answers: effectiveQuestionnaireAnswers(withoutPharmacyAcquisition(input.answers), input.channel) } }, work);
 }
 export function generationLocale(planId: string | null | undefined) {
   const scope = generationScope.getStore();
@@ -57,7 +61,7 @@ export function generationInput(payload: unknown): GenerationInput | null {
     typeof value.generatorVersion === "string" ? value : null;
 }
 export async function loadGenerationInput(sql: postgres.Sql | postgres.TransactionSql, planId: string, locale?: unknown): Promise<GenerationInput | null> {
-  const [row] = await sql`select answers, input_revision, input_hash, locale from public.assessments where plan_id = ${planId}::uuid`;
+  const [row] = await sql`select answers, input_revision, input_hash, locale, questionnaire_state->>'channel' as channel from public.assessments where plan_id = ${planId}::uuid`;
   if (!row) return null;
   const scope = generationScope.getStore();
   if (scope?.planId === planId) {
@@ -65,7 +69,8 @@ export async function loadGenerationInput(sql: postgres.Sql | postgres.Transacti
     return scope.input;
   }
   return {
-    answers: withoutPharmacyAcquisition(row.answers), revision: Number(row.input_revision), inputHash: row.input_hash ?? assessmentInputHash(row.answers),
+    channel: questionnaireChannel(row.channel),
+    answers: effectiveQuestionnaireAnswers(withoutPharmacyAcquisition(row.answers), questionnaireChannel(row.channel)), revision: Number(row.input_revision), inputHash: row.input_hash ?? assessmentInputHash(row.answers),
     locale: isLocale(locale) ? locale : isLocale(row.locale) ? row.locale : "en", generatorVersion: FUNNEL_GENERATOR_VERSION
   };
 }

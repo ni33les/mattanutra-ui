@@ -1,5 +1,7 @@
 "use client";
 
+import { effectiveQuestionnaireAnswers } from "@/lib/web-purchase-preferences";
+
 import { PharmacyProgressView } from "@/components/pharmacy/progress";
 import { pharmacyPath } from "@/lib/pharmacy-journey";
 import { retryHealthScoreCopy, waitForHealthScoreCopy } from "@/lib/healthscore-copy-client";
@@ -176,7 +178,7 @@ export function AssessmentFlow({
   const returningScoreStatus = returningPlanId && returningHealthScore
     ? buildReturningScoreGateStatus(returningPlanId, returningHealthScore)
     : null;
-  const [answers, setAnswers] = useState<Answers>(() => buildInitialAnswers(prefillAnswers));
+  const [answers, setAnswers] = useState<Answers>(() => buildInitialAnswers(effectiveQuestionnaireAnswers(prefillAnswers)));
   const [contactEmail, setContactEmail] = useState(prefillContactEmail ?? "");
   const [resumePlanId, setResumePlanId] = useState(returningPlanId ?? "");
   const [resumeStatus, setResumeStatus] = useState<"idle" | "sending" | "sent" | "failed">("idle");
@@ -199,7 +201,7 @@ export function AssessmentFlow({
   const normalizedContactEmail = normalizeAssessmentContactEmail(contactEmail);
   const contactEmailInvalid = assessmentContactEmailError(contactEmail) !== null;
   const effectiveReturningPlanId = resumePlanId || returningPlanId;
-  const capturedAnswers = useRef(JSON.stringify(buildInitialAnswers(prefillAnswers)));
+  const capturedAnswers = useRef(JSON.stringify(buildInitialAnswers(effectiveQuestionnaireAnswers(prefillAnswers))));
   const flowController = useRef<AbortController | null>(null);
   const [browserSession] = useState(() => sessionId || returningPlanId || paymentId || crypto.randomUUID());
   const [draftReady, setDraftReady] = useState(false);
@@ -212,9 +214,9 @@ export function AssessmentFlow({
         && (!serverUpdatedAt || saved.updatedAt > Date.parse(serverUpdatedAt))) {
         // Browser storage is available only after hydration; restore the scoped external draft once.
         // eslint-disable-next-line react-hooks/set-state-in-effect
-        setAnswers(buildInitialAnswers(saved.answers)); setContactEmail(saved.contactEmail || "");
+        setAnswers(buildInitialAnswers(effectiveQuestionnaireAnswers(saved.answers))); setContactEmail(saved.contactEmail || "");
         setSectionIndex(saved.sectionIndex || 0); setResumePlanId(saved.planId || returningPlanId || "");
-        if (saved.receipt) { capturedAnswers.current = JSON.stringify(buildInitialAnswers(saved.answers)); setCapturedStatus(saved.receipt); }
+        if (saved.receipt) { capturedAnswers.current = JSON.stringify(buildInitialAnswers(effectiveQuestionnaireAnswers(saved.answers))); setCapturedStatus(saved.receipt); }
         if (saved.processing && saved.receipt?.planId) router.replace(pharmacyId ? pharmacyPath(locale, pharmacyId, "progress", { plan: saved.receipt.planId }) : nutritionHealthScorePath(locale, saved.receipt.planId));
       }
     } catch { /* Ignore drafts from another format. */ }
@@ -976,27 +978,9 @@ export function AssessmentFlow({
       title: copy.safety.title
     },
     {
-      description: copy.precision.subtitle,
+      description: copy.precision.optionalBody,
       id: "precision",
       questions: [
-        {
-          content: <PillGroup options={copy.precision.budgetOptions} selected={answers.budget} onSelect={(value) => setSingle("budget", value)} />,
-          id: "budget",
-          isAnswered: hasText(answers.budget),
-          label: copy.precision.budget
-        },
-        {
-          content: <PillGroup options={copy.precision.maxPillsOptions} selected={answers.maxPills} onSelect={(value) => setSingle("maxPills", value)} />,
-          id: "maxPills",
-          isAnswered: hasText(answers.maxPills),
-          label: copy.precision.maxPills
-        },
-        {
-          content: <PillGroup options={copy.precision.formOptions} selected={answers.form} onSelect={(value) => setSingle("form", value)} />,
-          id: "form",
-          isAnswered: hasText(answers.form),
-          label: copy.precision.form
-        },
         {
           content: (
             <div className="space-y-5 rounded-lg border border-[color-mix(in_srgb,var(--mn-gold)_15%,transparent)] bg-[color-mix(in_srgb,var(--mn-gold)_5%,transparent)] p-4">
@@ -1235,6 +1219,7 @@ export function AssessmentFlow({
   }
 
   async function captureAssessment(force = false, answerPayload = answers) {
+    answerPayload = buildInitialAnswers(effectiveQuestionnaireAnswers(answerPayload));
     if (!force && capturedStatus?.planId && capturedAnswers.current === JSON.stringify(answerPayload)) {
       return capturedStatus;
     }

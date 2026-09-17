@@ -1,3 +1,4 @@
+import { effectiveQuestionnaireAnswers } from "@/lib/web-purchase-preferences";
 import { funnelRequestKey } from "@/lib/funnel-request-key";
 /**
  * Capture agent — normalizes chat answers and persists via /api/assessment.
@@ -49,7 +50,7 @@ export type CaptureFinalizeResult = Readonly<{
 
 export function buildCapturePayload(state: QuestionnaireState) {
   const definition = getDefinition(state);
-  const answers = toAssessmentAnswers(state.answers);
+  const answers = toAssessmentAnswers(effectiveQuestionnaireAnswers(state.answers, state.channel));
   const precision = computePrecision(definition, state);
 
   return {
@@ -57,7 +58,7 @@ export function buildCapturePayload(state: QuestionnaireState) {
     lang: state.locale,
     precision,
     answers,
-    chatAnswers: state.answers,
+    chatAnswers: effectiveQuestionnaireAnswers(state.answers, state.channel),
     extra: extraChatFields(state.answers),
     startedAt: state.startedAt,
     completedAt: state.completedAt ?? Date.now(),

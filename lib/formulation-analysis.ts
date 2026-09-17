@@ -1,3 +1,5 @@
+import { effectiveQuestionnaireAnswers } from "@/lib/web-purchase-preferences";
+import type { QuestionnaireChannel } from "@/lib/questionnaire/types";
 import { createHash } from "node:crypto";
 import type { AssessmentPlan } from "@/lib/assessment-snapshot";
 import type { CanonicalSupplementOption } from "@/lib/canonical-supplements";
@@ -32,6 +34,7 @@ type AnalysisAuditEvent = {
 
 type AnalysisInput = Readonly<{
   answers: unknown;
+  questionnaireChannel?: QuestionnaireChannel;
   audit?: (event: AnalysisAuditEvent) => Promise<void>;
   canonicalSupplements?: CanonicalSupplementOption[];
   chatMessages?: PlanChatMessage[];
@@ -107,7 +110,7 @@ function buildAssessmentSafetyContext(answers: unknown) {
   return {
     allergies: compactStringArray(record, "allergies"),
     antibiotics: compactText(record, "antibiotics"),
-    budget: compactText(record, "budget"),
+    ...(compactText(record, "budget") ? { budget: compactText(record, "budget") } : {}),
     country: compactText(record, "country") ?? "TH",
     digestiveCondition: compactText(record, "digCondition"),
     familyHistory: compactStringArray(record, "family"),
@@ -116,7 +119,7 @@ function buildAssessmentSafetyContext(answers: unknown) {
       diet: compactText(record, "diet"),
       frequency: isRecord(record.foodFrequency) ? record.foodFrequency : {}
     },
-    formPreference: compactText(record, "form"),
+    ...(compactText(record, "form") ? { formPreference: compactText(record, "form") } : {}),
     kidney: compactText(record, "kidney"),
     labs: Object.fromEntries(
       Object.entries(labs)
@@ -130,14 +133,14 @@ function buildAssessmentSafetyContext(answers: unknown) {
         ])
     ),
     liver: compactText(record, "liver"),
-    maxPills: compactText(record, "maxPills"),
+    ...(compactText(record, "maxPills") ? { maxPills: compactText(record, "maxPills") } : {}),
     medications: {
       answer: medicationAnswer,
       classes: medicationAnswer === "yes" ? compactStringArray(record, "medTypes") : [],
       other: medicationAnswer === "yes" ? compactText(record, "otherMed") : null
     },
     menopause: compactText(record, "menopause"),
-    pillCount: compactText(record, "maxPills"),
+    ...(compactText(record, "maxPills") ? { pillCount: compactText(record, "maxPills") } : {}),
     pregnancyBreastfeedingTryingToConceive: compactText(record, "reproStatus"),
     proteinIntake: compactText(record, "protein"),
     recentSurgery: compactText(record, "surgery"),
@@ -749,7 +752,7 @@ export async function analyzeFormulationWithGrok(
     role: "assistant" | "system" | "user";
   }> = [
     { content: systemPrompt(config.promptVersion), role: "system" },
-    ...userMessages(input)
+    ...userMessages({ ...input, answers: effectiveQuestionnaireAnswers(input.answers, input.questionnaireChannel) })
   ];
   // This is provider prefix routing, not an answer cache or conversation state.
   // Only immutable instructions/facts/configuration enter the opaque header;

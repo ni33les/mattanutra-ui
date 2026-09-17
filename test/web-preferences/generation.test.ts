@@ -32,3 +32,17 @@ test('WEB-PREF-08 provider prompt contains no direct or duplicated hidden prefer
   for (const row of [context.assessment, context.assessmentSafetyContext]) for (const key of ['budget', 'maxPills', 'form', 'pillCount', 'formPreference']) assert.equal(row[key], undefined, key);
   assert.doesNotMatch(JSON.stringify(context), /u1000|1-3|capsules/);
 });
+test('WEB-PREF-10 conversational assessment keeps preference context through generation', async t => {
+  const before = process.env.XAI_API_KEY; process.env.XAI_API_KEY = 'offline';
+  t.after(() => { if (before === undefined) delete process.env.XAI_API_KEY; else process.env.XAI_API_KEY = before; });
+  let context: Record<string, Record<string, unknown>> | undefined;
+  t.mock.method(globalThis, 'fetch', async (_url: unknown, init: RequestInit) => {
+    context = JSON.parse(JSON.parse(String(init.body)).messages[2].content);
+    return Response.json({ choices: [{ message: { content: JSON.stringify(formulaResponse) } }] });
+  });
+  await analyzeFormulationWithGrok({ ...formulaInput, answers: old, questionnaireChannel: 'agent' });
+  assert.ok(context); assert.equal(context.assessment.budget, 'u1000');
+  assert.equal(context.assessmentSafetyContext.maxPills, '1-3'); assert.equal(context.assessmentSafetyContext.formPreference, 'capsules');
+  const matching = productRecommendationClientContextFromPlan(old, [], [], 'agent');
+  assert.equal(matching.budgetPreference, 'u1000'); assert.equal(matching.pillLimit, '1-3'); assert.equal(matching.preferredForm, 'capsules');
+});
