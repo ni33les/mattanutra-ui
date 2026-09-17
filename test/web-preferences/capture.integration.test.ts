@@ -42,3 +42,18 @@ test('WEB-PREF-PG-01 capture, replay, legacy regeneration and agent generation p
     }
   }
 });
+
+test('WEB-PREF-PG-02 classic capture without chat state ignores saved preferences and keeps replay stable', async t => {
+  fixtureDatabaseUrl(); const sql = getSql(); assert.ok(sql); t.after(closeSqlPool);
+  const body = { locale: 'en', answers: { firstName: 'Classic', age: '36-45', sex: 'male', goals: ['energy'],
+    meds: 'yes', medTypes: ['statin'], budget: 'u1000', maxPills: '1-3', form: 'capsules' } };
+  const options = { idempotencyKey: randomUUID() };
+  const receipt = await captureAssessment(body, options);
+  assert.deepEqual(await captureAssessment(body, options), receipt);
+  const [row] = await sql`select answers, questionnaire_state from assessments where plan_id=${receipt.planId}::uuid`;
+  assert.equal(row.questionnaire_state, null);
+  for (const key of ['budget', 'maxPills', 'form']) assert.equal(row.answers[key], '');
+  assert.deepEqual(row.answers.medTypes, ['statin']);
+  const generation = await loadGenerationInput(sql, receipt.planId, 'en'); assert.ok(generation);
+  assert.equal(generation.channel, 'web'); assert.equal(generation.answers.budget, undefined);
+});
