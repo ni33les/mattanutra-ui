@@ -28,7 +28,7 @@ test('AVAIL-PG-01 an empty product market retains approved ingredients through A
  t.after(()=>{if(prior===undefined)delete process.env.XAI_API_KEY;else process.env.XAI_API_KEY=prior;});
  const ingredient=work.canonicalSupplements[0];let calls=0;
  t.mock.method(globalThis,'fetch',async()=>{calls++;return Response.json({choices:[{message:{content:JSON.stringify({
-  supplementBreakdown:[{id:ingredient.normalizedName,category:'Foundation',supplement:ingredient.name,dailyDose:'10 mg/day',effectivenessRank:1,status:'add',rationale:'Supports the stated goal.',decision:'Review total intake.',whyThisIsForYou:'Reflects the supplied goals.',cautions:[]}],
+  supplementBreakdown:[{id:'approved-ingredient',category:'Foundation',supplement:ingredient.name,dailyDose:'10 mg/day',effectivenessRank:1,status:'add',rationale:'Supports the stated goal.',decision:'Review total intake.',whyThisIsForYou:'Reflects the supplied goals.',cautions:[]}],
   cautions:[],marketingPoints:[1,2,3].map(n=>({id:`point-${n}`,title:'Routine',body:'Based on your answers.'}))
  })}}]});});
  const saved=(await getTaskBundle({taskId:task.id})).task;
