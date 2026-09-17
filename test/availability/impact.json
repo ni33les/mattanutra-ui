@@ -138,10 +138,10 @@
     },
     {
       "file": "test/availability/work-item.integration.test.ts",
-      "expectedCases": 2,
+      "expectedCases": 3,
       "database": true,
       "slice": "postgres",
-      "reason": "Actual task-row input freezing, lease loss, unchanged replay and empty completion preparation under isolated PostgreSQL"
+      "reason": "Approved ingredient inputs independent of empty country product markets, immutable publication and lost ownership"
     },
     {
       "file": "test/formulation-results-helpers.test.ts",
@@ -177,5 +177,11 @@
     "lib/matcher/config.ts",
     "test/healthscore-performance/fixtures.ts",
     "test/availability/expectation-changes.md"
+  ],
+  "expectationChanges": [
+    {
+      "id": "AVAIL-PG-01",
+      "change": "Empty product markets retain approved ingredients for AI formulation; only an empty approved ingredient catalogue skips AI. Requested on 2026-09-17; historical zero-result evidence preserved outside checkout."
+    }
   ]
 }
