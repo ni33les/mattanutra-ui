@@ -33,9 +33,9 @@
     },
     {
       "file": "test/healthscore-performance/availability-catalogue.test.ts",
-      "expectedCases": 6,
+      "expectedCases": 7,
       "slice": "web",
-      "reason": "Frozen UAT facts, exclusions, uncertain mappings and publication input fencing"
+      "reason": "Product availability remains factual and independent of formulation; approved-input fencing and in-flight policy compatibility"
     },
     {
       "file": "test/web-availability-copy.test.ts",
@@ -182,6 +182,10 @@
     {
       "id": "AVAIL-PG-01",
       "change": "Empty product markets retain approved ingredients for AI formulation; only an empty approved ingredient catalogue skips AI. Requested on 2026-09-17; historical zero-result evidence preserved outside checkout."
+    },
+    {
+      "id": "AVAIL-WEB-04\u201306",
+      "change": "Preserved original product-coverage assertions using the shared availability evaluator directly; coverage no longer constrains AI ingredient selection."
     }
   ]
 }

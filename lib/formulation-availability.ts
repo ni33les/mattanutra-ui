@@ -1,12 +1,10 @@
 import { sha256Hex } from '@/lib/sha256';
-import { webIngredientAvailability } from '@/lib/matcher/adapters/web';
-import type { ProductRecommendationInput } from '@/lib/product-recommendation-types';
 import type { CanonicalSupplementOption } from '@/lib/canonical-supplements';
 import type { FormulationBlueprint, LocalizedText } from '@/lib/formulation-types';
 import { WEB_FORMULATION_INGREDIENT_LIMIT } from '@/lib/formulation-types';
 
-export const FORMULATION_AVAILABILITY_POLICY = 'product-backed-v1';
-export type FormulationAvailability = Readonly<{ policy: typeof FORMULATION_AVAILABILITY_POLICY; catalogueIdentity: string; inputIdentity: string; supplements: CanonicalSupplementOption[] }>;
+export const FORMULATION_AVAILABILITY_POLICY = 'approved-ingredients-v2';
+export type FormulationAvailability = Readonly<{ policy: typeof FORMULATION_AVAILABILITY_POLICY | 'product-backed-v1'; catalogueIdentity: string; inputIdentity: string; supplements: CanonicalSupplementOption[] }>;
 const words = (value: string) => value.normalize('NFKC').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
 const texts = (value: LocalizedText | undefined) => typeof value === 'string' ? [value] : Object.values(value ?? {}).filter((value): value is string => typeof value === 'string');
 function keys(row: CanonicalSupplementOption) { return new Set([row.name, row.normalizedName, row.id, ...row.aliases].map(words)); }
@@ -28,16 +26,11 @@ export function formulationAvailabilityIdentity(catalogueIdentity: string, input
   return { policy: FORMULATION_AVAILABILITY_POLICY, catalogueIdentity,
     inputIdentity: sha256Hex(JSON.stringify({ policy: FORMULATION_AVAILABILITY_POLICY, ingredientLimit: WEB_FORMULATION_INGREDIENT_LIMIT, catalogueIdentity, input, supplements })), supplements };
 }
-export function productBackedSupplements(options: readonly CanonicalSupplementOption[], input: ProductRecommendationInput) {
-  const available = webIngredientAvailability(input);
-  const names = new Set(input.needs.filter(need => available.supplied.has(need.normalizedName || need.sourceId || need.id)).map(need => need.displayName));
-  return options.filter(row => names.has(row.name));
-}
 export function publishedFormulation(formula: FormulationBlueprint, payload: unknown, resultPayload: unknown) {
   const permitted = (payload as {formulationAvailability?: FormulationAvailability})?.formulationAvailability;
   if (!permitted && (payload as {formulationPolicy?: string})?.formulationPolicy) throw new Error('Missing frozen permitted ingredient input');
   if (!permitted) return formula; // Already-running tasks from the previous build retain their frozen inputs.
-  if (permitted.policy !== FORMULATION_AVAILABILITY_POLICY || (resultPayload as {formulationAvailabilityIdentity?: string})?.formulationAvailabilityIdentity !== permitted.inputIdentity) {
+  if ((permitted.policy !== FORMULATION_AVAILABILITY_POLICY && permitted.policy !== 'product-backed-v1') || (resultPayload as {formulationAvailabilityIdentity?: string})?.formulationAvailabilityIdentity !== permitted.inputIdentity) {
     throw new Error('Formulation result does not match its permitted ingredient input');
   }
   return constrainFormulation(formula, permitted.supplements);

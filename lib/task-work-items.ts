@@ -1,3 +1,4 @@
+import { sha256Hex } from '@/lib/sha256';
 import { pharmacyCandidatePrice, belongsToPharmacy } from "@/lib/pharmacy-journey";
 import { loadAdminSafetyReferenceSnapshot, refreshAdminSafetyCeilings } from "@/lib/agentic/catalogue/load-safety-ceilings";
 import { matchesSafetyReferenceIdentity } from "@/lib/agentic/catalogue/reference-job";
@@ -6,7 +7,7 @@ import { valueCatalogueFingerprint } from "@/lib/agentic/value/fingerprint";
 import { administrationDailyPills } from "@/lib/product-administration";
 import { assessmentFieldKnown } from "@/lib/assessment-input-provenance";
 import { ASSESSMENT_GENERATION_TASKS, generationInput, withGenerationInput, generationLocale, FUNNEL_GENERATOR_VERSION } from "@/lib/assessment-revisions";
-import { FORMULATION_AVAILABILITY_POLICY, formulationAvailabilityIdentity, productBackedSupplements, type FormulationAvailability } from '@/lib/formulation-availability';
+import { FORMULATION_AVAILABILITY_POLICY, formulationAvailabilityIdentity, type FormulationAvailability } from '@/lib/formulation-availability';
 import { computeHealthScore } from "@/lib/health-score";
 import { normalizeAssessmentPlan, type AssessmentPlan } from "@/lib/assessment-snapshot";
 import {
@@ -731,18 +732,9 @@ async function buildFormulationWorkItem(task: TaskRecord) {
   ]);
   let formulationAvailability = payloadRecord(task.payload).formulationAvailability as FormulationAvailability | undefined;
   if (!formulationAvailability) {
-    const countryCode = productCountryCodeFromAnswers(context.answers);
-    const retailers = await retailerCandidateSetsFromLiveSnapshot(countryCode, inStorePharmacyFromAnswers(context.answers)?.id ?? null);
-    const snapshot = requireCachedLiveRetailSnapshot(countryCode);
-    const permittedOptions = options.filter(option => snapshot.supplements.some(row => row.uuid === option.id));
-    const needs = buildProductNeeds({ foodGuidance: null, formulation: { supplementBreakdown: permittedOptions.map((option,index) => ({
-      id: option.normalizedName, category: option.category, supplement: option.name, dailyDose: `1 ${option.maxUnit ?? 'mg'}/day`,
-      effectivenessRank: index+1, status: 'add', rationale: '' })) } });
-    const preferences = await sql`select excluded_product_ids from public.assessment_product_preferences where plan_id=${task.planId}::uuid`;
-    const clientContext = { ...productRecommendationClientContextFromPlan(context.answers, [], []), excludeProductIds: preferences[0]?.excluded_product_ids ?? [] };
-    const permitted = productBackedSupplements(permittedOptions, { candidates: retailers.flatMap(row => row.candidates), needs, clientContext,
-      clientSex: productClientSexFromAnswers(context.answers), countryCode });
-    const prepared = formulationAvailabilityIdentity(valueCatalogueFingerprint(snapshot), { clientContext, countryCode }, permitted);
+    // Formulation uses approved ingredient facts, independently of retail stock,
+    // seller and destination. Product availability belongs to the later matcher.
+    const prepared = formulationAvailabilityIdentity(sha256Hex(JSON.stringify(options)), {}, options);
     const rows = await sql`update public.tasks set payload=jsonb_set(coalesce(payload,'{}'::jsonb),'{formulationAvailability}',${sql.json(toJsonValue(prepared))}::jsonb), updated_at=now()
       where id=${task.id}::uuid and status in ('reserved','running') and lease_until > now()
         and reserved_by_agent_id=${task.reservedByAgentId}::uuid and not coalesce(payload,'{}'::jsonb) ? 'formulationAvailability'
@@ -752,7 +744,7 @@ async function buildFormulationWorkItem(task: TaskRecord) {
     if (!winner?.availability) throw new Error('Formulation task ownership was lost before input preparation');
     formulationAvailability = winner.availability as FormulationAvailability;
   }
-  if (formulationAvailability.policy !== FORMULATION_AVAILABILITY_POLICY) throw new Error('Formulation availability policy is incompatible');
+  if (formulationAvailability.policy !== FORMULATION_AVAILABILITY_POLICY && formulationAvailability.policy !== 'product-backed-v1') throw new Error('Formulation availability policy is incompatible');
   const canonicalSupplements = formulationAvailability.supplements;
   const isBackgroundPregeneration = isPregenerationSource(taskSource(task));
 

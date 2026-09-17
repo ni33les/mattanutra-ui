@@ -1,0 +1,41 @@
+{
+  "releaseBase": "402ce06d6d58f2bfd22f27faca2eb04a4cff3e09",
+  "scope": "approved_ingredients_independent_of_retail_market",
+  "files": [
+    {
+      "file": "test/healthscore-performance/availability.test.ts",
+      "expectedCases": 5,
+      "reason": "Approved list enforcement, eight ingredients, genuine empty results and provider generation",
+      "database": false
+    },
+    {
+      "file": "test/healthscore-performance/availability-catalogue.test.ts",
+      "expectedCases": 7,
+      "reason": "Unchanged factual product coverage, frozen input identity and in-flight policy compatibility",
+      "database": false
+    },
+    {
+      "file": "test/healthscore-performance/formula-cache.test.ts",
+      "expectedCases": 7,
+      "reason": "Changed ingredient facts isolate AI routing; retries, three locales and health context remain intact",
+      "database": false
+    },
+    {
+      "file": "test/formulation-read-first.test.ts",
+      "expectedCases": 4,
+      "reason": "Saved formulas remain read-only; genuine empty results do not trigger automatic regeneration",
+      "database": false
+    },
+    {
+      "file": "test/availability/work-item.integration.test.ts",
+      "expectedCases": 3,
+      "reason": "Vietnam and Singapore product gaps retain approved inputs through real durable work preparation and publication",
+      "database": true
+    }
+  ],
+  "expectationChanges": [
+    "AVAIL-PG-01 now expects approved ingredients despite an empty retail market.",
+    "AVAIL-WEB-04\u201306 retain original coverage assertions, independently of AI ingredient eligibility.",
+    "No migration, business-data correction, matcher or MCP contract change."
+  ]
+}

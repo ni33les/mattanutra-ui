@@ -4,7 +4,10 @@ import { readFileSync } from 'node:fs';
 import { gunzipSync } from 'node:zlib';
 import { fixtureSnapshot } from '../../lib/agentic/catalogue/fixtures.ts';
 import type { CatalogueSnapshot } from '../../lib/agentic/catalogue/types.ts';
-import { productBackedSupplements, formulationAvailabilityIdentity, publishedFormulation } from '../../lib/formulation-availability.ts';
+import { formulationAvailabilityIdentity, publishedFormulation } from '../../lib/formulation-availability.ts';
+import { webIngredientAvailability } from '../../lib/matcher/adapters/web.ts';
+import type { ProductRecommendationInput } from '../../lib/product-recommendation-types.ts';
+import type { CanonicalSupplementOption } from '../../lib/canonical-supplements.ts';
 import { buildProductNeeds } from '../../lib/product-recommendations.ts';
 import { formulaInput, formulaResponse } from './fixtures.ts';
 import { administrationDailyPills } from '../../lib/product-administration.ts';
@@ -18,21 +21,27 @@ const needs = buildProductNeeds({foodGuidance:null,formulation:{supplementBreakd
   category:row.category,dailyDose:`1 ${row.maxUnit}/day`,effectivenessRank:index+1,status:'add',rationale:''}))}});
 const candidates=snapshot.products.filter(row=>row.orderable).map(row=>({...row.candidate,matchingFacts:{pillCountKnown:administrationDailyPills(row.candidate.administration)!=null,
   dailyPillsPerServing:row.dailyPills,form:row.form,dietarySource:row.dietarySource,omegaSource:row.omegaSource}}));
-test('AVAIL-WEB-04 frozen UAT catalogue excludes psyllium and garlic; sterols remain supported',()=>{
+// Product-coverage rules remain intact; they no longer constrain AI formulation.
+function suppliedOptions(options: CanonicalSupplementOption[], input: ProductRecommendationInput) {
+  const availability = webIngredientAvailability(input);
+  const names = new Set(input.needs.filter(need => availability.supplied.has(need.normalizedName || need.sourceId || need.id)).map(need => need.displayName));
+  return options.filter(row => names.has(row.name));
+}
+test('AVAIL-WEB-04 frozen product coverage excludes psyllium and garlic; sterols remain supported',()=>{
   assert.equal(snapshot.products.length,154);assert.equal(needs.length,10);assert.ok(candidates.length);
-  const included=productBackedSupplements(options,{needs,candidates,countryCode:'TH'}).map(row=>row.name);
+  const included=suppliedOptions(options,{needs,candidates,countryCode:'TH'}).map(row=>row.name);
   assert.ok(!included.includes('Psyllium'));assert.ok(!included.includes('Garlic extract standardized to allicin'));
   assert.ok(included.includes('Plant sterols / stanols'));assert.equal(included.length,8);
 });
 test('AVAIL-WEB-05 numerical preferences cannot remove ingredient coverage; explicit product exclusions can',()=>{
   const input={needs,candidates,countryCode:'TH'};
-  assert.deepEqual(productBackedSupplements(options,{...input,maxProducts:0,budgetAmount:0,clientContext:{pillLimit:'0'}}),productBackedSupplements(options,input));
-  assert.deepEqual(productBackedSupplements(options,{...input,clientContext:{excludeProductIds:candidates.map(row=>row.id)}}),[]);
+  assert.deepEqual(suppliedOptions(options,{...input,maxProducts:0,budgetAmount:0,clientContext:{pillLimit:'0'}}),suppliedOptions(options,input));
+  assert.deepEqual(suppliedOptions(options,{...input,clientContext:{excludeProductIds:candidates.map(row=>row.id)}}),[]);
 });
-test('AVAIL-WEB-06 unknown and contradictory facts cannot establish permitted coverage',()=>{
+test('AVAIL-WEB-06 unknown and contradictory product facts cannot establish coverage',()=>{
   const rows=fixtureSnapshot().products.slice(0,1).map(row=>({...row.candidate,facts:row.candidate.facts.map(f=>({...f,amount:null}))}));
-  assert.deepEqual(productBackedSupplements(options,{needs,candidates:rows,countryCode:'TH'}),[]);
-  assert.deepEqual(productBackedSupplements(options,{needs,candidates:candidates.map(row=>({...row,facts:row.facts.map(f=>({...f,mappingStatus:'conflicting' as const}))})),countryCode:'TH'}),[]);
+  assert.deepEqual(suppliedOptions(options,{needs,candidates:rows,countryCode:'TH'}),[]);
+  assert.deepEqual(suppliedOptions(options,{needs,candidates:candidates.map(row=>({...row,facts:row.facts.map(f=>({...f,mappingStatus:'conflicting' as const}))})),countryCode:'TH'}),[]);
 });
 test('AVAIL-WEB-07 publication reuses frozen permitted input and rejects mismatched completion',()=>{
   const allowed=formulationAvailabilityIdentity('catalogue-before',{country:'TH'},formulaInput.canonicalSupplements);
@@ -49,4 +58,10 @@ test('AVAIL-WEB-08 model cannot claim an allowed ID for an unsupported ingredien
 });
 test('AVAIL-WEB-09 new formulation work requires frozen availability before publication',()=>{
   assert.throws(()=>publishedFormulation(formulaResponse,{formulationPolicy:'product-backed-v1'},{}),/permitted ingredient input/);
+});
+
+test('AVAIL-WEB-12 in-flight product-backed work preserves its frozen input during rollout',()=>{
+  const frozen={...formulationAvailabilityIdentity('catalogue-before',{},formulaInput.canonicalSupplements),policy:'product-backed-v1' as const};
+  assert.deepEqual(publishedFormulation(formulaResponse,{formulationAvailability:frozen},{formulationAvailabilityIdentity:frozen.inputIdentity}),formulaResponse);
+  assert.throws(()=>publishedFormulation(formulaResponse,{formulationAvailability:{...frozen,policy:'unknown'}},{formulationAvailabilityIdentity:frozen.inputIdentity}),/does not match/);
 });
