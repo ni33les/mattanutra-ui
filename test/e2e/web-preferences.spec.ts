@@ -19,7 +19,7 @@ for (const locale of ['en', 'th', 'zh-CN'] as const) for (const pharmacy of [fal
     await expect(page.getByTestId('question-answers')).toBeVisible();
     await page.getByTestId('review-answers-btn').click();
     for (const key of ['budget', 'maxPills', 'form']) await expect(page.locator(`[data-turn-key="${key}"]`)).toHaveCount(0);
-    await page.getByTestId('review-answers-btn').click();
+    await page.getByRole('dialog').locator('.mn-chat-q__review-close').click();
     const captured = page.waitForRequest(request => request.method() === 'POST' && new URL(request.url()).pathname === '/api/assessment');
     await page.getByTestId('dev-fill-questionnaire').click();
     const body = (await captured).postDataJSON();
