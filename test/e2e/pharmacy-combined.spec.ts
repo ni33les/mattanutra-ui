@@ -119,7 +119,9 @@ test("PHARM-COMBINE completion before the animation finishes reveals immediately
     "data-phase",
     "inputs",
   );
-  await page.clock.pauseAt(new Date(await page.evaluate(() => Date.now() + 100)));
+  await page.clock.pauseAt(
+    new Date(await page.evaluate(() => Date.now() + 100)),
+  );
   await fixture(true, saved);
   await page.clock.runFor(1600);
   await expect(page.getByTestId("pharmacy-order")).toBeVisible();
@@ -196,15 +198,16 @@ test("PHARM-COMBINE replay preserves deselection and name without rematching or 
   await page
     .getByLabel("Name or nickname", { exact: true })
     .fill("Retained visitor");
-  await page
-    .getByRole("button", { name: /Replay analysis/ })
-    .click();
+  await page.getByRole("button", { name: /Replay analysis/ }).click();
   await expect(page.locator(".mn-window")).toHaveAttribute(
     "data-phase",
     "inputs",
   );
   await page.clock.runFor(17000);
-  await expect(page.locator(".mn-window")).toHaveAttribute("data-phase","ready");
+  await expect(page.locator(".mn-window")).toHaveAttribute(
+    "data-phase",
+    "ready",
+  );
   await expect(page.getByTestId("pharmacy-order")).toBeVisible();
   await expect(page.getByRole("checkbox")).not.toBeChecked();
   await expect(
@@ -225,14 +228,21 @@ for (const width of [1280, 390])
       Math.random = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
     });
     await page.goto(`/en/retail/${saved.slug}/reveal?plan=${saved.planId}`);
-    await page.clock.pauseAt(new Date(await page.evaluate(() => Date.now() + 100)));
+    await page.clock.pauseAt(
+      new Date(await page.evaluate(() => Date.now() + 100)),
+    );
     await page.clock.runFor(3300);
     await expect(page.locator(".mn-window")).toHaveAttribute(
       "data-phase",
       "rain",
     );
     await expect(page.locator(".mn-rain-chip")).toHaveCount(54);
-    expect(await page.locator(".mn-rain-chip").first().evaluate(el=>Number(el.getAnimations()[0].currentTime))).toBeLessThan(600);
+    expect(
+      await page
+        .locator(".mn-rain-chip")
+        .first()
+        .evaluate((el) => Number(el.getAnimations()[0].currentTime)),
+    ).toBeLessThan(600);
     await page.screenshot({
       path: test.info().outputPath(`rain-${width}.png`),
       fullPage: true,
@@ -274,17 +284,112 @@ for (const width of [1280, 390])
     ).toHaveCount(0);
   });
 
-for (const source of ['in_store','business_card']) test(`PHARM-COMBINE ${source} records processing then reveal only when visible`, async ({page}) => {
-  const session=crypto.randomUUID(),slug='matcher-v5-isolated-fixture-retailer';
-  const capture=await page.request.post('/api/assessment',{headers:{'Idempotency-Key':crypto.randomUUID()},data:{answers:{firstName:'Source visitor',sex:'female',age:'36-45',goals:['energy']},locale:'en',sessionId:session,pharmacyId:slug,bpm:{ray:session,attribution:{trafficSource:'pharmacy',sourceChannel:slug,sourceDetail:source}}}});
-  expect(capture.ok()).toBe(true);const saved={...await capture.json(),slug};
-  const events:{eventName:string;attribution:{sourceDetail:string}}[]=[];
-  await page.route('**/api/bpm',route=>{const value=route.request().postDataJSON();events.push(value);return route.fulfill({json:{ok:true}});});
-  await page.goto(`/en/retail/${slug}/reveal?plan=${saved.planId}`);
-  await expect.poll(()=>events.filter(e=>e.eventName==='pharmacy_processing_viewed').length).toBe(1);
-  expect(events.filter(e=>e.eventName==='formulation_page_viewed')).toHaveLength(0);
-  await fixture(true,saved);await expect(page.getByTestId('pharmacy-order')).toBeVisible();
-  await expect.poll(()=>events.filter(e=>e.eventName==='formulation_page_viewed').length).toBe(1);
-  const meaningful=events.filter(e=>['pharmacy_processing_viewed','formulation_page_viewed'].includes(e.eventName));
-  expect(meaningful.map(e=>e.attribution.sourceDetail)).toEqual([source,source]);
+for (const source of ["in_store", "business_card"])
+  test(`PHARM-COMBINE ${source} records processing then reveal only when visible`, async ({
+    page,
+  }) => {
+    const session = crypto.randomUUID(),
+      slug = "matcher-v5-isolated-fixture-retailer";
+    const capture = await page.request.post("/api/assessment", {
+      headers: { "Idempotency-Key": crypto.randomUUID() },
+      data: {
+        answers: {
+          firstName: "Source visitor",
+          sex: "female",
+          age: "36-45",
+          goals: ["energy"],
+        },
+        locale: "en",
+        sessionId: session,
+        pharmacyId: slug,
+        bpm: {
+          ray: session,
+          attribution: {
+            trafficSource: "pharmacy",
+            sourceChannel: slug,
+            sourceDetail: source,
+          },
+        },
+      },
+    });
+    expect(capture.ok()).toBe(true);
+    const saved = { ...(await capture.json()), slug };
+    const events: {
+      eventName: string;
+      attribution: { sourceDetail: string };
+    }[] = [];
+    await page.route("**/api/bpm", (route) => {
+      const value = route.request().postDataJSON();
+      events.push(value);
+      return route.fulfill({ json: { ok: true } });
+    });
+    await page.goto(`/en/retail/${slug}/reveal?plan=${saved.planId}`);
+    await expect
+      .poll(
+        () =>
+          events.filter((e) => e.eventName === "pharmacy_processing_viewed")
+            .length,
+      )
+      .toBe(1);
+    expect(
+      events.filter((e) => e.eventName === "formulation_page_viewed"),
+    ).toHaveLength(0);
+    await fixture(true, saved);
+    await expect(page.getByTestId("pharmacy-order")).toBeVisible();
+    await expect
+      .poll(
+        () =>
+          events.filter((e) => e.eventName === "formulation_page_viewed")
+            .length,
+      )
+      .toBe(1);
+    const meaningful = events.filter((e) =>
+      ["pharmacy_processing_viewed", "formulation_page_viewed"].includes(
+        e.eventName,
+      ),
+    );
+    expect(meaningful.map((e) => e.attribution.sourceDetail)).toEqual([
+      source,
+      source,
+    ]);
+  });
+
+test("PHARM-COMBINE failed order retains name, selection and idempotency for retry", async ({
+  page,
+}) => {
+  const saved = await fixture(true),
+    keys: string[] = [];
+  await page.route("**/api/retail/orders", async (route) => {
+    if (route.request().method() !== "POST") return route.continue();
+    keys.push(route.request().headers()["idempotency-key"]);
+    if (keys.length === 1)
+      return route.fulfill({
+        status: 503,
+        json: { message: "Controlled retry" },
+      });
+    return route.continue();
+  });
+  await page.goto(`/en/retail/${saved.slug}/reveal?plan=${saved.planId}`);
+  await page
+    .getByLabel("Name or nickname", { exact: true })
+    .fill("Retry visitor");
+  await page
+    .getByRole("button", { name: "Confirm my order", exact: true })
+    .click();
+  await expect(page.locator(".mn-order-error")).toBeVisible();
+  await expect(
+    page.getByLabel("Name or nickname", { exact: true }),
+  ).toHaveValue("Retry visitor");
+  await page
+    .getByRole("button", { name: "Confirm my order", exact: true })
+    .click();
+  await expect(page.locator(".mn-order-success")).toContainText(
+    "Retry visitor",
+  );
+  expect(keys.length).toBe(2);
+  expect(keys[1]).toBe(keys[0]);
+  await page.reload();
+  await expect(page.locator(".mn-order-success")).toContainText(
+    "Retry visitor",
+  );
 });

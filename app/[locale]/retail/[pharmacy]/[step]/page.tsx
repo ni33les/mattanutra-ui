@@ -53,7 +53,7 @@ export default async function PharmacyJourneyPage({ params, searchParams }: {
     entrySource = acquisition.source;
     const result = data.order?.result ?? (data.stored?.readiness?.formulationStatus === "ready" ? data.stored.result : null);
     const revision = data.order?.receipt.revision ?? data.assessment.revision;
-    if (step === "reveal") content = <PharmacyCombined locale={locale} sourceLocale={data.order?.locale ?? data.assessment.locale}
+    if (step === "reveal") content = <PharmacyCombined key={`${planId}:${revision}:${locale}:${data.order?.receipt.id ?? "live"}`} locale={locale} sourceLocale={data.order?.locale ?? data.assessment.locale}
       slug={slug} pharmacyName={pharmacy.name} planId={planId} revision={revision}
       initial={data.stored?.readiness ?? null} initialResult={result} initialReceipt={data.order?.receipt ?? null} />;
     else {

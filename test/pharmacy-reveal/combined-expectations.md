@@ -15,3 +15,7 @@ Historical evidence remains outside the checkout; no fixture prices are changed.
 - PHARM-LANDING header-link assertion now includes existing source/session attribution. The previous assertion predated source preservation; the same header, footer and quiz variant remain required.
 - PHARM-WAIT stationary-spinner tests are replaced by eight asset/geometry/reduced-motion/localization cases and real-page animation/cleanup tests.
 - PHARM-BROWSER no longer requires the old shared reveal's side-by-side order sidebar: it requires the supplied products → order → coffee/deep-dive order, while retaining real price, deselection, unpaid receipt and saved explanation checks.
+
+- Rain nodes now mount at the real rain phase, so their supplied delay/duration starts at 3.1 seconds. RED probe on compiled 32f902f1 is preserved externally (`red-rain2.log`).
+- Capture and order fields remain visible, but a name cannot be edited until the authoritative quote has loaded; the pre-fix browser failure demonstrated name reset during that race.
+- Mock printed-insert promises are replaced with a private-link reminder in all locales.

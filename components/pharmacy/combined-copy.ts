@@ -42,8 +42,7 @@ const en = {
   save: "Save this private link and open it in any browser.",
   copy: "Copy link",
   copied: "Private plan link copied.",
-  print:
-    "Your printed MattaNutra insert also includes a QR code so you can return to your plan anytime.",
+  print: "Keep your private plan link so you can return to your plan anytime.",
   failed:
     "This is taking longer than expected. Your saved answers are safe. Try again to continue.",
   saving: "Saving your answers…",
@@ -93,8 +92,7 @@ const th: Copy = {
   save: "เก็บลิงก์ส่วนตัวนี้ไว้ แล้วเปิดผ่านเบราว์เซอร์ได้ทุกเมื่อ",
   copy: "คัดลอกลิงก์",
   copied: "คัดลอกลิงก์ส่วนตัวแล้ว",
-  print:
-    "เอกสาร MattaNutra ที่แนบให้ยังมี QR code เพื่อกลับมาอ่านแผนได้ทุกเมื่อ",
+  print: "เก็บลิงก์ส่วนตัวนี้ไว้เพื่อกลับมาอ่านแผนได้ทุกเมื่อ",
   failed:
     "ขั้นตอนนี้ใช้เวลานานกว่าปกติ คำตอบที่บันทึกไว้ยังอยู่ โปรดลองอีกครั้งเพื่อดำเนินการต่อ",
   saving: "กำลังบันทึกคำตอบ…",
@@ -141,7 +139,7 @@ const zh: Copy = {
   save: "保存这个私人链接，随时用浏览器打开。",
   copy: "复制链接",
   copied: "私人方案链接已复制。",
-  print: "您的 MattaNutra 随单说明中也有二维码，可随时返回查看方案。",
+  print: "保存您的私人方案链接，即可随时返回查看方案。",
   failed: "此步骤比预期更久。已保存的回答仍然保留，请重试以继续。",
   saving: "正在保存您的回答…",
 };

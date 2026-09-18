@@ -99,7 +99,7 @@
     },
     {
       "file": "test/e2e/pharmacy-combined.spec.ts",
-      "expectedCases": 9,
+      "expectedCases": 10,
       "grep": "PHARM-COMBINE",
       "reason": "Actual animation, fast/slow readiness, partial formula, empty result, replay and cleanup"
     },

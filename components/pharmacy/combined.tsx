@@ -283,7 +283,8 @@ export function PharmacyCombined({
                 <span className="text-small">{c.possibilities}</span>
               </div>
             </div>
-            {(!work.ready || replaying) &&
+            {(animatedPhase === "rain" || animatedPhase === "clarity") &&
+              (!work.ready || replaying) &&
               pharmacyRainWords.map((word, i) => {
                 const v = pharmacyRainStyle(i);
                 return (
@@ -422,7 +423,11 @@ export function PharmacyCombined({
           <div className="mn-layer mn-result" aria-hidden={!result}>
             <div className="mn-selected-wrap">
               <h3 className="mn-selected-label">
-                {result ? ingredients.length : ""} {c.selected} <em>{name}</em>
+                {result ? ingredients.length : ""}{" "}
+                {locale === "en" && ingredients.length === 1
+                  ? "ingredient selected for"
+                  : c.selected}{" "}
+                <em>{name}</em>
               </h3>
               <div className="mn-selected-grid">
                 {ingredients.map((ingredient, i) => (
@@ -477,7 +482,18 @@ export function PharmacyCombined({
                       {line.name}
                     </div>
                     <div className="mn-coverage text-small">
-                      {product?.covers.join(" · ")}
+                      {product?.covers
+                        .map((id) => {
+                          const ingredient = ingredients.find(
+                            (item) => item.id === id,
+                          );
+                          return localizedSupplementName(
+                            ingredient?.supplement ?? id,
+                            id,
+                            locale,
+                          );
+                        })
+                        .join(" · ")}
                     </div>
                     <label className="mn-product-order">
                       <input
@@ -584,7 +600,7 @@ export function PharmacyCombined({
                 maxLength={120}
                 required
                 value={order.name}
-                disabled={order.busy}
+                disabled={!order.loaded || order.busy}
                 onChange={(e) => {
                   order.setName(e.target.value);
                   order.setKey(crypto.randomUUID());

@@ -54,8 +54,13 @@ async function pages(width: number) {
     viewport: { width, height: 900 },
   });
   await context.route("**/*", (route) => {
-    const path=new URL(route.request().url()).pathname;
-    return path.startsWith("/assets/") && existsSync("public"+path) ? route.fulfill({body:readFileSync("public"+path),contentType:"image/webp"}) : route.abort();
+    const path = new URL(route.request().url()).pathname;
+    return path.startsWith("/assets/") && existsSync("public" + path)
+      ? route.fulfill({
+          body: readFileSync("public" + path),
+          contentType: "image/webp",
+        })
+      : route.abort();
   });
   const control = await context.newPage(),
     candidate = await context.newPage();
@@ -64,7 +69,7 @@ async function pages(width: number) {
     base +
       reference.replace(
         "    play();",
-        "    window.referenceFlight = prepareClarityFlight; play(); clearTimers(); setPhase(\"clarity\", \"MattaNutra is bringing your personalised plan into focus\");",
+        '    window.referenceFlight = prepareClarityFlight; play(); clearTimers(); setPhase("clarity", "MattaNutra is bringing your personalised plan into focus");',
       ),
   );
   await candidate.setContent(base + `<style>${css}</style>` + markup());
@@ -167,9 +172,18 @@ for (const width of [1280, 390])
         await candidate.evaluate(() => document.documentElement.scrollWidth),
         width,
       );
-      const evidence=process.env["MCP_pharmacy-reveal_EVIDENCE_DIR"];
-      if(evidence){mkdirSync(evidence+"/reference-frames",{recursive:true});await control.screenshot({path:`${evidence}/reference-frames/reference-${width}.png`,fullPage:true});await candidate.screenshot({path:`${evidence}/reference-frames/candidate-${width}.png`,fullPage:true});}
-
+      const evidence = process.env["MCP_pharmacy-reveal_EVIDENCE_DIR"];
+      if (evidence) {
+        mkdirSync(evidence + "/reference-frames", { recursive: true });
+        await control.screenshot({
+          path: `${evidence}/reference-frames/reference-${width}.png`,
+          fullPage: true,
+        });
+        await candidate.screenshot({
+          path: `${evidence}/reference-frames/candidate-${width}.png`,
+          fullPage: true,
+        });
+      }
     } finally {
       await context.close();
     }
@@ -189,7 +203,7 @@ for (const locale of ["en", "th", "zh-CN"] as const)
       /160\+|12 ingredients|for Male|for Female|8E5C4C1F/,
     );
     assert.equal((html.match(/class="mn-analysis-tile /g) ?? []).length, 5);
-    assert.equal((html.match(/class="mn-rain-chip /g) ?? []).length, 54);
+    assert.equal((html.match(/class="mn-rain-chip /g) ?? []).length, 0);
     assert.doesNotMatch(html, /class="mn-product /);
   });
 test("PHARM-WAIT-05 reduced motion has no ongoing decorative animation", async () => {
