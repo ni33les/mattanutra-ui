@@ -120,7 +120,7 @@ async function prepareCompiledBuild() {
   save("lint-files.json", { releaseBase: MCP721_BASE, files: lint }); assert.ok(lint.length);
   await command("release-diff-lint", ["node_modules/eslint/bin/eslint.js", ...lint]);
 
-  await command("production-build", ["node_modules/next/dist/bin/next", "build", "--webpack"], { ...safe, NODE_ENV: "production", NEXT_BUILD_SKIP_TYPECHECK: "1", ...(["efficiency", "pharmacy-reveal"].includes(packageId) ? { NODE_OPTIONS: "--max-old-space-size=4096", NEXT_BUILD_CPUS: "1" } : {}) });
+  await command("production-build", ["node_modules/next/dist/bin/next", "build", "--webpack"], { ...safe, NODE_ENV: "production", NEXT_BUILD_SKIP_TYPECHECK: "1", ...(["efficiency", "pharmacy-reveal", "pharmacy-animation"].includes(packageId) ? { NODE_OPTIONS: "--max-old-space-size=4096", NEXT_BUILD_CPUS: "1" } : {}) });
 }
 if (mode === "validate") {
   const identity = mcp721Identity(source.sha256, commit, packageId);
@@ -189,7 +189,7 @@ if (mode === "validate") {
       TEST_DB_URL: process.env.TEST_DB_URL, DB_URL: process.env.TEST_DB_URL, DB_WORKER_URL: process.env.TEST_DB_URL,
       DB_ALLOW_DIRECT_CONNECTION: "true", MATCHER_TEST_EVIDENCE_DIR: resolve(output, "mcp-regression") });
   }
-  if (["efficiency", "practical", "availability", "pharmacy", "pharmacy-landing", "pharmacy-reveal", "pharmacy-source"].includes(packageId)) {
+  if (["efficiency", "practical", "availability", "pharmacy", "pharmacy-landing", "pharmacy-reveal", "pharmacy-source", "pharmacy-animation"].includes(packageId)) {
     const { runEfficiencyBrowser } = await import("./service-efficiency/release-stages.mjs");
     await runEfficiencyBrowser(output, isolated ?? { ...safe, TEST_DB_URL: process.env.TEST_DB_URL, DB_URL: process.env.TEST_DB_URL, DB_WORKER_URL: process.env.TEST_DB_URL, DB_ALLOW_DIRECT_CONNECTION: "true", DB_POOL_MAX: "3" }, inventory.browser);
     stages.push({ label: "affected-browser-tests", passed: true });

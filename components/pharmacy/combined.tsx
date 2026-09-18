@@ -124,7 +124,7 @@ export function PharmacyCombined({
   const end = useCallback(() => setReplaying(false), []);
   usePharmacyAnimation(
     root,
-    (!work.ready && !work.failed) || replaying,
+    (!work.ready && !work.failed && !result) || replaying,
     replay,
     setAnimatedPhase,
     end,
@@ -178,6 +178,8 @@ export function PharmacyCombined({
         ? c.rain
         : phase === "clarity"
           ? c.clarity
+          : phase === "waiting"
+            ? c.waiting
           : phase === "failed"
             ? c.failed
             : `${c.matching} ${c.personalised} ${c.matchingEnd}`;

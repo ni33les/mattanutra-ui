@@ -1,0 +1,41 @@
+{
+  "releaseBase": "732cf91f245c8b1d25422b717fbe1aaa29639fe3",
+  "scope": "pharmacy_animation_continuity",
+  "inputs": [
+    "test/helpers/pharmacy-fixture.ts",
+    "test/pharmacy-reveal/combined-reference.json",
+    "test/pharmacy-reveal/combined-reference.html",
+    "public/assets/pharmacy/combined/leaf.webp"
+  ],
+  "files": [
+    {
+      "file": "test/pharmacy-reveal/combined-state.test.ts",
+      "expectedCases": 8,
+      "reason": "Real readiness preempts decoration; exhausted presentation settles without fabricating readiness"
+    },
+    {
+      "file": "test/pharmacy-reveal/progress-presentation.test.ts",
+      "expectedCases": 9,
+      "reason": "Retain reference assets and five centre curves, locale copy, scoped styles, reduced motion and cleanup"
+    },
+    {
+      "file": "test/pharmacy-animation/motion.test.ts",
+      "expectedCases": 3,
+      "reason": "Bounded continuous banking, exact tap positions and monotonic tip-based trail progression"
+    }
+  ],
+  "browser": [
+    {
+      "file": "test/e2e/pharmacy-animation.spec.ts",
+      "expectedCases": 3,
+      "grep": "PHARM-MOTION",
+      "reason": "Dense mobile/desktop trail attachment, continuous rotation and explicit pending work after flight"
+    },
+    {
+      "file": "test/e2e/pharmacy-combined.spec.ts",
+      "expectedCases": 5,
+      "grep": "PHARM-COMBINE (saved formula|completion before|replay preserves|1280px real|390px real)",
+      "reason": "Preserve immediate formula/results, replay without mutations, rain timing, taps and motion cleanup"
+    }
+  ]
+}

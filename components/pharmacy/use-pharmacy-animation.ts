@@ -2,9 +2,7 @@
 import { useEffect, type RefObject } from "react";
 import {
   clarityFlight,
-  clarityStages,
-  cubicPoint,
-  smootherStep,
+  clarityPose,
   type PharmacyPhase,
   type Point,
 } from "@/lib/pharmacy-presentation";
@@ -64,9 +62,12 @@ export function usePharmacyAnimation(
         width: Math.max(1, rect.width),
         height: Math.max(1, rect.height),
         source: point(brand),
-        questions: questions.map(point),
+        questions: questions.map((el) => {
+        const style = getComputedStyle(el);
+        return { x: parseFloat(style.left), y: parseFloat(style.top) };
+      }),
         core: point(core),
-        shellSize: shell.getBoundingClientRect().width || 92,
+        shellSize: shell.offsetWidth || 92,
       });
       page
         .querySelector(".mn-clarity-orbit")!
@@ -136,72 +137,20 @@ export function usePharmacyAnimation(
     function animateFlight(time: number) {
       if (!flight) measure();
       const route = flight!;
-      let start = 0;
-      let stage: (typeof clarityStages)[number] =
-        clarityStages[clarityStages.length - 1];
-      for (const candidate of clarityStages) {
-        if (time <= start + candidate.duration) {
-          stage = candidate;
-          break;
-        }
-        start += candidate.duration;
-      }
-      const local = Math.max(0, Math.min(1, (time - start) / stage.duration));
-      let point: Point,
-        angle = 0,
-        progress = 1,
-        moving = false;
-      if (stage.type === "move") {
-        moving = true;
-        const t = smootherStep(local);
-        point = cubicPoint(route.segments[stage.segment], t);
-        const ahead = cubicPoint(
-            route.segments[stage.segment],
-            Math.min(1, t + 0.012),
-          ),
-          limit = stage.segment === 4 ? 11 : 8;
-        angle = Math.max(
-          -limit,
-          Math.min(
-            limit,
-            ((Math.atan2(ahead.y - point.y, ahead.x - point.x) * 180) /
-              Math.PI) *
-              0.18,
-          ),
-        );
-        progress = (stage.segment + t) / route.segments.length;
-      } else {
-        const base = route.points[stage.point];
-        point = {
-          x: base.x + Math.sin(local * Math.PI * 2) * 3.5,
-          y: base.y - Math.sin(local * Math.PI) * 5.5,
-        };
-        progress = stage.point / route.segments.length;
-        angle = stage.type === "hold" ? Math.sin(local * Math.PI) * 6 : 0;
-        if ("tap" in stage) tap(stage.tap, route.tapPoints[stage.tap]);
-      }
-      const scale =
-        stage.type === "hold" || stage.type === "launch"
-          ? 1 + Math.sin(local * Math.PI) * 0.08
-          : 1;
-      shell.style.transform = `translate3d(${point.x}px, ${point.y}px, 0) translate(-50%, -50%) rotate(${angle}deg) scale(${scale})`;
-      paths.forEach((path) => {
-        path.style.strokeDashoffset = String(100 * (1 - progress));
-      });
-      const tip = (shell.offsetWidth || 92) * 0.36 * scale,
-        radians = (angle * Math.PI) / 180;
-      if (elapsed - lastSpark >= (moving ? 62 : 112)) {
-        spark({
-          x: point.x + tip * Math.cos(radians) + tip * Math.sin(radians),
-          y: point.y + tip * Math.sin(radians) - tip * Math.cos(radians),
-        });
-        if (moving && Math.random() > 0.76) spark(point);
+      const pose = clarityPose(route, time);
+      if (pose.tap !== null) tap(pose.tap, route.tapPoints[pose.tap]);
+      shell.style.transform = `translate3d(${pose.point.x}px, ${pose.point.y}px, 0) translate(-50%, -50%) rotate(${pose.angle}deg) scale(${pose.scale})`;
+      const offset = 100 * (1 - pose.distance / (route.distance || 1));
+      paths.forEach((path) => { path.style.strokeDashoffset = String(offset); });
+      if (elapsed - lastSpark >= (pose.moving ? 62 : 112)) {
+        spark(pose.tip);
         lastSpark = elapsed;
       }
     }
+
     function frame(now: number) {
       if (document.hidden) return;
-      if (lastNow) elapsed += now - lastNow;
+      if (lastNow) elapsed += Math.min(50, now - lastNow);
       lastNow = now;
       tiles.forEach((tile, i) =>
         tile.classList.toggle("is-active", elapsed >= 300 + i * 540),

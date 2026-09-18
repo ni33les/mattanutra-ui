@@ -20,3 +20,5 @@ Historical evidence remains outside the checkout; no fixture prices are changed.
 - Capture and order fields remain visible, but a name cannot be edited until the authoritative quote has loaded; the pre-fix browser failure demonstrated name reset during that race.
 - Mock printed-insert promises are replaced with a private-link reminder in all locales.
 - The final desktop timing probe exposed a race in `clock.pauseAt(Date.now() + 100)`. Freeze the controlled clock before navigation and wait for the animation effect to attach; retain all stage, rain-age, path, tap and cleanup assertions without retries. The failed execution remains in `acceptance-final` evidence.
+
+- Animation continuity follow-up: original assets, section geometry and five centre curves remain. Replace the independently drawn magic curve and equal-segment dash fraction with an arc-measured trail of the leaf's actual tip. Rotation/hold easing now has continuous boundaries. Completed decoration without formula data becomes explicit `waiting`, not a frozen `clarity` frame. PHARM-MOTION records dense per-frame trail attachment and rotation; final readiness still preempts it.

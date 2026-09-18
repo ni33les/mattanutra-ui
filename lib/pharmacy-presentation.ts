@@ -4,6 +4,7 @@ export type PharmacyPhase =
   | "clarity"
   | "selected"
   | "matching"
+  | "waiting"
   | "ready"
   | "failed";
 export function pharmacyPresentationPhase(input: {
@@ -16,12 +17,7 @@ export function pharmacyPresentationPhase(input: {
   if (input.failed) return "failed";
   if (input.formulaReady)
     return input.phase === "selected" ? "selected" : "matching";
-  if (["selected", "matching", "ready"].includes(input.phase))
-    return input.formulaReady
-      ? input.phase === "selected"
-        ? "selected"
-        : "matching"
-      : "clarity";
+  if (["selected", "matching", "ready"].includes(input.phase)) return "waiting";
   return input.phase;
 }
 export const pharmacyRainWords = [
@@ -159,57 +155,29 @@ export function clarityFlight({
       p1: points[5],
     },
   ];
-  const magic = [
-    source,
-    ...questions,
-    { x: approach.x + tipOffset, y: approach.y - tipOffset },
-    corePoint,
-  ];
-  const magicSegments: Curve[] = [
-    {
-      p0: magic[0],
-      c1: segments[0].c1,
-      c2: { x: magic[1].x - width * 0.14, y: magic[1].y - height * 0.19 },
-      p1: magic[1],
-    },
-    {
-      p0: magic[1],
-      c1: { x: magic[1].x + width * 0.24, y: magic[1].y - height * 0.17 },
-      c2: { x: magic[2].x - width * 0.23, y: magic[2].y - height * 0.16 },
-      p1: magic[2],
-    },
-    {
-      p0: magic[2],
-      c1: { x: magic[2].x + width * 0.04, y: magic[2].y + height * 0.27 },
-      c2: { x: magic[3].x + width * 0.21, y: magic[3].y - height * 0.08 },
-      p1: magic[3],
-    },
-    {
-      p0: magic[3],
-      c1: { x: magic[3].x + width * 0.18, y: magic[3].y + height * 0.12 },
-      c2: { x: magic[4].x - width * 0.1, y: magic[4].y + height * 0.12 },
-      p1: magic[4],
-    },
-    {
-      p0: magic[4],
-      c1: {
-        x: corePoint.x + shellSize * 1.75,
-        y: corePoint.y - shellSize * 1.45,
-      },
-      c2: {
-        x: corePoint.x - shellSize * 0.5,
-        y: corePoint.y - shellSize * 1.05,
-      },
-      p1: magic[5],
-    },
-  ];
-  const path = magicSegments
-    .map(
-      (s, i) =>
-        `${i === 0 ? `M ${s.p0.x.toFixed(1)} ${s.p0.y.toFixed(1)} ` : ""}C ${s.c1.x.toFixed(1)} ${s.c1.y.toFixed(1)} ${s.c2.x.toFixed(1)} ${s.c2.y.toFixed(1)} ${s.p1.x.toFixed(1)} ${s.p1.y.toFixed(1)}`,
-    )
-    .join(" ");
-  return { points, segments, tapPoints: [...questions, corePoint], path };
+  const arcs = segments.map((curve) => {
+    const lengths = [0];
+    let previous = curve.p0;
+    for (let i = 1; i <= 128; i++) {
+      const point = cubicPoint(curve, i / 128);
+      lengths.push(lengths[i - 1] + Math.hypot(point.x - previous.x, point.y - previous.y));
+      previous = point;
+    }
+    return lengths;
+  });
+  const route = { points, segments, arcs, shellSize };
+  const samples: FlightPose[] = [];
+  let distance = 0;
+  // Compile once; the sprite and its drawn trail then use these same samples.
+  for (let time = 0; time <= clarityDuration + 8; time += 8) {
+    const pose = flightPose(route, Math.min(time, clarityDuration));
+    const previous = samples.at(-1);
+    if (previous) distance += Math.hypot(pose.tip.x - previous.tip.x, pose.tip.y - previous.tip.y);
+    samples.push({ ...pose, distance });
+  }
+  const path = samples.map((pose, i) => `${i ? "L" : "M"} ${pose.tip.x.toFixed(4)} ${pose.tip.y.toFixed(4)}`).join(" ");
+  return { points, segments, tapPoints: [...questions, corePoint], path, samples, distance };
+
 }
 export function cubicPoint(s: Curve, t: number): Point {
   const inverse = 1 - t,
@@ -238,3 +206,47 @@ export const clarityStages = [
   { type: "move", segment: 4, duration: 610 },
   { type: "hold", point: 5, tap: 3, duration: 500 },
 ] as const;
+
+const clarityDuration = clarityStages.reduce((total, stage) => total + stage.duration, 0);
+type FlightPose = { point: Point; tip: Point; angle: number; scale: number; distance: number; time: number; tap: number | null; moving: boolean };
+
+function flightPose(route: { points: Point[]; segments: Curve[]; arcs: number[][]; shellSize: number }, time: number): FlightPose {
+  let start = 0;
+  let stage: (typeof clarityStages)[number] = clarityStages[clarityStages.length - 1];
+  for (const candidate of clarityStages) {
+    if (time <= start + candidate.duration) { stage = candidate; break; }
+    start += candidate.duration;
+  }
+  const local = Math.max(0, Math.min(1, (time - start) / stage.duration));
+  const envelope = Math.sin(Math.PI * local) ** 2;
+  let point: Point, angle: number;
+  if (stage.type === "move") {
+    const curve = route.segments[stage.segment], lengths = route.arcs[stage.segment];
+    const distance = smootherStep(local) * lengths[lengths.length - 1];
+    let low = 0, high = lengths.length - 1;
+    while (high - low > 1) { const middle = (low + high) >> 1; if (lengths[middle] < distance) low = middle; else high = middle; }
+    const t = (low + (distance - lengths[low]) / (lengths[high] - lengths[low] || 1)) / 128;
+    point = cubicPoint(curve, t);
+    const before = cubicPoint(curve, Math.max(0, t - 0.001)), after = cubicPoint(curve, Math.min(1, t + 0.001));
+    // Banking has no atan2 wrap and eases to zero at every stop.
+    angle = 8 * envelope * (after.x - before.x) / (Math.hypot(after.x - before.x, after.y - before.y) || 1);
+  } else {
+    const base = route.points[stage.point];
+    point = { x: base.x + Math.sin(local * Math.PI * 2) * 3.5 * envelope, y: base.y - envelope * 5.5 };
+    angle = stage.type === "hold" ? envelope * 6 : 0;
+  }
+  const scale = stage.type === "move" ? 1 : 1 + envelope * 0.08;
+  const tip = route.shellSize * 0.36 * scale, radians = angle * Math.PI / 180;
+  return { point, angle, scale, time, distance: 0, moving: stage.type === "move", tap: "tap" in stage ? stage.tap : null,
+    tip: { x: point.x + tip * (Math.cos(radians) + Math.sin(radians)), y: point.y + tip * (Math.sin(radians) - Math.cos(radians)) } };
+}
+
+/** One position/distance clock drives the transform, sparks and visible trail. */
+export function clarityPose(flight: ReturnType<typeof clarityFlight>, time: number): FlightPose {
+  const bounded = Math.max(0, Math.min(clarityDuration, time));
+  const index = Math.min(Math.floor(bounded / 8), flight.samples.length - 2);
+  const a = flight.samples[index], b = flight.samples[index + 1], mix = (bounded - a.time) / (b.time - a.time || 1);
+  const value = (x: number, y: number) => x + (y - x) * mix;
+  return { ...a, time: bounded, point: { x: value(a.point.x,b.point.x), y: value(a.point.y,b.point.y) },
+    tip: { x: value(a.tip.x,b.tip.x), y: value(a.tip.y,b.tip.y) }, angle: value(a.angle,b.angle), scale: value(a.scale,b.scale), distance: value(a.distance,b.distance) };
+}

@@ -257,7 +257,10 @@ for (const width of [1280, 390])
       "clarity",
     );
     const path = await page.locator(".mn-clarity-path").getAttribute("d");
-    expect((path!.match(/C /g) || []).length).toBe(5);
+    expect(path).toMatch(/^M /);
+    expect(await page.locator(".mn-clarity-path").evaluate((p: SVGPathElement) => p.getTotalLength())).toBeGreaterThan(0);
+    // Dense PHARM-MOTION probes verify the drawn endpoint against the actual leaf tip.
+    // Original five-curve geometry remains independently checked by PHARM-WAIT-02.
     await expect(page.locator(".mn-tap.is-active")).toHaveCount(1);
     await page.screenshot({
       path: test.info().outputPath(`flight-${width}.png`),
