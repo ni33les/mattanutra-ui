@@ -12,7 +12,7 @@
   "files": [
     {
       "file": "test/pharmacy-reveal/progress-presentation.test.ts",
-      "expectedCases": 8,
+      "expectedCases": 9,
       "reason": "Exact supplied animation geometry, immutable assets, localization and reduced motion"
     },
     {

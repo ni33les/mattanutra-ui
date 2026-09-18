@@ -1709,8 +1709,12 @@
 #mn-pharmacy-combined .mn-product-price small { display:block; }
 #mn-pharmacy-combined .mn-coffee h3, #mn-pharmacy-combined .mn-status-payoff, #mn-pharmacy-combined #mn-order-title { font-family:var(--mn-font-display),var(--mn-font-thai),serif; }
 #mn-pharmacy-combined .mn-window[data-phase="ready"] .mn-nutrient { opacity:1; transform:none; animation:none; }
-#mn-pharmacy-combined .mn-window[data-paused="true"] * { animation-play-state:paused !important; }
-#mn-pharmacy-combined .mn-window[data-phase="failed"] * { animation:none !important; }
+#mn-pharmacy-combined .mn-window[data-paused="true"] *,
+#mn-pharmacy-combined .mn-window[data-paused="true"] *::before,
+#mn-pharmacy-combined .mn-window[data-paused="true"] *::after { animation-play-state:paused !important; }
+#mn-pharmacy-combined .mn-window:is([data-phase="ready"], [data-phase="failed"]) *,
+#mn-pharmacy-combined .mn-window:is([data-phase="ready"], [data-phase="failed"]) *::before,
+#mn-pharmacy-combined .mn-window:is([data-phase="ready"], [data-phase="failed"]) *::after { animation:none !important; }
 @media (prefers-reduced-motion: reduce) {
  #mn-pharmacy-combined *, #mn-pharmacy-combined *::before, #mn-pharmacy-combined *::after { animation:none !important; transition:none !important; }
  #mn-pharmacy-combined .mn-clarity, #mn-pharmacy-combined .mn-rain-chip { display:none; }
