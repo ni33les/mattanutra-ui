@@ -24,6 +24,8 @@ test("PHARM-LINE-UI failed preparation is retryable without an automatic request
     await page.locator('.mn-coffee').evaluate(el=>getComputedStyle(el).color));
   expect(attempts).toBe(2);
   expect(await connect.getByRole('link',{name:'Open LINE and save my plan',exact:true}).getAttribute('href')).toContain('/R/oaMessage/');
+  await page.getByTestId('pharmacy-deep-dive-link').click();
+  await expect(page.getByTestId('pharmacy-line-connect').getByRole('link',{name:'Open LINE and save my plan',exact:true})).toHaveCSS('color','rgb(255, 255, 255)');
 });
 test("PHARM-LINE-UI QR is prepared before clicking and expires without leaving a stale connection",async({page})=>{
   await page.clock.install({time:new Date('2026-09-18T00:00:00Z')});await page.clock.pauseAt(new Date('2026-09-18T00:01:00Z'));
