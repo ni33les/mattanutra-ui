@@ -27,9 +27,9 @@
   "browser": [
     {
       "file": "test/e2e/pharmacy-animation.spec.ts",
-      "expectedCases": 3,
+      "expectedCases": 4,
       "grep": "PHARM-MOTION",
-      "reason": "Dense mobile/desktop trail attachment, continuous rotation and explicit pending work after flight"
+      "reason": "Dense mobile/desktop trail attachment, continuous rotation, real-frame responsiveness and explicit pending work after flight"
     },
     {
       "file": "test/e2e/pharmacy-combined.spec.ts",

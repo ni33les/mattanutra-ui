@@ -2,12 +2,14 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { expect, test, type Page } from "../helpers/offline-browser";
 const execute = promisify(execFile);
-async function pending(page: Page, width: number) {
+async function pending(page: Page, width: number, virtualClock = true) {
   const {stdout}=await execute(process.execPath,["--experimental-strip-types","--import","./test/helpers/offline-network.mjs","--import","./scripts/register-ts-path-loader.mjs","--input-type=module","-e",`import {seedPharmacyFixture} from './test/helpers/pharmacy-fixture.ts';import {closeSqlPool} from './lib/db.ts';try{console.log('FIXTURE:'+JSON.stringify(await seedPharmacyFixture('en',false)));}finally{await closeSqlPool();}`],{env:process.env,timeout:30000});
   const saved=JSON.parse(stdout.split("\n").find(line=>line.startsWith("FIXTURE:"))!.slice(8));
   await page.setViewportSize({width,height:900});
-  await page.clock.install({time:new Date("2026-09-18T00:00:00Z")});
-  await page.clock.pauseAt(new Date("2026-09-18T00:01:00Z"));
+  if (virtualClock) {
+    await page.clock.install({time:new Date("2026-09-18T00:00:00Z")});
+    await page.clock.pauseAt(new Date("2026-09-18T00:01:00Z"));
+  }
   await page.goto(`/en/retail/${saved.slug}/reveal?plan=${saved.planId}`);
   await expect(page.locator(".mn-window")).toHaveAttribute("data-paused","false");
 }
@@ -48,4 +50,26 @@ test("PHARM-MOTION pending work settles after the final tap instead of freezing 
   await expect(page.locator(".mn-status")).toContainText("Still preparing");
   await expect(page.getByTestId("pharmacy-order")).toHaveCount(0);
   await expect(page.locator(".mn-nutrient")).toHaveCount(0);
+});
+test("PHARM-MOTION real-time mobile flight remains responsive through the final tap", async ({page}) => {
+  await pending(page,390,false);
+  await expect(page.locator(".mn-window")).toHaveAttribute("data-phase","clarity",{timeout:15000});
+  const frames = await page.evaluate(() => new Promise<number[]>(resolve => {
+    const times: number[] = [];
+    function observe() {
+      if (document.querySelector(".mn-window")!.getAttribute("data-phase") !== "clarity") {
+        resolve(times);
+        return;
+      }
+      times.push(performance.now());
+      requestAnimationFrame(observe);
+    }
+    requestAnimationFrame(observe);
+  }));
+  const intervals = frames.slice(1).map((time,i) => time-frames[i]).sort((a,b) => a-b);
+  await test.info().attach("real-frame-times",{body:JSON.stringify({frames,intervals}),contentType:"application/json"});
+  // Real RAF: virtual clocks cannot expose expensive animated SVG paint effects.
+  expect(frames.length).toBeGreaterThan(100);
+  expect(intervals[Math.floor(intervals.length/2)]).toBeLessThan(40);
+  await expect(page.locator(".mn-window")).toHaveAttribute("data-phase","waiting");
 });
