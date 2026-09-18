@@ -216,3 +216,18 @@ test("PHARM-WAIT-05 reduced motion has no ongoing decorative animation", async (
     await page.close();
   }
 });
+
+test('PHARM-WAIT-06 completion/failure stops pseudo-element decoration and hidden tabs pause it',async()=>{
+  const page=await browser.newPage();
+  try{
+    await page.route('**/*',r=>r.abort());
+    await page.setContent(base+`<style>${css}</style>`+markup());
+    for(const phase of ['ready','failed']){
+      await page.locator('.mn-window').evaluate((el,value)=>el.setAttribute('data-phase',value),phase);
+      const running=await page.locator('#mn-pharmacy-combined').evaluate(el=>el.getAnimations({subtree:true}).filter(a=>a instanceof CSSAnimation&&a.playState==='running').length);
+      assert.equal(running,0,`${phase} must stop decoration including pseudo-elements`);
+    }
+    await page.locator('.mn-window').evaluate(el=>{el.setAttribute('data-phase','clarity');el.setAttribute('data-paused','true');});
+    assert.equal(await page.locator('#mn-pharmacy-combined').evaluate(el=>el.getAnimations({subtree:true}).filter(a=>a instanceof CSSAnimation&&a.playState==='running').length),0);
+  }finally{await page.close();}
+});
