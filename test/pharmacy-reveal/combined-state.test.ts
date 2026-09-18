@@ -21,7 +21,7 @@ test("PHARM-COMBINE-02 real readiness preempts every decorative phase without an
   for (const phase of [
     "inputs",
     "rain",
-    "clarity",
+    "waiting",
     "selected",
     "matching",
   ] as const)
@@ -45,7 +45,7 @@ test("PHARM-COMBINE-03 timers cannot reveal invented ingredients or products", a
       ready: false,
       failed: false,
     }),
-    "clarity",
+    "waiting",
   );
   assert.equal(
     pharmacyPresentationPhase({
@@ -63,7 +63,7 @@ test("PHARM-COMBINE-03 timers cannot reveal invented ingredients or products", a
       ready: false,
       failed: false,
     }),
-    "clarity",
+    "waiting",
   );
   assert.equal(
     pharmacyPresentationPhase({
