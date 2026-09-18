@@ -39,7 +39,8 @@ export const MCP_PACKAGES = {
 };
 export const MCP721_STAGES = ["affected-tests", "typecheck", "release-diff-lint", "production-build", "unchanged-source-and-inputs"];
 export function packageStages(packageId) {
-  if (["pharmacy", "pharmacy-landing", "pharmacy-reveal", "pharmacy-source"].includes(packageId)) return [...MCP721_STAGES.slice(0,4), "affected-browser-tests", "unchanged-source-and-inputs"];
+  if (packageId === "pharmacy-reveal") return [...MCP721_STAGES.slice(0,4), "affected-browser-tests", "classic-browser-tests", "unchanged-source-and-inputs"];
+  if (["pharmacy", "pharmacy-landing", "pharmacy-source"].includes(packageId)) return [...MCP721_STAGES.slice(0,4), "affected-browser-tests", "unchanged-source-and-inputs"];
   if (packageId === "streaming") return ["affected-tests", "no-new-locks", "completion-comparison", ...MCP721_STAGES.slice(1)];
   if (packageId === "availability") return ["affected-tests", "no-new-locks", ...MCP721_STAGES.slice(1,4), "affected-browser-tests", "unchanged-source-and-inputs"];
   if (packageId === "refinement") return ["affected-tests", "fresh-standard-performance", "no-new-locks", ...MCP721_STAGES.slice(1)];
@@ -93,6 +94,7 @@ export function checkMcp721Proof(file, expected, packageId = "721") {
   }
   if (["pharmacy", "pharmacy-landing", "pharmacy-reveal", "pharmacy-source"].includes(packageId)) {
     assert.equal(json("browser-results.json").passed, true);
+    if (packageId === "pharmacy-reveal") assert.equal(json("classic-browser/browser-results.json").passed, true);
     assert.equal(build.sourceCommit, expected.sourceCommit);
     assert.deepEqual(inventory, JSON.parse(readFileSync(definition.inventory ?? `${definition.directory}/impact.json`)));
   }

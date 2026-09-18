@@ -44,7 +44,7 @@ for (const row of inventory.files) {
   assert.ok(row.reason.length > 20 && row.expectedCases > 0 && existsSync(row.file));
   assert.deepEqual(testSourceHygiene(readFileSync(row.file, "utf8"), row.file), []);
 }
-for (const row of inventory.browser ?? []) { assert.deepEqual(testSourceHygiene(readFileSync(row.file, "utf8"), row.file), []); assert.ok(row.expectedCases > 0 && row.reason); }
+for (const row of [...(inventory.browser ?? []), ...(inventory.classicBrowser ?? [])]) { assert.deepEqual(testSourceHygiene(readFileSync(row.file, "utf8"), row.file), []); assert.ok(row.expectedCases > 0 && row.reason); }
 if (mode === "validate") { assert.ok(git("branch", "--show-current") === "dev" || (packageId === "boundaries" && git("branch", "--show-current") === "codex/matching-lock-boundaries") || (packageId === "streaming" && git("branch", "--show-current") === "codex/mcp-completion-stream")); assert.equal(git("status", "--porcelain"), ""); git("merge-base", "--is-ancestor", MCP721_BASE, commit); }
 mkdirSync(output, { recursive: true, mode: 0o700 });
 const save = (name, value) => writeFileSync(resolve(output, name), JSON.stringify(value, null, 2) + "\n", { flag: "wx", mode: 0o600 });
@@ -193,6 +193,11 @@ if (mode === "validate") {
     const { runEfficiencyBrowser } = await import("./service-efficiency/release-stages.mjs");
     await runEfficiencyBrowser(output, isolated ?? { ...safe, TEST_DB_URL: process.env.TEST_DB_URL, DB_URL: process.env.TEST_DB_URL, DB_WORKER_URL: process.env.TEST_DB_URL, DB_ALLOW_DIRECT_CONNECTION: "true", DB_POOL_MAX: "3" }, inventory.browser);
     stages.push({ label: "affected-browser-tests", passed: true });
+    if (inventory.classicBrowser?.length) {
+      const classicOutput = resolve(output, "classic-browser"); mkdirSync(classicOutput);
+      await runEfficiencyBrowser(classicOutput, {...safe, TEST_DB_URL:process.env.TEST_DB_URL, DB_URL:process.env.TEST_DB_URL, DB_WORKER_URL:process.env.TEST_DB_URL, DB_ALLOW_DIRECT_CONNECTION:"true", DB_POOL_MAX:"3", NEXT_PUBLIC_CHAT_QUESTIONNAIRE_V6:"0", NEXT_PUBLIC_CHAT_QUESTIONNAIRE_V5:"0"}, inventory.classicBrowser);
+      stages.push({label:"classic-browser-tests",passed:true});
+    }
   }
   if (packageId === "efficiency") {
     const { benchmarkServices } = await import("./service-efficiency/benchmark.mjs");

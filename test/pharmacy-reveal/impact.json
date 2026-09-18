@@ -115,5 +115,13 @@
       "grep": "WEB-PREF-BROWSER",
       "reason": "Removed purchase questions stay absent in both flows and all three languages"
     }
+  ],
+  "classicBrowser": [
+    {
+      "file": "test/e2e/pharmacy-classic.spec.ts",
+      "expectedCases": 1,
+      "grep": "PHARM-CLASSIC",
+      "reason": "Existing classic fallback keeps capture inline, retries without HealthScore waiting, and opens combined reveal"
+    }
   ]
 }
