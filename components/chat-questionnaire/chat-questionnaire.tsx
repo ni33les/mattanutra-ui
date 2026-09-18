@@ -1,6 +1,7 @@
 "use client";
 
-import { PharmacyProgressView } from "@/components/pharmacy/progress";
+import { combinedCopy } from "@/components/pharmacy/combined-copy";
+import { pharmacyCopy } from "@/lib/pharmacy-copy";
 import { pharmacyPath } from "@/lib/pharmacy-journey";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -99,7 +100,7 @@ function resultsPath(
   skipHealthScore?: boolean,
   pharmacyId?: string
 ) {
-  if (pharmacyId) return pharmacyPath(locale, pharmacyId, "progress", { plan: planId });
+  if (pharmacyId) return pharmacyPath(locale, pharmacyId, "reveal", { plan: planId });
   return paymentId || skipHealthScore
     ? nutritionRevealPath(locale, planId)
     : nutritionHealthScorePath(locale, planId);
@@ -1378,9 +1379,7 @@ export function ChatQuestionnaire({
     );
   }
 
-  if (uiScreen === "calculating") {
-    if (pharmacyId) return <PharmacyProgressView locale={locale} failed={calcStatus === "error"}
-      onRetry={state ? () => { void capture.run(state, Boolean(capture.planId)); } : undefined} />;
+  if (uiScreen === "calculating" && !pharmacyId) {
     return (
       <QuestionnaireCalculating
         locale={locale}
@@ -1439,6 +1438,7 @@ export function ChatQuestionnaire({
             type="button"
             className="mn-chat-q__review-btn"
             data-testid="review-answers-btn"
+            disabled={Boolean(pharmacyId && uiScreen === "calculating")}
             onClick={() => setReviewOpen(true)}
             aria-haspopup="dialog"
           >
@@ -1473,7 +1473,12 @@ export function ChatQuestionnaire({
             ref={composerRef}
             data-testid="question-answers"
           >
-            <div className="mn-chat-q__composer-inner">{renderComposer()}</div>
+            <div className="mn-chat-q__composer-inner">{pharmacyId && uiScreen === "calculating" ? (
+              <div data-testid="pharmacy-capture-status" role={calcStatus === "error" ? "alert" : "status"}>
+                {calcStatus === "error" ? pharmacyCopy[locale].error : combinedCopy[locale].saving}
+                {calcStatus === "error" && state && <button type="button" className="mn-primary-button" onClick={() => { finalizing.current = true; void finalize(state); }}>{pharmacyCopy[locale].retry}</button>}
+              </div>
+            ) : renderComposer()}</div>
           </div>
         </div>
 

@@ -66,6 +66,8 @@ export function BpmTracker({ locale }: Readonly<{ locale: Locale }>) {
       // authoritative context instead of attributing it to a previous web visit.
       if (/\/retail\/[^/]+\//.test(pathname) && !document.querySelector("[data-pharmacy-source]")) return false;
       lastPageKey.current = pageKey;
+      // Combined pharmacy pages emit processing/reveal only when that state is actually visible.
+      if (new RegExp(`^/(${localePattern})/retail/[^/]+/(reveal|progress)$`).test(pathname)) return true;
       const pageEvent = pageEventForPath(pathname);
       trackBpmEvent(pageEvent.eventName, { eventType: pageEvent.eventType, locale,
         properties: { pageKey, title: document.title } });

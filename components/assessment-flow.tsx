@@ -2,7 +2,7 @@
 
 import { effectiveQuestionnaireAnswers } from "@/lib/web-purchase-preferences";
 
-import { PharmacyProgressView } from "@/components/pharmacy/progress";
+import { combinedCopy } from "@/components/pharmacy/combined-copy";
 import { pharmacyPath } from "@/lib/pharmacy-journey";
 import { retryHealthScoreCopy, waitForHealthScoreCopy } from "@/lib/healthscore-copy-client";
 import { fetchWithBodyDeadline } from "@/lib/funnel-polling";
@@ -217,7 +217,7 @@ export function AssessmentFlow({
         setAnswers(buildInitialAnswers(effectiveQuestionnaireAnswers(saved.answers))); setContactEmail(saved.contactEmail || "");
         setSectionIndex(saved.sectionIndex || 0); setResumePlanId(saved.planId || returningPlanId || "");
         if (saved.receipt) { capturedAnswers.current = JSON.stringify(buildInitialAnswers(effectiveQuestionnaireAnswers(saved.answers))); setCapturedStatus(saved.receipt); }
-        if (saved.processing && saved.receipt?.planId) router.replace(pharmacyId ? pharmacyPath(locale, pharmacyId, "progress", { plan: saved.receipt.planId }) : nutritionHealthScorePath(locale, saved.receipt.planId));
+        if (saved.processing && saved.receipt?.planId) router.replace(pharmacyId ? pharmacyPath(locale, pharmacyId, "reveal", { plan: saved.receipt.planId }) : nutritionHealthScorePath(locale, saved.receipt.planId));
       }
     } catch { /* Ignore drafts from another format. */ }
     setDraftReady(true);
@@ -1102,7 +1102,8 @@ export function AssessmentFlow({
   const currentSection = sections[Math.min(sectionIndex, sections.length - 1)];
   const renderedQuestions = currentSection.questions;
   const isFinalStep = sectionIndex === sections.length - 1;
-  const primaryActionDisabled = !answers.disclosure;
+  const pharmacySaving = Boolean(pharmacyId && processingStatus && !processingError);
+  const primaryActionDisabled = !answers.disclosure || pharmacySaving;
 
   function goBack() {
     setProcessingError("");
@@ -1116,6 +1117,7 @@ export function AssessmentFlow({
   }
 
   function goToSection(index: number) {
+    if (pharmacySaving) return;
     setProcessingError("");
     if (!answers.disclosure && index !== 0) {
       return;
@@ -1200,7 +1202,7 @@ export function AssessmentFlow({
       setShowHealthScore(!skipHealthScoreStep);
       router.replace(
         paymentId || skipHealthScoreStep
-          ? pharmacyId ? pharmacyPath(locale, pharmacyId, "progress", { plan: readyStatus.planId }) : nutritionRevealPath(locale, readyStatus.planId)
+          ? pharmacyId ? pharmacyPath(locale, pharmacyId, "reveal", { plan: readyStatus.planId }) : nutritionRevealPath(locale, readyStatus.planId)
           : nutritionHealthScorePath(locale, readyStatus.planId)
       );
     } catch {
@@ -1301,8 +1303,7 @@ export function AssessmentFlow({
 
   return (
     <main className="mx-auto w-full max-w-6xl px-6 pb-[calc(7rem+env(safe-area-inset-bottom))] pt-10 sm:px-8 sm:pb-16 lg:pt-14">
-        {processingStatus ? (pharmacyId ? <PharmacyProgressView locale={locale} failed={processingStatus.status === "failed"}
-          onRetry={() => void prepareHealthScoreGate()} /> : <ProcessingPanel
+        {processingStatus && !pharmacyId ? (<ProcessingPanel
             error={
               processingStatus.status === "failed"
                 ? ui.processingError
@@ -1322,6 +1323,7 @@ export function AssessmentFlow({
 	          />
 	        ) : (
 	          <div className="space-y-6">
+            {pharmacySaving && <p role="status" data-testid="pharmacy-capture-status">{combinedCopy[locale].saving}</p>}
             {sectionIndex === 0 || !answers.disclosure ? renderPrivacyGate() : null}
             <QuestionnairePrecisionMeter precision={precision} ui={ui} />
             <div className="py-3">
@@ -1349,7 +1351,7 @@ export function AssessmentFlow({
                     <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center">
                       <button
                         type="button"
-                        disabled={sectionIndex === 0}
+                        disabled={sectionIndex === 0 || pharmacySaving}
                         className="mn-secondary-button"
                         onClick={goBack}
                       >
@@ -1359,6 +1361,7 @@ export function AssessmentFlow({
                         <button
                           type="button"
                           className="mn-secondary-button mn-secondary-button--compact"
+                          disabled={pharmacySaving}
                           onClick={fillRandomDefaultsAndFinalStep}
                         >
                           {ui.devDefaults}
@@ -1385,9 +1388,7 @@ export function AssessmentFlow({
               supportingNote={sectionIndex === 0 ? undefined : copy.sectionNotes[sectionIndex]}
               title={currentSection.title}
             >
-              <div
-                className="space-y-7"
-              >
+              <fieldset disabled={pharmacySaving} className="space-y-7">
                 {sectionIndex === 0 ? (
                   <AssessmentIntroNote
                     body={copy.about.honestyBody}
@@ -1409,7 +1410,7 @@ export function AssessmentFlow({
                 {sectionIndex === 0 ? (
                   <AssessmentTrustStrip items={copy.about.trustItems} />
                 ) : null}
-              </div>
+              </fieldset>
             </SectionCard>
 
             {processingError ? (

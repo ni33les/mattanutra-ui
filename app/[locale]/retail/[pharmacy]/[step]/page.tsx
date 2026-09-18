@@ -8,9 +8,7 @@ import { SiteFooter } from "@/components/site-footer";
 import { PharmacyLanding } from "@/components/pharmacy/landing";
 import { PharmacyQuiz } from "@/components/pharmacy/quiz";
 import { PharmacyResults } from "@/components/pharmacy/results";
-import { PharmacyProgress } from "@/components/pharmacy/progress";
-import { FormulationResults } from "@/components/formulation-results";
-import { getFunnelReadiness } from "@/lib/funnel-readiness";
+import { PharmacyCombined } from "@/components/pharmacy/combined";
 import { isLocale, getDictionary } from "@/lib/i18n";
 import { pharmacyPath, pharmacyOrganisationSlug } from "@/lib/pharmacy-journey";
 import { resolvePharmacyOrganisation } from "@/lib/pharmacy-in-store";
@@ -29,6 +27,7 @@ export default async function PharmacyJourneyPage({ params, searchParams }: {
   const pharmacy = await resolvePharmacyOrganisation(pharmacyOrganisationSlug(slug));
   if (!pharmacy) notFound();
   const query = await searchParams, dictionary = getDictionary(locale);
+  if (step === "progress") redirect(pharmacyPath(locale, slug, "reveal", query));
   const currentPath = pharmacyPath(locale, slug, step as "landing" | "quiz" | "progress" | "reveal" | "plan", query);
   let content;
   let entrySource = pharmacySource(query.source);
@@ -46,25 +45,21 @@ export default async function PharmacyJourneyPage({ params, searchParams }: {
       try {
         const { assessment } = await pharmacyAssessment(planId, slug);
         const order = await readPharmacyOrder(planId, slug, query.order);
-        const status = step === "progress" ? await getFunnelReadiness(planId, assessment.locale) : null;
-        const stored = order || step === "progress" ? null : await getStoredFormulationRead(planId, { locale: assessment.locale, includeProducts: true });
-        return { assessment, order, stored, status };
+        const stored = order ? null : await getStoredFormulationRead(planId, { locale: assessment.locale, includeProducts: true });
+        return { assessment, order, stored };
       } catch (error) { if (error instanceof FunnelError && error.status === 404) notFound(); throw error; }
     })();
     const acquisition = pharmacyAcquisitionFromAnswers(data.assessment.answers) ?? {source: "unknown" as const, ray: planId};
     entrySource = acquisition.source;
-    if (step === "progress") {
-      if (data.order || data.status?.readyForReveal) redirect(pharmacyPath(locale, slug, "reveal", { plan: planId, order: data.order?.receipt.id }));
-      if (!data.status) notFound();
-      content = <PharmacyProgress locale={locale} sourceLocale={data.assessment.locale} slug={slug} planId={planId} initial={data.status} />;
-    } else {
-      const result = data.order?.result ?? (data.stored?.readiness?.readyForReveal ? data.stored.result : null);
-      if (!result) redirect(pharmacyPath(locale, slug, "progress", { plan: planId }));
-      const revision = data.order?.receipt.revision ?? data.assessment.revision;
-      content = step === "reveal" ? <FormulationResults locale={locale} planId={planId} initialResult={result}
-        pharmacy={{ slug, name: pharmacy.name, revision, sourceLocale: data.order?.locale ?? data.assessment.locale, receipt: data.order?.receipt ?? null, source: acquisition.source }} />
-        : <PharmacyResults locale={locale} sourceLocale={data.order?.locale ?? data.assessment.locale} slug={slug} pharmacyName={pharmacy.name} planId={planId}
-          revision={revision} initialResult={result} receipt={data.order?.receipt ?? null} />;
+    const result = data.order?.result ?? (data.stored?.readiness?.formulationStatus === "ready" ? data.stored.result : null);
+    const revision = data.order?.receipt.revision ?? data.assessment.revision;
+    if (step === "reveal") content = <PharmacyCombined locale={locale} sourceLocale={data.order?.locale ?? data.assessment.locale}
+      slug={slug} pharmacyName={pharmacy.name} planId={planId} revision={revision}
+      initial={data.stored?.readiness ?? null} initialResult={result} initialReceipt={data.order?.receipt ?? null} />;
+    else {
+      if (!result || (!data.order && !data.stored?.readiness?.readyForReveal)) redirect(pharmacyPath(locale, slug, "reveal", query));
+      content = <PharmacyResults locale={locale} sourceLocale={data.order?.locale ?? data.assessment.locale} slug={slug} pharmacyName={pharmacy.name} planId={planId}
+        revision={revision} initialResult={result} receipt={data.order?.receipt ?? null} />;
     }
     content = <PharmacyAcquisitionContext slug={pharmacy.slug} acquisition={acquisition}>{content}</PharmacyAcquisitionContext>;
   }

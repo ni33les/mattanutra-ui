@@ -2,7 +2,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useFormulationPolling } from "@/components/nutrition-flow/use-formulation-polling";
 import { PharmacyDeepDive } from "./deep-dive";
-import { PharmacyProgressView } from "@/components/pharmacy/progress";
 import { pharmacyCopy } from "@/lib/pharmacy-copy";
 import { pollFunnelStatus, fetchFunnelJson } from "@/lib/funnel-polling";
 import type { FormulationResult } from "@/lib/formulation-types";
@@ -38,7 +37,7 @@ export function PharmacyResults({ locale, sourceLocale = locale, slug, pharmacyN
     void observe().catch(() => { if (!controller.signal.aborted) setHealthFailed(true); });
     return () => controller.abort();
   }, [healthAttempt, planId, revision, sourceLocale, slug, receipt]);
-  if (!result) return <PharmacyProgressView locale={locale} stage={1} failed={polling.failed} onRetry={polling.retry} />;
+  if (!result) return <div className="notice" role="status">{polling.failed ? c.error : c.preparing}{polling.failed && <button className="link-button" onClick={polling.retry}>{c.retry}</button>}</div>;
   // Food guidance may finish after the order. Reuse it only for the frozen
   // recommendation; its formula, purchased products and prices stay unchanged.
   const current = polling.result;
