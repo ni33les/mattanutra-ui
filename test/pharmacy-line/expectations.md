@@ -12,6 +12,8 @@ RED evidence: /root/.codex/deploy/pharmacy-line-20260918/red-complete.log (7 fai
 
 Mobile visual review exposed the coffee illustration selector shrinking the QR. `red-layout` preserves the failing 176px assertion. The image selector now targets only the illustration, and LINE instructions inherit the containing panel's contrasting text colour.
 
+`red-button` preserves the deep-dive link rule overriding the LINE action's white text. The panel's scoped action selector takes precedence without changing other deep-dive links.
+
 LINE protocol references:
 - https://developers.line.biz/en/docs/messaging-api/using-line-url-scheme/#opening-a-chat-screen-with-a-line-official-account
 - https://developers.line.biz/en/docs/messaging-api/retrying-api-request/
