@@ -119,7 +119,7 @@ test("PHARM-COMBINE completion before the animation finishes reveals immediately
     "data-phase",
     "inputs",
   );
-  await page.clock.pauseAt(new Date());
+  await page.clock.pauseAt(new Date(await page.evaluate(() => Date.now() + 100)));
   await fixture(true, saved);
   await page.clock.runFor(1600);
   await expect(page.getByTestId("pharmacy-order")).toBeVisible();
@@ -182,6 +182,7 @@ test("PHARM-COMBINE replay preserves deselection and name without rematching or 
   page,
 }) => {
   const saved = await fixture(true);
+  await page.clock.install();
   let mutations = 0;
   page.on("request", (r) => {
     if (
@@ -196,14 +197,14 @@ test("PHARM-COMBINE replay preserves deselection and name without rematching or 
     .getByLabel("Name or nickname", { exact: true })
     .fill("Retained visitor");
   await page
-    .getByRole("button", { name: "Replay analysis", exact: true })
+    .getByRole("button", { name: /Replay analysis/ })
     .click();
   await expect(page.locator(".mn-window")).toHaveAttribute(
     "data-phase",
     "inputs",
   );
-  await page.clock.install();
-  await page.clock.fastForward(17000);
+  await page.clock.runFor(17000);
+  await expect(page.locator(".mn-window")).toHaveAttribute("data-phase","ready");
   await expect(page.getByTestId("pharmacy-order")).toBeVisible();
   await expect(page.getByRole("checkbox")).not.toBeChecked();
   await expect(
@@ -224,13 +225,14 @@ for (const width of [1280, 390])
       Math.random = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
     });
     await page.goto(`/en/retail/${saved.slug}/reveal?plan=${saved.planId}`);
-    await page.clock.pauseAt(new Date());
+    await page.clock.pauseAt(new Date(await page.evaluate(() => Date.now() + 100)));
     await page.clock.runFor(3300);
     await expect(page.locator(".mn-window")).toHaveAttribute(
       "data-phase",
       "rain",
     );
     await expect(page.locator(".mn-rain-chip")).toHaveCount(54);
+    expect(await page.locator(".mn-rain-chip").first().evaluate(el=>Number(el.getAnimations()[0].currentTime))).toBeLessThan(600);
     await page.screenshot({
       path: test.info().outputPath(`rain-${width}.png`),
       fullPage: true,
