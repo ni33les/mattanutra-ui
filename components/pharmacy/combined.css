@@ -1235,7 +1235,7 @@
     gap: 26px;
   }
 
-  #mn-pharmacy-combined .mn-coffee img {
+  #mn-pharmacy-combined .mn-coffee-intro img {
     width: 100%;
     max-height: 220px;
     display: block;
@@ -1648,7 +1648,7 @@
       text-align: center;
     }
 
-    #mn-pharmacy-combined .mn-coffee img {
+    #mn-pharmacy-combined .mn-coffee-intro img {
       width: 110px;
       max-height: 145px;
       margin: 0 auto;
