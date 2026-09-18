@@ -64,7 +64,7 @@ async function pages(width: number) {
     base +
       reference.replace(
         "    play();",
-        "    window.referenceFlight = prepareClarityFlight;",
+        "    window.referenceFlight = prepareClarityFlight; play(); clearTimers(); setPhase(\"clarity\", \"MattaNutra is bringing your personalised plan into focus\");",
       ),
   );
   await candidate.setContent(base + `<style>${css}</style>` + markup());

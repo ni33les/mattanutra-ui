@@ -494,6 +494,10 @@ export function ChatQuestionnaire({
     await runCapture(completed);
   }, [runCapture, locale, saveLocalState, pharmacyId]);
 
+  function retryPharmacyCapture() {
+    if (state) void finalize(state);
+  }
+
   const commitState = useCallback(
     async (
       next: QuestionnaireState,
@@ -1473,12 +1477,12 @@ export function ChatQuestionnaire({
             ref={composerRef}
             data-testid="question-answers"
           >
-            <div className="mn-chat-q__composer-inner">{pharmacyId && uiScreen === "calculating" ? (
+            <div className="mn-chat-q__composer-inner">{renderComposer()}{pharmacyId && uiScreen === "calculating" && (
               <div data-testid="pharmacy-capture-status" role={calcStatus === "error" ? "alert" : "status"}>
                 {calcStatus === "error" ? pharmacyCopy[locale].error : combinedCopy[locale].saving}
-                {calcStatus === "error" && state && <button type="button" className="mn-primary-button" onClick={() => { finalizing.current = true; void finalize(state); }}>{pharmacyCopy[locale].retry}</button>}
+                {calcStatus === "error" && state && <button type="button" className="mn-primary-button" onClick={retryPharmacyCapture}>{pharmacyCopy[locale].retry}</button>}
               </div>
-            ) : renderComposer()}</div>
+            )}</div>
           </div>
         </div>
 
