@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { isUuid } from "@/lib/assessment-store";
 import { createCustomerLineConnectToken } from "@/lib/communications";
 import { buildLineOfficialAccountMessageUrl } from "@/lib/chat-links";
+import { preparePharmacyLineConnect } from "@/lib/pharmacy-line-connect";
+import { FunnelError } from "@/lib/funnel-errors";
 import {
   enforceRateLimit,
   publicRateLimits
@@ -57,6 +59,10 @@ export async function POST(
   const body = objectValue(await request.json().catch(() => ({})));
 
   try {
+    if (body.source === "pharmacy_plan") {
+      return noStoreJson(await preparePharmacyLineConnect({ planId, pharmacy: body.pharmacy, locale: body.locale,
+        orderId: text(body.retailCustomerOrderId) || undefined }));
+    }
     const sqlStartedAt = Date.now();
     const token = await createCustomerLineConnectToken({
       planId,
@@ -93,7 +99,7 @@ export async function POST(
             ? error.message
             : "Could not create LINE connection code"
       },
-      400
+      error instanceof FunnelError ? error.status : 400
     );
   }
 }

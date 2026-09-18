@@ -17,6 +17,7 @@ export function verifyVersionExpectationEdit(before, after) {
   assert.equal(after, before.replaceAll(original, replacement), "Unexpected behavioral test change");
 }
 export const MCP_PACKAGES = {
+  "pharmacy-line": { version: "11.1.0", directory: "test/pharmacy-line", base: "de6aab700acd4bc022ba357911b39666a411dac8", scope: "pharmacy_line_plan_delivery" },
   "pharmacy-animation": { version: "11.1.0", directory: "test/pharmacy-animation", base: "732cf91f245c8b1d25422b717fbe1aaa29639fe3", scope: "pharmacy_animation_continuity" },
   "pharmacy-source": { version: "11.1.0", directory: "test/pharmacy", inventory: "test/pharmacy/source-impact.json", base: "88b3a2353d4b69a7294ad86f23e5cc79dd302fff", scope: "pharmacy_source_attribution" },
   "pharmacy-reveal": { version: "11.1.0", directory: "test/pharmacy-reveal", base: "2f0c5dcfcfa71ccb177171068f1b57335efbfe59", scope: "pharmacy_combined_processing_reveal_order" },
@@ -41,7 +42,7 @@ export const MCP_PACKAGES = {
 export const MCP721_STAGES = ["affected-tests", "typecheck", "release-diff-lint", "production-build", "unchanged-source-and-inputs"];
 export function packageStages(packageId) {
   if (packageId === "pharmacy-reveal") return [...MCP721_STAGES.slice(0,4), "affected-browser-tests", "classic-browser-tests", "unchanged-source-and-inputs"];
-  if (["pharmacy", "pharmacy-landing", "pharmacy-source", "pharmacy-animation"].includes(packageId)) return [...MCP721_STAGES.slice(0,4), "affected-browser-tests", "unchanged-source-and-inputs"];
+  if (["pharmacy", "pharmacy-landing", "pharmacy-source", "pharmacy-animation", "pharmacy-line"].includes(packageId)) return [...MCP721_STAGES.slice(0,4), "affected-browser-tests", "unchanged-source-and-inputs"];
   if (packageId === "streaming") return ["affected-tests", "no-new-locks", "completion-comparison", ...MCP721_STAGES.slice(1)];
   if (packageId === "availability") return ["affected-tests", "no-new-locks", ...MCP721_STAGES.slice(1,4), "affected-browser-tests", "unchanged-source-and-inputs"];
   if (packageId === "refinement") return ["affected-tests", "fresh-standard-performance", "no-new-locks", ...MCP721_STAGES.slice(1)];
@@ -93,7 +94,7 @@ export function checkMcp721Proof(file, expected, packageId = "721") {
     assert.ok(comparison.semanticSha256 && comparison.fixtureSha256);
     assert.equal(build.sourceCommit, expected.sourceCommit);
   }
-  if (["pharmacy", "pharmacy-landing", "pharmacy-reveal", "pharmacy-source", "pharmacy-animation"].includes(packageId)) {
+  if (["pharmacy", "pharmacy-landing", "pharmacy-reveal", "pharmacy-source", "pharmacy-animation", "pharmacy-line"].includes(packageId)) {
     assert.equal(json("browser-results.json").passed, true);
     if (packageId === "pharmacy-reveal") assert.equal(json("classic-browser/browser-results.json").passed, true);
     assert.equal(build.sourceCommit, expected.sourceCommit);

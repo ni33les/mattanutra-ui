@@ -9,7 +9,15 @@ The existing questionnaire capture binds the pharmacy server-side. Formula and H
 
 Orders use source `pharmacy`, status `placed`, and explicit unpaid/pay-at-till metadata. No online payment, financial booking, stock allocation, shipment or settlement is initiated. The shared order-creation revision/catalogue fences protect only final validation and necessary writes. Reused task infrastructure commits the notification request with the order and dispatches after commit. Delivery failure cannot invalidate a saved order. Counter payment/collection/POS integration is outside this version.
 
-The order UI reuses existing basket/order-summary styles. It removes address, billing, shipping and Stripe controls; it adds product inclusion, name/nickname and pay-at-till copy. Attached examples provide structure and text, not customer facts, prices, clearance claims or fixed counts. Deep-dive results distinguish the original formulation from the ordered product subset. LINE sharing opens only after a customer click and does not claim automatic delivery.
+The order UI reuses existing basket/order-summary styles. It removes address, billing, shipping and Stripe controls; it adds product inclusion, name/nickname and pay-at-till copy. Attached examples provide structure and text, not customer facts, prices, clearance claims or fixed counts. Deep-dive results distinguish the original formulation from the ordered product subset.
+
+## Save the plan in LINE
+
+The ready pharmacy page and deep dive prepare a local QR image automatically. It opens MattaNutra's official-account chat with a short-lived `MN PLAN` connection code; the same link supports phones already running LINE. The customer taps Send. A signature-verified private message then connects the saved assessment and queues an English, Thai or Chinese greeting with its full-plan link. A saved order retains its frozen-order link. Neither the QR nor an external image service receives questionnaire data.
+
+Connection, message and existing dispatch-task records commit together. Duplicate deliveries reuse the same message and provider retry key; provider acknowledgement controls sent status. QR preparation alone never claims delivery. Expired codes refresh on the page; failed preparation offers an explicit retry. The ordinary website's LINE flow remains unchanged.
+
+The LINE account's webhook must point to its own environment's `/api/line/webhook`. Verify this separately from application deployment. Focused validation: `node scripts/mcp-721.mjs validate --package=pharmacy-line --output /absolute/evidence/path` with isolated `TEST_DB_URL`; its reviewed inventory is `test/pharmacy-line/impact.json`.
 
 ## Verification and deployment
 

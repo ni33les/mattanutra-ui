@@ -32,6 +32,7 @@ import { useCombinedResult } from "@/components/pharmacy/use-combined-result";
 import { usePharmacyOrder } from "@/components/pharmacy/use-pharmacy-order";
 import { usePharmacyAnimation } from "@/components/pharmacy/use-pharmacy-animation";
 import { combinedCopy } from "@/components/pharmacy/combined-copy";
+import { PharmacyLineConnect } from "@/components/pharmacy/line-connect";
 import "./combined.css";
 
 const subscribeOrigin = () => () => {};
@@ -661,15 +662,7 @@ export function PharmacyCombined({
             </div>
           </div>
           <div className="mn-return-path">
-            <p className="mn-line-instruction">{p.lineHint}</p>
-            <a
-              className="mn-line-btn"
-              href={`https://line.me/R/share?text=${encodeURIComponent(link)}`}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              {c.line}
-            </a>
+            {work.ready && <PharmacyLineConnect planId={planId} slug={slug} locale={locale} orderId={order.receipt?.id} />}
             <p className="mn-choice-or">{c.or}</p>
             <a
               className="mn-read-now"

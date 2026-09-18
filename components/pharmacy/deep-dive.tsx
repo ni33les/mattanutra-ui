@@ -15,6 +15,7 @@ import type { HealthScoreResult } from "@/lib/health-score/v4-types";
 import type { PharmacyOrderReceipt } from "@/lib/pharmacy-orders";
 import { pharmacyDeepDiveCopy } from "./deep-dive-copy";
 import styles from "./deep-dive.module.css";
+import { PharmacyLineConnect } from "./line-connect";
 
 const normalized = (value: string) => value.toLowerCase().replace(/[\s_:-]+/g, "");
 
@@ -177,9 +178,10 @@ export function PharmacyDeepDive({ locale, slug, pharmacyName, planId, result, h
         <div className="pali">Mattaññutā</div><div className="measure" style={{ margin: "0 auto" }}><p>{d.meaning}</p><p>{d.closing}</p></div></div>
     </div>
     <section className="keep" data-testid="deep-dive-save"><div className="wrap keep-row"><div className="measure"><h3>{d.keep}</h3><p>{d.keepBody}</p>
-      <div className="keep-actions"><button className="btn" onClick={() => { window.open(`https://line.me/R/share?text=${encodeURIComponent(new URL(path, window.location.origin).href)}`, "_blank", "noopener,noreferrer"); }}>{c.line} <span aria-hidden="true">↗</span></button>
+      <PharmacyLineConnect planId={planId} slug={slug} locale={locale} orderId={receipt?.id} />
+      <div className="keep-actions">
         <button className="link-button" onClick={() => { void navigator.clipboard.writeText(new URL(path, window.location.origin).href).then(() => { setCopied(true); setCopyFailed(false); }).catch(() => setCopyFailed(true)); }}>{copied ? c.copied : c.copyLink}</button>
-        <a href={back}>{c.back}</a></div><p role="status">{copyFailed ? d.copyError : copied ? c.copied : c.lineHint}</p>
+        <a href={back}>{c.back}</a></div><p role="status">{copyFailed ? d.copyError : copied ? c.copied : ""}</p>
     </div></div></section>
     <div className="wrap"><footer><p>{pharmacyName}{Number.isFinite(date.getTime()) ? ` · ${d.composed} ${new Intl.DateTimeFormat(localeHtmlLang(locale), { dateStyle: "long", timeZone: "Asia/Bangkok" }).format(date)}` : ""}</p><p>{d.wellness}</p></footer></div>
   </article>;

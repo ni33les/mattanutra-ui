@@ -1,0 +1,15 @@
+{
+  "releaseBase": "de6aab700acd4bc022ba357911b39666a411dac8",
+  "scope": "pharmacy_line_plan_delivery",
+  "inputs": ["test/helpers/pharmacy-fixture.ts", "lib/pharmacy-line-copy.ts"],
+  "files": [
+    {"file":"test/pharmacy-line/connect.integration.test.ts","expectedCases":8,"database":true,"reason":"Local QR, signature-verified private connection, three locales, frozen order ownership, atomic outbox, retries and ordinary route compatibility"},
+    {"file":"test/communications.test.ts","expectedCases":9,"reason":"Shared channel and dispatch changes preserve ordinary customer/admin routing and message formatting"},
+    {"file":"test/panya-line-cta-static.test.ts","expectedCases":1,"reason":"Ordinary website LINE entry and existing command remain compatible with the shared endpoint"},
+    {"file":"test/panya-welcome.test.ts","expectedCases":3,"reason":"Ordinary customer welcome stays unchanged when pharmacy uses the deterministic delivery path"}
+  ],
+  "browser": [
+    {"file":"test/e2e/pharmacy-line.spec.ts","expectedCases":2,"grep":"PHARM-LINE-UI","reason":"Prepared QR without click, no error loop, explicit retry and automatic expiry refresh"},
+    {"file":"test/e2e/pharmacy-journey.spec.ts","expectedCases":3,"grep":"PHARM-BROWSER (en|th|zh-CN) landing","reason":"Reveal and deep dive LINE panels in all three languages preserve unpaid orders, selection, frozen receipt recovery and layout"}
+  ]
+}

@@ -24,7 +24,7 @@ const en = {
   noFood: "No separate food suggestions were recorded for this plan.",
   safetyIntro: "These are the relevant findings recorded with your formula and selected recommendation. Missing information is not a completed safety check. Discuss your medications, conditions and any changes with the pharmacist before use.",
   noSafety: "No additional ingredient-specific cautions were recorded. This does not establish medical clearance.",
-  keep: "Keep your complete plan", keepBody: "Copy your private link or choose a LINE chat to share it. Your order reference, when available, stays with the link.",
+  keep: "Keep your complete plan", keepBody: "Receive your private plan link in MattaNutra’s LINE chat, or copy it below. Your order reference, when available, stays with the link.",
   copyError: "The link could not be copied. You can copy the page address instead.",
   meaning: "From the Pāli — the wisdom of knowing the right amount.",
   closing: "Your answers. Your goals. A plan you can understand, and a conversation you can continue with your pharmacist.",
@@ -46,7 +46,7 @@ const th: Copy = {
   unknownProducts: "ข้อมูลที่บันทึกไว้ยังระบุความครอบคลุมจากผลิตภัณฑ์ได้ไม่ครบถ้วน",
   foodHowTo: "อาหารช่วยได้แค่ไหน", foodNote: "อาหารช่วยสนับสนุนกิจวัตรของคุณได้ แต่ปริมาณสารอาหารแตกต่างกันตามวัตถุดิบ ขนาดมื้อ และวิธีปรุง คำแนะนำเหล่านี้ไม่ได้ยืนยันว่าได้รับครบตามเป้าหมายอาหารเสริมแล้ว", noFood: "แผนนี้ไม่ได้บันทึกคำแนะนำอาหารแยกไว้",
   safetyIntro: "นี่คือข้อค้นพบที่เกี่ยวข้องซึ่งบันทึกไว้กับสูตรและชุดที่แนะนำ ข้อมูลที่ขาดหายไม่ได้หมายความว่าตรวจสอบความปลอดภัยครบแล้ว โปรดแจ้งยา ภาวะสุขภาพ และการเปลี่ยนแปลงต่าง ๆ ให้เภสัชกรทราบก่อนใช้", noSafety: "ไม่มีข้อควรระวังเฉพาะสารอาหารเพิ่มเติมที่บันทึกไว้ ทั้งนี้ไม่ได้ยืนยันความปลอดภัยทางการแพทย์",
-  keep: "เก็บแผนฉบับเต็มของคุณ", keepBody: "คัดลอกลิงก์ส่วนตัวหรือเลือกแชต LINE เพื่อแชร์ เมื่อมีเลขอ้างอิงรายการสั่งซื้อ เลขนั้นจะอยู่ในลิงก์ด้วย", copyError: "คัดลอกลิงก์ไม่สำเร็จ คุณคัดลอกที่อยู่ของหน้านี้แทนได้",
+  keep: "เก็บแผนฉบับเต็มของคุณ", keepBody: "รับลิงก์แผนส่วนตัวในแชต LINE ของ MattaNutra หรือคัดลอกลิงก์ด้านล่าง เมื่อมีเลขอ้างอิงรายการสั่งซื้อ เลขนั้นจะอยู่ในลิงก์ด้วย", copyError: "คัดลอกลิงก์ไม่สำเร็จ คุณคัดลอกที่อยู่ของหน้านี้แทนได้",
   meaning: "จากภาษาบาลี — ปัญญาแห่งการรู้จักปริมาณที่พอดี", closing: "คำตอบของคุณ เป้าหมายของคุณ แผนที่คุณเข้าใจได้ และบทสนทนาที่ต่อยอดกับเภสัชกรได้", composed: "จัดทำเมื่อ",
   wellness: "ข้อมูลเพื่อสุขภาวะ ไม่ใช่การวินิจฉัยหรือการรักษา อย่าเริ่มหรือหยุดยาโดยอาศัยแผนนี้ โปรดทบทวนกับแพทย์หรือเภสัชกรเมื่อสถานการณ์ของคุณเปลี่ยนไป"
 };
@@ -61,6 +61,6 @@ const zh: Copy = {
   recommended: "这些是这家药房为您推荐的产品。返回建议页，选择希望订购的产品。", ordered: "这些产品来自您保存的订单。下方数量和价格以该订单为准，请在药房柜台付款。", unknownProducts: "已保存的建议尚不能完整量化产品覆盖情况。",
   foodHowTo: "食物能做什么，不能做什么", foodNote: "食物可以支持您的日常营养，但营养含量随食材、分量和烹饪方法而变化。这些建议并不证明已达到营养补充目标。", noFood: "此方案未记录单独的食物建议。",
   safetyIntro: "以下是配方与推荐组合中记录的相关发现。缺少信息并不代表已完成安全检查。使用前请与药剂师讨论您的用药、健康状况及其变化。", noSafety: "未记录额外的营养素专属注意事项。这并不代表已获得医疗安全确认。",
-  keep: "保存您的完整方案", keepBody: "复制私人链接，或选择 LINE 聊天分享。若已有订单编号，链接会保留该编号。", copyError: "无法复制链接，您可以改为复制本页地址。", meaning: "源自巴利语——懂得适量的智慧。", closing: "您的回答，您的目标。一份能够理解的方案，一场可以与药剂师继续的交流。", composed: "制定日期", wellness: "仅供健康参考，不作诊断或治疗。请勿根据此方案开始或停止用药。情况变化时，请与医生或药剂师重新审阅。"
+  keep: "保存您的完整方案", keepBody: "在 MattaNutra 的 LINE 聊天中接收私人方案链接，或在下方复制。若已有订单编号，链接会保留该编号。", copyError: "无法复制链接，您可以改为复制本页地址。", meaning: "源自巴利语——懂得适量的智慧。", closing: "您的回答，您的目标。一份能够理解的方案，一场可以与药剂师继续的交流。", composed: "制定日期", wellness: "仅供健康参考，不作诊断或治疗。请勿根据此方案开始或停止用药。情况变化时，请与医生或药剂师重新审阅。"
 };
 export const pharmacyDeepDiveCopy: Record<Locale, Copy> = { en, th, "zh-CN": zh };

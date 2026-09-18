@@ -835,6 +835,7 @@ async function deliverLineMessage(row: DeliveryTargetRow) {
   }
 
   const response = await fetch("https://api.line.me/v2/bot/message/push", {
+    ...(row.message_type === "pharmacy_plan_welcome" ? { signal: AbortSignal.timeout(10_000) } : {}),
     body: JSON.stringify({
       messages: [
         {
@@ -846,13 +847,16 @@ async function deliverLineMessage(row: DeliveryTargetRow) {
     }),
     headers: {
       Authorization: `Bearer ${accessToken}`,
+      ...(row.message_type === "pharmacy_plan_welcome" ? { "X-Line-Retry-Key": row.id } : {}),
       "Content-Type": "application/json"
     },
     method: "POST"
   });
-  const providerMessageId = response.headers.get("x-line-request-id");
+  const acceptedReplay = row.message_type === "pharmacy_plan_welcome" && response.status === 409
+    ? response.headers.get("x-line-accepted-request-id") : null;
+  const providerMessageId = acceptedReplay || response.headers.get("x-line-request-id");
 
-  if (response.ok) {
+  if (response.ok || acceptedReplay) {
     const message = await updateCommunicationMessageStatus({
       messageId: row.id,
       providerMessageId,
@@ -909,7 +913,7 @@ export async function dispatchCommunicationMessage(messageId: string) {
     throw new Error("Communication message not found");
   }
 
-  if (row.status !== "queued") {
+  if (row.status !== "queued" && !(row.message_type === "pharmacy_plan_welcome" && row.status === "failed")) {
     return {
       attempted: false,
       configured: true,

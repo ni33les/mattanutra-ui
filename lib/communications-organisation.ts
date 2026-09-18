@@ -576,6 +576,7 @@ export async function createCustomerLineConnectToken(input: Readonly<{
   planId: string;
   retailCustomerOrderId?: string | null;
   source?: string | null;
+  planDelivery?: { locale: string; planUrl: string };
 }>) {
   if (!isUuid(input.planId)) {
     throw new Error("LINE connection requires a valid plan");
@@ -627,7 +628,8 @@ export async function createCustomerLineConnectToken(input: Readonly<{
         toJsonValue({
           expiresInMinutes,
           retailCustomerOrderId: orderId,
-          source
+          source,
+          ...(input.planDelivery ? { planDelivery: input.planDelivery } : {})
         })
       )},
       now(),
@@ -696,6 +698,7 @@ export async function consumeCustomerLineConnectCode(input: Readonly<{
       status = 'consuming',
       updated_at = now()
     where token_hash = ${hashLineConnectCode(code)}
+      and coalesce(metadata->>'source','') <> 'pharmacy_plan'
       and status = 'active'
       and consumed_at is null
       and expires_at > now()
@@ -932,6 +935,7 @@ export async function queueCustomerChatCommunicationDispatchTask(input: Readonly
   createdByTaskId?: string | null;
   messageId: string;
   planId?: string | null;
+  sql?: Db;
 }>) {
   if (!isUuid(input.messageId)) {
     throw new Error("Customer chat dispatch requires a message");
@@ -963,6 +967,5 @@ export async function queueCustomerChatCommunicationDispatchTask(input: Readonly
     sourceEntityType: "communication_message",
     taskType: "dispatch_chat_communication_message",
     title: "Dispatch Nong Mata LINE reply"
-  });
+  }, input.sql);
 }
-

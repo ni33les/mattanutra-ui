@@ -18,6 +18,7 @@ import { appendPlanChatMessage } from "@/lib/plan-concierge";
 import { enqueuePanyaCustomerChatReplyTask } from "@/lib/task-worker";
 import { t } from "@/lib/i18n-messages";
 import { createLogger } from "@/lib/logger";
+import { connectPharmacyLine } from "@/lib/pharmacy-line-connect";
 
 const log = createLogger("line.webhook");
 
@@ -223,6 +224,13 @@ export async function POST(request: Request) {
     const connectCommand = lineConnectCommandFromMessage(message);
 
     if (connectCommand) {
+      if (connectCommand.scope !== "admin") {
+        const pharmacy = await connectPharmacyLine({ code: connectCommand.code, recipientId, sourceType, providerEventId });
+        if (pharmacy.handled) {
+          results.push({ connected: pharmacy.connected, connectionScope: "customer", deliveryQueued: pharmacy.connected });
+          continue;
+        }
+      }
       const adminConnected =
         connectCommand.scope !== "customer"
           ? await consumeOrganisationLineConnectCode({

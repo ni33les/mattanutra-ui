@@ -6,7 +6,7 @@ import { POST as connectRoute } from "../../app/api/assessment/[planId]/line-con
 import { POST as webhook } from "../../app/api/line/webhook/route.ts";
 import { getSql, closeSqlPool } from "../../lib/db.ts";
 import { createPharmacyOrder } from "../../lib/pharmacy-orders.ts";
-import { dispatchCommunicationMessage } from "../../lib/communications.ts";
+import { dispatchCommunicationMessage, executeCommunicationDispatchTask } from "../../lib/communications.ts";
 import { seedPharmacyFixture } from "../helpers/pharmacy-fixture.ts";
 import { fixtureDatabaseUrl } from "../helpers/fixture-teardown.ts";
 fixtureDatabaseUrl();
@@ -82,7 +82,7 @@ it("PHARM-LINE accepted provider retries reuse the same key and acknowledge the 
   assert.ok(message,"Delivery must be durable before contacting LINE");
   const keys:string[]=[];let attempt=0;
   globalThis.fetch=async(_url,init)=>{keys.push(new Headers(init?.headers).get("X-Line-Retry-Key")!);return ++attempt===1?new Response("temporary",{status:503}):new Response("already accepted",{status:409,headers:{"x-line-accepted-request-id":"original-ack"}});};
-  try{assert.equal((await dispatchCommunicationMessage(message.id)).message.status,"failed");assert.equal((await dispatchCommunicationMessage(message.id)).message.status,"sent");}finally{globalThis.fetch=savedFetch;}
+  try{await assert.rejects(executeCommunicationDispatchTask({messageId:message.id}),/LINE plan delivery failed/);assert.equal((await executeCommunicationDispatchTask({messageId:message.id})).message.status,"sent");}finally{globalThis.fetch=savedFetch;}
   assert.deepEqual(keys,[message.id,message.id]);
   assert.equal((await sql`select provider_message_id from public.communication_messages where id=${message.id}::uuid`)[0].provider_message_id,"original-ack");
 });

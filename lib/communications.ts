@@ -715,7 +715,12 @@ export async function executeAdminCommunicationRouteTask(input: Readonly<{
 export async function executeCommunicationDispatchTask(input: Readonly<{
   messageId: string;
 }>) {
-  return dispatchCommunicationMessage(input.messageId);
+  const delivery = await dispatchCommunicationMessage(input.messageId);
+  if (delivery.message.messageType === "pharmacy_plan_welcome" && !["sent", "delivered"].includes(delivery.message.status)) {
+    // Let the existing three-attempt task policy recover this durable delivery.
+    throw new Error(`LINE plan delivery failed: ${delivery.reason ?? delivery.message.status}`);
+  }
+  return delivery;
 }
 
 export {
@@ -732,4 +737,3 @@ export {
   dispatchQueuedCommunicationMessages,
   sendClientSafetyFollowupTask
 } from "@/lib/communications-dispatch";
-
