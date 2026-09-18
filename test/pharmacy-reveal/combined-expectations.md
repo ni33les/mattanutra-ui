@@ -19,3 +19,4 @@ Historical evidence remains outside the checkout; no fixture prices are changed.
 - Rain nodes now mount at the real rain phase, so their supplied delay/duration starts at 3.1 seconds. RED probe on compiled 32f902f1 is preserved externally (`red-rain2.log`).
 - Capture and order fields remain visible, but a name cannot be edited until the authoritative quote has loaded; the pre-fix browser failure demonstrated name reset during that race.
 - Mock printed-insert promises are replaced with a private-link reminder in all locales.
+- The final desktop timing probe exposed a race in `clock.pauseAt(Date.now() + 100)`. Freeze the controlled clock before navigation and wait for the animation effect to attach; retain all stage, rain-age, path, tap and cleanup assertions without retries. The failed execution remains in `acceptance-final` evidence.

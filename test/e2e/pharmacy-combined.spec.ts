@@ -1,7 +1,14 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
+import type { Page } from "@playwright/test";
 import { expect, test } from "../helpers/offline-browser";
 const execute = promisify(execFile);
+async function freezePresentationClock(page: Page) {
+  // Freeze on the blank page, before application timers exist. Reading Date.now
+  // and pausing later races with elapsed browser time under CPU contention.
+  await page.clock.install({ time: new Date("2026-09-18T00:00:00Z") });
+  await page.clock.pauseAt(new Date("2026-09-18T00:01:00Z"));
+}
 async function fixture(
   ready = false,
   existing?: { planId: string; revision: number },
@@ -113,15 +120,13 @@ test("PHARM-COMBINE completion before the animation finishes reveals immediately
   page,
 }) => {
   const saved = await fixture();
-  await page.clock.install();
+  await freezePresentationClock(page);
   await page.goto(`/en/retail/${saved.slug}/reveal?plan=${saved.planId}`);
   await expect(page.locator(".mn-window")).toHaveAttribute(
     "data-phase",
     "inputs",
   );
-  await page.clock.pauseAt(
-    new Date(await page.evaluate(() => Date.now() + 100)),
-  );
+  await expect(page.locator(".mn-window")).toHaveAttribute("data-paused", "false");
   await fixture(true, saved);
   await page.clock.runFor(1600);
   await expect(page.getByTestId("pharmacy-order")).toBeVisible();
@@ -184,7 +189,7 @@ test("PHARM-COMBINE replay preserves deselection and name without rematching or 
   page,
 }) => {
   const saved = await fixture(true);
-  await page.clock.install();
+  await freezePresentationClock(page);
   let mutations = 0;
   page.on("request", (r) => {
     if (
@@ -203,6 +208,7 @@ test("PHARM-COMBINE replay preserves deselection and name without rematching or 
     "data-phase",
     "inputs",
   );
+  await expect(page.locator(".mn-window")).toHaveAttribute("data-paused", "false");
   await page.clock.runFor(17000);
   await expect(page.locator(".mn-window")).toHaveAttribute(
     "data-phase",
@@ -222,15 +228,13 @@ for (const width of [1280, 390])
   }) => {
     const saved = await fixture();
     await page.setViewportSize({ width, height: 900 });
-    await page.clock.install();
+    await freezePresentationClock(page);
     await page.addInitScript(() => {
       let seed = 17;
       Math.random = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
     });
     await page.goto(`/en/retail/${saved.slug}/reveal?plan=${saved.planId}`);
-    await page.clock.pauseAt(
-      new Date(await page.evaluate(() => Date.now() + 100)),
-    );
+    await expect(page.locator(".mn-window")).toHaveAttribute("data-paused", "false");
     await page.clock.runFor(3300);
     await expect(page.locator(".mn-window")).toHaveAttribute(
       "data-phase",
