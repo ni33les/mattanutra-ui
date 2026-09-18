@@ -9,6 +9,7 @@ async function saved(page:Page){
   await page.goto(`/en/retail/${f.slug}/reveal?plan=${f.planId}`);return f;
 }
 test("PHARM-LINE-UI failed preparation is retryable without an automatic request loop",async({page})=>{
+  await page.setViewportSize({width:390,height:844});
   let attempts=0;await page.route('**/api/assessment/*/line-connect',route=>++attempts===1?route.fulfill({status:503,json:{message:'controlled failure'}}):route.continue());
   await saved(page);
   const connect=page.getByTestId('pharmacy-line-connect');
@@ -17,6 +18,10 @@ test("PHARM-LINE-UI failed preparation is retryable without an automatic request
   await connect.getByRole('button',{name:'Try again',exact:true}).click();
   await expect(connect.getByRole('img')).toBeVisible();
   expect(await connect.getByRole('img').evaluate(image=>(image as HTMLImageElement).naturalWidth)).toBe(256);
+  const imageBox=await connect.getByRole('img').boundingBox();
+  expect(imageBox?.width).toBe(176);expect(imageBox?.height).toBe(176);
+  expect(await connect.getByText(/^Scan the QR code/).evaluate(el=>getComputedStyle(el).color)).toBe(
+    await page.locator('.mn-coffee').evaluate(el=>getComputedStyle(el).color));
   expect(attempts).toBe(2);
   expect(await connect.getByRole('link',{name:'Open LINE and save my plan',exact:true}).getAttribute('href')).toContain('/R/oaMessage/');
 });
