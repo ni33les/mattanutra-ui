@@ -1,16 +1,19 @@
 {
-  "releaseBase": "c3651f350ef5c511a0b7fcd574124972067736a2",
-  "scope": "pharmacy_standard_reveal_and_progress",
+  "releaseBase": "2f0c5dcfcfa71ccb177171068f1b57335efbfe59",
+  "scope": "pharmacy_combined_processing_reveal_order",
   "inputs": [
     "test/helpers/pharmacy-fixture.ts",
     "test/pharmacy-landing/reference.json",
-    "test/pharmacy-reveal/deep-dive-reference.json"
+    "test/pharmacy-reveal/deep-dive-reference.json",
+    "test/pharmacy-reveal/combined-reference.json",
+    "test/pharmacy-reveal/combined-reference.html",
+    "public/assets/pharmacy/combined/leaf.webp"
   ],
   "files": [
     {
       "file": "test/pharmacy-reveal/progress-presentation.test.ts",
       "expectedCases": 8,
-      "reason": "Page-wide rain; small stationary idle movement throughout waiting; mobile/desktop, localization, reduced motion and recovery"
+      "reason": "Exact supplied animation geometry, immutable assets, localization and reduced motion"
     },
     {
       "file": "test/assessment-first-name.test.ts",
@@ -51,6 +54,28 @@
       "file": "test/pharmacy-reveal/deep-dive-reference.test.ts",
       "expectedCases": 1,
       "reason": "Preserve the supplied deep-dive artwork exactly while rendering personalised saved facts"
+    },
+    {
+      "file": "test/pharmacy-reveal/combined-state.test.ts",
+      "expectedCases": 8,
+      "reason": "Real readiness preempts animation and intermediate formula availability is immediate"
+    },
+    {
+      "file": "test/pharmacy-orders.integration.test.ts",
+      "expectedCases": 7,
+      "database": true,
+      "reason": "Extracted order state preserves ownership, concurrent idempotency and frozen receipts"
+    },
+    {
+      "file": "test/pharmacy/sources.integration.test.ts",
+      "expectedCases": 4,
+      "database": true,
+      "reason": "Durable pharmacy source attribution and unpaid-order funnel counts"
+    },
+    {
+      "file": "test/web-preferences/questionnaire.test.ts",
+      "expectedCases": 8,
+      "reason": "Chat and classic questionnaires still omit budget, pills and format on both web flows"
     }
   ],
   "browser": [
@@ -58,19 +83,37 @@
       "file": "test/e2e/pharmacy-journey.spec.ts",
       "expectedCases": 4,
       "grep": "PHARM-BROWSER",
-      "reason": "Direct pharmacy questionnaire entry, saved-answer recovery, ordinary web welcome, unpaid receipts and deep dive in all three locales"
+      "reason": "Combined layout with preserved unpaid-order selection, receipt recovery and deep dive in three locales"
     },
     {
       "file": "test/e2e/pharmacy-progress.spec.ts",
       "expectedCases": 5,
       "grep": "PHARM-PROGRESS",
-      "reason": "Capture handoff, actual pending/ready stages, reload, explicit recovery and no HealthScore wait"
+      "reason": "Inline saving, canonical reveal, old progress redirect, reload and explicit recovery"
     },
     {
       "file": "test/e2e/pharmacy-landing.spec.ts",
       "expectedCases": 5,
       "grep": "PHARM-LANDING",
       "reason": "Shared route extension preserves supplied landing and standard site chrome"
+    },
+    {
+      "file": "test/e2e/pharmacy-combined.spec.ts",
+      "expectedCases": 9,
+      "grep": "PHARM-COMBINE",
+      "reason": "Actual animation, fast/slow readiness, partial formula, empty result, replay and cleanup"
+    },
+    {
+      "file": "test/e2e/pharmacy-source.spec.ts",
+      "expectedCases": 8,
+      "grep": "PHARM-SOURCE",
+      "reason": "Both QR sources preserve navigation, storage isolation and saved attribution"
+    },
+    {
+      "file": "test/e2e/web-preferences.spec.ts",
+      "expectedCases": 6,
+      "grep": "WEB-PREF-BROWSER",
+      "reason": "Removed purchase questions stay absent in both flows and all three languages"
     }
   ]
 }

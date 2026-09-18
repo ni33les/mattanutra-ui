@@ -18,7 +18,7 @@ export function verifyVersionExpectationEdit(before, after) {
 }
 export const MCP_PACKAGES = {
   "pharmacy-source": { version: "11.1.0", directory: "test/pharmacy", inventory: "test/pharmacy/source-impact.json", base: "88b3a2353d4b69a7294ad86f23e5cc79dd302fff", scope: "pharmacy_source_attribution" },
-  "pharmacy-reveal": { version: "11.1.0", directory: "test/pharmacy-reveal", base: "c3651f350ef5c511a0b7fcd574124972067736a2", scope: "pharmacy_standard_reveal_and_progress" },
+  "pharmacy-reveal": { version: "11.1.0", directory: "test/pharmacy-reveal", base: "2f0c5dcfcfa71ccb177171068f1b57335efbfe59", scope: "pharmacy_combined_processing_reveal_order" },
   "pharmacy-landing": { version: "11.1.0", directory: "test/pharmacy-landing", base: "bcd0384925d28980c6a0a39e308b4d702478adec", scope: "pharmacy_landing_reference_fidelity" },
   pharmacy: { version: "11.1.0", directory: "test/pharmacy", base: "6bd0542f7bc1d1d9b93fa67ac02dfa15146005c5", scope: "pharmacy_qr_unpaid_journey" },
   streaming: { version: "11.1.0", directory: "test/mcp-streaming", base: "e588c405473480ef5e0796c6f48d195365d450fc", scope: "streaming_matching_completion" },

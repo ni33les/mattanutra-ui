@@ -1,6 +1,7 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { expect, test } from "../helpers/offline-browser";
+import { combinedCopy } from "../../components/pharmacy/combined-copy";
 import { pharmacyCopy } from "../../lib/pharmacy-copy";
 const execute = promisify(execFile);
 for (const locale of ["en", "th", "zh-CN"] as const) {
@@ -45,33 +46,28 @@ for (const locale of ["en", "th", "zh-CN"] as const) {
     }
     await page.goto(`/${locale}/retail/${fixture.slug}/reveal?plan=${fixture.planId}`);
     await expect(page.getByTestId("pharmacy-order")).toBeVisible();
-    await expect(page.locator(".mn-reveal-final")).toBeVisible();
-    await expect(page.locator(".mn-reveal-final h1")).toContainText("Test");
+    await expect(page.getByTestId("pharmacy-combined")).toBeVisible();
+    await expect(page.locator(".mn-selected-label")).toContainText("Test");
     const planLink = page.getByTestId("pharmacy-deep-dive-link");
-    await expect(planLink).toHaveText(`${c.details} →`);
+    await expect(planLink).toHaveText(combinedCopy[locale].read);
     await expect(planLink).toHaveAttribute("href", `/${locale}/retail/${fixture.slug}/plan?plan=${fixture.planId}`);
-    await expect(page.locator("#formula")).toContainText("100%");
-    await expect(page.locator(".mn-reveal-final").locator('a[href*="/basket/checkout"],a[href*="/nutrition/quiz"]')).toHaveCount(0);
+    await expect(page.locator(".mn-nutrient")).toHaveCount(1);
     await expect(page.getByTestId("pharmacy-order").getByRole("checkbox")).toHaveCount(1);
-    const firstProduct = page.getByTestId("pharmacy-order").getByRole("checkbox").first().locator("..");
-    const summary = page.getByRole("heading", { name: c.orderSummary, exact: true }).locator("../..");
-    const firstProductTop = await firstProduct.evaluate(el => el.getBoundingClientRect().top);
-    const summaryTop = await summary.evaluate(el => el.getBoundingClientRect().top);
-    expect(Math.abs(firstProductTop - summaryTop)).toBeLessThanOrEqual(1);
-    await expect(page.getByTestId("pharmacy-order-summary").getByTestId("pharmacy-deep-dive-link")).toHaveCount(1);
-    await expect(planLink).toHaveCount(1);
-    const assertLinkBelowSummary = async () => {
-      const card = (await summary.boundingBox())!, link = (await planLink.boundingBox())!;
-      expect(link.y - (card.y + card.height)).toBeGreaterThanOrEqual(12);
-      expect(link.y - (card.y + card.height)).toBeLessThanOrEqual(24);
-      expect(Math.abs(link.x - card.x)).toBeLessThanOrEqual(1);
-      expect(Math.abs(link.width - card.width)).toBeLessThanOrEqual(1);
+    const summary = page.getByTestId("pharmacy-order-summary");
+    await expect(summary).toContainText("17");
+    const assertOrder = async () => {
+      const products = (await page.locator(".mn-products").boundingBox())!, order = (await summary.boundingBox())!, link = (await planLink.boundingBox())!;
+      expect(order.y).toBeGreaterThan(products.y + products.height);
+      expect(link.y).toBeGreaterThan(order.y + order.height);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(page.viewportSize()!.width);
     };
-    await assertLinkBelowSummary();
+    await assertOrder();
     const initialViewport = page.viewportSize()!;
     await page.setViewportSize({ width: 390, height: 844 });
-    await assertLinkBelowSummary();
+    await assertOrder();
+    await page.screenshot({path:test.info().outputPath(`combined-${locale}-mobile.png`),fullPage:true});
     await page.setViewportSize(initialViewport);
+    await page.screenshot({path:test.info().outputPath(`combined-${locale}-desktop.png`),fullPage:true});
     await expect(page.getByLabel(c.name, { exact: true })).toBeVisible();
     await expect(page.locator('input[autocomplete="street-address"],iframe[src*="stripe"]')).toHaveCount(0);
     await planLink.click();
@@ -112,7 +108,7 @@ for (const locale of ["en", "th", "zh-CN"] as const) {
       await expect(page.getByText(`Counter Test · ${pharmacyCopy.th.unpaid}`, { exact:true })).toBeVisible();
       await page.goto(receiptUrl);
     }
-    await page.getByTestId("pharmacy-order").getByRole("link", { name: `${c.details} →`, exact: true }).click();
+    await page.getByTestId("pharmacy-deep-dive-link").click();
     await expect(page.getByRole("heading", { name: c.details, exact: true })).toBeVisible();
     await expect(page.locator("#s05 .ch-label")).toHaveText(c.ordered);
     await expect(page.getByText(c.explanationPending, { exact: true })).toBeVisible();
@@ -149,7 +145,7 @@ test("PHARM-BROWSER food support arriving after an order is displayed without ch
       methodCards: [{ title: "Saved method", body: "Personalised method explanation" }]
     } } }
   } }));
-  await page.getByTestId('pharmacy-order').getByRole('link',{name:`${pharmacyCopy.en.details} →`,exact:true}).click();
+  await page.getByTestId('pharmacy-deep-dive-link').click();
   await expect(page.getByText('Late food support fixture',{exact:true})).toBeVisible();
   await expect(page.getByRole('heading',{name:'Vitamin D3',exact:true})).toBeVisible();
   await expect(page.getByText('1000 IU/day',{exact:true})).toBeVisible();

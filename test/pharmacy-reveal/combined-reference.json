@@ -1,0 +1,33 @@
+{
+  "sourceSha256": "7f091c7175ea10fe41202b7434c0a0ca8e29ca36184b2385f1c960b850422689",
+  "leafSha256": "bd3a20c0678e019e5ff7393674afc38626a2d43f82c7d611661e93f9057ae0de",
+  "flightDurations": [
+    220,
+    650,
+    230,
+    510,
+    230,
+    510,
+    230,
+    420,
+    610,
+    500
+  ],
+  "rain": {
+    "count": 54,
+    "xStep": 29,
+    "xModulo": 90,
+    "delayModulo": 17,
+    "delayStep": 0.13,
+    "duration": 2.8,
+    "durationStep": 0.15
+  },
+  "independentReferenceSha256": "2aa2ccdceccaec86e8ab915a584386b0b403c477c7c31054a5e8b13337755f55",
+  "assetHashes": {
+    "d08c8510aff87ea1fe2613b048e34580e3c6e361e19dd679c203fd85c14228bf": "/assets/library/nong/nong-energetic.webp",
+    "fdf22797c63985817017735ba0d6774c7665d6edc7556f928b6bb02f8ef6d898": "/assets/library/nong/nong-comparing.webp",
+    "bd3a20c0678e019e5ff7393674afc38626a2d43f82c7d611661e93f9057ae0de": "/assets/pharmacy/combined/leaf.webp",
+    "9db75f15ed1ad1252f8c74f0be2e2025ff3a94672b10ad9f9bcb0c41cd4e9a61": "/assets/library/nong/nong-coffee.webp",
+    "0d6f1a80daa1d60e267a4819c11a2808017ca19bb0522bcb454c806b60cd1d01": "/assets/library/nong/nong-thinking.webp"
+  }
+}

@@ -99,7 +99,7 @@ for (const database of (packageId === "practical" && mode === "validate" ? [] : 
     const migration = await runBatch("lock-boundaries-schema", ["--experimental-strip-types", "--import", "./scripts/register-ts-path-loader.mjs", "scripts/apply-matching-lock-boundaries.ts"], env, output);
     assert.ok(migration.passed, "Isolated lock migration failed");
   }
-  batches.push(await runBatch(label, ["--test", "--test-concurrency=1", "--experimental-test-module-mocks", "--experimental-strip-types", ...(packageId === "web-matching" ? ["--loader", "./test/payment-return/next-loader.mjs"] : []), ...(!database || ["payment-replay", "pharmacy", "pharmacy-source"].includes(packageId) ? ["--import", "./test/helpers/offline-network.mjs"] : []), "--import", "./scripts/register-ts-path-loader.mjs", ...selected], env, output));
+  batches.push(await runBatch(label, ["--test", "--test-concurrency=1", "--experimental-test-module-mocks", "--experimental-strip-types", ...(packageId === "web-matching" ? ["--loader", "./test/payment-return/next-loader.mjs"] : []), ...(!database || ["payment-replay", "pharmacy", "pharmacy-source", "pharmacy-reveal"].includes(packageId) ? ["--import", "./test/helpers/offline-network.mjs"] : []), "--import", "./scripts/register-ts-path-loader.mjs", ...selected], env, output));
   assert.ok(batches.at(-1).passed, `${label} failed; later stages were not started`);
   events.push(...readFileSync(resolve(output, `${label}-events.jsonl`), "utf8").trim().split("\n").filter(Boolean).map(line => JSON.parse(line)));
 }
@@ -120,7 +120,7 @@ async function prepareCompiledBuild() {
   save("lint-files.json", { releaseBase: MCP721_BASE, files: lint }); assert.ok(lint.length);
   await command("release-diff-lint", ["node_modules/eslint/bin/eslint.js", ...lint]);
 
-  await command("production-build", ["node_modules/next/dist/bin/next", "build", "--webpack"], { ...safe, NODE_ENV: "production", NEXT_BUILD_SKIP_TYPECHECK: "1", ...(packageId === "efficiency" ? { NODE_OPTIONS: "--max-old-space-size=4096", NEXT_BUILD_CPUS: "1" } : {}) });
+  await command("production-build", ["node_modules/next/dist/bin/next", "build", "--webpack"], { ...safe, NODE_ENV: "production", NEXT_BUILD_SKIP_TYPECHECK: "1", ...(["efficiency", "pharmacy-reveal"].includes(packageId) ? { NODE_OPTIONS: "--max-old-space-size=4096", NEXT_BUILD_CPUS: "1" } : {}) });
 }
 if (mode === "validate") {
   const identity = mcp721Identity(source.sha256, commit, packageId);

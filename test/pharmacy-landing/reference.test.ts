@@ -18,7 +18,7 @@ test("PHARM-LANDING retains the existing site header, footer and journey wrapper
   // Routing now also supports pharmacy progress; retain the standard chrome contract.
   const source = readFileSync(reference.shell.file, "utf8");
   assert.ok(source.includes('<TitleBar currentLocale={locale} currentPath={currentPath} title={dictionary.hero.eyebrow}'));
-  assert.ok(source.includes('assessmentHref={pharmacyPath(locale, slug, "quiz")} variant={step === "quiz" ? "quiz" : "default"} />'));
+  assert.ok(source.includes('assessmentHref={pharmacyPath(locale, slug, "quiz", {source: entrySource, session: step === "landing" ? query.session : undefined})} variant={step === "quiz" ? "quiz" : "default"} />'));
   assert.ok(source.includes('{step !== "quiz" && <SiteFooter locale={locale} content={dictionary.footer} />}'));
-  assert.ok(source.includes('if (step === "landing") content = <PharmacyLanding locale={locale} slug={pharmacy.slug} name={pharmacy.name} />;'));
+  assert.ok(source.includes('<PharmacyLanding locale={locale} slug={pharmacy.slug} name={pharmacy.name} query={{...query, source: acquisition.source}} />'));
 });

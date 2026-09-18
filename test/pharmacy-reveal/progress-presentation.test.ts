@@ -1,134 +1,204 @@
 import assert from "node:assert/strict";
 import { after, before, mock, test } from "node:test";
 import { register } from "node:module";
+import { readFileSync, existsSync, mkdirSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { createElement, type ImgHTMLAttributes } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { chromium, type Browser, type Page } from "@playwright/test";
-
-// Exercise the real progress view and its CSS without starting matching or a database.
+import { chromium, type Browser } from "@playwright/test";
+import { clarityFlight, cubicPoint } from "../../lib/pharmacy-presentation.ts";
 register("../payment-return/next-loader.mjs", import.meta.url);
+register("./style-loader.mjs", import.meta.url);
 mock.module("../../components/safe-image.tsx", {
-  namedExports: { SafeImage: (props: ImgHTMLAttributes<HTMLImageElement>) => createElement("img", props) }
+  namedExports: {
+    SafeImage: (props: ImgHTMLAttributes<HTMLImageElement>) =>
+      createElement("img", props),
+  },
 });
-const { PharmacyProgressView } = await import("../../components/pharmacy/progress.tsx");
+const { PharmacyCombined } = await import(
+  "../../components/pharmacy/combined.tsx"
+);
+const reference = readFileSync(
+    "test/pharmacy-reveal/combined-reference.html",
+    "utf8",
+  ),
+  css = readFileSync("components/pharmacy/combined.css", "utf8");
+const manifest = JSON.parse(
+  readFileSync("test/pharmacy-reveal/combined-reference.json", "utf8"),
+);
+const hash = (value: string | Buffer) =>
+  createHash("sha256").update(value).digest("hex");
 let browser: Browser;
-before(async () => { browser = await chromium.launch({ headless: true }); });
-after(async () => { await browser?.close(); });
-
-async function view(locale: "en" | "th" | "zh-CN", stage = 1, failed = false, reducedMotion: "reduce" | "no-preference" = "no-preference") {
-  const page = await browser.newPage({ viewport: { width: 375, height: 812 }, reducedMotion });
-  await page.route("**/*", route => route.abort());
-  await page.setContent("<style>body{margin:0}</style>" + renderToStaticMarkup(createElement(PharmacyProgressView, { locale, stage, failed, onRetry: () => {} })));
-  return page;
-}
-
-async function assertSubtleIdle(page: Page) {
-  const motion = await page.locator('.mn-pharmacy-waiting-nong').evaluate(el => {
-    const image = el.querySelector('img')!;
-    const animations = image.getAnimations();
-    if (animations.length !== 1) throw new Error('Nong needs one subtle idle animation');
-    const idle = animations[0]; idle.pause();
-    const duration = Number(idle.effect!.getTiming().duration);
-    const frames = [0, .25, .5, .75, .99].map(fraction => {
-      idle.currentTime = fraction * duration;
-      const r = image.getBoundingClientRect();
-      return {x: r.x + r.width / 2, y: r.y};
+before(async () => {
+  browser = await chromium.launch();
+});
+after(async () => {
+  await browser?.close();
+});
+const markup = (locale: "en" | "th" | "zh-CN" = "en") =>
+  renderToStaticMarkup(
+    createElement(PharmacyCombined, {
+      locale,
+      sourceLocale: locale,
+      slug: "delight",
+      pharmacyName: "Delight",
+      planId: "fixture",
+      revision: 1,
+      initial: null,
+      initialResult: null,
+    }),
+  );
+const base = `<base href="http://127.0.0.1:3100"><style>body{margin:0;font:14px/1.5 Arial}*{box-sizing:border-box}:root{--mn-cream:#faf7f0;--mn-paper:#fff;--mn-ink:#182d22;--mn-ash:#69766d;--color-line:#ddd;--color-forest:#194c39;--color-forest-light:#537d63;--color-gold:#b89652;--mn-mint:#edf3eb;--mn-font-body:Arial;--mn-font-display:Georgia}</style>`;
+async function pages(width: number) {
+  const context = await browser.newContext({
+    viewport: { width, height: 900 },
+  });
+  await context.route("**/*", (route) => {
+    const path=new URL(route.request().url()).pathname;
+    return path.startsWith("/assets/") && existsSync("public"+path) ? route.fulfill({body:readFileSync("public"+path),contentType:"image/webp"}) : route.abort();
+  });
+  const control = await context.newPage(),
+    candidate = await context.newPage();
+  // Disable demonstration scheduling only. Execute the original geometry functions unchanged.
+  await control.setContent(
+    base +
+      reference.replace(
+        "    play();",
+        "    window.referenceFlight = prepareClarityFlight;",
+      ),
+  );
+  await candidate.setContent(base + `<style>${css}</style>` + markup());
+  for (const page of [control, candidate])
+    await page.evaluate(() => {
+      document
+        .querySelector(".mn-window")!
+        .setAttribute("data-phase", "clarity");
+      document.querySelectorAll("*").forEach((el) =>
+        el.getAnimations().forEach((a) => {
+          a.pause();
+          a.currentTime = 1000;
+        }),
+      );
     });
-    const home = el.getBoundingClientRect(), section = el.closest('section')!.getBoundingClientRect();
-    return {frames, duration, path: getComputedStyle(el).offsetPath, travelling: el.getAnimations().length,
-      center: home.x + home.width / 2, expectedCenter: section.x + section.width / 2, top: home.y - section.y};
-  });
-  assert.equal(motion.path, 'none');
-  assert.equal(motion.travelling, 0, 'the sprite container stays anchored at the top');
-  assert.ok(Math.abs(motion.center - motion.expectedCenter) < 1);
-  assert.ok(motion.top >= 0 && motion.top <= 80);
-  const vertical = Math.max(...motion.frames.map(f => f.y)) - Math.min(...motion.frames.map(f => f.y));
-  assert.ok(vertical > 1 && vertical < 6, 'a small visible bob, not page travel');
-  assert.ok(Math.max(...motion.frames.map(f => f.x)) - Math.min(...motion.frames.map(f => f.x)) < 3);
-  assert.ok(motion.duration >= 4000, 'gentle idle timing');
+  return { context, control, candidate };
 }
-
-for (const [locale, phrase] of [["en", "about a minute"], ["th", "ประมาณ 1 นาที"], ["zh-CN", "大约需要一分钟"]] as const) {
-  test(`PHARM-WAIT-01 ${locale} keeps page-wide rain with a subtle stationary Nong`, async () => {
-    const page = await view(locale);
+test("PHARM-WAIT-01 frozen reference and exact existing Nong/leaf bytes are preserved", () => {
+  assert.equal(hash(reference), manifest.independentReferenceSha256);
+  assert.ok(Object.keys(manifest.assetHashes).length >= 5);
+  for (const [digest, path] of Object.entries(manifest.assetHashes))
+    assert.equal(hash(readFileSync(`public${path}`)), digest);
+  const view = markup();
+  assert.match(view, /nong-energetic.webp/);
+  assert.match(view, /combined\/leaf.webp/);
+});
+for (const width of [1280, 390])
+  test(`PHARM-WAIT-02 ${width}px anchors, five curves and orbit match independent reference geometry`, async () => {
+    const { context, control, candidate } = await pages(width);
     try {
-      assert.match(await page.locator("section").innerText(), new RegExp(phrase));
-      assert.equal(await page.locator('[data-testid="pharmacy-waiting-art"][aria-hidden="true"]').count(), 1);
-      assert.equal(await page.locator('.mn-pharmacy-waiting-word').count(), 36);
-      assert.equal(await page.locator('img[src="/assets/library/nong/nong-thinking.webp"]').count(), 1);
-      assert.equal(await page.locator("ol li").count(), 3);
-      assert.equal(await page.locator("ol li").nth(1).locator(".lucide-loader-circle").count(), 1);
-      const rain = await page.locator('[data-testid="pharmacy-waiting-art"]').evaluate(el => {
-        const word = el.querySelector('.mn-pharmacy-waiting-word')!;
-        const animation = word.getAnimations()[0]; animation.pause();
-        const timing = animation.effect!.getTiming();
-        animation.currentTime = Number(timing.delay) + Number(timing.duration) * .05;
-        const start = word.getBoundingClientRect().y;
-        animation.currentTime = Number(timing.delay) + Number(timing.duration) * .9;
-        return {width: el.getBoundingClientRect().width, height: el.getBoundingClientRect().height,
-          fall: word.getBoundingClientRect().y - start, pointerEvents: getComputedStyle(el).pointerEvents};
+      // Use a class index: the question spans follow the SVG in both implementations.
+      const actual = await candidate.evaluate(() => {
+        const v = document
+          .querySelector(".mn-clarity-visual")!
+          .getBoundingClientRect();
+        const center = (el: Element) => {
+          const r = el.getBoundingClientRect();
+          return { x: r.x + r.width / 2 - v.x, y: r.y + r.height / 2 - v.y };
+        };
+        return {
+          width: v.width,
+          height: v.height,
+          source: center(document.querySelector(".mn-brand-mark")!),
+          questions: [
+            ...document.querySelectorAll("[data-clarity-question]"),
+          ].map(center),
+          core: center(document.querySelector(".mn-core")!),
+          shellSize: document
+            .querySelector(".mn-clarity-logo-shell")!
+            .getBoundingClientRect().width,
+        };
       });
-      assert.equal(rain.width, 375);
-      assert.ok(rain.fall > rain.height * .75);
-      assert.equal(rain.pointerEvents, 'none');
-      await assertSubtleIdle(page);
-      assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), 375);
-    } finally { await page.close(); }
+      const expected = await control.evaluate(() => {
+        const w = window as unknown as {
+          referenceFlight: () => {
+            segments: {
+              p0: { x: number; y: number };
+              c1: { x: number; y: number };
+              c2: { x: number; y: number };
+              p1: { x: number; y: number };
+            }[];
+          };
+        };
+        const f = w.referenceFlight();
+        return {
+          flight: f,
+          path: document.querySelector(".mn-clarity-path")!.getAttribute("d"),
+        };
+      });
+      const calculated = clarityFlight(actual);
+      assert.equal(calculated.segments.length, 5);
+      assert.equal(expected.flight.segments.length, 5);
+      // Site header and text alter the source's vertical offset; compare relative local geometry,
+      // then evaluate the reference with the same DOM anchors, independently of production math.
+      const referenceVisual = await control
+        .locator(".mn-clarity-visual")
+        .boundingBox();
+      assert.ok(referenceVisual);
+      assert.equal(actual.width, referenceVisual.width);
+      assert.equal(actual.height, referenceVisual.height);
+      for (let segment = 1; segment < 5; segment++)
+        for (const key of ["p0", "c1", "c2", "p1"] as const) {
+          const a = calculated.segments[segment][key],
+            b = expected.flight.segments[segment][key];
+          assert.ok(
+            Math.abs(a.x - b.x) < 0.1,
+            `${width}: segment ${segment} ${key} x ${a.x} vs ${b.x}`,
+          );
+          assert.ok(
+            Math.abs(a.y - b.y) < 0.1,
+            `${width}: segment ${segment} ${key} y ${a.y} vs ${b.y}`,
+          );
+        }
+      for (const s of calculated.segments)
+        for (const t of [0, 0.25, 0.5, 0.75, 1]) {
+          const p = cubicPoint(s, t);
+          assert.ok(Number.isFinite(p.x) && Number.isFinite(p.y));
+        }
+      assert.equal(
+        await candidate.evaluate(() => document.documentElement.scrollWidth),
+        width,
+      );
+      const evidence=process.env["MCP_pharmacy-reveal_EVIDENCE_DIR"];
+      if(evidence){mkdirSync(evidence+"/reference-frames",{recursive:true});await control.screenshot({path:`${evidence}/reference-frames/reference-${width}.png`,fullPage:true});await candidate.screenshot({path:`${evidence}/reference-frames/candidate-${width}.png`,fullPage:true});}
+
+    } finally {
+      await context.close();
+    }
   });
-}
-
-test("PHARM-WAIT-02 reduced motion keeps Nong Matta static and hides decorative words", async () => {
-  const page = await view("en", 2, false, "reduce");
-  try {
-    assert.equal(await page.locator('[data-testid="pharmacy-waiting-art"]').count(), 1);
-    assert.equal(await page.locator('[data-testid="pharmacy-waiting-art"]').evaluate(el => el.getAnimations({ subtree: true }).length), 0);
-    assert.equal(await page.locator('[data-testid="pharmacy-waiting-art"] span:visible').count(), 0);
-    assert.equal(await page.locator("ol li").nth(1).locator(".lucide-check").count(), 1);
-    assert.equal(await page.locator("ol li").nth(2).locator(".lucide-loader-circle").count(), 1);
-  } finally { await page.close(); }
+test("PHARM-WAIT-03 styles and all keyframes are pharmacy-scoped", () => {
+  assert.doesNotMatch(css, /#mn-funnel-v9/);
+  assert.ok(css.includes("#mn-pharmacy-combined"));
+  const names = [...css.matchAll(/@keyframes\s+([^\s{]+)/g)].map((m) => m[1]);
+  assert.ok(names.length > 10);
+  assert.ok(names.every((n) => n.startsWith("mn-pharmacy-combined-")));
 });
-
-test("PHARM-WAIT-03 failure stops decoration and exposes the existing recovery without a time promise", async () => {
-  const page = await view("en", 2, true);
+for (const locale of ["en", "th", "zh-CN"] as const)
+  test(`PHARM-WAIT-04 ${locale} no invented counts, prices or demographic name`, () => {
+    const html = markup(locale);
+    assert.doesNotMatch(
+      html,
+      /160\+|12 ingredients|for Male|for Female|8E5C4C1F/,
+    );
+    assert.equal((html.match(/class="mn-analysis-tile /g) ?? []).length, 5);
+    assert.equal((html.match(/class="mn-rain-chip /g) ?? []).length, 54);
+    assert.doesNotMatch(html, /class="mn-product /);
+  });
+test("PHARM-WAIT-05 reduced motion has no ongoing decorative animation", async () => {
+  const page = await browser.newPage({ reducedMotion: "reduce" });
   try {
-    assert.equal(await page.locator('[data-testid="pharmacy-waiting-art"]').count(), 1);
-    assert.equal(await page.locator('[data-testid="pharmacy-waiting-art"]').evaluate(el => el.getAnimations({ subtree: true }).length), 0);
-    assert.equal(await page.locator('[data-testid="pharmacy-waiting-art"] span:visible').count(), 0);
-    assert.equal(await page.locator('[data-testid="pharmacy-progress-retry"]').count(), 1);
-    assert.match(await page.getByRole("alert").innerText(), /saved answers are safe/);
-    assert.doesNotMatch(await page.locator("section").innerText(), /about a minute/);
-    assert.equal(await page.locator(".lucide-loader-circle").count(), 0);
-  } finally { await page.close(); }
-});
-
-test("PHARM-WAIT-04 completion stops animation immediately and keeps all three real completion ticks", async () => {
-  const page = await view("en", 3);
-  try {
-    assert.equal(await page.locator('[data-testid="pharmacy-waiting-art"]').count(), 1);
-    assert.equal(await page.locator('[data-testid="pharmacy-waiting-art"]').evaluate(el => el.getAnimations({ subtree: true }).length), 0);
-    assert.equal(await page.locator('section[aria-busy="false"]').count(), 1);
-    assert.equal(await page.locator("ol .lucide-check").count(), 3);
-    assert.doesNotMatch(await page.locator("section").innerText(), /about a minute/);
-  } finally { await page.close(); }
-});
-
-
-test("PHARM-WAIT-05 saving keeps the same subtle idle at the top", async () => {
-  const page = await view("en", 0);
-  try {
-    assert.equal(await page.locator(".lucide-loader-circle").count(), 0);
-    await assertSubtleIdle(page);
-    assert.equal(await page.locator(".mn-pharmacy-waiting-word").count(), 36);
-  } finally { await page.close(); }
-});
-
-test("PHARM-WAIT-06 desktop product matching keeps Nong at the top and the real spinner below", async () => {
-  const page = await view("en", 2);
-  try {
-    await page.setViewportSize({width: 1280, height: 900});
-    await assertSubtleIdle(page);
-    assert.equal(await page.locator('ol li').nth(1).locator('.lucide-check').count(), 1);
-    assert.equal(await page.locator('ol li').nth(2).locator('.lucide-loader-circle').count(), 1);
-    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), 1280);
-  } finally { await page.close(); }
+    await page.route("**/*", (r) => r.abort());
+    await page.setContent(base + `<style>${css}</style>` + markup());
+    assert.equal(await page.evaluate(() => document.getAnimations().length), 0);
+  } finally {
+    await page.close();
+  }
 });

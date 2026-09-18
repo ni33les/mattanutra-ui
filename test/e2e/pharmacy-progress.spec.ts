@@ -8,45 +8,25 @@ async function fixture(locale: string, ready = false, existing?: { planId: strin
   return JSON.parse(stdout.split("\n").find(line => line.startsWith("FIXTURE:"))!.slice(8));
 }
 for (const locale of ["en", "th", "zh-CN"]) {
-  test(`PHARM-PROGRESS ${locale} pending reveal uses pharmacy progress and opens the standard reveal when ready`, async ({ page }) => {
+  test(`PHARM-PROGRESS ${locale} pending reveal remains on the combined page through reload and readiness`, async ({ page }) => {
     const saved = await fixture(locale);
     const mutations: string[] = [];
     page.on("request", request => { if (request.method() === "POST" && request.url().includes(`/api/assessment/${saved.planId}/`)) mutations.push(request.url()); });
-    await page.goto(`/${locale}/retail/${saved.slug}/reveal?plan=${saved.planId}`);
-    await expect(page).toHaveURL(new RegExp(`/retail/${saved.slug}/progress\\?plan=${saved.planId}`));
-    await expect(page.getByTestId("pharmacy-progress")).toBeVisible();
-    await expect(page.locator(".mn-quiz-calc, .mn-quiz-calc__spinner")).toHaveCount(0);
-    await expect(page.getByTestId("pharmacy-progress").getByRole("listitem")).toHaveCount(3);
+    await page.goto(`/${locale}/retail/${saved.slug}/progress?plan=${saved.planId}&source=business_card`);
+    await expect(page).toHaveURL(new RegExp(`/retail/${saved.slug}/reveal\\?plan=${saved.planId}&source=business_card`));
+    await expect(page.getByTestId("pharmacy-combined")).toBeVisible();
+    await expect(page.locator(".mn-quiz-calc, .mn-reveal-final")).toHaveCount(0);
+    await expect(page.locator(".mn-analysis-tile")).toHaveCount(5);
     await page.reload();
-    await expect(page.getByTestId("pharmacy-progress")).toBeVisible();
-    const steps = page.getByTestId("pharmacy-progress").getByRole("listitem");
-    await expect(steps.nth(1).locator(".lucide-loader-circle")).toBeVisible();
-    await expect(steps.nth(2).locator(".lucide-loader-circle")).toHaveCount(0);
-    await page.route(`**/api/assessment/${saved.planId}/journey?*`, async route => {
-      const response = await route.fetch(); const status = await response.json();
-      await route.fulfill({ response, json: status.readyForReveal ? status : {
-        ...status, stages: { ...status.stages, formulation: "complete", products: "active" }
-      } });
-    });
-    await expect(steps.nth(1).locator(".lucide-check")).toBeVisible({ timeout: 15000 });
-    await expect(steps.nth(2).locator(".lucide-loader-circle")).toBeVisible();
-    let openReveal!: () => void;
-    const readyBarrier = new Promise<void>(resolve => { openReveal = resolve; });
-    await page.route(`**/retail/${saved.slug}/reveal?*`, async route => { await readyBarrier; await route.continue(); });
-    await fixture(locale, true, saved);
-    try {
-      await expect(steps.nth(2).locator(".lucide-check")).toBeVisible({ timeout: 15000 });
-      await expect(steps.locator(".lucide-loader-circle")).toHaveCount(0);
-    } finally { openReveal(); }
-    await expect(page.locator(".mn-reveal-final")).toBeVisible({ timeout: 15000 });
-    await expect(page).toHaveURL(new RegExp(`/retail/${saved.slug}/reveal\\?plan=${saved.planId}`));
-    await expect(page.getByTestId("pharmacy-order")).toBeVisible();
+    await expect(page.getByTestId("pharmacy-combined")).toBeVisible();
+    await fixture(locale,true,saved);
+    await expect(page.getByTestId("pharmacy-order")).toBeVisible({timeout:15000});
+    await expect(page.locator(".mn-products .mn-product")).toHaveCount(1);
     expect(mutations).toEqual([]);
-    await page.unrouteAll({ behavior: "wait" });
   });
 }
 
-test("PHARM-PROGRESS capture displays pharmacy progress before the receipt, then hands off without HealthScore waiting", async ({ page }) => {
+test("PHARM-PROGRESS capture stays inline before the receipt, then opens combined reveal without HealthScore waiting", async ({ page }) => {
   const saved = await fixture("en");
   await page.emulateMedia({ reducedMotion: "no-preference" });
   let leafBursts = 0;
@@ -68,10 +48,11 @@ test("PHARM-PROGRESS capture displays pharmacy progress before the receipt, then
   await page.goto(`/en/retail/${saved.slug}/quiz`);
   await page.getByTestId("dev-fill-questionnaire").click();
   try {
-    await expect(page.getByTestId("pharmacy-progress")).toBeVisible({ timeout: 15000 });
+    await expect(page.getByTestId("pharmacy-capture-status")).toBeVisible({ timeout: 15000 });
+    await expect(page.getByTestId("chat-questionnaire")).toBeVisible();
     await expect(page.locator(".mn-quiz-calc")).toHaveCount(0);
   } finally { release(); }
-  await expect(page).toHaveURL(new RegExp(`/retail/${saved.slug}/progress\\?plan=${saved.planId}`));
+  await expect(page).toHaveURL(new RegExp(`/retail/${saved.slug}/reveal\\?plan=${saved.planId}`));
   expect(leafBursts).toBe(0);
 });
 
@@ -91,7 +72,7 @@ test("PHARM-PROGRESS failures provide an explicit retry and continue observing t
   expect(retries).toBe(0);
   await page.getByTestId("pharmacy-progress-retry").click();
   await fixture("en", true, saved);
-  await expect(page.locator(".mn-reveal-final")).toBeVisible({ timeout: 15000 });
+  await expect(page.getByTestId("pharmacy-order")).toBeVisible({ timeout: 15000 });
   expect(retries).toBe(1);
   // The reveal starts its own readiness read. Drain that intercepted request
   // before Playwright closes the page so teardown cannot cancel route.fetch.

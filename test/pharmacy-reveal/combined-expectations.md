@@ -9,3 +9,9 @@ Reference: QR-Pharmacy-Final-Questionnaire-Order-v2.5.html, SHA-256 7f091c7175ea
 - Ordinary web appearance, matching, omitted purchase-preference questions and financial assertions remain unchanged.
 
 Historical evidence remains outside the checkout; no fixture prices are changed.
+
+- The supplied final pose uses the exact `nong-energetic.webp` bytes behind its `mn-guide-celebrate` class. No substitute asset is generated.
+- Curve/rain arithmetic assertions compare intended coordinates to 1e-12, rather than requiring one arbitrary binary-float spelling.
+- PHARM-LANDING header-link assertion now includes existing source/session attribution. The previous assertion predated source preservation; the same header, footer and quiz variant remain required.
+- PHARM-WAIT stationary-spinner tests are replaced by eight asset/geometry/reduced-motion/localization cases and real-page animation/cleanup tests.
+- PHARM-BROWSER no longer requires the old shared reveal's side-by-side order sidebar: it requires the supplied products → order → coffee/deep-dive order, while retaining real price, deselection, unpaid receipt and saved explanation checks.
