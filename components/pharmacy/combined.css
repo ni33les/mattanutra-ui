@@ -491,17 +491,15 @@
   }
 
   #mn-pharmacy-combined .mn-clarity-path-glow {
-    stroke: color-mix(in srgb, var(--mn-gold) 48%, transparent);
-    stroke-width: 13;
-    filter: blur(6px) drop-shadow(0 0 13px color-mix(in srgb, var(--mn-gold) 72%, transparent));
+    /* A translucent halo keeps each changing stroke local to the path.
+       Blurring this viewport-spanning SVG rerasterizes it on every frame. */
+    stroke: color-mix(in srgb, var(--mn-gold) 22%, transparent);
+    stroke-width: 11;
   }
 
   #mn-pharmacy-combined .mn-clarity-path {
     stroke: url(#mn-combined-gradient);
     stroke-width: 3;
-    filter:
-      drop-shadow(0 0 3px color-mix(in srgb, #fff4c9 92%, transparent))
-      drop-shadow(0 0 9px color-mix(in srgb, var(--mn-gold) 78%, transparent));
   }
 
   #mn-pharmacy-combined .mn-window[data-phase="clarity"] .mn-clarity-path,
