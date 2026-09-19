@@ -18,16 +18,17 @@ for(const width of [390,1280]) test(`PHARM-MOTION ${width}px butterfly leaves fa
   await pending(page,width);
   await page.clock.runFor(500);
   await expect(page.locator(".mn-window")).toHaveAttribute("data-flight","flying");
-  await expect(page.locator(".mn-clarity-path,.mn-clarity-path-glow")).toHaveCount(0);
+  await expect(page.locator(".mn-clarity-path,.mn-clarity-path-glow,.mn-leading-spark")).toHaveCount(0);
   await expect(page.locator(".mn-dust-particle")).toHaveCount(96);
   expect(await page.locator(".mn-dust-particle").evaluateAll(els=>els.every(el=>getComputedStyle(el).color==="rgb(255, 255, 255)"))).toBe(true);
   await page.evaluate(()=>{
     const samples:{gap:number;angle:number;x:number;y:number;time:number;count:number}[]=[];
     Object.assign(window,{motionSamples:samples});const start=performance.now();
     const sample=()=>{
-      const shell=document.querySelector<HTMLElement>(".mn-clarity-logo-shell")!,tip=document.querySelector(".mn-leading-spark")!.getBoundingClientRect(),transform=new DOMMatrix(getComputedStyle(shell).transform);
+      const shell=document.querySelector<HTMLElement>(".mn-clarity-logo-shell")!,bounds=shell.getBoundingClientRect(),transform=new DOMMatrix(getComputedStyle(shell).transform);
+      const offset=shell.offsetWidth*.36,tip={x:bounds.x+bounds.width/2+offset*(transform.a+transform.b),y:bounds.y+bounds.height/2+offset*(transform.b-transform.a)};
       const particles=[...document.querySelectorAll<HTMLElement>(".mn-dust-particle")].filter(el=>Number(getComputedStyle(el).opacity)>.05);
-      const gap=Math.min(...particles.map(el=>{const r=el.getBoundingClientRect();return Math.hypot(r.x+r.width/2-tip.x-tip.width/2,r.y+r.height/2-tip.y-tip.height/2);}));
+      const gap=Math.min(...particles.map(el=>{const r=el.getBoundingClientRect();return Math.hypot(r.x+r.width/2-tip.x,r.y+r.height/2-tip.y);}));
       samples.push({gap,angle:Math.atan2(transform.b,transform.a)*180/Math.PI,x:transform.e,y:transform.f,time:performance.now()-start,count:particles.length});
       if(performance.now()-start<8000)requestAnimationFrame(sample);
     };requestAnimationFrame(sample);

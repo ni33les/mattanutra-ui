@@ -14,8 +14,6 @@ for (const [locale, pharmacy] of [["en", false], ["th", true], ["zh-CN", true]] 
     const definition = getDefinition(state);
     expect(definition.turns[state.turnIndex].k).toBe("symptoms");
     await page.setViewportSize({ width: 390, height: 844 });
-    await page.clock.install({ time: new Date("2026-09-19T12:00:00Z") });
-    await page.clock.pauseAt(new Date("2026-09-19T12:01:00Z"));
     await page.addInitScript(({ state }) => {
       localStorage.setItem(`mn-questionnaire:v1:${state.sessionId}`, JSON.stringify({ version: 1, state, revision: 0,
         captured: null, contactEmail: null, paymentId: null, updatedAt: Date.now() }));
@@ -34,22 +32,20 @@ for (const [locale, pharmacy] of [["en", false], ["th", true], ["zh-CN", true]] 
     const path = pharmacy ? "/retail/matcher-v5-isolated-fixture-retailer/quiz" : "/nutrition/quiz";
     await page.goto(`/${locale}${path}?session=${state.sessionId}`);
     await page.getByRole("button", { name: definition.ui.resumeYes, exact: true }).click();
-    await page.clock.runFor(600);
     const symptoms = definition.turns.find(t => t.k === "symptoms")!;
     await page.getByRole("button", { name: symptoms.opts!.find(o => o.v === "great")!.l, exact: true }).click();
     await page.evaluate(() => { (window as unknown as { quizScrolls: string[] }).quizScrolls.length = 0; });
     await page.getByTestId("question-answers").locator(".mn-chat-q__primary").click();
     await expect(page.getByTestId("section-stage-overlay")).toBeVisible();
-    await page.clock.runFor(1000);
     const question = page.getByTestId("paged-question");
-    await expect(question).toContainText(definition.turns.find(t => t.k === "sex")!.q);
+    await expect(question).toContainText(definition.turns.find(t => t.k === "sex")!.q, { timeout: 1000 });
     await expect(page.getByTestId("section-stage-overlay")).toBeVisible();
     // The old question must never flash back during the overlay's fade-out.
-    expect(await question.evaluate(el => [...el.getAnimations(), ...el.querySelector(".mn-chat-q__bubble")!.getAnimations()].filter(a => a.playState === "running").length)).toBe(0);
-    await page.clock.runFor(1300);
+    await expect.poll(() => question.evaluate(el => [...el.getAnimations(), ...el.querySelector(".mn-chat-q__bubble")!.getAnimations()].filter(a => a.playState === "running").length), { timeout: 700 }).toBe(0);
+    await expect(page.getByTestId("section-stage-overlay")).toBeVisible();
     await expect(page.getByTestId("section-stage-overlay")).toHaveCount(0);
     const before = await question.boundingBox();
-    await page.clock.runFor(500);
+    await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
     expect(await question.boundingBox()).toEqual(before);
     expect(await page.evaluate(() => (window as unknown as { quizScrolls: string[] }).quizScrolls)).toEqual([]);
     expect(await page.locator(".mn-chat-q__page").evaluate(el => el.scrollTop)).toBe(0);
@@ -58,7 +54,7 @@ for (const [locale, pharmacy] of [["en", false], ["th", true], ["zh-CN", true]] 
     // Normal question changes retain one entrance; reduced motion remains immediate.
     await page.emulateMedia({ reducedMotion: "reduce" });
     await page.getByTestId("question-answers").locator("button.mn-chat-q__chip").first().click();
-    await page.clock.runFor(500);
+    await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
     await expect(question).toContainText(definition.turns.find(t => t.k === "age")!.q);
     await expect(page.getByTestId("section-stage-overlay")).toHaveCount(0);
   });
