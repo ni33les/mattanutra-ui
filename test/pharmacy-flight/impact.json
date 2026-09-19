@@ -1,0 +1,41 @@
+{
+  "releaseBase": "9e3773365e21066dd50c2a55d57896efc518b92b",
+  "scope": "pharmacy_readiness_driven_flight",
+  "inputs": [
+    "test/helpers/pharmacy-fixture.ts",
+    "test/pharmacy-reveal/combined-reference.json",
+    "test/pharmacy-reveal/combined-reference.html",
+    "public/assets/pharmacy/combined/leaf.webp"
+  ],
+  "files": [
+    {
+      "file": "test/pharmacy-reveal/combined-state.test.ts",
+      "expectedCases": 8,
+      "reason": "Real readiness preempts decoration; exhausted presentation settles without fabricating readiness"
+    },
+    {
+      "file": "test/pharmacy-reveal/progress-presentation.test.ts",
+      "expectedCases": 9,
+      "reason": "Retain reference assets and five centre curves, locale copy, scoped styles, reduced motion and cleanup"
+    },
+    {
+      "file": "test/pharmacy-animation/motion.test.ts",
+      "expectedCases": 6,
+      "reason": "Original exact motion plus continuous bounded waiting flight and velocity-preserving landing"
+    }
+  ],
+  "browser": [
+    {
+      "file": "test/e2e/pharmacy-animation.spec.ts",
+      "expectedCases": 7,
+      "grep": "PHARM-MOTION|PHARM-FLIGHT",
+      "reason": "Mobile/desktop continuous trail, indefinite pending flight, real readiness landing, hidden-tab/reduced-motion cleanup"
+    },
+    {
+      "file": "test/e2e/pharmacy-combined.spec.ts",
+      "expectedCases": 3,
+      "grep": "PHARM-COMBINE (saved formula|completion before|no replay)",
+      "reason": "Saved formula does not interrupt flight; products show immediately; completed reload preserves order selections"
+    }
+  ]
+}

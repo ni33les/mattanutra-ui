@@ -116,7 +116,7 @@ test("PHARM-COMBINE saved formula is visible before products, fetched once per v
   await page.unrouteAll({ behavior: "wait" });
 });
 
-test("PHARM-COMBINE completion before the animation finishes reveals immediately and cancels decoration", async ({
+test("PHARM-COMBINE completion before the animation finishes reveals immediately and rests without replay", async ({
   page,
 }) => {
   const saved = await fixture();
@@ -135,10 +135,8 @@ test("PHARM-COMBINE completion before the animation finishes reveals immediately
     "ready",
   );
   await expect(page.locator(".mn-rain-chip,.mn-flight-spark")).toHaveCount(0);
-  await expect(page.locator(".mn-clarity-logo-shell")).toHaveCSS(
-    "transform",
-    "matrix(1, 0, 0, 1, -9999, -9999)",
-  );
+  await page.clock.runFor(1500);
+  await expect(page.locator(".mn-window")).toHaveAttribute("data-flight","landed");
 });
 
 test("PHARM-COMBINE empty result completes without an invented purchase", async ({

@@ -12,6 +12,7 @@ async function pending(page: Page, width: number, virtualClock = true) {
   }
   await page.goto(`/en/retail/${saved.slug}/reveal?plan=${saved.planId}`);
   await expect(page.locator(".mn-window")).toHaveAttribute("data-paused","false");
+  return saved;
 }
 for(const width of [390,1280]) test(`PHARM-MOTION ${width}px trail stays attached and rotation remains continuous`,async({page})=>{
   await pending(page,width);
@@ -42,11 +43,15 @@ for(const width of [390,1280]) test(`PHARM-MOTION ${width}px trail stays attache
   expect(Math.max(...samples.slice(1).map((s,i)=>Math.abs(s.angle-samples[i].angle)))).toBeLessThan(2);
   await page.screenshot({path:test.info().outputPath(`settled-${width}.png`),fullPage:true});
 });
-test("PHARM-MOTION pending work settles after the final tap instead of freezing the leaf",async({page})=>{
+test("PHARM-MOTION pending work keeps flying after the final tap until real results arrive",async({page})=>{
   await pending(page,390);
   await page.clock.runFor(18000);
   await expect(page.locator(".mn-window")).toHaveAttribute("data-phase","waiting");
-  await expect(page.locator(".mn-clarity-logo-shell")).toHaveCSS("opacity","0");
+  await expect(page.locator(".mn-window")).toHaveAttribute("data-flight","flying");
+  await expect(page.locator(".mn-clarity-logo-shell")).toHaveCSS("opacity","1");
+  const position=await page.locator(".mn-clarity-logo-shell").evaluate(el=>getComputedStyle(el).transform);
+  await page.clock.runFor(20000);
+  expect(await page.locator(".mn-clarity-logo-shell").evaluate(el=>getComputedStyle(el).transform)).not.toBe(position);
   await expect(page.locator(".mn-status")).toContainText("Still preparing");
   await expect(page.getByTestId("pharmacy-order")).toHaveCount(0);
   await expect(page.locator(".mn-nutrient")).toHaveCount(0);
@@ -72,4 +77,45 @@ test("PHARM-MOTION real-time mobile flight remains responsive through the final 
   expect(frames.length).toBeGreaterThan(100);
   expect(intervals[Math.floor(intervals.length/2)]).toBeLessThan(40);
   await expect(page.locator(".mn-window")).toHaveAttribute("data-phase","waiting");
+});
+
+for(const width of [390,1280]) test(`PHARM-FLIGHT ${width}px completion reveals immediately while the sprite lands and then stops`,async({page})=>{
+  const saved=await pending(page,width);
+  await page.clock.runFor(24000);
+  await expect(page.locator(".mn-window")).toHaveAttribute("data-flight","flying");
+  await execute(process.execPath,["--experimental-strip-types","--import","./test/helpers/offline-network.mjs","--import","./scripts/register-ts-path-loader.mjs","--input-type=module","-e",`import {seedPharmacyFixture} from './test/helpers/pharmacy-fixture.ts';import {closeSqlPool} from './lib/db.ts';try{await seedPharmacyFixture('en',true,JSON.parse(process.argv[1]));}finally{await closeSqlPool();}`,JSON.stringify(saved)],{env:process.env,timeout:30000});
+  // Let the next real status response arrive, but do not advance the landing clock.
+  await page.clock.runFor(1600);
+  await expect(page.getByTestId("pharmacy-order")).toBeVisible();
+  await page.clock.runFor(32);
+  await expect(page.locator(".mn-window")).toHaveAttribute("data-flight","landing");
+  await expect(page.locator(".mn-product")).toHaveCount(1);
+  await page.clock.runFor(1500);
+  await expect(page.locator(".mn-window")).toHaveAttribute("data-flight","landed");
+  const shell=page.locator(".mn-clarity-logo-shell"),rest=await shell.evaluate(el=>getComputedStyle(el).transform);
+  const gap=await page.evaluate(()=>{const a=document.querySelector(".mn-clarity-logo-shell")!.getBoundingClientRect(),b=document.querySelector(".mn-brand-mark")!.getBoundingClientRect();return Math.hypot(a.x+a.width/2-b.x-b.width/2,a.y+a.height/2-b.y-b.height/2);});
+  expect(gap).toBeLessThan(.1);
+  await expect(page.locator(".mn-flight-spark")).toHaveCount(0);
+  await page.clock.runFor(3000);
+  expect(await shell.evaluate(el=>getComputedStyle(el).transform)).toBe(rest);
+  await page.screenshot({path:test.info().outputPath(`landed-${width}.png`),fullPage:true});
+});
+test("PHARM-FLIGHT hidden tabs pause flight; reduced motion and navigation stop it",async({page})=>{
+  await pending(page,390);
+  await page.clock.runFor(22000);
+  await expect(page.locator(".mn-window")).toHaveAttribute("data-flight","flying");
+  const shell=page.locator(".mn-clarity-logo-shell"),before=await shell.evaluate(el=>getComputedStyle(el).transform);
+  await page.evaluate(()=>{Object.defineProperty(document,"hidden",{configurable:true,value:true});document.dispatchEvent(new Event("visibilitychange"));});
+  await page.clock.runFor(4000);
+  expect(await shell.evaluate(el=>getComputedStyle(el).transform)).toBe(before);
+  await page.evaluate(()=>{Object.defineProperty(document,"hidden",{configurable:true,value:false});document.dispatchEvent(new Event("visibilitychange"));});
+  await page.clock.runFor(500);
+  expect(await shell.evaluate(el=>getComputedStyle(el).transform)).not.toBe(before);
+  await page.emulateMedia({reducedMotion:"reduce"});
+  const reduced=await shell.evaluate(el=>getComputedStyle(el).transform);
+  await page.clock.runFor(3000);
+  expect(await shell.evaluate(el=>getComputedStyle(el).transform)).toBe(reduced);
+  await expect(page.getByTestId("pharmacy-order")).toHaveCount(0);
+  await page.goto("/en/nutrition/quiz");
+  await expect(page.locator(".mn-flight-spark,.mn-clarity-logo-shell")).toHaveCount(0);
 });
