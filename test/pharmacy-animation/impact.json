@@ -20,8 +20,8 @@
     },
     {
       "file": "test/pharmacy-animation/motion.test.ts",
-      "expectedCases": 3,
-      "reason": "Bounded continuous banking, exact tap positions and monotonic tip-based trail progression"
+      "expectedCases": 7,
+      "reason": "Original tap/trail geometry, continuing flight, velocity-preserving landing and visible mobile waiting area"
     }
   ],
   "browser": [
@@ -29,7 +29,7 @@
       "file": "test/e2e/pharmacy-animation.spec.ts",
       "expectedCases": 4,
       "grep": "PHARM-MOTION",
-      "reason": "Dense mobile/desktop trail attachment, continuous rotation, real-frame responsiveness and explicit pending work after flight"
+      "reason": "Dense mobile/desktop trail attachment, continuous rotation, real-frame responsiveness and flight until actual readiness"
     },
     {
       "file": "test/e2e/pharmacy-combined.spec.ts",
