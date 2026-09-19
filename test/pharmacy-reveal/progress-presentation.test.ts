@@ -95,9 +95,10 @@ test("PHARM-WAIT-01 frozen reference and exact existing Nong/leaf bytes are pres
   const view = markup();
   assert.match(view, /nong-energetic.webp/);
   assert.match(view, /combined\/leaf.webp/);
+  assert.doesNotMatch(view, /class="mn-(?:brand|brand-mark|brand-lockup)"/);
 });
 for (const width of [1280, 390])
-  test(`PHARM-WAIT-02 ${width}px anchors, five curves and orbit match independent reference geometry`, async () => {
+  test(`PHARM-WAIT-02 ${width}px historical five curves and orbit retain independent reference geometry`, async () => {
     const { context, control, candidate } = await pages(width);
     try {
       // Use a class index: the question spans follow the SVG in both implementations.
@@ -112,7 +113,7 @@ for (const width of [1280, 390])
         return {
           width: v.width,
           height: v.height,
-          source: center(document.querySelector(".mn-brand-mark")!),
+          source: center(document.querySelector(".mn-clarity-logo-shell")!),
           questions: [
             ...document.querySelectorAll("[data-clarity-question]"),
           ].map(center),

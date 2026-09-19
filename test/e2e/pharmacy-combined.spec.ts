@@ -116,7 +116,7 @@ test("PHARM-COMBINE saved formula is visible before products, fetched once per v
   await page.unrouteAll({ behavior: "wait" });
 });
 
-test("PHARM-COMBINE completion before the animation finishes reveals immediately and rests without replay", async ({
+test("PHARM-COMBINE completion before the animation finishes reveals immediately and exits without replay", async ({
   page,
 }) => {
   const saved = await fixture();
@@ -135,8 +135,17 @@ test("PHARM-COMBINE completion before the animation finishes reveals immediately
     "ready",
   );
   await expect(page.locator(".mn-rain-chip,.mn-flight-spark")).toHaveCount(0);
-  await page.clock.runFor(1500);
-  await expect(page.locator(".mn-window")).toHaveAttribute("data-flight","landed");
+  await page.clock.runFor(5000);
+  await expect(page.locator(".mn-window")).toHaveAttribute("data-flight","exited");
+  await expect(page.locator("#mn-pharmacy-combined .mn-brand-mark,#mn-pharmacy-combined .mn-brand-lockup")).toHaveCount(0);
+  await page.reload();
+  await expect(page.getByTestId("pharmacy-order")).toBeVisible();
+  await page.clock.runFor(32);
+  await expect(page.locator(".mn-window")).toHaveAttribute("data-flight","exited");
+  const shell=page.locator(".mn-clarity-logo-shell"),rest=await shell.evaluate(el=>getComputedStyle(el).transform);
+  await page.clock.runFor(3000);
+  expect(await shell.evaluate(el=>getComputedStyle(el).transform)).toBe(rest);
+  await expect(shell).toHaveCSS("opacity","0");
 });
 
 test("PHARM-COMBINE empty result completes without an invented purchase", async ({

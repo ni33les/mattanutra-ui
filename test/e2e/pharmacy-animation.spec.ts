@@ -16,7 +16,11 @@ async function pending(page: Page, width: number, virtualClock = true) {
 }
 for(const width of [390,1280]) test(`PHARM-MOTION ${width}px butterfly leaves fading magic dust instead of a line`,async({page})=>{
   await pending(page,width);
-  await page.clock.runFor(500);
+  await expect.soft(page.locator("#mn-pharmacy-combined .mn-brand-mark,#mn-pharmacy-combined .mn-brand-lockup")).toHaveCount(0);
+  await page.clock.runFor(32);
+  const entry=await page.locator(".mn-clarity-logo-shell").boundingBox();
+  expect.soft(entry!.x+entry!.width).toBeLessThan(0);
+  await page.clock.runFor(468);
   await expect(page.locator(".mn-window")).toHaveAttribute("data-flight","flying");
   await expect(page.locator(".mn-clarity-path,.mn-clarity-path-glow,.mn-leading-spark")).toHaveCount(0);
   await expect(page.locator(".mn-dust-particle")).toHaveCount(96);
@@ -76,7 +80,7 @@ test("PHARM-MOTION real-time mobile butterfly flight remains responsive",async({
   await expect(page.locator(".mn-window")).toHaveAttribute("data-flight","flying");
 });
 
-for(const width of [390,1280]) test(`PHARM-FLIGHT ${width}px completion reveals immediately while the sprite lands and then stops`,async({page})=>{
+for(const width of [390,1280]) test(`PHARM-FLIGHT ${width}px completion reveals immediately while the sprite flies offscreen and then stops`,async({page})=>{
   const saved=await pending(page,width);
   await page.clock.runFor(6000);
   await expect(page.locator(".mn-window")).toHaveAttribute("data-flight","flying");
@@ -84,16 +88,16 @@ for(const width of [390,1280]) test(`PHARM-FLIGHT ${width}px completion reveals 
   const quoteGate=new Promise<void>(resolve=>{releaseQuote=resolve;});
   await page.route("**/api/retail/orders?*",async route=>{const response=await route.fetch();quoteLoaded=true;await quoteGate;await route.fulfill({response});});
   await page.evaluate(()=>{
-    const samples:{x:number;y:number;dust:number}[]=[];Object.assign(window,{landingSamples:samples});
+    const samples:{x:number;y:number;dust:number}[]=[];Object.assign(window,{exitSamples:samples});
     const sample=()=>{
       const shell=document.querySelector(".mn-clarity-logo-shell")!,r=shell.getBoundingClientRect();
       const dust=[...document.querySelectorAll<HTMLElement>(".mn-dust-particle")].filter(el=>Number(getComputedStyle(el).opacity)>.05).length;
       samples.push({x:r.x+r.width/2,y:r.y+r.height/2,dust});
-      if(document.querySelector(".mn-window")!.getAttribute("data-flight")!=="landed")requestAnimationFrame(sample);
+      if(document.querySelector(".mn-window")!.getAttribute("data-flight")!=="exited")requestAnimationFrame(sample);
     };requestAnimationFrame(sample);
   });
   await execute(process.execPath,["--experimental-strip-types","--import","./test/helpers/offline-network.mjs","--import","./scripts/register-ts-path-loader.mjs","--input-type=module","-e",`import {seedPharmacyFixture} from './test/helpers/pharmacy-fixture.ts';import {closeSqlPool} from './lib/db.ts';try{await seedPharmacyFixture('en',true,JSON.parse(process.argv[1]));}finally{await closeSqlPool();}`,JSON.stringify(saved)],{env:process.env,timeout:30000});
-  // Let the next real status response arrive, but do not advance the landing clock.
+  // Let the next real status response arrive, but do not advance the exit clock.
   await page.clock.runFor(1600);
   await expect.poll(()=>quoteLoaded).toBe(true);
   await expect(page.getByTestId("pharmacy-order")).toHaveCount(0);
@@ -101,23 +105,25 @@ for(const width of [390,1280]) test(`PHARM-FLIGHT ${width}px completion reveals 
   releaseQuote();
   await expect(page.getByTestId("pharmacy-order")).toBeVisible();
   await page.clock.runFor(32);
-  await expect(page.locator(".mn-window")).toHaveAttribute("data-flight","landing");
+  await expect(page.locator(".mn-window")).toHaveAttribute("data-flight","exiting");
   await expect(page.locator(".mn-product")).toHaveCount(1);
-  await page.clock.runFor(1500);
-  await expect(page.locator(".mn-window")).toHaveAttribute("data-flight","landed");
+  await page.clock.runFor(3500);
+  await expect(page.locator(".mn-window")).toHaveAttribute("data-flight","exited");
   const shell=page.locator(".mn-clarity-logo-shell"),rest=await shell.evaluate(el=>getComputedStyle(el).transform);
-  const gap=await page.evaluate(()=>{const a=document.querySelector(".mn-clarity-logo-shell")!.getBoundingClientRect(),b=document.querySelector(".mn-brand-mark")!.getBoundingClientRect();return Math.hypot(a.x+a.width/2-b.x-b.width/2,a.y+a.height/2-b.y-b.height/2);});
-  expect(gap).toBeLessThan(.1);
-  const samples=await page.evaluate(()=>(window as unknown as {landingSamples:{x:number;y:number;dust:number}[]}).landingSamples);
+  const exit=await shell.boundingBox();
+  expect(exit!.x).toBeGreaterThan(width);
+  await expect(shell).toHaveCSS("opacity","0");
+  await expect(page.locator("#mn-pharmacy-combined .mn-brand-mark,#mn-pharmacy-combined .mn-brand-lockup")).toHaveCount(0);
+  const samples=await page.evaluate(()=>(window as unknown as {exitSamples:{x:number;y:number;dust:number}[]}).exitSamples);
   expect(samples.length).toBeGreaterThan(50);
   expect(samples.some(s=>s.dust>20)).toBe(true);
   expect(await page.locator(".mn-dust-particle").evaluateAll(elements=>elements.every(el=>getComputedStyle(el).opacity==="0"))).toBe(true);
   expect(Math.max(...samples.slice(1).map((s,i)=>Math.hypot(s.x-samples[i].x,s.y-samples[i].y)))).toBeLessThan(25);
-  await test.info().attach("landing-measurements",{body:JSON.stringify(samples),contentType:"application/json"});
+  await test.info().attach("exit-measurements",{body:JSON.stringify(samples),contentType:"application/json"});
   await expect(page.locator(".mn-flight-spark")).toHaveCount(0);
   await page.clock.runFor(3000);
   expect(await shell.evaluate(el=>getComputedStyle(el).transform)).toBe(rest);
-  await page.screenshot({path:test.info().outputPath(`landed-${width}.png`),fullPage:true});
+  await page.screenshot({path:test.info().outputPath(`exited-${width}.png`),fullPage:true});
 });
 test("PHARM-FLIGHT hidden tabs pause flight; reduced motion and navigation stop it",async({page})=>{
   await pending(page,390);

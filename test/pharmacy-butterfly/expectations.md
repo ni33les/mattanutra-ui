@@ -38,3 +38,11 @@ The requested follow-up changes the dust only: Nong's blue (`#0088b8`, sampled f
 PHARM-MOTION-03 requires the first particle to remain visible after 1.5 seconds, eventual expiry, frame-independent births and no live modulo-slot collisions. Browser measurements now compare dust with the rendered icon centre and check both star colour and fill. The selected inventory is the seven motion and seven browser cases; unrelated questionnaire/card cases are preserved without rerunning them. Historical expectation changes and evidence above remain intact.
 
 RED evidence against d16ec252 is retained at `/root/.codex/deploy/pharmacy-blue-dust-20260919/red-node` and `red-browser`: the old minimum lifetime expires too soon, stars are white and their rendered origin is offset from the icon centre.
+
+## Offscreen entry and exit, without duplicate body branding
+
+The user replaces the body logo/wordmark and return-to-logo landing with an offscreen entrance during processing and an offscreen exit on readiness. Results still appear immediately. Completed visits/reloads do not replay. The site header/footer, blue centred sparkles and continuous pending flight remain unchanged.
+
+PHARM-MOTION-02 now starts beyond the left edge; PHARM-FLIGHT-03 verifies smooth exit to the right. Browser motion and fast-completion cases replace the intentional stationary-logo endpoint with offscreen/hidden and no-body-brand assertions. PHARM-WAIT-02 retains the historical reference geometry using the existing animated-shell anchor, without depending on the deliberately removed static logo. Historical references and prices are unchanged.
+
+RED evidence is retained against 8014c79c in `/root/.codex/deploy/pharmacy-offscreen-20260919/red-node` and `red-browser`. The baseline still renders the duplicate body brand and starts its sprite inside the page.

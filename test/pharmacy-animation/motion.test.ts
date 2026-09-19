@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import * as motion from "../../lib/pharmacy-presentation.ts";
-const area = (width = 650) => ({ left: 60, top: 110, width, height: 400, source: {x: 38, y: 38}, shellSize: 82 });
+const area = (width = 650) => ({ left: 60, top: 110, width, height: 400, source: {x: -82, y: 260}, shellSize: 82 });
 
 test("PHARM-MOTION-01 one butterfly curve has gentle continuous movement through the former phase boundaries", () => {
   assert.equal(typeof motion.butterflyFlight, "function");
@@ -16,7 +16,7 @@ test("PHARM-MOTION-01 one butterfly curve has gentle continuous movement through
     previous=pose;previousSpeed=speed;
   }
 });
-test("PHARM-MOTION-02 takeoff begins at the logo and the same smooth path closes without a seam", () => {
+test("PHARM-MOTION-02 takeoff begins offscreen and the same smooth path closes without a seam", () => {
   const flight=motion.butterflyFlight(area());
   assert.deepEqual(motion.butterflyPose(flight,0).point,area().source);
   for(const time of [7600,11710,13900,24000,48000]){
@@ -73,15 +73,15 @@ test("PHARM-FLIGHT-02 banking and subtle flutter preserve the original sprite ge
     assert.ok(Math.abs(pose.angle)<16);
   }
 });
-test("PHARM-FLIGHT-03 landing preserves entry velocity and eases into an exact stationary destination",()=>{
-  const flight=motion.butterflyFlight(area()),target=area().source;
-  const pose=(time:number)=>motion.landButterflyPose(motion.butterflyPose(flight,18123+time),target,38/82,82,time/1200);
+test("PHARM-FLIGHT-03 exit preserves entry velocity and finishes completely offscreen",()=>{
+  const flight=motion.butterflyFlight(area()),target={x:900,y:220};
+  const pose=(time:number)=>motion.exitButterflyPose(motion.butterflyPose(flight,18123+time),target,82,time/1800);
   assert.deepEqual(pose(0).point,motion.butterflyPose(flight,18123).point);
   const before=motion.butterflyPose(flight,18122).point,start=pose(0).point,after=pose(1).point;
   assert.ok(Math.hypot(start.x-before.x-(after.x-start.x),start.y-before.y-(after.y-start.y))<.002);
-  assert.deepEqual(pose(1200).point,target);assert.deepEqual(pose(9000).point,target);
-  assert.equal(pose(1200).angle,0);assert.equal(pose(1200).scale,38/82);
-  assert.ok(Math.hypot(pose(1199).point.x-target.x,pose(1199).point.y-target.y)<.001);
+  assert.deepEqual(pose(1800).point,target);assert.deepEqual(pose(9000).point,target);
+  assert.equal(pose(1800).angle,0);assert.equal(pose(1800).scale,1);
+  assert.ok(Math.hypot(pose(1799).point.x-target.x,pose(1799).point.y-target.y)<.001);
 });
 test("PHARM-FLIGHT-04 single flight stays inside the supplied visible mobile area",()=>{
   const input=area(240),flight=motion.butterflyFlight(input);
