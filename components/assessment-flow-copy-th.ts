@@ -315,10 +315,10 @@ export const th: Copy = {
     ],
     maxPills: "จำนวนเม็ดหรือแคปซูลสูงสุดต่อวัน",
     maxPillsOptions: [
+      { label: "ไม่จำกัด", value: "nolimit" },
       { label: "1–3", value: "1-3" },
       { label: "4–6", value: "4-6" },
-      { label: "7–10", value: "7-10" },
-      { label: "ไม่จำกัด", value: "nolimit" }
+      { label: "7–10", value: "7-10" }
     ],
     form: "รูปแบบผลิตภัณฑ์ที่ต้องการ",
     formOptions: [
@@ -338,12 +338,12 @@ export const th: Copy = {
     ],
     family: "ประวัติสุขภาพในครอบครัว",
     familyOptions: [
+      { label: "ไม่ใช้", value: "none" },
       { label: "โรคหัวใจ", value: "heart" },
       { label: "โรคอัลไซเมอร์", value: "alzheimers" },
       { label: "เบาหวาน", value: "diabetes" },
       { label: "มะเร็ง", value: "cancer" },
-      { label: "โรคกระดูกพรุน", value: "osteoporosis" },
-      { label: "ไม่ใช้", value: "none" }
+      { label: "โรคกระดูกพรุน", value: "osteoporosis" }
     ],
     tracker: "อุปกรณ์ติดตามสุขภาพ",
     trackerOptions: [

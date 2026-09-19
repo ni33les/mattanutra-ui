@@ -1399,6 +1399,10 @@
       "q": "Max pills or capsules per day?",
       "opts": [
         {
+          "v": "nolimit",
+          "l": "No limit"
+        },
+        {
           "v": "1-3",
           "l": "1–3"
         },
@@ -1409,10 +1413,6 @@
         {
           "v": "7-10",
           "l": "7–10"
-        },
-        {
-          "v": "nolimit",
-          "l": "No limit"
         }
       ],
       "pts": 3,
@@ -1494,6 +1494,10 @@
       "q": "Any family health history?",
       "opts": [
         {
+          "v": "none",
+          "l": "None"
+        },
+        {
           "v": "heart",
           "l": "Heart disease"
         },
@@ -1512,10 +1516,6 @@
         {
           "v": "osteoporosis",
           "l": "Osteoporosis"
-        },
-        {
-          "v": "none",
-          "l": "None"
         }
       ],
       "pts": 2,

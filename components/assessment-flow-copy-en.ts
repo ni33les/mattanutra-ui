@@ -315,10 +315,10 @@ export const en: Copy = {
     ],
     maxPills: "Max pills / capsules ( Per day )",
     maxPillsOptions: [
+      { label: "No limit", value: "nolimit" },
       { label: "1-3", value: "1-3" },
       { label: "4-6", value: "4-6" },
-      { label: "7-10", value: "7-10" },
-      { label: "No limit", value: "nolimit" }
+      { label: "7-10", value: "7-10" }
     ],
     form: "Preferred form",
     formOptions: [
@@ -338,12 +338,12 @@ export const en: Copy = {
     ],
     family: "Family history",
     familyOptions: [
+      { label: "None", value: "none" },
       { label: "Heart disease", value: "heart" },
       { label: "Alzheimer's", value: "alzheimers" },
       { label: "Diabetes", value: "diabetes" },
       { label: "Cancer", value: "cancer" },
-      { label: "Osteoporosis", value: "osteoporosis" },
-      { label: "None", value: "none" }
+      { label: "Osteoporosis", value: "osteoporosis" }
     ],
     tracker: "Fitness tracker",
     trackerOptions: [

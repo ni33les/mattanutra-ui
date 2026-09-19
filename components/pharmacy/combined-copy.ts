@@ -1,6 +1,5 @@
 import type { Locale } from "@/lib/i18n";
 const en = {
-  replay: "Replay analysis",
   title: "Building your personalised supplement plan",
   complete: "ANALYSIS COMPLETE",
   payoff: "You have stopped guessing. Now you know.",
@@ -52,7 +51,6 @@ type Copy = {
   [K in keyof typeof en]: (typeof en)[K] extends string[] ? string[] : string;
 };
 const th: Copy = {
-  replay: "ดูภาพการวิเคราะห์อีกครั้ง",
   title: "กำลังจัดแผนอาหารเสริมเฉพาะคุณ",
   complete: "วิเคราะห์เสร็จแล้ว",
   payoff: "เลิกเดา เริ่มรู้จริง",
@@ -100,7 +98,6 @@ const th: Copy = {
   saving: "กำลังบันทึกคำตอบ…",
 };
 const zh: Copy = {
-  replay: "重播分析动画",
   title: "正在制定您的个性化营养补充方案",
   complete: "分析完成",
   payoff: "不再猜测，开始了解。",

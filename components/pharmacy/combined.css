@@ -37,7 +37,7 @@
     justify-content: space-between;
   }
 
-  #mn-pharmacy-combined .mn-replay-top {
+  #mn-pharmacy-combined .mn-recovery-button {
     min-height: 40px;
     padding: 8px 14px;
     border: 1px solid color-mix(in srgb, var(--mn-green) 34%, transparent);
@@ -49,8 +49,8 @@
     cursor: pointer;
   }
 
-  #mn-pharmacy-combined .mn-replay-top:hover,
-  #mn-pharmacy-combined .mn-replay-top:focus-visible {
+  #mn-pharmacy-combined .mn-recovery-button:hover,
+  #mn-pharmacy-combined .mn-recovery-button:focus-visible {
     background: var(--mn-soft-green);
     outline: none;
   }
@@ -1676,6 +1676,21 @@
       padding: 0 12px;
     }
   }
+
+  #mn-pharmacy-combined .mn-processing-activity {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.65rem;
+    margin: 0.7rem auto;
+    max-width: 34rem;
+    color: var(--mn-teal);
+  }
+  #mn-pharmacy-combined .mn-processing-activity svg {
+    flex-shrink: 0;
+    animation: mn-pharmacy-combined-spin 1.3s linear infinite;
+  }
+  @keyframes mn-pharmacy-combined-spin { to { transform: rotate(360deg); } }
 
   @media (prefers-reduced-motion: reduce) {
     #mn-pharmacy-combined .mn-rain-chip,

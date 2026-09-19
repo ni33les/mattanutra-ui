@@ -799,6 +799,10 @@ export const zhCn: Copy = {
       "maxPills": "每日最多服用（片/胶囊）",
       "maxPillsOptions": [
         {
+          "label": "无限制",
+          "value": "nolimit"
+        },
+        {
           "label": "1-3",
           "value": "1-3"
         },
@@ -809,10 +813,6 @@ export const zhCn: Copy = {
         {
           "label": "7-10",
           "value": "7-10"
-        },
-        {
-          "label": "无限制",
-          "value": "nolimit"
         }
       ],
       "form": "偏好形式",
@@ -858,6 +858,10 @@ export const zhCn: Copy = {
       "family": "家族病史",
       "familyOptions": [
         {
+          "label": "无",
+          "value": "none"
+        },
+        {
           "label": "心脏病",
           "value": "heart"
         },
@@ -876,10 +880,6 @@ export const zhCn: Copy = {
         {
           "label": "骨质疏松症",
           "value": "osteoporosis"
-        },
-        {
-          "label": "无",
-          "value": "none"
         }
       ],
       "tracker": "健身追踪器",

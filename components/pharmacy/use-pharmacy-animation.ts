@@ -11,9 +11,8 @@ import {
 export function usePharmacyAnimation(
   root: RefObject<HTMLElement | null>,
   active: boolean,
-  replay: number,
+  formulaReady: boolean,
   onPhase: (phase: PharmacyPhase) => void,
-  onEnd: () => void,
 ) {
   useEffect(() => {
     if (!root.current || !active) return;
@@ -40,7 +39,7 @@ export function usePharmacyAnimation(
       lastNow = 0,
       lastSpark = 0,
       phase: PharmacyPhase | undefined,
-      ended = false;
+      ended = formulaReady;
     let flight: ReturnType<typeof clarityFlight> | null = null;
     const triggered = new Set<number>();
     const phaseTo = (next: PharmacyPhase) => {
@@ -174,7 +173,6 @@ export function usePharmacyAnimation(
       if (elapsed < 16700) frameId = requestAnimationFrame(frame);
       else {
         ended = true;
-        onEnd();
       }
     }
     function visible() {
@@ -190,11 +188,10 @@ export function usePharmacyAnimation(
         tiles.forEach((t) => t.classList.add("is-active"));
         phaseTo("matching");
         ended = true;
-        onEnd();
       } else {
         lastNow = 0;
-        ended = false;
-        frameId = requestAnimationFrame(frame);
+        ended = formulaReady || elapsed >= 16700;
+        if (!ended && !document.hidden) frameId = requestAnimationFrame(frame);
       }
     }
     function resized() {
@@ -205,7 +202,10 @@ export function usePharmacyAnimation(
     document.addEventListener("visibilitychange", visible);
     motion.addEventListener("change", reduced);
     if (motion.matches) reduced();
-    else visible();
+    else {
+      if (formulaReady) phaseTo("matching");
+      visible();
+    }
     return () => {
       cancelAnimationFrame(frameId);
       observer.disconnect();
@@ -220,5 +220,5 @@ export function usePharmacyAnimation(
       page.classList.remove("is-final-tap", "is-logo-linger");
       page.removeAttribute("data-paused");
     };
-  }, [root, active, replay, onPhase, onEnd]);
+  }, [root, active, formulaReady, onPhase]);
 }

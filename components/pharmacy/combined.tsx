@@ -1,13 +1,12 @@
 "use client";
 import {
-  useCallback,
   useEffect,
   useRef,
   useState,
   useSyncExternalStore,
   type CSSProperties,
 } from "react";
-import { Check } from "lucide-react";
+import { Check, LoaderCircle } from "lucide-react";
 import { SafeImage } from "@/components/safe-image";
 import {
   visibleFormulaIngredients,
@@ -120,25 +119,19 @@ export function PharmacyCombined({
     p = pharmacyCopy[locale];
   const root = useRef<HTMLElement | null>(null);
   const [animatedPhase, setAnimatedPhase] = useState<PharmacyPhase>("inputs");
-  const [replay, setReplay] = useState(0),
-    [replaying, setReplaying] = useState(false);
-  const end = useCallback(() => setReplaying(false), []);
+  const ready = work.ready && order.loaded;
   usePharmacyAnimation(
     root,
-    (!work.ready && !work.failed && !result) || replaying,
-    replay,
+    !ready && !work.failed,
+    Boolean(result),
     setAnimatedPhase,
-    end,
   );
-  const phase =
-    replaying && result
-      ? animatedPhase
-      : pharmacyPresentationPhase({
-          phase: animatedPhase,
-          formulaReady: Boolean(result),
-          ready: work.ready,
-          failed: work.failed,
-        });
+  const phase = pharmacyPresentationPhase({
+    phase: animatedPhase,
+    formulaReady: Boolean(result),
+    ready,
+    failed: work.failed,
+  });
   const ingredients = visibleFormulaIngredients(
     result?.supplementBreakdown ?? [],
   ).sort((a, b) => a.effectivenessRank - b.effectivenessRank);
@@ -146,7 +139,7 @@ export function PharmacyCombined({
     result?.firstName || result?.assessmentSummary.firstName || c.you;
   const emitted = useRef(new Set<string>());
   useEffect(() => {
-    const event = work.ready
+    const event = ready
       ? "formulation_page_viewed"
       : "pharmacy_processing_viewed";
     const key = `${planId}:${work.snapshot?.revision ?? revision}:${event}`;
@@ -161,7 +154,7 @@ export function PharmacyCombined({
         pageKey: window.location.pathname + window.location.search,
       },
     });
-  }, [locale, planId, revision, work.ready, work.snapshot?.revision]);
+  }, [locale, planId, revision, ready, work.snapshot?.revision]);
   const deepLink = pharmacyPath(locale, slug, "plan", {
     plan: planId,
     order: order.receipt?.id,
@@ -204,9 +197,9 @@ export function PharmacyCombined({
         ref={root}
         className="mn-window"
         data-phase={phase}
-        data-testid={work.ready ? "pharmacy-order" : undefined}
+        data-testid={ready ? "pharmacy-order" : undefined}
         aria-labelledby="mn-combined-title"
-        aria-busy={!work.ready && !work.failed}
+        aria-busy={!ready && !work.failed}
       >
         <div className="mn-top">
           <div className="mn-brand-lockup">
@@ -221,18 +214,7 @@ export function PharmacyCombined({
               Matta<span>Nutra</span>
             </strong>
           </div>
-          <button
-            className="mn-replay-top"
-            type="button"
-            onClick={() => {
-              setAnimatedPhase("inputs");
-              setReplaying(work.ready);
-              setReplay((n) => n + 1);
-            }}
-            disabled={work.failed}
-          >
-            ↻ {c.replay}
-          </button>
+
         </div>
         <h2 id="mn-combined-title">{c.title}</h2>
         <div className="mn-status-row">
@@ -258,8 +240,16 @@ export function PharmacyCombined({
             ))}
           </div>
         </div>
-        {!work.ready && !work.failed && (
-          <p className="mn-estimate">{c.estimate}</p>
+        {!ready && !work.failed && (
+          <div className="mn-estimate">
+            <p>{c.estimate}</p>
+            {(phase === "waiting" || phase === "matching") && (
+              <p className="mn-processing-activity" data-testid="pharmacy-processing-activity" role="status">
+                <LoaderCircle aria-hidden="true" size={22} />
+                {result ? `${c.matching} ${c.personalised} ${c.matchingEnd}` : c.waiting}
+              </p>
+            )}
+          </div>
         )}
         <div className="mn-stage" role="group" aria-label={p.preparing}>
           <div
@@ -287,7 +277,7 @@ export function PharmacyCombined({
               </div>
             </div>
             {(animatedPhase === "rain" || animatedPhase === "clarity") &&
-              (!work.ready || replaying) &&
+              !ready &&
               pharmacyRainWords.map((word, i) => {
                 const v = pharmacyRainStyle(i);
                 return (
@@ -535,7 +525,7 @@ export function PharmacyCombined({
           <div className="mn-recovery" role="alert">
             <p>{c.failed}</p>
             <button
-              className="mn-replay-top"
+              className="mn-recovery-button"
               data-testid="pharmacy-progress-retry"
               onClick={retry}
             >
@@ -544,12 +534,12 @@ export function PharmacyCombined({
           </div>
         )}
         <p className="mn-ready" aria-live="polite">
-          {work.ready ? c.ready : ""}
+          {ready ? c.ready : ""}
         </p>
         <section
           className="mn-transaction"
           aria-labelledby="mn-order-title"
-          hidden={!work.ready}
+          hidden={!ready}
         >
           <p className="mn-order-kicker">
             {c.at} {pharmacyName}
@@ -645,7 +635,7 @@ export function PharmacyCombined({
         <section
           className="mn-coffee"
           aria-labelledby="mn-coffee-title"
-          hidden={!work.ready}
+          hidden={!ready}
         >
           <div className="mn-coffee-intro">
             <SafeImage
