@@ -342,7 +342,7 @@ export function stepMagicDust(state: ReturnType<typeof createMagicDust>, tip: Po
         x: p.origin.x + Math.sin(p.id * 2.399) * (8 + p.id % 5 * 3) * progress,
         y: p.origin.y + (12 + p.id % 7 * 2) * progress * progress + Math.sin(p.id * 1.7) * progress * 6,
       },
-      opacity: smootherStep(age / 40) * (1 - progress) ** 2 * (.72 + .28 * Math.sin(age / 130 + p.id * .7) ** 2),
+      opacity: smootherStep(age / 16) * (1 - progress) ** 2 * (.72 + .28 * Math.sin(age / 130 + p.id * .7) ** 2),
       scale: (.65 + p.id % 5 * .16) * (1 - progress * .5),
       angle: p.id * 137.5 % 180 + age * .025,
     };
