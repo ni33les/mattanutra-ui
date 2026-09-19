@@ -306,20 +306,21 @@ function butterflyTip(pose: Omit<ButterflyPose,"tip">,shellSize: number): Butter
 }
 
 export const MAGIC_DUST_CAPACITY = 96;
-const MAGIC_DUST_INTERVAL_MS = 20;
+// The longer fade still fits in the same 96-slot render pool.
+const MAGIC_DUST_INTERVAL_MS = 24;
 type DustParticle = { id: number; born: number; origin: Point; life: number };
 export function createMagicDust() {
   return {
     particles: [] as DustParticle[],
-    previous: null as { tip: Point; time: number } | null,
+    previous: null as { origin: Point; time: number } | null,
     nextEmission: 0,
     sequence: 0,
   };
 }
 
-/** Emit on the flight clock, interpolate births at the leaf tip, and reuse a bounded pool. */
-export function stepMagicDust(state: ReturnType<typeof createMagicDust>, tip: Point, time: number, emit = true) {
-  const previous = state.previous ?? { tip, time };
+/** Emit on the flight clock, interpolate births at the supplied origin, and reuse a bounded pool. */
+export function stepMagicDust(state: ReturnType<typeof createMagicDust>, origin: Point, time: number, emit = true) {
+  const previous = state.previous ?? { origin, time };
   // A late frame never creates an unbounded backlog of invisible particles.
   const skipped = Math.max(0, Math.floor((time - state.nextEmission) / MAGIC_DUST_INTERVAL_MS) + 1 - MAGIC_DUST_CAPACITY);
   state.nextEmission += skipped * MAGIC_DUST_INTERVAL_MS;
@@ -328,12 +329,12 @@ export function stepMagicDust(state: ReturnType<typeof createMagicDust>, tip: Po
     const born = state.nextEmission, id = state.sequence++;
     const mix = Math.max(0, Math.min(1, (born - previous.time) / (time - previous.time || 1)));
     if (emit) state.particles.push({
-      id, born, life: 1400 + (id % 6) * 80,
-      origin: { x: previous.tip.x + (tip.x - previous.tip.x) * mix, y: previous.tip.y + (tip.y - previous.tip.y) * mix },
+      id, born, life: 1800 + (id % 6) * 80,
+      origin: { x: previous.origin.x + (origin.x - previous.origin.x) * mix, y: previous.origin.y + (origin.y - previous.origin.y) * mix },
     });
     state.nextEmission += MAGIC_DUST_INTERVAL_MS;
   }
-  state.previous = { tip, time };
+  state.previous = { origin, time };
   state.particles = state.particles.filter(p => time - p.born < p.life);
   return state.particles.map(p => {
     const age = time - p.born, progress = age / p.life;

@@ -10,6 +10,7 @@
     --mn-teal: var(--color-forest-light);
     --mn-gold: var(--color-gold);
     --mn-soft-green: var(--mn-mint);
+    --mn-nong-blue: #0088b8;
     color-scheme: light;
     color: var(--mn-text);
   }
@@ -1674,9 +1675,9 @@
   width: 4px;
   height: 4px;
   border-radius: 50%;
-  color: #fff;
+  color: var(--mn-nong-blue);
   background: currentColor;
-  box-shadow: 0 0 7px 2px #afcbdc88;
+  box-shadow: 0 0 7px 2px #0088b866;
   opacity: 0;
   will-change: transform, opacity;
 }
@@ -1685,7 +1686,7 @@
   width: 10px;
   height: 10px;
   border-radius: 0;
-  background: #fff;
+  background: currentColor;
   clip-path: polygon(50% 0, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0 50%, 38% 38%);
   box-shadow: none;
 }

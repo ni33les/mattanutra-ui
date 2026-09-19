@@ -80,7 +80,7 @@ export function usePharmacyAnimation(
       }
       shell.style.transform = `translate3d(${pose.point.x}px, ${pose.point.y}px, 0) translate(-50%, -50%) rotate(${pose.angle}deg) scale(${pose.scale})`;
       activeDust.fill(0);
-      for (const particle of stepMagicDust(dust, pose.tip, elapsed)) {
+      for (const particle of stepMagicDust(dust, pose.point, elapsed)) {
         const index = particle.id % particles.length, element = particles[index];
         activeDust[index] = 1;
         element.style.transform = `translate3d(${particle.point.x}px, ${particle.point.y}px, 0) translate(-50%, -50%) rotate(${particle.angle}deg) scale(${particle.scale})`;
