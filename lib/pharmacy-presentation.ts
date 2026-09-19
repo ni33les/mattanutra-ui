@@ -250,3 +250,33 @@ export function clarityPose(flight: ReturnType<typeof clarityFlight>, time: numb
   return { ...a, time: bounded, point: { x: value(a.point.x,b.point.x), y: value(a.point.y,b.point.y) },
     tip: { x: value(a.tip.x,b.tip.x), y: value(a.tip.y,b.tip.y) }, angle: value(a.angle,b.angle), scale: value(a.scale,b.scale), distance: value(a.distance,b.distance) };
 }
+
+/** Continue the opening choreography on a smooth closed curve, for as long as work takes. */
+export function continuingClarityPose(flight: ReturnType<typeof clarityFlight>, time: number, width: number, height: number, shellSize: number): FlightPose {
+  if (time <= clarityDuration) return clarityPose(flight, time);
+  const start = clarityPose(flight, clarityDuration), elapsed = time - clarityDuration;
+  const blend = smootherStep(elapsed / 1200), phase = elapsed * Math.PI * 2 / 8600;
+  const point = {
+    x: start.point.x + (width / 2 + Math.max(0, width / 2 - shellSize * .7) * Math.sin(phase) - start.point.x) * blend,
+    y: start.point.y + (height / 2 + height * .27 * Math.sin(phase * 2) - start.point.y) * blend,
+  };
+  return withLeafTip({ ...start, time, point, angle: 12 * Math.cos(phase) * blend, scale: 1, moving: true, tap: null }, shellSize);
+}
+
+/** Blend the continuing trajectory into rest: preserve entry velocity, finish with zero velocity. */
+export function landingClarityPose(pose: FlightPose, target: Point, scale: number, shellSize: number, progress: number): FlightPose {
+  const blend = smootherStep(progress);
+  return withLeafTip({ ...pose,
+    point: blend === 1 ? target : { x: pose.point.x + (target.x - pose.point.x) * blend, y: pose.point.y + (target.y - pose.point.y) * blend },
+    angle: pose.angle * (1 - blend), scale: blend === 1 ? scale : pose.scale + (scale - pose.scale) * blend,
+    tap: null, moving: blend < 1,
+  }, shellSize);
+}
+
+function withLeafTip(pose: FlightPose, shellSize: number): FlightPose {
+  const tip = shellSize * .36 * pose.scale, radians = pose.angle * Math.PI / 180;
+  return { ...pose, tip: {
+    x: pose.point.x + tip * (Math.cos(radians) + Math.sin(radians)),
+    y: pose.point.y + tip * (Math.sin(radians) - Math.cos(radians)),
+  } };
+}

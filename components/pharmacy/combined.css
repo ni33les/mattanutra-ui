@@ -1738,7 +1738,15 @@
 #mn-pharmacy-combined .mn-estimate { margin:0 auto 10px; text-align:center; color:var(--mn-muted); }
 #mn-pharmacy-combined .mn-match svg { display:inline-block; vertical-align:middle; margin-right:4px; }
 
-/* The flight finishes independently of generation; settle into honest waiting. */
+/* Work controls landing; the original opening sequence continues into a bounded flight. */
+#mn-pharmacy-combined .mn-flight-layer { position: absolute; inset: 0; z-index: 7; pointer-events: none; }
+#mn-pharmacy-combined .mn-window:is([data-flight="flying"], [data-flight="landing"]) .mn-clarity-logo-shell { opacity: 1; }
+#mn-pharmacy-combined .mn-window:is([data-flight="flying"], [data-flight="landing"]) .mn-brand-mark { opacity: 0; }
+#mn-pharmacy-combined .mn-window:is([data-flight="landed"], [data-flight="stopped"]) .mn-clarity-logo-shell { opacity: 0; transition: none; }
+#mn-pharmacy-combined .mn-window:is([data-flight="flying"], [data-flight="landing"]) .mn-clarity-path,
+#mn-pharmacy-combined .mn-window:is([data-flight="flying"], [data-flight="landing"]) .mn-clarity-path-glow { opacity: .8; }
+#mn-pharmacy-combined .mn-window:is([data-flight="flying"], [data-flight="landing"]) .mn-leading-spark { opacity: 1; }
+@media (prefers-reduced-motion: reduce) { #mn-pharmacy-combined .mn-flight-layer { display: none; } }
 #mn-pharmacy-combined .mn-window[data-phase="waiting"] .mn-rain,
 #mn-pharmacy-combined .mn-window[data-phase="waiting"] .mn-guide-comparing { opacity: 1; }
 #mn-pharmacy-combined .mn-window[data-phase="waiting"] .mn-guide-comparing { transform: translateY(0) scale(1); }

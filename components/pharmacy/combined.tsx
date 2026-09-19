@@ -122,8 +122,8 @@ export function PharmacyCombined({
   const ready = work.ready && order.loaded;
   usePharmacyAnimation(
     root,
-    !ready && !work.failed,
-    Boolean(result),
+    ready,
+    work.failed,
     setAnimatedPhase,
   );
   const phase = pharmacyPresentationPhase({
@@ -201,6 +201,57 @@ export function PharmacyCombined({
         aria-labelledby="mn-combined-title"
         aria-busy={!ready && !work.failed}
       >
+        <div className="mn-flight-layer" aria-hidden="true">
+              <svg
+                className="mn-clarity-orbit"
+                viewBox="0 0 650 360"
+                focusable="false"
+              >
+                <defs>
+                  <linearGradient
+                    id="mn-combined-gradient"
+                    x1="0"
+                    y1="0"
+                    x2="1"
+                    y2="1"
+                  >
+                    <stop
+                      offset="0%"
+                      stopColor="var(--mn-gold-tint)"
+                      stopOpacity="0"
+                    />
+                    <stop
+                      offset="16%"
+                      stopColor="var(--mn-gold-tint)"
+                      stopOpacity=".96"
+                    />
+                    <stop offset="58%" stopColor="var(--mn-gold)" />
+                    <stop
+                      offset="86%"
+                      stopColor="var(--mn-gold-tint)"
+                      stopOpacity=".92"
+                    />
+                    <stop
+                      offset="100%"
+                      stopColor="var(--mn-green)"
+                      stopOpacity=".26"
+                    />
+                  </linearGradient>
+                </defs>
+                <path className="mn-clarity-path-glow" pathLength="100" />
+                <path className="mn-clarity-path" pathLength="100" />
+              </svg>
+              <span className="mn-clarity-logo-shell">
+                <SafeImage
+                  className="mn-clarity-logo"
+                  src="/assets/pharmacy/combined/leaf.webp"
+                  alt=""
+                  width={92}
+                  height={92}
+                />
+                <span className="mn-leading-spark" />
+              </span>
+        </div>
         <div className="mn-top">
           <div className="mn-brand-lockup">
             <SafeImage
@@ -300,45 +351,6 @@ export function PharmacyCombined({
           </div>
           <div className="mn-layer mn-clarity" aria-hidden="true">
             <div className="mn-clarity-visual">
-              <svg
-                className="mn-clarity-orbit"
-                viewBox="0 0 650 360"
-                focusable="false"
-              >
-                <defs>
-                  <linearGradient
-                    id="mn-combined-gradient"
-                    x1="0"
-                    y1="0"
-                    x2="1"
-                    y2="1"
-                  >
-                    <stop
-                      offset="0%"
-                      stopColor="var(--mn-gold-tint)"
-                      stopOpacity="0"
-                    />
-                    <stop
-                      offset="16%"
-                      stopColor="var(--mn-gold-tint)"
-                      stopOpacity=".96"
-                    />
-                    <stop offset="58%" stopColor="var(--mn-gold)" />
-                    <stop
-                      offset="86%"
-                      stopColor="var(--mn-gold-tint)"
-                      stopOpacity=".92"
-                    />
-                    <stop
-                      offset="100%"
-                      stopColor="var(--mn-green)"
-                      stopOpacity=".26"
-                    />
-                  </linearGradient>
-                </defs>
-                <path className="mn-clarity-path-glow" pathLength="100" />
-                <path className="mn-clarity-path" pathLength="100" />
-              </svg>
               {stops.map((stop, i) => (
                 <span
                   key={i}
@@ -401,16 +413,7 @@ export function PharmacyCombined({
                   }
                 />
               ))}
-              <span className="mn-clarity-logo-shell">
-                <SafeImage
-                  className="mn-clarity-logo"
-                  src="/assets/pharmacy/combined/leaf.webp"
-                  alt=""
-                  width={92}
-                  height={92}
-                />
-                <span className="mn-leading-spark" />
-              </span>
+
             </div>
           </div>
           <div className="mn-layer mn-result" aria-hidden={!result}>

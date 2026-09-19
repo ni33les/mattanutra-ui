@@ -1,23 +1,31 @@
 "use client";
-import { useEffect, type RefObject } from "react";
+import { useEffect, useRef, type RefObject } from "react";
 import {
   clarityFlight,
-  clarityPose,
+  continuingClarityPose,
+  landingClarityPose,
   type PharmacyPhase,
   type Point,
 } from "@/lib/pharmacy-presentation";
 
-/** The supplied v2.5 choreography. This clock owns decoration, never work/readiness. */
+/** Decoration follows real readiness; finishing the flight never delays results. */
 export function usePharmacyAnimation(
   root: RefObject<HTMLElement | null>,
-  active: boolean,
-  formulaReady: boolean,
+  ready: boolean,
+  failed: boolean,
   onPhase: (phase: PharmacyPhase) => void,
 ) {
+  const state = useRef({ ready, failed });
+  const wake = useRef<(() => void) | null>(null);
   useEffect(() => {
-    if (!root.current || !active) return;
+    state.current = { ready, failed };
+    wake.current?.();
+  }, [ready, failed]);
+  useEffect(() => {
+    if (!root.current) return;
     const page: HTMLElement = root.current;
     const visual = page.querySelector<HTMLElement>(".mn-clarity-visual")!;
+    const layer = page.querySelector<HTMLElement>(".mn-flight-layer")!;
     const shell = page.querySelector<HTMLElement>(".mn-clarity-logo-shell")!;
     const brand = page.querySelector<HTMLElement>(".mn-brand-mark")!;
     const core = page.querySelector<HTMLElement>(".mn-core")!;
@@ -39,8 +47,12 @@ export function usePharmacyAnimation(
       lastNow = 0,
       lastSpark = 0,
       phase: PharmacyPhase | undefined,
-      ended = formulaReady;
+      ended = false;
     let flight: ReturnType<typeof clarityFlight> | null = null;
+    let origin: Point = { x: 0, y: 0 }, width = 0, height = 0, shellSize = 92;
+    let landingAt: number | null = null;
+    let hasFlown = false;
+    const trail: { tip: Point; time: number }[] = [];
     const triggered = new Set<number>();
     const phaseTo = (next: PharmacyPhase) => {
       if (next !== phase) {
@@ -50,6 +62,9 @@ export function usePharmacyAnimation(
     };
     function measure() {
       const rect = visual.getBoundingClientRect();
+      const parent = page.getBoundingClientRect();
+      origin = { x: rect.left - parent.left, y: rect.top - parent.top };
+      width = rect.width; height = rect.height; shellSize = shell.offsetWidth || 92;
       const point = (el: HTMLElement): Point => {
         const r = el.getBoundingClientRect();
         return {
@@ -62,25 +77,21 @@ export function usePharmacyAnimation(
         height: Math.max(1, rect.height),
         source: point(brand),
         questions: questions.map((el) => {
-        const style = getComputedStyle(el);
-        return { x: parseFloat(style.left), y: parseFloat(style.top) };
-      }),
+          const style = getComputedStyle(el);
+          return { x: parseFloat(style.left), y: parseFloat(style.top) };
+        }),
         core: point(core),
         shellSize: shell.offsetWidth || 92,
       });
-      page
-        .querySelector(".mn-clarity-orbit")!
-        .setAttribute(
-          "viewBox",
-          `0 0 ${rect.width.toFixed(1)} ${rect.height.toFixed(1)}`,
-        );
-      paths.forEach((p) => p.setAttribute("d", flight!.path));
+      const orbit = page.querySelector<SVGElement>(".mn-clarity-orbit")!;
+      orbit.setAttribute("viewBox", `0 0 ${width} ${height}`);
+      Object.assign(orbit.style, { left: `${origin.x}px`, top: `${origin.y}px`, width: `${width}px`, height: `${height}px` });
       finalTap.style.left = `${flight.tapPoints[3].x}px`;
       finalTap.style.top = `${flight.tapPoints[3].y}px`;
     }
     function spark(point: Point, burst = false) {
       // Same lifetime, colour distribution and displacement as the supplied asset.
-      if (visual.querySelectorAll(".mn-flight-spark").length >= 72) return;
+      if (layer.querySelectorAll(".mn-flight-spark").length >= 72) return;
       const node = document.createElement("span"),
         colors = [
           "var(--mn-gold-soft)",
@@ -95,8 +106,8 @@ export function usePharmacyAnimation(
       const angle = Math.random() * Math.PI * 2,
         distance = burst ? 20 + Math.random() * 38 : 7 + Math.random() * 18;
       node.className = "mn-flight-spark";
-      node.style.left = `${point.x + (Math.random() - 0.5) * 8}px`;
-      node.style.top = `${point.y + (Math.random() - 0.5) * 8}px`;
+      node.style.left = `${origin.x + point.x + (Math.random() - 0.5) * 8}px`;
+      node.style.top = `${origin.y + point.y + (Math.random() - 0.5) * 8}px`;
       node.style.setProperty(
         "--spark-size",
         `${burst ? 4 + Math.random() * 6 : 3 + Math.random() * 4}px`,
@@ -113,7 +124,7 @@ export function usePharmacyAnimation(
         "--spark-drift-y",
         `${Math.sin(angle) * distance}px`,
       );
-      visual.appendChild(node);
+      layer.appendChild(node);
       node.addEventListener("animationend", () => node.remove(), {
         once: true,
       });
@@ -136,21 +147,51 @@ export function usePharmacyAnimation(
     function animateFlight(time: number) {
       if (!flight) measure();
       const route = flight!;
-      const pose = clarityPose(route, time);
-      if (pose.tap !== null) tap(pose.tap, route.tapPoints[pose.tap]);
-      shell.style.transform = `translate3d(${pose.point.x}px, ${pose.point.y}px, 0) translate(-50%, -50%) rotate(${pose.angle}deg) scale(${pose.scale})`;
-      const offset = 100 * (1 - pose.distance / (route.distance || 1));
-      paths.forEach((path) => { path.style.strokeDashoffset = String(offset); });
-      if (elapsed - lastSpark >= (pose.moving ? 62 : 112)) {
+      let pose = continuingClarityPose(route, time, width, height, shellSize);
+      if (landingAt !== null) {
+        const r = brand.getBoundingClientRect(), parent = page.getBoundingClientRect();
+        pose = landingClarityPose(pose, { x: r.left + r.width / 2 - parent.left - origin.x, y: r.top + r.height / 2 - parent.top - origin.y }, r.width / shellSize, shellSize, (elapsed - landingAt) / 1200);
+      } else if (pose.tap !== null) tap(pose.tap, route.tapPoints[pose.tap]);
+      shell.style.transform = `translate3d(${origin.x + pose.point.x}px, ${origin.y + pose.point.y}px, 0) translate(-50%, -50%) rotate(${pose.angle}deg) scale(${pose.scale})`;
+      // The trail ends at this frame's actual leaf tip. Storage is bounded even for long waits.
+      trail.push({ tip: pose.tip, time: elapsed });
+      while (trail.length > 56 || (trail.length > 1 && trail[0].time < elapsed - 900)) trail.shift();
+      const pathData = trail.map(({ tip }, i) => `${i ? "L" : "M"} ${tip.x.toFixed(3)} ${tip.y.toFixed(3)}`).join(" ");
+      paths.forEach((path) => { path.setAttribute("d", pathData); path.style.strokeDashoffset = "0"; });
+      if (landingAt === null && elapsed - lastSpark >= (pose.moving ? 62 : 112)) {
         spark(pose.tip);
         lastSpark = elapsed;
       }
+    }
+
+    function rest(status: "landed" | "stopped") {
+      ended = true;
+      page.setAttribute("data-flight", status);
+      bursts.length = 0; trail.length = 0;
+      layer.querySelectorAll(".mn-flight-spark").forEach((n) => n.remove());
+      paths.forEach((path) => path.removeAttribute("d"));
+      const r = brand.getBoundingClientRect(), parent = page.getBoundingClientRect();
+      shell.style.transform = `translate3d(${r.left + r.width / 2 - parent.left}px, ${r.top + r.height / 2 - parent.top}px, 0) translate(-50%, -50%) scale(${r.width / (shell.offsetWidth || 92)})`;
     }
 
     function frame(now: number) {
       if (document.hidden) return;
       if (lastNow) elapsed += Math.min(50, now - lastNow);
       lastNow = now;
+      if (state.current.failed) { rest("stopped"); return; }
+      if (state.current.ready) {
+        if (!hasFlown) { rest("landed"); return; }
+        if (landingAt === null) {
+          landingAt = elapsed;
+          page.setAttribute("data-flight", "landing");
+          bursts.length = 0;
+          layer.querySelectorAll(".mn-flight-spark").forEach((n) => n.remove());
+        }
+        animateFlight(elapsed - 7600);
+        if (elapsed - landingAt >= 1200) { rest("landed"); return; }
+        frameId = requestAnimationFrame(frame);
+        return;
+      }
       tiles.forEach((tile, i) =>
         tile.classList.toggle("is-active", elapsed >= 300 + i * 540),
       );
@@ -159,26 +200,28 @@ export function usePharmacyAnimation(
       else if (elapsed < 7600) phaseTo("rain");
       else if (elapsed < 11710) {
         phaseTo("clarity");
-        animateFlight(elapsed - 7600);
       } else if (elapsed < 13900) {
-        if (!triggered.has(3)) animateFlight(4110);
         phaseTo("selected");
-        page.classList.toggle("is-logo-linger", elapsed < 12330);
       } else phaseTo("matching");
+      if (elapsed >= 7600) {
+        hasFlown = true;
+        page.setAttribute("data-flight", "flying");
+        animateFlight(elapsed - 7600);
+      }
       for (let i = bursts.length - 1; i >= 0; i--)
         if (bursts[i].at <= elapsed) {
           spark(bursts[i].point, true);
           bursts.splice(i, 1);
         }
-      if (elapsed < 16700) frameId = requestAnimationFrame(frame);
-      else {
-        ended = true;
-      }
+      frameId = requestAnimationFrame(frame);
     }
     function visible() {
       page.setAttribute("data-paused", String(document.hidden));
       cancelAnimationFrame(frameId);
       lastNow = 0;
+      if (!state.current.ready && !state.current.failed && ended && !motion.matches) {
+        ended = false; landingAt = null;
+      }
       if (!document.hidden && !ended && !motion.matches)
         frameId = requestAnimationFrame(frame);
     }
@@ -187,38 +230,43 @@ export function usePharmacyAnimation(
       if (motion.matches) {
         tiles.forEach((t) => t.classList.add("is-active"));
         phaseTo("matching");
-        ended = true;
+        rest(state.current.failed ? "stopped" : "landed");
       } else {
         lastNow = 0;
-        ended = formulaReady || elapsed >= 16700;
+        ended = state.current.ready || state.current.failed;
         if (!ended && !document.hidden) frameId = requestAnimationFrame(frame);
       }
     }
     function resized() {
-      flight = null;
+      // Readiness changes layout, not the running flight's coordinate system.
+      // Only a genuine viewport resize requires a new local route.
+      if (flight && Math.abs(visual.getBoundingClientRect().width - width) > 1) {
+        flight = null;
+        trail.length = 0;
+      }
     }
     const observer = new ResizeObserver(resized);
     observer.observe(visual);
     document.addEventListener("visibilitychange", visible);
     motion.addEventListener("change", reduced);
+    wake.current = visible;
     if (motion.matches) reduced();
-    else {
-      if (formulaReady) phaseTo("matching");
-      visible();
-    }
+    else visible();
     return () => {
+      wake.current = null;
       cancelAnimationFrame(frameId);
       observer.disconnect();
       document.removeEventListener("visibilitychange", visible);
       motion.removeEventListener("change", reduced);
       bursts.length = 0;
-      visual.querySelectorAll(".mn-flight-spark").forEach((n) => n.remove());
+      layer.querySelectorAll(".mn-flight-spark").forEach((n) => n.remove());
       shell.style.transform = "translate3d(-9999px,-9999px,0)";
       [...questions, ...taps, core, finalTap].forEach((n) =>
         n.classList.remove("is-resolving", "is-active"),
       );
       page.classList.remove("is-final-tap", "is-logo-linger");
       page.removeAttribute("data-paused");
+      page.removeAttribute("data-flight");
     };
-  }, [root, active, formulaReady, onPhase]);
+  }, [root, onPhase]);
 }
