@@ -64,3 +64,10 @@ test("PHARM-FLIGHT-03 landing starts from the current flight and eases into an e
   assert.equal(pose(1200).scale,38/size);
   assert.ok(Math.hypot(pose(1199).point.x-target.x,pose(1199).point.y-target.y)<.001);
 });
+test("PHARM-FLIGHT-04 waiting flight stays in its visible area when mobile tiles push the original core below the fold",()=>{
+  const flight=route(350);
+  for(let time=5310;time<30000;time+=100){
+    const pose=presentation.continuingClarityPose(flight,time,350,400,82,-500);
+    assert.ok(pose.point.y>-500&&pose.point.y<-100,`y=${pose.point.y}`);
+  }
+});

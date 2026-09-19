@@ -52,6 +52,10 @@ test("PHARM-MOTION pending work keeps flying after the final tap until real resu
   const position=await page.locator(".mn-clarity-logo-shell").evaluate(el=>getComputedStyle(el).transform);
   await page.clock.runFor(20000);
   expect(await page.locator(".mn-clarity-logo-shell").evaluate(el=>getComputedStyle(el).transform)).not.toBe(position);
+  const bounds=await page.locator(".mn-clarity-logo-shell").boundingBox();
+  expect(bounds).not.toBeNull();
+  expect(bounds!.y).toBeGreaterThan(0);
+  expect(bounds!.y+bounds!.height).toBeLessThan(900);
   await expect(page.locator(".mn-status")).toContainText("Still preparing");
   await expect(page.getByTestId("pharmacy-order")).toHaveCount(0);
   await expect(page.locator(".mn-nutrient")).toHaveCount(0);

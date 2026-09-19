@@ -20,7 +20,7 @@
     },
     {
       "file": "test/pharmacy-animation/motion.test.ts",
-      "expectedCases": 6,
+      "expectedCases": 7,
       "reason": "Original exact motion plus continuous bounded waiting flight and velocity-preserving landing"
     }
   ],
