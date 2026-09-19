@@ -28,10 +28,7 @@ import {
 } from "@/lib/product-recommendations";
 import { warmLiveRetailSnapshot } from "@/lib/agentic/catalogue/live";
 import { warmSupplementEffectiveAvailability } from "@/lib/supplement-country-availability";
-import {
-  defaultProductCountryCode,
-  normalizeProductCountryCode
-} from "@/lib/product-countries";
+import { productCountryCodeFromAnswers } from "@/lib/pharmacy-in-store";
 import {
   loadProductRecommendationFreshnessSnapshot
 } from "@/lib/product-recommendation-freshness";
@@ -471,14 +468,7 @@ export async function enqueueAssessmentPregenerationTasks({
     return null;
   }
 
-  const answerRecord =
-    answers && typeof answers === "object" && !Array.isArray(answers)
-      ? (answers as Record<string, unknown>)
-      : {};
-  const catalogueCountry =
-    normalizeProductCountryCode(
-      typeof answerRecord.country === "string" ? answerRecord.country : null
-    ) ?? defaultProductCountryCode;
+  const catalogueCountry = productCountryCodeFromAnswers(answers);
 
   const warm = () => {
     void warmLiveRetailSnapshot(catalogueCountry).catch(() => undefined);

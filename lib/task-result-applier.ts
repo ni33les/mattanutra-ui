@@ -15,10 +15,7 @@ import {
 } from "@/lib/communications";
 import { getSql } from "@/lib/db";
 import { appendAssessmentVersion } from "@/lib/domain-versions";
-import {
-  defaultProductCountryCode,
-  normalizeProductCountryCode
-} from "@/lib/product-countries";
+import { productCountryCodeFromAnswers } from "@/lib/pharmacy-in-store";
 import type {
   ProductSnapshot,
   MarketplaceSearchDiagnostic
@@ -2120,12 +2117,12 @@ export async function prepareTaskCompletionResult({ task, resultPayload, sql: sq
     return { food: { value, json: JSON.stringify(toJsonValue(value)), locale, afterCommit: effects } };
   }
   let locale: Locale = generation?.locale ?? "en";
-  let country = generation?.answers.country;
+  let countryCode = productCountryCodeFromAnswers(generation?.answers);
   if (!generation && task.planId) {
     const sql = getSql();
     if (!sql) throw new Error("Database is not configured");
-    const [row] = await sql`select locale, answers ->> 'country' as country from public.assessments where plan_id = ${task.planId}::uuid`;
-    locale = isLocale(row?.locale) ? row.locale : "en"; country = row?.country;
+    const [row] = await sql`select locale, answers from public.assessments where plan_id = ${task.planId}::uuid`;
+    locale = isLocale(row?.locale) ? row.locale : "en"; countryCode = productCountryCodeFromAnswers(row?.answers);
   }
   if (task.taskType === "analyze_healthscore") {
     const score = objectValue(resultPayload).healthScore;
@@ -2160,7 +2157,7 @@ export async function prepareTaskCompletionResult({ task, resultPayload, sql: sq
   const selected = variants.find(item => item.stackPreference === stackPreference) ?? variants.find(item => item.stackPreference === "balanced") ?? variants[0];
   const configured = discovery.diagnostics.filter(item => item.configured).length;
   const found = discovery.diagnostics.reduce((total, item) => total + item.resultCount, 0);
-  return { products: { variants, selected, discovery, locale, decisionTableAvailable, configuredAdapters: configured, countryCode: normalizeProductCountryCode(country) ?? defaultProductCountryCode,
+  return { products: { variants, selected, discovery, locale, decisionTableAvailable, configuredAdapters: configured, countryCode,
     discoveryNotes: !discovery.diagnostics.length ? "Matched against the approved curated product catalogue." : !configured ? "Product discovery adapters are not configured." : `Product discovery returned ${found} products.`,
     legacyJson: JSON.stringify(toJsonValue(selected?.result.recommendations.map(item => toRecommendedProduct(item, selected.result.stackCoveragePercent, selected.runId, locale)) ?? [])) } };
 }

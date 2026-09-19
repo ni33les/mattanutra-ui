@@ -1,3 +1,4 @@
+import { defaultProductCountryCode, normalizeProductCountryCode } from "@/lib/product-countries";
 import type { PharmacyAcquisition } from "@/lib/pharmacy-acquisition";
 import { pharmacyAnalysisPolicy } from "@/lib/pharmacy-journey";
 import { FunnelError } from "@/lib/funnel-errors";
@@ -62,6 +63,15 @@ export function inStorePharmacyFromAnswers(
     name: typeof record.name === "string" ? record.name : "",
     slug
   };
+}
+
+/** Pharmacy purchases use the shop's market; residence remains health context. */
+export function productCountryCodeFromAnswers(answers: unknown) {
+  const pharmacy = inStorePharmacyFromAnswers(answers);
+  const record = answers && typeof answers === "object" && !Array.isArray(answers)
+    ? answers as Record<string, unknown> : {};
+  return normalizeProductCountryCode(pharmacy?.countryCode) ??
+    normalizeProductCountryCode(record.country) ?? defaultProductCountryCode;
 }
 
 export function assessmentSkipsHealthScore(answers: unknown) {

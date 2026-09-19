@@ -4,10 +4,7 @@ import type {
   ProductRecommendationRefreshReason,
   ProductStackPreference
 } from "@/lib/formulation-types";
-import {
-  defaultProductCountryCode,
-  normalizeProductCountryCode
-} from "@/lib/product-countries";
+import { productCountryCodeFromAnswers } from "@/lib/pharmacy-in-store";
 
 export const PRODUCT_RECOMMENDATION_FRESHNESS_MS = 24 * 60 * 60 * 1000;
 
@@ -31,12 +28,6 @@ export type ProductRecommendationFreshnessSnapshot = Readonly<{
   stockOrAllocationUpdatedAt: string | null;
   supplementGovernanceUpdatedAt: string | null;
 }>;
-
-function payloadRecord(value: unknown) {
-  return value && typeof value === "object" && !Array.isArray(value)
-    ? value as Record<string, unknown>
-    : {};
-}
 
 function dateMs(value: string | Date | null | undefined) {
   if (!value) {
@@ -98,12 +89,6 @@ export function productRecommendationRefreshReason(input: Readonly<{
   return null;
 }
 
-function countryCodeFromAnswers(value: unknown) {
-  const record = payloadRecord(value);
-
-  return normalizeProductCountryCode(record.country) ?? defaultProductCountryCode;
-}
-
 export async function loadProductRecommendationFreshnessSnapshot(
   sql: ProductRecommendationFreshnessDb,
   input: Readonly<{
@@ -125,7 +110,7 @@ export async function loadProductRecommendationFreshnessSnapshot(
     return null;
   }
 
-  const countryCode = countryCodeFromAnswers(assessment.answers);
+  const countryCode = productCountryCodeFromAnswers(assessment.answers);
   const rows = await sql<Array<{
     formulation_generated_at: string | null;
     formulation_version: number | string | null;
@@ -266,6 +251,7 @@ export async function loadProductRecommendationFreshnessSnapshot(
       from public.product_recommendation_runs
       where catalogue_revision = (select revision from public.catalogue_runtime_revision where singleton=true)
         and plan_id = ${input.planId}::uuid
+        and (market_region is null or market_region = ${countryCode})
         and selection_revision = coalesce((select revision from public.assessment_product_preferences where plan_id = ${input.planId}::uuid), 0)
         and assessment_revision = (select input_revision from public.assessments where plan_id = ${input.planId}::uuid)
         and generation_locale = coalesce(${generationLocale(input.planId)}, (select locale from public.assessments where plan_id = ${input.planId}::uuid))

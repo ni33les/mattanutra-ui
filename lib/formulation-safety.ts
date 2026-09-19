@@ -1,3 +1,4 @@
+import { productCountryCodeFromAnswers } from "@/lib/pharmacy-in-store";
 import { joinedAdviceMessage, webHealthAdvice } from "@/lib/web-health-advice";
 import type { AssessmentPlan } from "@/lib/assessment-snapshot";
 import { writeBpmEvent } from "@/lib/bpm";
@@ -185,9 +186,7 @@ function countryCodeFromSafetyInput(input: SafetyInput) {
     return normalizeProductCountryCode(input.countryCode) ?? defaultProductCountryCode;
   }
 
-  const answers = isRecord(input.answers) ? input.answers : {};
-
-  return normalizeProductCountryCode(answers.country) ?? defaultProductCountryCode;
+  return productCountryCodeFromAnswers(input.answers);
 }
 
 async function loadSupplementLookup(sql: TaskServiceDb, countryCode: string) {

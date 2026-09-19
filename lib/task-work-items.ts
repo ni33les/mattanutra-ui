@@ -53,10 +53,9 @@ import {
   ADMIN_CATALOGUE_OPTIMIZATION_TASK_TYPE
 } from "@/lib/admin-catalogue-optimization-jobs";
 import { kidneyAnswerToConditionCode } from "@/lib/matcher/condition-ceilings";
-import { inStorePharmacyFromAnswers } from "@/lib/pharmacy-in-store";
+import { inStorePharmacyFromAnswers, productCountryCodeFromAnswers } from "@/lib/pharmacy-in-store";
 import {
-  defaultProductCountryCode,
-  normalizeProductCountryCode
+  defaultProductCountryCode
 } from "@/lib/product-countries";
 import {
   enrichProductNeedsWithAvailabilityLookup,
@@ -474,12 +473,6 @@ function productClientSexFromAnswers(value: unknown): ProductClientSex | null {
   const record = payloadRecord(value);
 
   return assessmentFieldKnown(record, "sex") && (record.sex === "female" || record.sex === "male") ? record.sex : null;
-}
-
-function productCountryCodeFromAnswers(value: unknown) {
-  const record = payloadRecord(value);
-
-  return normalizeProductCountryCode(record.country) ?? defaultProductCountryCode;
 }
 
 function textFromRecord(record: Record<string, unknown>, key: string) {
