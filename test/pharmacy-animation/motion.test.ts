@@ -26,7 +26,7 @@ test("PHARM-MOTION-02 takeoff begins at the logo and the same smooth path closes
   }
   assert.ok(flight.samples.length<=769);
 });
-test("PHARM-MOTION-03 magic dust emits at the leaf tip, drifts and fades independently of frame rate with bounded particles", () => {
+test("PHARM-MOTION-03 magic dust emits at the supplied origin, drifts and fades independently of frame rate with bounded particles", () => {
   assert.equal(typeof motion.createMagicDust, "function");
   const snapshots: { id:number; born:number; origin:motion.Point }[][]=[];
   for(const step of [8,16,33]){
@@ -34,24 +34,28 @@ test("PHARM-MOTION-03 magic dust emits at the leaf tip, drifts and fades indepen
     for(let time=0;time<6000;time+=step){
       const frames=motion.stepMagicDust(state,{x:time/10,y:time/20},time);
       assert.ok(frames.length<=96);assert.ok(state.particles.length<=96);
+      assert.equal(new Set(frames.map(p=>p.id % motion.MAGIC_DUST_CAPACITY)).size,frames.length,"Live dust must never reuse an occupied render slot");
       for(const frame of frames){assert.ok(frame.opacity>=0&&frame.opacity<=1);assert.ok(Number.isFinite(frame.point.x+frame.point.y+frame.scale+frame.angle));}
       if(time>2000)assert.ok(frames.filter(f=>f.opacity>.05).length>=50);
     }
     motion.stepMagicDust(state,{x:600,y:300},6000);
     snapshots.push(state.particles.map(p=>({id:p.id,born:p.born,origin:p.origin})));
     for(const p of state.particles){assert.ok(Math.abs(p.origin.x-p.born/10)<.00001);assert.ok(Math.abs(p.origin.y-p.born/20)<.00001);}
-    assert.deepEqual(motion.stepMagicDust(state,{x:600,y:300},8000,false),[]);
+    assert.deepEqual(motion.stepMagicDust(state,{x:600,y:300},8400,false),[]);
     assert.equal(state.particles.length,0);
   }
   for(const sample of snapshots.slice(1))assert.deepEqual(sample.map(p=>[p.id,p.born]),snapshots[0].map(p=>[p.id,p.born]));
   const state=motion.createMagicDust();
   const birth=motion.stepMagicDust(state,{x:10,y:20},0)[0];assert.deepEqual(birth.point,{x:10,y:20});
   assert.equal(birth.opacity,0);
-  assert.ok(motion.stepMagicDust(state,{x:10,y:20},16,false)[0].opacity>.5, "Fresh dust stays visible near the leaf during takeoff");
+  assert.ok(motion.stepMagicDust(state,{x:10,y:20},16,false)[0].opacity>.5, "Fresh dust stays visible near the icon during takeoff");
   const bright=motion.stepMagicDust(state,{x:10,y:20},200,false)[0];
   const fading=motion.stepMagicDust(state,{x:10,y:20},1300,false)[0];
   assert.ok(bright.opacity>.3);assert.ok(fading.opacity<bright.opacity);
   assert.ok(Math.hypot(fading.point.x-10,fading.point.y-20)>4);
+  const extended=motion.stepMagicDust(state,{x:10,y:20},1500,false);
+  assert.ok(extended.length===1&&extended[0].opacity>0,"Dust remains visible beyond the former 1.4-second minimum lifetime");
+  assert.deepEqual(motion.stepMagicDust(state,{x:10,y:20},2300,false),[],"Longer dust still expires promptly");
 });
 test("PHARM-FLIGHT-01 movement continues for as long as processing takes without a second routine",()=>{
   const flight=motion.butterflyFlight(area());
@@ -60,7 +64,7 @@ test("PHARM-FLIGHT-01 movement continues for as long as processing takes without
     assert.ok(Math.hypot(a.point.x-b.point.x,a.point.y-b.point.y)>10);
   }
 });
-test("PHARM-FLIGHT-02 banking and subtle flutter keep the dust emission point attached exactly",()=>{
+test("PHARM-FLIGHT-02 banking and subtle flutter preserve the original sprite geometry",()=>{
   const flight=motion.butterflyFlight(area());
   for(let time=0;time<30000;time+=23){
     const pose=motion.butterflyPose(flight,time),offset=flight.shellSize*.36*pose.scale,radians=pose.angle*Math.PI/180;

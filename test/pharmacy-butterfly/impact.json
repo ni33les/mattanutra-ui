@@ -1,32 +1,18 @@
 {
-  "releaseBase": "48718f39cbc1598d610d52c51d65250620bc507d",
-  "scope": "pharmacy_stardust_and_questionnaire_transitions",
+  "releaseBase": "d16ec25222b23d281b9e5f5271bae92dbd4c3e0c",
+  "scope": "pharmacy_blue_centred_stardust",
   "inputs": [
     "test/helpers/pharmacy-fixture.ts",
     "test/pharmacy-reveal/combined-reference.json",
     "test/pharmacy-reveal/combined-reference.html",
-    "public/assets/pharmacy/combined/leaf.webp"
+    "public/assets/pharmacy/combined/leaf.webp",
+    "public/assets/library/nong/nong-thinking.webp"
   ],
   "files": [
     {
-      "file": "test/pharmacy-reveal/combined-state.test.ts",
-      "expectedCases": 8,
-      "reason": "Real readiness preempts decoration; exhausted presentation settles without fabricating readiness"
-    },
-    {
-      "file": "test/pharmacy-reveal/progress-presentation.test.ts",
-      "expectedCases": 9,
-      "reason": "Preserve attachment assets and scoped layout, localized content and reduced-motion handling; original curve geometry remains historical evidence"
-    },
-    {
       "file": "test/pharmacy-animation/motion.test.ts",
       "expectedCases": 7,
-      "reason": "One smooth trajectory, bounded magic dust independent of frame rate, exact landing and bounded visible motion"
-    },
-    {
-      "file": "test/questionnaire-v14-static.test.ts",
-      "expectedCases": 15,
-      "reason": "Existing shared questionnaire chrome, stage timings, first-question rendering, review and localized copy remain compatible with the transition fix"
+      "reason": "Longer frame-independent dust lifetime with bounded live slots, preserved smooth flight and exact landing"
     }
   ],
   "browser": [
@@ -34,19 +20,7 @@
       "file": "test/e2e/pharmacy-animation.spec.ts",
       "expectedCases": 7,
       "grep": "PHARM-MOTION|PHARM-FLIGHT",
-      "reason": "One trajectory across former phase times; soft dust instead of a line, real frames, readiness landing and cancellation"
-    },
-    {
-      "file": "test/e2e/pharmacy-combined.spec.ts",
-      "expectedCases": 5,
-      "grep": "PHARM-COMBINE (saved formula|completion before|no replay|1280px real|390px real)",
-      "reason": "Immediate formula/results, no replay, preserved rain and responsive structure, single flight instead of timed taps"
-    },
-    {
-      "file": "test/e2e/questionnaire-transition.spec.ts",
-      "expectedCases": 3,
-      "grep": "QUIZ-MOTION",
-      "reason": "Section overlays uncover settled questions; no competing scrolls, preserved focus, reduced motion and localized ordinary/pharmacy flow"
+      "reason": "Nong-blue stars emitted at the icon centre, consistent visible density, mobile frame rate, readiness landing and cleanup"
     }
   ]
 }

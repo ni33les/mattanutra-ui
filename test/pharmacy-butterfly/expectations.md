@@ -30,3 +30,11 @@ Clarification: the unwanted “target” is the bright glint at the head of the 
 The first integrated browser run exposed slow frames (89/3 s) and a test-clock mismatch: Playwright's virtual JavaScript clock does not advance CSS entrances. Section tests now observe the real overlay/entrance timelines, require the new question within 1 s while the 1.8 s overlay is still visible, and retain stable-position/focus/no-scroll assertions. The frame-rate requirement is unchanged.
 
 The denser trail now uses one inexpensive soft glow and no per-star filter. A bounded 3-second rendering comparison recorded 134 frames with the initial filters, 148 without per-star filters, and 154 with one soft glow (diagnostic, not an acceptance substitute). Live particles are also updated once per frame instead of first being hidden and then shown. Existing frame-rate, attachment and cleanup assertions remain intact.
+
+## Nong-blue centred sparkles
+
+The requested follow-up changes the dust only: Nong's blue (`#0088b8`, sampled from the original mascot), a slightly longer fade, and emission from the icon centre rather than its tip. The 96-element pool, flight geometry, real-time frame-rate requirement and readiness landing stay unchanged.
+
+PHARM-MOTION-03 requires the first particle to remain visible after 1.5 seconds, eventual expiry, frame-independent births and no live modulo-slot collisions. Browser measurements now compare dust with the rendered icon centre and check both star colour and fill. The selected inventory is the seven motion and seven browser cases; unrelated questionnaire/card cases are preserved without rerunning them. Historical expectation changes and evidence above remain intact.
+
+RED evidence against d16ec252 is retained at `/root/.codex/deploy/pharmacy-blue-dust-20260919/red-node` and `red-browser`: the old minimum lifetime expires too soon, stars are white and their rendered origin is offset from the icon centre.
