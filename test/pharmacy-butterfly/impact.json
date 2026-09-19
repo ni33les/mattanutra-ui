@@ -5,7 +5,10 @@
     "test/helpers/pharmacy-fixture.ts",
     "test/pharmacy-reveal/combined-reference.json",
     "test/pharmacy-reveal/combined-reference.html",
-    "public/assets/pharmacy/combined/leaf.webp"
+    "public/assets/pharmacy/combined/leaf.webp",
+    "public/assets/pharmacy/combined/nong-thinking-empty.webp",
+    "public/assets/pharmacy/combined/nong-comparing-empty.webp",
+    "public/assets/pharmacy/combined/nong-energetic-empty.webp"
   ],
   "files": [
     {

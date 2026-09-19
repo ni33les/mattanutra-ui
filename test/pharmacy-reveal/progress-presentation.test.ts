@@ -93,7 +93,9 @@ test("PHARM-WAIT-01 frozen reference and exact existing Nong/leaf bytes are pres
   for (const [digest, path] of Object.entries(manifest.assetHashes))
     assert.equal(hash(readFileSync(`public${path}`)), digest);
   const view = markup();
-  assert.match(view, /nong-energetic.webp/);
+  for (const pose of ["thinking", "comparing", "energetic"]) {
+    assert.ok(view.includes(`/assets/pharmacy/combined/nong-${pose}-empty.webp`));
+  }
   assert.match(view, /combined\/leaf.webp/);
 });
 for (const width of [1280, 390])

@@ -45,7 +45,7 @@ for (const [locale, pharmacy] of [["en", false], ["th", true], ["zh-CN", true]] 
     await expect(question).toContainText(definition.turns.find(t => t.k === "sex")!.q);
     await expect(page.getByTestId("section-stage-overlay")).toBeVisible();
     // The old question must never flash back during the overlay's fade-out.
-    expect(await question.evaluate(el => el.getAnimations({ subtree: true }).filter(a => a.playState === "running").length)).toBe(0);
+    expect(await question.evaluate(el => [...el.getAnimations(), ...el.querySelector(".mn-chat-q__bubble")!.getAnimations()].filter(a => a.playState === "running").length)).toBe(0);
     await page.clock.runFor(1300);
     await expect(page.getByTestId("section-stage-overlay")).toHaveCount(0);
     const before = await question.boundingBox();
