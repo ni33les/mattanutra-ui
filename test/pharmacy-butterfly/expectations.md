@@ -46,3 +46,7 @@ The user replaces the body logo/wordmark and return-to-logo landing with an offs
 PHARM-MOTION-02 now starts beyond the left edge; PHARM-FLIGHT-03 verifies smooth exit to the right. Browser motion and fast-completion cases replace the intentional stationary-logo endpoint with offscreen/hidden and no-body-brand assertions. PHARM-WAIT-02 retains the historical reference geometry using the existing animated-shell anchor, without depending on the deliberately removed static logo. Historical references and prices are unchanged.
 
 RED evidence is retained against 8014c79c in `/root/.codex/deploy/pharmacy-offscreen-20260919/red-node` and `red-browser`. The baseline still renders the duplicate body brand and starts its sprite inside the page.
+
+## More prominent pharmacy ingredient cards
+
+CSS-only follow-up: wider ingredient group, larger names/doses, a stronger section heading and white cards with forest-green borders. The four-column desktop/two-column mobile structure is retained. No functional expectations or test cases change. Existing presentation and completed-reload tests are selected, with mobile/desktop before-and-after visual review; unrelated motion, matching and commerce suites are not rerun.

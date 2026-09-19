@@ -667,7 +667,7 @@
   }
 
   #mn-pharmacy-combined .mn-selected-wrap {
-    width: min(100%, 650px);
+    width: min(100%, 960px);
     margin: 0 auto;
     transform: translateY(105px);
     transition: transform 650ms ease;
@@ -679,9 +679,11 @@
   }
 
   #mn-pharmacy-combined .mn-selected-label {
-    margin: 0 0 12px;
+    margin: 0 0 20px;
     color: var(--mn-green);
-    font-weight: 500;
+    font-size: clamp(22px, 2.4vw, 30px);
+    font-weight: 700;
+    line-height: 1.25;
     text-align: center;
   }
 
@@ -694,17 +696,22 @@
   #mn-pharmacy-combined .mn-selected-grid {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 9px;
+    gap: 14px;
   }
 
   #mn-pharmacy-combined .mn-nutrient {
-    min-height: 76px;
-    padding: 14px 10px;
+    min-width: 0;
+    min-height: 112px;
+    padding: 20px 16px;
     display: grid;
     place-content: center;
-    border-radius: 14px;
-    background: var(--mn-soft-green);
+    border: 1px solid color-mix(in srgb, var(--mn-green) 30%, transparent);
+    border-top: 4px solid var(--mn-green);
+    border-radius: 16px;
+    background: var(--mn-surface);
+    box-shadow: 0 6px 18px color-mix(in srgb, var(--mn-text) 7%, transparent);
     text-align: center;
+    overflow-wrap: anywhere;
     opacity: 0;
     transform: translate(var(--from-x, 0), var(--from-y, 12px)) scale(0.78);
   }
@@ -740,9 +747,19 @@
     display: block;
   }
 
+  #mn-pharmacy-combined .mn-nutrient strong {
+    color: var(--mn-text);
+    font-size: clamp(18px, 1.6vw, 22px);
+    font-weight: 750;
+    line-height: 1.3;
+  }
+
   #mn-pharmacy-combined .mn-nutrient span {
-    margin-top: 2px;
-    color: var(--mn-muted);
+    margin-top: 8px;
+    color: var(--mn-green);
+    font-size: 16px;
+    font-weight: 600;
+    line-height: 1.4;
   }
 
   @keyframes mn-pharmacy-combined-arrive {
@@ -1473,12 +1490,12 @@
 
     #mn-pharmacy-combined .mn-selected-grid {
       grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 7px;
+      gap: 10px;
     }
 
     #mn-pharmacy-combined .mn-nutrient {
-      min-height: 72px;
-      padding: 12px 8px;
+      min-height: 104px;
+      padding: 16px 10px;
     }
 
     #mn-pharmacy-combined .mn-nutrient:nth-child(odd) { --from-x: 54px; }
