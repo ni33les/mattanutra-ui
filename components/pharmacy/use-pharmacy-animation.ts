@@ -31,6 +31,7 @@ export function usePharmacyAnimation(
     const shell = page.querySelector<HTMLElement>(".mn-clarity-logo-shell")!;
     const brand = page.querySelector<HTMLElement>(".mn-brand-mark")!;
     const particles = [...page.querySelectorAll<HTMLElement>(".mn-dust-particle")];
+    const activeDust = new Uint8Array(particles.length);
     const tiles = [...page.querySelectorAll<HTMLElement>(".mn-analysis-tile")];
     const analysis = page.querySelector<HTMLElement>(".mn-analysis")!;
     const motion = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -78,12 +79,17 @@ export function usePharmacyAnimation(
         fade = 1 - smootherStep(progress);
       }
       shell.style.transform = `translate3d(${pose.point.x}px, ${pose.point.y}px, 0) translate(-50%, -50%) rotate(${pose.angle}deg) scale(${pose.scale})`;
-      particles.forEach(element => { element.style.opacity = "0"; });
+      activeDust.fill(0);
       for (const particle of stepMagicDust(dust, pose.tip, elapsed)) {
-        const element = particles[particle.id % particles.length];
+        const index = particle.id % particles.length, element = particles[index];
+        activeDust[index] = 1;
         element.style.transform = `translate3d(${particle.point.x}px, ${particle.point.y}px, 0) translate(-50%, -50%) rotate(${particle.angle}deg) scale(${particle.scale})`;
         element.style.opacity = String(particle.opacity * fade);
       }
+      // Only expire unused slots; don't hide and immediately repaint live dust.
+      particles.forEach((element, index) => {
+        if (!activeDust[index] && element.style.opacity !== "0") element.style.opacity = "0";
+      });
     }
     function rest(status: "landed" | "stopped") {
       ended = true;

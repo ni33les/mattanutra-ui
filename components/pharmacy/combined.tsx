@@ -217,7 +217,6 @@ export function PharmacyCombined({
                   width={92}
                   height={92}
                 />
-                <span className="mn-leading-spark" />
               </span>
         </div>
         <div className="mn-top">
@@ -251,7 +250,7 @@ export function PharmacyCombined({
               <SafeImage
                 key={pose}
                 className={`mn-guide-${pose}`}
-                src={`/assets/pharmacy/combined/nong-${pose === "celebrate" ? "energetic" : pose}-empty.webp`}
+                src={`/assets/library/nong/nong-${pose === "celebrate" ? "energetic" : pose}.webp`}
                 alt=""
                 width={74}
                 height={78}

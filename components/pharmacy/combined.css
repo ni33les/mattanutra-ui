@@ -520,42 +520,6 @@
     opacity: 1;
   }
 
-  #mn-pharmacy-combined .mn-leading-spark {
-    width: 18px;
-    height: 18px;
-    position: absolute;
-    left: 86%;
-    top: 14%;
-    z-index: 7;
-    border-radius: 50%;
-    background: radial-gradient(circle, #ffffff 0 16%, #fff 20% 35%, #d7e8ef 48%, transparent 72%);
-    opacity: 0;
-    transform: translate(-50%, -50%);
-    transform-origin: center;
-    will-change: opacity, filter;
-    filter: drop-shadow(0 0 7px #fff) drop-shadow(0 0 15px #a5c9d9);
-  }
-
-  #mn-pharmacy-combined .mn-leading-spark::before,
-  #mn-pharmacy-combined .mn-leading-spark::after {
-    content: "";
-    position: absolute;
-    left: 50%;
-    top: 50%;
-    background: #fff;
-    border-radius: 999px;
-    transform: translate(-50%, -50%);
-  }
-
-  #mn-pharmacy-combined .mn-leading-spark::before { width: 30px; height: 2px; }
-  #mn-pharmacy-combined .mn-leading-spark::after { width: 2px; height: 30px; }
-
-  #mn-pharmacy-combined .mn-window[data-phase="clarity"] .mn-leading-spark,
-  #mn-pharmacy-combined .mn-window[data-phase="selected"].is-logo-linger .mn-leading-spark {
-    opacity: 1;
-    animation: mn-pharmacy-combined-leading-twinkle 560ms ease-in-out infinite alternate;
-  }
-
   #mn-pharmacy-combined .mn-flight-spark {
     --spark-color: #ffd66b;
     width: var(--spark-size, 5px);
@@ -703,11 +667,6 @@
   @keyframes mn-pharmacy-combined-logo-aura {
     from { opacity: .46; transform: translate(-50%, -50%) scale(.88); }
     to { opacity: .92; transform: translate(-50%, -50%) scale(1.12); }
-  }
-
-  @keyframes mn-pharmacy-combined-leading-twinkle {
-    from { filter: drop-shadow(0 0 5px #fff4c9) drop-shadow(0 0 11px var(--mn-gold)); }
-    to { filter: drop-shadow(0 0 9px #fff4c9) drop-shadow(0 0 22px var(--mn-gold)); }
   }
 
   @keyframes mn-pharmacy-combined-flight-spark {
@@ -1651,7 +1610,6 @@
     #mn-pharmacy-combined .mn-rain-chip,
     #mn-pharmacy-combined .mn-nutrient,
     #mn-pharmacy-combined .mn-clarity-logo-shell,
-    #mn-pharmacy-combined .mn-leading-spark,
     #mn-pharmacy-combined .mn-flight-spark,
     #mn-pharmacy-combined .mn-clarity-particle,
     #mn-pharmacy-combined .mn-clarity-question,
@@ -1696,9 +1654,7 @@
 #mn-pharmacy-combined .mn-window:is([data-flight="flying"], [data-flight="landing"]) .mn-clarity-logo-shell { opacity: 1; }
 #mn-pharmacy-combined .mn-window:is([data-flight="flying"], [data-flight="landing"]) .mn-brand-mark { opacity: 0; }
 #mn-pharmacy-combined .mn-window:is([data-flight="landed"], [data-flight="stopped"]) .mn-clarity-logo-shell { opacity: 0; transition: none; }
-#mn-pharmacy-combined .mn-window:is([data-flight="flying"], [data-flight="landing"]) .mn-leading-spark { opacity: 1; }
 #mn-pharmacy-combined .mn-window[data-flight] .mn-brand-lockup,
-#mn-pharmacy-combined .mn-flight-layer .mn-leading-spark,
 #mn-pharmacy-combined .mn-flight-layer .mn-clarity-logo-shell::before { animation: none; }
 @media (prefers-reduced-motion: reduce) { #mn-pharmacy-combined .mn-flight-layer { display: none; } }
 #mn-pharmacy-combined .mn-window[data-phase="waiting"] .mn-rain,
@@ -1720,7 +1676,7 @@
   border-radius: 50%;
   color: #fff;
   background: currentColor;
-  box-shadow: 0 0 5px 2px #fff9, 0 0 9px 3px #779baf55;
+  box-shadow: 0 0 7px 2px #afcbdc88;
   opacity: 0;
   will-change: transform, opacity;
 }
@@ -1732,5 +1688,4 @@
   background: #fff;
   clip-path: polygon(50% 0, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0 50%, 38% 38%);
   box-shadow: none;
-  filter: drop-shadow(0 0 2px #779baf99);
 }
