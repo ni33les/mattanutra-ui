@@ -1,5 +1,5 @@
 {
-  "releaseBase": "0c5d22709fb7654139215c731c35d4f1a127633e",
+  "releaseBase": "48718f39cbc1598d610d52c51d65250620bc507d",
   "scope": "pharmacy_single_butterfly_flight",
   "inputs": [
     "test/helpers/pharmacy-fixture.ts",
@@ -36,6 +36,12 @@
       "expectedCases": 5,
       "grep": "PHARM-COMBINE (saved formula|completion before|no replay|1280px real|390px real)",
       "reason": "Immediate formula/results, no replay, preserved rain and responsive structure, single flight instead of timed taps"
+    },
+    {
+      "file": "test/e2e/questionnaire-transition.spec.ts",
+      "expectedCases": 3,
+      "grep": "QUIZ-MOTION",
+      "reason": "Section overlays uncover settled questions; no competing scrolls, preserved focus, reduced motion and localized ordinary/pharmacy flow"
     }
   ]
 }

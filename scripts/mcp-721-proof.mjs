@@ -17,7 +17,7 @@ export function verifyVersionExpectationEdit(before, after) {
   assert.equal(after, before.replaceAll(original, replacement), "Unexpected behavioral test change");
 }
 export const MCP_PACKAGES = {
-  "pharmacy-butterfly": { version: "11.1.0", directory: "test/pharmacy-butterfly", base: "0c5d22709fb7654139215c731c35d4f1a127633e", scope: "pharmacy_single_butterfly_flight" },
+  "pharmacy-butterfly": { version: "11.1.0", directory: "test/pharmacy-butterfly", base: "48718f39cbc1598d610d52c51d65250620bc507d", scope: "pharmacy_single_butterfly_flight" },
   "pharmacy-flight": { version: "11.1.0", directory: "test/pharmacy-flight", base: "9e3773365e21066dd50c2a55d57896efc518b92b", scope: "pharmacy_readiness_driven_flight" },
   "pharmacy-followup": { version: "11.1.0", directory: "test/pharmacy-followup", base: "272f014356a8ed1ce7804ac297c800782611df03", scope: "pharmacy_market_and_reveal_followup" },
   "pharmacy-line": { version: "11.1.0", directory: "test/pharmacy-line", base: "de6aab700acd4bc022ba357911b39666a411dac8", scope: "pharmacy_line_plan_delivery" },

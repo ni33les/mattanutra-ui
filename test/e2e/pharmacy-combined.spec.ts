@@ -213,6 +213,9 @@ test("PHARM-COMBINE no replay control; reload preserves deselection and name wit
     page.getByLabel("Name or nickname", { exact: true }),
   ).toHaveValue("Retained visitor");
   expect(mutations).toBe(0);
+  const ingredient = await page.locator(".mn-nutrient").first().boundingBox();
+  expect(ingredient).not.toBeNull();
+  expect(ingredient!.height).toBeGreaterThanOrEqual(72);
 });
 
 for (const width of [1280, 390])
@@ -250,7 +253,7 @@ for (const width of [1280, 390])
       "clarity",
     );
     await expect(page.locator(".mn-clarity-path,.mn-clarity-path-glow")).toHaveCount(0);
-    await expect(page.locator(".mn-dust-particle")).toHaveCount(48);
+    await expect(page.locator(".mn-dust-particle")).toHaveCount(96);
     expect(await page.locator(".mn-dust-particle").evaluateAll(elements=>elements.filter(el=>Number(getComputedStyle(el).opacity)>.05).length)).toBeGreaterThan(20);
     // Historical attachment geometry stays recorded; runtime uses one butterfly curve with magic dust.
     await expect(page.locator(".mn-window")).toHaveAttribute("data-flight", "flying");

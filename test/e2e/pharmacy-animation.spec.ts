@@ -19,7 +19,8 @@ for(const width of [390,1280]) test(`PHARM-MOTION ${width}px butterfly leaves fa
   await page.clock.runFor(500);
   await expect(page.locator(".mn-window")).toHaveAttribute("data-flight","flying");
   await expect(page.locator(".mn-clarity-path,.mn-clarity-path-glow")).toHaveCount(0);
-  await expect(page.locator(".mn-dust-particle")).toHaveCount(48);
+  await expect(page.locator(".mn-dust-particle")).toHaveCount(96);
+  expect(await page.locator(".mn-dust-particle").evaluateAll(els=>els.every(el=>getComputedStyle(el).color==="rgb(255, 255, 255)"))).toBe(true);
   await page.evaluate(()=>{
     const samples:{gap:number;angle:number;x:number;y:number;time:number;count:number}[]=[];
     Object.assign(window,{motionSamples:samples});const start=performance.now();
@@ -39,7 +40,7 @@ for(const width of [390,1280]) test(`PHARM-MOTION ${width}px butterfly leaves fa
   expect(Math.max(...samples.slice(1).map((s,i)=>Math.abs(s.angle-samples[i].angle)))).toBeLessThan(1);
   expect(Math.max(...samples.slice(1).map((s,i)=>Math.hypot(s.x-samples[i].x,s.y-samples[i].y)))).toBeLessThan(12);
   const steady=samples.filter(s=>s.time>2000);expect(steady.length).toBeGreaterThan(200);
-  for(const sample of steady){expect(sample.count).toBeGreaterThanOrEqual(20);expect(sample.count).toBeLessThanOrEqual(48);}
+  for(const sample of steady){expect(sample.count).toBeGreaterThanOrEqual(50);expect(sample.count).toBeLessThanOrEqual(96);}
   await page.screenshot({path:test.info().outputPath(`magic-dust-${width}.png`),fullPage:true});
 });
 test("PHARM-MOTION pending work keeps the same flight until real results arrive",async({page})=>{

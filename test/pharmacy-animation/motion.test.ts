@@ -33,9 +33,9 @@ test("PHARM-MOTION-03 magic dust emits at the leaf tip, drifts and fades indepen
     const state=motion.createMagicDust();
     for(let time=0;time<6000;time+=step){
       const frames=motion.stepMagicDust(state,{x:time/10,y:time/20},time);
-      assert.ok(frames.length<=48);assert.ok(state.particles.length<=48);
+      assert.ok(frames.length<=96);assert.ok(state.particles.length<=96);
       for(const frame of frames){assert.ok(frame.opacity>=0&&frame.opacity<=1);assert.ok(Number.isFinite(frame.point.x+frame.point.y+frame.scale+frame.angle));}
-      if(time>2000)assert.ok(frames.filter(f=>f.opacity>.05).length>=20);
+      if(time>2000)assert.ok(frames.filter(f=>f.opacity>.05).length>=50);
     }
     motion.stepMagicDust(state,{x:600,y:300},6000);
     snapshots.push(state.particles.map(p=>({id:p.id,born:p.born,origin:p.origin})));

@@ -13,3 +13,12 @@ No prices, catalogue facts, API contracts or matching inputs change. Earlier evi
 ## Magic-dust follow-up
 
 The user replaces the continuous line with soft magic-dust sparkles. PHARM-MOTION-03 now checks time-based emission at the leaf tip, gentle drift, fading, frame-rate independence and a fixed 48-particle pool. Browser checks replace line-length assertions with visible dust, near-tip emission, no drawn line and full cleanup. Flight coordinates and landing assertions remain unchanged. Previous line-trail results remain historical evidence.
+
+## White stardust and stable questionnaire sections
+
+Requested follow-up: denser white star dust, slightly larger pharmacy ingredient cards, and a stable first question after each section overlay. The flight geometry, landing, readiness and order semantics are unchanged.
+
+- PHARM-MOTION-03 and mobile/desktop browser checks now require a bounded 96-particle pool and at least 50 visible particles during steady flight (previously 48/20). Emission remains frame-rate independent and attached to the sprite.
+- PHARM-COMBINE reload also checks ingredient cards are at least 72 px tall. The original responsive column counts remain unchanged.
+- QUIZ-MOTION checks the real section boundary with English ordinary and Thai/Chinese pharmacy routes: the new question settles under the overlay before it fades, no competing smooth scrolls, preserved answer focus and reduced motion.
+- RED evidence against 48718f39 is preserved at `/root/.codex/deploy/pharmacy-stardust-20260919/red-node` and `red-browser`: one density failure and five rendered presentation failures. No historical cases or prices were removed.
