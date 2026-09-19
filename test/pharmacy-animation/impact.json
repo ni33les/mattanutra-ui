@@ -21,7 +21,7 @@
     {
       "file": "test/pharmacy-animation/motion.test.ts",
       "expectedCases": 7,
-      "reason": "Original tap/trail geometry, continuing flight, velocity-preserving landing and visible mobile waiting area"
+      "reason": "One smooth trajectory, spatial trail independent of frame rate, exact landing and bounded visible motion"
     }
   ],
   "browser": [
@@ -29,7 +29,7 @@
       "file": "test/e2e/pharmacy-animation.spec.ts",
       "expectedCases": 4,
       "grep": "PHARM-MOTION",
-      "reason": "Dense mobile/desktop trail attachment, continuous rotation, real-frame responsiveness and flight until actual readiness"
+      "reason": "One trajectory across former phase times; constant attached trail, real frames, readiness landing and cancellation"
     },
     {
       "file": "test/e2e/pharmacy-combined.spec.ts",

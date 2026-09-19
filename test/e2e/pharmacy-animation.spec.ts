@@ -14,43 +14,43 @@ async function pending(page: Page, width: number, virtualClock = true) {
   await expect(page.locator(".mn-window")).toHaveAttribute("data-paused","false");
   return saved;
 }
-for(const width of [390,1280]) test(`PHARM-MOTION ${width}px trail stays attached and rotation remains continuous`,async({page})=>{
+for(const width of [390,1280]) test(`PHARM-MOTION ${width}px single butterfly flight has a consistent attached trail`,async({page})=>{
   await pending(page,width);
-  await page.clock.runFor(7400);
+  await page.clock.runFor(500);
+  await expect(page.locator(".mn-window")).toHaveAttribute("data-flight","flying");
   await page.evaluate(()=>{
-    const samples: {gap:number;angle:number;x:number;y:number;time:number}[]=[];
-    Object.assign(window,{motionSamples:samples});
+    const samples:{gap:number;angle:number;x:number;y:number;time:number;length:number}[]=[];
+    Object.assign(window,{motionSamples:samples});const start=performance.now();
     const sample=()=>{
-      const path=document.querySelector<SVGPathElement>(".mn-clarity-path")!;
-      const shell=document.querySelector<HTMLElement>(".mn-clarity-logo-shell")!;
-      const phase=document.querySelector(".mn-window")!.getAttribute("data-phase");
-      const total=path.getTotalLength();
-      if(phase==="clarity"&&total>0){
-        const style=getComputedStyle(path),offset=style.strokeDasharray==="none"?0:parseFloat(style.strokeDashoffset)/Number(path.getAttribute("pathLength"));
-        const end=path.getPointAtLength(total*(1-offset)).matrixTransform(path.getScreenCTM()!);
-        const tip=document.querySelector(".mn-leading-spark")!.getBoundingClientRect();
-        const transform=new DOMMatrix(getComputedStyle(shell).transform);
-        samples.push({gap:Math.hypot(end.x-tip.x-tip.width/2,end.y-tip.y-tip.height/2),angle:Math.atan2(transform.b,transform.a)*180/Math.PI,x:transform.e,y:transform.f,time:performance.now()});
+      const path=document.querySelector<SVGPathElement>(".mn-clarity-path")!,shell=document.querySelector<HTMLElement>(".mn-clarity-logo-shell")!;
+      if(path.getAttribute("d")){
+        const length=path.getTotalLength(),end=path.getPointAtLength(length).matrixTransform(path.getScreenCTM()!);
+        const tip=document.querySelector(".mn-leading-spark")!.getBoundingClientRect(),transform=new DOMMatrix(getComputedStyle(shell).transform);
+        samples.push({gap:Math.hypot(end.x-tip.x-tip.width/2,end.y-tip.y-tip.height/2),angle:Math.atan2(transform.b,transform.a)*180/Math.PI,x:transform.e,y:transform.f,time:performance.now()-start,length});
       }
-      if(samples.length<400)requestAnimationFrame(sample);
+      if(performance.now()-start<19000)requestAnimationFrame(sample);
     };requestAnimationFrame(sample);
   });
-  await page.clock.runFor(5700);
-  const samples=await page.evaluate(()=>(window as unknown as {motionSamples:{gap:number;angle:number;x:number;y:number;time:number}[]}).motionSamples);
+  await page.clock.runFor(19000);
+  const samples=await page.evaluate(()=>(window as unknown as {motionSamples:{gap:number;angle:number;x:number;y:number;time:number;length:number}[]}).motionSamples);
   await test.info().attach("motion-measurements",{body:JSON.stringify(samples),contentType:"application/json"});
-  expect(samples.length).toBeGreaterThan(200);
+  expect(samples.length).toBeGreaterThan(900);
   expect(Math.max(...samples.map(s=>s.gap))).toBeLessThan(2);
-  expect(Math.max(...samples.slice(1).map((s,i)=>Math.abs(s.angle-samples[i].angle)))).toBeLessThan(2);
-  await page.screenshot({path:test.info().outputPath(`settled-${width}.png`),fullPage:true});
+  expect(Math.max(...samples.slice(1).map((s,i)=>Math.abs(s.angle-samples[i].angle)))).toBeLessThan(1);
+  expect(Math.max(...samples.slice(1).map((s,i)=>Math.hypot(s.x-samples[i].x,s.y-samples[i].y)))).toBeLessThan(12);
+  const tail=samples.filter(s=>s.time>12000);expect(tail.length).toBeGreaterThan(200);
+  for(const sample of tail)expect(Math.abs(sample.length-(width===390?180:300))).toBeLessThan(2);
+  expect(await page.locator(".mn-clarity-path").evaluate(el=>getComputedStyle(el).stroke)).not.toContain("url(");
+  await page.screenshot({path:test.info().outputPath(`butterfly-${width}.png`),fullPage:true});
 });
-test("PHARM-MOTION pending work keeps flying after the final tap until real results arrive",async({page})=>{
+test("PHARM-MOTION pending work keeps the same flight until real results arrive",async({page})=>{
   await pending(page,390);
   await page.clock.runFor(18000);
   await expect(page.locator(".mn-window")).toHaveAttribute("data-phase","waiting");
   await expect(page.locator(".mn-window")).toHaveAttribute("data-flight","flying");
   await expect(page.locator(".mn-clarity-logo-shell")).toHaveCSS("opacity","1");
   const position=await page.locator(".mn-clarity-logo-shell").evaluate(el=>getComputedStyle(el).transform);
-  await page.clock.runFor(20000);
+  await page.clock.runFor(3000);
   expect(await page.locator(".mn-clarity-logo-shell").evaluate(el=>getComputedStyle(el).transform)).not.toBe(position);
   const bounds=await page.locator(".mn-clarity-logo-shell").boundingBox();
   expect(bounds).not.toBeNull();
@@ -60,32 +60,24 @@ test("PHARM-MOTION pending work keeps flying after the final tap until real resu
   await expect(page.getByTestId("pharmacy-order")).toHaveCount(0);
   await expect(page.locator(".mn-nutrient")).toHaveCount(0);
 });
-test("PHARM-MOTION real-time mobile flight remains responsive through the final tap", async ({page}) => {
+test("PHARM-MOTION real-time mobile butterfly flight remains responsive",async({page})=>{
   await pending(page,390,false);
-  await expect(page.locator(".mn-window")).toHaveAttribute("data-phase","clarity",{timeout:15000});
-  const frames = await page.evaluate(() => new Promise<number[]>(resolve => {
-    const times: number[] = [];
-    function observe() {
-      if (document.querySelector(".mn-window")!.getAttribute("data-phase") !== "clarity") {
-        resolve(times);
-        return;
-      }
-      times.push(performance.now());
-      requestAnimationFrame(observe);
-    }
-    requestAnimationFrame(observe);
+  await expect(page.locator(".mn-window")).toHaveAttribute("data-flight","flying");
+  const frames=await page.evaluate(()=>new Promise<number[]>(resolve=>{
+    const times:number[]=[],start=performance.now();
+    function sample(){times.push(performance.now());if(performance.now()-start>=3000)resolve(times);else requestAnimationFrame(sample);}
+    requestAnimationFrame(sample);
   }));
-  const intervals = frames.slice(1).map((time,i) => time-frames[i]).sort((a,b) => a-b);
+  const intervals=frames.slice(1).map((t,i)=>t-frames[i]).sort((a,b)=>a-b);
   await test.info().attach("real-frame-times",{body:JSON.stringify({frames,intervals}),contentType:"application/json"});
-  // Real RAF: virtual clocks cannot expose expensive animated SVG paint effects.
   expect(frames.length).toBeGreaterThan(100);
   expect(intervals[Math.floor(intervals.length/2)]).toBeLessThan(40);
-  await expect(page.locator(".mn-window")).toHaveAttribute("data-phase","waiting");
+  await expect(page.locator(".mn-window")).toHaveAttribute("data-flight","flying");
 });
 
 for(const width of [390,1280]) test(`PHARM-FLIGHT ${width}px completion reveals immediately while the sprite lands and then stops`,async({page})=>{
   const saved=await pending(page,width);
-  await page.clock.runFor(24000);
+  await page.clock.runFor(6000);
   await expect(page.locator(".mn-window")).toHaveAttribute("data-flight","flying");
   let releaseQuote!:()=>void,quoteLoaded=false;
   const quoteGate=new Promise<void>(resolve=>{releaseQuote=resolve;});
@@ -131,7 +123,7 @@ for(const width of [390,1280]) test(`PHARM-FLIGHT ${width}px completion reveals 
 });
 test("PHARM-FLIGHT hidden tabs pause flight; reduced motion and navigation stop it",async({page})=>{
   await pending(page,390);
-  await page.clock.runFor(22000);
+  await page.clock.runFor(6000);
   await expect(page.locator(".mn-window")).toHaveAttribute("data-flight","flying");
   const shell=page.locator(".mn-clarity-logo-shell"),before=await shell.evaluate(el=>getComputedStyle(el).transform);
   await page.evaluate(()=>{Object.defineProperty(document,"hidden",{configurable:true,value:true});document.dispatchEvent(new Event("visibilitychange"));});

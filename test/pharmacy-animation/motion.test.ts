@@ -1,73 +1,75 @@
 import assert from "node:assert/strict";
-import {test} from "node:test";
-import {clarityFlight,clarityPose} from "../../lib/pharmacy-presentation.ts";
-import * as presentation from "../../lib/pharmacy-presentation.ts";
-function route(width=650){return clarityFlight({width,height:360,source:{x:20,y:-190},questions:[{x:width*.24,y:122.4},{x:width*.76,y:136.8},{x:width*.3,y:273.6}],core:{x:width/2,y:213},shellSize:width===650?92:82});}
-test("PHARM-MOTION-01 rotation is continuous across every move and hold boundary",()=>{
-  for(const width of [350,650]){
-    const flight=route(width);let previous=clarityPose(flight,0);
-    for(let time=16;time<=4110;time+=16){const current=clarityPose(flight,time);assert.ok(Math.abs(current.angle-previous.angle)<2,`rotation jump at ${time}ms`);previous=current;}
+import { test } from "node:test";
+import * as motion from "../../lib/pharmacy-presentation.ts";
+const area = (width = 650) => ({ left: 60, top: 110, width, height: 400, source: {x: 38, y: 38}, shellSize: 82 });
+const length = (points: motion.Point[]) => points.slice(1).reduce((sum,p,i) => sum + Math.hypot(p.x-points[i].x,p.y-points[i].y),0);
+
+test("PHARM-MOTION-01 one butterfly curve has gentle continuous movement through the former phase boundaries", () => {
+  assert.equal(typeof motion.butterflyFlight, "function");
+  const flight = motion.butterflyFlight(area());
+  let previous = motion.butterflyPose(flight, 0), previousSpeed = 0;
+  for (let time=16;time<50000;time+=16) {
+    const pose=motion.butterflyPose(flight,time), speed=Math.hypot(pose.point.x-previous.point.x,pose.point.y-previous.point.y)/16;
+    assert.ok(speed<.4, `speed ${speed} at ${time}`);
+    assert.ok(Math.abs(speed-previousSpeed)<.02, `speed jump at ${time}`);
+    assert.ok(Math.abs(pose.angle-previous.angle)<1, `banking jump at ${time}`);
+    if(time>3400)assert.ok(speed>.01, `unrequested pause at ${time}`);
+    previous=pose;previousSpeed=speed;
   }
 });
-test("PHARM-MOTION-02 leaf tip reaches every question and the final core",()=>{
-  const flight=route();
-  for(const [index,time] of [870,1610,2350,3610].entries()){
-    const tip=clarityPose(flight,time).tip,target=flight.tapPoints[index];
-    assert.ok(Math.hypot(tip.x-target.x,tip.y-target.y)<.1,`tap ${index}`);
+test("PHARM-MOTION-02 takeoff begins at the logo and the same smooth path closes without a seam", () => {
+  const flight=motion.butterflyFlight(area());
+  assert.deepEqual(motion.butterflyPose(flight,0).point,area().source);
+  for(const time of [7600,11710,13900,24000,48000]){
+    const before=motion.butterflyPose(flight,time-.1),at=motion.butterflyPose(flight,time),after=motion.butterflyPose(flight,time+.1);
+    const a={x:(at.point.x-before.point.x)/.1,y:(at.point.y-before.point.y)/.1},b={x:(after.point.x-at.point.x)/.1,y:(after.point.y-at.point.y)/.1};
+    assert.ok(Math.hypot(a.x-b.x,a.y-b.y)<.002,`seam at ${time}`);
   }
+  assert.ok(flight.samples.length<=769);
 });
-test("PHARM-MOTION-03 trail distance is monotonic, bounded and reaches the same final tip",()=>{
-  const flight=route();assert.ok(flight.samples.length<600);let previous=0;
-  for(let time=0;time<=4200;time+=7){const pose=clarityPose(flight,time);assert.ok(pose.distance>=previous&&pose.distance<=flight.distance);previous=pose.distance;}
-  assert.equal(clarityPose(flight,-10).distance,0);
-  assert.equal(clarityPose(flight,100000).distance,flight.distance);
-  const end=clarityPose(flight,100000).tip;assert.deepEqual(end,flight.samples.at(-1)!.tip);
-});
-test("PHARM-FLIGHT-01 pending flight keeps moving beyond the demonstration and joins without a position jump",()=>{
-  assert.equal(typeof presentation.continuingClarityPose,"function");
-  const flight=route();
-  const pose=(t:number)=>presentation.continuingClarityPose(flight,t,650,360,92);
-  assert.deepEqual(pose(4110).point,clarityPose(flight,4110).point);
-  assert.ok(Math.hypot(pose(4110.01).point.x-pose(4110).point.x,pose(4110.01).point.y-pose(4110).point.y)<0.01);
-  for(const time of [18000,40000,90000]){
-    const a=pose(time),b=pose(time+500);
-    assert.ok(Math.hypot(a.point.x-b.point.x,a.point.y-b.point.y)>5);
-    assert.ok(a.point.x>=46&&a.point.x<=604&&a.point.y>=46&&a.point.y<=314);
-  }
-});
-test("PHARM-FLIGHT-02 repeated flight is continuous with bounded frame movement and an attached tip",()=>{
-  assert.equal(typeof presentation.continuingClarityPose,"function");
-  for(const width of [350,650]){
-    const flight=route(width),size=width===650?92:82;
-    let previous=presentation.continuingClarityPose(flight,5310,width,360,size);
-    for(let time=5326;time<30000;time+=16){
-      const current=presentation.continuingClarityPose(flight,time,width,360,size);
-      assert.ok(Math.hypot(current.point.x-previous.point.x,current.point.y-previous.point.y)<6);
-      assert.ok(Math.abs(current.angle-previous.angle)<1);
-      assert.ok(Math.abs(Math.hypot(current.tip.x-current.point.x,current.tip.y-current.point.y)-size*.36*current.scale*Math.SQRT2)<.001);
-      previous=current;
+test("PHARM-MOTION-03 trail is distance-based, frame-rate independent, bounded and always ends at the sprite tip", () => {
+  for(const step of [8,16,33]){
+    const history:motion.Point[]=[],flight=motion.butterflyFlight(area());
+    for(let time=0;time<90000;time+=step){
+      const tip=motion.butterflyPose(flight,time).tip,trail=motion.updateFlightTrail(history,tip,260);
+      assert.deepEqual(trail.at(-1),tip);
+      assert.ok(history.length<=133);
+      assert.ok(length(trail)<=260.001);
+      if(time>12000)assert.ok(Math.abs(length(trail)-260)<.001,`trail collapsed at ${time}/${step}`);
     }
   }
 });
-test("PHARM-FLIGHT-03 landing starts from the current flight and eases into an exact stationary destination",()=>{
-  assert.equal(typeof presentation.landingClarityPose,"function");
-  const flight=route(),target={x:20,y:-190},size=92;
-  const pose=(time:number)=>presentation.landingClarityPose(presentation.continuingClarityPose(flight,18123+time,650,360,size),target,38/size,size,time/1200);
-  const start=presentation.continuingClarityPose(flight,18123,650,360,size);
-  assert.deepEqual(pose(0).point,start.point);
-  const velocity=(a:{x:number;y:number},b:{x:number;y:number})=>({x:b.x-a.x,y:b.y-a.y});
-  const before=velocity(presentation.continuingClarityPose(flight,18122,650,360,size).point,start.point),after=velocity(pose(0).point,pose(1).point);
-  assert.ok(Math.hypot(before.x-after.x,before.y-after.y)<.002);
-  assert.deepEqual(pose(1200).point,target);
-  assert.deepEqual(pose(9000).point,target);
-  assert.equal(pose(1200).angle,0);
-  assert.equal(pose(1200).scale,38/size);
+test("PHARM-FLIGHT-01 movement continues for as long as processing takes without a second routine",()=>{
+  const flight=motion.butterflyFlight(area());
+  for(const time of [18000,40000,90000]){
+    const a=motion.butterflyPose(flight,time),b=motion.butterflyPose(flight,time+500);
+    assert.ok(Math.hypot(a.point.x-b.point.x,a.point.y-b.point.y)>10);
+  }
+});
+test("PHARM-FLIGHT-02 banking and subtle flutter keep the trail tip attached exactly",()=>{
+  const flight=motion.butterflyFlight(area());
+  for(let time=0;time<30000;time+=23){
+    const pose=motion.butterflyPose(flight,time),offset=flight.shellSize*.36*pose.scale,radians=pose.angle*Math.PI/180;
+    assert.ok(Math.abs(pose.tip.x-pose.point.x-offset*(Math.cos(radians)+Math.sin(radians)))<.001);
+    assert.ok(Math.abs(pose.tip.y-pose.point.y-offset*(Math.sin(radians)-Math.cos(radians)))<.001);
+    assert.ok(Math.abs(pose.angle)<16);
+  }
+});
+test("PHARM-FLIGHT-03 landing preserves entry velocity and eases into an exact stationary destination",()=>{
+  const flight=motion.butterflyFlight(area()),target=area().source;
+  const pose=(time:number)=>motion.landButterflyPose(motion.butterflyPose(flight,18123+time),target,38/82,82,time/1200);
+  assert.deepEqual(pose(0).point,motion.butterflyPose(flight,18123).point);
+  const before=motion.butterflyPose(flight,18122).point,start=pose(0).point,after=pose(1).point;
+  assert.ok(Math.hypot(start.x-before.x-(after.x-start.x),start.y-before.y-(after.y-start.y))<.002);
+  assert.deepEqual(pose(1200).point,target);assert.deepEqual(pose(9000).point,target);
+  assert.equal(pose(1200).angle,0);assert.equal(pose(1200).scale,38/82);
   assert.ok(Math.hypot(pose(1199).point.x-target.x,pose(1199).point.y-target.y)<.001);
 });
-test("PHARM-FLIGHT-04 waiting flight stays in its visible area when mobile tiles push the original core below the fold",()=>{
-  const flight=route(350);
-  for(let time=5310;time<30000;time+=100){
-    const pose=presentation.continuingClarityPose(flight,time,350,400,82,-500);
-    assert.ok(pose.point.y>-500&&pose.point.y<-100,`y=${pose.point.y}`);
+test("PHARM-FLIGHT-04 single flight stays inside the supplied visible mobile area",()=>{
+  const input=area(240),flight=motion.butterflyFlight(input);
+  for(let time=3400;time<90000;time+=100){
+    const pose=motion.butterflyPose(flight,time);
+    assert.ok(pose.point.x>=input.left&&pose.point.x<=input.left+input.width);
+    assert.ok(pose.point.y>=input.top&&pose.point.y<=input.top+input.height);
   }
 });

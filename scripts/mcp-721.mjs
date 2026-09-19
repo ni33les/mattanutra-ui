@@ -99,7 +99,7 @@ for (const database of (packageId === "practical" && mode === "validate" ? [] : 
     const migration = await runBatch("lock-boundaries-schema", ["--experimental-strip-types", "--import", "./scripts/register-ts-path-loader.mjs", "scripts/apply-matching-lock-boundaries.ts"], env, output);
     assert.ok(migration.passed, "Isolated lock migration failed");
   }
-  batches.push(await runBatch(label, ["--test", "--test-concurrency=1", "--experimental-test-module-mocks", "--experimental-strip-types", ...(packageId === "pharmacy-line" ? ["--loader", "./scripts/matcher-http-loader.mjs"] : packageId === "web-matching" ? ["--loader", "./test/payment-return/next-loader.mjs"] : []), ...(!database || ["payment-replay", "pharmacy", "pharmacy-source", "pharmacy-reveal", "pharmacy-line", "pharmacy-followup", "pharmacy-flight"].includes(packageId) ? ["--import", "./test/helpers/offline-network.mjs"] : []), "--import", "./scripts/register-ts-path-loader.mjs", ...selected], env, output));
+  batches.push(await runBatch(label, ["--test", "--test-concurrency=1", "--experimental-test-module-mocks", "--experimental-strip-types", ...(packageId === "pharmacy-line" ? ["--loader", "./scripts/matcher-http-loader.mjs"] : packageId === "web-matching" ? ["--loader", "./test/payment-return/next-loader.mjs"] : []), ...(!database || ["payment-replay", "pharmacy", "pharmacy-source", "pharmacy-reveal", "pharmacy-line", "pharmacy-followup", "pharmacy-flight", "pharmacy-butterfly"].includes(packageId) ? ["--import", "./test/helpers/offline-network.mjs"] : []), "--import", "./scripts/register-ts-path-loader.mjs", ...selected], env, output));
   assert.ok(batches.at(-1).passed, `${label} failed; later stages were not started`);
   events.push(...readFileSync(resolve(output, `${label}-events.jsonl`), "utf8").trim().split("\n").filter(Boolean).map(line => JSON.parse(line)));
 }
@@ -120,7 +120,7 @@ async function prepareCompiledBuild() {
   save("lint-files.json", { releaseBase: MCP721_BASE, files: lint }); assert.ok(lint.length);
   await command("release-diff-lint", ["node_modules/eslint/bin/eslint.js", ...lint]);
 
-  await command("production-build", ["node_modules/next/dist/bin/next", "build", "--webpack"], { ...safe, NODE_ENV: "production", NEXT_BUILD_SKIP_TYPECHECK: "1", ...(["efficiency", "pharmacy-reveal", "pharmacy-animation", "pharmacy-line", "pharmacy-followup", "pharmacy-flight"].includes(packageId) ? { NODE_OPTIONS: "--max-old-space-size=4096", NEXT_BUILD_CPUS: "1" } : {}) });
+  await command("production-build", ["node_modules/next/dist/bin/next", "build", "--webpack"], { ...safe, NODE_ENV: "production", NEXT_BUILD_SKIP_TYPECHECK: "1", ...(["efficiency", "pharmacy-reveal", "pharmacy-animation", "pharmacy-line", "pharmacy-followup", "pharmacy-flight", "pharmacy-butterfly"].includes(packageId) ? { NODE_OPTIONS: "--max-old-space-size=4096", NEXT_BUILD_CPUS: "1" } : {}) });
 }
 if (mode === "validate") {
   const identity = mcp721Identity(source.sha256, commit, packageId);
@@ -189,7 +189,7 @@ if (mode === "validate") {
       TEST_DB_URL: process.env.TEST_DB_URL, DB_URL: process.env.TEST_DB_URL, DB_WORKER_URL: process.env.TEST_DB_URL,
       DB_ALLOW_DIRECT_CONNECTION: "true", MATCHER_TEST_EVIDENCE_DIR: resolve(output, "mcp-regression") });
   }
-  if (["efficiency", "practical", "availability", "pharmacy", "pharmacy-landing", "pharmacy-reveal", "pharmacy-source", "pharmacy-animation", "pharmacy-line", "pharmacy-followup", "pharmacy-flight"].includes(packageId)) {
+  if (["efficiency", "practical", "availability", "pharmacy", "pharmacy-landing", "pharmacy-reveal", "pharmacy-source", "pharmacy-animation", "pharmacy-line", "pharmacy-followup", "pharmacy-flight", "pharmacy-butterfly"].includes(packageId)) {
     const { runEfficiencyBrowser } = await import("./service-efficiency/release-stages.mjs");
     await runEfficiencyBrowser(output, isolated ?? { ...safe, TEST_DB_URL: process.env.TEST_DB_URL, DB_URL: process.env.TEST_DB_URL, DB_WORKER_URL: process.env.TEST_DB_URL, DB_ALLOW_DIRECT_CONNECTION: "true", DB_POOL_MAX: "3" }, inventory.browser);
     stages.push({ label: "affected-browser-tests", passed: true });
