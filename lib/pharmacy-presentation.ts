@@ -252,13 +252,13 @@ export function clarityPose(flight: ReturnType<typeof clarityFlight>, time: numb
 }
 
 /** Continue the opening choreography on a smooth closed curve, for as long as work takes. */
-export function continuingClarityPose(flight: ReturnType<typeof clarityFlight>, time: number, width: number, height: number, shellSize: number): FlightPose {
+export function continuingClarityPose(flight: ReturnType<typeof clarityFlight>, time: number, width: number, height: number, shellSize: number, top = 0): FlightPose {
   if (time <= clarityDuration) return clarityPose(flight, time);
   const start = clarityPose(flight, clarityDuration), elapsed = time - clarityDuration;
   const blend = smootherStep(elapsed / 1200), phase = elapsed * Math.PI * 2 / 8600;
   const point = {
     x: start.point.x + (width / 2 + Math.max(0, width / 2 - shellSize * .7) * Math.sin(phase) - start.point.x) * blend,
-    y: start.point.y + (height / 2 + height * .27 * Math.sin(phase * 2) - start.point.y) * blend,
+    y: start.point.y + (top + height / 2 + height * .27 * Math.sin(phase * 2) - start.point.y) * blend,
   };
   return withLeafTip({ ...start, time, point, angle: 12 * Math.cos(phase) * blend, scale: 1, moving: true, tap: null }, shellSize);
 }

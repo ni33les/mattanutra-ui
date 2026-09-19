@@ -50,6 +50,7 @@ export function usePharmacyAnimation(
       ended = false;
     let flight: ReturnType<typeof clarityFlight> | null = null;
     let origin: Point = { x: 0, y: 0 }, width = 0, height = 0, shellSize = 92;
+    let loopTop = 0, loopHeight = 0;
     let landingAt: number | null = null;
     let hasFlown = false;
     const trail: { tip: Point; time: number }[] = [];
@@ -65,6 +66,12 @@ export function usePharmacyAnimation(
       const parent = page.getBoundingClientRect();
       origin = { x: rect.left - parent.left, y: rect.top - parent.top };
       width = rect.width; height = rect.height; shellSize = shell.offsetWidth || 92;
+      // Mobile analysis tiles can put the core below the fold. Keep the waiting
+      // loop in view instead of spending the long wait flying off-screen.
+      const visibleTop = Math.max(parent.top + 110, shellSize);
+      const visibleBottom = Math.max(visibleTop + 180, Math.min(rect.bottom, window.innerHeight - shellSize));
+      loopTop = visibleTop - rect.top;
+      loopHeight = visibleBottom - visibleTop;
       const point = (el: HTMLElement): Point => {
         const r = el.getBoundingClientRect();
         return {
@@ -147,7 +154,7 @@ export function usePharmacyAnimation(
     function animateFlight(time: number) {
       if (!flight) measure();
       const route = flight!;
-      let pose = continuingClarityPose(route, time, width, height, shellSize);
+      let pose = continuingClarityPose(route, time, width, loopHeight, shellSize, loopTop);
       if (landingAt !== null) {
         const r = brand.getBoundingClientRect(), parent = page.getBoundingClientRect();
         pose = landingClarityPose(pose, { x: r.left + r.width / 2 - parent.left - origin.x, y: r.top + r.height / 2 - parent.top - origin.y }, r.width / shellSize, shellSize, (elapsed - landingAt) / 1200);
