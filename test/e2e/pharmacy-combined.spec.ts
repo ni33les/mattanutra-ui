@@ -185,7 +185,7 @@ test("PHARM-COMBINE empty result completes without an invented purchase", async 
   await page.unrouteAll({ behavior: "wait" });
 });
 
-test("PHARM-COMBINE replay preserves deselection and name without rematching or ordering", async ({
+test("PHARM-COMBINE no replay control; reload preserves deselection and name without rematching or ordering", async ({
   page,
 }) => {
   const saved = await fixture(true);
@@ -203,13 +203,8 @@ test("PHARM-COMBINE replay preserves deselection and name without rematching or 
   await page
     .getByLabel("Name or nickname", { exact: true })
     .fill("Retained visitor");
-  await page.getByRole("button", { name: /Replay analysis/ }).click();
-  await expect(page.locator(".mn-window")).toHaveAttribute(
-    "data-phase",
-    "inputs",
-  );
-  await expect(page.locator(".mn-window")).toHaveAttribute("data-paused", "false");
-  await page.clock.runFor(17000);
+  await expect(page.getByRole("button", { name: /Replay analysis/ })).toHaveCount(0);
+  await page.reload();
   await expect(page.locator(".mn-window")).toHaveAttribute(
     "data-phase",
     "ready",
@@ -399,4 +394,25 @@ test("PHARM-COMBINE failed order retains name, selection and idempotency for ret
   await expect(page.locator(".mn-order-success")).toContainText(
     "Retry visitor",
   );
+});
+
+for (const locale of ["en", "th", "zh-CN"]) test(`PHARM-FOLLOWUP-WAIT ${locale}: activity continues beyond decoration and stops on real completion`, async ({page}) => {
+  const saved = await fixture();
+  await freezePresentationClock(page);
+  await page.goto(`/${locale}/retail/${saved.slug}/reveal?plan=${saved.planId}`);
+  await page.clock.runFor(20000);
+  const activity = page.getByTestId("pharmacy-processing-activity");
+  await expect(activity).toBeVisible();
+  await expect(activity.locator("svg")).toHaveCSS("animation-iteration-count", "infinite");
+  await expect(page.locator(".mn-window")).toHaveAttribute("aria-busy", "true");
+  await expect(page.getByTestId("pharmacy-order")).toHaveCount(0);
+  await page.clock.runFor(20000);
+  await expect(activity).toBeVisible();
+  await page.emulateMedia({reducedMotion:"reduce"});
+  await expect(activity).toBeVisible();
+  await expect(activity.locator("svg")).toHaveCSS("animation-name", "none");
+  await fixture(true,saved);
+  await page.clock.runFor(1600);
+  await expect(page.locator(".mn-product")).toHaveCount(1);
+  await expect(activity).toHaveCount(0);
 });
