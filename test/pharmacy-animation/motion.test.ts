@@ -47,6 +47,7 @@ test("PHARM-MOTION-03 magic dust emits at the leaf tip, drifts and fades indepen
   const state=motion.createMagicDust();
   const birth=motion.stepMagicDust(state,{x:10,y:20},0)[0];assert.deepEqual(birth.point,{x:10,y:20});
   assert.equal(birth.opacity,0);
+  assert.ok(motion.stepMagicDust(state,{x:10,y:20},16,false)[0].opacity>.5, "Fresh dust stays visible near the leaf during takeoff");
   const bright=motion.stepMagicDust(state,{x:10,y:20},200,false)[0];
   const fading=motion.stepMagicDust(state,{x:10,y:20},1300,false)[0];
   assert.ok(bright.opacity>.3);assert.ok(fading.opacity<bright.opacity);
