@@ -292,11 +292,11 @@ export function butterflyPose(flight: ReturnType<typeof butterflyFlight>, time: 
   },flight.shellSize);
 }
 
-export function landButterflyPose(pose: ButterflyPose,target: Point,scale: number,shellSize: number,progress: number): ButterflyPose {
+export function exitButterflyPose(pose: ButterflyPose,target: Point,shellSize: number,progress: number): ButterflyPose {
   const blend=smootherStep(progress);
   return butterflyTip({
     point:blend===1?target:{x:pose.point.x+(target.x-pose.point.x)*blend,y:pose.point.y+(target.y-pose.point.y)*blend},
-    angle:blend===1?0:pose.angle*(1-blend),scale:blend===1?scale:pose.scale+(scale-pose.scale)*blend,
+    angle:blend===1?0:pose.angle*(1-blend),scale:blend===1?1:pose.scale+(1-pose.scale)*blend,
   },shellSize);
 }
 

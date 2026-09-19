@@ -219,21 +219,6 @@ export function PharmacyCombined({
                 />
               </span>
         </div>
-        <div className="mn-top">
-          <div className="mn-brand-lockup">
-            <SafeImage
-              className="mn-brand-mark"
-              src="/assets/pharmacy/combined/leaf.webp"
-              alt=""
-              width={38}
-              height={38}
-            />
-            <strong className="mn-brand">
-              Matta<span>Nutra</span>
-            </strong>
-          </div>
-
-        </div>
         <h2 id="mn-combined-title">{c.title}</h2>
         <div className="mn-status-row">
           <div className="mn-status" aria-live="polite">

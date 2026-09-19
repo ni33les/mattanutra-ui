@@ -4,11 +4,12 @@ import {
   butterflyFlight,
   butterflyPose,
   blendButterflyPoses,
-  landButterflyPose,
+  exitButterflyPose,
   smootherStep,
   createMagicDust,
   stepMagicDust,
   type PharmacyPhase,
+  type Point,
 } from "@/lib/pharmacy-presentation";
 
 /** One flight clock, independent of the presentation stages and real generation. */
@@ -29,14 +30,14 @@ export function usePharmacyAnimation(
     if (!root.current) return;
     const page = root.current;
     const shell = page.querySelector<HTMLElement>(".mn-clarity-logo-shell")!;
-    const brand = page.querySelector<HTMLElement>(".mn-brand-mark")!;
     const particles = [...page.querySelectorAll<HTMLElement>(".mn-dust-particle")];
     const activeDust = new Uint8Array(particles.length);
     const tiles = [...page.querySelectorAll<HTMLElement>(".mn-analysis-tile")];
     const analysis = page.querySelector<HTMLElement>(".mn-analysis")!;
     const motion = window.matchMedia("(prefers-reduced-motion: reduce)");
     let frameId = 0, elapsed = 0, lastNow = 0, ended = false, hasFlown = false;
-    let phase: PharmacyPhase | undefined, landingAt: number | null = null;
+    let phase: PharmacyPhase | undefined;
+    let exit: { at: number; target: Point; duration: number } | null = null;
     let flight: ReturnType<typeof butterflyFlight> | null = null;
     let previousFlight: ReturnType<typeof butterflyFlight> | null = null, resizedAt = 0;
     let width = 0, shellSize = 92, dirty = true;
@@ -48,10 +49,6 @@ export function usePharmacyAnimation(
     const phaseTo = (next: PharmacyPhase) => {
       if (phase !== next) { phase = next; onPhase(next); }
     };
-    const destination = () => {
-      const r = brand.getBoundingClientRect(), parent = page.getBoundingClientRect();
-      return { point: { x: r.left + r.width / 2 - parent.left, y: r.top + r.height / 2 - parent.top }, scale: r.width / shellSize };
-    };
     function measure() {
       const parent = page.getBoundingClientRect();
       width = parent.width;
@@ -61,10 +58,11 @@ export function usePharmacyAnimation(
       const bottom = Math.max(top + 180, Math.min(parent.height - margin, window.innerHeight - parent.top - margin));
       previousFlight = flight;
       resizedAt = elapsed;
-      flight = butterflyFlight({ left: margin, top, width: Math.max(80, width - margin * 2), height: bottom - top, source: destination().point, shellSize });
+      const source = { x: -parent.left - shellSize, y: top + (bottom - top) * .42 };
+      flight = butterflyFlight({ left: margin, top, width: Math.max(80, width - margin * 2), height: bottom - top, source, shellSize });
       dirty = false;
     }
-    function draw() {
+    function draw(leaving = false) {
       if (!flight || dirty) measure();
       let pose = butterflyPose(flight!, elapsed);
       if (previousFlight) {
@@ -72,10 +70,16 @@ export function usePharmacyAnimation(
         pose = blendButterflyPoses(butterflyPose(previousFlight, elapsed), pose, shellSize, blend);
         if (blend === 1) previousFlight = null;
       }
+      if (leaving && !exit) {
+        const target = { x: window.innerWidth - page.getBoundingClientRect().left + shellSize, y: Math.max(flight!.top, pose.point.y - 60) };
+        // Keep the exit gentle across different screen sizes without delaying results.
+        exit = { at: elapsed, target, duration: Math.max(1200, Math.hypot(target.x - pose.point.x, target.y - pose.point.y) * 2.5) };
+        page.setAttribute("data-flight", "exiting");
+      }
       let fade = 1;
-      if (landingAt !== null) {
-        const target = destination(), progress = (elapsed - landingAt) / 1200;
-        pose = landButterflyPose(pose, target.point, target.scale, shellSize, progress);
+      if (exit) {
+        const progress = (elapsed - exit.at) / exit.duration;
+        pose = exitButterflyPose(pose, exit.target, shellSize, progress);
         fade = 1 - smootherStep(progress);
       }
       shell.style.transform = `translate3d(${pose.point.x}px, ${pose.point.y}px, 0) translate(-50%, -50%) rotate(${pose.angle}deg) scale(${pose.scale})`;
@@ -90,27 +94,24 @@ export function usePharmacyAnimation(
       particles.forEach((element, index) => {
         if (!activeDust[index] && element.style.opacity !== "0") element.style.opacity = "0";
       });
+      return exit !== null && elapsed - exit.at >= exit.duration;
     }
-    function rest(status: "landed" | "stopped") {
+    function rest(status: "exited" | "stopped") {
       ended = true;
       page.setAttribute("data-flight", status);
       clearDust();
-      shellSize = shell.offsetWidth || 92;
-      const target = destination();
-      shell.style.transform = `translate3d(${target.point.x}px, ${target.point.y}px, 0) translate(-50%, -50%) scale(${target.scale})`;
+      if (!hasFlown || status === "stopped") shell.style.transform = "translate3d(-9999px,-9999px,0)";
     }
     function frame(now: number) {
       if (document.hidden) return;
       if (lastNow) elapsed += Math.min(50, now - lastNow);
       lastNow = now;
       if (state.current.failed) { rest("stopped"); return; }
-      // Completed visits stay still, including while their order quote loads.
-      if (!hasFlown && state.current.matchingReady) { rest("landed"); return; }
+      // Completed visits keep the icon offscreen, including while their order quote loads.
+      if (!hasFlown && state.current.matchingReady) { rest("exited"); return; }
       if (state.current.ready) {
-        if (!hasFlown) { rest("landed"); return; }
-        if (landingAt === null) { landingAt = elapsed; page.setAttribute("data-flight", "landing"); }
-        draw();
-        if (elapsed - landingAt >= 1200) { rest("landed"); return; }
+        if (!hasFlown) { rest("exited"); return; }
+        if (draw(true)) { rest("exited"); return; }
       } else {
         tiles.forEach((tile, i) => tile.classList.toggle("is-active", elapsed >= 300 + i * 540));
         analysis.classList.toggle("is-complete", elapsed >= 2460);
@@ -125,7 +126,7 @@ export function usePharmacyAnimation(
       cancelAnimationFrame(frameId);
       lastNow = 0;
       if (ended && !state.current.ready && !state.current.failed && !state.current.matchingReady && !motion.matches) {
-        ended = false; hasFlown = false; elapsed = 0; landingAt = null; flight = null; previousFlight = null;
+        ended = false; hasFlown = false; elapsed = 0; exit = null; flight = null; previousFlight = null;
       }
       if (!document.hidden && !ended && !motion.matches) frameId = requestAnimationFrame(frame);
     }
@@ -134,7 +135,7 @@ export function usePharmacyAnimation(
       if (motion.matches) {
         tiles.forEach((tile) => tile.classList.add("is-active"));
         phaseTo("matching");
-        rest(state.current.failed ? "stopped" : "landed");
+        rest("stopped");
       } else visible();
     }
     const observer = new ResizeObserver(() => {

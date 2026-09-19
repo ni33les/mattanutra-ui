@@ -26,16 +26,11 @@
       var(--mn-bg);
   }
 
-  #mn-pharmacy-combined .mn-top,
   #mn-pharmacy-combined .mn-actions {
     display: flex;
     align-items: center;
     flex-wrap: wrap;
     gap: 9px;
-  }
-
-  #mn-pharmacy-combined .mn-top {
-    justify-content: space-between;
   }
 
   #mn-pharmacy-combined .mn-recovery-button {
@@ -54,29 +49,6 @@
   #mn-pharmacy-combined .mn-recovery-button:focus-visible {
     background: var(--mn-soft-green);
     outline: none;
-  }
-
-  #mn-pharmacy-combined .mn-brand {
-    font-family: var(--mn-font-display), Georgia, serif;
-    letter-spacing: -0.03em;
-  }
-
-  #mn-pharmacy-combined .mn-brand-lockup {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    transform-origin: left center;
-  }
-
-  #mn-pharmacy-combined .mn-brand-mark {
-    width: 38px;
-    height: 38px;
-    display: block;
-    object-fit: contain;
-  }
-
-  #mn-pharmacy-combined .mn-brand span {
-    color: var(--mn-green);
   }
 
   #mn-pharmacy-combined .mn-example {
@@ -482,7 +454,7 @@
     z-index: 5;
     overflow: visible;
     opacity: 0;
-    transform: translate3d(0, 0, 0) translate(-50%, -50%);
+    transform: translate3d(-9999px, -9999px, 0) translate(-50%, -50%);
     will-change: transform, opacity;
     transition: opacity 220ms ease;
     filter:
@@ -614,10 +586,6 @@
       0 0 42px color-mix(in srgb, var(--mn-gold) 68%, transparent);
   }
 
-  #mn-pharmacy-combined .mn-window[data-phase="clarity"] .mn-brand-lockup {
-    animation: mn-pharmacy-combined-brand-launch 760ms ease-out both;
-  }
-
   #mn-pharmacy-combined .mn-clarity-particle {
     width: var(--size, 8px);
     height: var(--size, 8px);
@@ -657,12 +625,6 @@
     0% { opacity: 0; transform: translate(-50%, -50%) scale(.18); }
     34% { opacity: 1; transform: translate(-50%, -50%) scale(.72); }
     100% { opacity: 0; transform: translate(-50%, -50%) scale(1.65); }
-  }
-
-  @keyframes mn-pharmacy-combined-brand-launch {
-    0% { filter: none; transform: scale(1); }
-    36% { filter: drop-shadow(0 0 12px color-mix(in srgb, var(--mn-gold) 70%, transparent)); transform: scale(1.12); }
-    100% { filter: none; transform: scale(1); }
   }
 
   @keyframes mn-pharmacy-combined-logo-aura {
@@ -1382,11 +1344,6 @@
       border-radius: 18px;
     }
 
-    #mn-pharmacy-combined .mn-top {
-      justify-content: space-between;
-      text-align: center;
-    }
-
     #mn-pharmacy-combined .mn-status-row {
       min-height: 92px;
       grid-template-columns: minmax(0, 1fr) 58px;
@@ -1652,10 +1609,8 @@
 
 /* One flight continues until real readiness; its dust uses the same pausable clock. */
 #mn-pharmacy-combined .mn-flight-layer { position: absolute; inset: 0; z-index: 7; pointer-events: none; }
-#mn-pharmacy-combined .mn-window:is([data-flight="flying"], [data-flight="landing"]) .mn-clarity-logo-shell { opacity: 1; }
-#mn-pharmacy-combined .mn-window:is([data-flight="flying"], [data-flight="landing"]) .mn-brand-mark { opacity: 0; }
-#mn-pharmacy-combined .mn-window:is([data-flight="landed"], [data-flight="stopped"]) .mn-clarity-logo-shell { opacity: 0; transition: none; }
-#mn-pharmacy-combined .mn-window[data-flight] .mn-brand-lockup,
+#mn-pharmacy-combined .mn-window:is([data-flight="flying"], [data-flight="exiting"]) .mn-clarity-logo-shell { opacity: 1; }
+#mn-pharmacy-combined .mn-window:is([data-flight="exited"], [data-flight="stopped"]) .mn-clarity-logo-shell { opacity: 0; transition: none; }
 #mn-pharmacy-combined .mn-flight-layer .mn-clarity-logo-shell::before { animation: none; }
 @media (prefers-reduced-motion: reduce) { #mn-pharmacy-combined .mn-flight-layer { display: none; } }
 #mn-pharmacy-combined .mn-window[data-phase="waiting"] .mn-rain,
