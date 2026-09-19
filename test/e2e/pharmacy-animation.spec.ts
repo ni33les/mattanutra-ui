@@ -14,34 +14,33 @@ async function pending(page: Page, width: number, virtualClock = true) {
   await expect(page.locator(".mn-window")).toHaveAttribute("data-paused","false");
   return saved;
 }
-for(const width of [390,1280]) test(`PHARM-MOTION ${width}px single butterfly flight has a consistent attached trail`,async({page})=>{
+for(const width of [390,1280]) test(`PHARM-MOTION ${width}px butterfly leaves fading magic dust instead of a line`,async({page})=>{
   await pending(page,width);
   await page.clock.runFor(500);
   await expect(page.locator(".mn-window")).toHaveAttribute("data-flight","flying");
+  await expect(page.locator(".mn-clarity-path,.mn-clarity-path-glow")).toHaveCount(0);
+  await expect(page.locator(".mn-dust-particle")).toHaveCount(48);
   await page.evaluate(()=>{
-    const samples:{gap:number;angle:number;x:number;y:number;time:number;length:number}[]=[];
+    const samples:{gap:number;angle:number;x:number;y:number;time:number;count:number}[]=[];
     Object.assign(window,{motionSamples:samples});const start=performance.now();
     const sample=()=>{
-      const path=document.querySelector<SVGPathElement>(".mn-clarity-path")!,shell=document.querySelector<HTMLElement>(".mn-clarity-logo-shell")!;
-      if(path.getAttribute("d")){
-        const length=path.getTotalLength(),end=path.getPointAtLength(length).matrixTransform(path.getScreenCTM()!);
-        const tip=document.querySelector(".mn-leading-spark")!.getBoundingClientRect(),transform=new DOMMatrix(getComputedStyle(shell).transform);
-        samples.push({gap:Math.hypot(end.x-tip.x-tip.width/2,end.y-tip.y-tip.height/2),angle:Math.atan2(transform.b,transform.a)*180/Math.PI,x:transform.e,y:transform.f,time:performance.now()-start,length});
-      }
-      if(performance.now()-start<19000)requestAnimationFrame(sample);
+      const shell=document.querySelector<HTMLElement>(".mn-clarity-logo-shell")!,tip=document.querySelector(".mn-leading-spark")!.getBoundingClientRect(),transform=new DOMMatrix(getComputedStyle(shell).transform);
+      const particles=[...document.querySelectorAll<HTMLElement>(".mn-dust-particle")].filter(el=>Number(getComputedStyle(el).opacity)>.05);
+      const gap=Math.min(...particles.map(el=>{const r=el.getBoundingClientRect();return Math.hypot(r.x+r.width/2-tip.x-tip.width/2,r.y+r.height/2-tip.y-tip.height/2);}));
+      samples.push({gap,angle:Math.atan2(transform.b,transform.a)*180/Math.PI,x:transform.e,y:transform.f,time:performance.now()-start,count:particles.length});
+      if(performance.now()-start<8000)requestAnimationFrame(sample);
     };requestAnimationFrame(sample);
   });
-  await page.clock.runFor(19000);
-  const samples=await page.evaluate(()=>(window as unknown as {motionSamples:{gap:number;angle:number;x:number;y:number;time:number;length:number}[]}).motionSamples);
+  await page.clock.runFor(8000);
+  const samples=await page.evaluate(()=>(window as unknown as {motionSamples:{gap:number;angle:number;x:number;y:number;time:number;count:number}[]}).motionSamples);
   await test.info().attach("motion-measurements",{body:JSON.stringify(samples),contentType:"application/json"});
-  expect(samples.length).toBeGreaterThan(900);
-  expect(Math.max(...samples.map(s=>s.gap))).toBeLessThan(2);
+  expect(samples.length).toBeGreaterThan(400);
+  expect(Math.max(...samples.map(s=>s.gap))).toBeLessThan(20);
   expect(Math.max(...samples.slice(1).map((s,i)=>Math.abs(s.angle-samples[i].angle)))).toBeLessThan(1);
   expect(Math.max(...samples.slice(1).map((s,i)=>Math.hypot(s.x-samples[i].x,s.y-samples[i].y)))).toBeLessThan(12);
-  const tail=samples.filter(s=>s.time>12000);expect(tail.length).toBeGreaterThan(200);
-  for(const sample of tail)expect(Math.abs(sample.length-(width===390?180:300))).toBeLessThan(2);
-  expect(await page.locator(".mn-clarity-path").evaluate(el=>getComputedStyle(el).stroke)).not.toContain("url(");
-  await page.screenshot({path:test.info().outputPath(`butterfly-${width}.png`),fullPage:true});
+  const steady=samples.filter(s=>s.time>2000);expect(steady.length).toBeGreaterThan(200);
+  for(const sample of steady){expect(sample.count).toBeGreaterThanOrEqual(20);expect(sample.count).toBeLessThanOrEqual(48);}
+  await page.screenshot({path:test.info().outputPath(`magic-dust-${width}.png`),fullPage:true});
 });
 test("PHARM-MOTION pending work keeps the same flight until real results arrive",async({page})=>{
   await pending(page,390);
@@ -83,15 +82,11 @@ for(const width of [390,1280]) test(`PHARM-FLIGHT ${width}px completion reveals 
   const quoteGate=new Promise<void>(resolve=>{releaseQuote=resolve;});
   await page.route("**/api/retail/orders?*",async route=>{const response=await route.fetch();quoteLoaded=true;await quoteGate;await route.fulfill({response});});
   await page.evaluate(()=>{
-    const samples:{x:number;y:number;gap:number}[]=[];Object.assign(window,{landingSamples:samples});
+    const samples:{x:number;y:number;dust:number}[]=[];Object.assign(window,{landingSamples:samples});
     const sample=()=>{
       const shell=document.querySelector(".mn-clarity-logo-shell")!,r=shell.getBoundingClientRect();
-      const path=document.querySelector<SVGPathElement>(".mn-clarity-path")!;
-      const tip=document.querySelector(".mn-leading-spark")!.getBoundingClientRect();
-      if(path.getAttribute("d")){
-        const end=path.getPointAtLength(path.getTotalLength()).matrixTransform(path.getScreenCTM()!);
-        samples.push({x:r.x+r.width/2,y:r.y+r.height/2,gap:Math.hypot(end.x-tip.x-tip.width/2,end.y-tip.y-tip.height/2)});
-      }
+      const dust=[...document.querySelectorAll<HTMLElement>(".mn-dust-particle")].filter(el=>Number(getComputedStyle(el).opacity)>.05).length;
+      samples.push({x:r.x+r.width/2,y:r.y+r.height/2,dust});
       if(document.querySelector(".mn-window")!.getAttribute("data-flight")!=="landed")requestAnimationFrame(sample);
     };requestAnimationFrame(sample);
   });
@@ -111,9 +106,10 @@ for(const width of [390,1280]) test(`PHARM-FLIGHT ${width}px completion reveals 
   const shell=page.locator(".mn-clarity-logo-shell"),rest=await shell.evaluate(el=>getComputedStyle(el).transform);
   const gap=await page.evaluate(()=>{const a=document.querySelector(".mn-clarity-logo-shell")!.getBoundingClientRect(),b=document.querySelector(".mn-brand-mark")!.getBoundingClientRect();return Math.hypot(a.x+a.width/2-b.x-b.width/2,a.y+a.height/2-b.y-b.height/2);});
   expect(gap).toBeLessThan(.1);
-  const samples=await page.evaluate(()=>(window as unknown as {landingSamples:{x:number;y:number;gap:number}[]}).landingSamples);
+  const samples=await page.evaluate(()=>(window as unknown as {landingSamples:{x:number;y:number;dust:number}[]}).landingSamples);
   expect(samples.length).toBeGreaterThan(50);
-  expect(Math.max(...samples.map(s=>s.gap))).toBeLessThan(2);
+  expect(samples.some(s=>s.dust>20)).toBe(true);
+  expect(await page.locator(".mn-dust-particle").evaluateAll(elements=>elements.every(el=>getComputedStyle(el).opacity==="0"))).toBe(true);
   expect(Math.max(...samples.slice(1).map((s,i)=>Math.hypot(s.x-samples[i].x,s.y-samples[i].y)))).toBeLessThan(25);
   await test.info().attach("landing-measurements",{body:JSON.stringify(samples),contentType:"application/json"});
   await expect(page.locator(".mn-flight-spark")).toHaveCount(0);
@@ -126,9 +122,11 @@ test("PHARM-FLIGHT hidden tabs pause flight; reduced motion and navigation stop 
   await page.clock.runFor(6000);
   await expect(page.locator(".mn-window")).toHaveAttribute("data-flight","flying");
   const shell=page.locator(".mn-clarity-logo-shell"),before=await shell.evaluate(el=>getComputedStyle(el).transform);
+  const dustBefore=await page.locator(".mn-dust-particle").evaluateAll(elements=>elements.map(el=>el.getAttribute("style")));
   await page.evaluate(()=>{Object.defineProperty(document,"hidden",{configurable:true,value:true});document.dispatchEvent(new Event("visibilitychange"));});
   await page.clock.runFor(4000);
   expect(await shell.evaluate(el=>getComputedStyle(el).transform)).toBe(before);
+  expect(await page.locator(".mn-dust-particle").evaluateAll(elements=>elements.map(el=>el.getAttribute("style")))).toEqual(dustBefore);
   await page.evaluate(()=>{Object.defineProperty(document,"hidden",{configurable:true,value:false});document.dispatchEvent(new Event("visibilitychange"));});
   await page.clock.runFor(500);
   expect(await shell.evaluate(el=>getComputedStyle(el).transform)).not.toBe(before);
@@ -137,6 +135,7 @@ test("PHARM-FLIGHT hidden tabs pause flight; reduced motion and navigation stop 
   await page.clock.runFor(3000);
   expect(await shell.evaluate(el=>getComputedStyle(el).transform)).toBe(reduced);
   await expect(page.getByTestId("pharmacy-order")).toHaveCount(0);
+  expect(await page.locator(".mn-dust-particle").evaluateAll(elements=>elements.every(el=>getComputedStyle(el).opacity==="0"))).toBe(true);
   await page.goto("/en/nutrition/quiz");
-  await expect(page.locator(".mn-flight-spark,.mn-clarity-logo-shell")).toHaveCount(0);
+  await expect(page.locator(".mn-dust-particle,.mn-clarity-logo-shell")).toHaveCount(0);
 });

@@ -249,11 +249,10 @@ for (const width of [1280, 390])
       "data-phase",
       "clarity",
     );
-    const path = await page.locator(".mn-clarity-path").getAttribute("d");
-    expect(path).toMatch(/^M /);
-    expect(await page.locator(".mn-clarity-path").evaluate((p: SVGPathElement) => p.getTotalLength())).toBeGreaterThan(0);
-    // Dense PHARM-MOTION probes verify the drawn endpoint against the actual leaf tip.
-    // Historical attachment geometry stays recorded; runtime now uses one continuous butterfly curve.
+    await expect(page.locator(".mn-clarity-path,.mn-clarity-path-glow")).toHaveCount(0);
+    await expect(page.locator(".mn-dust-particle")).toHaveCount(48);
+    expect(await page.locator(".mn-dust-particle").evaluateAll(elements=>elements.filter(el=>Number(getComputedStyle(el).opacity)>.05).length)).toBeGreaterThan(20);
+    // Historical attachment geometry stays recorded; runtime uses one butterfly curve with magic dust.
     await expect(page.locator(".mn-window")).toHaveAttribute("data-flight", "flying");
     await expect(page.locator(".mn-tap.is-active")).toHaveCount(0);
     await page.screenshot({
@@ -281,7 +280,7 @@ for (const width of [1280, 390])
     await page.goto("/en/nutrition/quiz");
     await expect(page.getByTestId("questionnaire-welcome")).toBeVisible();
     await expect(
-      page.locator(".mn-flight-spark,.mn-clarity-logo-shell"),
+      page.locator(".mn-dust-particle,.mn-clarity-logo-shell"),
     ).toHaveCount(0);
   });
 

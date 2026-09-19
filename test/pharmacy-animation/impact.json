@@ -21,7 +21,7 @@
     {
       "file": "test/pharmacy-animation/motion.test.ts",
       "expectedCases": 7,
-      "reason": "One smooth trajectory, spatial trail independent of frame rate, exact landing and bounded visible motion"
+      "reason": "One smooth trajectory, bounded magic dust independent of frame rate, exact landing and bounded visible motion"
     }
   ],
   "browser": [
@@ -29,7 +29,7 @@
       "file": "test/e2e/pharmacy-animation.spec.ts",
       "expectedCases": 4,
       "grep": "PHARM-MOTION",
-      "reason": "One trajectory across former phase times; constant attached trail, real frames, readiness landing and cancellation"
+      "reason": "One trajectory across former phase times; soft dust instead of a line, real frames, readiness landing and cancellation"
     },
     {
       "file": "test/e2e/pharmacy-combined.spec.ts",

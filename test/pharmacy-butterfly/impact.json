@@ -1,5 +1,5 @@
 {
-  "releaseBase": "45ad7c5afd14502f83d6ad627f892728c0a6790b",
+  "releaseBase": "0c5d22709fb7654139215c731c35d4f1a127633e",
   "scope": "pharmacy_single_butterfly_flight",
   "inputs": [
     "test/helpers/pharmacy-fixture.ts",
@@ -21,7 +21,7 @@
     {
       "file": "test/pharmacy-animation/motion.test.ts",
       "expectedCases": 7,
-      "reason": "One smooth trajectory, spatial trail independent of frame rate, exact landing and bounded visible motion"
+      "reason": "One smooth trajectory, bounded magic dust independent of frame rate, exact landing and bounded visible motion"
     }
   ],
   "browser": [
@@ -29,7 +29,7 @@
       "file": "test/e2e/pharmacy-animation.spec.ts",
       "expectedCases": 7,
       "grep": "PHARM-MOTION|PHARM-FLIGHT",
-      "reason": "One trajectory across former phase times; constant attached trail, real frames, readiness landing and cancellation"
+      "reason": "One trajectory across former phase times; soft dust instead of a line, real frames, readiness landing and cancellation"
     },
     {
       "file": "test/e2e/pharmacy-combined.spec.ts",

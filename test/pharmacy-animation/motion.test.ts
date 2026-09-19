@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import * as motion from "../../lib/pharmacy-presentation.ts";
 const area = (width = 650) => ({ left: 60, top: 110, width, height: 400, source: {x: 38, y: 38}, shellSize: 82 });
-const length = (points: motion.Point[]) => points.slice(1).reduce((sum,p,i) => sum + Math.hypot(p.x-points[i].x,p.y-points[i].y),0);
 
 test("PHARM-MOTION-01 one butterfly curve has gentle continuous movement through the former phase boundaries", () => {
   assert.equal(typeof motion.butterflyFlight, "function");
@@ -27,17 +26,31 @@ test("PHARM-MOTION-02 takeoff begins at the logo and the same smooth path closes
   }
   assert.ok(flight.samples.length<=769);
 });
-test("PHARM-MOTION-03 trail is distance-based, frame-rate independent, bounded and always ends at the sprite tip", () => {
+test("PHARM-MOTION-03 magic dust emits at the leaf tip, drifts and fades independently of frame rate with bounded particles", () => {
+  assert.equal(typeof motion.createMagicDust, "function");
+  const snapshots: { id:number; born:number; origin:motion.Point }[][]=[];
   for(const step of [8,16,33]){
-    const history:motion.Point[]=[],flight=motion.butterflyFlight(area());
-    for(let time=0;time<90000;time+=step){
-      const tip=motion.butterflyPose(flight,time).tip,trail=motion.updateFlightTrail(history,tip,260);
-      assert.deepEqual(trail.at(-1),tip);
-      assert.ok(history.length<=133);
-      assert.ok(length(trail)<=260.001);
-      if(time>12000)assert.ok(Math.abs(length(trail)-260)<.001,`trail collapsed at ${time}/${step}`);
+    const state=motion.createMagicDust();
+    for(let time=0;time<6000;time+=step){
+      const frames=motion.stepMagicDust(state,{x:time/10,y:time/20},time);
+      assert.ok(frames.length<=48);assert.ok(state.particles.length<=48);
+      for(const frame of frames){assert.ok(frame.opacity>=0&&frame.opacity<=1);assert.ok(Number.isFinite(frame.point.x+frame.point.y+frame.scale+frame.angle));}
+      if(time>2000)assert.ok(frames.filter(f=>f.opacity>.05).length>=20);
     }
+    motion.stepMagicDust(state,{x:600,y:300},6000);
+    snapshots.push(state.particles.map(p=>({id:p.id,born:p.born,origin:p.origin})));
+    for(const p of state.particles){assert.ok(Math.abs(p.origin.x-p.born/10)<.00001);assert.ok(Math.abs(p.origin.y-p.born/20)<.00001);}
+    assert.deepEqual(motion.stepMagicDust(state,{x:600,y:300},8000,false),[]);
+    assert.equal(state.particles.length,0);
   }
+  for(const sample of snapshots.slice(1))assert.deepEqual(sample.map(p=>[p.id,p.born]),snapshots[0].map(p=>[p.id,p.born]));
+  const state=motion.createMagicDust();
+  const birth=motion.stepMagicDust(state,{x:10,y:20},0)[0];assert.deepEqual(birth.point,{x:10,y:20});
+  assert.equal(birth.opacity,0);
+  const bright=motion.stepMagicDust(state,{x:10,y:20},200,false)[0];
+  const fading=motion.stepMagicDust(state,{x:10,y:20},1300,false)[0];
+  assert.ok(bright.opacity>.3);assert.ok(fading.opacity<bright.opacity);
+  assert.ok(Math.hypot(fading.point.x-10,fading.point.y-20)>4);
 });
 test("PHARM-FLIGHT-01 movement continues for as long as processing takes without a second routine",()=>{
   const flight=motion.butterflyFlight(area());
@@ -46,7 +59,7 @@ test("PHARM-FLIGHT-01 movement continues for as long as processing takes without
     assert.ok(Math.hypot(a.point.x-b.point.x,a.point.y-b.point.y)>10);
   }
 });
-test("PHARM-FLIGHT-02 banking and subtle flutter keep the trail tip attached exactly",()=>{
+test("PHARM-FLIGHT-02 banking and subtle flutter keep the dust emission point attached exactly",()=>{
   const flight=motion.butterflyFlight(area());
   for(let time=0;time<30000;time+=23){
     const pose=motion.butterflyPose(flight,time),offset=flight.shellSize*.36*pose.scale,radians=pose.angle*Math.PI/180;

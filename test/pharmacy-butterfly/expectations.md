@@ -9,3 +9,7 @@ The user explicitly replaces the opening hop/tap choreography and its later loop
 - Completed plans remain still. Real readiness reveals results immediately while the sprite lands. Hidden tabs, reduced motion, navigation, order state and ordinary web pages retain their behaviour.
 
 No prices, catalogue facts, API contracts or matching inputs change. Earlier evidence is retained outside the repository.
+
+## Magic-dust follow-up
+
+The user replaces the continuous line with soft magic-dust sparkles. PHARM-MOTION-03 now checks time-based emission at the leaf tip, gentle drift, fading, frame-rate independence and a fixed 48-particle pool. Browser checks replace line-length assertions with visible dust, near-tip emission, no drawn line and full cleanup. Flight coordinates and landing assertions remain unchanged. Previous line-trail results remain historical evidence.

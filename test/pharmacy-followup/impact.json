@@ -66,7 +66,7 @@
       "file": "test/e2e/pharmacy-animation.spec.ts",
       "expectedCases": 4,
       "grep": "PHARM-MOTION",
-      "reason": "Retained mobile/desktop trail fidelity, smooth animation and pending phase"
+      "reason": "Retained mobile/desktop dust emission, smooth animation and pending phase"
     },
     {
       "file": "test/e2e/web-preferences.spec.ts",
