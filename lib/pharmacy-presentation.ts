@@ -305,23 +305,48 @@ function butterflyTip(pose: Omit<ButterflyPose,"tip">,shellSize: number): Butter
   return {...pose,tip:{x:pose.point.x+offset*(Math.cos(radians)+Math.sin(radians)),y:pose.point.y+offset*(Math.sin(radians)-Math.cos(radians))}};
 }
 
-/** Keep a spatial ribbon, not a frame/time window. Interpolate its tail instead of popping whole points. */
-export function updateFlightTrail(history: Point[],tip: Point,limit: number): Point[] {
-  const last=history.at(-1);
-  if(!last||Math.hypot(tip.x-last.x,tip.y-last.y)>=2)history.push({...tip});
-  const end=history.at(-1)!;
-  const points=end.x===tip.x&&end.y===tip.y?[...history]:[...history,tip];
-  let remaining=limit;
-  for(let i=points.length-1;i>0;i--){
-    const next=points[i],previous=points[i-1],distance=Math.hypot(next.x-previous.x,next.y-previous.y);
-    if(distance>=remaining){
-      const mix=remaining/(distance||1),start={x:next.x+(previous.x-next.x)*mix,y:next.y+(previous.y-next.y)*mix};
-      if(i>1)history.splice(0,i-1);
-      return [start,...points.slice(i)];
-    }
-    remaining-=distance;
+export const MAGIC_DUST_CAPACITY = 48;
+type DustParticle = { id: number; born: number; origin: Point; life: number };
+export function createMagicDust() {
+  return {
+    particles: [] as DustParticle[],
+    previous: null as { tip: Point; time: number } | null,
+    nextEmission: 0,
+    sequence: 0,
+  };
+}
+
+/** Emit on the flight clock, interpolate births at the leaf tip, and reuse a bounded pool. */
+export function stepMagicDust(state: ReturnType<typeof createMagicDust>, tip: Point, time: number, emit = true) {
+  const previous = state.previous ?? { tip, time };
+  // A late frame never creates an unbounded backlog of invisible particles.
+  const skipped = Math.max(0, Math.floor((time - state.nextEmission) / 40) + 1 - MAGIC_DUST_CAPACITY);
+  state.nextEmission += skipped * 40;
+  state.sequence += skipped;
+  while (state.nextEmission <= time) {
+    const born = state.nextEmission, id = state.sequence++;
+    const mix = Math.max(0, Math.min(1, (born - previous.time) / (time - previous.time || 1)));
+    if (emit) state.particles.push({
+      id, born, life: 1400 + (id % 6) * 80,
+      origin: { x: previous.tip.x + (tip.x - previous.tip.x) * mix, y: previous.tip.y + (tip.y - previous.tip.y) * mix },
+    });
+    state.nextEmission += 40;
   }
-  return points;
+  state.previous = { tip, time };
+  state.particles = state.particles.filter(p => time - p.born < p.life);
+  return state.particles.map(p => {
+    const age = time - p.born, progress = age / p.life;
+    return {
+      id: p.id,
+      point: {
+        x: p.origin.x + Math.sin(p.id * 2.399) * (8 + p.id % 5 * 3) * progress,
+        y: p.origin.y + (12 + p.id % 7 * 2) * progress * progress + Math.sin(p.id * 1.7) * progress * 6,
+      },
+      opacity: smootherStep(age / 40) * (1 - progress) ** 2 * (.72 + .28 * Math.sin(age / 130 + p.id * .7) ** 2),
+      scale: (.65 + p.id % 5 * .16) * (1 - progress * .5),
+      angle: p.id * 137.5 % 180 + age * .025,
+    };
+  });
 }
 
 /** Resizing blends the same trajectory without moving its origin abruptly. */

@@ -6,9 +6,9 @@ import {
   blendButterflyPoses,
   landButterflyPose,
   smootherStep,
-  updateFlightTrail,
+  createMagicDust,
+  stepMagicDust,
   type PharmacyPhase,
-  type Point,
 } from "@/lib/pharmacy-presentation";
 
 /** One flight clock, independent of the presentation stages and real generation. */
@@ -30,8 +30,7 @@ export function usePharmacyAnimation(
     const page = root.current;
     const shell = page.querySelector<HTMLElement>(".mn-clarity-logo-shell")!;
     const brand = page.querySelector<HTMLElement>(".mn-brand-mark")!;
-    const orbit = page.querySelector<SVGElement>(".mn-clarity-orbit")!;
-    const paths = [...page.querySelectorAll<SVGPathElement>(".mn-clarity-path, .mn-clarity-path-glow")];
+    const particles = [...page.querySelectorAll<HTMLElement>(".mn-dust-particle")];
     const tiles = [...page.querySelectorAll<HTMLElement>(".mn-analysis-tile")];
     const analysis = page.querySelector<HTMLElement>(".mn-analysis")!;
     const motion = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -39,8 +38,12 @@ export function usePharmacyAnimation(
     let phase: PharmacyPhase | undefined, landingAt: number | null = null;
     let flight: ReturnType<typeof butterflyFlight> | null = null;
     let previousFlight: ReturnType<typeof butterflyFlight> | null = null, resizedAt = 0;
-    let width = 0, shellSize = 92, trailLength = 300, dirty = true;
-    const history: Point[] = [];
+    let width = 0, shellSize = 92, dirty = true;
+    let dust = createMagicDust();
+    const clearDust = () => {
+      dust = createMagicDust();
+      particles.forEach(element => { element.style.opacity = "0"; });
+    };
     const phaseTo = (next: PharmacyPhase) => {
       if (phase !== next) { phase = next; onPhase(next); }
     };
@@ -58,9 +61,6 @@ export function usePharmacyAnimation(
       previousFlight = flight;
       resizedAt = elapsed;
       flight = butterflyFlight({ left: margin, top, width: Math.max(80, width - margin * 2), height: bottom - top, source: destination().point, shellSize });
-      trailLength = Math.min(300, Math.max(180, width * .34));
-      orbit.setAttribute("viewBox", `0 0 ${width} ${parent.height}`);
-      Object.assign(orbit.style, { width: `${width}px`, height: `${parent.height}px` });
       dirty = false;
     }
     function draw() {
@@ -78,18 +78,17 @@ export function usePharmacyAnimation(
         fade = 1 - smootherStep(progress);
       }
       shell.style.transform = `translate3d(${pose.point.x}px, ${pose.point.y}px, 0) translate(-50%, -50%) rotate(${pose.angle}deg) scale(${pose.scale})`;
-      const trail = updateFlightTrail(history, pose.tip, trailLength);
-      const path = trail.map((tip, i) => `${i ? "L" : "M"} ${tip.x.toFixed(3)} ${tip.y.toFixed(3)}`).join(" ");
-      paths.forEach((element) => {
-        element.setAttribute("d", path);
-        element.style.opacity = String(.85 * fade);
-      });
+      particles.forEach(element => { element.style.opacity = "0"; });
+      for (const particle of stepMagicDust(dust, pose.tip, elapsed)) {
+        const element = particles[particle.id % particles.length];
+        element.style.transform = `translate3d(${particle.point.x}px, ${particle.point.y}px, 0) translate(-50%, -50%) rotate(${particle.angle}deg) scale(${particle.scale})`;
+        element.style.opacity = String(particle.opacity * fade);
+      }
     }
     function rest(status: "landed" | "stopped") {
       ended = true;
       page.setAttribute("data-flight", status);
-      history.length = 0;
-      paths.forEach((path) => path.removeAttribute("d"));
+      clearDust();
       shellSize = shell.offsetWidth || 92;
       const target = destination();
       shell.style.transform = `translate3d(${target.point.x}px, ${target.point.y}px, 0) translate(-50%, -50%) scale(${target.scale})`;
@@ -150,9 +149,8 @@ export function usePharmacyAnimation(
       window.removeEventListener("resize", resized);
       document.removeEventListener("visibilitychange", visible);
       motion.removeEventListener("change", reduced);
-      history.length = 0;
+      clearDust();
       shell.style.transform = "translate3d(-9999px,-9999px,0)";
-      paths.forEach((path) => { path.removeAttribute("d"); path.style.removeProperty("opacity"); });
       page.removeAttribute("data-paused");
       page.removeAttribute("data-flight");
     };

@@ -472,46 +472,6 @@
     animation: mn-pharmacy-combined-clarity-halo 3500ms 80ms ease-out both;
   }
 
-  #mn-pharmacy-combined .mn-clarity-orbit {
-    width: 100%;
-    height: 100%;
-    position: absolute;
-    inset: 0;
-    overflow: visible;
-  }
-
-  #mn-pharmacy-combined .mn-clarity-path,
-  #mn-pharmacy-combined .mn-clarity-path-glow {
-    fill: none;
-    stroke-linecap: round;
-    stroke-dasharray: 100;
-    stroke-dashoffset: 100;
-    opacity: 0;
-    transition: opacity 360ms ease;
-  }
-
-  #mn-pharmacy-combined .mn-clarity-path-glow {
-    /* A translucent halo keeps each changing stroke local to the path.
-       Blurring this viewport-spanning SVG rerasterizes it on every frame. */
-    stroke: color-mix(in srgb, var(--mn-gold) 22%, transparent);
-    stroke-width: 11;
-  }
-
-  #mn-pharmacy-combined .mn-clarity-path {
-    stroke: var(--mn-gold);
-    stroke-width: 3;
-  }
-
-  #mn-pharmacy-combined .mn-window[data-phase="clarity"] .mn-clarity-path,
-  #mn-pharmacy-combined .mn-window[data-phase="clarity"] .mn-clarity-path-glow {
-    opacity: .95;
-  }
-
-  #mn-pharmacy-combined .mn-window.is-final-tap .mn-clarity-path,
-  #mn-pharmacy-combined .mn-window.is-final-tap .mn-clarity-path-glow {
-    opacity: .18;
-  }
-
   #mn-pharmacy-combined .mn-clarity-logo-shell {
     width: 92px;
     height: 92px;
@@ -1546,11 +1506,6 @@
       height: 330px;
     }
 
-    #mn-pharmacy-combined .mn-clarity-orbit {
-      width: 100%;
-      height: 100%;
-    }
-
     #mn-pharmacy-combined .mn-clarity-logo-shell {
       width: 82px;
       height: 82px;
@@ -1698,8 +1653,6 @@
     #mn-pharmacy-combined .mn-clarity-logo-shell,
     #mn-pharmacy-combined .mn-leading-spark,
     #mn-pharmacy-combined .mn-flight-spark,
-    #mn-pharmacy-combined .mn-clarity-path,
-    #mn-pharmacy-combined .mn-clarity-path-glow,
     #mn-pharmacy-combined .mn-clarity-particle,
     #mn-pharmacy-combined .mn-clarity-question,
     #mn-pharmacy-combined .mn-tap,
@@ -1738,15 +1691,12 @@
 #mn-pharmacy-combined .mn-estimate { margin:0 auto 10px; text-align:center; color:var(--mn-muted); }
 #mn-pharmacy-combined .mn-match svg { display:inline-block; vertical-align:middle; margin-right:4px; }
 
-/* Work controls landing; the original opening sequence continues into a bounded flight. */
+/* One flight continues until real readiness; its dust uses the same pausable clock. */
 #mn-pharmacy-combined .mn-flight-layer { position: absolute; inset: 0; z-index: 7; pointer-events: none; }
 #mn-pharmacy-combined .mn-window:is([data-flight="flying"], [data-flight="landing"]) .mn-clarity-logo-shell { opacity: 1; }
 #mn-pharmacy-combined .mn-window:is([data-flight="flying"], [data-flight="landing"]) .mn-brand-mark { opacity: 0; }
 #mn-pharmacy-combined .mn-window:is([data-flight="landed"], [data-flight="stopped"]) .mn-clarity-logo-shell { opacity: 0; transition: none; }
-#mn-pharmacy-combined .mn-window:is([data-flight="flying"], [data-flight="landing"]) .mn-clarity-path,
-#mn-pharmacy-combined .mn-window:is([data-flight="flying"], [data-flight="landing"]) .mn-clarity-path-glow { opacity: .8; }
 #mn-pharmacy-combined .mn-window:is([data-flight="flying"], [data-flight="landing"]) .mn-leading-spark { opacity: 1; }
-#mn-pharmacy-combined .mn-flight-layer :is(.mn-clarity-path, .mn-clarity-path-glow) { stroke-dasharray: none; stroke-dashoffset: 0; stroke-linejoin: round; transition: none; }
 #mn-pharmacy-combined .mn-window[data-flight] .mn-brand-lockup,
 #mn-pharmacy-combined .mn-flight-layer .mn-leading-spark,
 #mn-pharmacy-combined .mn-flight-layer .mn-clarity-logo-shell::before { animation: none; }
@@ -1758,4 +1708,28 @@
 @keyframes mn-pharmacy-combined-waiting {
   from { transform: translateX(-50%) scale(1); }
   to { transform: translateX(-50%) scale(1.025); }
+}
+
+#mn-pharmacy-combined .mn-magic-dust { position: absolute; inset: 0; z-index: 6; pointer-events: none; }
+#mn-pharmacy-combined .mn-dust-particle {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  color: var(--mn-gold);
+  background: currentColor;
+  box-shadow: 0 0 7px 2px color-mix(in srgb, var(--mn-gold) 38%, transparent);
+  opacity: 0;
+  will-change: transform, opacity;
+}
+#mn-pharmacy-combined .mn-dust-particle:nth-child(3n) { color: var(--mn-gold-tint); }
+#mn-pharmacy-combined .mn-dust-particle:nth-child(4n) {
+  width: 9px;
+  height: 9px;
+  border-radius: 0;
+  background: radial-gradient(circle, #fff8da 0 10%, var(--mn-gold) 55%);
+  clip-path: polygon(50% 0, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0 50%, 38% 38%);
+  box-shadow: none;
 }

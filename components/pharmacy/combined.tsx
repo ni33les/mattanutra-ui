@@ -18,6 +18,7 @@ import { pharmacyCopy } from "@/lib/pharmacy-copy";
 import { pharmacyPath } from "@/lib/pharmacy-journey";
 import { trackBpmEvent } from "@/lib/bpm-client";
 import {
+  MAGIC_DUST_CAPACITY,
   pharmacyPresentationPhase,
   pharmacyRainWords,
   pharmacyRainStyle,
@@ -203,14 +204,11 @@ export function PharmacyCombined({
         aria-busy={!ready && !work.failed}
       >
         <div className="mn-flight-layer" aria-hidden="true">
-              <svg
-                className="mn-clarity-orbit"
-                viewBox="0 0 650 360"
-                focusable="false"
-              >
-                <path className="mn-clarity-path-glow" pathLength="100" />
-                <path className="mn-clarity-path" pathLength="100" />
-              </svg>
+              <div className="mn-magic-dust">
+                {Array.from({ length: MAGIC_DUST_CAPACITY }, (_, index) => (
+                  <span key={index} className="mn-dust-particle" />
+                ))}
+              </div>
               <span className="mn-clarity-logo-shell">
                 <SafeImage
                   className="mn-clarity-logo"
