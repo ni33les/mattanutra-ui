@@ -27,7 +27,16 @@ test("PHARM-FOLLOWUP-MARKET visiting customer uses pharmacy catalogue through pr
   const task = {...original, payload: {...original.payload as Record<string,unknown>, catalogueRevision: runtimeRevision, safetyReferenceIdentity: {runtimeRevision,fingerprint}}};
   const freshness = await loadProductRecommendationFreshnessSnapshot(sql, {planId:saved.planId,algorithmVersion:"importance-matching-4",stackPreference:"balanced"});
   assert.equal(freshness?.countryCode,"TH");
-  const work = await buildTaskWorkItem(task);
+  // Exercise the actual immutable catalogue loader, not its empty unit-test stub.
+  const marker = process.env.NODE_TEST_CONTEXT;
+  let work;
+  try {
+    delete process.env.NODE_TEST_CONTEXT;
+    work = await buildTaskWorkItem(task);
+  } finally {
+    if (marker === undefined) delete process.env.NODE_TEST_CONTEXT;
+    else process.env.NODE_TEST_CONTEXT = marker;
+  }
   assert.equal(work.taskType, "generate_product_recommendations");
   if (work.taskType !== "generate_product_recommendations") throw new Error("Matching work was not prepared");
   assert.equal(work.countryCode, "TH", "The shop country owns product eligibility, not the visitor's residence");
@@ -40,5 +49,13 @@ test("PHARM-FOLLOWUP-MARKET visiting customer uses pharmacy catalogue through pr
   assert.equal(prepared.products?.countryCode, "TH");
   const quote = await pharmacyOrderQuote(saved.planId,saved.slug,"en");
   assert.equal(quote.lines.length,1); assert.equal(quote.lines[0].unitPrice,17);
+  assert.ok(freshness?.runId, "The original TH recommendation is current");
+  const wrongRun = randomUUID();
+  await sql`insert into product_recommendation_runs
+    select (jsonb_populate_record(null::product_recommendation_runs,
+      to_jsonb(r) || jsonb_build_object('id',${wrongRun}::uuid,'market_region','PH','generated_at',now()))).*
+    from product_recommendation_runs r where id=${freshness!.runId}::uuid`;
+  const stale = await loadProductRecommendationFreshnessSnapshot(sql, {planId:saved.planId,algorithmVersion:result.diagnostics.algorithmVersion,stackPreference:"balanced"});
+  assert.equal(stale?.runId,freshness!.runId,"A newer result from the wrong market cannot replace the last correct recommendation");
   assert.equal((await sql`select answers->>'country' as country from assessments where plan_id=${saved.planId}::uuid`)[0].country,"Philippines");
 });

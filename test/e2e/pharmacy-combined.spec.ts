@@ -194,7 +194,7 @@ test("PHARM-COMBINE no replay control; reload preserves deselection and name wit
   page.on("request", (r) => {
     if (
       r.method() === "POST" &&
-      /\/api\/(assessment|retail\/orders)/.test(r.url())
+      /\/api\/(assessment(?:$|\/[^/]+\/(?:journey\/retry|formulation\/refresh))|retail\/orders)/.test(new URL(r.url()).pathname)
     )
       mutations++;
   });

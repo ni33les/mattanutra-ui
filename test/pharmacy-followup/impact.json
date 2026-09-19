@@ -1,0 +1,78 @@
+{
+  "releaseBase": "272f014356a8ed1ce7804ac297c800782611df03",
+  "scope": "pharmacy_market_and_reveal_followup",
+  "inputs": [
+    "test/helpers/pharmacy-fixture.ts",
+    "test/pharmacy-reveal/combined-reference.json",
+    "public/assets/pharmacy/combined/leaf.webp"
+  ],
+  "files": [
+    {
+      "file": "test/pharmacy-followup/options.test.ts",
+      "expectedCases": 3,
+      "reason": "All localized chat/classic negative options precede other choices"
+    },
+    {
+      "file": "test/pharmacy-followup/market.test.ts",
+      "expectedCases": 1,
+      "reason": "Shop market, invalid pharmacy input and ordinary web residence fallback"
+    },
+    {
+      "file": "test/pharmacy-followup/market.integration.test.ts",
+      "expectedCases": 1,
+      "reason": "Real task catalogue preparation, current-result selection, publication and unchanged RRP checkout quote",
+      "database": true
+    },
+    {
+      "file": "test/pharmacy-reveal/combined-state.test.ts",
+      "expectedCases": 8,
+      "reason": "Real readiness preempts all decorative stages and preserves genuine empty results"
+    },
+    {
+      "file": "test/pharmacy-reveal/progress-presentation.test.ts",
+      "expectedCases": 9,
+      "reason": "Preserve supplied animation geometry, scoped CSS, completion cleanup and reduced motion"
+    },
+    {
+      "file": "test/web-preferences/questionnaire.test.ts",
+      "expectedCases": 8,
+      "reason": "Questionnaire traversal, stable resume indices and retired web purchase preferences"
+    },
+    {
+      "file": "test/product-recommendation-freshness.test.ts",
+      "expectedCases": 6,
+      "reason": "Existing read-only freshness and explicit refresh behaviour"
+    },
+    {
+      "file": "test/formulation-safety.test.ts",
+      "expectedCases": 4,
+      "reason": "Shared governance lookup retains factual safety policy and advice"
+    },
+    {
+      "file": "test/pharmacy-orders.integration.test.ts",
+      "expectedCases": 7,
+      "reason": "Existing unpaid order replay, ownership and frozen receipt recovery",
+      "database": true
+    }
+  ],
+  "browser": [
+    {
+      "file": "test/e2e/pharmacy-combined.spec.ts",
+      "expectedCases": 7,
+      "grep": "PHARM-COMBINE (saved formula|completion before|no replay|empty result)|PHARM-FOLLOWUP-WAIT",
+      "reason": "No replay, live pending indicator, partial data, immediate completion and reload persistence"
+    },
+    {
+      "file": "test/e2e/pharmacy-animation.spec.ts",
+      "expectedCases": 4,
+      "grep": "PHARM-MOTION",
+      "reason": "Retained mobile/desktop trail fidelity, smooth animation and pending phase"
+    },
+    {
+      "file": "test/e2e/web-preferences.spec.ts",
+      "expectedCases": 2,
+      "grep": "WEB-PREF-BROWSER en",
+      "reason": "Both questionnaires still resume and capture without purchase-preference questions"
+    }
+  ]
+}

@@ -34,8 +34,8 @@
     {
       "file": "test/e2e/pharmacy-combined.spec.ts",
       "expectedCases": 5,
-      "grep": "PHARM-COMBINE (saved formula|completion before|replay preserves|1280px real|390px real)",
-      "reason": "Preserve immediate formula/results, replay without mutations, rain timing, taps and motion cleanup"
+      "grep": "PHARM-COMBINE (saved formula|completion before|no replay|1280px real|390px real)",
+      "reason": "Preserve immediate formula/results, reload without mutations, rain timing, taps and motion cleanup"
     }
   ]
 }
