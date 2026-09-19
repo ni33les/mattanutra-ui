@@ -251,7 +251,7 @@ export function PharmacyCombined({
               <SafeImage
                 key={pose}
                 className={`mn-guide-${pose}`}
-                src={`/assets/library/nong/nong-${pose === "celebrate" ? "energetic" : pose}.webp`}
+                src={`/assets/pharmacy/combined/nong-${pose === "celebrate" ? "energetic" : pose}-empty.webp`}
                 alt=""
                 width={74}
                 height={78}

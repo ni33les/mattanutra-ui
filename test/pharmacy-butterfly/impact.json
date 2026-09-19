@@ -1,6 +1,6 @@
 {
   "releaseBase": "48718f39cbc1598d610d52c51d65250620bc507d",
-  "scope": "pharmacy_single_butterfly_flight",
+  "scope": "pharmacy_stardust_and_questionnaire_transitions",
   "inputs": [
     "test/helpers/pharmacy-fixture.ts",
     "test/pharmacy-reveal/combined-reference.json",
@@ -25,6 +25,11 @@
       "file": "test/pharmacy-animation/motion.test.ts",
       "expectedCases": 7,
       "reason": "One smooth trajectory, bounded magic dust independent of frame rate, exact landing and bounded visible motion"
+    },
+    {
+      "file": "test/questionnaire-v14-static.test.ts",
+      "expectedCases": 15,
+      "reason": "Existing shared questionnaire chrome, stage timings, first-question rendering, review and localized copy remain compatible with the transition fix"
     }
   ],
   "browser": [

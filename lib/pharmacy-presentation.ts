@@ -305,7 +305,8 @@ function butterflyTip(pose: Omit<ButterflyPose,"tip">,shellSize: number): Butter
   return {...pose,tip:{x:pose.point.x+offset*(Math.cos(radians)+Math.sin(radians)),y:pose.point.y+offset*(Math.sin(radians)-Math.cos(radians))}};
 }
 
-export const MAGIC_DUST_CAPACITY = 48;
+export const MAGIC_DUST_CAPACITY = 96;
+const MAGIC_DUST_INTERVAL_MS = 20;
 type DustParticle = { id: number; born: number; origin: Point; life: number };
 export function createMagicDust() {
   return {
@@ -320,8 +321,8 @@ export function createMagicDust() {
 export function stepMagicDust(state: ReturnType<typeof createMagicDust>, tip: Point, time: number, emit = true) {
   const previous = state.previous ?? { tip, time };
   // A late frame never creates an unbounded backlog of invisible particles.
-  const skipped = Math.max(0, Math.floor((time - state.nextEmission) / 40) + 1 - MAGIC_DUST_CAPACITY);
-  state.nextEmission += skipped * 40;
+  const skipped = Math.max(0, Math.floor((time - state.nextEmission) / MAGIC_DUST_INTERVAL_MS) + 1 - MAGIC_DUST_CAPACITY);
+  state.nextEmission += skipped * MAGIC_DUST_INTERVAL_MS;
   state.sequence += skipped;
   while (state.nextEmission <= time) {
     const born = state.nextEmission, id = state.sequence++;
@@ -330,7 +331,7 @@ export function stepMagicDust(state: ReturnType<typeof createMagicDust>, tip: Po
       id, born, life: 1400 + (id % 6) * 80,
       origin: { x: previous.tip.x + (tip.x - previous.tip.x) * mix, y: previous.tip.y + (tip.y - previous.tip.y) * mix },
     });
-    state.nextEmission += 40;
+    state.nextEmission += MAGIC_DUST_INTERVAL_MS;
   }
   state.previous = { tip, time };
   state.particles = state.particles.filter(p => time - p.born < p.life);
@@ -339,8 +340,8 @@ export function stepMagicDust(state: ReturnType<typeof createMagicDust>, tip: Po
     return {
       id: p.id,
       point: {
-        x: p.origin.x + Math.sin(p.id * 2.399) * (8 + p.id % 5 * 3) * progress,
-        y: p.origin.y + (12 + p.id % 7 * 2) * progress * progress + Math.sin(p.id * 1.7) * progress * 6,
+        x: p.origin.x + Math.sin(p.id * 2.399) * (14 + p.id % 7 * 5) * Math.sqrt(progress),
+        y: p.origin.y + (12 + p.id % 7 * 2) * progress * progress + Math.sin(p.id * 1.7) * Math.sqrt(progress) * 26,
       },
       opacity: smootherStep(age / 16) * (1 - progress) ** 2 * (.72 + .28 * Math.sin(age / 130 + p.id * .7) ** 2),
       scale: (.65 + p.id % 5 * .16) * (1 - progress * .5),

@@ -3,7 +3,7 @@
 import { combinedCopy } from "@/components/pharmacy/combined-copy";
 import { pharmacyCopy } from "@/lib/pharmacy-copy";
 import { pharmacyPath } from "@/lib/pharmacy-journey";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   applyAnswer,
@@ -120,7 +120,6 @@ export function ChatQuestionnaire({
 }: ChatQuestionnaireProps) {
   const skipHealthScoreStep = skipHealthScore || Boolean(pharmacyId);
   const router = useRouter();
-  const logEndRef = useRef<HTMLDivElement | null>(null);
   const logScrollRef = useRef<HTMLDivElement | null>(null);
   const composerRef = useRef<HTMLDivElement | null>(null);
   const finalizing = useRef(false);
@@ -333,18 +332,11 @@ export function ChatQuestionnaire({
     trackBpmEvent("chat_view", { eventType: "funnel", locale, properties: { channel: "web", questionnaireVersion: "v6-conversational", uxVersion: UX_VERSION } });
   }, [locale, serverDraft, saveDraft, runCapture, reviewRequested, pharmacyId, startChat]);
 
-  useEffect(() => {
-    if (uiScreen !== "chat") {
-      return;
-    }
-
-    const scroller = logScrollRef.current;
-    if (scroller) {
-      scroller.scrollTo({ top: scroller.scrollHeight, behavior: "smooth" });
-    } else {
-      logEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-    }
-  }, [state?.log.length, currentTurn?.k, uiScreen]);
+  // This is a paged question, not a scrolling transcript. Reset before paint;
+  // scrolling to the answers during the bubble entrance pulls it out of view.
+  useLayoutEffect(() => {
+    if (uiScreen === "chat" && logScrollRef.current) logScrollRef.current.scrollTop = 0;
+  }, [currentTurn?.k, uiScreen]);
 
   // Reset composer draft when turn changes + pull focus to answers
   useEffect(() => {
@@ -383,11 +375,19 @@ export function ChatQuestionnaire({
       setHrv(String(state?.answers.hrv ?? ""));
     }
 
-    const focusTimer = window.setTimeout(() => {
+  }, [
+    currentTurn?.k,
+    currentTurn?.kind,
+    definition.meta,
+    state?.answers,
+    uiScreen
+  ]);
+
+  useEffect(() => {
+    if (uiScreen !== "chat" || stageFlash || state?.phase !== "active") return;
+    const focusFrame = window.requestAnimationFrame(() => {
       const root = composerRef.current;
-      if (!root || state?.phase !== "active") {
-        return;
-      }
+      if (!root) return;
 
       // Focus first control only — no temporary focus ring/box on the whole group
       // (that looked like a strange box flashing around the answers).
@@ -395,18 +395,9 @@ export function ChatQuestionnaire({
         "button.mn-chat-q__chip, button.mn-chat-q__swatch, button.mn-chat-q__primary, input, button.mn-chat-q__ghost, button.mn-chat-q__skip-link"
       );
       target?.focus({ preventScroll: true });
-      root.scrollIntoView({ behavior: "smooth", block: "nearest" });
-    }, 80);
-
-    return () => window.clearTimeout(focusTimer);
-  }, [
-    currentTurn?.k,
-    currentTurn?.kind,
-    definition.meta,
-    state?.answers,
-    state?.phase,
-    uiScreen
-  ]);
+    });
+    return () => window.cancelAnimationFrame(focusFrame);
+  }, [currentTurn?.k, stageFlash, state?.phase, uiScreen]);
 
   const clearStageTimers = useCallback(() => {
     for (const id of stageTimers.current) {
@@ -419,8 +410,9 @@ export function ChatQuestionnaire({
   useEffect(() => () => clearStageTimers(), [clearStageTimers]);
 
   const showStageOverlay = useCallback(
-    (payload: { pose: string; eyebrow: string; title: string }) => {
+    (payload: { pose: string; eyebrow: string; title: string }, onCovered?: () => void) => {
       if (prefersReducedMotion()) {
+        onCovered?.();
         return Promise.resolve();
       }
 
@@ -432,6 +424,12 @@ export function ChatQuestionnaire({
         // Mount already "shown" at full size — CSS keyframe fades opacity only
         // (matches HTML #stage.show). Avoid prep/hold/exit scale morphs.
         setStageFlash({ ...payload, phase: "show" });
+
+        // Prepare the next page behind the opaque stage. Its entrance finishes
+        // before the stage fades, so the previous bubble never flashes back.
+        const prepareTimer = window.setTimeout(() => {
+          if (stageGeneration.current === generation) onCovered?.();
+        }, 240);
 
         const exitTimer = window.setTimeout(() => {
           if (stageGeneration.current !== generation) {
@@ -450,19 +448,20 @@ export function ChatQuestionnaire({
           resolve();
         }, STAGE_MS + STAGE_FADE_OUT_MS);
 
-        stageTimers.current = [exitTimer, doneTimer];
+        stageTimers.current = [prepareTimer, exitTimer, doneTimer];
       });
     },
     [clearStageTimers]
   );
 
   const showStageFlash = useCallback(
-    (sectionIndex: number) => {
+    (sectionIndex: number, onCovered: () => void) => {
       const def = getDefinition(
         state ?? createInitialState({ locale, channel: "web" })
       );
       const section = def.sections[sectionIndex];
       if (!section) {
+        onCovered();
         return Promise.resolve();
       }
 
@@ -470,7 +469,7 @@ export function ChatQuestionnaire({
         pose: section.pose || "open",
         eyebrow: section.eyebrow,
         title: section.title
-      });
+      }, onCovered);
     },
     [locale, showStageOverlay, state]
   );
@@ -506,11 +505,8 @@ export function ChatQuestionnaire({
       const partBreak = events.find((e) => e.type === "chat_part_break");
       // Section stage only on true part boundaries (engine chat_part_break).
       if (partBreak && partBreak.type === "chat_part_break") {
-        await showStageFlash(partBreak.sectionIndex);
-      }
-
-      // No typing-indicator bubble (ellipsis flash) between questions.
-      setState(next);
+        await showStageFlash(partBreak.sectionIndex, () => setState(next));
+      } else setState(next);
       void track(events);
       const sectionDone = events.find((e) => e.type === "chat_section_done");
       await persistCheckpoint(
@@ -1442,7 +1438,7 @@ export function ChatQuestionnaire({
             type="button"
             className="mn-chat-q__review-btn"
             data-testid="review-answers-btn"
-            disabled={Boolean(pharmacyId && uiScreen === "calculating")}
+            disabled={Boolean(stageFlash || (pharmacyId && uiScreen === "calculating"))}
             onClick={() => setReviewOpen(true)}
             aria-haspopup="dialog"
           >
@@ -1466,10 +1462,9 @@ export function ChatQuestionnaire({
 
       <div className="mn-chat-q__frame">
         {/* Single scroll page: question + answers together (not a bottom dock). */}
-        <div className="mn-chat-q__page" ref={logScrollRef}>
+        <div className="mn-chat-q__page" ref={logScrollRef} inert={Boolean(stageFlash)}>
           <div className="mn-chat-q__log" role="log" aria-live="polite">
             {state?.log.map((msg, index) => renderLogItem(msg, index))}
-            <div ref={logEndRef} />
           </div>
 
           <div

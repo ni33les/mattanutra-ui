@@ -528,12 +528,12 @@
     top: 14%;
     z-index: 7;
     border-radius: 50%;
-    background: radial-gradient(circle, #ffffff 0 16%, #fff4c9 20% 35%, var(--mn-gold) 48%, transparent 72%);
+    background: radial-gradient(circle, #ffffff 0 16%, #fff 20% 35%, #d7e8ef 48%, transparent 72%);
     opacity: 0;
     transform: translate(-50%, -50%);
     transform-origin: center;
     will-change: opacity, filter;
-    filter: drop-shadow(0 0 7px #fff4c9) drop-shadow(0 0 15px var(--mn-gold));
+    filter: drop-shadow(0 0 7px #fff) drop-shadow(0 0 15px #a5c9d9);
   }
 
   #mn-pharmacy-combined .mn-leading-spark::before,
@@ -542,7 +542,7 @@
     position: absolute;
     left: 50%;
     top: 50%;
-    background: #fff8da;
+    background: #fff;
     border-radius: 999px;
     transform: translate(-50%, -50%);
   }
@@ -776,8 +776,8 @@
   }
 
   #mn-pharmacy-combined .mn-nutrient {
-    min-height: 58px;
-    padding: 9px 7px;
+    min-height: 76px;
+    padding: 14px 10px;
     display: grid;
     place-content: center;
     border-radius: 14px;
@@ -1560,8 +1560,8 @@
     }
 
     #mn-pharmacy-combined .mn-nutrient {
-      min-height: 56px;
-      padding: 7px 4px;
+      min-height: 72px;
+      padding: 12px 8px;
     }
 
     #mn-pharmacy-combined .mn-nutrient:nth-child(odd) { --from-x: 54px; }
@@ -1718,18 +1718,19 @@
   width: 4px;
   height: 4px;
   border-radius: 50%;
-  color: var(--mn-gold);
+  color: #fff;
   background: currentColor;
-  box-shadow: 0 0 7px 2px color-mix(in srgb, var(--mn-gold) 38%, transparent);
+  box-shadow: 0 0 5px 2px #fff9, 0 0 9px 3px #779baf55;
   opacity: 0;
   will-change: transform, opacity;
 }
-#mn-pharmacy-combined .mn-dust-particle:nth-child(3n) { color: var(--mn-gold-tint); }
-#mn-pharmacy-combined .mn-dust-particle:nth-child(4n) {
-  width: 9px;
-  height: 9px;
+#mn-pharmacy-combined .mn-dust-particle:nth-child(3n) { width: 3px; height: 3px; }
+#mn-pharmacy-combined .mn-dust-particle:nth-child(2n) {
+  width: 10px;
+  height: 10px;
   border-radius: 0;
-  background: radial-gradient(circle, #fff8da 0 10%, var(--mn-gold) 55%);
+  background: #fff;
   clip-path: polygon(50% 0, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0 50%, 38% 38%);
   box-shadow: none;
+  filter: drop-shadow(0 0 2px #779baf99);
 }
