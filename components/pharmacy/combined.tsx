@@ -125,6 +125,7 @@ export function PharmacyCombined({
     ready,
     work.failed,
     setAnimatedPhase,
+    work.ready,
   );
   const phase = pharmacyPresentationPhase({
     phase: animatedPhase,
@@ -207,37 +208,6 @@ export function PharmacyCombined({
                 viewBox="0 0 650 360"
                 focusable="false"
               >
-                <defs>
-                  <linearGradient
-                    id="mn-combined-gradient"
-                    x1="0"
-                    y1="0"
-                    x2="1"
-                    y2="1"
-                  >
-                    <stop
-                      offset="0%"
-                      stopColor="var(--mn-gold-tint)"
-                      stopOpacity="0"
-                    />
-                    <stop
-                      offset="16%"
-                      stopColor="var(--mn-gold-tint)"
-                      stopOpacity=".96"
-                    />
-                    <stop offset="58%" stopColor="var(--mn-gold)" />
-                    <stop
-                      offset="86%"
-                      stopColor="var(--mn-gold-tint)"
-                      stopOpacity=".92"
-                    />
-                    <stop
-                      offset="100%"
-                      stopColor="var(--mn-green)"
-                      stopOpacity=".26"
-                    />
-                  </linearGradient>
-                </defs>
                 <path className="mn-clarity-path-glow" pathLength="100" />
                 <path className="mn-clarity-path" pathLength="100" />
               </svg>

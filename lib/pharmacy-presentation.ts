@@ -251,32 +251,80 @@ export function clarityPose(flight: ReturnType<typeof clarityFlight>, time: numb
     tip: { x: value(a.tip.x,b.tip.x), y: value(a.tip.y,b.tip.y) }, angle: value(a.angle,b.angle), scale: value(a.scale,b.scale), distance: value(a.distance,b.distance) };
 }
 
-/** Continue the opening choreography on a smooth closed curve, for as long as work takes. */
-export function continuingClarityPose(flight: ReturnType<typeof clarityFlight>, time: number, width: number, height: number, shellSize: number, top = 0): FlightPose {
-  if (time <= clarityDuration) return clarityPose(flight, time);
-  const start = clarityPose(flight, clarityDuration), elapsed = time - clarityDuration;
-  const blend = smootherStep(elapsed / 1200), phase = elapsed * Math.PI * 2 / 8600;
-  const point = {
-    x: start.point.x + (width / 2 + Math.max(0, width / 2 - shellSize * .7) * Math.sin(phase) - start.point.x) * blend,
-    y: start.point.y + (top + height / 2 + height * .27 * Math.sin(phase * 2) - start.point.y) * blend,
-  };
-  return withLeafTip({ ...start, time, point, angle: 12 * Math.cos(phase) * blend, scale: 1, moving: true, tap: null }, shellSize);
+export type ButterflyPose = { point: Point; tip: Point; angle: number; scale: number };
+type ButterflyArea = { left: number; top: number; width: number; height: number; source: Point; shellSize: number };
+const butterflyControls = [[.08,.35],[.16,.08],[.65,.08],[.94,.32],[.77,.88],[.48,.59],[.14,.93],[.08,.58],[.40,.32],[.75,.13],[.93,.72],[.49,.94]];
+
+/** A periodic cubic B-spline: continuous position, velocity and curvature at every join. */
+function butterflySpline(points: Point[], position: number) {
+  const index = Math.floor(position) % points.length, t = position - Math.floor(position), inverse = 1 - t;
+  const weights = [inverse ** 3 / 6, (3*t**3-6*t*t+4)/6, (-3*t**3+3*t*t+3*t+1)/6, t**3/6];
+  const slopes = [-inverse*inverse/2, (9*t*t-12*t)/6, (-9*t*t+6*t+3)/6, t*t/2];
+  const point = {x:0,y:0}, tangent = {x:0,y:0};
+  for (let n=0;n<4;n++) {
+    const p=points[(index+n)%points.length];
+    point.x+=p.x*weights[n];point.y+=p.y*weights[n];
+    tangent.x+=p.x*slopes[n];tangent.y+=p.y*slopes[n];
+  }
+  return {point,tangent};
 }
 
-/** Blend the continuing trajectory into rest: preserve entry velocity, finish with zero velocity. */
-export function landingClarityPose(pose: FlightPose, target: Point, scale: number, shellSize: number, progress: number): FlightPose {
-  const blend = smootherStep(progress);
-  return withLeafTip({ ...pose,
-    point: blend === 1 ? target : { x: pose.point.x + (target.x - pose.point.x) * blend, y: pose.point.y + (target.y - pose.point.y) * blend },
-    angle: pose.angle * (1 - blend), scale: blend === 1 ? scale : pose.scale + (scale - pose.scale) * blend,
-    tap: null, moving: blend < 1,
-  }, shellSize);
+export function butterflyFlight(area: ButterflyArea) {
+  const controls=butterflyControls.map(([x,y])=>({x:area.left+x*area.width,y:area.top+y*area.height}));
+  const samples=[0];let length=0,previous=butterflySpline(controls,0).point;
+  for(let i=1;i<=controls.length*64;i++) {
+    const point=butterflySpline(controls,i/64).point;
+    length+=Math.hypot(point.x-previous.x,point.y-previous.y);samples.push(length);previous=point;
+  }
+  return {...area,controls,samples,length};
 }
 
-function withLeafTip(pose: FlightPose, shellSize: number): FlightPose {
-  const tip = shellSize * .36 * pose.scale, radians = pose.angle * Math.PI / 180;
-  return { ...pose, tip: {
-    x: pose.point.x + tip * (Math.cos(radians) + Math.sin(radians)),
-    y: pose.point.y + tip * (Math.sin(radians) - Math.cos(radians)),
-  } };
+export function butterflyPose(flight: ReturnType<typeof butterflyFlight>, time: number): ButterflyPose {
+  const elapsed=Math.max(0,time), distance=((elapsed%24000)/24000)*flight.length;
+  let low=0,high=flight.samples.length-1;
+  while(high-low>1){const middle=(low+high)>>1;if(flight.samples[middle]<distance)low=middle;else high=middle;}
+  const position=(low+(distance-flight.samples[low])/(flight.samples[high]-flight.samples[low]||1))/64;
+  const {point,tangent}=butterflySpline(flight.controls,position), blend=smootherStep(elapsed/3400);
+  return butterflyTip({
+    point:{x:flight.source.x+(point.x-flight.source.x)*blend,y:flight.source.y+(point.y-flight.source.y)*blend},
+    angle:(10*tangent.x/(Math.hypot(tangent.x,tangent.y)||1)+1.5*Math.sin(elapsed/1100))*blend,
+    scale:38/flight.shellSize+(1+.012*Math.sin(elapsed/700)-38/flight.shellSize)*blend,
+  },flight.shellSize);
+}
+
+export function landButterflyPose(pose: ButterflyPose,target: Point,scale: number,shellSize: number,progress: number): ButterflyPose {
+  const blend=smootherStep(progress);
+  return butterflyTip({
+    point:blend===1?target:{x:pose.point.x+(target.x-pose.point.x)*blend,y:pose.point.y+(target.y-pose.point.y)*blend},
+    angle:blend===1?0:pose.angle*(1-blend),scale:blend===1?scale:pose.scale+(scale-pose.scale)*blend,
+  },shellSize);
+}
+
+function butterflyTip(pose: Omit<ButterflyPose,"tip">,shellSize: number): ButterflyPose {
+  const offset=shellSize*.36*pose.scale,radians=pose.angle*Math.PI/180;
+  return {...pose,tip:{x:pose.point.x+offset*(Math.cos(radians)+Math.sin(radians)),y:pose.point.y+offset*(Math.sin(radians)-Math.cos(radians))}};
+}
+
+/** Keep a spatial ribbon, not a frame/time window. Interpolate its tail instead of popping whole points. */
+export function updateFlightTrail(history: Point[],tip: Point,limit: number): Point[] {
+  const last=history.at(-1);
+  if(!last||Math.hypot(tip.x-last.x,tip.y-last.y)>=2)history.push({...tip});
+  const end=history.at(-1)!;
+  const points=end.x===tip.x&&end.y===tip.y?[...history]:[...history,tip];
+  let remaining=limit;
+  for(let i=points.length-1;i>0;i--){
+    const next=points[i],previous=points[i-1],distance=Math.hypot(next.x-previous.x,next.y-previous.y);
+    if(distance>=remaining){
+      const mix=remaining/(distance||1),start={x:next.x+(previous.x-next.x)*mix,y:next.y+(previous.y-next.y)*mix};
+      if(i>1)history.splice(0,i-1);
+      return [start,...points.slice(i)];
+    }
+    remaining-=distance;
+  }
+  return points;
+}
+
+/** Resizing blends the same trajectory without moving its origin abruptly. */
+export function blendButterflyPoses(a: ButterflyPose,b: ButterflyPose,shellSize: number,blend: number): ButterflyPose {
+  return butterflyTip({point:{x:a.point.x+(b.point.x-a.point.x)*blend,y:a.point.y+(b.point.y-a.point.y)*blend},angle:a.angle+(b.angle-a.angle)*blend,scale:a.scale+(b.scale-a.scale)*blend},shellSize);
 }

@@ -498,7 +498,7 @@
   }
 
   #mn-pharmacy-combined .mn-clarity-path {
-    stroke: url(#mn-combined-gradient);
+    stroke: var(--mn-gold);
     stroke-width: 3;
   }
 
@@ -1746,6 +1746,10 @@
 #mn-pharmacy-combined .mn-window:is([data-flight="flying"], [data-flight="landing"]) .mn-clarity-path,
 #mn-pharmacy-combined .mn-window:is([data-flight="flying"], [data-flight="landing"]) .mn-clarity-path-glow { opacity: .8; }
 #mn-pharmacy-combined .mn-window:is([data-flight="flying"], [data-flight="landing"]) .mn-leading-spark { opacity: 1; }
+#mn-pharmacy-combined .mn-flight-layer :is(.mn-clarity-path, .mn-clarity-path-glow) { stroke-dasharray: none; stroke-dashoffset: 0; stroke-linejoin: round; transition: none; }
+#mn-pharmacy-combined .mn-window[data-flight] .mn-brand-lockup,
+#mn-pharmacy-combined .mn-flight-layer .mn-leading-spark,
+#mn-pharmacy-combined .mn-flight-layer .mn-clarity-logo-shell::before { animation: none; }
 @media (prefers-reduced-motion: reduce) { #mn-pharmacy-combined .mn-flight-layer { display: none; } }
 #mn-pharmacy-combined .mn-window[data-phase="waiting"] .mn-rain,
 #mn-pharmacy-combined .mn-window[data-phase="waiting"] .mn-guide-comparing { opacity: 1; }
