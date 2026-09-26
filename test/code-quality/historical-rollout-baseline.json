@@ -1,0 +1,91 @@
+{
+  "sourceCommit": "576065f1979e0890ada9eb1a325c7af06f5e431a",
+  "originals": [
+    {
+      "path": "db-rollout/db-rollout.sql",
+      "bytes": 63814681,
+      "sha256": "4de4175f993c3bf57a6e8a092e4020a53079cc99436e4a4a127408864ed2887f",
+      "offset": 0
+    },
+    {
+      "path": "db-rollout/db-data-05-catalogue-reset.sql",
+      "bytes": 993,
+      "sha256": "edb5c888015b08b154adc028242cb49ce403c872fbaa3372c9ed0587b14aa145",
+      "offset": 154253
+    },
+    {
+      "path": "db-rollout/db-data-10-platform-seed.sql",
+      "bytes": 13847,
+      "sha256": "a8beb06b2b6e2c3b29fd0582ad81edc678e3d83689a521e0b9f8f0f54f7acf58",
+      "offset": 155302
+    },
+    {
+      "path": "db-rollout/db-data-20-supplement-catalogue.sql",
+      "bytes": 414476,
+      "sha256": "90ad95ba29268370c66cbbabf9d2a1215ab60e8316e4de70e9bf3cdf53f032c0",
+      "offset": 169212
+    },
+    {
+      "path": "db-rollout/db-data-25-product-brands.sql",
+      "bytes": 3978,
+      "sha256": "71c423a8b6d3ad21993ca08eb30e39aad7791488fc80ab8cd73c987b088448d2",
+      "offset": 583745
+    },
+    {
+      "path": "db-rollout/db-data-27-products.sql",
+      "bytes": 12940137,
+      "sha256": "420f8570a7255a292888ca7759e7df88058af7d413645ffa35a489f6921b0771",
+      "offset": 587774
+    },
+    {
+      "path": "db-rollout/db-data-28-product-countries.sql",
+      "bytes": 82713,
+      "sha256": "fa0a38f2e889538ce994ebbb1e94dc1bbcbf81dbb00ae9c460206a8a55de108c",
+      "offset": 13527971
+    },
+    {
+      "path": "db-rollout/db-data-29-product-facts.sql",
+      "bytes": 723051,
+      "sha256": "f383085bfaacfc762cb56816c48e73d74cbd916560582478b5cb4b6ba1bdf634",
+      "offset": 13610740
+    },
+    {
+      "path": "db-rollout/db-data-30-product-versions.sql",
+      "bytes": 35614077,
+      "sha256": "862caab510385fc27e094b704535607f30a8a345ead995f2320411c89041d099",
+      "offset": 14333850
+    },
+    {
+      "path": "db-rollout/db-data-31-product-offers.sql",
+      "bytes": 40865,
+      "sha256": "8328ace950b28d2c073e5dba571f45034dfbe7b7eecdd79ead2d8be5cd9416f9",
+      "offset": 49947984
+    },
+    {
+      "path": "db-rollout/db-data-32-product-imports.sql",
+      "bytes": 13825774,
+      "sha256": "60192e6344e17d6f0ec399e020fcb567272232b649266f9e569f381d27ea40e0",
+      "offset": 49988907
+    }
+  ],
+  "schema": {
+    "path": "db-rollout/historical-schema-2026-05-23.sql",
+    "offset": 29,
+    "bytes": 154167,
+    "sha256": "4312edd53b35158cb61c568fc5303a8e4b1f15ad2bf088ed2173679722be07d1"
+  },
+  "taskDefinitions": [
+    {
+      "table": "tasks",
+      "sha256": "e343ca8bd33fcae7db825d91651b57617c19aeafc31cf4f9355eb91d4f9b7c55"
+    },
+    {
+      "table": "task_events",
+      "sha256": "4ef7302b5a9f71bbab6d82cc09249b2386ddfbdff28a1a4143b8d99370a77fbd"
+    },
+    {
+      "table": "task_dependencies",
+      "sha256": "6d9020f8c9ef41e76add50af1a3b18251fcf2341725453f1af55a6c55b554c56"
+    }
+  ]
+}
