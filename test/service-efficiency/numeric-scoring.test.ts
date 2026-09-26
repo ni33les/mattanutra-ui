@@ -14,11 +14,28 @@ mock.module('../../lib/matcher/exact-values.ts', { namedExports: { ...exactValue
 const dose = await import('../../lib/matcher/dose.ts');
 const fractions = await import('../../lib/matcher/rational.ts');
 let conversions = 0, unitCompilations = 0, exactEncodings = 0;
+let preferenceParses = 0;
 let linearEvaluations = 0; let multiplications = 0; let measurements = 0; let additions = 0; let aggregateSums = 0; let conversionsToNumber = 0; let exactComparisons = 0;
 mock.module('../../lib/matcher/dose.ts', { namedExports: { ...dose, scaleAmount: (...args: Parameters<typeof dose.scaleAmount>) => { unitCompilations++; return dose.scaleAmount(...args); }, amountFromScaled: (...args: Parameters<typeof dose.amountFromScaled>) => { conversions++; return dose.amountFromScaled(...args); } } });
-mock.module('../../lib/matcher/rational.ts', { namedExports: { ...fractions, linearSum: (...args: Parameters<typeof fractions.linearSum>) => { linearEvaluations++; return fractions.linearSum(...args); }, toNumber: (...args: Parameters<typeof fractions.toNumber>) => { conversionsToNumber++; return fractions.toNumber(...args); }, compare: (...args: Parameters<typeof fractions.compare>) => { exactComparisons++; return fractions.compare(...args); }, sum: (...args: Parameters<typeof fractions.sum>) => { aggregateSums++; return fractions.sum(...args); }, add: (...args: Parameters<typeof fractions.add>) => { additions++; return fractions.add(...args); }, serialize: (...args: Parameters<typeof fractions.serialize>) => { exactEncodings++; return fractions.serialize(...args); }, fromDecimal: (...args: Parameters<typeof fractions.fromDecimal>) => { measurements++; return fractions.fromDecimal(...args); }, multiply: (...args: Parameters<typeof fractions.multiply>) => { multiplications++; return fractions.multiply(...args); } } });
+mock.module('../../lib/matcher/rational.ts', { namedExports: { ...fractions, linearSum: (...args: Parameters<typeof fractions.linearSum>) => { linearEvaluations++; return fractions.linearSum(...args); }, toNumber: (...args: Parameters<typeof fractions.toNumber>) => { conversionsToNumber++; return fractions.toNumber(...args); }, compare: (...args: Parameters<typeof fractions.compare>) => { exactComparisons++; return fractions.compare(...args); }, sum: (...args: Parameters<typeof fractions.sum>) => { aggregateSums++; return fractions.sum(...args); }, add: (...args: Parameters<typeof fractions.add>) => { additions++; return fractions.add(...args); }, serialize: (...args: Parameters<typeof fractions.serialize>) => { exactEncodings++; return fractions.serialize(...args); }, fromDecimal: (...args: Parameters<typeof fractions.fromDecimal>) => { measurements++; if ([7.75, 37, 123457].includes(args[0] as number)) preferenceParses++; return fractions.fromDecimal(...args); }, multiply: (...args: Parameters<typeof fractions.multiply>) => { multiplications++; return fractions.multiply(...args); } } });
 const { request } = await import('../matcher/flexible-v5-fixtures.ts');
 const { doseFitScore, numericalDoseFitScore, exactDoseFit, compareDoseFit, weightedDoseFitScore, numericalWeightedDoseFitScore } = await import('../../lib/matcher/dose-fit.ts');
+
+test('PERF-CPU-33 numerical preference denominators compile once across basket evaluations', async () => {
+  const { scorePracticalPenalties } = await import('../../lib/matcher/practical-scoring.ts');
+  const input = request({ maxDailyPills: 7.75, maxProductCount: 37, maxPriceMinor: 123457 });
+  const actual = { currency: 'THB', dailyPills: 9, pillLowerBound: 9, productCount: 2, priceMinor: 200000, servings: [1, 1], uncertainProductCount: 0 };
+  scorePracticalPenalties(input, { ...actual, dailyPills: 8, pillLowerBound: 8, priceMinor: 180000 });
+  preferenceParses = 0;
+  const value = scorePracticalPenalties(input, actual);
+  assert.equal(value.preferences.maxDailyPills.scale, 7.75);
+  assert.equal(value.preferences.maxDailyPills.penalty, 25 / 3844);
+  assert.ok(Math.abs(value.preferences.maxPriceMinor.penalty - 76543 ** 2 / (4 * 123457 ** 2)) < 1e-14);
+  assert.equal(value.preferences.maxProductCount.penalty, 0);
+  assert.equal(preferenceParses, 0, 'Unchanged requested values and denominators are not candidate measurements');
+  const revised = scorePracticalPenalties({ ...input, maxPriceMinor: 100000 }, actual);
+  assert.equal(revised.preferences.maxPriceMinor.penalty, 0.25, 'A new immutable request must use its own denominator');
+});
 
 test('PERF-CPU-31 diverse retention sorts representatives instead of the complete candidate pool', async () => {
   const { seedState, reviewFrontier } = await import('../../lib/matcher/search.ts');

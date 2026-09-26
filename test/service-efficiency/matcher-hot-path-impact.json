@@ -5,7 +5,7 @@
   "files": [
     {
       "file": "test/service-efficiency/numeric-scoring.test.ts",
-      "expectedCases": 43,
+      "expectedCases": 44,
       "reason": "Exact internal records, serving lower bounds, immutable quantity/intake/exposure reuse and complete public materialization without search changes; PERF-CPU-26\u201328 and 30: one quantity-group lookup, normalized endpoint components, exact identity/common-denominator comparison and canonical unit parsing"
     },
     {
