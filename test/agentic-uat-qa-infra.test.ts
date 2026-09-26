@@ -273,7 +273,7 @@ describe("UAT QA infrastructure Slice B rate allowance", () => {
           return limited?.status ?? 200;
         })
       );
-      assert.deepEqual(statuses, Array.from({ length: 10 }, () => 200));
+      assert.deepEqual(statuses, Array.from({ length: 10 }, () => 200), `Batch ${_batch} must remain unthrottled`);
     }
   });
 
@@ -297,7 +297,7 @@ describe("UAT QA infrastructure Slice B rate allowance", () => {
       "observe",
       "evidence"
     ]) {
-      assert.equal(await enforceMcpOrQaRateLimit(qaRequest(), "uat"), null);
+      assert.equal(await enforceMcpOrQaRateLimit(qaRequest(), "uat"), null, _proof);
     }
   });
 

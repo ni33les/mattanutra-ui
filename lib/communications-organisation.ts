@@ -2,29 +2,23 @@
  * Organisation channels, notification preferences, and LINE connect flows.
  * Re-exported from the communications facade for stable call sites.
  */
-import { createHash, randomBytes, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import { isUuid, toJsonValue } from "@/lib/assessment-store";
 import { writeBpmEvent } from "@/lib/bpm";
-import { formatOutboundLineMessage } from "@/lib/line-message-format";
 import {
-  ADMIN_COMMUNICATION_CHANNEL_TYPES,
   ADMIN_COMMUNICATION_DISPATCH_TASK_PRIORITY,
   adminCommunicationChannelRank,
   adminCommunicationEventKeysForScope,
-  adminCommunicationPreferenceDefault,
   cleanText,
-  configuredLineAccessToken,
   ensureCommunicationSchema,
   ensureOrganisationIdentity,
   ensurePlanIdentity,
   eventKeyAllowedForScope,
   hashLineConnectCode,
   isoDate,
-  lineMetadata,
   mapChannel,
   mapMessage,
   newLineConnectCode,
-  normalizeAddress,
   normalizeAdminCommunicationChannelType,
   normalizeAdminCommunicationEventKey,
   objectValue,
@@ -36,11 +30,8 @@ import {
   upsertChannel,
   type AdminCommunicationChannelType,
   type AdminCommunicationEventKey,
-  type AdminCommunicationScope,
   type ChannelRow,
-  type CommunicationChannel,
   type CommunicationChannelStatus,
-  type CommunicationMessage,
   type Db,
   type MessageRow,
   type OrganisationNotificationPreference

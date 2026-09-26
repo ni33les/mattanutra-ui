@@ -228,10 +228,6 @@ function p95(values: readonly number[]) {
   return interpolatePercentile(values, 95);
 }
 
-function p50(values: readonly number[]) {
-  return interpolatePercentile(values, 50);
-}
-
 function isValidMcp(payload: unknown, expected: "info" | "plan" | "tools/list") {
   try { assertMcpSuccess(payload, expected); return true; } catch { return false; }
 }

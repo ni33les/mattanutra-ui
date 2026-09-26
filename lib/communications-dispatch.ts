@@ -16,22 +16,16 @@ import {
   sendTransactionalEmail,
   type TransactionalEmailAttachment
 } from "@/lib/smtp-email";
-import { AGENT_CAPABILITIES } from "@/lib/system-agents";
-import { createTask } from "@/lib/task-service";
 import type { ReservedTask } from "@/lib/task-service";
 import { validateLeadEmail } from "@/lib/email-validation";
 import {
-  ADMIN_COMMUNICATION_DISPATCH_TASK_PRIORITY,
   cleanText,
   configuredLineAccessToken,
   ensureCommunicationSchema,
   ensurePlanIdentity,
-  isoDate,
-  lineMetadata,
   mapChannel,
   mapMessage,
   MESSAGE_STATUSES,
-  normalizeAddress,
   objectValue,
   optionalText,
   safetyFollowupItems,
@@ -51,7 +45,6 @@ import {
   type MessageRow,
   type PreparedRetryMessage
 } from "@/lib/communications-shared";
-import { queueCommunicationMessageDispatchTask } from "@/lib/communications-organisation";
 
 export async function ensurePlanCommunicationIdentity(input: Readonly<{
   planId: string;
