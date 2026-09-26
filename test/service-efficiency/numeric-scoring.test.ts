@@ -21,6 +21,30 @@ mock.module('../../lib/matcher/rational.ts', { namedExports: { ...fractions, lin
 const { request } = await import('../matcher/flexible-v5-fixtures.ts');
 const { doseFitScore, numericalDoseFitScore, exactDoseFit, compareDoseFit, weightedDoseFitScore, numericalWeightedDoseFitScore } = await import('../../lib/matcher/dose-fit.ts');
 
+test('PERF-MEM-01 completed frontier reductions release discarded live basket caches', async () => {
+  const { createSearchCursor, advanceSearchCursor, archivedSearchStates } = await import('../../lib/matcher/search-cursor.ts');
+  const { compileGroups } = await import('../../lib/matcher/candidates.ts');
+  const { DEFAULT_MATCHER_CONFIG } = await import('../../lib/matcher/config.ts');
+  const { product, catalog } = await import('../matcher/flexible-v5-fixtures.ts');
+  const input = request(), groups = compileGroups(input, catalog(Array.from({ length: 16 }, (_, i) => product(`memory-${i}`, { a: i + 1 }))));
+  const original = Map.prototype.delete; let releases = 0;
+  const cursor = createSearchCursor(groups, input, DEFAULT_MATCHER_CONFIG);
+  try {
+    Map.prototype.delete = function (key) {
+      if (Array.isArray(key) && this.get(key)?.exposure instanceof Map) releases++;
+      return original.call(this, key);
+    };
+    advanceSearchCursor(cursor, input, 2000);
+  } finally { Map.prototype.delete = original; }
+  assert.equal(cursor.expansionAttempts, 2000);
+  assert.ok(cursor.archive.size > 200 && cursor.review.length > 0, 'Exercise a populated frontier reduction');
+  assert.ok(releases > 100, 'Discarded numerical baskets need not remain resident until the entire operation ends');
+  const values = [...archivedSearchStates(cursor)];
+  assert.deepEqual([...archivedSearchStates(structuredClone(cursor))], values, 'Compacted durable rows retain every candidate value');
+  const repeated = [...archivedSearchStates(cursor)];
+  values.forEach((row, index) => assert.strictEqual(repeated[index], row));
+});
+
 test('PERF-CPU-33 numerical preference denominators compile once across basket evaluations', async () => {
   const { scorePracticalPenalties } = await import('../../lib/matcher/practical-scoring.ts');
   const input = request({ maxDailyPills: 7.75, maxProductCount: 37, maxPriceMinor: 123457 });
