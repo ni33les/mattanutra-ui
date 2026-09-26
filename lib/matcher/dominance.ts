@@ -169,18 +169,12 @@ export function dominatesAtLayer(
   return strict;
 }
 
-const stateFingerprints = new WeakMap<SearchState, string>();
 export function fingerprintState(state: SearchState) {
-  let fingerprint = stateFingerprints.get(state);
-  if (fingerprint === undefined) {
-    fingerprint = [
+  return [
     state.nextGroupIndex,
     ...state.selectedVariantIds,
     state.price,
     state.pills,
     state.count
-    ].join("|");
-    stateFingerprints.set(state, fingerprint);
-  }
-  return fingerprint;
+  ].join("|");
 }
