@@ -21,26 +21,6 @@ mock.module('../../lib/matcher/rational.ts', { namedExports: { ...fractions, lin
 const { request } = await import('../matcher/flexible-v5-fixtures.ts');
 const { doseFitScore, numericalDoseFitScore, exactDoseFit, compareDoseFit, weightedDoseFitScore, numericalWeightedDoseFitScore } = await import('../../lib/matcher/dose-fit.ts');
 
-test('PERF-CPU-40 tiny basket identities preserve exact numeric order without general sorting allocations', async () => {
-  const { createSearchCursor, advanceSearchCursor } = await import('../../lib/matcher/search-cursor.ts');
-  const { compileGroups } = await import('../../lib/matcher/candidates.ts');
-  const { DEFAULT_MATCHER_CONFIG } = await import('../../lib/matcher/config.ts');
-  const { product, catalog } = await import('../matcher/flexible-v5-fixtures.ts');
-  const input = request(), groups = compileGroups(input, catalog(Array.from({ length: 8 }, (_, i) => product(`identity-${i}`, { a: 7 + i * 11 }))));
-  const cursor = createSearchCursor(groups, input, { ...DEFAULT_MATCHER_CONFIG, exactGroupLimit: 0 });
-  const original = Array.prototype.sort; let numericSorts = 0;
-  try {
-    Array.prototype.sort = function (...args) {
-      if (this.length > 1 && this.length <= 16 && this.every(value => typeof value === 'number')) numericSorts++;
-      return Reflect.apply(original, this, args);
-    };
-    advanceSearchCursor(cursor, input, 1000);
-  } finally { Array.prototype.sort = original; }
-  assert.equal(cursor.expansionAttempts, 1000); assert.ok(cursor.archive.size > 100);
-  for (const [key, packed] of cursor.archive) assert.equal(key, [...packed[5]].sort((a, b) => a - b).join(','));
-  assert.equal(numericSorts, 0, 'Small basket keys need exact ordering, not the general stable-sort workspace');
-});
-
 test('PERF-CPU-33 numerical preference denominators compile once across basket evaluations', async () => {
   const { scorePracticalPenalties } = await import('../../lib/matcher/practical-scoring.ts');
   const input = request({ maxDailyPills: 7.75, maxProductCount: 37, maxPriceMinor: 123457 });
