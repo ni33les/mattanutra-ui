@@ -71,3 +71,5 @@ pairs in Euclidean reduction. Two safe-integer-remainder experiments had exact
 matching outputs but did not improve the constrained-worker measurements. Their
 patch/timings remain in evidence; the Number fast paths were withdrawn. The
 shared implementation retains BigInt arithmetic and a scalar remainder loop.
+
+- PERF-CPU-08 incremental parent-score prototype withdrawn before release: all 69 affected assertions passed and Daniel retained its exact result identity, but constrained warm trials (2615/2269/2513 ms) did not improve over the retained implementation (2338/2083/2405 ms). The additional WeakMap and delta bookkeeping are removed. RED/GREEN and the patch remain in performance-20260926 evidence; existing scoring and recovery contracts remain unchanged.
