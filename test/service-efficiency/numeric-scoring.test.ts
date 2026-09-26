@@ -49,6 +49,8 @@ test('REF-CPU-03 unchanged subject exposure reuses exact arithmetic across disti
 });
 test('REF-CPU-04 neutral rational operations reuse immutable values without changing exact arithmetic', () => {
   const value = fractions.rational(7n, 13n);
+  assert.strictEqual(fractions.fromDecimal(0), fractions.ZERO, 'Repeated zero coefficients need no allocation');
+  assert.strictEqual(fractions.fromDecimal(1), fractions.ONE, 'Repeated unit coefficients need no allocation');
   assert.strictEqual(fractions.multiply(value, fractions.ONE), value);
   assert.strictEqual(fractions.add(value, fractions.ZERO), value);
   assert.strictEqual(fractions.divide(value, fractions.ONE), value);
