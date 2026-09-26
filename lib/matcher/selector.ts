@@ -7,7 +7,7 @@ import {
   targetCoverageUnits,
   oversupplyScore
 } from "@/lib/matcher/dominance";
-import { seedState, tryAddVariant, revalidateState } from "@/lib/matcher/search";
+import { revalidateState } from "@/lib/matcher/search";
 import { minUnits } from "@/lib/matcher/dose";
 import { knownTargetExposure } from "@/lib/matcher/target-basis";
 import { comparePillCounts } from "@/lib/matcher/pill-burden";
@@ -228,10 +228,6 @@ export function materiallyDifferent(left: ScoredBasket, right: ScoredBasket) {
   return productDoseSignature(left) !== productDoseSignature(right);
 }
 
-// Kept for older callers. Optional targets are still part of the request and
-// scoring them as zero would manufacture a different customer request.
-export function requestWithoutOptionalPurchases(request: CanonicalRequest): CanonicalRequest { return request; }
-
 function selectedReason(request: CanonicalRequest) {
   if (request.optimization === "lowest_cost") return "Best overall match with stronger price penalties; dose and routine trade-offs remain available";
   if (request.optimization === "fewest_pills") return "Best overall match with stronger daily-routine penalties; dose and price trade-offs remain available";
@@ -391,27 +387,6 @@ export function selectOptions(input: Readonly<{ baskets: readonly ScoredBasket[]
       optionRole: recommended ? "requested_objective" as const : roles.includes("fewer_concerns") ? "fewer_concerns" as const : "best_value" as const };
   });
   return { selected: mapped.find(row => row.recommended)!, alternatives: mapped.filter(row => !row.recommended) };
-}
-
-/** Deterministic fallback improves the same score, never just covered-target count. */
-export function salvagePartialBasket(input: Readonly<{ groups: readonly ProductGroup[]; request: CanonicalRequest; sellerId: string }>): ScoredBasket | null {
-  let state = seedState(input.request);
-  let best = scoreState({ ...input, state });
-  if (!best) return null;
-  for (let iteration = 0; iteration < input.groups.length; iteration += 1) {
-    let chosen: { state: SearchState; basket: ScoredBasket } | null = null;
-    for (const group of input.groups) for (const variant of group.variants) {
-      const next = tryAddVariant(state, variant, group, input.request);
-      if (!next) continue;
-      const basket = scoreState({ ...input, state: next });
-      if (!basket || compareBaskets(basket, best, input.request) >= 0) continue;
-      if (!chosen || compareBaskets(basket, chosen.basket, input.request) < 0) chosen = { state: next, basket };
-    }
-    if (!chosen) break;
-    state = chosen.state;
-    best = chosen.basket;
-  }
-  return best;
 }
 
 export function groupProduct(
