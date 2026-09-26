@@ -17,12 +17,19 @@ import { inStorePharmacyFromAnswers } from "../lib/pharmacy-in-store.ts";
 fixtureDatabaseUrl();
 const sql = getSql()!;
 const otherPharmacy = { id: randomUUID(), slug: `pharmacy-order-isolation-${randomUUID()}` };
+let originalPharmacies: unknown;
 before(async () => {
+  originalPharmacies = await sql`select to_jsonb(o) as value from public.organisations o order by id`;
   const migration = await readFile("db-rollout/pharmacy-orders.sql", "utf8"); await sql.begin(tx => tx.unsafe(migration));
   await sql`insert into public.organisations (id, name, slug, organisation_type, status, country_code, currency)
     values (${otherPharmacy.id}::uuid, 'Isolated cross-store ownership fixture', ${otherPharmacy.slug}, 'tenant', 'active', 'TH', 'THB')`;
 });
-after(closeSqlPool);
+after(async () => {
+  try {
+    assert.deepEqual(await sql`select to_jsonb(o) as value from public.organisations o order by id`, originalPharmacies,
+      "PERF-PACK-04 pharmacy fixtures must leave the original catalogue exactly unchanged");
+  } finally { await closeSqlPool(); }
+});
 async function counters() {
   return (await sql`select (select count(*) from public.payments)::int as payments,
     (select count(*) from public.retail_checkout_payments)::int as checkout_payments,
