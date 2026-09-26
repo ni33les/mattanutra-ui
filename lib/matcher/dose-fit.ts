@@ -161,7 +161,7 @@ function cachedSubjectLoss(input: ReturnType<typeof compileSubject>, known: bigi
 
 // Every loss denominator divides a request's target, continued-dose or reference
 // scale. Compile their common basis once; baskets only add exact integer terms.
-const aggregationScales = new WeakMap<CanonicalRequest, { base: bigint; weighted: bigint }>();
+const aggregationScales = new WeakMap<CanonicalRequest, { base: bigint; weighted?: bigint }>();
 function aggregationScale(request: CanonicalRequest, weights: ReturnType<typeof exactWeights> | null) {
   let scales = aggregationScales.get(request);
   if (!scales) {
@@ -178,10 +178,10 @@ function aggregationScale(request: CanonicalRequest, weights: ReturnType<typeof 
       if (!isDoseError(amount) && amount.units > BigInt(0)) denominators.push({ num: BigInt(1), den: amount.units });
     }
     const base = compileLinearTerms(denominators).denominator;
-    scales = { base, weighted: base }; aggregationScales.set(request, scales);
+    scales = { base }; aggregationScales.set(request, scales);
   }
-  if (weights && scales.weighted === scales.base) scales.weighted = scales.base * compileLinearTerms([weights.defaultWeight, ...weights.subjects.values()]).denominator;
-  return weights ? scales.weighted : scales.base;
+  if (weights && scales.weighted === undefined) scales.weighted = scales.base * compileLinearTerms([weights.defaultWeight, ...weights.subjects.values()]).denominator;
+  return weights ? scales.weighted! : scales.base;
 }
 
 export function numericalDoseFitScore(request: CanonicalRequest, exposure: ReadonlyMap<string, bigint>): NumericalDoseFitScore {
