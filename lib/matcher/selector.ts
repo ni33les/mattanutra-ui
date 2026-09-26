@@ -245,7 +245,10 @@ function satisfiesRetained(request: CanonicalRequest, basket: ScoredBasket) {
     request.retainSubjectIds.every((id) => (basket.exposure.totals.get(id)?.units ?? BigInt(0)) > BigInt(0));
 }
 
+const basketConcerns = new WeakMap<ScoredBasket, Map<string, number>>();
 function concernMap(basket: ScoredBasket, request: CanonicalRequest) {
+  const cached = basketConcerns.get(basket);
+  if (cached) return cached;
   const concerns = new Map<string, number>();
   const fit = fitOf(basket, request);
   for (const row of fit.perTarget) {
@@ -266,6 +269,9 @@ function concernMap(basket: ScoredBasket, request: CanonicalRequest) {
       for (const reason of finding.uncertainty) concerns.set(key + ":" + reason, 1);
     } else concerns.set(key, 1);
   }
+  // Evaluated baskets own immutable dose/reference facts. Legacy callers without
+  // a score still resolve against their supplied request on each comparison.
+  if (basket.doseFit) basketConcerns.set(basket, concerns);
   return concerns;
 }
 
