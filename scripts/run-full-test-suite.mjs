@@ -69,6 +69,10 @@ export async function cloneIsolatedDatabase(templateUrl, identity) {
 
 export function fullTestPreflight(env, inventory = fullTestInventory()) {
   const failures = isolatedDatabasePreflight(env);
+  if (!failures.some(message => message.includes("TEST_DB_URL")) &&
+      !/^\/mattanutra_lock_review_ax_[a-zA-Z0-9_]+$/.test(new URL(env.TEST_DB_URL).pathname)) {
+    failures.push("Complete PostgreSQL inventory requires a mattanutra_lock_review_ax_ database; use cloneIsolatedDatabase before acceptance");
+  }
   let app;
   try { app = new URL(env.PLAYWRIGHT_BASE_URL); } catch { /* diagnostic below */ }
   if (app?.origin !== "http://127.0.0.1:3100" || app.username || app.password || app.pathname !== "/" || app.search || app.hash) failures.push("PLAYWRIGHT_BASE_URL must identify the isolated localhost application on port 3100");
