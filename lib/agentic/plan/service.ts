@@ -1,7 +1,7 @@
 import { measureService, recordServiceMetric } from "@/lib/service-metrics";
 import { refinementDecisionSummary } from "@/lib/agentic/presentation/decision";
 import { withServiceMeasurements } from "@/lib/service-metrics";
-import { planStatusProjection, visiblePlanRevision } from "@/lib/agentic/presentation/status-projection";
+import { planStatusProjection, visiblePlanRevision, type PlanOperationRead } from "@/lib/agentic/presentation/status-projection";
 import {preparePlanRevisionRecord} from "@/lib/agentic/store/prepared-revision";
 import { readPlanPresentation } from "@/lib/agentic/presentation/plan-read";
 import { planContractCompatible } from "@/lib/agentic/presentation/compatibility";
@@ -1004,7 +1004,7 @@ export async function runAdmittedPlanOperation(input: Readonly<{
   return work;
 }
 
-function operationFailureResponse(operation: PlanOperationRecord, currentRevision = operation.expectedRevision) {
+export function operationFailureResponse(operation: PlanOperationRead, currentRevision: number) {
   const failure = isAgenticErrorResult(operation.error) ? operation.error : businessError({
     reasonCode: "stale_revision", message: "This refinement did not complete. Read the plan, then revise its returned revision with a new idempotency key." });
   return { ...failure, error: { ...failure.error, currentRevision: visiblePlanRevision({ revision: currentRevision, operation }),
@@ -1017,7 +1017,7 @@ async function admittedResponse(input: PlanExecutionInput, operation: PlanOperat
   if (operation.status === "complete") return operation.response as PlanToolSuccess;
   if (operation.status === "failed" || operation.status === "cancelled") {
     const current = await input.store.getPlan(operation.planId);
-    return operationFailureResponse(operation, current?.currentRevision);
+    return operationFailureResponse(operation, current?.currentRevision ?? operation.expectedRevision);
   }
   // Admission returns its durable receipt independently of the executor's lifetime.
   return operationProcessingResponse(operation);

@@ -8,19 +8,32 @@ import { catalogueSnapshotId } from "@/lib/agentic/catalogue/freeze";
 import { ensureCatalogueSnapshot } from "@/lib/agentic/catalogue/snapshot";
 import { prepareSimpleRequest } from "@/lib/agentic/plan/simple-input";
 import { canonicalRequestHash } from "@/lib/agentic/idempotency";
-import { planTool, commitPlanNoop, type PlanToolInput } from "@/lib/agentic/plan/service";
+import { planTool, commitPlanNoop, operationFailureResponse, type PlanToolInput } from "@/lib/agentic/plan/service";
 import type { PlanResult } from "@/lib/agentic/plan/types";
 import { AGENTIC_CONTRACT_VERSION } from "@/lib/agentic/config";
-import { visiblePlanRevision, operationForRead } from "@/lib/agentic/presentation/status-projection";
+import { visiblePlanRevision, operationForRead, type PlanOperationRead } from "@/lib/agentic/presentation/status-projection";
 
 export async function simplePlanTool(runtime: AgenticRuntime, params: Record<string, unknown>) {
   const end = measureService(typeof params.planHandle === "string" && Object.keys(params).length === 1 ? "mcp.retrieval_ms" : "mcp.admission_ms");
   try { return await runSimplePlanTool(runtime, params); } finally { end(); }
 }
+/** A rejected request keeps its typed validation details on every delivery path.
+ * Operational failure and cancellation retain the existing recovery decision. */
+function terminalPlanDecision(operation: PlanOperationRead, handle: string, revision: number, locale?: string) {
+  if (operation.status === "failed" && isAgenticErrorResult(operation.error) &&
+      operation.error.error.category === "INVALID_ARGUMENT" && !operation.error.error.retryable) {
+    const failure = operationFailureResponse(operation, revision);
+    return { ...failure, error: { ...failure.error,
+      fieldPath: failure.error.fieldPath?.replace(/^request\./, "") ?? null,
+      ...(failure.error.issues ? { issues: failure.error.issues.map(issue => ({ ...issue, fieldPath: issue.fieldPath.replace(/^request\./, "") })) } : {})
+    } };
+  }
+  return failedDecision(handle, visiblePlanRevision({ revision, operation }), locale);
+}
 /** Reuse an authorised coherent read for both ordinary and streamed delivery. */
 export function simplePlanReadDecision(state: Exclude<Awaited<ReturnType<typeof readPlanState>>, { ok: false }>, handle: string) {
   if (state.operation && ["queued", "running", "retryable"].includes(state.operation.status)) return processingDecision(handle, visiblePlanRevision(state), state.projection.locale);
-  if (state.operation && ["failed", "cancelled"].includes(state.operation.status)) return failedDecision(handle, visiblePlanRevision(state), state.projection.locale);
+  if (state.operation && ["failed", "cancelled"].includes(state.operation.status)) return terminalPlanDecision(state.operation, handle, state.revision, state.projection.locale);
   const complete = planPresentation(state);
   return presentDecision(complete.result, handle, complete.revision.revision);
 }
@@ -42,7 +55,7 @@ async function runSimplePlanTool(runtime: AgenticRuntime, params: Record<string,
   if (existing || receipt) {
     const observed = existing && operationForRead(existing);
     if (existing && observed && ["failed", "cancelled"].includes(observed.status)) {
-      return failedDecision(String(existing.command.prepared.planHandle), visiblePlanRevision({ revision: existing.expectedRevision, operation: observed }), existing.command.prepared.locale as string | undefined);
+      return terminalPlanDecision(observed, String(existing.command.prepared.planHandle), existing.expectedRevision, existing.command.prepared.locale as string | undefined);
     }
     const internal = existing ? await planTool({ ...runtime, now, payload: existing.command.payload as PlanToolInput }) : JSON.parse(receipt!.responseJson);
     if (isAgenticErrorResult(internal)) return internal;
