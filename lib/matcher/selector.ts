@@ -134,21 +134,28 @@ export function scoreState(input: Readonly<{
   return {
     aggregateCoverage: aggregateCoverage(input.request, input.state.delivered),
     coverageBySubject,
-    get coverageSummary() { return coverageSummary(input.request, validated.exposure); },
-    get coveredCount() { return coveredTargetCount(input.request, coverageBySubject); },
+    coverageSummary: coverageSummary(input.request, validated.exposure),
+    coveredCount: coveredTargetCount(input.request, coverageBySubject),
     dailyPills: input.state.pills,
     pillCountKnown: input.state.pillCountKnown !== false && selectedGroups.every(group => group.product.pillCountKnown !== false),
-    get dedicatedPartialCount() { return dedicatedPartialCountFor(products, input.request, coverageBySubject); },
+    dedicatedPartialCount: dedicatedPartialCountFor(
+      products,
+      input.request,
+      coverageBySubject
+    ),
     exposure: validated.exposure,
     incidentalCount: incidentalNutrientCount(products, input.request),
-    get oversupplyScore() { return oversupplyScore(input.request, input.state.exposure); },
+    oversupplyScore: oversupplyScore(input.request, input.state.exposure),
     doseFit: withProductUncertainty(doseFitScore(input.request, input.state.exposure), validated.exposure.unknownSubjectIds),
     overallScore: searchStateScore(input.request, input.state),
     priceMinor: input.state.price,
     productCount: input.state.count,
     productIds,
     reason: selectedReason(input.request),
-    get titleExactCount() { return titleExactCountFor(products, input.request); },
+    titleExactCount: titleExactCountFor(
+      products,
+      input.request
+    ),
     requestedLabelCount: requestedLabelCountFor(
       products,
       input.request
