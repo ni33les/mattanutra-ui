@@ -188,7 +188,6 @@ function dedicatedPartialCountFor(
 }
 
 export function scoreState(input: Readonly<{
-  allowIncidentalBlock?: boolean;
   groups: readonly ProductGroup[];
   request: CanonicalRequest;
   sellerId: string;
@@ -197,8 +196,7 @@ export function scoreState(input: Readonly<{
   const validated = revalidateState(
     input.state,
     input.groups,
-    input.request,
-    { allowIncidentalBlock: input.allowIncidentalBlock }
+    input.request
   );
 
   if (!validated) {

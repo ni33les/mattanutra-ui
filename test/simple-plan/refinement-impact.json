@@ -97,8 +97,8 @@
     },
     {
       "file": "test/service-efficiency/numeric-scoring.test.ts",
-      "expectedCases": 22,
-      "reason": "Exact ranking must avoid allocating human display conversions while preserving complete serialized score facts and weighted penalties; PERF-CPU-01 exact interior-probe comparison and historical checkpoint recovery without response materialization; PERF-CPU-02 repeated label identities share reference resolution without sharing quantities or confidence; PERF-CPU-03 physical variant reuse with changed-offer repricing",
+      "expectedCases": 23,
+      "reason": "Exact ranking must avoid allocating human display conversions while preserving complete serialized score facts and weighted penalties; PERF-CPU-01 exact interior-probe comparison and historical checkpoint recovery without response materialization; PERF-CPU-02 repeated label identities share reference resolution without sharing quantities or confidence; PERF-CPU-03 physical variant reuse with changed-offer repricing; PERF-CPU-04 independent exact linear coefficients; PERF-CPU-05 safety and retained scores share verified quantities without trusting stale preparation",
       "slice": "matching"
     },
     {

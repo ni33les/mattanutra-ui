@@ -266,13 +266,16 @@ export function variantDedicatedOvershoot(
 
 export function evaluateSafety(input: Readonly<{
   exposure: Exposure;
+  preparedExposure?: ReadonlyMap<string, bigint>;
   products: readonly MatcherProduct[];
   request: CanonicalRequest;
   rulesVersion?: string;
   variants: readonly DoseVariant[];
 }>): SafetyResult {
   const findings: SafetyFinding[] = [];
-  const exposure = new Map([...input.exposure.totals].map(([id, amount]) => [id, amount.units]));
+  const prepared = input.preparedExposure;
+  const exposure = prepared?.size === input.exposure.totals.size && [...input.exposure.totals].every(([id, amount]) => prepared.get(id) === amount.units)
+    ? prepared : new Map([...input.exposure.totals].map(([id, amount]) => [id, amount.units]));
   const fit = doseFitScore(input.request, exposure);
   const contributors = [...new Set(input.variants.map((row) => row.productId))].sort();
   const add = (row: Omit<SafetyFinding, "action" | "guidanceId" | "contributors"> & { contributors?: readonly string[] }) => {

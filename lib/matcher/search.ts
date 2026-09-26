@@ -398,10 +398,8 @@ export function reconstructVariants(
 export function revalidateState(
   state: SearchState,
   groups: readonly ProductGroup[],
-  request: CanonicalRequest,
-  options?: Readonly<{ allowIncidentalBlock?: boolean }>
+  request: CanonicalRequest
 ) {
-  void options;
   const variants = reconstructVariants(groups, state.selectedVariantIds);
   const exposure = aggregateDailyExposure({
     current: request.currentSupplements,
@@ -414,6 +412,7 @@ export function revalidateState(
 
   const safety = evaluateSafety({
     exposure,
+    preparedExposure: state.exposure,
     products: groups.map((item) => item.product),
     request,
     variants
