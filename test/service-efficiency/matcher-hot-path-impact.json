@@ -142,6 +142,11 @@
       "file": "test/service-efficiency/selector-facts.test.ts",
       "expectedCases": 1,
       "reason": "PERF-CPU-35: exact incidental facts and request-isolated target resolution without per-label repeated lookups"
+    },
+    {
+      "file": "test/sha256.test.ts",
+      "expectedCases": 6,
+      "reason": "PERF-CPU-37/38: native server hashing with identical browser UTF-8 identities and fallback"
     }
   ],
   "exclusions": "No full application/MCP, live database, payment or unrelated browser suites; no contract or scoring-policy changes."
