@@ -103,3 +103,31 @@ test("PERF-PACK-01 read benchmarks use the current public request and identify i
   assert.equal(projection.decision.status,"ready");
   assert.equal(Object.hasOwn(projection,"choices"),false);
 });
+
+test('PERF-PACK-02 benchmark control requires the requested clean source and preserves achieved overhead reductions', async () => {
+  const { mkdtempSync, writeFileSync, rmSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os'); const { join } = await import('node:path');
+  const { execFileSync } = await import('node:child_process');
+  const { benchmarkControl } = await import('../../scripts/service-efficiency/benchmark.mjs');
+  const { verifyBenchmarkOverheads } = await import('../../scripts/service-efficiency/benchmark-proof.mjs');
+  assert.equal(typeof benchmarkControl, 'function'); assert.equal(typeof verifyBenchmarkOverheads, 'function');
+  const root = mkdtempSync(join(tmpdir(), 'benchmark-control-'));
+  const git = (...args: string[]) => execFileSync('git', ['-C', root, ...args], { encoding: 'utf8', stdio: ['ignore','pipe','pipe'] }).trim();
+  try {
+    git('init'); writeFileSync(join(root, 'source.txt'), 'original'); git('add', 'source.txt');
+    git('-c', 'user.name=Fixture', '-c', 'user.email=fixture@localhost', 'commit', '-m', 'control');
+    const sha = git('rev-parse', 'HEAD'), env = { EFFICIENCY_CONTROL_WORKTREE: root, EFFICIENCY_CONTROL_COMMIT: sha };
+    assert.deepEqual(benchmarkControl(env), { control: root, releaseBase: sha });
+    assert.throws(() => benchmarkControl({}), /control/i);
+    assert.throws(() => benchmarkControl({ ...env, EFFICIENCY_CONTROL_COMMIT: 'a'.repeat(40) }));
+    writeFileSync(join(root, 'source.txt'), 'changed'); assert.throws(() => benchmarkControl(env));
+    const measurements = { warm: { reads: 20, applicationSelects: 40, rowBytes: 1200 }, inputTransfers: 1, checkpointBytes: 400 };
+    const rows = ['reads','funnel','expanded'].map(id => ({ id, control: measurements, candidate: structuredClone(measurements) }));
+    assert.equal(verifyBenchmarkOverheads(rows), true, 'A newer control may already contain the structural improvements');
+    for (const id of ['reads','funnel','expanded']) {
+      const bad = structuredClone(rows); const candidate = bad.find(row => row.id === id)!.candidate;
+      if (id === 'expanded') candidate.inputTransfers = 2; else candidate.warm.rowBytes++;
+      assert.throws(() => verifyBenchmarkOverheads(bad), 'No regression of the previously achieved structure is allowed');
+    }
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
