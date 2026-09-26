@@ -594,6 +594,11 @@
       "slice": "harness",
       "expectedCases": 17,
       "reason": "PERF-PACK-03: reject incompatible isolated database names before executing the complete maintained inventory; retain discovery, hygiene and execution reconciliation."
+    },
+    {
+      "file": "test/service-efficiency/native-worker-readiness.test.ts",
+      "expectedCases": 1,
+      "reason": "PERF-NATIVE-01: isolated external executor warms the production matching threads before registration and readiness"
     }
   ],
   "inputs": [

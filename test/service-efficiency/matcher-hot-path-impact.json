@@ -127,6 +127,11 @@
       "file": "test/agentic-matching.test.ts",
       "expectedCases": 7,
       "reason": "Actual MCP matching preserves source choices, retailer isolation and product eligibility"
+    },
+    {
+      "file": "test/service-efficiency/native-worker-readiness.test.ts",
+      "expectedCases": 1,
+      "reason": "PERF-NATIVE-01: isolated external executor warms the production matching threads before registration and readiness"
     }
   ],
   "exclusions": "No full application/MCP, live database, payment or unrelated browser suites; no contract or scoring-policy changes."
