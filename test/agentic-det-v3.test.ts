@@ -1,6 +1,7 @@
 import { AGENT_CARD } from "../lib/agentic/contract/agent-card.ts";
 import { agenticToolDescriptions } from "../lib/agentic/contract/instructions.ts";
 import { observeLatency } from "./helpers/latency-observation.ts";
+import { assertPlanDeliveryInstructions } from "./helpers/plan-delivery-instructions.ts";
 import assert from "node:assert/strict";
 import { afterEach, beforeEach, describe, it } from "node:test";
 import {
@@ -274,7 +275,7 @@ describe("Slice A discovery", () => {
     assert.doesNotMatch(instructions, /welness/i);
     assert.match(instructions, /Thailand/);
     assert.match(instructions, /flat targets/);
-    assert.match(instructions, /planHandle to read\/poll/);
+    assertPlanDeliveryInstructions(instructions);
   });
 });
 

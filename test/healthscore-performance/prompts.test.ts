@@ -27,6 +27,7 @@ function capture(t: TestContext, responses: unknown[]) {
 test("HS-PERF-01: formula prompt preserves every fact with compact JSON", async t => {
   const requests = capture(t, [formulaResponse]);
   await analyzeFormulationWithGrok(formulaInput);
+  assert.equal(requests.length, 1);
   const contents = requests[0].messages.slice(1).map(m => m.content);
   const baseline = JSON.parse(readFileSync(new URL("./baseline-prompts.json", import.meta.url), "utf8")).formula;
   const prompt = Object.assign({}, ...contents.map(content => JSON.parse(content)));
@@ -35,6 +36,16 @@ test("HS-PERF-01: formula prompt preserves every fact with compact JSON", async 
   // roles are asserted by HS-CACHE-05; the rest of the contract stays identical.
   for (const key of ["rationale", "decision", "whyThisIsForYou"]) {
     original.contract.supplementBreakdown[0][key] = prompt.contract.supplementBreakdown[0][key];
+  }
+  // The approved web preference removal omits these four null placeholders.
+  // Preserve the historical baseline file and compare every remaining fact exactly.
+  for (const key of ["budget", "maxPills", "pillCount", "formPreference"]) {
+    assert.equal(original.assessmentSafetyContext[key], null, `Historical ${key} must be an absent-preference placeholder`);
+    assert.equal(Object.hasOwn(prompt.assessmentSafetyContext, key), false, key);
+    delete original.assessmentSafetyContext[key];
+  }
+  for (const context of [prompt.assessment, prompt.assessmentSafetyContext]) {
+    for (const key of ["budget", "maxPills", "pillCount", "formPreference", "form"]) assert.equal(Object.hasOwn(context, key), false, key);
   }
   for (const key of ["assessment", "assessmentSafetyContext", "canonicalSupplementCatalogue", "currentPlanContext", "contract", "locale", "plan", "planId"]) {
     assert.deepEqual(prompt[key], original[key], key);

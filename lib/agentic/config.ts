@@ -3,7 +3,7 @@ import { runtimeBuildIdentity } from "@/lib/runtime-build-identity";
 
 export const AGENTIC_CONTRACT_VERSION = "11.1.0";
 export const AGENTIC_SERVICE_NAME = "MattaNutra";
-export const AGENTIC_SERVICE_VERSION = "11.0.0";
+export const AGENTIC_SERVICE_VERSION = AGENTIC_CONTRACT_VERSION;
 export const AGENTIC_MIGRATION_VERSION = "agentic-3.0.0";
 export const AGENTIC_POLL_AFTER_SECONDS = 3;
 export const AGENTIC_CHECKOUT_TTL_MS = 15 * 60 * 1000;

@@ -8,10 +8,13 @@ import { CLIENT_GUIDE_URI, CONTRACT_SCHEMA_URI, readContractResource, CLIENT_EXA
 import { runtime, rpc } from "./helpers.ts";
 
 test("AXR-SPEC-01 current contract publishes six tools and current schemas; clinical references stay unchanged", () => {
-  assert.equal(AGENTIC_CONTRACT_VERSION, "11.0.0"); assert.equal(GUIDANCE_RULES_VERSION, "6.0.0");
+  const schema = readContractResource(CONTRACT_SCHEMA_URI); assert.ok(schema);
+  assert.equal(JSON.parse(schema.contents[0].text).contractVersion, AGENTIC_CONTRACT_VERSION);
+  assert.equal(GUIDANCE_RULES_VERSION, "6.0.0");
   assert.deepEqual([...AGENTIC_PUBLIC_TOOLS], ["info", "plan", "execute", "order", "support", "feedback"]);
   for (const version of ["4.0.0", "5.0.0", "6.0.0", "7.0.0", "8.0.0"]) assert.equal(readContractResource(`mattanutra://contract/${version}/schema`), null);
-  assert.ok(CLIENT_GUIDE_URI.includes("11.0.0")); assert.ok(CONTRACT_SCHEMA_URI.includes("11.0.0"));
+  assert.equal(CLIENT_GUIDE_URI, `mattanutra://contract/${AGENTIC_CONTRACT_VERSION}/client-guide`);
+  assert.equal(CONTRACT_SCHEMA_URI, `mattanutra://contract/${AGENTIC_CONTRACT_VERSION}/schema`);
 });
 
 for (const locale of ["en", "th", "zh-CN"]) test(`AXR-SPEC-02 ${locale} tools-only info and native resources provide the same executable conversational contract`, async () => {

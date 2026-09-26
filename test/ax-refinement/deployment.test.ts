@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { test } from "node:test";
 import { createHash } from "node:crypto";
 import { readAxValidationProof, AX_STAGES, AX_ARTIFACTS } from "../../scripts/ax-validation-proof.mjs";
+import { AGENTIC_CONTRACT_VERSION } from "../../lib/agentic/config.ts";
 
 test("AXR-DEPLOY-01 DEV work-package proofs reject stale source, wrong environment, missing stages and altered artifacts", () => {
   const dir = mkdtempSync(join(tmpdir(), "ax-proof-test-"));
@@ -38,7 +39,7 @@ test("AXR-DEPLOY-01 DEV work-package proofs reject stale source, wrong environme
 test("AXR-DEPLOY-02 scoped verification is explicit and DEV-only while ordinary deployment retains full verification", () => {
   const dev = readFileSync(new URL("../../scripts/deploy-dev.mjs", import.meta.url), "utf8");
   const published = JSON.parse(readFileSync(new URL("../../public/.well-known/mcp.json", import.meta.url), "utf8"));
-  assert.equal(published.contractVersion, "11.0.0");
+  assert.equal(published.contractVersion, AGENTIC_CONTRACT_VERSION);
   const fullGate = readFileSync(new URL("../../scripts/run-dev-advisory-validation.mjs", import.meta.url), "utf8");
   assert.match(fullGate, /contractVersion !== validationContractIdentity\(\)\.contractVersion/, "Full acceptance must bind the current generated contract identity");
   assert.match(dev, /--ax-refinement-attestation/); assert.match(dev, /verify:dev/); assert.match(dev, /readAxValidationProof/);

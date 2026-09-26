@@ -7,7 +7,7 @@ import { AGENTIC_INPUT_SCHEMAS, REQUIREMENTS_SCHEMA } from "../lib/agentic/contr
 import { validateToolIssues } from "../lib/agentic/contract/validate.ts";
 import { AGENTIC_OUTPUT_SCHEMAS } from "../lib/agentic/contract/outputs.ts";
 import { infoTool } from "../lib/agentic/info.ts";
-import { loadAgenticConfig } from "../lib/agentic/config.ts";
+import { AGENTIC_CONTRACT_VERSION, loadAgenticConfig } from "../lib/agentic/config.ts";
 
 describe("current conversational discovery and advisory preferences", () => {
   it("ANNA-AX-01: existing locale-only discovery explains basis and links to executable flat request templates", () => {
@@ -25,7 +25,9 @@ describe("current conversational discovery and advisory preferences", () => {
   });
   it("ANNA-AX-02: retired resources return ordinary not-found; only current publication remains", () => {
     assert.equal(readContractResource("mattanutra://contract/5.0.0/schema"), null);
-    assert.ok(readContractResource("mattanutra://contract/11.0.0/schema"));
+    const current = readContractResource(`mattanutra://contract/${AGENTIC_CONTRACT_VERSION}/schema`);
+    assert.ok(current);
+    assert.equal(JSON.parse(current.contents[0].text).contractVersion, AGENTIC_CONTRACT_VERSION);
   });
   it("ANNA-AX-03: all retained numeric preference names publish advisory semantics and zero/null remain valid", () => {
     for (const name of ["maxProductCount", "maxDailyPills", "maxPriceMinor"]) {

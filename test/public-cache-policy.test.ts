@@ -41,7 +41,8 @@ describe("public cache and crawl policy", () => {
       "basket",
       "nutrition",
       "order",
-      "p"
+      "p",
+      "retail"
     ]);
 
     assert.equal(localePathRequiresNoStore("/en"), false);
@@ -59,6 +60,12 @@ describe("public cache and crawl policy", () => {
     assert.equal(localePathRequiresNoStore("/en/nutrition/reveal"), true);
     assert.equal(localePathRequiresNoStore("/en/order/track/abc"), true);
     assert.equal(localePathRequiresNoStore("/en/p/delight-pharmacy"), true);
+    for (const locale of ["en", "th", "zh-CN"]) {
+      for (const page of ["", "/quiz", "/reveal", "/plan"]) {
+        assert.equal(localePathRequiresNoStore(`/${locale}/retail/delight${page}`), true);
+      }
+      assert.equal(localePathRequiresNoStore(`/${locale}/retailers`), false, "Only the exact pharmacy root is private");
+    }
   });
 
   it("disallows admin, api, and private funnels in robots.txt rules", () => {

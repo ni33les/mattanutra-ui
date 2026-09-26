@@ -305,7 +305,10 @@ describe("life-stage stack UL on every live matching flow", () => {
       "utf8"
     );
 
-    assert.match(search, /doseFitScore/);
+    // Exploration uses the shared numerical scorer; retained results alone
+    // materialize display fields from that same evaluator.
+    assert.match(search, /import \{ compareDoseFit, numericalDoseFitScore, doseFitTargetDeviations \} from "@\/lib\/matcher\/dose-fit"/);
+    assert.match(search, /compareDoseFit\(numericalDoseFitScore\(request, a\.exposure\), numericalDoseFitScore\(request, b\.exposure\)\)/);
     assert.doesNotMatch(search, /stackUnitsViolateCeiling/);
     assert.match(search, /labelledSafetyExposure/);
     // V5 centralises all attempted additions in the budgeted search pass;

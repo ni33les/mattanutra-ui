@@ -88,9 +88,13 @@ test('PRACTICAL-API-06 internal scores remain inspectable without adding public 
   assert.equal(result.selected?.overallScore?.overallPenalty, 1.25);
 });
 
-test('PRACTICAL-API-07 contract supports v10 only without changing stored web settings', () => {
-  assert.equal(AGENTIC_CONTRACT_VERSION, '11.0.0'); assert.equal(validateContractPin(undefined), null);
-  assert.equal(validateContractPin('11.0.0'), null); assert.equal(validateContractPin('8.0.0')?.ok, false);
+test('PRACTICAL-API-07 contract pins accept only the current publication without changing stored web settings', () => {
+  assert.equal(validateContractPin(undefined), null);
+  assert.equal(validateContractPin(AGENTIC_CONTRACT_VERSION), null);
+  for (const retired of ['8.0.0', '10.0.0', '11.0.0']) {
+    assert.notEqual(retired, AGENTIC_CONTRACT_VERSION);
+    assert.equal(validateContractPin(retired)?.ok, false);
+  }
 });
 
 test('PRACTICAL-API-08 compact changes penalty weights without a second search policy', async () => {

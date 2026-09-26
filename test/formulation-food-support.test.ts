@@ -159,13 +159,15 @@ describe("formulation food support", () => {
     );
   });
 
-  it("lets formulation AI choose a supplement count within the intended range", async () => {
+  it("requests at most eight highest-impact ingredients without padding or a minimum", async () => {
     const source = await readFile("lib/formulation-analysis.ts", "utf8");
 
-    assert.match(source, /rank every supplement that is clearly effective and needed/);
-    assert.match(source, /complete ranked set of assessment-justified items, usually 6 to 12/);
-    assert.match(source, /return the top 12 by expected impact and safety fit/);
-    assert.match(source, /Eight is acceptable only when exactly eight/);
+    const { WEB_FORMULATION_INGREDIENT_LIMIT } = await import("../lib/formulation-types.ts");
+    assert.equal(WEB_FORMULATION_INGREDIENT_LIMIT, 8);
+    assert.ok(source.includes("Return at most ${WEB_FORMULATION_INGREDIENT_LIMIT} justified ingredients, ranked by expected impact for this assessment."));
+    assert.match(source, /Return fewer when fewer are justified; there is no minimum count/);
+    assert.match(source, /Do not pad with weak or duplicative items/);
+    assert.doesNotMatch(source, /usually 6 to 12|return the top 12|Eight is acceptable only when exactly eight/);
     assert.doesNotMatch(source, /targetSupplementCount/);
     assert.doesNotMatch(source, /supplementBreakdown must contain 6 to 18 items/);
   });

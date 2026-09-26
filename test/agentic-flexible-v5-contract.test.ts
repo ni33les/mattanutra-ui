@@ -31,7 +31,10 @@ describe("current conversational contract", () => {
     assert.ok(validateToolIssues(PLAN_REQUEST, { ...request, requirements: { productDoses: [{ productId: "prd_returned", servingsPerDay: 0 }] } }).length);
   });
   it("publishes only the current contract with validated conversational examples", () => {
-    assert.equal(AGENTIC_CONTRACT_VERSION, "11.0.0"); assert.equal(CLIENT_GUIDE_URI, `mattanutra://contract/${AGENTIC_CONTRACT_VERSION}/client-guide`);
+    const schema = readContractResource(`mattanutra://contract/${AGENTIC_CONTRACT_VERSION}/schema`);
+    assert.ok(schema);
+    assert.equal(JSON.parse(schema.contents[0].text).contractVersion, AGENTIC_CONTRACT_VERSION);
+    assert.equal(CLIENT_GUIDE_URI, `mattanutra://contract/${AGENTIC_CONTRACT_VERSION}/client-guide`);
     assert.equal(readContractResource("mattanutra://contract/4.0.0/schema"), null);
     assert.equal(readContractResource("mattanutra://contract/8.0.0/schema"), null);
     const current = readContractResource(CLIENT_GUIDE_URI); assert.ok(current);

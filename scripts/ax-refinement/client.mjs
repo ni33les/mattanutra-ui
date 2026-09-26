@@ -2,6 +2,7 @@
  * supplies agreed flat request fields; the harness alone owns test settlement. */
 import assert from "node:assert/strict";
 import Ajv from "ajv";
+import { validationContractIdentity } from "../dev-validation-proof.mjs";
 import { contractFromToolDiscovery, publishedExample, selectPublishedResources } from "../published-client-journey.mjs";
 
 export async function refinementJourney({ rpc, request, discovery = "tools_only", key, settle, wait = ms => new Promise(done => setTimeout(done, ms)) }) {
@@ -9,7 +10,10 @@ export async function refinementJourney({ rpc, request, discovery = "tools_only"
   const listing = await rpc("tools/list", {}), tools = listing.tools;
   assert.deepEqual(tools.map(row => row.name), ["info", "plan", "execute", "order", "support", "feedback"]);
   const first = (await rpc("tools/call", { name: "info", arguments: { locale: request.locale } })).structuredContent;
-  assert.equal(first.contractVersion, "11.0.0");
+  const expected = validationContractIdentity();
+  assert.equal(listing.contractVersion, expected.contractVersion);
+  assert.equal(listing.schemaChecksum, expected.schemaChecksum);
+  assert.equal(first.contractVersion, expected.contractVersion);
   assert.equal(first.schemaChecksum, listing.schemaChecksum);
   let contract;
   if (discovery === "resources") {
@@ -20,6 +24,7 @@ export async function refinementJourney({ rpc, request, discovery = "tools_only"
     const guide = (await rpc("tools/call", { name: "info", arguments: { locale: request.locale, view: "client_guide" } })).structuredContent;
     contract = contractFromToolDiscovery(first, tools, guide.clientGuideText);
   }
+  assert.equal(contract.contractVersion, expected.contractVersion);
   const ajv = new Ajv({ strict: false, allErrors: true, validateFormats: false });
   const schemas = new Map(tools.map(tool => [tool.name, { input: ajv.compile(tool.inputSchema), output: ajv.compile(tool.outputSchema) }]));
   async function call(tool, args) {

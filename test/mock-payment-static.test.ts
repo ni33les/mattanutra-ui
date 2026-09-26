@@ -11,7 +11,8 @@ describe("DEV mock payment completion", () => {
     );
 
     const completion = source.slice(source.indexOf("export async function completeMockPayment"), source.indexOf("export async function notifyWebPaymentFulfilled"));
-    assert.match(completion, /withDatabaseTransaction[\s\S]*status: "paid"[\s\S]*await enqueueWebPaymentFulfillment\(tx, paid\)[\s\S]*destination/);
+    assert.match(completion, /withDatabaseTransaction[\s\S]*status: "paid"[\s\S]*await enqueueWebPaymentFulfillment\(tx, paid, current\.status === "paid" \|\| current\.status === "bound" \? prepared : newlyConfirmedFulfillment\(paid\)\)[\s\S]*destination/);
+    assert.match(completion, /await preparePaymentFulfillment\(sql, previous\)[\s\S]*withDatabaseTransaction/, "Historical completion evidence is prepared before acquiring the payment lock");
     assert.match(completion, /current\.stripe_mode !== "mock"/);
     assert.match(completion, /only available in dev mock mode/);
     assert.doesNotMatch(completion, /setTimeout|recordMockStripePayoutLifecycle|queuePlatformPaymentNotification/);

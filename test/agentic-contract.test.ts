@@ -22,6 +22,7 @@ import {
 import { AGENTIC_CONTRACT_VERSION } from "../lib/agentic/config.ts";
 import { createAgenticRuntime } from "../lib/agentic/runtime.ts";
 import { publicContractBundle } from "../lib/agentic/contract/guide.ts";
+import { assertPlanDeliveryInstructions } from "./helpers/plan-delivery-instructions.ts";
 
 function rpcResult(response: JsonRpcResponse | null) {
   assert.ok(response);
@@ -133,7 +134,7 @@ describe(`agentic MCP contract ${AGENTIC_CONTRACT_VERSION}`, () => {
     });
     const result = rpcResult(response);
     assert.equal(result.instructions, AGENTIC_UAT_SERVER_INSTRUCTIONS);
-    assert.match(String(result.instructions), /only planHandle to read\/poll/i);
+    assertPlanDeliveryInstructions(String(result.instructions));
     assert.match(String(result.instructions), /order recovers\/tracks payment and fulfilment/);
     assert.match(String(result.instructions), /test payments only/);
     assert.match(AGENTIC_TOOL_DESCRIPTIONS.feedback, /optional[^.]*feedback.*consentConfirmed=true/);
@@ -166,7 +167,7 @@ describe(`agentic MCP contract ${AGENTIC_CONTRACT_VERSION}`, () => {
     });
     const result = rpcResult(response);
     assert.equal(result.instructions, AGENTIC_PRD_SERVER_INSTRUCTIONS);
-    assert.match(String(result.instructions), /only planHandle to read\/poll/i);
+    assertPlanDeliveryInstructions(String(result.instructions));
     assert.match(String(result.instructions), /order recovers\/tracks payment and fulfilment/);
     assert.equal(String(result.instructions).includes("Stripe Test Mode"), false);
     assert.equal(String(result.instructions).includes("4242"), false);
