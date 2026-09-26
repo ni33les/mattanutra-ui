@@ -5,6 +5,8 @@ import postgres from "postgres";
 import { createPostgresStore } from "../../lib/agentic/store/postgres.ts";
 import type { PlanOperationRecord } from "../../lib/agentic/store/types.ts";
 import { claimPlanOperation, updateClaimedOperation, cancelPlanOperation } from "../../lib/agentic/plan/operations.ts";
+import { runAdmittedPlanOperation } from "../../lib/agentic/plan/service.ts";
+import { runtime } from "../ax-refinement/helpers.ts";
 
 assert.ok(process.env.TEST_DB_URL, "Isolated PostgreSQL is mandatory");
 const url = new URL(process.env.TEST_DB_URL);
@@ -24,6 +26,44 @@ async function operation() {
   return row;
 }
 const business = () => queries.filter(query => /^\s*(select|update)/i.test(query));
+
+test("PERF-LOCK-41 healthy and completed worker operations issue no speculative expiry write", async () => {
+  const row = await operation();
+  const future = { ...row, deadlineAt: new Date(Date.now() + 60_000).toISOString() };
+  assert.equal(await store.updatePlanOperation(future, row.version), true);
+  const claimed = new Error("Stop at the actual atomic claim");
+  let claims = 0;
+  const observed = { ...store, claimOperation: async (...args: Parameters<NonNullable<typeof store.claimOperation>>) => {
+    const result = await store.claimOperation!(...args);
+    assert.equal(result?.status, "running"); claims++;
+    throw claimed;
+  } };
+  const config = runtime("expiry-overhead", store).config;
+  queries.length = 0;
+  await assert.rejects(runAdmittedPlanOperation({ store: observed, config, operationId: row.id }), error => error === claimed);
+  assert.equal(claims, 1);
+  assert.equal(business().filter(query => /^\s*update/i.test(query)).length, 1, "Only the necessary ownership claim may write");
+
+  const current = await store.getPlanOperation(row.id); assert.ok(current);
+  const response = { ok: true, revision: 2, status: "ready" };
+  assert.equal(await store.updatePlanOperation({ ...current, status: "complete", response }, current.version), true);
+  queries.length = 0;
+  assert.deepEqual(await runAdmittedPlanOperation({ store, config, operationId: row.id }), response);
+  assert.equal(business().filter(query => /^\s*update/i.test(query)).length, 0);
+});
+
+test("PERF-LOCK-42 overdue worker admission still atomically expires before execution", async () => {
+  const row = await operation();
+  assert.ok(Date.parse(row.deadlineAt!) < Date.now(), "Fixture must have an expired deadline");
+  let claims = 0;
+  const observed = { ...store, claimOperation: async (...args: Parameters<NonNullable<typeof store.claimOperation>>) => {
+    claims++; return store.claimOperation!(...args);
+  } };
+  const result = await runAdmittedPlanOperation({ store: observed, config: runtime("expired-worker", store).config, operationId: row.id });
+  assert.equal(result.ok, false); assert.equal(claims, 0);
+  const expired = await store.getPlanOperation(row.id);
+  assert.equal(expired?.status, "failed"); assert.equal(expired?.leaseToken, null); assert.ok(expired?.error);
+});
 
 test("EFF-TXN-PG-01 claiming work returns its input in one database statement", async () => {
   const row = await operation(); queries.length = 0;

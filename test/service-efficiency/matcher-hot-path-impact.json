@@ -147,6 +147,11 @@
       "file": "test/sha256.test.ts",
       "expectedCases": 6,
       "reason": "PERF-CPU-37/38: native server hashing with identical browser UTF-8 identities and fallback"
+    },
+    {
+      "file": "test/service-efficiency/operations.integration.test.ts",
+      "expectedCases": 6,
+      "reason": "PERF-LOCK-41/42 and atomic ownership/deadline fencing after removal of speculative worker expiry writes"
     }
   ],
   "exclusions": "No full application/MCP, live database, payment or unrelated browser suites; no contract or scoring-policy changes."

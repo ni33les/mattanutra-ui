@@ -38,8 +38,8 @@
       "file": "test/service-efficiency/operations.integration.test.ts",
       "slice": "operations-pg",
       "database": true,
-      "expectedCases": 4,
-      "reason": "Bounded atomic lease and checkpoint statements with preserved commands, cursor and stale-owner rejection"
+      "expectedCases": 6,
+      "reason": "Bounded atomic lease and checkpoint statements with preserved commands, cursor and stale-owner rejection; PERF-LOCK-41/42: no speculative expiry writes, preserved overdue cleanup"
     },
     {
       "file": "test/service-efficiency/dispatch.test.ts",
