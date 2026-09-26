@@ -20,7 +20,7 @@
     {
       "file": "test/service-efficiency/checkpoint-hot-path.test.ts",
       "slice": "matching",
-      "expectedCases": 3,
+      "expectedCases": 4,
       "reason": "Completion without redundant checkpoint continuation, historical cursor recovery and standard-to-expanded attempt accounting"
     },
     {
