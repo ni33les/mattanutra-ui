@@ -21,6 +21,31 @@ mock.module('../../lib/matcher/rational.ts', { namedExports: { ...fractions, lin
 const { request } = await import('../matcher/flexible-v5-fixtures.ts');
 const { doseFitScore, numericalDoseFitScore, exactDoseFit, compareDoseFit, weightedDoseFitScore, numericalWeightedDoseFitScore } = await import('../../lib/matcher/dose-fit.ts');
 
+test('PERF-MEM-02 completed seller search releases discarded cache ownership without discarding recovery facts', async () => {
+  const { createSearchCursor, advanceSearchCursor, archivedSearchStates, extendSearchCursor } = await import('../../lib/matcher/search-cursor.ts');
+  const { compileGroups } = await import('../../lib/matcher/candidates.ts');
+  const { DEFAULT_MATCHER_CONFIG } = await import('../../lib/matcher/config.ts');
+  const { product, catalog } = await import('../matcher/flexible-v5-fixtures.ts');
+  const input = request(), groups = compileGroups(input, catalog(Array.from({ length: 12 }, (_, i) => product(`completed-${i}`, { a: i + 10 }))));
+  const cursor = createSearchCursor(groups, input, { ...DEFAULT_MATCHER_CONFIG, exactGroupLimit: 0, expansionBudget: 1000 });
+  const original = WeakMap.prototype.delete; let releases = 0;
+  try {
+    WeakMap.prototype.delete = function (key) { if (Array.isArray(key) && this.get(key)?.exposure instanceof Map) releases++; return original.call(this, key); };
+    advanceSearchCursor(cursor, input, 500);
+    assert.equal(releases, 0, 'Active search retains its useful arithmetic caches');
+    advanceSearchCursor(cursor, input, 500);
+  } finally { WeakMap.prototype.delete = original; }
+  assert.equal(cursor.done, true); assert.equal(cursor.expansionAttempts, 1000);
+  assert.ok(cursor.archive.size > 200 && cursor.review.length > 0);
+  assert.ok(releases > 100, 'Finished sellers need only retained live candidates plus compact archive rows');
+  const restored = structuredClone(cursor), values = [...archivedSearchStates(cursor)];
+  assert.deepEqual([...archivedSearchStates(restored)], values);
+  for (const state of cursor.review) assert.strictEqual(values.find(row => row.selectedVariantIds.join('|') === state.selectedVariantIds.join('|')), state);
+  extendSearchCursor(cursor, 1200); extendSearchCursor(restored, 1200);
+  advanceSearchCursor(cursor, input, 200); advanceSearchCursor(restored, input, 200);
+  assert.deepEqual(restored, cursor, 'Expanded recovery preserves budgets, order and all candidate values');
+});
+
 test('PERF-CPU-33 numerical preference denominators compile once across basket evaluations', async () => {
   const { scorePracticalPenalties } = await import('../../lib/matcher/practical-scoring.ts');
   const input = request({ maxDailyPills: 7.75, maxProductCount: 37, maxPriceMinor: 123457 });

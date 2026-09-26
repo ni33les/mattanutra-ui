@@ -308,3 +308,5 @@ work still takes the tested conditional retirement path.
 - PERF-CPU-47 dedicated-product memoization withdrawn after exact result parity but increased total CPU and five slower frozen trials. The narrower cache did not justify another retained ownership structure. Patch and RED/GREEN evidence are preserved externally.
 
 - PERF-CPU-48 nutrient lower-bound experiment withdrawn: independent proof, invalid-input handling and exact frozen outputs passed, but total CPU remained unchanged. Avoid retaining extra comparison branches without a timing benefit. Evidence remains external.
+
+- PERF-MEM-02 tests cache release only after bounded seller completion, avoiding the reconstruction trade-off of discarded mid-search caches. Preserve live retained candidates, every packed archive row, standard-to-expanded recovery and attempt accounting. RED observes no completed cache release.
