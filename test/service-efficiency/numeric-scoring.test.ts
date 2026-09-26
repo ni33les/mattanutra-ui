@@ -20,6 +20,21 @@ mock.module('../../lib/matcher/rational.ts', { namedExports: { ...fractions, toN
 const { request } = await import('../matcher/flexible-v5-fixtures.ts');
 const { doseFitScore, numericalDoseFitScore, exactDoseFit, compareDoseFit, weightedDoseFitScore, numericalWeightedDoseFitScore } = await import('../../lib/matcher/dose-fit.ts');
 
+test('PERF-CPU-18 repeated nutrient amounts reuse immutable frontier deviations', async () => {
+  const { doseFitTargetDeviations } = await import('../../lib/matcher/dose-fit.ts');
+  const input = request();
+  const first = numericalDoseFitScore(input, new Map([['a', 75_000_000n]]));
+  conversionsToNumber = 0;
+  const second = numericalDoseFitScore(input, new Map([['a', 75_000_000n], ['incidental', 20n]]));
+  assert.deepEqual(exactDoseFit(second), { num: 1n, den: 4n });
+  assert.equal(conversionsToNumber, 5, 'Only aggregate score fields need conversion when the nutrient endpoint was already evaluated');
+  assert.strictEqual(doseFitTargetDeviations(first)[0], doseFitTargetDeviations(second)[0]);
+  assert.deepEqual(doseFitTargetDeviations(second), [{ subjectId: 'a', under: 0.25, over: 0 }]);
+  const changed = numericalDoseFitScore(input, new Map([['a', 125_000_000n]]));
+  assert.deepEqual(doseFitTargetDeviations(changed), [{ subjectId: 'a', under: 0, over: 0.25 }]);
+  assert.deepEqual(doseFitTargetDeviations(first), [{ subjectId: 'a', under: 0.25, over: 0 }]);
+});
+
 test('REF-CPU-01 numerical ranking does not format display doses for losing candidates', () => {
   const input = request({ safetyCeilings: [{ subjectId: 'a', name: 'A', maxAmount: 100, maxUnit: 'mg', sourceScope: 'supplemental' }] });
   conversions = 0; additions = 0; aggregateSums = 0; conversionsToNumber = 0;
