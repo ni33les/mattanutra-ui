@@ -344,7 +344,15 @@ export function groupCoversTargetAtFloor(
   return false;
 }
 
-export function productIsDedicatedForTarget(
+const dedicatedProducts = new WeakMap<MatcherProduct, WeakMap<CanonicalTarget, boolean>>();
+export function productIsDedicatedForTarget(product: MatcherProduct, target: CanonicalTarget) {
+  let facts = dedicatedProducts.get(product);
+  if (!facts) { facts = new WeakMap(); dedicatedProducts.set(product, facts); }
+  const cached = facts.get(target); if (cached !== undefined) return cached;
+  const value = dedicatedForTarget(product, target); facts.set(target, value); return value;
+}
+
+function dedicatedForTarget(
   product: MatcherProduct,
   target: CanonicalTarget
 ) {
