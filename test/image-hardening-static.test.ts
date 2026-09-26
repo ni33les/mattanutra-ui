@@ -18,7 +18,6 @@ const generatedOrScraperImageExceptions = [
   "scripts/scrape-levitaminsasia-products.ts"
 ] as const;
 const qrUnoptimizedAllowlist = new Set([
-  "components/chat-channel-cards.tsx",
   "components/living-protocol-line-cta.tsx",
   "components/admin/communications-view.tsx",
   "components/reveal-final-results.tsx"

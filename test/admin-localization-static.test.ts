@@ -167,7 +167,6 @@ test("admin action buttons render as text buttons without decorative action icon
     "components/admin/product-view-ui.tsx",
     "components/admin/plan-safety-review-modal.tsx",
     "components/admin/supplement-view.tsx",
-    "components/admin/supplement-create-modal.tsx",
     "components/admin/financials-view.tsx",
     "components/admin/product-view.tsx",
     "components/admin/content-editor-modal.tsx",

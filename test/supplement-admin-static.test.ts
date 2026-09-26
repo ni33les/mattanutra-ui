@@ -33,16 +33,11 @@ describe("supplement admin popup", () => {
 
   it("uses one popup to create, AI-suggest, edit, save, and delete supplements", async () => {
     const view = await readFile("components/admin/supplement-view.tsx", "utf8");
-    const createModal = await readFile(
-      "components/admin/supplement-create-modal.tsx",
-      "utf8"
-    );
     const createRoute = await readFile("app/api/admin/supplements/route.ts", "utf8");
     const suggestion = await readFile("lib/supplement-dose-suggestion.ts", "utf8");
     const labels = await readFile("components/admin/dashboard-content.tsx", "utf8");
 
     assert.doesNotMatch(view, /CreateSupplementModal/);
-    assert.match(createModal, /export function CreateSupplementModal/);
     assert.match(view, /newSupplementDraftId/);
     assert.match(view, /createSupplementFromDraft/);
     assert.match(view, /setSearch\(name\)/);

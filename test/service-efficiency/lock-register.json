@@ -506,7 +506,7 @@
       "release": "Outer withDatabaseTransaction ends only after the callback/applier finishes. Configured database-phase deadline is 15 seconds; actual holds were not measured.",
       "callers": [
         "lib/task-service.ts",
-        "db-rollout/db-rollout.sql:public.prevent_task_dependency_cycle",
+        "db-rollout/historical-schema-2026-05-23.sql:public.prevent_task_dependency_cycle",
         "db-schema.sql:public.prevent_task_dependency_cycle",
         "lib/task-service.ts:withTaskRowLock"
       ],
@@ -912,7 +912,7 @@
       "release": "Typically transaction lifetime. Internal buffer/WAL/latch waits are shorter engine critical sections, not app-owned leases; no per-site duration evidence was captured.",
       "callers": [
         "lib/db.ts",
-        "db-rollout/db-rollout.sql:public.prevent_task_dependency_cycle",
+        "db-rollout/historical-schema-2026-05-23.sql:public.prevent_task_dependency_cycle",
         "db-schema.sql:public.prevent_task_dependency_cycle"
       ],
       "tests": [
@@ -2227,9 +2227,9 @@
       "justification": "Payment-evidence repair revalidates the paid state before task creation; provider verification is outside the lock."
     },
     {
-      "file": "db-rollout/db-rollout.sql",
+      "file": "db-rollout/historical-schema-2026-05-23.sql",
       "owner": "public.prevent_task_dependency_cycle",
-      "key": "826f6c22adf32ee31ab3ffac237d3eee3d124f87473e9a785c533c2757aef475",
+      "key": "ca3b5f5df178879d927f3bf976da5a1794e6ae1257db7aaf95054851573e85d7",
       "statement": "FOREACH node_id IN ARRAY nodes LOOP IF NOT pg_try_advisory_xact_lock(hashtextextended('task-dependency:'||node_id::text,0)) THEN RAISE EXCEPTION 'Concurrent task dependency change",
       "mechanisms": [
         12

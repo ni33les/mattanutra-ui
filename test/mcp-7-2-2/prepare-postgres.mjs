@@ -10,7 +10,7 @@ assert.match(url.pathname, /^\/mattanutra_lock_review_ax_mcp722(?:_[a-z0-9]+)?$/
 const sql = postgres(url.href, { max: 1, prepare: false });
 try {
  await sql.begin(async sql => {
-  const base = readFileSync("db-rollout/db-rollout.sql", "utf8");
+  const base = readFileSync("db-rollout/historical-schema-2026-05-23.sql", "utf8");
   const [existing] = await sql`select to_regclass('public.tasks') as tasks, to_regclass('public.products') as products`;
   assert.equal(existing.tasks, null, "Prepare a clean isolated schema, never replace existing task data");
   assert.equal(existing.products, null, "Do not overwrite a catalogue");
@@ -31,5 +31,5 @@ try {
   const correction = JSON.parse(readFileSync("data/catalogue-corrections/mcp-7.2.2-dev.json", "utf8")).corrections[0];
   await sql`insert into public.products (id,administration) values (${correction.entityId},null)`;
  });
-  console.log(JSON.stringify({ isolated: true, database: url.pathname.slice(1), taskDdl: "db-rollout/db-rollout.sql", fullApplicationSchema: false }));
+  console.log(JSON.stringify({ isolated: true, database: url.pathname.slice(1), taskDdl: "db-rollout/historical-schema-2026-05-23.sql", fullApplicationSchema: false }));
 } finally { await sql.end(); }

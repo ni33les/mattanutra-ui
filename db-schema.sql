@@ -3,7 +3,9 @@
 --
 -- This file is intentionally schema-first: it creates the current database
 -- shape from scratch and does not contain migration/backfill patch logic.
--- Apply the db-data-* files afterwards to seed catalogue data.
+-- Historical db-data-* files can be restored offline before seed review:
+-- node scripts/historical-rollout.mjs restore --output /absolute/restore-directory
+-- See db-rollout/archive/README.md; these historical seeds may predate this schema.
 --
 -- WARNING: this deletes MattaNutra app tables and app enum/function objects
 -- before rebuilding them. It does not drop the whole public schema, so
