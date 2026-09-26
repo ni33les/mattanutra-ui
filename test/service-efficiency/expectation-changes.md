@@ -296,5 +296,3 @@ failed proof and replace the whole file's execution. PERF-LOCK-41 is strengthene
 to use an already-expired completed receipt, exposing a second redundant cleanup
 write. Terminal status is now returned before considering expiry; active overdue
 work still takes the tested conditional retirement path.
-
-- PERF-CPU-44: test cursor-owned archive reuse without per-basket weak registrations. The production failure is 56 registrations; exact live identity and recovered values remain asserted. The first invocation used an unavailable tsx loader and is retained separately as an invalid harness attempt; the maintained loader then executed all 45 cases with this single meaningful RED.
