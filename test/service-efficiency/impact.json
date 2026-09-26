@@ -514,7 +514,7 @@
       "slice": "checkout-fence",
       "database": true,
       "expectedCases": 7,
-      "reason": "Prepared checkout publication, immutable frozen replay, short current catalogue/revision checks and pharmacy ownership/read contention"
+      "reason": "Prepared checkout publication, immutable frozen replay, short current catalogue/revision checks and pharmacy ownership/read contention PERF-PACK-04 asserts exact catalogue restoration after the fixture-owned cross-store organisation is removed."
     },
     {
       "file": "test/service-efficiency/catalogue-sync.integration.test.ts",
@@ -588,6 +588,12 @@
       "slice": "request-lifetime",
       "expectedCases": 7,
       "reason": "Direct consumers of the removed unused permit scheduler; verify actual request cleanup, independent admission and cancellation with existing durable/commerce assertions."
+    },
+    {
+      "file": "test/full-test-suite-discovery.test.ts",
+      "slice": "harness",
+      "expectedCases": 17,
+      "reason": "PERF-PACK-03: reject incompatible isolated database names before executing the complete maintained inventory; retain discovery, hygiene and execution reconciliation."
     }
   ],
   "inputs": [

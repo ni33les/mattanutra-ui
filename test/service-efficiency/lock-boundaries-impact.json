@@ -250,7 +250,7 @@
       "file": "test/service-efficiency/permit-removal.test.ts",
       "slice": "permits",
       "expectedCases": 4,
-      "reason": "Audits 22–25: remove artificial admission/worker/connection/database gates while preserving cancellation and deadlines"
+      "reason": "Audits 22\u201325: remove artificial admission/worker/connection/database gates while preserving cancellation and deadlines"
     },
     {
       "file": "test/agentic-catalogue-publish-v5.test.ts",
@@ -596,6 +596,12 @@
       "slice": "request-lifetime",
       "expectedCases": 7,
       "reason": "Direct consumers of the removed unused permit scheduler; verify actual request cleanup, independent admission and cancellation with existing durable/commerce assertions."
+    },
+    {
+      "file": "test/full-test-suite-discovery.test.ts",
+      "slice": "harness",
+      "expectedCases": 17,
+      "reason": "PERF-PACK-03: reject incompatible isolated database names before executing the complete maintained inventory; retain discovery, hygiene and execution reconciliation."
     }
   ],
   "inputs": [

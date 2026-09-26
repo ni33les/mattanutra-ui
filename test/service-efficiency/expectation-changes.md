@@ -155,3 +155,26 @@ execute their search attempts; this does not constitute completed-match reuse.
 Changed inputs and reset invalidate the compiled entry. Dynamic quantities
 cannot alter another search's compiled inputs. Frozen result/timing comparisons
 remain a separate release requirement.
+
+### Final preparation, 26 September 2026
+
+- PERF-CPU-14 shares compiled product groups only. Each execution retains its own
+  canonical request and numerical cache lifetime; recovery still uses the
+  acknowledged checkpoint. `compiled-groups-consumers` records 48 passing cases.
+- PERF-PACK-04 caught a fixture-owned cross-store pharmacy persisting after the
+  integration file. Teardown now deletes only that owned ID and compares every
+  original organisation row exactly. The original full-run catalogue fingerprint
+  failure remains preserved; the verifier was not weakened.
+- Two further unshipped allocation experiments (routine-value memoization and
+  request-owned strong numerical maps) retained exact results but lacked a
+  consistent latency improvement. Their changes and exclusive allocation cases
+  were reverted; RED/GREEN logs, patches and rejection receipts are retained in
+  the external evidence directory. Existing arithmetic cases are unchanged.
+- The completed full run is recorded as failed. Subsequent execution evidence
+  replaces affected whole files, never individual failed cases. Database-prefix
+  corrections, active-frontier observation and fixture cleanup are explicit
+  corrections, not automatic retries. An evidence reconciliation does not turn
+  the original run into an unchanged-source green attestation.
+- Fresh standard calculations remain above the 1,000 ms native terminal gate.
+  Kernel timings cannot satisfy that gate. No release-ready or deployment claim
+  is permitted while it remains unmet.
