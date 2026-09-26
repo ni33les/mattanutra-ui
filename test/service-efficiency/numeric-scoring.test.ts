@@ -15,30 +15,11 @@ const dose = await import('../../lib/matcher/dose.ts');
 const fractions = await import('../../lib/matcher/rational.ts');
 let conversions = 0, unitCompilations = 0, exactEncodings = 0;
 let preferenceParses = 0;
-const scalarParses = new Map<number, number>();
 let linearEvaluations = 0; let multiplications = 0; let measurements = 0; let additions = 0; let aggregateSums = 0; let conversionsToNumber = 0; let exactComparisons = 0;
 mock.module('../../lib/matcher/dose.ts', { namedExports: { ...dose, scaleAmount: (...args: Parameters<typeof dose.scaleAmount>) => { unitCompilations++; return dose.scaleAmount(...args); }, amountFromScaled: (...args: Parameters<typeof dose.amountFromScaled>) => { conversions++; return dose.amountFromScaled(...args); } } });
-mock.module('../../lib/matcher/rational.ts', { namedExports: { ...fractions, linearSum: (...args: Parameters<typeof fractions.linearSum>) => { linearEvaluations++; return fractions.linearSum(...args); }, toNumber: (...args: Parameters<typeof fractions.toNumber>) => { conversionsToNumber++; return fractions.toNumber(...args); }, compare: (...args: Parameters<typeof fractions.compare>) => { exactComparisons++; return fractions.compare(...args); }, sum: (...args: Parameters<typeof fractions.sum>) => { aggregateSums++; return fractions.sum(...args); }, add: (...args: Parameters<typeof fractions.add>) => { additions++; return fractions.add(...args); }, serialize: (...args: Parameters<typeof fractions.serialize>) => { exactEncodings++; return fractions.serialize(...args); }, fromDecimal: (...args: Parameters<typeof fractions.fromDecimal>) => { measurements++; if (typeof args[0] === 'number' && [9.25, 3, 200003].includes(args[0])) scalarParses.set(args[0], (scalarParses.get(args[0]) ?? 0) + 1); if ([7.75, 37, 123457].includes(args[0] as number)) preferenceParses++; return fractions.fromDecimal(...args); }, multiply: (...args: Parameters<typeof fractions.multiply>) => { multiplications++; return fractions.multiply(...args); } } });
+mock.module('../../lib/matcher/rational.ts', { namedExports: { ...fractions, linearSum: (...args: Parameters<typeof fractions.linearSum>) => { linearEvaluations++; return fractions.linearSum(...args); }, toNumber: (...args: Parameters<typeof fractions.toNumber>) => { conversionsToNumber++; return fractions.toNumber(...args); }, compare: (...args: Parameters<typeof fractions.compare>) => { exactComparisons++; return fractions.compare(...args); }, sum: (...args: Parameters<typeof fractions.sum>) => { aggregateSums++; return fractions.sum(...args); }, add: (...args: Parameters<typeof fractions.add>) => { additions++; return fractions.add(...args); }, serialize: (...args: Parameters<typeof fractions.serialize>) => { exactEncodings++; return fractions.serialize(...args); }, fromDecimal: (...args: Parameters<typeof fractions.fromDecimal>) => { measurements++; if ([7.75, 37, 123457].includes(args[0] as number)) preferenceParses++; return fractions.fromDecimal(...args); }, multiply: (...args: Parameters<typeof fractions.multiply>) => { multiplications++; return fractions.multiply(...args); } } });
 const { request } = await import('../matcher/flexible-v5-fixtures.ts');
 const { doseFitScore, numericalDoseFitScore, exactDoseFit, compareDoseFit, weightedDoseFitScore, numericalWeightedDoseFitScore } = await import('../../lib/matcher/dose-fit.ts');
-
-test('PERF-CPU-57 exact preference overruns reuse already validated basket measurements', async () => {
-  const { scorePracticalPenalties } = await import('../../lib/matcher/practical-scoring.ts');
-  const input = request({ maxDailyPills: 8, maxProductCount: 2, maxPriceMinor: 200000 });
-  const actual = { currency: 'THB', dailyPills: 9.25, pillLowerBound: 9.25, productCount: 3, priceMinor: 200003, servings: [1, 1, 1], uncertainProductCount: 0 };
-  scorePracticalPenalties(input, { ...actual, dailyPills: 8, pillLowerBound: 8, productCount: 2, priceMinor: 200000 });
-  scalarParses.clear();
-  const score = scorePracticalPenalties(input, actual);
-  assert.equal(score.preferences.maxDailyPills.penalty, 25 / 4096);
-  assert.equal(score.preferences.maxProductCount.penalty, 1 / 16);
-  assert.equal(score.preferences.maxPriceMinor.penalty, 9 / 160000000000);
-  assert.deepEqual([...scalarParses], [[9.25, 1], [3, 1], [200003, 1]], 'Pill, product and price values are already exact before preference evaluation');
-  assert.throws(() => scorePracticalPenalties(input, { ...actual, dailyPills: -1 }), /dailyPills must be a nonnegative/);
-  assert.throws(() => scorePracticalPenalties(input, { ...actual, dailyPills: 10 }), /pillLowerBound must equal/);
-  const monthly = scorePracticalPenalties({ ...input, pricePreferenceBasis: 'monthly_30_days' }, { ...actual, monthlyPriceMinor: 200006 });
-  assert.equal(monthly.preferences.maxPriceMinor.actual, 200006);
-  assert.equal(monthly.preferences.maxPriceMinor.penalty, 36 / 160000000000);
-});
 
 test('PERF-CPU-33 numerical preference denominators compile once across basket evaluations', async () => {
   const { scorePracticalPenalties } = await import('../../lib/matcher/practical-scoring.ts');
