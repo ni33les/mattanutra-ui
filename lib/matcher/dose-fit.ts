@@ -143,7 +143,8 @@ function subjectLoss(input: { target: CanonicalRequest["targets"][number] | unde
       if (!worst || compareFractions(candidate.total, worst.total) > 0) worst = candidate;
     }
   }
-  return { minimum, maximum, added, continuedIncrease, worst: worst! };
+  return { minimum, maximum, added, continuedIncrease, worst: worst!,
+    deviation: target ? { subjectId: target.subjectId, under: value(worst!.shortfall), over: value(worst!.overshoot) } : null };
 }
 function cachedSubjectLoss(input: ReturnType<typeof compileSubject>, known: bigint, weight: Fraction) {
   let cache = input.losses.get(weight);
@@ -217,12 +218,12 @@ function calculateDoseFit(request: CanonicalRequest, exposure: ReadonlyMap<strin
     if (!target && reference === BigInt(0) && bounds.length === 0) continue;
     const known = exposure.get(subjectId) ?? BigInt(0);
     const weight = weights ? weights.subjects.get(subjectId) ?? weights.defaultWeight : ONE;
-    const { minimum, maximum, added, continuedIncrease, worst } = cachedSubjectLoss(compiled, known, weight);
+    const { minimum, maximum, added, continuedIncrease, worst, deviation } = cachedSubjectLoss(compiled, known, weight);
     if (settings) intentTerms.push(worst.total);
     underTerms.push(worst.shortfall);
     overTerms.push(worst.overshoot);
     limitTerms.push(worst.limitLoss);
-    if (target) deviations.push({ subjectId, under: value(worst.shortfall), over: value(worst.overshoot) });
+    if (deviation) deviations.push(deviation);
     if (!materialize) continue;
     const estimated = minimum !== maximum || dietary.minimum !== dietary.maximum;
     const rowCertainty = certainty(request, subjectId) === "unknown" ? "unknown" : estimated ? "estimated" : certainty(request, subjectId);
