@@ -88,7 +88,7 @@ test('PERF-CPU-15 one exact score owns its arithmetic and deviation facts togeth
     score = numericalDoseFitScore(input, exposure);
   } finally { WeakMap.prototype.set = original; }
   assert.deepEqual(exactDoseFit(score), { num: 9n, den: 4n });
-  assert.equal(registrations.get(score) ?? 0, 0, 'Exact arithmetic facts should belong to the numerical record without an additional GC ownership edge');
+  assert.equal(registrations.get(score), 1, 'Thousands of losing scores need one lifetime record, not three independent GC ownership edges');
   const display = doseFitScore(input, exposure);
   assert.equal(compareDoseFit(display, score), 0);
   assert.equal(display.perTarget[0].over, 0.75);
