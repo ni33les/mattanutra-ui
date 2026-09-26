@@ -359,16 +359,8 @@ export async function enqueueHealthScoreAnalysisTask({
 async function activePlanTaskId(
   sql: postgres.Sql,
   planId: string,
-  taskType: WorkTaskType,
-  inputHash?: string | readonly string[] | null
+  taskType: WorkTaskType
 ) {
-  const inputHashes = Array.isArray(inputHash)
-    ? inputHash.filter(Boolean)
-    : inputHash
-      ? [inputHash]
-      : [];
-  const inputHashPatterns = inputHashes.flatMap((hash) => [`%:${hash}`, `%:${hash}:%`]);
-
   const rows = await sql<Array<{ id: string }>>`
     select id::text
     from public.tasks
@@ -378,10 +370,8 @@ async function activePlanTaskId(
       and payload #>> '{generation,generatorVersion}' = ${FUNNEL_GENERATOR_VERSION}
       and task_type = ${taskType}
       and status not in ('completed', 'failed', 'cancelled', 'skipped')
-      and (
-        ${inputHashes.length < 1}
-        or payload ->> 'inputHash' = any(${textArray(sql, inputHashes)}::text[])
-        or idempotency_key like any(${textArray(sql, inputHashPatterns)}::text[])
+      and payload #>> '{generation,inputHash}' = (
+        select input_hash from public.assessments where plan_id = ${planId}::uuid
       )
     order by business_value desc, scheduled_for asc, created_at asc
     limit 1
@@ -402,6 +392,8 @@ async function nutritionOutputReadiness(
       : [];
   const inputHashPatterns = inputHashes.flatMap((hash) => [`%:${hash}`, `%:${hash}:%`]);
 
+  // Durable generation identity survives answer presentation changes (for
+  // example omitted web preferences). Legacy tasks retain their exact-hash check.
   const rows = await sql<Array<{
     food_guidance_ready: boolean;
     formulation_ready: boolean;
@@ -427,8 +419,21 @@ async function nutritionOutputReadiness(
                 and tasks.task_type = 'generate_supplement_guidance'
                 and tasks.status in ('completed', 'skipped')
                 and (
-                  tasks.payload ->> 'inputHash' = any(${textArray(sql, inputHashes)}::text[])
-                  or tasks.idempotency_key like any(${textArray(sql, inputHashPatterns)}::text[])
+                  (
+                    tasks.payload #>> '{generation,revision}' = formulations.assessment_revision::text
+                    and tasks.payload #>> '{generation,locale}' = formulations.generation_locale
+                    and tasks.payload #>> '{generation,generatorVersion}' = formulations.generator_version
+                    and tasks.payload #>> '{generation,inputHash}' = (
+                      select input_hash from public.assessments where plan_id = ${planId}::uuid
+                    )
+                  )
+                  or (
+                    not (tasks.payload ? 'generation')
+                    and (
+                      tasks.payload ->> 'inputHash' = any(${textArray(sql, inputHashes)}::text[])
+                      or tasks.idempotency_key like any(${textArray(sql, inputHashPatterns)}::text[])
+                    )
+                  )
                 )
             )
           )
@@ -495,7 +500,8 @@ export async function enqueueAssessmentPregenerationTasks({
       });
   // Reuse the formula already shown on HealthScore. Active-task deduplication
   // alone does not protect completed outputs from being regenerated on retry.
-  const formulationTaskId = readiness.formulationReady ? null : await createWorkTask({
+  const formulationTaskId = readiness.formulationReady ? null :
+    (await activePlanTaskId(sql, planId, "generate_supplement_guidance")) ?? await createWorkTask({
     actorType: "deterministic",
     businessValue: TASK_BUSINESS_VALUES.precision,
     groupLabel: "Pre-generate nutrition guidance",
@@ -598,8 +604,7 @@ export async function enqueueNutritionPlanTasks({
     : (await activePlanTaskId(
         sql,
         planId,
-        "generate_supplement_guidance",
-        reusableInputHashes
+        "generate_supplement_guidance"
       )) ??
       await createWorkTask({
         actorType: "ai",
@@ -802,8 +807,7 @@ export async function enqueuePaymentCheckoutPregenerationTasks({
     await activePlanTaskId(
       sql,
       planId,
-      "generate_supplement_guidance",
-      reusableInputHashes
+      "generate_supplement_guidance"
     );
   const existingTaskGroupId =
     (await latestNutritionTaskGroupId(sql, planId)) ??
