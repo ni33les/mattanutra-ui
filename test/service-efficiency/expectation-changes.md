@@ -312,3 +312,5 @@ work still takes the tested conditional retirement path.
 - PERF-MEM-02 completed-cache eviction withdrawn: it reduced heap but slowed seven of eight trials. The initial candidate test overclaimed empty-seed identity (seeds were never interned); its corrected nonempty identity prerequisite and full recovery assertions passed. Preserve original failed execution, corrected GREEN, patch and timings externally; no cache lifetime policy changes remain.
 
 - PERF-CPU-49 integer-value interning withdrawn: exact immutable reuse passed but did not improve frozen calculation latency. Retain the smaller existing conversion path and preserve the allocation experiment externally.
+
+- PERF-CPU-50 coefficient-normalization experiment withdrawn: hand-calculated exact component values and full hashes passed, but total timing/CPU improvement was not demonstrated. No normalization policy change remains.
