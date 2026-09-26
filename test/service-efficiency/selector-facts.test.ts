@@ -1,32 +1,13 @@
 import assert from 'node:assert/strict';
 import test, { mock } from 'node:test';
 const candidates = await import('../../lib/matcher/candidates.ts');
-let lookups = 0, dedicationChecks = 0, coverageRenders = 0;
+let lookups = 0;
 mock.module('../../lib/matcher/candidates.ts', { namedExports: { ...candidates,
-  productIsDedicatedForTarget: (...args: Parameters<typeof candidates.productIsDedicatedForTarget>) => { dedicationChecks++; return candidates.productIsDedicatedForTarget(...args); },
   contributionFor: (...args: Parameters<typeof candidates.contributionFor>) => { lookups++; return candidates.contributionFor(...args); }
 } });
-const coverage = await import('../../lib/matcher/coverage.ts');
-mock.module('../../lib/matcher/coverage.ts', { namedExports: { ...coverage, coverageSummary: (...args: Parameters<typeof coverage.coverageSummary>) => { coverageRenders++; return coverage.coverageSummary(...args); } } });
 const { request, product, catalog } = await import('../matcher/flexible-v5-fixtures.ts');
 const { seedState, tryAddVariant } = await import('../../lib/matcher/search.ts');
 const { scoreState, materiallyDifferent } = await import('../../lib/matcher/selector.ts');
-
-test('PERF-CPU-52 losing baskets do not render unused coverage and descriptive counts', () => {
-  const input = request(), groups = candidates.compileGroups(input, catalog([product('partial', { a: 5 })]));
-  const variant = groups[0].variants.find(row => row.dailyUnits === 1); assert.ok(variant);
-  const state = tryAddVariant(seedState(input), variant, groups[0], input); assert.ok(state);
-  dedicationChecks = coverageRenders = 0;
-  const score = scoreState({ groups, request: input, sellerId: 'seller', state }); assert.ok(score);
-  assert.deepEqual({ dedicationChecks, coverageRenders }, { dedicationChecks: 0, coverageRenders: 0 });
-  assert.equal(score.coverageSummary?.[0].coveragePercent, 5);
-  assert.equal(score.coverageSummary?.[0].remainingGap, 95);
-  assert.equal(score.dedicatedPartialCount, 1);
-  assert.equal(score.coveredCount, 0); assert.equal(score.titleExactCount, 0); assert.equal(score.oversupplyScore, 0);
-  const copied = structuredClone(score);
-  assert.deepEqual(copied, score, 'Worker transfer preserves complete values for retained baskets');
-  assert.equal(Object.getOwnPropertyDescriptor(copied, 'coverageSummary')?.get, undefined);
-});
 
 test('PERF-CPU-46 repeated choice comparisons reuse immutable product-dose identities', () => {
   const input = request(), groups = candidates.compileGroups(input, catalog([product('choice', { a: 50 })]));

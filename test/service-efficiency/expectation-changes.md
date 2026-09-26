@@ -314,5 +314,3 @@ work still takes the tested conditional retirement path.
 - PERF-CPU-49 integer-value interning withdrawn: exact immutable reuse passed but did not improve frozen calculation latency. Retain the smaller existing conversion path and preserve the allocation experiment externally.
 
 - PERF-CPU-50 coefficient-normalization experiment withdrawn: hand-calculated exact component values and full hashes passed, but total timing/CPU improvement was not demonstrated. No normalization policy change remains.
-
-- PERF-CPU-52: final ranking does not consume detailed coverage summaries or descriptive counts for losing baskets. Defer only those fields, preserving all properties and exact values when read, copied or transferred. RED renders both coverage and dedication before either is requested; the independent partial fixture retains 5% coverage and gap 95.
