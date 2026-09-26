@@ -24,14 +24,15 @@ test('PERF-CPU-35 incidental classification resolves each requested product cont
 });
 
 test('PERF-CPU-43 repeated baskets reuse immutable label classification without caching dose-dependent coverage', () => {
-  const input = request(), item = product('focused', { a: 100 });
+  const input = request(), item = product('focused', { a: 50 });
   const [group] = candidates.compileGroups(input, catalog([item])); assert.ok(group);
   const one = group.variants.find(row => row.dailyUnits === 1); assert.ok(one);
-  const state = tryAddVariant(seedState(input), one, group, input); assert.ok(state);
+  const two = group.variants.find(row => row.dailyUnits === 2); assert.ok(two);
+  const state = tryAddVariant(seedState(input), two, group, input); assert.ok(state);
   const first = scoreState({ groups: [group], request: input, sellerId: 'seller', state }); assert.ok(first);
   assert.equal(first.requestedLabelCount, 1); assert.equal(first.incidentalCount, 0);
   lookups = 0;
-  const partial = { ...state, exposure: new Map([['a', 50_000_000n]]), delivered: new Map([['a', 50_000_000n]]) };
+  const partial = tryAddVariant(seedState(input), one, group, input); assert.ok(partial);
   const changed = scoreState({ groups: [group], request: input, sellerId: 'seller', state: partial }); assert.ok(changed);
   assert.equal(changed.dedicatedPartialCount, 1); assert.equal(first.dedicatedPartialCount, 0);
   assert.equal(changed.coverageBySubject.get('a'), 5000); assert.equal(first.coverageBySubject.get('a'), 10000);
