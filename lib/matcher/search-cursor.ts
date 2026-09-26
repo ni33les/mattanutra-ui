@@ -71,16 +71,9 @@ function restoreState(cursor: SearchCursor, packed: ArchivedState): SearchState 
 export function* archivedSearchStates(cursor: SearchCursor) {
   for (const packed of cursor.archive.values()) yield restoreState(cursor, packed);
 }
-const ordinalKeys = new WeakMap<readonly string[], { indices: Map<string, number>; key: string }>();
-function ordinalKey(cursor: SearchCursor, state: SearchState, ordinals?: readonly number[]) {
-  const previous = ordinalKeys.get(state.selectedVariantIds);
-  if (previous?.indices === cursor.variantIndex) return previous.key;
-  const key = [...(ordinals ?? state.selectedVariantIds.map(id => indexFor(cursor.variantIds, cursor.variantIndex, id)))].sort((a, b) => a - b).join(",");
-  ordinalKeys.set(state.selectedVariantIds, { indices: cursor.variantIndex, key }); return key;
-}
 function remember(cursor: SearchCursor, state: SearchState) {
   const ids = state.selectedVariantIds.map(id => indexFor(cursor.variantIds, cursor.variantIndex, id));
-  const key = ordinalKey(cursor, state, ids);
+  const key = [...ids].sort((a, b) => a - b).join(",");
   if (!cursor.archive.has(key)) {
     const exposure = packedExposure(cursor, state.exposure);
     cursor.archive.set(key, [state.nextGroupIndex, state.price, state.pills, state.count, state.pillCountKnown !== false,
@@ -225,7 +218,8 @@ function completedAttempt(cursor: SearchCursor, request: CanonicalRequest) {
   if (cursor.expansionAttempts % 1000 === 0) reduceReview(cursor, request);
 }
 function add(cursor: SearchCursor, state: SearchState, groupIndex: number, id: string, request: CanonicalRequest) {
-  const edge = ordinalKey(cursor, state) + ">" + indexFor(cursor.variantIds, cursor.variantIndex, id);
+  const ids = state.selectedVariantIds.map(selected => indexFor(cursor.variantIds, cursor.variantIndex, selected)).sort((a, b) => a - b);
+  const edge = ids.join(",") + ">" + indexFor(cursor.variantIds, cursor.variantIndex, id);
   if (cursor.edges.has(edge)) { const key = cursor.edges.get(edge); return key != null ? restoreState(cursor, cursor.archive.get(key)!) : null; }
   cursor.expansionAttempts++;
   let next = tryAddVariant(state, variant(cursor, groupIndex, id), cursor.groups[groupIndex]!, request);
