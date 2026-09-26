@@ -9,6 +9,7 @@ import { createPostgresStore } from "../../lib/agentic/store/postgres.ts";
 import type { AgenticStore } from "../../lib/agentic/store/types.ts";
 import type { CatalogueSnapshot } from "../../lib/agentic/catalogue/types.ts";
 import { withDatabaseTransaction } from "../../lib/db.ts";
+import { requestLifetime, withRequestLifetime } from "../../lib/request-lifetime.ts";
 import { sampleValueSnapshot } from "../agentic/value/sample-catalogue.ts";
 
 beforeEach(resetCataloguePins);
@@ -25,6 +26,21 @@ function mutableSnapshot() {
 
 function independentlyCommittedStore() {
   return Object.assign(createMemoryStore(), { catalogueWritesCommitIndependently: () => true });
+}
+
+async function waitForInsertRelease(release: Promise<void>) {
+  const signal = requestLifetime()?.signal;
+  assert.ok(signal, "persistence carries its request lifetime into the store");
+  signal.throwIfAborted();
+  let onAbort!: () => void;
+  try {
+    await Promise.race([release, new Promise<never>((_resolve, reject) => {
+      onAbort = () => reject(signal.reason);
+      signal.addEventListener("abort", onAbort, { once: true });
+    })]);
+  } finally {
+    signal.removeEventListener("abort", onAbort);
+  }
 }
 
 async function countHashes(work: () => Promise<void> | void) {
@@ -166,6 +182,76 @@ test("EFF-PIN-08 transaction-owned memory inserts are neither published nor reme
   await persistCataloguePin(snapshot, "guidance-test", store);
   assert.equal(inserts, 2);
   assert.deepEqual(await store.getCatalogueSnapshot(id), snapshot);
+});
+
+test("EFF-PIN-14 cancelling the first subscriber preserves the active subscriber's shared persistence", async () => {
+  const store = independentlyCommittedStore();
+  const snapshot = freezeCatalogueSnapshot(mutableSnapshot());
+  const started = deferred();
+  const release = deferred();
+  const firstOwner = new AbortController();
+  const secondOwner = new AbortController();
+  const cancellation = new Error("First catalogue subscriber cancelled");
+  let inserts = 0;
+  store.insertCatalogueSnapshot = async () => {
+    inserts++;
+    started.resolve();
+    await waitForInsertRelease(release.promise);
+  };
+  const first = withRequestLifetime({ signal: firstOwner.signal }, () => persistCataloguePin(snapshot, "guidance-test", store));
+  const second = withRequestLifetime({ signal: secondOwner.signal }, () => persistCataloguePin(snapshot, "guidance-test", store));
+  const settled = Promise.allSettled([first, second]);
+  try {
+    await started.promise;
+    firstOwner.abort(cancellation);
+  } finally {
+    release.resolve();
+  }
+  const [firstResult, secondResult] = await settled;
+  assert.equal(firstResult!.status, "rejected");
+  if (firstResult!.status === "rejected") assert.equal(firstResult.reason, cancellation);
+  assert.equal(secondOwner.signal.aborted, false);
+  assert.equal(secondResult!.status, "fulfilled", "a subscriber cannot cancel another subscriber's persistence");
+  if (secondResult!.status === "fulfilled") assert.equal(secondResult.value, snapshot);
+  assert.equal(inserts, 1);
+  assert.equal(getPinnedCatalogueSnapshot(matchingSnapshotId(snapshot))?.snapshot, snapshot);
+});
+
+test("EFF-PIN-15 cancelling the second subscriber rejects promptly while the first completes", async () => {
+  const store = independentlyCommittedStore();
+  const snapshot = freezeCatalogueSnapshot(mutableSnapshot());
+  const started = deferred();
+  const release = deferred();
+  const firstOwner = new AbortController();
+  const secondOwner = new AbortController();
+  const cancellation = new Error("Second catalogue subscriber cancelled");
+  let inserts = 0;
+  store.insertCatalogueSnapshot = async () => {
+    inserts++;
+    started.resolve();
+    await waitForInsertRelease(release.promise);
+  };
+  const first = withRequestLifetime({ signal: firstOwner.signal }, () => persistCataloguePin(snapshot, "guidance-test", store));
+  const second = withRequestLifetime({ signal: secondOwner.signal }, () => persistCataloguePin(snapshot, "guidance-test", store));
+  const settled = Promise.allSettled([first, second]);
+  const secondOutcome = second.then(() => "fulfilled", error => error);
+  try {
+    await started.promise;
+    secondOwner.abort(cancellation);
+    const outcome = await Promise.race([secondOutcome, new Promise<string>(resolve => setImmediate(() => resolve("still waiting for shared persistence")))]);
+    assert.equal(outcome, cancellation, "an aborted subscriber settles before the shared insert is released");
+    assert.equal(firstOwner.signal.aborted, false);
+  } finally {
+    release.resolve();
+    await settled;
+  }
+  const [firstResult, secondResult] = await settled;
+  assert.equal(firstResult!.status, "fulfilled");
+  if (firstResult!.status === "fulfilled") assert.equal(firstResult.value, snapshot);
+  assert.equal(secondResult!.status, "rejected");
+  if (secondResult!.status === "rejected") assert.equal(secondResult.reason, cancellation);
+  assert.equal(inserts, 1);
+  assert.equal(getPinnedCatalogueSnapshot(matchingSnapshotId(snapshot))?.snapshot, snapshot);
 });
 
 test("EFF-PIN-09 transaction ownership is explicit for PostgreSQL stores and ambient phases", async () => {
