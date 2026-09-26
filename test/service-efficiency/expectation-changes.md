@@ -102,3 +102,12 @@ failed startup is preserved and is not read-performance evidence.
   per-nutrient reference guards. No data or live catalogue synchronization ran.
 - Evidence: `catalogue-dry-run-maintained-red.tap` and
   `catalogue-dry-run-green.{tap,events.jsonl}` in the performance evidence root.
+
+### Benchmark baseline identity (PERF-PACK-02)
+
+The benchmark caller must supply a clean control worktree and exact source SHA.
+The report uses that identity and the verified 2-GiB runtime, not the retired
+7.2.4/a28f3b27/1-GiB labels. Previously achieved structural reductions remain
+hard no-regression checks against a newer control; the independent native
+sub-second release gate is unchanged. RED/GREEN evidence is in
+`benchmark-control-{red,green}.tap` with GREEN execution events alongside it.

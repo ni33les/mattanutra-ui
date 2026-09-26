@@ -28,6 +28,23 @@ export function compareBenchmarkRuns(control, candidate, inventory) {
   return { passed: true, normalization: "Object key order only; typed BigInt and Map encoding. Matching results, array order and work counts preserved exactly.", rows };
 }
 
+/** Preserve reductions already present in a newer control; require no regression. */
+export function verifyBenchmarkOverheads(rows) {
+  for (const { id, control, candidate } of rows) {
+    if (id === 'reads' || id === 'funnel') {
+      assert.ok(candidate.warm.rowBytes <= control.warm.rowBytes, `${id}: returned database bytes increased`);
+      assert.ok(candidate.warm.applicationSelects <= control.warm.applicationSelects, `${id}: database SELECTs increased`);
+      if (id === 'reads') assert.ok(candidate.warm.applicationSelects <= 2 * candidate.warm.reads);
+    }
+    if (id === 'expanded') {
+      assert.equal(candidate.inputTransfers, 1);
+      assert.ok(candidate.inputTransfers <= control.inputTransfers);
+      assert.ok(candidate.checkpointBytes <= control.checkpointBytes, 'Checkpoint traffic increased');
+    }
+  }
+  return true;
+}
+
 /** Hard release condition for this work package, separate from descriptive
  * efficiency comparisons. Kernel diagnostics and cached timings cannot pass. */
 export function verifyFreshStandardTimings(report, identity) {

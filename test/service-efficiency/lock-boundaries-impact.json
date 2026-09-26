@@ -225,7 +225,7 @@
     {
       "file": "test/service-efficiency/harness.test.ts",
       "slice": "harness",
-      "expectedCases": 7,
+      "expectedCases": 8,
       "reason": "Reject incomplete benchmark comparisons, changed semantics, missing browser evidence and unchanged-source proof gaps"
     },
     {
@@ -250,7 +250,7 @@
       "file": "test/service-efficiency/permit-removal.test.ts",
       "slice": "permits",
       "expectedCases": 3,
-      "reason": "Audits 22–25: remove artificial admission/worker/connection/database gates while preserving cancellation and deadlines"
+      "reason": "Audits 22\u201325: remove artificial admission/worker/connection/database gates while preserving cancellation and deadlines"
     },
     {
       "file": "test/agentic-catalogue-publish-v5.test.ts",
