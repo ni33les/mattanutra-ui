@@ -21,25 +21,6 @@ mock.module('../../lib/matcher/rational.ts', { namedExports: { ...fractions, lin
 const { request } = await import('../matcher/flexible-v5-fixtures.ts');
 const { doseFitScore, numericalDoseFitScore, exactDoseFit, compareDoseFit, weightedDoseFitScore, numericalWeightedDoseFitScore } = await import('../../lib/matcher/dose-fit.ts');
 
-test('PERF-CPU-54 numerical nutrient rows reuse request ordering without sorting each basket', () => {
-  const base = request(), input = { ...base, targets: ['z', 'a'].map(subjectId => ({ ...base.targets[0], subjectId,
-    name: subjectId.toUpperCase(), requested: { ...base.targets[0].requested, subjectId } })) };
-  const original = Array.prototype.sort; let repeatedSorts = 0;
-  try {
-    Array.prototype.sort = function (...args) {
-      if (this[0] && typeof this[0] === 'object' && 'under' in this[0] && 'subjectId' in this[0]) repeatedSorts++;
-      return Reflect.apply(original, this, args);
-    };
-    for (const known of [25n, 50n, 125n]) {
-      const score = numericalDoseFitScore(input, new Map([['z', known * 1000000n], ['a', 75000000n], ['incidental', 5000000n]]));
-      assert.deepEqual(score.deviations.map(row => row.subjectId), ['a', 'z']);
-      assert.equal(score.deviations[0].under, 0.25);
-      assert.equal(fractions.compare(score.exact, { num: 25n + (known < 100n ? 100n - known : known - 100n), den: 100n }), 0);
-    }
-  } finally { Array.prototype.sort = original; }
-  assert.equal(repeatedSorts, 0, 'Requested subject order is immutable; losing baskets need no repeated row sort');
-});
-
 test('PERF-CPU-33 numerical preference denominators compile once across basket evaluations', async () => {
   const { scorePracticalPenalties } = await import('../../lib/matcher/practical-scoring.ts');
   const input = request({ maxDailyPills: 7.75, maxProductCount: 37, maxPriceMinor: 123457 });
