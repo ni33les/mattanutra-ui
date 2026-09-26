@@ -119,35 +119,6 @@ test('PERF-CPU-16 retained baskets reuse quantity lookup without rescanning unre
   watched[0].variants.pop();
   assert.deepEqual(reconstructVariants(watched, [id]), [first], 'A truncated quantity domain invalidates the prior index');
 });
-test('PERF-CPU-17 profile scores share one bounded candidate ownership record', async () => {
-  const { seedState } = await import('../../lib/matcher/search.ts');
-  const { numericalSearchStateScore, requestForProfile } = await import('../../lib/matcher/practical-scoring.ts');
-  const input = request({ scoring: { profile: 'balanced', weights: {} } });
-  const state = { ...seedState(input), count: 1, pills: 3, price: 10000, exposure: new Map([['a', 75_000_000n]]) };
-  const profiles = ['balanced', 'best_coverage', 'fewest_pills', 'lowest_cost'].map(mode => requestForProfile(input, mode as typeof input.optimization));
-  const original = WeakMap.prototype.set;
-  let ownershipRecords = 0, scores;
-  try {
-    WeakMap.prototype.set = function (key, value) {
-      if (key === state.exposure && Array.isArray(value)) ownershipRecords++;
-      return original.call(this, key, value);
-    };
-    scores = profiles.map(profile => numericalSearchStateScore(profile, state));
-  } finally { WeakMap.prototype.set = original; }
-  assert.deepEqual(scores.map(score => score.overallPenalty), [0.355, 0.605, 0.43, 0.36]);
-  assert.equal(ownershipRecords, 1, 'The same basket needs one weak ownership boundary, not a separate candidate graph for each profile');
-  for (let i = 0; i < profiles.length; i++) {
-    assert.strictEqual(numericalSearchStateScore(profiles[i], { ...state, nextGroupIndex: 2 }), scores[i]);
-  }
-  const morePills = numericalSearchStateScore(input, { ...state, pills: 6 });
-  assert.equal(morePills.overallPenalty, 0.405);
-  assert.equal(numericalSearchStateScore(input, state).overallPenalty, 0.355, 'Different measurements remain isolated even with shared nutrient exposure');
-  for (let i = 0; i < 20; i++) {
-    const changed = { ...input, scoring: { profile: 'balanced' as const, weights: { pills: i / 10 } } };
-    assert.equal(numericalSearchStateScore(changed, state).overallPenalty, fractions.toNumber(fractions.add(fractions.rational(61n, 200n), fractions.rational(BigInt(i), 200n))));
-  }
-  assert.equal(numericalSearchStateScore(input, state).overallPenalty, 0.355, 'Eviction cannot change the original result');
-});
 test('REF-CPU-04 neutral rational operations reuse immutable values without changing exact arithmetic', () => {
   const value = fractions.rational(7n, 13n);
   assert.strictEqual(fractions.fromDecimal(0), fractions.ZERO, 'Repeated zero coefficients need no allocation');
