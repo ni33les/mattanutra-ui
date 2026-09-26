@@ -26,7 +26,7 @@ import {
 } from "./agentic/det-v3/harness.ts";
 import { DET_V3_CLOCK } from "./agentic/det-v3/manifest.ts";
 
-import { LIVE_ORIGIN as ORIGIN, LIVE_PUBLIC as PUBLIC, LIVE_QA as QA } from "./helpers/live-mcp.ts";
+import { LIVE_ORIGIN as ORIGIN, LIVE_PUBLIC as PUBLIC, LIVE_QA as QA, liveStructured, liveCompletedCall, LIVE_CLIENT_HEADERS } from "./helpers/live-mcp.ts";
 const MIXED_ACCEPT = "application/json, text/event-stream";
 const BASELINE_BUILD = "720be33c98528eb3415d874e049a266dbdfa6e27";
 const BASELINE_SNAPSHOT = "snap_ba9c871d1d1e665a";
@@ -108,6 +108,8 @@ function payloadHash(value: unknown) {
 
 type StageSample = {
   bodyMs: number;
+  buildId: string;
+  schemaChecksum: string;
   connectMs: number;
   contentType: string;
   firstByteMs: number;
@@ -135,6 +137,7 @@ function stagedPost(
     const request = lib.request(
       {
         headers: {
+          ...LIVE_CLIENT_HEADERS,
           Accept: accept,
           "Cache-Control": "no-cache, no-store",
           Connection: "close",
@@ -169,6 +172,8 @@ function stagedPost(
           }
           resolve({
             bodyMs: totalMs - (firstByteMs || preHeaderMs),
+            buildId: String(response.headers["x-agentic-build-id"] ?? ""),
+            schemaChecksum: String(response.headers["x-agentic-schema-checksum"] ?? ""),
             connectMs,
             contentType,
             firstByteMs: firstByteMs || preHeaderMs,
@@ -193,6 +198,7 @@ function stagedPost(
       });
     });
     request.on("error", reject);
+    request.setTimeout(30_000, () => request.destroy(new Error("Latency probe HTTP request exceeded 30 seconds")));
     request.write(body);
     request.end();
   });
@@ -276,23 +282,45 @@ function owningStage(input: {
 describe("DEV pre-header latency pack", () => {
   let liveBuildId = "";
   let liveSnapshotId = "";
+  let liveSchemaChecksum = "";
+  let qaNamespace = "";
 
   before(async () => {
     const info = await stagedPost(PUBLIC, INFO_BODY, MIXED_ACCEPT, "dev-lat-pin-info");
-    const structured =
-      ((info.payload as { result?: { structuredContent?: { buildId?: string } } })?.result
-        ?.structuredContent ?? {}) as { buildId?: string };
-    liveBuildId = structured.buildId ?? "";
+    assert.equal(info.status, 200);
+    const structured = liveStructured(info.payload);
+    assert.equal(structured.ok, true, JSON.stringify(structured));
+    assert.match(String(process.env.AGENTIC_BUILD_ID ?? ""), /^[0-9a-f]{40}$/, "Pin the candidate build before measuring it");
+    assert.equal(structured.buildId, process.env.AGENTIC_BUILD_ID);
+    liveBuildId = String(structured.buildId);
+    liveSchemaChecksum = String(structured.schemaChecksum);
+    assert.match(liveSchemaChecksum, /^[0-9a-f]{64}$/);
+    assert.equal(info.buildId, liveBuildId);
+    assert.equal(info.schemaChecksum, liveSchemaChecksum);
     const qa = await stagedPost(
       QA,
-      JSON.stringify({ runId: "dev-lat-pin" }),
+      JSON.stringify({ runId: `dev-lat-pin-${process.pid}` }),
       "application/json",
       "dev-lat-pin-qa"
     );
-    liveSnapshotId = String(
-      (qa.payload as { preflight?: { manifest?: { catalogueChecksum?: string } } })?.preflight
-        ?.manifest?.catalogueChecksum ?? ""
-    );
+    assert.equal(qa.status, 200);
+    const begun = liveStructured(qa.payload);
+    assert.equal(begun.ok, true, JSON.stringify(begun));
+    assert.equal(typeof begun.namespace, "string");
+    qaNamespace = String(begun.namespace); assert.ok(qaNamespace.length > 0);
+    const preflight = begun.preflight as { ok?: boolean; manifest?: { catalogueChecksum?: string; schemaChecksum?: string } };
+    assert.equal(preflight?.ok, true, JSON.stringify(preflight));
+    assert.equal(preflight.manifest?.schemaChecksum, liveSchemaChecksum);
+    assert.equal(qa.buildId, liveBuildId); assert.equal(qa.schemaChecksum, liveSchemaChecksum);
+    liveSnapshotId = String(preflight.manifest?.catalogueChecksum ?? "");
+    assert.match(liveSnapshotId, /^snap_[0-9a-f]{16}$/);
+  });
+
+  after(async () => {
+    if (qaNamespace) {
+      const reset = await stagedPost(QA, JSON.stringify({ reset: true, namespace: qaNamespace }), "application/json", "dev-lat-unpin-qa");
+      assert.equal(reset.status, 200); assert.equal(liveStructured(reset.payload).ok, true);
+    }
   });
 
   it("DEV-LAT-001 public info and tools/list pre-header P95 is within 5s", async () => {
@@ -327,10 +355,7 @@ describe("DEV pre-header latency pack", () => {
       BODY_COMPLETION_P95_MS: Math.round(
         p95([...info.map((item) => item.bodyMs), ...list.map((item) => item.bodyMs)])
       ),
-      BUILD_PINNED:
-        liveBuildId.length === 0 ||
-        liveBuildId === BASELINE_BUILD ||
-        /^[0-9a-f]{40}$/.test(liveBuildId),
+      BUILD_PINNED: liveBuildId === process.env.AGENTIC_BUILD_ID && /^[0-9a-f]{40}$/.test(liveBuildId),
       FAILED_TEST: failure === "NONE" ? "" : "DEV-LAT-001",
       FAILURE_CODE: failure === "PRE_HEADER" ? "PRE_HEADER_BUDGET_EXCEEDED" : failure,
       HTTP_STATUS: 200,
@@ -339,13 +364,17 @@ describe("DEV pre-header latency pack", () => {
       NEUTRAL_PUBLIC_TOOLS_LIST_PRE_HEADER_P95_MS: Math.round(liveListPreHeader),
       PAYLOAD_VALID: info.every((item) => isValidMcp(item.payload)) &&
         list.every((item) => isValidMcp(item.payload)),
-      SNAPSHOT_PINNED: liveSnapshotId === BASELINE_SNAPSHOT || liveSnapshotId.length > 0,
+      SNAPSHOT_PINNED: /^snap_[0-9a-f]{16}$/.test(liveSnapshotId),
       TOOLS_LIST_PRE_HEADER_P95_MS: Math.round(agentListPreHeader)
     };
     console.log(JSON.stringify(report));
     assert.equal(report.HTTP_STATUS, 200);
     assert.equal(report.PAYLOAD_VALID, true);
     assert.equal(report.BUILD_PINNED, true, `live build ${liveBuildId}`);
+    assert.equal(report.SNAPSHOT_PINNED, true, `live snapshot ${liveSnapshotId}`);
+    for (const sample of [...info, ...list]) {
+      assert.equal(sample.buildId, liveBuildId); assert.equal(sample.schemaChecksum, liveSchemaChecksum);
+    }
     assert.ok(info.every((item) => item.status === 200));
     assert.ok(list.every((item) => item.status === 200));
     observeLatency(p95(info.map((item) => item.bodyMs)), BODY_P95_MS, "info body p95");
@@ -356,7 +385,7 @@ describe("DEV pre-header latency pack", () => {
     void agentPreHeaderExceeded;
   });
 
-  it("DEV-LAT-002 three-vantage ownership names one stage", async () => {
+  it("DEV-LAT-002 measures current responses and keeps historical route attribution separate", async () => {
     const direct = await concurrent(10, 10, (index) =>
       stagedPost(ORIGIN, INFO_BODY, MIXED_ACCEPT, `dev-lat-002-direct-${index}`)
     );
@@ -368,23 +397,33 @@ describe("DEV pre-header latency pack", () => {
     const publicP95 = p95(pub.map((item) => item.totalMs));
     const publicBodyP95 = p95(pub.map((item) => item.bodyMs));
     const agentP95 = Math.max(AGENT_ROUTE.runA.infoP95Ms, AGENT_ROUTE.runB.infoP95Ms);
-    const owner = owningStage({
-      agentP95Ms: agentP95,
-      directP95Ms: directP95,
-      publicBodyP95Ms: publicBodyP95,
-      publicP95Ms: publicP95
-    });
+    // No current agent-route probe exists in this suite. Its old captured
+    // timing cannot identify today's bottleneck or turn a latency warning red.
     const report = {
-      AGENT_ROUTE_P95_MS: Math.round(agentP95),
+      HISTORICAL_AGENT_ROUTE_BUILD_ID: AGENT_ROUTE.buildId,
+      HISTORICAL_AGENT_ROUTE_P95_MS: Math.round(agentP95),
       DIRECT_APP_P95_MS: Math.round(directP95),
       NEUTRAL_PUBLIC_P95_MS: Math.round(publicP95),
-      OWNING_STAGE: owner
+      PUBLIC_BODY_P95_MS: Math.round(publicBodyP95),
+      COMPARISON: "historical_reference_not_current_attribution"
     };
     console.log(JSON.stringify(report));
+    assert.equal(direct.length, 10); assert.equal(pub.length, 10);
+    for (const sample of [...direct, ...pub]) {
+      assert.equal(sample.status, 200);
+      assert.equal(liveStructured(sample.payload).ok, true, JSON.stringify(sample.payload));
+      assert.equal(sample.buildId, liveBuildId); assert.equal(sample.schemaChecksum, liveSchemaChecksum);
+    }
     observeLatency(directP95, DIRECT_P95_MS, "direct p95");
     observeLatency(publicP95, SIMPLE_P95_MS, "public p95");
-    assert.equal(owner === "APPLICATION_ADMISSION" || owner === "MATTA_INGRESS_OR_PROXY", false);
-    assert.equal(owner, "AGENT_EGRESS_OR_ROUTE", JSON.stringify(report));
+    for (const [expected, directP95Ms, publicP95Ms, agentP95Ms, publicBodyP95Ms] of [
+      ["NONE", 100, 100, 100, 10],
+      ["RESPONSE_COMPLETION", 100, 100, 100, 600],
+      ["APPLICATION_ADMISSION", 301, 5001, 5001, 10],
+      ["MATTA_INGRESS_OR_PROXY", 100, 5001, 5001, 10],
+      ["AGENT_EGRESS_OR_ROUTE", 100, 100, 5001, 10],
+      ["APPLICATION_ADMISSION", 301, 100, 100, 10]
+    ] as const) assert.equal(owningStage({ directP95Ms, publicP95Ms, agentP95Ms, publicBodyP95Ms }), expected);
   });
 
   it("DEV-LAT-003 thirty uncached public plans meet live p50/p95", async () => {
@@ -411,6 +450,12 @@ describe("DEV pre-header latency pack", () => {
         statuses: samples.map((item) => item.status)
       })
     );
+    for (const sample of samples) {
+      const admitted = liveStructured(sample.payload);
+      assert.equal(admitted.ok, true, JSON.stringify(admitted));
+      assert.equal(typeof admitted.planHandle, "string", "Admission must return a real durable plan receipt");
+      assert.ok(["processing", "ready", "needs_input", "no_purchase"].includes(String(admitted.status)), JSON.stringify(admitted));
+    }
     observeBenchmark(scored, "public uncached plans");
   });
 
