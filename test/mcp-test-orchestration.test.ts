@@ -123,3 +123,20 @@ it("QUALITY-PLAN-06 an independent batch cannot duplicate files or take an exclu
     }
   } finally { rmSync(directory, { recursive: true, force: true }); }
 });
+
+it("QUALITY-PLAN-07 cancellation stops the canonical lifecycle before HTTP, PostgreSQL or replay can start", async () => {
+  const directory = mkdtempSync(join(tmpdir(), "cancelled-canonical-plan-"));
+  const discovered = full.fullTestInventory();
+  const seen: string[] = [];
+  let starts = 0;
+  try {
+    const result = await full.runCanonicalNodeSuite({ common: {}, evidence: directory,
+      inventory: { ...discovered, node: ["test/sha256.test.ts", ...replayFiles, "test/exclusive.integration.test.ts"], integration: ["test/exclusive.integration.test.ts"] }, args: ["--test"],
+      start: async () => { starts++; return { identity: { origin: "http://127.0.0.1:3101" }, stop: async () => {} }; },
+      batch: async (label: string) => { seen.push(label); return { label, passed: false, signal: "SIGTERM", interrupted: true }; }
+    });
+    assert.deepEqual(seen, ["node-application-independent"]);
+    assert.equal(starts, 0);
+    assert.equal(result.semanticReplay.passed, false);
+  } finally { rmSync(directory, { recursive: true, force: true }); }
+});
