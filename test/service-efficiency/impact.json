@@ -604,6 +604,11 @@
       "file": "test/service-efficiency/native-worker-idle.test.ts",
       "expectedCases": 1,
       "reason": "PERF-NATIVE-02: production wake endpoint and signals avoid artificial idle reservation contention in native measurements"
+    },
+    {
+      "file": "test/service-efficiency/selector-facts.test.ts",
+      "expectedCases": 1,
+      "reason": "PERF-CPU-35: exact incidental facts and request-isolated target resolution without per-label repeated lookups"
     }
   ],
   "inputs": [

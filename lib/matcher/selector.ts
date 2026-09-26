@@ -38,19 +38,11 @@ function coverageMap(
   return map;
 }
 
-function factCoversTarget(
-  product: MatcherProduct,
-  fact: MatcherProduct["labelledContributions"][number],
-  request: CanonicalRequest
-) {
-  return request.targets.some((target) =>
-    contributionFor(product, target.name, target.subjectId).includes(fact)
-  );
-}
-
 function incidentalNutrientCount(products: readonly MatcherProduct[], request: CanonicalRequest) {
-  return products.reduce((count, product) => count + product.labelledContributions.filter(fact =>
-    fact.amount != null && fact.amount > 0 && !factCoversTarget(product, fact, request)).length, 0);
+  return products.reduce((count, product) => {
+    const requested = new Set(request.targets.flatMap(target => contributionFor(product, target.name, target.subjectId)));
+    return count + product.labelledContributions.filter(fact => fact.amount != null && fact.amount > 0 && !requested.has(fact)).length;
+  }, 0);
 }
 
 function coveredTargetCount(
