@@ -328,6 +328,7 @@ export function amountFromScaled(
   return Number(amount.units) / Number(one.units);
 }
 
+const variantExposures = new WeakMap<DoseVariant, readonly ScaledAmount[]>();
 export function aggregateDailyExposure(input: Readonly<{
   current: readonly CanonicalCurrent[];
   variants: readonly DoseVariant[];
@@ -376,17 +377,14 @@ export function aggregateDailyExposure(input: Readonly<{
   );
 
   for (const variant of variants) {
-    const supplied = new Map(variant.safetyExposure ?? []);
-    for (const [id, amount] of variant.contributions) supplied.set(id, amount);
-    const subjects = [...supplied.keys()].sort();
-
-    for (const subjectId of subjects) {
-      const contribution = supplied.get(subjectId);
-
-      if (!contribution) {
-        continue;
-      }
-
+    let supplied = variantExposures.get(variant);
+    if (!supplied) {
+      const merged = new Map(variant.safetyExposure ?? []);
+      for (const [id, amount] of variant.contributions) merged.set(id, amount);
+      supplied = [...merged.keys()].sort().map(id => merged.get(id)!).filter(Boolean);
+      variantExposures.set(variant, supplied);
+    }
+    for (const contribution of supplied) {
       const error = add(contribution, "selected", variant.variantId);
 
       if (error) {
