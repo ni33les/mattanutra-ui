@@ -135,34 +135,24 @@ function compileMeasurements(request: PracticalRequest, actual: PracticalActuals
   const price = measurement(priceValue, "priceMinor", true);
   const uncertain = measurement(actual.uncertainProductCount, "uncertainProductCount", true);
   if (actual.uncertainProductCount > actual.productCount) throw new Error("uncertainProductCount cannot exceed productCount");
-  const missing = new Set<string>();
-  if (actual.uncertainProductCount > 0) missing.add("administrationBasis");
-  if (actual.dailyPills === null) missing.add("dailyPills");
-  if (actual.priceMinor === null) missing.add("firstOrderPrice");
   const preferencePrice = profile.pricePreferenceBasis === "monthly_30_days" ? actual.monthlyPriceMinor ?? null : actual.priceMinor;
   const preferencePriceLower = preferencePrice ?? (profile.pricePreferenceBasis === "monthly_30_days" ? actual.monthlyPriceLowerBound ?? 0 : priceValue);
   if (profile.pricePreferenceBasis === "monthly_30_days") measurement(preferencePriceLower, "monthlyPriceMinor", true);
-  const values = [
-    { field: "maxDailyPills", actual: actual.dailyPills, lower: actual.pillLowerBound, zeroScale: 1 },
-    { field: "maxProductCount", actual: actual.productCount, lower: actual.productCount, zeroScale: 1 },
-    { field: "maxPriceMinor", actual: preferencePrice, lower: preferencePriceLower, zeroScale: 10000 }
-  ] as const;
-  const preferences = values.map(row => {
-    const preferred = request[row.field] ?? null;
-    const target = preferred === null ? null : measurement(preferred, row.field, row.field !== "maxDailyPills");
-    const scale = preferred === null ? null : preferred > 0 ? preferred : row.zeroScale;
-    const active = preferred !== null;
-    const ratio = target && scale !== null ? divide(positive(subtract(fromDecimal(row.lower), target)), fromDecimal(scale)) : ZERO;
-    if (active && row.actual === null) missing.add(row.field);
-    return { ...row, preferred, scale, active, squaredOverrun: square(ratio) };
+  const lowerBounds = [actual.pillLowerBound, actual.productCount, preferencePriceLower];
+  const overruns = FIELDS.map((field, index) => {
+    const preferred = request[field] ?? null;
+    if (preferred === null) return ZERO;
+    const target = measurement(preferred, field, field !== "maxDailyPills");
+    return square(divide(positive(subtract(fromDecimal(lowerBounds[index]!), target)),
+      fromDecimal(preferred > 0 ? preferred : field === "maxPriceMinor" ? 10000 : 1)));
   });
   const servings = actual.servingBurdenExact ?? sum(actual.servings.map((n, i) => square(positive(subtract(measurement(n, `servings[${i}]`), ONE)))));
   const normalizedPills = divide(pills, THREE), normalizedPrice = divide(price, PRICE_SCALE), uncertainty = multiply(QUARTER, uncertain);
   const weightedUncertainty = profile.version === WEB_PRACTICAL_SCORING_VERSION && request.maxDailyPills != null;
-  return { pills: normalizedPills, products, price: normalizedPrice, uncertainty, preferencePrice, preferences, servings, missingComponents: [...missing].sort(),
+  return { pills: normalizedPills, products, price: normalizedPrice, uncertainty, preferencePrice, preferencePriceLower, overruns, servings,
     linear: compileLinearTerms([request.maxDailyPills == null ? normalizedPills : ZERO, request.maxProductCount == null ? products : ZERO,
       request.maxPriceMinor == null || (profile.version === WEB_PRACTICAL_SCORING_VERSION && preferencePrice === null) ? normalizedPrice : ZERO,
-      servings, weightedUncertainty ? ZERO : uncertainty, weightedUncertainty ? uncertainty : ZERO, ...preferences.map(row => row.squaredOverrun)]) };
+      servings, weightedUncertainty ? ZERO : uncertainty, weightedUncertainty ? uncertainty : ZERO, ...overruns]) };
 }
 function measurementsFor(request: PracticalRequest, actual: PracticalActuals, profile: Profile) {
   const source = doseRequest.get(request as CanonicalRequest) ?? request;
@@ -176,14 +166,26 @@ function numericalPracticalPenalties(request: PracticalRequest, actual: Practica
   if (actual.currency !== request.currency || actual.currency !== "THB") throw new Error("currency must match the THB profile normalization currency");
   const profile = resolvePracticalProfile(request), coefficient = coefficients(profile);
   const measured = measurementsFor(request, actual, profile);
-  return { request, profile, measured, coefficient, total: linearSum(measured.linear, coefficient.linear) };
+  return { request, actual, profile, measured, coefficient, total: linearSum(measured.linear, coefficient.linear) };
 }
 type NumericalPracticalScore = ReturnType<typeof numericalPracticalPenalties>;
 export type NumericalOverallScore = Readonly<{ profile: Profile; request: CanonicalRequest; actual: PracticalActuals;
   dosePenalty: number; overallPenalty: number; exactTotal: Rational }>;
 function displayPenalties(score: NumericalPracticalScore): PracticalPenaltyScore {
-  const { request, profile, measured, coefficient, total } = score, m = profile.multipliers;
-  const exactPreferences = measured.preferences.map(row => multiply(coefficient.preferences[row.field], row.squaredOverrun));
+  const { request, actual, profile, measured, coefficient, total } = score, m = profile.multipliers;
+  const missing = new Set<string>();
+  if (actual.uncertainProductCount > 0) missing.add("administrationBasis");
+  if (actual.dailyPills === null) missing.add("dailyPills");
+  if (actual.priceMinor === null) missing.add("firstOrderPrice");
+  const values = [actual.dailyPills, actual.productCount, measured.preferencePrice];
+  const lower = [actual.pillLowerBound, actual.productCount, measured.preferencePriceLower];
+  const preferences = FIELDS.map((field, index) => {
+    const preferred = request[field] ?? null, amount = values[index]!, active = preferred !== null;
+    if (active && amount === null) missing.add(field);
+    return { field, preferred, actual: amount, lower: lower[index]!, active,
+      scale: preferred === null ? null : preferred > 0 ? preferred : field === "maxPriceMinor" ? 10000 : 1 };
+  });
+  const exactPreferences = FIELDS.map((field, index) => multiply(coefficient.preferences[field], measured.overruns[index]!));
   const exactComponents = {
     pills: request.maxDailyPills == null ? multiply(coefficient.objectives.pills, measured.pills) : ZERO,
     products: request.maxProductCount == null ? multiply(coefficient.objectives.products, measured.products) : ZERO,
@@ -194,12 +196,12 @@ function displayPenalties(score: NumericalPracticalScore): PracticalPenaltyScore
       ? multiply(measured.uncertainty, fromDecimal(Math.max(1, m.pills * IMPORTANCE[profile.importance.maxDailyPills]))) : measured.uncertainty,
     preferences: sum(exactPreferences)
   };
-  return { profile, total: toNumber(total), exact: encoded(total), complete: measured.missingComponents.length === 0,
+  return { profile, total: toNumber(total), exact: encoded(total), complete: missing.size === 0,
     components: Object.fromEntries(Object.entries(exactComponents).map(([k, v]) => [k, toNumber(v)])) as PracticalPenaltyScore["components"],
-    preferences: Object.fromEntries(measured.preferences.map((row, index) => [row.field, {
+    preferences: Object.fromEntries(preferences.map((row, index) => [row.field, {
       active: row.active, actual: row.actual, actualLowerBound: row.lower, preferred: row.preferred, complete: row.actual !== null,
       scale: row.scale, importance: profile.importance[row.field], multiplier: [m.pills, m.products, m.price][index]!, penalty: toNumber(exactPreferences[index]!)
-    }])) as Record<Field, PreferencePenalty>, missingComponents: measured.missingComponents };
+    }])) as Record<Field, PreferencePenalty>, missingComponents: [...missing].sort() };
 }
 export function scorePracticalPenalties(request: PracticalRequest, actual: PracticalActuals): PracticalPenaltyScore {
   return displayPenalties(numericalPracticalPenalties(request, actual));
