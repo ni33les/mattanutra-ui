@@ -152,6 +152,23 @@ test('REF-CPU-07 profile representatives share immutable quantity measurements',
   assert.equal(simpler.preferences.maxDailyPills.penalty, 169 / 9);
 });
 
+test('PERF-CPU-15 equal routine measurements reuse arithmetic across different nutrient baskets', async () => {
+  const { numericalOverallMatchingScore } = await import('../../lib/matcher/practical-scoring.ts');
+  const input = request({ maxDailyPills: 3, maxPriceMinor: 200000 });
+  const firstDose = new Map([['a', 75_000_000n]]), secondDose = new Map([['a', 50_000_000n]]);
+  numericalDoseFitScore(input, firstDose); numericalDoseFitScore(input, secondDose);
+  const actual = { dailyPills: 16, pillLowerBound: 16, productCount: 2, priceMinor: 259400, currency: 'THB',
+    servings: [1, 1], uncertainProductCount: 0 };
+  const first = numericalOverallMatchingScore(input, firstDose, actual);
+  measurements = 0;
+  const second = numericalOverallMatchingScore(input, secondDose, structuredClone(actual));
+  assert.equal(second.overallPenalty - first.overallPenalty, 0.25, 'Different nutrient facts remain independently scored');
+  assert.equal(measurements, 0, 'The same verified routine does not need decimal and penalty recompilation');
+  assert.ok(numericalOverallMatchingScore(input, secondDose, { ...actual, dailyPills: 17, pillLowerBound: 17 }).overallPenalty > second.overallPenalty);
+  assert.throws(() => numericalOverallMatchingScore(input, secondDose, { ...actual, priceMinor: NaN }));
+  assert.throws(() => numericalOverallMatchingScore(input, secondDose, { ...actual, currency: 'USD' }));
+});
+
 test('PERF-CPU-11 candidate addition avoids temporary maps without mixing product contribution and total exposure', async () => {
   const { compileGroups } = await import('../../lib/matcher/candidates.ts');
   const { product } = await import('../matcher/flexible-v5-fixtures.ts');
