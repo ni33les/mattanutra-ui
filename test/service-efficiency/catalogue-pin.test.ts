@@ -208,3 +208,59 @@ test("EFF-PIN-11 restoring an uncommitted catalogue cannot publish it to another
   assert.equal(await store.getCatalogueSnapshot(id), null);
   assert.equal(await restoreCataloguePin(id, "guidance-test", store), null);
 });
+
+test("EFF-PIN-12 pending pin storage is bounded while existing identities continue to coalesce", async () => {
+  const store = independentlyCommittedStore();
+  const gate = deferred();
+  const inserts = new Map<string, number>();
+  store.insertCatalogueSnapshot = async id => { inserts.set(id, (inserts.get(id) ?? 0) + 1); await gate.promise; };
+  const snapshots = Array.from({ length: 33 }, (_, index) => freezeCatalogueSnapshot({
+    availabilityAsOf: "2026-09-26T00:00:00.000Z", catalogueVersion: `bounded-pin-${index}`, products: [], supplements: []
+  }));
+  const pending = snapshots.slice(0, 32).map(snapshot => persistCataloguePin(snapshot, "guidance-test", store));
+  pending.push(persistCataloguePin(snapshots[0]!, "guidance-test", store));
+  pending.push(persistCataloguePin(snapshots[32]!, "guidance-test", store));
+  pending.push(persistCataloguePin(snapshots[32]!, "guidance-test", store));
+  try {
+    await Promise.resolve();
+    assert.equal(inserts.get(matchingSnapshotId(snapshots[0]!)), 1, "existing tracked work still coalesces at capacity");
+    assert.equal(inserts.get(matchingSnapshotId(snapshots[32]!)), 2, "overflow executes independently instead of growing the pending registry");
+  } finally {
+    gate.resolve();
+    await Promise.all(pending);
+  }
+});
+
+test("EFF-PIN-13 a memory transaction starting during async insertion cannot publish rolled-back facts", async () => {
+  const store = createMemoryStore();
+  const snapshot = freezeCatalogueSnapshot(mutableSnapshot());
+  const id = matchingSnapshotId(snapshot);
+  const allowInsert = deferred();
+  const transactionStarted = deferred();
+  const finishTransaction = deferred();
+  const insert = store.insertCatalogueSnapshot.bind(store);
+  let inserts = 0;
+  store.insertCatalogueSnapshot = async (...args) => { inserts++; await allowInsert.promise; await insert(...args); };
+  const pin = persistCataloguePin(snapshot, "guidance-test", store);
+  const transaction = store.transaction(async () => {
+    transactionStarted.resolve();
+    await finishTransaction.promise;
+    throw new Error("Rollback overlapping transaction");
+  });
+  const rolledBack = assert.rejects(transaction, /Rollback overlapping transaction/);
+  try {
+    await transactionStarted.promise;
+    allowInsert.resolve();
+    await pin;
+    assert.equal(getPinnedCatalogueSnapshot(id), null, "an insertion overlapping whole-map rollback is not independently durable");
+  } finally {
+    allowInsert.resolve();
+    finishTransaction.resolve();
+    await pin;
+    await rolledBack;
+  }
+  assert.equal(await store.getCatalogueSnapshot(id), null);
+  await persistCataloguePin(snapshot, "guidance-test", store);
+  assert.equal(inserts, 2, "a rolled-back overlapping write cannot satisfy later persistence");
+  assert.deepEqual(await store.getCatalogueSnapshot(id), snapshot);
+});
