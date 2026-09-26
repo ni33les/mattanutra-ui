@@ -7,6 +7,9 @@ import { normalizePlanRequest } from "../../lib/agentic/plan/normalize.ts";
 import { loadAgenticConfig } from "../../lib/agentic/config.ts";
 import { toCanonicalRequest } from "../../lib/agentic/plan/matching.ts";
 import { toMatcherProduct } from "../../lib/agentic/plan/to-matcher-product.ts";
+import { compileGroups } from "../../lib/matcher/candidates.ts";
+import { seedState, tryAddVariant } from "../../lib/matcher/search.ts";
+import { doseFitScore } from "../../lib/matcher/dose-fit.ts";
 import { match } from "../../lib/matcher/index.ts";
 import { setMatcherSafetyCeilings, resetMatcherSafetyCeilings } from "../../lib/matcher/safety-ceilings.ts";
 import { readFileSync } from "node:fs";
@@ -44,9 +47,32 @@ for (const [id, loss, price] of [["A4", 4/300, 91900], ["A5", 5/100, 70300]] as 
   try {
     const normalized = await normalizePlanRequest({ config: loadAgenticConfig(), request, snapshot }); assert.ok("state" in normalized);
     const canonical = toCanonicalRequest(normalized.state); assert.ok(!("error" in canonical));
+    const control = baseline.cases.find(row => row.caseId === `${id}-en`)!.plan;
+    if (id === "A4") {
+      // Independently rebuild the immutable historical witness using today's
+      // eligible quantities and clinical references. The search bound is valid
+      // only if this actual basket still achieves it; no fixture is rewritten.
+      const groups = compileGroups(canonical, { ...snapshot, products: snapshot.products.map(toMatcherProduct) });
+      const sellerId = groups.find(group => group.productId === control.basket[0]!.productId)?.sellerId;
+      assert.ok(sellerId, "The historical witness must remain eligible");
+      let witness = seedState(canonical);
+      for (const line of control.basket) {
+        const group = groups.find(row => row.sellerId === sellerId && row.productId === line.productId);
+        assert.ok(group, `Historical product ${line.productId} must remain eligible`);
+        const quantity = group.variants.find(row => row.dailyUnits === line.servingsPerDay);
+        assert.ok(quantity, `Historical quantity ${line.servingsPerDay} must remain physically supported`);
+        const next = tryAddVariant(witness, quantity, group, canonical);
+        assert.ok(next, "The historical basket must still satisfy binding constraints");
+        witness = next;
+      }
+      const fit = doseFitScore(canonical, witness.exposure);
+      assert.equal(fit.total, loss);
+      assert.equal(fit.limit, 0);
+      assert.equal(witness.price, price);
+      assert.deepEqual(fit.perTarget.map(row => [row.name, row.exposure]), [["Calcium", 296], ["Vitamin D3", 20]]);
+    }
     const result = match(canonical, { ...snapshot, products: snapshot.products.map(toMatcherProduct) }); assert.ok(closestDoseOption(result));
     assert.ok(closestDoseOption(result).doseFit!.total <= loss, `Dose loss ${closestDoseOption(result).doseFit!.total} exceeds control ${loss}`);
-    const control = baseline.cases.find(row => row.caseId === `${id}-en`)!.plan;
     assert.equal(control.stackSummary!.totalPriceMinor, price, "Historical prices are unchanged");
     const controlPills = control.stackSummary!.totalDailyPills;
     if (closestDoseOption(result).doseFit!.total === loss) {
