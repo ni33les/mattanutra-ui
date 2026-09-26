@@ -20,6 +20,28 @@ mock.module('../../lib/matcher/rational.ts', { namedExports: { ...fractions, lin
 const { request } = await import('../matcher/flexible-v5-fixtures.ts');
 const { doseFitScore, numericalDoseFitScore, exactDoseFit, compareDoseFit, weightedDoseFitScore, numericalWeightedDoseFitScore } = await import('../../lib/matcher/dose-fit.ts');
 
+test('PERF-CPU-23 retained exposure reuses sorted immutable variant facts', async () => {
+  const { product, catalog } = await import('../matcher/flexible-v5-fixtures.ts');
+  const { compileGroups } = await import('../../lib/matcher/candidates.ts');
+  const input = request(), groups = compileGroups(input, catalog([product('p', { a: 25, b: 7 }), product('q', { a: 35, c: 11 })]));
+  const variants = groups.map(group => { const row = group.variants.find(variant => variant.dailyUnits === 1); assert.ok(row); return row; });
+  const expected = dose.aggregateDailyExposure({ current: [], variants }); assert.ok(!dose.isDoseError(expected));
+  assert.equal(expected.totals.get('a')?.units, 60_000_000n, 'The safety label and requested contribution are the same amount, not two doses');
+  assert.equal(expected.totals.get('b')?.units, 7_000_000n); assert.equal(expected.totals.get('c')?.units, 11_000_000n);
+  assert.deepEqual(expected.provenance.map(row => row.subjectId), ['a', 'b', 'a', 'c']);
+  const OriginalMap = globalThis.Map; let allocations = 0, actual;
+  try {
+    globalThis.Map = new Proxy(OriginalMap, { construct(type, args) { allocations++; return Reflect.construct(type, args); } });
+    actual = dose.aggregateDailyExposure({ current: [], variants });
+  } finally { globalThis.Map = OriginalMap; }
+  assert.deepEqual(actual, expected);
+  assert.equal(allocations, 1, 'Only basket totals need a new map; the same physical quantity needs no repeated label merging');
+  const changed = { ...variants[0], contributions: new Map(variants[0].contributions).set('a', { subjectId: 'a', dim: 'mass_ng' as const, units: 30_000_000n }) };
+  const corrected = dose.aggregateDailyExposure({ current: [], variants: [changed, variants[1]] }); assert.ok(!dose.isDoseError(corrected));
+  assert.equal(corrected.totals.get('a')?.units, 65_000_000n, 'New immutable facts must not reuse prior amounts');
+  assert.equal(expected.totals.get('a')?.units, 60_000_000n);
+});
+
 test('PERF-CPU-24 exact search records defer unused display totals until retention', async () => {
   const { numericalOverallMatchingScore, overallMatchingScore } = await import('../../lib/matcher/practical-scoring.ts');
   const input = request(), exposure = new Map([['a', 75_000_000n]]);
