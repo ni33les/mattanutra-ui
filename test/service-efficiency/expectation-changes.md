@@ -59,3 +59,15 @@ and a contention test attempting two sessions through a one-connection pool.
 They now create their own second pharmacy and use an independent writer session.
 Neither prerequisite is skipped; the timeout and complete row-equality assertions
 remain. Original failed executions are retained outside the checkout.
+
+### 2026-09-26 — cursor identity and exact reduction experiments
+
+`REF-CPU-14` now rejects redundant serialization of compiled seller quantities.
+The complete parent catalogue/request/configuration identity scopes each seller;
+standalone cursor identities and all previous checkpoint readers remain intact.
+
+`PERF-CPU-07` preserves wide-integer arithmetic and rejects temporary iterable
+pairs in Euclidean reduction. Two safe-integer-remainder experiments had exact
+matching outputs but did not improve the constrained-worker measurements. Their
+patch/timings remain in evidence; the Number fast paths were withdrawn. The
+shared implementation retains BigInt arithmetic and a scalar remainder loop.

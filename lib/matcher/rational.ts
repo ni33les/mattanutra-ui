@@ -4,7 +4,7 @@ export type Decimal = string | number;
 
 function gcd(a: bigint, b: bigint): bigint {
   if (a < BigInt(0)) a = -a;
-  while (b !== BigInt(0)) [a, b] = [b, a % b];
+  while (b !== BigInt(0)) { const rest = a % b; a = b; b = rest; }
   return a || BigInt(1);
 }
 export function rational(num: bigint, den = BigInt(1)): Rational {
