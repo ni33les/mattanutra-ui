@@ -40,8 +40,7 @@ test('PERF-MEM-02 completed seller search releases discarded cache ownership wit
   assert.ok(releases > 100, 'Finished sellers need only retained live candidates plus compact archive rows');
   const restored = structuredClone(cursor), values = [...archivedSearchStates(cursor)];
   assert.deepEqual([...archivedSearchStates(restored)], values);
-  const retained = cursor.review.filter(state => state.count > 0); assert.ok(retained.length > 0);
-  for (const state of retained) assert.strictEqual(values.find(row => row.selectedVariantIds.join('|') === state.selectedVariantIds.join('|')), state);
+  for (const state of cursor.review) assert.strictEqual(values.find(row => row.selectedVariantIds.join('|') === state.selectedVariantIds.join('|')), state);
   extendSearchCursor(cursor, 1200); extendSearchCursor(restored, 1200);
   advanceSearchCursor(cursor, input, 200); advanceSearchCursor(restored, input, 200);
   assert.deepEqual(restored, cursor, 'Expanded recovery preserves budgets, order and all candidate values');

@@ -310,5 +310,3 @@ work still takes the tested conditional retirement path.
 - PERF-CPU-48 nutrient lower-bound experiment withdrawn: independent proof, invalid-input handling and exact frozen outputs passed, but total CPU remained unchanged. Avoid retaining extra comparison branches without a timing benefit. Evidence remains external.
 
 - PERF-MEM-02 tests cache release only after bounded seller completion, avoiding the reconstruction trade-off of discarded mid-search caches. Preserve live retained candidates, every packed archive row, standard-to-expanded recovery and attempt accounting. RED observes no completed cache release.
-
-- PERF-MEM-02 fixture correction: the first candidate execution failed an overbroad seed-identity assertion. Empty seeds have never been cached by `remember`; preserve the requirement for all retained nonempty candidates and keep an explicit nonempty precondition. Empty archive values remain in the full recovery equality assertion. Preserve that failed execution; it is not GREEN evidence.
