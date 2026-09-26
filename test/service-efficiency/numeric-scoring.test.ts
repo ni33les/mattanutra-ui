@@ -14,11 +14,31 @@ mock.module('../../lib/matcher/exact-values.ts', { namedExports: { ...exactValue
 const dose = await import('../../lib/matcher/dose.ts');
 const fractions = await import('../../lib/matcher/rational.ts');
 let conversions = 0, unitCompilations = 0, exactEncodings = 0;
-let multiplications = 0; let measurements = 0; let additions = 0; let aggregateSums = 0; let conversionsToNumber = 0; let exactComparisons = 0;
+let linearEvaluations = 0; let multiplications = 0; let measurements = 0; let additions = 0; let aggregateSums = 0; let conversionsToNumber = 0; let exactComparisons = 0;
 mock.module('../../lib/matcher/dose.ts', { namedExports: { ...dose, scaleAmount: (...args: Parameters<typeof dose.scaleAmount>) => { unitCompilations++; return dose.scaleAmount(...args); }, amountFromScaled: (...args: Parameters<typeof dose.amountFromScaled>) => { conversions++; return dose.amountFromScaled(...args); } } });
-mock.module('../../lib/matcher/rational.ts', { namedExports: { ...fractions, toNumber: (...args: Parameters<typeof fractions.toNumber>) => { conversionsToNumber++; return fractions.toNumber(...args); }, compare: (...args: Parameters<typeof fractions.compare>) => { exactComparisons++; return fractions.compare(...args); }, sum: (...args: Parameters<typeof fractions.sum>) => { aggregateSums++; return fractions.sum(...args); }, add: (...args: Parameters<typeof fractions.add>) => { additions++; return fractions.add(...args); }, serialize: (...args: Parameters<typeof fractions.serialize>) => { exactEncodings++; return fractions.serialize(...args); }, fromDecimal: (...args: Parameters<typeof fractions.fromDecimal>) => { measurements++; return fractions.fromDecimal(...args); }, multiply: (...args: Parameters<typeof fractions.multiply>) => { multiplications++; return fractions.multiply(...args); } } });
+mock.module('../../lib/matcher/rational.ts', { namedExports: { ...fractions, linearSum: (...args: Parameters<typeof fractions.linearSum>) => { linearEvaluations++; return fractions.linearSum(...args); }, toNumber: (...args: Parameters<typeof fractions.toNumber>) => { conversionsToNumber++; return fractions.toNumber(...args); }, compare: (...args: Parameters<typeof fractions.compare>) => { exactComparisons++; return fractions.compare(...args); }, sum: (...args: Parameters<typeof fractions.sum>) => { aggregateSums++; return fractions.sum(...args); }, add: (...args: Parameters<typeof fractions.add>) => { additions++; return fractions.add(...args); }, serialize: (...args: Parameters<typeof fractions.serialize>) => { exactEncodings++; return fractions.serialize(...args); }, fromDecimal: (...args: Parameters<typeof fractions.fromDecimal>) => { measurements++; return fractions.fromDecimal(...args); }, multiply: (...args: Parameters<typeof fractions.multiply>) => { multiplications++; return fractions.multiply(...args); } } });
 const { request } = await import('../matcher/flexible-v5-fixtures.ts');
 const { doseFitScore, numericalDoseFitScore, exactDoseFit, compareDoseFit, weightedDoseFitScore, numericalWeightedDoseFitScore } = await import('../../lib/matcher/dose-fit.ts');
+
+test('PERF-CPU-22 exact serving lower bounds avoid unnecessary profile evaluation', async () => {
+  const { seedState, compareSearchStates } = await import('../../lib/matcher/search.ts');
+  const { numericalSearchStateScore, requestForProfile } = await import('../../lib/matcher/practical-scoring.ts');
+  const input = request();
+  const large = { ...seedState(input), count: 1, pills: 1, price: 100, servingBurden: { num: 10000n, den: 1n }, exposure: new Map([['a', 100_000_000n]]) };
+  const small = { ...seedState(input), count: 1, pills: 1, price: 100, exposure: new Map([['a', 100_000_000n]]) };
+  numericalSearchStateScore(input, large); numericalSearchStateScore(input, small);
+  const profile = requestForProfile(input, 'fewest_pills');
+  linearEvaluations = 0;
+  assert.equal(Math.sign(compareSearchStates(large, small, profile)), 1);
+  assert.equal(linearEvaluations, 1, 'A verified 2000-point serving penalty already exceeds the complete smaller-routine score');
+  assert.equal(numericalSearchStateScore(profile, large).overallPenalty - numericalSearchStateScore(profile, small).overallPenalty, 2000);
+  assert.equal(Math.sign(compareSearchStates(small, large, profile)), -1);
+  const zero = request({ scoring: { profile: 'balanced', weights: { servings: 0 } } });
+  assert.equal(compareSearchStates(large, small, zero), 0, 'Zero-weight servings cannot be used to reject a routine');
+  const invalid = { ...large, pills: -1 };
+  assert.throws(() => numericalSearchStateScore(input, invalid), /nonnegative/);
+  assert.throws(() => compareSearchStates(invalid, small, profile), /nonnegative/, 'A failed validation cannot authorize a lower-bound shortcut');
+});
 
 test('PERF-CPU-18 repeated nutrient amounts reuse immutable frontier deviations', async () => {
   const { doseFitTargetDeviations } = await import('../../lib/matcher/dose-fit.ts');
