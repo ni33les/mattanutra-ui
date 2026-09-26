@@ -651,19 +651,15 @@ export function createPostgresStore(inputSql: Sql, inTransaction = false, notifi
       `;
     },
     async insertOrderItems(items) {
-      for (const item of items) {
-        await sql`
-          insert into public.agentic_order_items (
-            id, order_id, product_id, product_name, retailer_sku, seller_id, seller_name,
-            quantity, form, daily_pills, unit_price_minor, line_total_minor, currency
-          ) values (
-            ${item.id}::uuid, ${item.orderId}::uuid, ${item.productId}, ${item.productName},
-            ${item.retailerSku}, ${item.sellerId}, ${item.sellerName}, ${item.quantity},
-            ${item.form}, ${item.dailyPills}, ${item.unitPriceMinor}, ${item.lineTotalMinor},
-            ${item.currency}
-          )
-        `;
-      }
+      if (!items.length) return;
+      await sql`
+        insert into public.agentic_order_items (
+          id, order_id, product_id, product_name, retailer_sku, seller_id, seller_name,
+          quantity, form, daily_pills, unit_price_minor, line_total_minor, currency
+        ) values ${sql(items.map(item => [item.id, item.orderId, item.productId, item.productName,
+          item.retailerSku, item.sellerId, item.sellerName, item.quantity, item.form, item.dailyPills,
+          item.unitPriceMinor, item.lineTotalMinor, item.currency]))}
+      `;
     },
     async insertOutbox(record) {
       await sql`
