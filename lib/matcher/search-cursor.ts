@@ -112,10 +112,24 @@ function variant(cursor: SearchCursor, index: number, id: string) {
   if (!found) throw new Error("Search cursor lost a physical quantity");
   return found;
 }
+const quantityBases = new WeakMap<readonly string[], { initial: DoseVariant[]; step: ReturnType<typeof servingIncrement>; upper: bigint }>();
+function quantityBasis(cursor: SearchCursor, index: number) {
+  const ids = cursor.baseline[index]!;
+  let basis = quantityBases.get(ids);
+  if (!basis) {
+    const initial = ids.map(id => variant(cursor, index, id)), step = servingIncrement(cursor.groups[index]!.product);
+    const upper = initial.reduce((highest, row) => {
+      const tick = divide(row.dailyUnitsRatio ?? fromDecimal(row.dailyUnits), step), ceiling = (tick.num + tick.den - BigInt(1)) / tick.den;
+      return highest > ceiling ? highest : ceiling;
+    }, BigInt(1));
+    basis = { initial, step, upper }; quantityBases.set(ids, basis);
+  }
+  return basis;
+}
 function variantsFor(cursor: SearchCursor, index: number, state: SearchState, request: CanonicalRequest, stop: number): string[] | null {
-  const group = cursor.groups[index]!, initial = cursor.baseline[index]!.map(id => variant(cursor, index, id));
-  if (request.productDoses?.some(row => row.productId === group.productId) || !initial.length) return initial.map(row => row.variantId);
-  const step = servingIncrement(group.product), result = new Set(initial.map(row => row.variantId));
+  const group = cursor.groups[index]!, { initial, step, upper } = quantityBasis(cursor, index);
+  if (request.productDoses?.some(row => row.productId === group.productId) || !initial.length) return cursor.baseline[index]!;
+  const result = new Set(cursor.baseline[index]);
   for (const target of request.targets) {
     const perServing = initial[0]!.amountPerUnit.get(target.subjectId)?.units;
     if (!perServing || perServing <= 0 || isDeferredConditional(target)) continue;
@@ -130,8 +144,6 @@ function variantsFor(cursor: SearchCursor, index: number, state: SearchState, re
   const key = `${fingerprintState(state)}>${index}`;
   let job = cursor.quantitySearch;
   if (!job || job.key !== key) {
-    const ticks = initial.map(row => divide(row.dailyUnitsRatio ?? fromDecimal(row.dailyUnits), step)).map(row => (row.num + row.den - BigInt(1)) / row.den);
-    const upper = ticks.reduce((a, b) => a > b ? a : b, BigInt(1));
     job = { key, ids: [...result], low: BigInt(1), high: upper, steps: 0 }; cursor.quantitySearch = job;
     const addTick = (tick: bigint) => {
       if (tick < BigInt(1)) return;
@@ -453,7 +465,7 @@ export function advanceSearchCursor(cursor: SearchCursor, request: CanonicalRequ
         // Try the already-compiled labelled quantities before interior probes
         // can consume this group's small repair allowance. Completed edges are
         // reused after a yield, so these attempts remain checkpoint-safe.
-        const initial=cursor.baseline[cursor.group]!.map(id=>variant(cursor,cursor.group,id));
+        const initial=quantityBasis(cursor,cursor.group).initial;
         const residual = cursor.secondReferences.includes(completionKey(base)) && !request.productDoses?.some(row => row.productId === cursor.groups[cursor.group]!.productId)
           ? residualCompletions(initial, base, request) : [];
         const labelled=[...new Set([...residual, initial[0], ...[1,2,3].map(amount=>initial.find(row=>row.dailyUnits===amount))].filter((row): row is DoseVariant=>Boolean(row)))];
