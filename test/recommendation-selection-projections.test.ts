@@ -20,10 +20,6 @@ describe("recommendation selection projections", () => {
       "components/admin/dashboard-content.tsx",
       "utf8"
     );
-    const recommendationInsights = readFileSync(
-      "lib/admin-recommendation-insights.ts",
-      "utf8"
-    );
     const productSearch = readFileSync("lib/admin-product-search.ts", "utf8");
     const taskExecution = readFileSync("lib/task-execution.ts", "utf8");
     const taskWorker = readFileSync("lib/task-worker.ts", "utf8");
@@ -62,20 +58,6 @@ describe("recommendation selection projections", () => {
     assert.doesNotMatch(adminDashboard, /AdminFoodImprovementInsightsView/);
     assert.doesNotMatch(dashboardContent, /out-of-catalog-insights/);
     assert.doesNotMatch(adminDashboard, /AdminRecommendationInsightsView/);
-    assert.doesNotMatch(recommendationInsights, /outOfCatalogSupplements/);
-    assert.match(
-      recommendationInsights,
-      /supplement_recommendation_selections\.supplement_id is null/
-    );
-    assert.match(recommendationInsights, /left join public\.supplements/);
-    assert.match(recommendationInsights, /supplements\.source_status/);
-    assert.match(recommendationInsights, /review_required/);
-    assert.match(recommendationInsights, /missing/);
-    assert.match(recommendationInsights, /blocked/);
-    assert.match(recommendationInsights, /banned/);
-    assert.match(recommendationInsights, /unknown_supplement/);
-    assert.match(recommendationInsights, /row\.source_status && row\.source_status !== "core"/);
-    assert.match(recommendationInsights, /row\.list_status === "blocked"/);
     assert.match(productSearch, /getRetailerAwareProductRecommendationCandidateSets/);
     assert.match(productSearch, /sellable\.status = 'active'/);
     assert.match(productSearch, /assessRetailSellability/);

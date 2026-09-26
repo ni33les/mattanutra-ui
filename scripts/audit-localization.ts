@@ -31,8 +31,6 @@ const DOCUMENTED_LOCALE_BRANCH_ALLOWLIST: Readonly<Record<string, string>> = {
     "Locale branches choose Intl locale codes and legacy DB fallback fields.",
   "components/admin/product-view-ui.tsx":
     "Locale branches update locale-specific DB translation fields.",
-  "components/admin/recommendation-insights-view.tsx":
-    "Locale branch selects an Intl locale code for numeric display.",
   "components/admin/review-queue-helpers.ts":
     "Locale branches build localized DB draft maps rather than render copy directly.",
   "components/formulation-results-panels.tsx":

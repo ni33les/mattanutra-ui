@@ -541,7 +541,6 @@ test("admin DB object titles are rendered through localized translation helpers"
   const foodView = source("components/admin/safety-views.tsx");
   const reviewQueue = source("components/admin/review-queue-view.tsx");
   const reviewQueueHelpers = source("components/admin/review-queue-helpers.ts");
-  const insights = source("lib/admin-recommendation-insights.ts");
   const dashboardPage = source("app/[locale]/admin/dashboard/page.tsx");
   const simulationInputRoute = source(
     "app/api/admin/product-coverage/simulation-input/route.ts"
@@ -582,10 +581,4 @@ test("admin DB object titles are rendered through localized translation helpers"
   assert.doesNotMatch(dashboardPage, /getAdminSupplementImprovementInsightsData/);
   assert.doesNotMatch(dashboardPage, /getAdminProductImprovementInsightsData\(range,\s*locale\)/);
   assert.doesNotMatch(dashboardPage, /getAdminFoodImprovementInsightsData\(range,\s*locale\)/);
-  assert.match(insights, /left join public\.product_translations/);
-  assert.match(insights, /left join public\.supplement_translations/);
-  assert.match(insights, /left join public\.food_translations/);
-  assert.match(insights, /product_translations\.locale = \$\{locale\}/);
-  assert.match(insights, /supplement_translations\.locale = \$\{locale\}/);
-  assert.match(insights, /food_translations\.locale = \$\{locale\}/);
 });

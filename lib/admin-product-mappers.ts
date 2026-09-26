@@ -7,7 +7,7 @@ import type {
   ProductValidationCacheStatus
 } from "./admin-product-types.ts";
 import type { ProductDbRow, FactDbPayload } from "./admin-product-types.ts";
-import type { AdminProductDecisionStats } from "@/lib/admin-recommendation-insights";
+import type { AdminProductDecisionStats } from "@/lib/admin-recommendation-stats";
 import type { ValidationResult } from "@/lib/product-validation";
 import {
   numberOrNull,

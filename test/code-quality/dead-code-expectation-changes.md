@@ -10,7 +10,7 @@ The current dashboard already rejects the retired view names. This change remove
 
 - `baseline.tap`: all 77 tests passed across `continuous-improvement-insights`, `coverage-improvement-insights`, `product-recommendation-insights`, `recommendation-selection-projections`, `admin-localization-static`, `product-coverage-workflow`, and `product-card-layout`.
 - `retirement-red.tap`: `admin-insights-retirement.test.ts` reports two intended failures (four retired files still exist; active types still import the retired service), one passing authorization test, and zero skips/cancellations.
-- RED tests are committed before the implementation. Failed evidence is retained; it is not acceptance evidence.
+- RED tests were committed in `e47d6e8a` before the implementation. Failed evidence is retained; it is not acceptance evidence.
 
 ## Case disposition
 
@@ -42,3 +42,9 @@ The following tests exercise only unreachable implementations and are retired wi
 Two mixed tests lose only dead-reader assertions: **recommendation selection projections / keeps schema and apply script for recommendation insights** removes its read of the retired service and its eleven assertions about that service; all schema, projection, sellability, task execution and freshness assertions remain. **admin DB object titles are rendered through localized translation helpers** removes its dead service read and six dead SQL-join assertions; all current product, supplement, food, review and dashboard localization assertions remain. The localization audit drops only the allowlist entry for the removed view.
 
 The implementation does not delete the live recommendation-selection projection pipeline, its schema/apply script, current coverage/simulator/optimization code, or their behavioral tests. No fixtures, historical baseline files, evidence, database records, or public contracts are changed.
+
+## Implemented verification
+
+The four retired modules remove 5,382 application lines; `lib/admin-recommendation-stats.ts` preserves the three shared type definitions byte-for-byte in 28 lines, giving a net reduction of **5,354 application lines**. Only type-import paths change in the three live consumers.
+
+`green.tap` records 62/62 passing tests, zero failures/skips/cancellations in the same focused baseline inventory after removing the six-case retired product-insight suite and adding the three-case retirement suite. `test-disposition.json` independently compares AST test bodies against the RED commit: 18 mapped retired cases, the two mixed tests changed exactly as described above, and every other retained case unchanged. `lint.log` records a clean scoped lint run. These are focused slice checks; the programme's broader final gates remain separate.

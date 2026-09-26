@@ -28,7 +28,7 @@ import {
 import type { AdminDashboardRange } from "@/lib/admin-dashboard-data";
 import {
   type AdminSupplementSelectionStats
-} from "@/lib/admin-recommendation-insights";
+} from "@/lib/admin-recommendation-stats";
 import { normalizeLocaleCode, type LocaleCode } from "@/lib/i18n";
 import { flushMatchingCatalogueCaches } from "@/lib/agentic/catalogue/flush";
 import {

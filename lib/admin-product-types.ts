@@ -12,7 +12,7 @@ import type {
   ProductCountryCode,
   ProductCountryPricing
 } from "@/lib/product-countries";
-import type { AdminProductDecisionStats } from "@/lib/admin-recommendation-insights";
+import type { AdminProductDecisionStats } from "@/lib/admin-recommendation-stats";
 import type {
   ProductIdentifier,
   ProductIdentifierCandidate,
