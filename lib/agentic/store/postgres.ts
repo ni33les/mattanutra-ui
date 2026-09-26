@@ -656,7 +656,7 @@ export function createPostgresStore(inputSql: Sql, inTransaction = false, notifi
         insert into public.agentic_order_items (
           id, order_id, product_id, product_name, retailer_sku, seller_id, seller_name,
           quantity, form, daily_pills, unit_price_minor, line_total_minor, currency
-        ) values ${sql(items.map(item => [item.id, item.orderId, item.productId, item.productName,
+        ) values ${inputSql(items.map(item => [item.id, item.orderId, item.productId, item.productName,
           item.retailerSku, item.sellerId, item.sellerName, item.quantity, item.form, item.dailyPills,
           item.unitPriceMinor, item.lineTotalMinor, item.currency]))}
       `;
