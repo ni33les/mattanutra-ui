@@ -151,6 +151,7 @@ test('REF-CPU-12 frontier numerical records contain no response getters or displ
     'Losing states must be plain numerical records, not lazy response objects');
   assert.equal(Object.hasOwn(score, 'components'), false);
   assert.equal(Object.hasOwn(score, 'preferences'), false);
+  assert.equal(Object.hasOwn(score, 'penalties'), false, 'Losing scores must not retain per-component preference trees through a nested field');
   assert.equal(Object.hasOwn(score, 'overallExact'), false);
   assert.equal(scoring.compareOverallScores(score, score), 0);
   assert.equal(scoring.searchStateScore(input, state).overallPenalty, score.overallPenalty);
