@@ -10,19 +10,28 @@ async function fixture(locale: string, ready = false, existing?: { planId: strin
 for (const locale of ["en", "th", "zh-CN"]) {
   test(`PHARM-PROGRESS ${locale} pending reveal remains on the combined page through reload and readiness`, async ({ page }) => {
     const saved = await fixture(locale);
-    const mutations: string[] = [];
-    page.on("request", request => { if (request.method() === "POST" && request.url().includes(`/api/assessment/${saved.planId}/`)) mutations.push(request.url()); });
+    const mutations: Array<{ path: string; body: unknown }> = [];
+    page.on("request", request => {
+      if (request.method() === "POST" && request.url().includes(`/api/assessment/${saved.planId}/`)) {
+        mutations.push({ path: new URL(request.url()).pathname, body: request.postDataJSON() });
+      }
+    });
     await page.goto(`/${locale}/retail/${saved.slug}/progress?plan=${saved.planId}&source=business_card`);
     await expect(page).toHaveURL(new RegExp(`/retail/${saved.slug}/reveal\\?plan=${saved.planId}&source=business_card`));
     await expect(page.getByTestId("pharmacy-combined")).toBeVisible();
     await expect(page.locator(".mn-quiz-calc, .mn-reveal-final")).toHaveCount(0);
     await expect(page.locator(".mn-analysis-tile")).toHaveCount(5);
+    expect(mutations).toEqual([], "Pending readiness reads cannot schedule work");
     await page.reload();
     await expect(page.getByTestId("pharmacy-combined")).toBeVisible();
+    expect(mutations).toEqual([], "Reloading pending work cannot schedule a new operation");
     await fixture(locale,true,saved);
     await expect(page.getByTestId("pharmacy-order")).toBeVisible({timeout:15000});
     await expect(page.locator(".mn-products .mn-product")).toHaveCount(1);
-    expect(mutations).toEqual([]);
+    await expect(page.getByTestId("pharmacy-line-connect").getByRole("img")).toBeVisible();
+    expect(mutations).toEqual([{ path: `/api/assessment/${saved.planId}/line-connect`,
+      body: { source: "pharmacy_plan", pharmacy: saved.slug, locale } }],
+      "Ready display may prepare one private LINE code, but must not regenerate or retry analysis");
   });
 }
 

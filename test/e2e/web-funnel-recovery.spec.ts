@@ -118,6 +118,10 @@ for (const locale of ["en", "th", "zh-CN"] as const) {
     const preferences = page.getByTestId("selected-matching-preferences");
     await expect(preferences).toHaveCount(0);
     await expect(page.getByTestId("matching-option")).toHaveCount(0);
+    await expect(page.locator("#products .product-card")).toHaveCount(2);
+    const names = await page.locator("#products .product-card h3").allTextContents();
+    const prices = await page.getByTestId("reveal-product-price").allTextContents();
+    expect(names).toHaveLength(2); expect(prices).toHaveLength(2);
 
     // A declared response fixture exercises incomplete physical metadata in the
     // browser. The real stored purchase option and monetary facts remain intact.
@@ -143,8 +147,12 @@ for (const locale of ["en", "th", "zh-CN"] as const) {
       await route.fulfill({ response, json: payload });
     });
     await page.reload();
-    const unknown = { en: "total unknown", th: "ไม่ทราบจำนวนรวม", "zh-CN": "总数未知" }[locale]!;
-    await expect(page.locator("#products")).toContainText(unknown);
+    // The approved concise reveal removed daily-pill totals and matching-detail
+    // walls. Unknown metadata must not restore them or alter products/prices.
+    await expect(page.locator("#products .product-card")).toHaveCount(2);
+    await expect(page.locator("#products .product-card h3")).toHaveText(names);
+    await expect(page.getByTestId("reveal-product-price")).toHaveText(prices);
+    await expect(page.getByTestId("matching-advice-details")).toHaveCount(0);
     await expect(preferences).toHaveCount(0);
     expect(unknownResponses).toBeGreaterThan(0);
     await expect(page.getByTestId("matching-option")).toHaveCount(0);
