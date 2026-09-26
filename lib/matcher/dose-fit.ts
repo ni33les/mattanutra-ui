@@ -107,6 +107,12 @@ function compileSubject(request: CanonicalRequest, subjectId: string) {
   const scale = zeroScale?.units;
   return { requested, target, ranges, dietary, referenceRows, reference, scale, bounds: limitsFor(request, subjectId), losses: new Map<Fraction, Map<bigint, ReturnType<typeof subjectLoss>>>() };
 }
+function subjectInputs(request: CanonicalRequest, subjectId: string) {
+  request = sharedInputs.get(request) ?? request;
+  let compiled = subjectCache.get(request); if (!compiled) { compiled = new Map(); subjectCache.set(request, compiled); }
+  let value = compiled.get(subjectId); if (!value) { value = compileSubject(request, subjectId); compiled.set(subjectId, value); } return value;
+}
+
 /** Request-local exact endpoint terms. Different baskets commonly supply the
  * same amount of one nutrient; profile weights and uncertain endpoints stay isolated. */
 function subjectLoss(input: { target: CanonicalRequest["targets"][number] | undefined; ranges: ReturnType<typeof rangeOffsets>; dietary: ReturnType<typeof rangeOffsets>; reference: bigint; scale: bigint | undefined; bounds: readonly Limit[] }, known: bigint, weight: Fraction) {
@@ -206,12 +212,8 @@ function calculateDoseFit(request: CanonicalRequest, exposure: ReadonlyMap<strin
   if (!requested) { requested = new Set([...(request.dietaryIntake ?? []).map(row => row.subjectId), ...request.targets.map(row => row.subjectId)].sort()); requestedSubjects.set(request, requested); }
   const subjects = fixed ?? (materialize ? [...new Set([...exposure.keys(), ...requested])].sort()
     : [...requested, ...exposure.keys()].filter((id, index) => index < requested.size || !requested.has(id)));
-  const source = sharedInputs.get(request) ?? request;
-  let compiledSubjects = subjectCache.get(source);
-  if (!compiledSubjects) { compiledSubjects = new Map(); subjectCache.set(source, compiledSubjects); }
   for (const subjectId of subjects) {
-    let compiled = compiledSubjects.get(subjectId);
-    if (!compiled) { compiled = compileSubject(source, subjectId); compiledSubjects.set(subjectId, compiled); }
+    const compiled = subjectInputs(request, subjectId);
     const { target, dietary, referenceRows, reference, bounds } = compiled;
     if (!target && reference === BigInt(0) && bounds.length === 0) continue;
     const known = exposure.get(subjectId) ?? BigInt(0);
