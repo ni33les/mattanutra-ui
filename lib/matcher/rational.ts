@@ -23,7 +23,8 @@ export const subtract = (a: Rational, b: Rational): Rational => b.num === BigInt
 export const multiply = (a: Rational, b: Rational): Rational => a.num === BigInt(0) || b.num === BigInt(0) ? ZERO : a.num === a.den ? b : b.num === b.den ? a : rational(a.num * b.num, a.den * b.den);
 export const divide = (a: Rational, b: Rational): Rational => b.num !== BigInt(0) && b.num === b.den ? a : rational(a.num * b.den, a.den * b.num);
 export function compare(a: Rational, b: Rational): number {
-  const delta = a.num * b.den - b.num * a.den;
+  if (a === b) return 0;
+  const delta = a.den === b.den ? a.num - b.num : a.num * b.den - b.num * a.den;
   return delta < BigInt(0) ? -1 : delta > BigInt(0) ? 1 : 0;
 }
 export const abs = (value: Rational): Rational => value.num < BigInt(0) ? rational(-value.num, value.den) : value;
