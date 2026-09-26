@@ -21,6 +21,19 @@ mock.module('../../lib/matcher/rational.ts', { namedExports: { ...fractions, lin
 const { request } = await import('../matcher/flexible-v5-fixtures.ts');
 const { doseFitScore, numericalDoseFitScore, exactDoseFit, compareDoseFit, weightedDoseFitScore, numericalWeightedDoseFitScore } = await import('../../lib/matcher/dose-fit.ts');
 
+test('PERF-CPU-49 recurring small integer measurements share bounded immutable exact values', () => {
+  for (const value of [0, 1, 2, 3, 8, 16, 32, 64]) {
+    const first = fractions.fromDecimal(value), repeated = fractions.fromDecimal(value);
+    assert.deepEqual(first, { num: BigInt(value), den: 1n });
+    assert.ok(Object.isFrozen(first));
+    assert.strictEqual(repeated, first, `Repeated integer ${value} needs no new exact-value object`);
+  }
+  for (const value of [-65, -1, 65, 10000, Number.MAX_SAFE_INTEGER]) assert.deepEqual(fractions.fromDecimal(value), { num: BigInt(value), den: 1n });
+  assert.deepEqual(fractions.fromDecimal(0.6), { num: 3n, den: 5n });
+  assert.deepEqual(fractions.fromDecimal('9007199254740993'), { num: 9007199254740993n, den: 1n });
+  for (const value of [NaN, Infinity, -Infinity]) assert.throws(() => fractions.fromDecimal(value), /finite/);
+});
+
 test('PERF-CPU-33 numerical preference denominators compile once across basket evaluations', async () => {
   const { scorePracticalPenalties } = await import('../../lib/matcher/practical-scoring.ts');
   const input = request({ maxDailyPills: 7.75, maxProductCount: 37, maxPriceMinor: 123457 });

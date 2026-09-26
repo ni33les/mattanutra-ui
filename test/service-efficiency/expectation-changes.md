@@ -310,3 +310,5 @@ work still takes the tested conditional retirement path.
 - PERF-CPU-48 nutrient lower-bound experiment withdrawn: independent proof, invalid-input handling and exact frozen outputs passed, but total CPU remained unchanged. Avoid retaining extra comparison branches without a timing benefit. Evidence remains external.
 
 - PERF-MEM-02 completed-cache eviction withdrawn: it reduced heap but slowed seven of eight trials. The initial candidate test overclaimed empty-seed identity (seeds were never interned); its corrected nonempty identity prerequisite and full recovery assertions passed. Preserve original failed execution, corrected GREEN, patch and timings externally; no cache lifetime policy changes remain.
+
+- PERF-CPU-49: repeated small integer measurements should share immutable exact constants under a fixed 65-value allocation bound. Negative, larger and fractional quantities still follow exact arithmetic without any dosage restriction. RED allocates another object for 2; all original numeric assertions remain.
