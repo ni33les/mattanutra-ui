@@ -956,9 +956,9 @@ export async function runAdmittedPlanOperation(input: Readonly<{
   if (existingWork) return existingWork;
   const operation = await input.store.getPlanOperation(input.operationId, { includeCursor: false });
   if (!operation) return businessError({ reasonCode: "not_found", message: "Matching operation not found." });
-  if (operationDeadlineRemaining(operation) === 0 && await expirePlanOperation(input.store, operation.id, new Date().toISOString())) return planOperationDeadlineError();
   if (operation.status === "complete") return operation.response as PlanToolSuccess;
   if (operation.status === "cancelled" || operation.status === "failed") return (operation.error as AgenticErrorResult | null) ?? businessError({ reasonCode: "stale_revision", message: "This matching operation is no longer active. Reload the plan." });
+  if (operationDeadlineRemaining(operation) === 0 && await expirePlanOperation(input.store, operation.id, new Date().toISOString())) return planOperationDeadlineError();
   const claim = await claimPlanOperation(input.store, operation.id, nextTestUuid(), new Date().toISOString());
   if (!claim) return operationProcessingResponse(operation);
   const controller = new AbortController();

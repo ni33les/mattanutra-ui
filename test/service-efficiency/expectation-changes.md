@@ -288,3 +288,11 @@ addition path. All three behavioural life-stage/stack cases, including exact
   bookkeeping is measured separately. Three D3 diagnostic trials remain above
   one second (1.71–1.97 s); neither later bookkeeping nor polling intervals are
   used to hide the failed gate. No deployment is authorized by this evidence.
+
+The a386a737 focused run passed all 253 executed cases but failed reconciliation:
+refinement-consistency had five additional nested validation cases missing from
+its reviewed count (16, not 11). The inventory now includes them; preserve that
+failed proof and replace the whole file's execution. PERF-LOCK-41 is strengthened
+to use an already-expired completed receipt, exposing a second redundant cleanup
+write. Terminal status is now returned before considering expiry; active overdue
+work still takes the tested conditional retirement path.
