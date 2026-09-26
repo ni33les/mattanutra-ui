@@ -244,7 +244,11 @@ function compileVariantBasis(input: Readonly<{ product: MatcherProduct; request:
     }
   }
 
-  return { amountPerUnit, unknownSubjectIds, unknown };
+  const declaredTarget = unknown && input.request.targets.some(row => input.product.contributionSubjectIds.includes(row.subjectId) || unknownSubjectIds.includes(row.subjectId)) &&
+    (!input.product.administration || input.product.administration.route === "oral" || input.product.administration.route === "unknown");
+  const relevant = amountPerUnit.size > 0 || declaredTarget || input.request.retainProductIds.includes(input.product.productId) ||
+    Boolean(input.request.productDoses?.some(row => row.productId === input.product.productId));
+  return { amountPerUnit, unknownSubjectIds, unknown, relevant };
 }
 function variantBasisFor(input: Readonly<{ product: MatcherProduct; request: CanonicalRequest }>) {
   let cache = variantBasis.get(input.request); if (!cache) { cache = new WeakMap(); variantBasis.set(input.request, cache); }
@@ -261,14 +265,10 @@ export function compileVariant(input: Readonly<{
 }>): DoseVariant | null {
   const ratio = input.dailyUnitsRatio ?? ratioForSupportedServings(input.product, input.dailyUnits);
   if (!ratio) return null;
-  const { amountPerUnit, unknownSubjectIds, unknown } = variantBasisFor(input);
-
+  const { amountPerUnit, unknownSubjectIds, unknown, relevant } = variantBasisFor(input);
+  if (!relevant && input.request.retainSubjectIds.length === 0) return null;
   const safetyExposure = labelledSafetyExposure(input.product, input.dailyUnits, input.request, ratio);
-  const declaredTarget = unknown && input.request.targets.some(row => input.product.contributionSubjectIds.includes(row.subjectId) || unknownSubjectIds.includes(row.subjectId)) &&
-    (!input.product.administration || input.product.administration.route === "oral" || input.product.administration.route === "unknown");
-  if (amountPerUnit.size < 1 && !declaredTarget && !input.request.retainProductIds.includes(input.product.productId) &&
-    !input.request.productDoses?.some(row => row.productId === input.product.productId) &&
-    !input.request.retainSubjectIds.some((id) => (safetyExposure.get(id)?.units ?? BigInt(0)) > BigInt(0))) {
+  if (!relevant && !input.request.retainSubjectIds.some((id) => (safetyExposure.get(id)?.units ?? BigInt(0)) > BigInt(0))) {
     return null;
   }
 
@@ -397,6 +397,9 @@ function compileProductGroupFresh(
     return null;
   }
 
+  // A quantity cannot make an unrelated fact become a requested contribution.
+  // Retained subjects still require quantified label checks at each quantity.
+  if (!variantBasisFor({ product, request }).relevant && request.retainSubjectIds.length === 0) return null;
   const variants: DoseVariant[] = [];
   for (const ratio of supportedDoseDomain(product, request)) {
     const dailyUnits = Number(ratio.num) / Number(ratio.den);
