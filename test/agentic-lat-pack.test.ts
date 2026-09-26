@@ -28,7 +28,7 @@ import {
 } from "./agentic/det-v3/harness.ts";
 import { DET_V3_CLOCK } from "./agentic/det-v3/manifest.ts";
 
-import { LIVE_ORIGIN as ORIGIN, LIVE_PUBLIC as PUBLIC } from "./helpers/live-mcp.ts";
+import { LIVE_ORIGIN as ORIGIN, LIVE_PUBLIC as PUBLIC, liveStructured } from "./helpers/live-mcp.ts";
 const MIXED_ACCEPT = "application/json, text/event-stream";
 const LIST_BODY = JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list" });
 const INFO_BODY = JSON.stringify({
@@ -167,6 +167,10 @@ async function concurrentPlanSamples(
       );
       samples.push(result.totalMs);
       assert.equal(result.status, 200, result.text.slice(0, 300));
+      const admitted = liveStructured(result.payload);
+      assert.equal(admitted.ok, true, JSON.stringify(admitted));
+      assert.equal(typeof admitted.planHandle, "string", "LAT samples require accepted plan work, not HTTP-200 tool errors");
+      assert.ok(["processing", "ready", "needs_input", "no_purchase"].includes(String(admitted.status)), JSON.stringify(admitted));
     }
   }
   await Promise.all(Array.from({ length: workers }, () => worker()));
@@ -223,6 +227,9 @@ describe("LAT transport contract", () => {
     const plan = await timedPost(ORIGIN, MIXED_ACCEPT, planBody("lat-001-plan-00000001"), {
       "x-request-id": "lat-001-plan"
     });
+    assert.equal(liveStructured(info.payload).ok, true, JSON.stringify(info.payload));
+    assert.equal(liveStructured(plan.payload).ok, true, JSON.stringify(plan.payload));
+    assert.equal(typeof liveStructured(plan.payload).planHandle, "string");
     const infoStage = classifyCompletion({ ...info, accept: MIXED_ACCEPT });
     const planStage = classifyCompletion({ ...plan, accept: MIXED_ACCEPT });
     assert.notEqual(infoStage.code, "LAT_STAGE_UNOBSERVABLE");
