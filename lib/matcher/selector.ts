@@ -388,19 +388,3 @@ export function selectOptions(input: Readonly<{ baskets: readonly ScoredBasket[]
   });
   return { selected: mapped.find(row => row.recommended)!, alternatives: mapped.filter(row => !row.recommended) };
 }
-
-export function groupProduct(
-  groups: readonly ProductGroup[],
-  productId: string
-) {
-  return groups.find((item) => item.productId === productId)?.product ?? null;
-}
-
-export function selectedProducts(
-  groups: readonly ProductGroup[],
-  basket: ScoredBasket
-) {
-  return basket.productIds
-    .map((productId) => groupProduct(groups, productId))
-    .filter((item): item is NonNullable<typeof item> => Boolean(item));
-}

@@ -285,22 +285,6 @@ export function addScaled(
   return { dim: left.dim, subjectId: left.subjectId, units };
 }
 
-export function compareScaled(left: ScaledAmount, right: ScaledAmount) {
-  if (left.dim !== right.dim) {
-    return null;
-  }
-
-  if (left.units < right.units) {
-    return -1;
-  }
-
-  if (left.units > right.units) {
-    return 1;
-  }
-
-  return 0;
-}
-
 export function minUnits(left: bigint, right: bigint) {
   return left < right ? left : right;
 }
@@ -398,13 +382,6 @@ export function aggregateDailyExposure(input: Readonly<{
 
   const unknownSubjectIds = [...new Set(input.variants.flatMap(variant => variant.unknownSubjectIds ?? []))].sort();
   return { provenance, totals, ...(unknownSubjectIds.length ? { unknownSubjectIds } : {}) };
-}
-
-export function unitsOrZero(
-  totals: ReadonlyMap<string, ScaledAmount>,
-  subjectId: string
-) {
-  return totals.get(subjectId)?.units ?? BigInt(0);
 }
 
 export function isDoseError(value: unknown): value is DoseError {

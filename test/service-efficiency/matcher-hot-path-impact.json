@@ -5,8 +5,8 @@
   "files": [
     {
       "file": "test/service-efficiency/numeric-scoring.test.ts",
-      "expectedCases": 38,
-      "reason": "Exact internal records, serving lower bounds, immutable quantity/intake/exposure reuse and complete public materialization without search changes"
+      "expectedCases": 42,
+      "reason": "Exact internal records, serving lower bounds, immutable quantity/intake/exposure reuse and complete public materialization without search changes; PERF-CPU-26\u201328 and 30: one quantity-group lookup, normalized endpoint components, exact identity/common-denominator comparison and canonical unit parsing"
     },
     {
       "file": "test/service-efficiency/immutable-references.test.ts",
@@ -107,6 +107,26 @@
       "file": "test/service-efficiency/reference-browser.test.ts",
       "expectedCases": 1,
       "reason": "Shared matcher bundles without Node-only browser imports"
+    },
+    {
+      "file": "test/matcher/experiment-scoring.test.ts",
+      "expectedCases": 19,
+      "reason": "Direct shared rational consumers preserve exact non-linear arithmetic without repeating the offline matrix"
+    },
+    {
+      "file": "test/matcher/stack-life-stage-ul-flows.test.ts",
+      "expectedCases": 4,
+      "reason": "Removing uncalled veto helpers must preserve factual age/reference advice and nonblocking purchase"
+    },
+    {
+      "file": "test/matcher/advisory-v6-preferences.test.ts",
+      "expectedCases": 8,
+      "reason": "Advisory numerical preferences, missing measurements and categorical eligibility remain effective"
+    },
+    {
+      "file": "test/agentic-matching.test.ts",
+      "expectedCases": 7,
+      "reason": "Actual MCP matching preserves source choices, retailer isolation and product eligibility"
     }
   ],
   "exclusions": "No full application/MCP, live database, payment or unrelated browser suites; no contract or scoring-policy changes."

@@ -5,7 +5,7 @@ import { doseFitScore, knownLimitProfile } from "@/lib/matcher/dose-fit";
 import { canonicalNutrientKey, normalizeProductFactKey, productKeysMatch } from "@/lib/product-key-matching";
 import { nutrientNameMatchesTarget } from "@/lib/nutrient-identity";
 import { isDoseError, scaleAmount, multiplyScaled, numberToRational } from "@/lib/matcher/dose";
-import { catalogSubjectHasCeiling, matcherSafetyCeilingsUnavailable, safetyCeilingFor } from "@/lib/matcher/safety-ceilings";
+import { matcherSafetyCeilingsUnavailable } from "@/lib/matcher/safety-ceilings";
 import type {
   CanonicalRequest,
   DoseVariant,
@@ -49,14 +49,6 @@ function unitOf(request: CanonicalRequest, subjectId: string | null) {
     request.safetyCeilings?.find((item) => item.subjectId === subjectId)?.maxUnit ??
     null
   );
-}
-
-export function exposureExceedsCeiling(
-  request: CanonicalRequest,
-  subjectId: string,
-  exposureUnits: bigint
-) {
-  return stackUnitsViolateCeiling(request, subjectId, nameOf(request, subjectId), exposureUnits);
 }
 
 type ResolvedLabelledFact = Readonly<{
@@ -165,107 +157,6 @@ export function labelledSafetyExposure(
   }
 
   return exposure;
-}
-
-export function stackUnitsViolateCeiling(
-  request: CanonicalRequest,
-  subjectId: string,
-  name: string,
-  exposureUnits: bigint
-) {
-  if (exposureUnits <= BigInt(0)) {
-    return false;
-  }
-
-  const ceiling = safetyCeilingFor(request.safetyCeilings ?? [], {
-    name,
-    profile: request.profile,
-    subjectId
-  });
-
-  if (ceiling) {
-    const threshold = scaleAmount({
-      amount: ceiling.maxAmount,
-      subjectId,
-      subjectName: ceiling.name || name || subjectId,
-      unit: ceiling.maxUnit
-    });
-
-    if (isDoseError(threshold)) {
-      return true;
-    }
-
-    return exposureUnits > threshold.units;
-  }
-
-  return catalogSubjectHasCeiling(request.safetyCeilings ?? [], {
-    name,
-    subjectId
-  });
-}
-
-export function exposureOvershootsTarget(
-  request: CanonicalRequest,
-  subjectId: string,
-  exposureUnits: bigint
-) {
-  const target = request.targets.find((item) => item.subjectId === subjectId);
-
-  if (!target || target.requested.units <= BigInt(0)) {
-    return false;
-  }
-
-  return (
-    exposureUnits > target.requested.units
-  );
-}
-
-export function variantDedicatedOvershoot(
-  request: CanonicalRequest,
-  contributions: DoseVariant["contributions"],
-  dailyUnits = 1
-) {
-  if (dailyUnits > 1) {
-    return false;
-  }
-
-  const contributing = request.targets.filter(
-    (target) => (contributions.get(target.subjectId)?.units ?? BigInt(0)) > BigInt(0)
-  );
-
-  if (contributing.length !== 1) {
-    return false;
-  }
-
-  const target = contributing[0]!;
-  const units = contributions.get(target.subjectId)?.units ?? BigInt(0);
-
-  if (!exposureOvershootsTarget(request, target.subjectId, units)) {
-    return false;
-  }
-
-  const ceiling = safetyCeilingFor(request.safetyCeilings ?? [], {
-    name: target.name,
-    profile: request.profile,
-    subjectId: target.subjectId
-  });
-
-  if (!ceiling) {
-    return true;
-  }
-
-  const scaled = scaleAmount({
-    amount: ceiling.maxAmount,
-    subjectId: target.subjectId,
-    subjectName: ceiling.name || target.name,
-    unit: ceiling.maxUnit
-  });
-
-  if ("reason" in scaled || units < scaled.units) {
-    return false;
-  }
-
-  return units * BigInt(100) > target.requested.units * BigInt(250);
 }
 
 export function evaluateSafety(input: Readonly<{

@@ -53,23 +53,6 @@ export function isDeferredConditional(target: CanonicalRequest["targets"][number
   );
 }
 
-export function remainingRequestedUnits(
-  request: CanonicalRequest,
-  subjectId: string
-) {
-  const target = request.targets.find((item) => item.subjectId === subjectId);
-
-  if (!target || isDeferredConditional(target)) {
-    return BigInt(0);
-  }
-
-  const current = knownCurrentTargetExposure(request, target);
-
-  return target.requested.units > current
-    ? target.requested.units - current
-    : BigInt(0);
-}
-
 function subjectKeyVariants(value: string) {
   const trimmed = value.trim();
 

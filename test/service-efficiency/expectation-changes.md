@@ -228,3 +228,24 @@ affected dose, quantity, reference, recovery and MCP weight consumers. The main
 inventory's checkpoint count is corrected from four to five to include the
 already-maintained PERF-CKPT-02; no case is skipped. Frozen whole-result hashes,
 attempt counts and native terminal timings remain separate release conditions.
+
+### Repeated numerical work and unused helpers
+
+PERF-CPU-26–28 and 30 cover one quantity-group lookup per candidate, reuse of
+normalized endpoint components, exact identity/common-denominator comparison,
+and canonical units bypassing the alias parser. Complete display values,
+wide-integer ordering, uncertain endpoints and independently weighted safety
+penalties retain their existing assertions. PERF-CPU-29's additional aggregate
+record sharing was withdrawn because all D3 trials became slower; its test,
+implementation, RED/GREEN evidence and withdrawal receipt remain in history.
+
+Repository-wide caller review found no consumers of remainingRequestedUnits,
+compareScaled, unitsOrZero, paretoPrune, groupProduct, selectedProducts or the
+old exposureExceedsCeiling/stackUnitsViolateCeiling/variantDedicatedOvershoot
+veto chain. Remove these orphan implementations, not the active factual safety
+evaluator. No historical case or active safety assertion is removed. Direct
+advisory, life-stage, rational and MCP consumers join the reviewed inventory.
+
+One canonical-unit benchmark overlapped a source census. Its semantic hashes
+remain useful, but its timing is explicitly excluded; the bounded final-source
+measurement replaces timing only. This is not a discarded functional failure.

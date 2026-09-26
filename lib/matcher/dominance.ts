@@ -169,19 +169,6 @@ export function dominatesAtLayer(
   return strict;
 }
 
-export function paretoPrune(
-  states: readonly SearchState[],
-  request: CanonicalRequest
-) {
-  return states.filter(
-    (candidate, index) =>
-      !states.some(
-        (other, otherIndex) =>
-          otherIndex !== index && dominatesAtLayer(other, candidate, request)
-      )
-  );
-}
-
 export function fingerprintState(state: SearchState) {
   return [
     state.nextGroupIndex,
