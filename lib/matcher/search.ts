@@ -34,9 +34,7 @@ export type SearchRun = Readonly<{
   trimmed: boolean;
 }>;
 
-function cloneMap(source: ReadonlyMap<string, bigint>) {
-  return new Map(source);
-}
+const variantMeasurements = new WeakMap<DoseVariant, { product: ProductGroup["product"]; burden: ReturnType<typeof multiply>; monthly: number | null; uncertain: number }>();
 
 export function seedState(request: CanonicalRequest): SearchState {
   const exposure = new Map<string, bigint>();
@@ -90,11 +88,17 @@ export function tryAddVariant(
   // Checkout acquires one pack per selected product. Daily servings affect
   // depletion and replenishment, not the number of packs in this order.
   const price = state.price + group.product.unitPriceMinor;
-  const excessServings = positive(subtract(variant.dailyUnitsRatio ?? fromDecimal(variant.dailyUnits), fromDecimal(1)));
-  const monthly = monthlyGoodsPrice(group.product, variant.dailyUnits, variant.dailyUnitsRatio);
+  let measured = variantMeasurements.get(variant);
+  if (measured?.product !== group.product) {
+    const excess = positive(subtract(variant.dailyUnitsRatio ?? fromDecimal(variant.dailyUnits), fromDecimal(1)));
+    measured = { product: group.product, burden: multiply(excess, excess),
+      monthly: monthlyGoodsPrice(group.product, variant.dailyUnits, variant.dailyUnitsRatio), uncertain: Number(!administrationBasisKnown(group.product)) };
+    variantMeasurements.set(variant, measured);
+  }
+  const monthly = measured.monthly;
 
-  const delivered = cloneMap(state.delivered);
-  const exposure = cloneMap(state.exposure);
+  const delivered = new Map(state.delivered);
+  const exposure = new Map(state.exposure);
   const safetyExposure =
     variant.safetyExposure ??
     labelledSafetyExposure(group.product, variant.dailyUnits, request);
@@ -117,8 +121,8 @@ export function tryAddVariant(
 
   return {
     routineServings: [...(state.routineServings ?? []), variant.dailyUnits],
-    servingBurden: add(state.servingBurden ?? ZERO, multiply(excessServings, excessServings)),
-    uncertainAdministrationCount: (state.uncertainAdministrationCount ?? state.count) + Number(!administrationBasisKnown(group.product)),
+    servingBurden: add(state.servingBurden ?? ZERO, measured.burden),
+    uncertainAdministrationCount: (state.uncertainAdministrationCount ?? state.count) + measured.uncertain,
     monthlyPriceMinor: state.monthlyPriceMinor === null || monthly === null ? null : (state.monthlyPriceMinor ?? 0) + monthly,
     monthlyPriceLowerBound: (state.monthlyPriceLowerBound ?? 0) + (monthly ?? 0),
     count,
