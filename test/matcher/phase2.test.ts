@@ -235,21 +235,18 @@ function emptySafety() {
   return { findings: [], hardBlocked: false, requiresAck: false };
 }
 
-function scored(overrides: Partial<ScoredBasket> & { productIds: readonly string[] }): ScoredBasket {
+function scored(overrides: Partial<ScoredBasket> & { productIds: readonly string[]; oversupplyScore?: number }): ScoredBasket {
   return {
     aggregateCoverage: 10_000,
     coverageBySubject: new Map(),
     coveredCount: 5,
     dailyPills: 4,
-    dedicatedPartialCount: 0,
     exposure: { provenance: [], totals: new Map() },
     incidentalCount: 0,
-    oversupplyScore: 0,
     priceMinor: 65000,
     productCount: overrides.productIds.length,
     reason: "",
     requestedLabelCount: 0,
-    titleExactCount: 0,
     safety: emptySafety(),
     sellerId: "seller_th",
     variantIds: [],

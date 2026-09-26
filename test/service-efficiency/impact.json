@@ -607,8 +607,8 @@
     },
     {
       "file": "test/service-efficiency/selector-facts.test.ts",
-      "expectedCases": 2,
-      "reason": "PERF-CPU-35: exact incidental facts and request-isolated target resolution without per-label repeated lookups"
+      "expectedCases": 3,
+      "reason": "PERF-CPU-35/46/53: exact incidental facts, immutable choice identities and removal of unused internal ranking calculations without changing active dose or coverage facts"
     },
     {
       "file": "test/sha256.test.ts",

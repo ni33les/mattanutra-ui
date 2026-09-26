@@ -1,11 +1,10 @@
 import { coverageSummary } from "@/lib/matcher/coverage";
 import { compareDoseFit, doseFitScore, withProductUncertainty } from "@/lib/matcher/dose-fit";
 import { COVERED_THRESHOLD, DEFAULT_MATCHER_CONFIG } from "@/lib/matcher/config";
-import { contributionFor, productIsDedicatedForTarget } from "@/lib/matcher/candidates";
+import { contributionFor } from "@/lib/matcher/candidates";
 import {
   aggregateCoverage,
-  targetCoverageUnits,
-  oversupplyScore
+  targetCoverageUnits
 } from "@/lib/matcher/dominance";
 import { revalidateState } from "@/lib/matcher/search";
 import { minUnits } from "@/lib/matcher/dose";
@@ -54,58 +53,9 @@ function coveredTargetCount(
   ).length;
 }
 
-function titleExactCountFor(products: readonly MatcherProduct[], request: CanonicalRequest) {
-  const normalize = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
-  return products.filter(product => {
-    const title = normalize(product.title);
-    return title.length >= 2 && request.targets.some(target => title === normalize(target.name));
-  }).length;
-}
-
 function requestedLabelCountFor(products: readonly MatcherProduct[], request: CanonicalRequest) {
   return products.reduce((count, product) => count + request.targets.filter(target =>
     contributionFor(product, target.name, target.subjectId).length > 0).length, 0);
-}
-
-function dedicatedPartialCountFor(
-  products: readonly MatcherProduct[],
-  request: CanonicalRequest,
-  coverageBySubject: ReadonlyMap<string, number>
-) {
-  let count = 0;
-
-  for (const target of request.targets) {
-    if ((coverageBySubject.get(target.subjectId) ?? 0) >= COVERED_THRESHOLD * 100) {
-      continue;
-    }
-
-    const hasDedicated = products.some((product) => {
-
-      if (
-        /\bjoint\b/i.test(product.title) ||
-        /\b50\+|multivitamins for 50/i.test(product.title) ||
-        /\bextract\b|\bbacopa\b|\bturmeric\b/i.test(product.title)
-      ) {
-        return false;
-      }
-
-      if (productIsDedicatedForTarget(product, target)) {
-        return true;
-      }
-
-      const hits = request.targets.filter(
-        (item) => contributionFor(product, item.name, item.subjectId).length > 0
-      );
-
-      return hits.length === 1 && hits[0]?.subjectId === target.subjectId;
-    });
-
-    if (hasDedicated) {
-      count += 1;
-    }
-  }
-
-  return count;
 }
 
 export function scoreState(input: Readonly<{
@@ -138,24 +88,14 @@ export function scoreState(input: Readonly<{
     coveredCount: coveredTargetCount(input.request, coverageBySubject),
     dailyPills: input.state.pills,
     pillCountKnown: input.state.pillCountKnown !== false && selectedGroups.every(group => group.product.pillCountKnown !== false),
-    dedicatedPartialCount: dedicatedPartialCountFor(
-      products,
-      input.request,
-      coverageBySubject
-    ),
     exposure: validated.exposure,
     incidentalCount: incidentalNutrientCount(products, input.request),
-    oversupplyScore: oversupplyScore(input.request, input.state.exposure),
     doseFit: withProductUncertainty(doseFitScore(input.request, input.state.exposure), validated.exposure.unknownSubjectIds),
     overallScore: searchStateScore(input.request, input.state),
     priceMinor: input.state.price,
     productCount: input.state.count,
     productIds,
     reason: selectedReason(input.request),
-    titleExactCount: titleExactCountFor(
-      products,
-      input.request
-    ),
     requestedLabelCount: requestedLabelCountFor(
       products,
       input.request

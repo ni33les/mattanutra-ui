@@ -27,22 +27,19 @@ function emptySafety() {
 }
 
 function scored(
-  overrides: Partial<ScoredBasket> & { productIds: readonly string[] }
+  overrides: Partial<ScoredBasket> & { productIds: readonly string[]; dedicatedPartialCount?: number }
 ): ScoredBasket {
   return {
     aggregateCoverage: 10_000,
     coverageBySubject: new Map(),
     coveredCount: 3,
     dailyPills: 4,
-    dedicatedPartialCount: 0,
     exposure: { provenance: [], totals: new Map() },
     incidentalCount: 0,
-    oversupplyScore: 0,
     priceMinor: 65000,
     productCount: overrides.productIds.length,
     reason: "",
     requestedLabelCount: 0,
-    titleExactCount: 0,
     safety: emptySafety(),
     sellerId: "seller_th",
     variantIds: [],

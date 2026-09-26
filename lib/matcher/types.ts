@@ -348,13 +348,11 @@ export type ScoredBasket = Readonly<{
   coveredCount: number;
   dailyPills: number;
   pillCountKnown?: boolean;
-  dedicatedPartialCount: number;
   exposure: Exposure;
   incidentalCount: number;
   optionRole?: ValueOptionRole;
   roles?: readonly ConversationalOptionRole[];
   purchaseEligible?: boolean;
-  oversupplyScore: number;
   doseFit?: DoseFitScore;
   overallScore?: import("@/lib/matcher/practical-scoring").OverallMatchingScore;
   priceMinor: number;
@@ -363,7 +361,6 @@ export type ScoredBasket = Readonly<{
   recommended?: boolean;
   reason: string;
   requestedLabelCount: number;
-  titleExactCount: number;
   safety: SafetyResult;
   sellerId: string;
   variantIds: readonly string[];
