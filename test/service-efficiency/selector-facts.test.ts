@@ -9,6 +9,18 @@ const { request, product, catalog } = await import('../matcher/flexible-v5-fixtu
 const { seedState, tryAddVariant } = await import('../../lib/matcher/search.ts');
 const { scoreState, materiallyDifferent } = await import('../../lib/matcher/selector.ts');
 
+test('PERF-CPU-53 scored baskets omit unused ranking counters while retaining active dose and coverage facts', () => {
+  const input = request(), groups = candidates.compileGroups(input, catalog([product('partial', { a: 5 })]));
+  const variant = groups[0].variants.find(row => row.dailyUnits === 1); assert.ok(variant);
+  const state = tryAddVariant(seedState(input), variant, groups[0], input); assert.ok(state);
+  const score = scoreState({ groups, request: input, sellerId: 'seller', state }); assert.ok(score);
+  assert.equal(score.coverageSummary?.[0].coveragePercent, 5);
+  assert.equal(score.coverageSummary?.[0].remainingGap, 95);
+  assert.equal(score.doseFit?.under, 0.95);
+  assert.equal(score.priceMinor, 100); assert.equal(score.dailyPills, 1);
+  for (const field of ['dedicatedPartialCount', 'titleExactCount', 'oversupplyScore']) assert.equal(Object.hasOwn(score, field), false, `${field} has no production reader and must not add calculation or serialization work`);
+});
+
 test('PERF-CPU-46 repeated choice comparisons reuse immutable product-dose identities', () => {
   const input = request(), groups = candidates.compileGroups(input, catalog([product('choice', { a: 50 })]));
   const scores = [1, 2].map(units => {
