@@ -39,7 +39,7 @@
         },
         {
           "file": "test/service-efficiency/operations.integration.test.ts",
-          "name": "EFF-TXN-PG-01 claiming work returns its input in at most two database statements"
+          "name": "EFF-TXN-PG-01 claiming work returns its input in one database statement"
         },
         {
           "file": "test/service-efficiency/operations.integration.test.ts",
@@ -86,7 +86,7 @@
       "cases": [
         {
           "file": "test/service-efficiency/operations.integration.test.ts",
-          "name": "EFF-TXN-PG-01 claiming work returns its input in at most two database statements"
+          "name": "EFF-TXN-PG-01 claiming work returns its input in one database statement"
         },
         {
           "file": "test/service-efficiency/operations.integration.test.ts",
@@ -1281,7 +1281,7 @@
       "cases": [
         {
           "file": "test/service-efficiency/operations.integration.test.ts",
-          "name": "EFF-TXN-PG-01 claiming work returns its input in at most two database statements"
+          "name": "EFF-TXN-PG-01 claiming work returns its input in one database statement"
         },
         {
           "file": "test/service-efficiency/operations.integration.test.ts",

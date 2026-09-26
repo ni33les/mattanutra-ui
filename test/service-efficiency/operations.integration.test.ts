@@ -25,11 +25,18 @@ async function operation() {
 }
 const business = () => queries.filter(query => /^\s*(select|update)/i.test(query));
 
-test("EFF-TXN-PG-01 claiming work returns its input in at most two database statements", async () => {
+test("EFF-TXN-PG-01 claiming work returns its input in one database statement", async () => {
   const row = await operation(); queries.length = 0;
   const claimed = await claimPlanOperation(store, row.id, "owner", now); assert.ok(claimed);
   assert.deepEqual(claimed.command, row.command); assert.equal(claimed.version, 2);
-  assert.ok(business().length <= 2, `Claim used ${business().length} statements`);
+  assert.equal(business().length, 1, `Claim used ${business().length} statements`);
+  const before = await store.getPlanOperation(row.id);
+  assert.equal(await claimPlanOperation(store, row.id, "competing-owner", now), null);
+  assert.deepEqual(await store.getPlanOperation(row.id), before, 'A competing owner cannot rewrite or expire live work');
+  assert.equal(await claimPlanOperation(store, row.id, "late-owner", "2026-09-09T00:03:00Z"), null);
+  const expired = await store.getPlanOperation(row.id);
+  assert.equal(expired?.status, 'failed'); assert.equal(expired?.leaseToken, null);
+  assert.ok(expired?.error, 'An expired claim must retain the terminal failure explanation');
 });
 
 test("EFF-TXN-PG-02 checkpoint updates use one conditional write and preserve stale-owner fencing", async () => {
