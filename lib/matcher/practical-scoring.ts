@@ -267,13 +267,9 @@ export function compareSearchStateScores(request: CanonicalRequest, left: Search
   const actual = stateActuals.get(left);
   // All other loss terms are nonnegative. Only reuse a bound after the common
   // measurements have passed validation; an unassessed state takes the full path.
-  if (actual && measuredActuals.get(doseRequest.get(request) ?? request)?.values.has(actual)) {
-    const nutrient = request.scoring ? numericalWeightedDoseFitScore(request, left.exposure) : numericalDoseFitScore(doseRequest.get(request) ?? request, left.exposure);
-    if (compare(exactDoseFit(nutrient), score.exactTotal) > 0) return 1;
-    if (left.servingBurden) {
-      const weight = coefficients(score.profile).objectives.servings;
-      if (compare({ num: left.servingBurden.num * weight.num, den: left.servingBurden.den * weight.den }, score.exactTotal) > 0) return 1;
-    }
+  if (left.servingBurden && actual && measuredActuals.get(doseRequest.get(request) ?? request)?.values.has(actual)) {
+    const weight = coefficients(score.profile).objectives.servings;
+    if (compare({ num: left.servingBurden.num * weight.num, den: left.servingBurden.den * weight.den }, score.exactTotal) > 0) return 1;
   }
   return compareOverallScores(numericalSearchStateScore(request, left), score);
 }
