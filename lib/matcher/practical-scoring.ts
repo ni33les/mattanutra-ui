@@ -135,7 +135,7 @@ function coefficients(profile: Profile) {
 
 type PracticalRequest = Pick<CanonicalRequest, "currency" | "maxDailyPills" | "maxProductCount" | "maxPriceMinor"> & ProfileRequest;
 type PreferenceBases = readonly ({ target: Rational; scale: Rational } | null)[];
-const measuredActuals = new WeakMap<PracticalRequest, { values: WeakMap<PracticalActuals, ReturnType<typeof compileMeasurements>>; bases: PreferenceBases }>();
+const measuredActuals = new WeakMap<PracticalRequest, { values: Map<PracticalActuals, ReturnType<typeof compileMeasurements>>; bases: PreferenceBases }>();
 function compileMeasurements(request: PracticalRequest, actual: PracticalActuals, profile: Profile, bases: PreferenceBases) {
   const pills = measurement(actual.pillLowerBound, "pillLowerBound"), products = measurement(actual.productCount, "productCount", true);
   if (actual.dailyPills !== null) {
@@ -167,10 +167,10 @@ function measurementsFor(request: PracticalRequest, actual: PracticalActuals, pr
     const bases = FIELDS.map(field => source[field] == null ? null : {
       target: measurement(source[field], field, field !== "maxDailyPills"),
       scale: fromDecimal(source[field] > 0 ? source[field] : field === "maxPriceMinor" ? 10000 : 1) });
-    cache = { values: new WeakMap(), bases }; measuredActuals.set(source, cache);
+    cache = { values: new Map(), bases }; measuredActuals.set(source, cache);
   }
   let result = cache.values.get(actual);
-  if (!result) { result = compileMeasurements(request, actual, profile, cache.bases); cache.values.set(actual, result); }
+  if (!result) { result = compileMeasurements(request, actual, profile, cache.bases); if (cache.values.size >= 8192) cache.values.delete(cache.values.keys().next().value!); cache.values.set(actual, result); }
   return result;
 }
 /** Exact ranking estimate, with incomplete observations explicitly distinct from known zero. */
@@ -239,7 +239,7 @@ export function overallMatchingScore(request: CanonicalRequest, exposure: Readon
 }
 
 const stateActuals = new WeakMap<SearchState, PracticalActuals>();
-const stateScores = new WeakMap<CanonicalRequest, WeakMap<SearchState["exposure"], { state: SearchState; score: NumericalOverallScore }[]>>();
+const stateScores = new WeakMap<CanonicalRequest, Map<SearchState["exposure"], { state: SearchState; score: NumericalOverallScore }[]>>();
 function sameMeasurements(a: SearchState, b: SearchState) {
   return a.pills === b.pills && a.pillCountKnown === b.pillCountKnown && a.count === b.count && a.price === b.price &&
     a.uncertainAdministrationCount === b.uncertainAdministrationCount && a.monthlyPriceMinor === b.monthlyPriceMinor &&
@@ -261,9 +261,9 @@ export function numericalSearchStateScore(request: CanonicalRequest, state: Sear
       servings: state.routineServings ?? [], servingBurdenExact: state.servingBurden, uncertainProductCount: state.uncertainAdministrationCount ?? state.count,
       monthlyPriceMinor: state.monthlyPriceMinor, monthlyPriceLowerBound: state.monthlyPriceLowerBound }; stateActuals.set(state, actual); }
   const result = numericalOverallMatchingScore(request, state.exposure, actual);
-  let cache = stateScores.get(request); if (!cache) { cache = new WeakMap(); stateScores.set(request, cache); }
+  let cache = stateScores.get(request); if (!cache) { cache = new Map(); stateScores.set(request, cache); }
   let bucket = cache.get(state.exposure);
-  if (!bucket) { bucket = []; cache.set(state.exposure, bucket); }
+  if (!bucket) { bucket = []; if (cache.size >= 8192) cache.delete(cache.keys().next().value!); cache.set(state.exposure, bucket); }
   if (bucket.length >= 8) bucket.shift();
   bucket.push({ state, score: result });
   return result;

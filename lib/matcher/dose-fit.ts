@@ -15,8 +15,9 @@ const exactFacts = new WeakMap<DoseFitScore, NumericalDoseFitScore>();
 /** Frontier comparisons need deviations, not unit-converted display rows. */
 export function doseFitTargetDeviations(score: NumericalDoseFitScore | DoseFitScore) { return "deviations" in score ? score.deviations : exactFacts.get(score)?.deviations ?? score.perTarget; }
 const fixedWeights = new WeakMap<CanonicalRequest, number | null>();
-const scoreCache = new WeakMap<CanonicalRequest, WeakMap<object, NumericalDoseFitScore>>();
-const weightedCache = new WeakMap<CanonicalRequest, WeakMap<object, NumericalDoseFitScore>>();
+// One weak request boundary; bounded ordinary maps avoid per-basket GC chains.
+const scoreCache = new WeakMap<CanonicalRequest, Map<object, NumericalDoseFitScore>>();
+const weightedCache = new WeakMap<CanonicalRequest, Map<object, NumericalDoseFitScore>>();
 const sharedInputs = new WeakMap<CanonicalRequest, CanonicalRequest>();
 /** Only the internal profile copier calls this: all intake, target and reference
  * objects are shared immutable inputs, while weighted endpoint caches stay separate. */
@@ -176,10 +177,11 @@ export function numericalWeightedDoseFitScore(request: CanonicalRequest, exposur
     fixedWeights.set(request, uniform);
   }
   if (uniform !== null) {
-    let cache = weightedCache.get(request); if (!cache) { cache = new WeakMap(); weightedCache.set(request, cache); }
+    let cache = weightedCache.get(request); if (!cache) { cache = new Map(); weightedCache.set(request, cache); }
     const found = cache.get(exposure); if (found) return found;
     const base = numericalDoseFitScore(request, exposure);
     const score = { ...base, exact: add(multiply(exactWeights(settings).defaultWeight, base.fitting), base.safety) };
+    if (cache.size >= 8192) cache.delete(cache.keys().next().value!);
     cache.set(exposure, score); return score;
   }
   return calculateDoseFit(request, exposure, true);
@@ -189,7 +191,7 @@ function calculateDoseFit(request: CanonicalRequest, exposure: ReadonlyMap<strin
 function calculateDoseFit(request: CanonicalRequest, exposure: ReadonlyMap<string, bigint>, applyWeights: boolean, materialize = false): NumericalDoseFitScore | DoseFitScore {
   const memo = applyWeights ? weightedCache : scoreCache;
   let cache = memo.get(request);
-  if (!cache) { cache = new WeakMap(); memo.set(request, cache); }
+  if (!cache) { cache = new Map(); memo.set(request, cache); }
   const previous = cache.get(exposure);
   if (previous && !materialize) return previous;
   const fittingTerms: Fraction[] = [], safetyTerms: Fraction[] = [], intentTerms: Fraction[] = [];
@@ -269,6 +271,7 @@ function calculateDoseFit(request: CanonicalRequest, exposure: ReadonlyMap<strin
   const facts = { exact, fitting, safety: weighted, deviations };
   if (!materialize) {
     deviations.sort((a, b) => a.subjectId < b.subjectId ? -1 : a.subjectId > b.subjectId ? 1 : 0);
+    if (cache.size >= 8192) cache.delete(cache.keys().next().value!);
     cache.set(exposure, facts); return facts;
   }
   const [under, over, limit] = displayTerms!.map(sum);
