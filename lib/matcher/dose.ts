@@ -128,9 +128,12 @@ function iuMassNg(subjectName: string): bigint | null {
 }
 
 function normalizeUnit(unit: string): string {
-  const token = unit
-    .trim()
-    .toLowerCase()
+  const lower = unit.trim().toLowerCase();
+  switch (lower) {
+    case "g": case "mg": case "mcg": case "iu": case "cfu":
+    case "million_cfu": case "billion_cfu": case "ml": case "serving": return lower;
+  }
+  const token = lower
     .replace(/µ/g, "u")
     .replace(/μ/g, "u")
     .replace("µg", "mcg")
