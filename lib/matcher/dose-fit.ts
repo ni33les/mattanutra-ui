@@ -9,15 +9,11 @@ import type { CanonicalRequest, DoseDimension, DoseFitScore, MatcherUnit, Safety
 
 type Fraction = Readonly<{ num: bigint; den: bigint }>;
 const ZERO: Fraction = { num: BigInt(0), den: BigInt(1) };
+export type NumericalDoseFitScore = Pick<DoseFitScore, "total" | "under" | "over" | "limit" | "weightedLimit" | "version" | "limitWeight">;
 type TargetDeviation = Pick<DoseFitScore["perTarget"][number], "subjectId" | "under" | "over">;
-const exactFacts = Symbol("exact-dose-fit");
-type ExactFacts = { exact: Fraction; fitting: Fraction; safety: Fraction; deviations: readonly TargetDeviation[] };
-export type NumericalDoseFitScore = Pick<DoseFitScore, "total" | "under" | "over" | "limit" | "weightedLimit" | "version" | "limitWeight"> & { [exactFacts]?: ExactFacts };
-function retainExactFacts(score: NumericalDoseFitScore, facts: ExactFacts) {
-  Object.defineProperty(score, exactFacts, { value: facts });
-}
+const exactFacts = new WeakMap<NumericalDoseFitScore, { exact: Fraction; fitting: Fraction; safety: Fraction; deviations: readonly TargetDeviation[] }>();
 /** Frontier comparisons need deviations, not unit-converted display rows. */
-export function doseFitTargetDeviations(score: NumericalDoseFitScore) { return score[exactFacts]?.deviations ?? (score as DoseFitScore).perTarget; }
+export function doseFitTargetDeviations(score: NumericalDoseFitScore) { return exactFacts.get(score)?.deviations ?? (score as DoseFitScore).perTarget; }
 const fixedWeights = new WeakMap<CanonicalRequest, number | null>();
 const scoreCache = new WeakMap<CanonicalRequest, WeakMap<object, NumericalDoseFitScore>>();
 const weightedCache = new WeakMap<CanonicalRequest, WeakMap<object, NumericalDoseFitScore>>();
@@ -180,11 +176,11 @@ export function numericalWeightedDoseFitScore(request: CanonicalRequest, exposur
   if (uniform !== null) {
     let cache = weightedCache.get(request); if (!cache) { cache = new WeakMap(); weightedCache.set(request, cache); }
     const found = cache.get(exposure); if (found) return found;
-    const base = numericalDoseFitScore(request, exposure), parts = base[exactFacts]!;
+    const base = numericalDoseFitScore(request, exposure), parts = exactFacts.get(base)!;
     const exact = add(multiply(exactWeights(settings).defaultWeight, parts.fitting), parts.safety);
     const score: NumericalDoseFitScore = { version: base.version, limitWeight: base.limitWeight, under: base.under, over: base.over,
       limit: base.limit, weightedLimit: base.weightedLimit, total: value(exact) };
-    retainExactFacts(score, { ...parts, exact }); cache.set(exposure, score); return score;
+    exactFacts.set(score, { ...parts, exact }); cache.set(exposure, score); return score;
   }
   return calculateDoseFit(request, exposure, true);
 }
@@ -274,7 +270,7 @@ function calculateDoseFit(request: CanonicalRequest, exposure: ReadonlyMap<strin
       unknownSubjectIds: [...new Set(request.unknownIntakeSubjectIds ?? [])].sort(),
       estimatedSubjectIds: [...new Set([...(request.estimatedIntakeSubjectIds ?? []), ...estimatedTargets])].sort() } : {}) };
   if (!materialize) deviations.sort((a, b) => a.subjectId < b.subjectId ? -1 : a.subjectId > b.subjectId ? 1 : 0);
-  retainExactFacts(score, { exact, fitting: add(under, over), safety: weighted, deviations });
+  exactFacts.set(score, { exact, fitting: add(under, over), safety: weighted, deviations });
   if (!materialize) cache.set(exposure, score);
   return score;
 }
@@ -300,15 +296,15 @@ export function weightedDoseFitScore(request: CanonicalRequest, exposure: Readon
 
 /** Compare rational sums, not rounded display scores: even a tiny excess counts. */
 export function compareDoseFit(left: NumericalDoseFitScore, right: NumericalDoseFitScore) {
-  const a = left[exactFacts]?.exact;
-  const b = right[exactFacts]?.exact;
+  const a = exactFacts.get(left)?.exact;
+  const b = exactFacts.get(right)?.exact;
   if (!a || !b) return left.total - right.total;
   return compareFractions(a, b);
 }
 
 /** Fresh scoring callers reuse the original exact sum, never a rounded DTO. */
 export function exactDoseFit(score: NumericalDoseFitScore): Fraction {
-  const exact = score[exactFacts]?.exact;
+  const exact = exactFacts.get(score)?.exact;
   if (!exact) throw new Error("Exact dose-fit score must be calculated from immutable inputs");
   return exact;
 }
@@ -323,7 +319,7 @@ export function withProductUncertainty(score: DoseFitScore, subjectIds: readonly
   const result: DoseFitScore = { ...score, unknownSubjectIds: [...unknown].sort(),
     perTarget: score.perTarget.map(annotate), perLimit: score.perLimit.map(annotate),
     ...(score.perContinuedDose ? { perContinuedDose: score.perContinuedDose.map(annotate) } : {}) };
-  const exact = (score as NumericalDoseFitScore)[exactFacts];
-  if (exact) retainExactFacts(result, exact);
+  const exact = exactFacts.get(score);
+  if (exact) exactFacts.set(result, exact);
   return result;
 }
