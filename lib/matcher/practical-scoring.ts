@@ -128,9 +128,9 @@ type PreferenceBases = readonly ({ target: Rational; scale: Rational } | null)[]
 const measuredActuals = new WeakMap<PracticalRequest, { values: WeakMap<PracticalActuals, ReturnType<typeof compileMeasurements>>; bases: PreferenceBases }>();
 function compileMeasurements(request: PracticalRequest, actual: PracticalActuals, profile: Profile, bases: PreferenceBases) {
   const pills = measurement(actual.pillLowerBound, "pillLowerBound"), products = measurement(actual.productCount, "productCount", true);
-  if (actual.dailyPills !== null) {
+  if (actual.dailyPills !== null && actual.dailyPills !== actual.pillLowerBound) {
     measurement(actual.dailyPills, "dailyPills");
-    if (actual.dailyPills !== actual.pillLowerBound) throw new Error("pillLowerBound must equal a complete dailyPills measurement");
+    throw new Error("pillLowerBound must equal a complete dailyPills measurement");
   }
   const priceValue = actual.priceMinor ?? actual.priceLowerBound ?? 0;
   const price = measurement(priceValue, "priceMinor", true);
@@ -138,10 +138,9 @@ function compileMeasurements(request: PracticalRequest, actual: PracticalActuals
   if (actual.uncertainProductCount > actual.productCount) throw new Error("uncertainProductCount cannot exceed productCount");
   const preferencePrice = profile.pricePreferenceBasis === "monthly_30_days" ? actual.monthlyPriceMinor ?? null : actual.priceMinor;
   const preferencePriceLower = preferencePrice ?? (profile.pricePreferenceBasis === "monthly_30_days" ? actual.monthlyPriceLowerBound ?? 0 : priceValue);
-  if (profile.pricePreferenceBasis === "monthly_30_days") measurement(preferencePriceLower, "monthlyPriceMinor", true);
-  const lowerBounds = [actual.pillLowerBound, actual.productCount, preferencePriceLower];
+  const lowerBounds = [pills, products, profile.pricePreferenceBasis === "monthly_30_days" ? measurement(preferencePriceLower, "monthlyPriceMinor", true) : price];
   const overruns = bases.map((basis, index) => basis
-    ? square(divide(positive(subtract(fromDecimal(lowerBounds[index]!), basis.target)), basis.scale)) : ZERO);
+    ? square(divide(positive(subtract(lowerBounds[index]!, basis.target)), basis.scale)) : ZERO);
   const servings = actual.servingBurdenExact ?? sum(actual.servings.map((n, i) => square(positive(subtract(measurement(n, `servings[${i}]`), ONE)))));
   const normalizedPills = divide(pills, THREE), normalizedPrice = divide(price, PRICE_SCALE), uncertainty = multiply(QUARTER, uncertain);
   const weightedUncertainty = profile.version === WEB_PRACTICAL_SCORING_VERSION && request.maxDailyPills != null;
