@@ -3,7 +3,7 @@ import { targetDoseTicks } from "@/lib/matcher/target-basis";
 import { servingIncrement } from "@/lib/matcher/serving-grid";
 import { comparePillCounts } from "@/lib/matcher/pill-burden";
 import { compileVariant, isDeferredConditional } from "@/lib/matcher/candidates";
-import { compareDoseFit, numericalDoseFitScore, doseFitTargetDeviations } from "@/lib/matcher/dose-fit";
+import { compareDoseFit, numericalDoseFitScore, doseFitTargetDeviations, recordDoseFitAddition } from "@/lib/matcher/dose-fit";
 import { administrationBasisKnown, compareSearchStateScores, monthlyGoodsPrice, PRACTICAL_OBJECTIVES, requestForProfile } from "@/lib/matcher/practical-scoring";
 import { DEFAULT_MATCHER_CONFIG } from "@/lib/matcher/config";
 import { fingerprintState } from "@/lib/matcher/dominance";
@@ -34,7 +34,7 @@ export type SearchRun = Readonly<{
   trimmed: boolean;
 }>;
 
-const variantMeasurements = new WeakMap<DoseVariant, { product: ProductGroup["product"]; burden: ReturnType<typeof multiply>; monthly: number | null; uncertain: number; contributionOnly: boolean }>();
+const variantMeasurements = new WeakMap<DoseVariant, { product: ProductGroup["product"]; burden: ReturnType<typeof multiply>; monthly: number | null; uncertain: number; subjects: readonly string[]; contributionOnly: boolean }>();
 
 // Quantity arrays are immutable apart from append-only, physically compiled
 // probes. A resumed/replaced array gets a fresh index; traversal order is unchanged.
@@ -113,6 +113,7 @@ export function tryAddVariant(
     const excess = positive(subtract(variant.dailyUnitsRatio ?? fromDecimal(variant.dailyUnits), fromDecimal(1)));
     measured = { product: group.product, burden: multiply(excess, excess),
       monthly: monthlyGoodsPrice(group.product, variant.dailyUnits, variant.dailyUnitsRatio), uncertain: Number(!administrationBasisKnown(group.product)),
+      subjects: [...new Set([...safetyExposure.keys(), ...variant.contributions.keys()])],
       contributionOnly: safetyExposure.size === variant.contributions.size && [...safetyExposure].every(([id, amount]) => variant.contributions.get(id)?.units === amount.units) };
     variantMeasurements.set(variant, measured);
   }
@@ -122,6 +123,7 @@ export function tryAddVariant(
   for (const [id, amount] of safetyExposure) exposure.set(id, (state.exposure.get(id) ?? BigInt(0)) + amount.units);
   // A verified contribution replaces the same label's amount; it is not added twice.
   if (!measured.contributionOnly) for (const [id, amount] of variant.contributions) exposure.set(id, (state.exposure.get(id) ?? BigInt(0)) + amount.units);
+  recordDoseFitAddition(exposure, state.exposure, measured.subjects);
   const delivered = measured.contributionOnly && state.delivered === state.exposure ? exposure : new Map(state.delivered);
   if (delivered !== exposure) for (const [id, amount] of variant.contributions) {
     delivered.set(id, (delivered.get(id) ?? BigInt(0)) + amount.units);
