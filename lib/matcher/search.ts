@@ -36,6 +36,19 @@ export type SearchRun = Readonly<{
 
 const variantMeasurements = new WeakMap<DoseVariant, { product: ProductGroup["product"]; burden: ReturnType<typeof multiply>; monthly: number | null; uncertain: number }>();
 
+// Quantity arrays are immutable apart from append-only, physically compiled
+// probes. A resumed/replaced array gets a fresh index; traversal order is unchanged.
+const quantityIndices = new WeakMap<readonly DoseVariant[], { size: number; ids: Map<string, DoseVariant> }>();
+export function quantityById(variants: readonly DoseVariant[], id: string) {
+  let index = quantityIndices.get(variants);
+  if (!index || index.size > variants.length) { index = { size: 0, ids: new Map() }; quantityIndices.set(variants, index); }
+  while (index.size < variants.length) {
+    const variant = variants[index.size++]!;
+    if (!index.ids.has(variant.variantId)) index.ids.set(variant.variantId, variant);
+  }
+  return index.ids.get(id);
+}
+
 export function seedState(request: CanonicalRequest): SearchState {
   const exposure = new Map<string, bigint>();
 
@@ -81,7 +94,7 @@ export function tryAddVariant(
     return null;
   }
 
-  if (state.selectedVariantIds.some((id) => group.variants.some((row) => row.variantId === id))) return null;
+  if (state.selectedVariantIds.some((id) => quantityById(group.variants, id))) return null;
   const count = state.count + 1;
   const pills = state.pills + variant.dailyPills;
 
@@ -191,7 +204,7 @@ export function searchGroups(groups: readonly ProductGroup[], request: Canonical
         const ratio = { num: tick * step.num, den: step.den };
         const dailyUnits = Number(ratio.num) / Number(ratio.den);
         const id = `${group.sellerId}:${group.productId}:x${dailyUnits}`;
-        let variant = group.variants.find(row => row.variantId === id);
+        let variant = quantityById(group.variants, id);
         if (!variant) {
           variant = compileVariant({ product: group.product, request, dailyUnits, dailyUnitsRatio: ratio }) ?? undefined;
           if (variant) (group.variants as DoseVariant[]).push(variant);
@@ -382,11 +395,11 @@ export function reconstructVariants(
   groups: readonly ProductGroup[],
   variantIds: readonly string[]
 ) {
-  const byId = new Map<string, DoseVariant>();
+  const selected = new Set(variantIds), byId = new Map<string, DoseVariant>();
 
   for (const group of groups) {
     for (const variant of group.variants) {
-      byId.set(variant.variantId, variant);
+      if (selected.has(variant.variantId)) byId.set(variant.variantId, variant);
     }
   }
 

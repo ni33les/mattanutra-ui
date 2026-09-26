@@ -8,7 +8,7 @@ import { compareOverallScores, resolvePracticalProfile, numericalSearchStateScor
 import { divide, fromDecimal, multiply, rational, toNumber } from "@/lib/matcher/rational";
 import { fingerprintState } from "@/lib/matcher/dominance";
 import { compareDoseFit, numericalDoseFitScore, doseFitTargetDeviations } from "@/lib/matcher/dose-fit";
-import { compareSearchStates, profileLeaders, residualPattern, reviewFrontier, seedState, tryAddVariant, type SearchRun } from "@/lib/matcher/search";
+import { quantityById, compareSearchStates, profileLeaders, residualPattern, reviewFrontier, seedState, tryAddVariant, type SearchRun } from "@/lib/matcher/search";
 import type { CanonicalRequest, DoseVariant, MatcherConfig, ProductGroup, SearchState } from "@/lib/matcher/types";
 
 type ExactFrame = { state: SearchState; variantIds: string[] | null; position: number };
@@ -107,7 +107,7 @@ function mustSelect(group: ProductGroup, request: CanonicalRequest) {
   return request.productDoses?.some(row => row.productId === group.productId) || request.retainProductIds.includes(group.productId) && !request.currentSupplements.some(row => row.productId === group.productId);
 }
 function variant(cursor: SearchCursor, index: number, id: string) {
-  const found = cursor.groups[index]!.variants.find(row => row.variantId === id);
+  const found = quantityById(cursor.groups[index]!.variants, id);
   if (!found) throw new Error("Search cursor lost a physical quantity");
   return found;
 }
@@ -121,7 +121,7 @@ function variantsFor(cursor: SearchCursor, index: number, state: SearchState, re
     for (const tick of targetDoseTicks(request, target, perServing, step, state.exposure.get(target.subjectId) ?? BigInt(0))) {
       const ratio = { num: tick * step.num, den: step.den }, dailyUnits = Number(ratio.num) / Number(ratio.den);
       const id = `${group.sellerId}:${group.productId}:x${dailyUnits}`;
-      let found = group.variants.find(row => row.variantId === id);
+      let found = quantityById(group.variants, id);
       if (!found) { found = compileVariant({ product: group.product, request, dailyUnits, dailyUnitsRatio: ratio }) ?? undefined; if (found) (group.variants as DoseVariant[]).push(found); }
       if (found) result.add(id);
     }
@@ -135,8 +135,8 @@ function variantsFor(cursor: SearchCursor, index: number, state: SearchState, re
     const addTick = (tick: bigint) => {
       if (tick < BigInt(1)) return;
       const ratio = multiply(rational(tick), step), dailyUnits = toNumber(ratio), id = `${group.sellerId}:${group.productId}:x${dailyUnits}`;
-      if (!group.variants.some(row => row.variantId === id)) { const next = compileVariant({ product: group.product, request, dailyUnits, dailyUnitsRatio: ratio }); if (next) (group.variants as DoseVariant[]).push(next); }
-      if (group.variants.some(row => row.variantId === id) && !job!.ids.includes(id)) job!.ids.push(id);
+      if (!quantityById(group.variants, id)) { const next = compileVariant({ product: group.product, request, dailyUnits, dailyUnitsRatio: ratio }); if (next) (group.variants as DoseVariant[]).push(next); }
+      if (quantityById(group.variants, id) && !job!.ids.includes(id)) job!.ids.push(id);
     };
     if (request.maxDailyPills != null && group.product.pillCountKnown !== false && group.product.dailyPillsPerServing > 0) {
       const remaining = Math.max(0, request.maxDailyPills - state.pills);
@@ -177,8 +177,8 @@ function variantsFor(cursor: SearchCursor, index: number, state: SearchState, re
     const tick = job.left === undefined ? middle : middle + BigInt(1);
     if (cursor.expansionAttempts >= stop) return null;
     const ratio = multiply(rational(tick), step), dailyUnits = toNumber(ratio), id = `${group.sellerId}:${group.productId}:x${dailyUnits}`;
-    if (!group.variants.some(row => row.variantId === id)) { const next = compileVariant({ product: group.product, request, dailyUnits, dailyUnitsRatio: ratio }); if (next) (group.variants as DoseVariant[]).push(next); }
-    const exists = group.variants.some(row => row.variantId === id);
+    if (!quantityById(group.variants, id)) { const next = compileVariant({ product: group.product, request, dailyUnits, dailyUnitsRatio: ratio }); if (next) (group.variants as DoseVariant[]).push(next); }
+    const exists = quantityById(group.variants, id);
     // Invalid physical probes still consume an expansion attempt.
     const candidate = exists ? add(cursor, state, index, id, request) : (cursor.expansionAttempts++, completedAttempt(cursor, request), null);
     // Probes are productive expansions too. Preserve their continuation when
@@ -421,7 +421,7 @@ export function advanceSearchCursor(cursor: SearchCursor, request: CanonicalRequ
       }
       if (job.stage === "build") {
         if (job.build < job.retained.length) {
-          const id=job.retained[job.build++]!, index=cursor.groups.findIndex(group=>group.variants.some(row=>row.variantId===id));
+          const id=job.retained[job.build++]!, index=cursor.groups.findIndex(group=>quantityById(group.variants,id));
           if (index<0 || !job.base) throw new Error("Repair lost an incumbent quantity");
           job.base=add(cursor,job.base,index,id,request); if (!job.base) job.stage="prepare";
           continue;
