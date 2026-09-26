@@ -53,12 +53,18 @@ try {
   if (id === "reads" || id === "funnel") {
     const database = await openMeasuredDatabase(load); close = database.close;
     const reader = id === "reads" ? await seedPlanReader(load, database.sql) : await seedFunnelReader(load, database.sql, hash);
-    database.reset(); const coldStart = performance.now(); await database.observe(() => reader.poll());
+    const read = id === "reads" ? reader.projection : reader.poll;
+    database.reset(); const coldStart = performance.now(); await database.observe(read);
     extra.cold = { wallMs: performance.now() - coldStart, ...database.measurements() };
     database.reset(); const warmStart = performance.now(); const values = [];
-    for (let n = 0; n < 20; n++) values.push(await database.observe(() => reader.poll()));
+    for (let n = 0; n < 20; n++) values.push(await database.observe(read));
     extra.warm = { wallMs: performance.now() - warmStart, reads: 20, ...database.measurements() };
     semantic = comparableStatus(values.at(-1)); inputSha256 = hash(reader.input);
+    if (id === "reads") {
+      database.reset(); const start = performance.now(), decision = await database.observe(reader.poll);
+      extra.decision = { wallMs: performance.now() - start, responseBytes: Buffer.byteLength(JSON.stringify(decision)), ...database.measurements() };
+      semantic = { projection: semantic, decision: comparableStatus(decision) };
+    }
   } else {
     const request = id === "anna" || id === "expanded" ? profile("A2") : structuredClone(goldens.d3);
     const normalized = await normalizePlanRequest({ config: loadAgenticConfig(), snapshot: frozen.snapshot, request }); assert.ok("state" in normalized);

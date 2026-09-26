@@ -23,10 +23,14 @@ export async function seedPlanReader(load, sql) {
   await store.insertPlanRevision({ planId, revision: 1, result: input, requestSnapshot: input.requestSnapshot, status: input.status,
     createdAt: app.now, availabilityAsOf: app.now, catalogueVersion: "fixture", guidanceRulesVersion: "unchanged" });
   const { handle } = await issueCapability({ config: app.config, store, scope: app.scope, now: app.now, resourceId: planId, resourceType: "plan", allowedActions: ["plan.read"] });
-  let version;
-  return { input, poll: async () => {
-    const reply = await handleJsonRpc(app, { id: 1, method: "tools/call", params: { name: "plan", arguments: { operation: "get", planHandle: handle, responseView: "status", ...(version ? { knownResultVersion: version } : {}) } } });
-    const value = reply?.result?.structuredContent; assert.equal(value?.ok, true); version = value.resultVersion; return value;
+  const { readPlanState } = await load("lib/agentic/presentation/plan-read.ts");
+  return { input, projection: async () => {
+    const state = await readPlanState(app, handle); assert.ok(state.projection);
+    return { revision: state.revision, decision: state.projection.decision, payment: state.payment, operation: state.operation,
+      refreshRequired: state.refreshRequired, resultVersion: state.resultVersion };
+  }, poll: async () => {
+    const reply = await handleJsonRpc(app, { id: 1, method: "tools/call", params: { name: "plan", arguments: { planHandle: handle } } });
+    const value = reply?.result?.structuredContent; assert.equal(value?.ok, true, JSON.stringify(value)); return value;
   } };
 }
 export async function seedFunnelReader(load, sql, hash) {
