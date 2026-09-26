@@ -57,6 +57,26 @@ test('PERF-CPU-19 retained concern comparisons do not rebuild immutable facts', 
   assert.equal(hasFewerConcerns(selected, candidate, input), false, 'Measured excess cannot disappear through reuse');
 });
 
+test('PERF-CPU-20 cursor continuations compile their fixed quantity basis once', async () => {
+  const { product, catalog } = await import('../matcher/flexible-v5-fixtures.ts');
+  const { compileGroups } = await import('../../lib/matcher/candidates.ts');
+  const { createSearchCursor, advanceSearchCursor, archivedSearchStates } = await import('../../lib/matcher/search-cursor.ts');
+  const { DEFAULT_MATCHER_CONFIG } = await import('../../lib/matcher/config.ts');
+  const input = request(), groups = compileGroups(input, catalog(Array.from({ length: 8 }, (_, i) => product('basis-' + i, { a: 7 + i }))));
+  const cursor = createSearchCursor(groups, input, { ...DEFAULT_MATCHER_CONFIG, expansionBudget: 800, exactGroupLimit: 0 });
+  const control = structuredClone(cursor);
+  let projections = 0;
+  cursor.baseline = cursor.baseline.map(ids => new Proxy(ids, { get(target, key, receiver) {
+    if (key === 'map') return (...args: Parameters<typeof target.map>) => { projections++; return target.map(...args); };
+    return Reflect.get(target, key, receiver);
+  } }));
+  while (!cursor.done) advanceSearchCursor(cursor, input, 17);
+  while (!control.done) advanceSearchCursor(control, input, 800);
+  assert.equal(cursor.expansionAttempts, 800);
+  assert.ok(projections > 0 && projections <= groups.length, `Immutable quantity basis rebuilt ${projections} times for ${groups.length} groups`);
+  assert.deepEqual([...archivedSearchStates(cursor)], [...archivedSearchStates(control)], 'Chunk size and basis reuse must not alter quantities, work, order or exact scores');
+});
+
 test('REF-CPU-01 numerical ranking does not format display doses for losing candidates', () => {
   const input = request({ safetyCeilings: [{ subjectId: 'a', name: 'A', maxAmount: 100, maxUnit: 'mg', sourceScope: 'supplemental' }] });
   conversions = 0; additions = 0; aggregateSums = 0; conversionsToNumber = 0;
