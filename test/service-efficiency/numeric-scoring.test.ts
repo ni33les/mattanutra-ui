@@ -26,6 +26,22 @@ mock.module('../../lib/matcher/safety.ts', { namedExports: { ...safetyModule, la
 const { request } = await import('../matcher/flexible-v5-fixtures.ts');
 const { doseFitScore, numericalDoseFitScore, exactDoseFit, compareDoseFit, weightedDoseFitScore, numericalWeightedDoseFitScore } = await import('../../lib/matcher/dose-fit.ts');
 
+test('PERF-CPU-65 exact arithmetic reuses constant integer identities', () => {
+  const original = globalThis.BigInt; let constantConversions = 0;
+  const a = fractions.rational(7n, 13n), b = fractions.rational(5n, 11n);
+  let total;
+  try {
+    globalThis.BigInt = new Proxy(original, { apply(target, receiver, args) {
+      if (args[0] === 0 || args[0] === 1) constantConversions++;
+      return Reflect.apply(target, receiver, args);
+    } });
+    for (let i = 0; i < 100; i++) total = fractions.sum([fractions.add(a, b), fractions.multiply(a, b), fractions.ZERO]);
+  } finally { globalThis.BigInt = original; }
+  assert.deepEqual(total, { num: 177n, den: 143n });
+  assert.ok(Object.isFrozen(total));
+  assert.equal(constantConversions, 0, 'Zero/one integer identities need not be reconstructed on every exact arithmetic call');
+});
+
 test('PERF-CPU-64 physical breakpoint preparation reuses its verified minimum-quantity exposure', async () => {
   const { supportedDoseDomain } = await import('../../lib/matcher/candidates.ts');
   const { product } = await import('../matcher/flexible-v5-fixtures.ts');
