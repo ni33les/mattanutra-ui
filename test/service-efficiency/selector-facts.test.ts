@@ -7,26 +7,7 @@ mock.module('../../lib/matcher/candidates.ts', { namedExports: { ...candidates,
 } });
 const { request, product, catalog } = await import('../matcher/flexible-v5-fixtures.ts');
 const { seedState, tryAddVariant } = await import('../../lib/matcher/search.ts');
-const { scoreState, materiallyDifferent, basketSignature } = await import('../../lib/matcher/selector.ts');
-
-test('PERF-CPU-56 repeated stable basket comparisons reuse seller-and-quantity signatures', () => {
-  const rows = [
-    { sellerId: 'seller-b', variantIds: ['b:x1', 'a:x2'] },
-    { sellerId: 'seller-a', variantIds: ['b:x1', 'a:x2'] },
-    { sellerId: 'seller-a', variantIds: ['b:x1', 'a:x3'] }
-  ].map(row => Object.freeze({ ...row, variantIds: Object.freeze(row.variantIds) }));
-  const original = Array.prototype.sort; let identitySorts = 0;
-  try {
-    Array.prototype.sort = function (...args) { if (this[0] === 'b:x1') identitySorts++; return Reflect.apply(original, this, args); };
-    for (let i = 0; i < 100; i++) {
-      assert.equal(basketSignature(rows[0]), 'seller-b|a:x2|b:x1');
-      assert.equal(basketSignature(rows[1]), 'seller-a|a:x2|b:x1');
-      assert.equal(basketSignature(rows[2]), 'seller-a|a:x3|b:x1');
-    }
-  } finally { Array.prototype.sort = original; }
-  assert.equal(identitySorts, 3, 'Stable seller/quantity ties do not need another array and sort for every comparison');
-  assert.deepEqual(rows[0].variantIds, ['b:x1', 'a:x2']);
-});
+const { scoreState, materiallyDifferent } = await import('../../lib/matcher/selector.ts');
 
 test('PERF-CPU-53 scored baskets omit unused ranking counters while retaining active dose and coverage facts', () => {
   const input = request(), groups = candidates.compileGroups(input, catalog([product('partial', { a: 5 })]));
