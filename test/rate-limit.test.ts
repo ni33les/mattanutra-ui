@@ -200,10 +200,45 @@ describe("D10-09 mutation rate-limit proof", () => {
       assert.equal(result.status, 429); assert.equal(result.remaining, "0"); assert.equal(result.retryAfterPositive, true);
       assert.equal(result.retryWithinWindow, true); assert.equal(result.retryMetadataConsistent, true); assert.equal(result.limit, "60");
     }
-    assert.equal(getRateLimitStoreSizeForTests(), before + 1, "The proof creates one bounded expiring bucket");
+    assert.equal(getRateLimitStoreSizeForTests(), before, "Proof storage never enters the customer bucket store");
     assert.deepEqual(await mcpLimiter.mutationRateLimitProof(), proof, "Private bucket identities and raw retry clocks never enter semantic proof evidence");
     for (let index = 1; index < 60; index++) assert.equal(enforceRateLimit(customer, publicRateLimits.mcp), null);
     assert.equal(enforceRateLimit(customer, publicRateLimits.mcp)?.status, 429, "The customer's existing count was neither consumed nor cleared");
+  });
+  it("preserves exhausted customer buckets and their capacity when proof starts at the store limit", async () => {
+    setRateLimitNowForTests(1_000_000);
+    setRateLimitMaxStoreEntriesForTests(2);
+    const customer = new Request("https://example.test/api/mcp", { method: "POST" });
+    const configs = ["customer-a", "customer-b"].map(name => ({ ...publicRateLimits.mcp, name }));
+    for (const config of configs) for (let index = 0; index < 60; index++) assert.equal(enforceRateLimit(customer, config), null);
+    const before = configs.map(config => Object.fromEntries(enforceRateLimit(customer, config)!.headers));
+    assert.equal(getRateLimitStoreSizeForTests(), 2);
+    const proof = await mcpLimiter.mutationRateLimitProof();
+    assert.equal(proof.passed, true, JSON.stringify(proof));
+    for (const [index, config] of configs.entries()) {
+      const blocked = enforceRateLimit(customer, config);
+      assert.equal(blocked?.status, 429, `${config.name} must not be evicted by QA proof storage`);
+      assert.deepEqual(Object.fromEntries(blocked!.headers), before[index]);
+    }
+    assert.equal(getRateLimitStoreSizeForTests(), 2);
+    // Ordinary insertion still enforces the existing capacity and keeps the recent customer.
+    setRateLimitNowForTests(1_000_001);
+    assert.equal(enforceRateLimit(customer, { ...publicRateLimits.mcp, name: "customer-c" }), null);
+    assert.equal(getRateLimitStoreSizeForTests(), 2);
+    assert.equal(enforceRateLimit(customer, configs[1])?.status, 429);
+  });
+  it("keeps interleaved proofs independent while ordinary customer traffic reaches its own boundary", async () => {
+    setRateLimitNowForTests(1_000_000);
+    const customer = new Request("https://example.test/api/mcp", { method: "POST" });
+    for (let index = 0; index < 59; index++) assert.equal(enforceRateLimit(customer, publicRateLimits.mcp), null);
+    const first = mcpLimiter.mutationRateLimitProof();
+    assert.equal(enforceRateLimit(customer, publicRateLimits.mcp), null);
+    const second = mcpLimiter.mutationRateLimitProof();
+    assert.equal(enforceRateLimit(customer, publicRateLimits.mcp)?.status, 429);
+    const [left, right] = await Promise.all([first, second]);
+    assert.equal(left.passed, true, JSON.stringify(left)); assert.deepEqual(left, right);
+    assert.equal(getRateLimitStoreSizeForTests(), 1, "Proof awaits must neither add global buckets nor swap the customer's store");
+    assert.equal(enforceRateLimit(customer, publicRateLimits.mcp)?.status, 429);
   });
   it("fails closed when enforcement is disabled, premature or loses retry metadata", async () => {
     const unavailable = () => rateLimitExceededResponse({ allowed: false, limit: 60, remaining: 0, resetAtMs: 1_060_000, retryAfterSeconds: 60 });
