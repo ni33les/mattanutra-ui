@@ -58,6 +58,23 @@ test('REF-CPU-03 unchanged subject exposure reuses exact arithmetic across disti
   const second = doseFitScore(input, new Map([['a', 75_000_000n], ['unrequested', 1n]]));
   assert.equal(second.total, first.total); assert.equal(multiplications, 0, 'Unchanged exact nutrient terms need no repeated endpoint arithmetic');
 });
+test('PERF-CPU-13 compiled endpoint scoring avoids temporary sets and preserves complete safety arithmetic', () => {
+  const input = request({ safetyCeilings: [{ subjectId: 'a', name: 'A', maxAmount: 100, maxUnit: 'mg', sourceScope: 'supplemental' }] });
+  numericalDoseFitScore(input, new Map([['a', 150_000_000n]]));
+  const exposure = new Map([['a', 175_000_000n]]), OriginalSet = globalThis.Set;
+  let allocations = 0, result;
+  try {
+    globalThis.Set = new Proxy(OriginalSet, { construct(target, args) { allocations++; return Reflect.construct(target, args); } });
+    result = numericalDoseFitScore(input, exposure);
+  } finally { globalThis.Set = OriginalSet; }
+  assert.equal(result.total, 2.25);
+  assert.deepEqual(exactDoseFit(result), { num: 9n, den: 4n });
+  assert.equal(allocations, 0, 'Fixed endpoint facts need no per-candidate sets or endpoint deduplication');
+  const display = doseFitScore(input, exposure);
+  assert.equal(display.perTarget[0].exposure, 175);
+  assert.equal(display.perLimit[0].exposure, 175);
+  assert.equal(display.perLimit[0].excess, 0.75);
+});
 test('REF-CPU-04 neutral rational operations reuse immutable values without changing exact arithmetic', () => {
   const value = fractions.rational(7n, 13n);
   assert.strictEqual(fractions.fromDecimal(0), fractions.ZERO, 'Repeated zero coefficients need no allocation');
