@@ -1,3 +1,4 @@
+import { smallest } from "@/lib/matcher/top-k";
 import { verifiedAdministration } from "@/lib/product-administration";
 import { sha256Hex } from "@/lib/sha256";
 import { serializeExactValue } from "@/lib/matcher/exact-values";
@@ -248,12 +249,16 @@ function diverseSingles(cursor: SearchCursor, request: CanonicalRequest) {
   return result;
 }
 export function rawDoseLeaders(states: readonly SearchState[], request: CanonicalRequest, limit: number) {
-  const ranked = [...states].sort((a,b) => compareDoseFit(numericalDoseFitScore(request,a.exposure),numericalDoseFitScore(request,b.exposure)) || compareSearchStates(a,b,request));
-  // A basket that exactly meets several targets is a useful completion base,
-  // even when one remaining gap gives it a larger aggregate dose loss.
-  const exactCount = (state: SearchState) => doseFitTargetDeviations(numericalDoseFitScore(request,state.exposure)).filter(row => row.under === 0 && row.over === 0).length;
-  const exact = [...ranked].sort((a,b) => exactCount(b)-exactCount(a) || compareDoseFit(numericalDoseFitScore(request,a.exposure),numericalDoseFitScore(request,b.exposure)) || compareSearchStates(a,b,request));
-  const chosen: SearchState[] = [...new Set([ranked[0], ...exact.slice(0,2)].filter((row): row is SearchState => Boolean(row)))].slice(0,limit);
+  const facts = new Map(states.map(state => {
+    const dose = numericalDoseFitScore(request, state.exposure);
+    return [state, { dose, met: doseFitTargetDeviations(dose).filter(row => row.under === 0 && row.over === 0).length }] as const;
+  }));
+  const order = (a: SearchState, b: SearchState) => compareDoseFit(facts.get(a)!.dose, facts.get(b)!.dose) || compareSearchStates(a, b, request);
+  const ranked = [...states].sort(order);
+  // Exact-target completion bases retain the same stable prefix without a
+  // second complete sort or repeated exposure/deviation reads per comparison.
+  const exact = smallest(ranked, 2, (a,b) => facts.get(b)!.met - facts.get(a)!.met || order(a,b));
+  const chosen: SearchState[] = [...new Set([ranked[0], ...exact].filter((row): row is SearchState => Boolean(row)))].slice(0,limit);
   const patterns = new Set(chosen.map(state => residualPattern(state,request)));
   for (const state of ranked) {
     const pattern = residualPattern(state, request);
