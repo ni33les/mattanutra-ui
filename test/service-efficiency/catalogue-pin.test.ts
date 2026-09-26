@@ -193,3 +193,18 @@ test("EFF-PIN-10 persistence without an explicit independent-commit capability i
   assert.equal(inserts, 3);
   assert.equal(getPinnedCatalogueSnapshot(matchingSnapshotId(snapshot)), null);
 });
+
+test("EFF-PIN-11 restoring an uncommitted catalogue cannot publish it to another owner", async () => {
+  const store = createMemoryStore();
+  const snapshot = freezeCatalogueSnapshot(mutableSnapshot());
+  const id = matchingSnapshotId(snapshot);
+  await assert.rejects(store.transaction(async transaction => {
+    await transaction.insertCatalogueSnapshot(id, snapshot);
+    const restored = await restoreCataloguePin(id, "guidance-test", transaction);
+    assert.deepEqual(restored, snapshot);
+    assert.equal(getPinnedCatalogueSnapshot(id), null);
+    throw new Error("Rollback restored catalogue");
+  }), /Rollback restored catalogue/);
+  assert.equal(await store.getCatalogueSnapshot(id), null);
+  assert.equal(await restoreCataloguePin(id, "guidance-test", store), null);
+});
