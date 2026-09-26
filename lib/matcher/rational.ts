@@ -18,6 +18,7 @@ export function rational(num: bigint, den = BigInt(1)): Rational {
 
 export const ZERO: Rational = Object.freeze({ num: BigInt(0), den: BigInt(1) });
 export const ONE: Rational = Object.freeze({ num: BigInt(1), den: BigInt(1) });
+const integerValues: Rational[] = [ZERO, ONE];
 export const add = (a: Rational, b: Rational): Rational => a.num === BigInt(0) ? b : b.num === BigInt(0) ? a : a.den === b.den ? rational(a.num + b.num, a.den) : rational(a.num * b.den + b.num * a.den, a.den * b.den);
 export const subtract = (a: Rational, b: Rational): Rational => b.num === BigInt(0) ? a : a.den === b.den ? rational(a.num - b.num, a.den) : rational(a.num * b.den - b.num * a.den, a.den * b.den);
 export const multiply = (a: Rational, b: Rational): Rational => a.num === BigInt(0) || b.num === BigInt(0) ? ZERO : a.num === a.den ? b : b.num === b.den ? a : rational(a.num * b.num, a.den * b.den);
@@ -54,7 +55,10 @@ export const serialize = (value: Rational) => ({ numerator: String(value.num), d
 export function fromDecimal(value: unknown): Rational {
   if (typeof value !== "string" && typeof value !== "number") throw new Error("Expected a finite decimal coefficient");
   if (typeof value === "number" && !Number.isFinite(value)) throw new Error("Expected a finite decimal coefficient");
-  if (typeof value === "number" && Number.isSafeInteger(value)) return value === 0 ? ZERO : value === 1 ? ONE : rational(BigInt(value));
+  if (typeof value === "number" && Number.isSafeInteger(value)) {
+    if (value >= 0 && value <= 64) return integerValues[value] ??= rational(BigInt(value));
+    return rational(BigInt(value));
+  }
   const text = String(value);
   if (text.length > 256) throw new Error("Decimal representation exceeds 256 characters");
   const match = /^([+-]?)(\d+)(?:\.(\d*))?(?:e([+-]?\d+))?$/i.exec(text);
