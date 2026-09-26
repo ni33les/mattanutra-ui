@@ -256,3 +256,35 @@ case now requires shared revalidation/dose scoring and forbids that duplicate
 addition path. All three behavioural life-stage/stack cases, including exact
 50 mg zinc against a 40 mg reference, remain unchanged. Preserve the original
 216-case failed run and replace only this affected whole file's execution.
+
+### Final allocation and worker refinements
+
+- PERF-CPU-31 retains the same stable minimum for each remaining-gap pattern;
+  only those representatives are sorted. PERF-CPU-33 compiles preference scales
+  once per immutable request. Exact frozen results and attempt counts agree.
+- PERF-CPU-35 resolves requested contributions once when counting incidental
+  labels. PERF-CPU-37/38 use native server SHA-256 and preserve the tested browser
+  fallback, original UTF-8 vectors and complete hash identities.
+- PERF-NATIVE-01/02 correct the isolated external executor: prepare real matching
+  threads before readiness, and use production wake notifications while idle.
+  The old 100 ms claim loop introduced artificial database contention. Production
+  queue capacity, leases, periodic recovery and deadlines are unchanged.
+- PERF-LOCK-41/42 remove speculative worker expiry writes. Only a known overdue
+  operation attempts retirement; atomic claim still checks its deadline. The
+  PostgreSQL cases prove healthy claim, completed replay and overdue cleanup.
+- Exclusive experiments PERF-CPU-32, 34, 36, 39, 40 and 43 are withdrawn with their
+  unshipped implementations. Basket/state identity caching, raw-dose partial
+  retention, early practical bounds, tiny-key sorting and eager product-label
+  classification did not demonstrate sufficient benefit. Original arithmetic,
+  priority, catalogue, quantity and recovery assertions remain. External patches,
+  RED/GREEN evidence, timings and withdrawal receipts preserve the investigation.
+- An initial classification fixture used inconsistent manually edited quantities;
+  its corrected RED uses real one-/two-serving variants before implementation.
+  Two manually invoked test commands named nonexistent companion files. Their
+  incomplete execution was recorded and corrected by running the actual maintained
+  whole files. Reviewed final execution rejects missing files and case mismatches.
+- The native publication probe now timestamps the existing measurement after
+  the publication transaction resolves, then verifies a ready native read. Task
+  bookkeeping is measured separately. Three D3 diagnostic trials remain above
+  one second (1.71–1.97 s); neither later bookkeeping nor polling intervals are
+  used to hide the failed gate. No deployment is authorized by this evidence.

@@ -71,7 +71,7 @@
       "disposition": "narrow",
       "invariant": "Claims/renews operation ownership, reserves attempts, saves checkpoints, expires/cancels work and records terminal publication.",
       "acquisition": "Explicit mutation transaction or conditional write; ordinary reads never acquire this lock.",
-      "permittedWork": "Revalidate ownership, revision and affected row identities; apply necessary writes only. Prepare, calculate, serialize, render and perform external effects outside the protected phase.",
+      "permittedWork": "Revalidate ownership, revision and affected row identities; apply necessary writes only. Prepare, calculate, serialize, render and perform external effects outside the protected phase. Healthy worker admission skips speculative expiry writes; the atomic claim revalidates its deadline, and overdue work uses existing conditional retirement.",
       "release": "Each UPDATE locks its row until its transaction ends; the 60-second ownership lease is separate.",
       "callers": [
         "lib/agentic/plan/operations.ts",
@@ -99,6 +99,14 @@
         {
           "file": "test/service-efficiency/operations.integration.test.ts",
           "name": "LOCK-ATTEMPTS-04 unstarted reservation compensation preserves prior lost attempts and refuses a newer owner"
+        },
+        {
+          "file": "test/service-efficiency/operations.integration.test.ts",
+          "name": "PERF-LOCK-41 healthy and completed worker operations issue no speculative expiry write"
+        },
+        {
+          "file": "test/service-efficiency/operations.integration.test.ts",
+          "name": "PERF-LOCK-42 overdue worker admission still atomically expires before execution"
         }
       ],
       "historicalCallers": [
