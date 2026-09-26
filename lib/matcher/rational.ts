@@ -31,7 +31,7 @@ export const serialize = (value: Rational) => ({ numerator: String(value.num), d
 export function fromDecimal(value: unknown): Rational {
   if (typeof value !== "string" && typeof value !== "number") throw new Error("Expected a finite decimal coefficient");
   if (typeof value === "number" && !Number.isFinite(value)) throw new Error("Expected a finite decimal coefficient");
-  if (typeof value === "number" && Number.isSafeInteger(value)) return rational(BigInt(value));
+  if (typeof value === "number" && Number.isSafeInteger(value)) return value === 0 ? ZERO : value === 1 ? ONE : rational(BigInt(value));
   const text = String(value);
   if (text.length > 256) throw new Error("Decimal representation exceeds 256 characters");
   const match = /^([+-]?)(\d+)(?:\.(\d*))?(?:e([+-]?\d+))?$/i.exec(text);
