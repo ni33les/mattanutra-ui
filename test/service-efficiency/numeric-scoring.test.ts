@@ -195,6 +195,28 @@ test('PERF-CPU-03 repeated candidate additions reuse physical quantities and rep
   assert.ok(measurements > 0, 'A changed offer must invalidate the cached commercial measurements');
 });
 
+test('PERF-CPU-08 adding one nutrient preserves exact totals without rereading unchanged exposure', async () => {
+  const { product } = await import('../matcher/flexible-v5-fixtures.ts');
+  const { canonicalizeTargets } = await import('../../lib/matcher/canonicalizer.ts');
+  const { compileGroups } = await import('../../lib/matcher/candidates.ts');
+  const { seedState, tryAddVariant } = await import('../../lib/matcher/search.ts');
+  const input = request({ targets: canonicalizeTargets({ targets: ['a','b'].map(subjectId => ({subjectId, name:subjectId.toUpperCase(), amount:100, unit:'mg'})) }).targets,
+    safetyCeilings: ['a','b'].map(subjectId=>({subjectId,name:subjectId.toUpperCase(),maxAmount:100,maxUnit:'mg',sourceScope:'supplemental'})) });
+  const groups = compileGroups(input, {catalogueVersion:'incremental',availabilityAsOf:'2026-09-26',products:[product('first',{a:150}),product('second',{b:50})]});
+  const first=groups.find(row=>row.productId==='first')!,second=groups.find(row=>row.productId==='second')!;
+  const parent=tryAddVariant(seedState(input),first.variants.find(row=>row.dailyUnits===1)!,first,input)!;
+  const previous=numericalDoseFitScore(input,parent.exposure);assert.equal(previous.total,2.5);
+  const child=tryAddVariant(parent,second.variants.find(row=>row.dailyUnits===1)!,second,input)!;
+  assert.ok(child);let unchangedReads=0;const get=child.exposure.get.bind(child.exposure);
+  Object.defineProperty(child.exposure,'get',{value:(id:string)=>{if(id==='a')unchangedReads++;return get(id);}});
+  const next=numericalDoseFitScore(input,child.exposure);
+  assert.equal(next.total,2);assert.deepEqual(exactDoseFit(next),{num:2n,den:1n});
+  assert.equal(unchangedReads,0,'A one-nutrient change must not recalculate unchanged exposure terms');
+  assert.deepEqual(doseFitScore(input,child.exposure),doseFitScore(structuredClone(input),new Map(child.exposure)),
+    'Cold/recovered scoring and incremental scoring must retain every displayed dose and reference fact');
+  assert.equal(previous.total,2.5,'The parent candidate remains immutable');
+});
+
 test('REF-CPU-09 numerical matching compiles the subject set when incidental exposure has no applicable reference', () => {
   const input = request({ profileKnown: { ageYears: false, lifeStage: false, sex: false } });
   let traversals = 0;
