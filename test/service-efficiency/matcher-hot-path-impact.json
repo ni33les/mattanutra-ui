@@ -6,7 +6,7 @@
     {
       "file": "test/service-efficiency/numeric-scoring.test.ts",
       "expectedCases": 45,
-      "reason": "Exact internal records, serving lower bounds, immutable quantity/intake/exposure reuse and complete public materialization without search changes; PERF-CPU-26\u201328 and 30: one quantity-group lookup, normalized endpoint components, exact identity/common-denominator comparison and canonical unit parsing; PERF-CPU-31/33 preserve stable remaining-gap leaders and reuse preference denominators"
+      "reason": "Exact internal records, serving lower bounds, immutable quantity/intake/exposure reuse and complete public materialization without search changes; PERF-CPU-26\u201328 and 30: one quantity-group lookup, normalized endpoint components, exact identity/common-denominator comparison and canonical unit parsing; PERF-CPU-31/33 preserve stable remaining-gap leaders and reuse preference denominators; PERF-CPU-59: exact monotonic profile bounds avoid redundant scoring while allowing decreasing weights to reverse ordering"
     },
     {
       "file": "test/service-efficiency/immutable-references.test.ts",
@@ -167,6 +167,21 @@
       "file": "test/mcp-7-2-1/routines.test.ts",
       "expectedCases": 3,
       "reason": "Selected product labels preserve equal-fit routines and unknown pill comparisons"
+    },
+    {
+      "file": "test/agentic-phase3-pills.test.ts",
+      "expectedCases": 11,
+      "reason": "Historical obsolete ranking metadata cannot override active pill/product ranking"
+    },
+    {
+      "file": "test/agentic-phase6.test.ts",
+      "expectedCases": 14,
+      "reason": "Coverage and advisory preference consumers retain unchanged assertions after removal of unused internal counters"
+    },
+    {
+      "file": "test/matcher/phase2.test.ts",
+      "expectedCases": 9,
+      "reason": "Independent dose-fit, quantity and ordering assertions remain effective without obsolete oversupply metadata"
     }
   ],
   "exclusions": "No full application/MCP, live database, payment or unrelated browser suites; no contract or scoring-policy changes."
