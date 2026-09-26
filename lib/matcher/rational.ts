@@ -38,6 +38,16 @@ export function sum(values: readonly Rational[]): Rational {
   }
   return rational(num, den);
 }
+export function compileLinearTerms(values: readonly Rational[]) {
+  const denominator = values.reduce((den, value) => den / gcd(den, value.den) * value.den, BigInt(1));
+  return Object.freeze({ denominator, numerators: Object.freeze(values.map(value => value.num * (denominator / value.den))) });
+}
+export function linearSum(values: ReturnType<typeof compileLinearTerms>, weights: ReturnType<typeof compileLinearTerms>): Rational {
+  if (values.numerators.length !== weights.numerators.length) throw new Error("Exact linear axes must match");
+  let num = BigInt(0);
+  for (let i = 0; i < values.numerators.length; i++) num += values.numerators[i]! * weights.numerators[i]!;
+  return rational(num, values.denominator * weights.denominator);
+}
 export const serialize = (value: Rational) => ({ numerator: String(value.num), denominator: String(value.den) });
 
 export function fromDecimal(value: unknown): Rational {

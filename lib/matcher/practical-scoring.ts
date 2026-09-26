@@ -2,7 +2,7 @@ import { effectiveWeights, CONVERSATIONAL_POLICY_VERSION } from "@/lib/matcher/s
 import { sha256Hex } from "@/lib/sha256";
 import { verifiedAdministration } from "@/lib/product-administration";
 import { numericalDoseFitScore, numericalWeightedDoseFitScore, exactDoseFit, shareDoseFitInputs } from "@/lib/matcher/dose-fit";
-import { add, compare, divide, fromDecimal, multiply, positive, rational, serialize, subtract, sum, toNumber, ZERO, type Rational } from "@/lib/matcher/rational";
+import { add, compare, compileLinearTerms, linearSum, divide, fromDecimal, multiply, positive, rational, serialize, subtract, sum, toNumber, ZERO, type Rational } from "@/lib/matcher/rational";
 import type { CanonicalRequest, MatcherProduct, OptimizationMode, PreferenceImportance, SearchState } from "@/lib/matcher/types";
 
 export const PRACTICAL_SCORING_VERSION = "practical-penalties-1";
@@ -108,14 +108,16 @@ function encoded(value: Rational) {
   const dto = serialize(normalized); nativeExact.set(dto, normalized); return dto;
 }
 const QUARTER = fromDecimal(0.25), ONE = fromDecimal(1), THREE = fromDecimal(3), PRICE_SCALE = fromDecimal(100000);
-const profileCoefficients = new WeakMap<Profile, { objectives: Record<"pills" | "products" | "price" | "servings", Rational>; preferences: Record<Field, Rational> }>();
+const profileCoefficients = new WeakMap<Profile, { objectives: Record<"pills" | "products" | "price" | "servings", Rational>; preferences: Record<Field, Rational>; linear: ReturnType<typeof compileLinearTerms> }>();
 function coefficients(profile: Profile) {
   let value = profileCoefficients.get(profile);
   if (!value) {
     const m = profile.multipliers;
     const objective = (weight: number) => profile.version === CONVERSATIONAL_POLICY_VERSION ? multiply(fromDecimal(0.05), fromDecimal(weight)) : fromDecimal(0.05 * weight);
-    value = { objectives: { pills: objective(m.pills), products: objective(m.products), price: objective(m.price), servings: objective(m.servings) },
-      preferences: Object.fromEntries(FIELDS.map((field, index) => [field, multiply(multiply(QUARTER, fromDecimal([m.pills, m.products, m.price][index]!)), fromDecimal(IMPORTANCE[profile.importance[field]]))])) as Record<Field, Rational> };
+    const objectives = { pills: objective(m.pills), products: objective(m.products), price: objective(m.price), servings: objective(m.servings) };
+    const preferences = Object.fromEntries(FIELDS.map((field, index) => [field, multiply(multiply(QUARTER, fromDecimal([m.pills, m.products, m.price][index]!)), fromDecimal(IMPORTANCE[profile.importance[field]]))])) as Record<Field, Rational>;
+    value = { objectives, preferences, linear: compileLinearTerms([objectives.pills, objectives.products, objectives.price, objectives.servings,
+      ONE, fromDecimal(Math.max(1, m.pills * IMPORTANCE[profile.importance.maxDailyPills])), ...FIELDS.map(field => preferences[field])]) };
     profileCoefficients.set(profile, value);
   }
   return value;
@@ -155,8 +157,12 @@ function compileMeasurements(request: PracticalRequest, actual: PracticalActuals
     return { ...row, preferred, scale, active, squaredOverrun: square(ratio) };
   });
   const servings = actual.servingBurdenExact ?? sum(actual.servings.map((n, i) => square(positive(subtract(measurement(n, `servings[${i}]`), ONE)))));
-  return { pills: divide(pills, THREE), products, price: divide(price, PRICE_SCALE), uncertainty: multiply(QUARTER, uncertain),
-    preferencePrice, preferences, servings, missingComponents: [...missing].sort() };
+  const normalizedPills = divide(pills, THREE), normalizedPrice = divide(price, PRICE_SCALE), uncertainty = multiply(QUARTER, uncertain);
+  const weightedUncertainty = profile.version === WEB_PRACTICAL_SCORING_VERSION && request.maxDailyPills != null;
+  return { pills: normalizedPills, products, price: normalizedPrice, uncertainty, preferencePrice, preferences, servings, missingComponents: [...missing].sort(),
+    linear: compileLinearTerms([request.maxDailyPills == null ? normalizedPills : ZERO, request.maxProductCount == null ? products : ZERO,
+      request.maxPriceMinor == null || (profile.version === WEB_PRACTICAL_SCORING_VERSION && preferencePrice === null) ? normalizedPrice : ZERO,
+      servings, weightedUncertainty ? ZERO : uncertainty, weightedUncertainty ? uncertainty : ZERO, ...preferences.map(row => row.squaredOverrun)]) };
 }
 function measurementsFor(request: PracticalRequest, actual: PracticalActuals, profile: Profile) {
   const source = doseRequest.get(request as CanonicalRequest) ?? request;
@@ -168,8 +174,15 @@ function measurementsFor(request: PracticalRequest, actual: PracticalActuals, pr
 /** Exact ranking estimate, with incomplete observations explicitly distinct from known zero. */
 function numericalPracticalPenalties(request: PracticalRequest, actual: PracticalActuals) {
   if (actual.currency !== request.currency || actual.currency !== "THB") throw new Error("currency must match the THB profile normalization currency");
-  const profile = resolvePracticalProfile(request), m = profile.multipliers, coefficient = coefficients(profile);
+  const profile = resolvePracticalProfile(request), coefficient = coefficients(profile);
   const measured = measurementsFor(request, actual, profile);
+  return { request, profile, measured, coefficient, total: linearSum(measured.linear, coefficient.linear) };
+}
+type NumericalPracticalScore = ReturnType<typeof numericalPracticalPenalties>;
+export type NumericalOverallScore = Readonly<{ profile: Profile; request: CanonicalRequest; actual: PracticalActuals;
+  dosePenalty: number; overallPenalty: number; exactTotal: Rational }>;
+function displayPenalties(score: NumericalPracticalScore): PracticalPenaltyScore {
+  const { request, profile, measured, coefficient, total } = score, m = profile.multipliers;
   const exactPreferences = measured.preferences.map(row => multiply(coefficient.preferences[row.field], row.squaredOverrun));
   const exactComponents = {
     pills: request.maxDailyPills == null ? multiply(coefficient.objectives.pills, measured.pills) : ZERO,
@@ -181,14 +194,6 @@ function numericalPracticalPenalties(request: PracticalRequest, actual: Practica
       ? multiply(measured.uncertainty, fromDecimal(Math.max(1, m.pills * IMPORTANCE[profile.importance.maxDailyPills]))) : measured.uncertainty,
     preferences: sum(exactPreferences)
   };
-  const total = sum(Object.values(exactComponents));
-  return { profile, measured, exactPreferences, exactComponents, total };
-}
-type NumericalPracticalScore = ReturnType<typeof numericalPracticalPenalties>;
-export type NumericalOverallScore = Readonly<{ profile: Profile; request: CanonicalRequest; actual: PracticalActuals;
-  dosePenalty: number; overallPenalty: number; exactTotal: Rational }>;
-function displayPenalties(score: NumericalPracticalScore): PracticalPenaltyScore {
-  const { profile, measured, exactPreferences, exactComponents, total } = score, m = profile.multipliers;
   return { profile, total: toNumber(total), exact: encoded(total), complete: measured.missingComponents.length === 0,
     components: Object.fromEntries(Object.entries(exactComponents).map(([k, v]) => [k, toNumber(v)])) as PracticalPenaltyScore["components"],
     preferences: Object.fromEntries(measured.preferences.map((row, index) => [row.field, {
