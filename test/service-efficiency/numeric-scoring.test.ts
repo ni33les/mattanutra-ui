@@ -20,6 +20,28 @@ mock.module('../../lib/matcher/rational.ts', { namedExports: { ...fractions, lin
 const { request } = await import('../matcher/flexible-v5-fixtures.ts');
 const { doseFitScore, numericalDoseFitScore, exactDoseFit, compareDoseFit, weightedDoseFitScore, numericalWeightedDoseFitScore } = await import('../../lib/matcher/dose-fit.ts');
 
+test('PERF-CPU-30 canonical dose units do not repeat alias-rewriting work', () => {
+  const original = String.prototype.replace; let rewrites = 0;
+  const expected = [['mg', 1000000n], ['mcg', 1000n], ['g', 1000000000n], ['cfu', 1n], ['million_cfu', 1000000n], ['billion_cfu', 1000000000n], ['ml', 1000n], ['serving', 1000n]] as const;
+  try {
+    String.prototype.replace = function (...args) { rewrites++; return Reflect.apply(original, this, args); };
+    for (const [unit, units] of expected) {
+      const row = dose.scaleAmount({ amount: 1, unit, subjectId: 'a', subjectName: 'A' });
+      assert.ok(!dose.isDoseError(row)); assert.equal(row.units, units);
+      assert.equal(dose.amountFromScaled(row, unit, 'A'), 1);
+    }
+  } finally { String.prototype.replace = original; }
+  assert.equal(rewrites, 0, 'Validated canonical units need no regular-expression alias pipeline');
+  for (const unit of ['µg', 'μg', 'micrograms', ' ug ']) {
+    const row = dose.scaleAmount({ amount: 2, unit, subjectId: 'a', subjectName: 'A' });
+    assert.ok(!dose.isDoseError(row)); assert.equal(row.units, 2000n);
+  }
+  const d3 = dose.scaleAmount({ amount: 2000, unit: ' IU ', subjectId: 'd3', subjectName: 'Vitamin D3' });
+  assert.ok(!dose.isDoseError(d3)); assert.equal(d3.units, 50000n);
+  const unsupported = dose.scaleAmount({ amount: 1, unit: 'unknown', subjectId: 'a', subjectName: 'A' });
+  assert.ok(dose.isDoseError(unsupported)); assert.equal(unsupported.reason, 'unsupported_unit');
+});
+
 test('PERF-CPU-28 exact comparison reuses identity and compares common denominators directly', () => {
   let reads = 0;
   const same = Object.freeze({ get num() { reads++; return 7n; }, get den() { reads++; return 13n; } });
