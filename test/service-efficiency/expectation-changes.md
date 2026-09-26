@@ -304,3 +304,5 @@ work still takes the tested conditional retirement path.
 - PERF-MEM-01 live frontier cache eviction withdrawn: it reduced retained memory and preserved all candidate values but reconstruction slowed seven of eight frozen trials. Preserve the experiment and RED/GREEN externally; retain the current cache lifetime for latency.
 
 - PERF-CPU-46: repeated material-difference checks must reuse immutable basket identity while keeping seller-only differences equivalent and physically different quantities distinct. RED performs 400 sorts for three baskets; the expected work is three. No choice eligibility, order or scoring change is intended.
+
+- PERF-CPU-47 dedicated-product memoization withdrawn after exact result parity but increased total CPU and five slower frozen trials. The narrower cache did not justify another retained ownership structure. Patch and RED/GREEN evidence are preserved externally.
