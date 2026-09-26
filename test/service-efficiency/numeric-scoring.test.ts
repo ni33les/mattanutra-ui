@@ -462,3 +462,27 @@ test('QC-RES-02 changed caller facts still invalidate an old checkpoint instead 
       'Mutable external snapshots must never receive an unsafe permanent identity memo');
   } finally { uninstallGoldCatalogue(); }
 });
+
+
+test('PERF-CPU-12 numerical practical scoring does not allocate presentation completeness sets', async () => {
+  const { numericalOverallMatchingScore, scorePracticalPenalties } = await import('../../lib/matcher/practical-scoring.ts');
+  const input=request({maxDailyPills:3,maxProductCount:1,maxPriceMinor:10000});
+  const exposure=new Map([['a',100_000_000n]]);
+  const actual={dailyPills:null,pillLowerBound:4,productCount:2,priceMinor:null,priceLowerBound:12000,currency:'THB',servings:[1,1],uncertainProductCount:1};
+  numericalOverallMatchingScore(input,exposure,{...actual});
+  const SetType=globalThis.Set;let allocations=0;let score;
+  try {
+    globalThis.Set=new Proxy(SetType,{construct(target,args){allocations++;return Reflect.construct(target,args);}});
+    score=numericalOverallMatchingScore(input,exposure,actual);
+  } finally {globalThis.Set=SetType;}
+  assert.ok(score);assert.equal(allocations,0,'Losing candidates need exact penalties, not a presentation set of missing fields');
+  // 1/36 pill overrun + 1/4 product overrun + 1/100 price overrun + 1/4 unknown administration.
+  assert.deepEqual(score.exactTotal,{num:121n,den:225n});
+  const display=scorePracticalPenalties(input,actual);
+  assert.equal(display.complete,false);
+  assert.deepEqual(display.missingComponents,['administrationBasis','dailyPills','firstOrderPrice','maxDailyPills','maxPriceMinor']);
+  assert.equal(display.preferences.maxDailyPills.actual,null);
+  assert.equal(display.preferences.maxDailyPills.actualLowerBound,4);
+  assert.equal(display.preferences.maxDailyPills.penalty,1/36);
+  assert.equal(display.preferences.maxPriceMinor.penalty,1/100);
+});
