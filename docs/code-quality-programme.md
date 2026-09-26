@@ -80,3 +80,73 @@ their evidence rather than inventing a speedup.
 The programme ends with verified DEV deployment and an undeployed promotion
 package. Additional opportunities become a follow-up backlog, not an implicit
 UAT or PRD rollout.
+
+## Reviewed slices and test impact
+
+| Slice | Maintained checks and evidence |
+| --- | --- |
+| Worker notification and SSE lifecycle | `test/service-efficiency/wakeup.test.ts`, admin SSE lifecycle and task-worker boundary checks; `runtime-lifecycle/` |
+| Catalogue refresh ownership | `test/service-efficiency/catalogue-refresh.test.ts`, live-catalogue guards; `catalogue-refresh/` |
+| Immutable snapshots and persistence | `test/service-efficiency/catalogue-pin.test.ts`, its PostgreSQL integration file, DB transaction/snapshot-store consumers and cancellation/cache checks; `catalogue-pin/` |
+| Unreachable admin implementations | `test/code-quality/dead-code-expectation-changes.md`, retained statistics/localization/CRUD consumers; `dead-code/` |
+| Shared fact writes, hashes, session controls and message copy | `test/code-quality-deduplication.test.ts`, `test/code-quality/deduplication-expectation-changes.md`, product import/edit and communications consumers; `deduplication/` |
+| Discovery, startup and canonical execution | Discovery, execution-proof, loader/timing, orchestration, validation-proof, CI and documented-client checks; `test-discovery/`, `test-speed/` |
+| Historical SQL and unreachable widgets | `test/historical-rollout-archive.test.ts`, `test/orphan-components-retirement.test.ts`, `test/code-quality/archive-orphan-expectation-changes.md`, live localization/CRUD/image and SQL lock-register checks; `archive-orphans/` |
+| Existing pharmacy image expectations | Exact approved landing tag and QR render-prop parity, including invalid-tag mutations; `test/code-quality/pharmacy-image-expectation-changes.md`, `pharmacy-image-guards/` |
+
+The final runner discovers all maintained Node and browser suites. Its reviewed
+independent-file allowlist contains only pure tests; HTTP-dependent and
+PostgreSQL cases retain serial ownership. Canonical execution runs every case
+once. Only the declared frozen business journeys receive a second semantic
+execution, with independent stores and no database credentials. Their exact
+business values are compared separately from diagnostic timings. The full
+validation gate also retains its documented public-client language/payment
+checks. This replaces redundant outer pack execution, not individual assertions.
+
+The catalogue persistence slice received additional cancellation RED evidence
+after review exposed first-subscriber ownership leaking into shared persistence.
+Subscribers now cancel independently, shared work uses the existing database
+deadline policy, and uncommitted transactional writes never satisfy another
+owner. Ten isolated PostgreSQL checks passed for commit visibility, rollback,
+transaction timeout and snapshot-store consumers; final acceptance is separate.
+
+The historical lock register had two pre-existing stale source keys after
+assessment-column and checkout-helper changes. Metadata was corrected against
+the existing SQL statements and invariants. This did not add application locks
+or weaken lock-site discovery.
+
+## Measurements and deliberately retained work
+
+Controlled fresh-process plain-TypeScript startup fell from about 440 ms to
+180 ms after deferring the TSX compiler import. TSX startup remained about
+437 ms: its required compiler work was deferred rather than removed. These are
+small fixture measurements on this host, not a promise for every suite.
+
+For eight concurrent pins of the same 128-product immutable fixture, complete
+hashes fell from nine to one and insert preparations from eight to one. All five
+baseline/candidate samples retained the same snapshot identity. The local
+median was about 38 ms before and 8 ms after; SQL/network and customer matching
+latency are not represented by this in-memory measurement.
+
+The existing retail-adapter preparation of a frozen 154-listing, 869-fact
+catalogue took about 19–34 ms locally and retained identical output hashes.
+No further adapter rewrite is included: the measured work does not justify
+extra alias/fact-resolution risk. Database transaction setup continues to
+enforce existing managed-pool cancellation and timeout semantics.
+
+Keep application lines, test/tooling lines, and archived artifact bytes as
+separate figures. Offline SQL restoration preserves every original byte and
+does not execute a migration. Runtime content, library handoffs and all existing
+recovery backups remain available.
+
+The SQL archive removes 117,830,364 active artifact bytes while retaining exact
+offline restoration of all eleven originals. The two dead-component slices and
+shared-implementation extraction remove 6,374 application lines before counting
+the small runtime fixes added elsewhere. Final totals must use the complete
+release census rather than this gross-removal figure.
+
+Two pre-existing image-policy failures were resolved without changing the
+approved landing markup or its appearance. Its exact Nong image is now a narrow
+element-level exception with negative mutation checks. The pharmacy LINE QR
+lost a redundant Next Image property; installed-framework output is identical
+in English, Thai and Chinese. Existing browser geometry checks remain required.
