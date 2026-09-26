@@ -38,15 +38,16 @@ const variantMeasurements = new WeakMap<DoseVariant, { product: ProductGroup["pr
 
 // Quantity arrays are immutable apart from append-only, physically compiled
 // probes. A resumed/replaced array gets a fresh index; traversal order is unchanged.
-const quantityIndices = new WeakMap<readonly DoseVariant[], { size: number; ids: Map<string, DoseVariant> }>();
-export function quantityById(variants: readonly DoseVariant[], id: string) {
+const quantityIndices = new WeakMap<readonly DoseVariant[], { size: number; ids: Map<string, DoseVariant>; duplicates?: Map<string, DoseVariant> }>();
+export function quantityById(variants: readonly DoseVariant[], id: string, last = false) {
   let index = quantityIndices.get(variants);
   if (!index || index.size > variants.length) { index = { size: 0, ids: new Map() }; quantityIndices.set(variants, index); }
   while (index.size < variants.length) {
     const variant = variants[index.size++]!;
     if (!index.ids.has(variant.variantId)) index.ids.set(variant.variantId, variant);
+    else (index.duplicates ??= new Map()).set(variant.variantId, variant);
   }
-  return index.ids.get(id);
+  return (last ? index.duplicates?.get(id) : undefined) ?? index.ids.get(id);
 }
 
 export function seedState(request: CanonicalRequest): SearchState {
@@ -383,12 +384,10 @@ export function reconstructVariants(
   groups: readonly ProductGroup[],
   variantIds: readonly string[]
 ) {
-  const selected = new Set(variantIds), byId = new Map<string, DoseVariant>();
-
-  for (const group of groups) {
-    for (const variant of group.variants) {
-      if (selected.has(variant.variantId)) byId.set(variant.variantId, variant);
-    }
+  const byId = new Map<string, DoseVariant>();
+  for (const group of groups) for (const id of variantIds) {
+    const variant = quantityById(group.variants, id, true);
+    if (variant) byId.set(id, variant);
   }
 
   return variantIds
