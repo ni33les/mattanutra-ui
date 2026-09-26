@@ -4,7 +4,7 @@ import { catalogBandRuleId, safetyCeilingFor } from "@/lib/matcher/safety-ceilin
 import { intakeIsKnown, targetBasis } from "@/lib/matcher/target-basis";
 import { zeroTargetScale } from "@/lib/matcher/zero-target-policy";
 import { effectiveWeights } from "@/lib/matcher/scoring-policy";
-import { add, fromDecimal, multiply, sum } from "@/lib/matcher/rational";
+import { add, compare as compareFractions, fromDecimal, multiply, sum, toNumber as value } from "@/lib/matcher/rational";
 import type { CanonicalRequest, DoseDimension, DoseFitScore, MatcherUnit, SafetyCeiling } from "@/lib/matcher/types";
 
 type Fraction = Readonly<{ num: bigint; den: bigint }>;
@@ -38,18 +38,6 @@ function exactWeights(settings: ReturnType<typeof effectiveWeights>) {
 
 function excess(amount: bigint, limit: bigint): Fraction {
   return amount > limit && limit > BigInt(0) ? { num: amount - limit, den: limit } : ZERO;
-}
-
-function value(fraction: Fraction) {
-  const numerator = Number(fraction.num), denominator = Number(fraction.den);
-  if (Number.isFinite(numerator) && Number.isFinite(denominator)) return numerator / denominator;
-  // Exact sums may have enormous coprime denominators even though their ratio
-  // is small. Convert leading significant digits without Infinity / Infinity.
-  const n = fraction.num.toString(), d = fraction.den.toString();
-  const leadingN = n.slice(0, 17), leadingD = d.slice(0, 17);
-  const coefficient = (Number(leadingN) / 10 ** (leadingN.length - 1)) /
-    (Number(leadingD) / 10 ** (leadingD.length - 1));
-  return Number(`${coefficient}e${n.length - d.length}`);
 }
 
 function certainty(request: CanonicalRequest, subjectId: string) {
@@ -164,11 +152,6 @@ function cachedSubjectLoss(input: ReturnType<typeof compileSubject>, known: bigi
     cache.set(known, value);
   }
   return value;
-}
-
-function compareFractions(a: Fraction, b: Fraction) {
-  const delta = a.num * b.den - b.num * a.den;
-  return delta < BigInt(0) ? -1 : delta > BigInt(0) ? 1 : 0;
 }
 
 export function numericalDoseFitScore(request: CanonicalRequest, exposure: ReadonlyMap<string, bigint>): NumericalDoseFitScore {
@@ -315,8 +298,7 @@ export function compareDoseFit(left: NumericalDoseFitScore, right: NumericalDose
   const a = exactTotals.get(left);
   const b = exactTotals.get(right);
   if (!a || !b) return left.total - right.total;
-  const delta = a.num * b.den - b.num * a.den;
-  return delta < BigInt(0) ? -1 : delta > BigInt(0) ? 1 : 0;
+  return compareFractions(a, b);
 }
 
 /** Fresh scoring callers reuse the original exact sum, never a rounded DTO. */
