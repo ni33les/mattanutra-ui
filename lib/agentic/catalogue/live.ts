@@ -604,7 +604,8 @@ function startLiveLoad(code: string): Promise<CatalogueSnapshot> {
 
   void loadLiveRetailSnapshot(code)
     .then((snapshot) => {
-      if (snapshot.products.length > 0 || snapshot.supplements.length > 0) {
+      if (liveInflight().get(code) === inflight &&
+          (snapshot.products.length > 0 || snapshot.supplements.length > 0)) {
         liveCache().set(code, { at: Date.now(), snapshot });
       }
 
@@ -647,6 +648,9 @@ export async function cachedLiveRetailSnapshot(
   const inflight = startLiveLoad(code);
 
   if (hit && hit.snapshot.runtimeRevision === currentRevision) {
+    // Same-epoch facts remain usable while refresh completes. Cold requests
+    // await this promise; the background branch must observe failures itself.
+    void inflight.catch(() => {});
     return hit.snapshot;
   }
 
