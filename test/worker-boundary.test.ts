@@ -484,7 +484,7 @@ describe("external worker boundaries", () => {
     );
     assert.match(
       visibilityEventsSource,
-      /waitForSnapshotSignal: waitForTaskQueueChange/,
+      /waitForSnapshotSignal: \(timeoutMs, signal\) => waitForTaskQueueChange\(timeoutMs, undefined, signal\)/,
       "admin task visibility should refresh when the queue changes, not wait for the fallback snapshot interval",
     );
     assert.match(

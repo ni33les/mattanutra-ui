@@ -97,6 +97,6 @@ describe("consistency r4 regression guards", () => {
       "utf8"
     );
 
-    assert.match(events, /waitForSnapshotSignal: waitForTaskQueueChange/);
+    assert.match(events, /waitForSnapshotSignal: \(timeoutMs, signal\) => waitForTaskQueueChange\(timeoutMs, undefined, signal\)/);
   });
 });

@@ -6,12 +6,19 @@ export type TaskQueueSignal = Readonly<{
 const globalTaskWakeup = globalThis as typeof globalThis & {
   mattanutraTaskQueuePending?: TaskQueueSignal[];
   mattanutraTaskWakeupWaiters?: Set<(signal: TaskQueueSignal) => boolean>;
+  mattanutraTaskQueueObservers?: Set<(signal: TaskQueueSignal) => void>;
 };
 
 function taskWakeupWaiters() {
   globalTaskWakeup.mattanutraTaskWakeupWaiters ??= new Set();
 
   return globalTaskWakeup.mattanutraTaskWakeupWaiters;
+}
+
+function taskQueueObservers() {
+  globalTaskWakeup.mattanutraTaskQueueObservers ??= new Set();
+
+  return globalTaskWakeup.mattanutraTaskQueueObservers;
 }
 
 function pendingTaskQueueSignals() {
@@ -21,6 +28,7 @@ function pendingTaskQueueSignals() {
 }
 
 export function signalTaskQueue(signal: TaskQueueSignal) {
+  for (const observer of taskQueueObservers()) observer(signal);
   const waiters = taskWakeupWaiters();
   for (const waiter of waiters) {
     if (waiter(signal)) return;
@@ -38,8 +46,10 @@ export function signalTaskQueue(signal: TaskQueueSignal) {
 
 export function waitForTaskQueueChange(
   timeoutMs: number,
-  taskTypes?: readonly string[]
+  taskTypes?: readonly string[],
+  signal?: AbortSignal
 ) {
+  if (signal?.aborted) return Promise.reject<boolean>(signal.reason);
   if (timeoutMs <= 0) {
     return Promise.resolve(false);
   }
@@ -48,17 +58,20 @@ export function waitForTaskQueueChange(
     (taskTypes ?? []).filter((taskType) => taskType.trim().length > 0)
   );
 
-  const pending = pendingTaskQueueSignals();
-  const index = pending.findIndex(signal => accepted.size === 0 || accepted.has(signal.taskType));
-  if (index >= 0) { pending.splice(index, 1); return Promise.resolve(true); }
-
-  return new Promise<boolean>((resolve) => {
-    const waiters = taskWakeupWaiters();
-    const complete = (changed: boolean) => {
+  // Observers already load an initial snapshot. Only future changes wake them;
+  // pending task hints belong to workers and must not cause observer busy loops.
+  return new Promise<boolean>((resolve, reject) => {
+    const observers = taskQueueObservers();
+    const cleanup = () => {
       clearTimeout(timeout);
-      waiters.delete(onWakeup);
+      observers.delete(onWakeup);
+      signal?.removeEventListener("abort", onAbort);
+    };
+    const complete = (changed: boolean) => {
+      cleanup();
       resolve(changed);
     };
+    const onAbort = () => { cleanup(); reject(signal?.reason); };
     const onWakeup = (signal: TaskQueueSignal) => {
       if (
         accepted.size === 0 ||
@@ -66,13 +79,13 @@ export function waitForTaskQueueChange(
         accepted.has(signal.taskType)
       ) {
         complete(true);
-        return true;
       }
-      return false;
     };
     const timeout = setTimeout(() => complete(false), timeoutMs);
 
-    waiters.add(onWakeup);
+    observers.add(onWakeup);
+    signal?.addEventListener("abort", onAbort, { once: true });
+    if (signal?.aborted) onAbort();
   });
 }
 

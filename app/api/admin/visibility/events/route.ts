@@ -23,6 +23,6 @@ export async function GET(request: Request) {
     eventName: "visibility",
     load: () => getAdminTaskVisibilityData(range),
     request,
-    waitForSnapshotSignal: waitForTaskQueueChange
+    waitForSnapshotSignal: (timeoutMs, signal) => waitForTaskQueueChange(timeoutMs, undefined, signal)
   });
 }
