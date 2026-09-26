@@ -50,7 +50,7 @@
     },
     {
       "file": "test/service-efficiency/frontier-hot-path.test.ts",
-      "expectedCases": 3,
+      "expectedCases": 4,
       "reason": "Stable top-K retention and reduced comparison count"
     },
     {
