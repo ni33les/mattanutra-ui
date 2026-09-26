@@ -591,16 +591,23 @@ export async function createCustomerLineConnectToken(input: Readonly<{
     90 * 24 * 60,
     Math.max(1, Math.round(Number(input.expiresInMinutes) || 15))
   );
-  const code = newLineConnectCode();
-  const tokenHash = hashLineConnectCode(code);
   const expiresAt = new Date(Date.now() + expiresInMinutes * 60 * 1000);
   const tokenId = randomUUID();
 
-  const rows = await sql<Array<{
+  let code = "";
+  type CreatedToken = {
     expires_at: Date | string;
     id: string;
     retail_customer_order_id: string | null;
-  }>>`
+  };
+  let created: CreatedToken | undefined;
+  // The short human-entered code can collide, including with an expired row
+  // still reserved by the active-code index. Retry without aborting the caller
+  // transaction or changing any other plan's token.
+  for (let attempt = 0; attempt < 5; attempt++) {
+    code = newLineConnectCode();
+    const tokenHash = hashLineConnectCode(code);
+    const rows = await sql<CreatedToken[]>`
     insert into public.customer_line_connect_tokens (
       id,
       plan_id,
@@ -637,13 +644,17 @@ export async function createCustomerLineConnectToken(input: Readonly<{
     from public.assessments
     where assessments.plan_id = ${input.planId}::uuid
     limit 1
+    on conflict (token_hash)
+      where consumed_at is null and status in ('active', 'consuming')
+      do nothing
     returning id::text, expires_at, retail_customer_order_id::text
   `;
-  const created = rows[0];
-
-  if (!created) {
-    throw new Error("Plan not found");
+    created = rows[0];
+    if (created) break;
+    const plans = await sql`select plan_id from public.assessments where plan_id = ${input.planId}::uuid limit 1`;
+    if (!plans[0]) throw new Error("Plan not found");
   }
+  if (!created) throw new Error("Unable to allocate a LINE connection code; please try again");
 
   void writeBpmEvent({
     actorType: "visitor",
