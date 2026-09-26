@@ -77,6 +77,23 @@ test('PERF-CPU-20 cursor continuations compile their fixed quantity basis once',
   assert.deepEqual([...archivedSearchStates(cursor)], [...archivedSearchStates(control)], 'Chunk size and basis reuse must not alter quantities, work, order or exact scores');
 });
 
+test('PERF-CPU-21 quantity breakpoints reuse intake endpoints without per-probe sets', async () => {
+  const { targetDoseTicks } = await import('../../lib/matcher/target-basis.ts');
+  const input = request(), target = input.targets[0]!, step = { num: 1n, den: 1n };
+  assert.deepEqual(targetDoseTicks(input, target, 10_000_000n, step), [9n, 10n, 11n]);
+  const OriginalSet = globalThis.Set; let allocations = 0, quantities;
+  try {
+    globalThis.Set = new Proxy(OriginalSet, { construct(type, args) { allocations++; return Reflect.construct(type, args); } });
+    quantities = targetDoseTicks(input, target, 10_000_000n, step, 20_000_000n);
+  } finally { globalThis.Set = OriginalSet; }
+  assert.deepEqual(quantities, [7n, 8n, 9n]);
+  assert.equal(allocations, 0, 'Physical probes must not repeatedly deduplicate the same immutable intake endpoints');
+  const estimated = request({ currentSupplements: [{ subjectId: 'a', sourceId: 'existing', name: 'A', dailyAmount: 50, unit: 'mg',
+    daily: { subjectId: 'a', dim: 'mass_ng', units: 50_000_000n }, certainty: 'estimated', minimumDailyAmount: 40, maximumDailyAmount: 60 }] });
+  assert.deepEqual(targetDoseTicks(estimated, estimated.targets[0]!, 10_000_000n, step), [3n, 4n, 5n, 6n, 7n, 9n, 10n, 11n]);
+  assert.deepEqual(targetDoseTicks(estimated, estimated.targets[0]!, 10_000_000n, step, 70_000_000n), [1n, 2n, 3n, 4n, 5n, 7n, 8n, 9n]);
+});
+
 test('REF-CPU-01 numerical ranking does not format display doses for losing candidates', () => {
   const input = request({ safetyCeilings: [{ subjectId: 'a', name: 'A', maxAmount: 100, maxUnit: 'mg', sourceScope: 'supplemental' }] });
   conversions = 0; additions = 0; aggregateSums = 0; conversionsToNumber = 0;
