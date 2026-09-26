@@ -8,11 +8,14 @@
     "test/fixtures/mcp-evidence-images/dev-20260911.json.gz",
     "contract/mcp/11.1.0/tools.json",
     "contract/mcp/11.1.0/schema.json",
-    "test/mcp-streaming/schema-baseline.json"
+    "test/mcp-streaming/schema-baseline.json",
+    "test/mcp-streaming/http-adapter-notification-probe.mjs"
   ],
   "expectationChanges": [
     "SSE plan responses may await committed completion; JSON clients still return immediate admission. No input or output schema change.",
-    "Observed revision, products, quantities, advice and money remain identical to ordinary authorized reads."
+    "Observed revision, products, quantities, advice and money remain identical to ordinary authorized reads.",
+    "Isolated HTTP acceptance now starts the same PostgreSQL completion listener as production; terminal SSE waits are not reported as admission latency.",
+    "Historical agent-route measurements remain evidence for their captured build only. Current admission diagnostics never assert current bottleneck ownership from those old measurements."
   ],
   "files": [
     {
@@ -45,7 +48,7 @@
     },
     {
       "file": "test/mcp-streaming/journey.test.ts",
-      "expectedCases": 7,
+      "expectedCases": 9,
       "slice": "journey",
       "database": false,
       "reason": "Real admitted matching and refinement return identical decisions in three locales; durable ownership and replay preserved."
@@ -59,7 +62,7 @@
     },
     {
       "file": "test/simple-plan/refinement-consistency.test.ts",
-      "expectedCases": 14,
+      "expectedCases": 16,
       "slice": "journey",
       "database": false,
       "reason": "Directly affected shared plan-read renderer preserves pending revisions, failure recovery, replay and frozen checkout access."
@@ -105,6 +108,20 @@
       "slice": "contract",
       "database": false,
       "reason": "Scoped release proof rejects wrong source and environment, incomplete evidence and unhygienic tests."
+    },
+    {
+      "file": "test/mcp-streaming/http-adapter-notifications.integration.test.ts",
+      "expectedCases": 1,
+      "slice": "signals",
+      "database": true,
+      "reason": "STREAM-HTTP-notify: actual isolated HTTP adapter receives completion from another process and closes observer/LISTEN once after repeated stop signals; fresh empty PostgreSQL prepared by the existing bootstrap prevents worker interference without cloning the active candidate database."
+    },
+    {
+      "file": "test/agentic-live-timing.test.ts",
+      "expectedCases": 1,
+      "slice": "transport",
+      "database": false,
+      "reason": "LIVE-LAT-TIMING-01: real local HTTP headers and deliberately delayed body are measured independently with a monotonic clock."
     }
   ]
 }

@@ -20,17 +20,24 @@ test("PAY-HANDOFF-01 concise refinement replay and get preserve a held pending r
   // An independently held worker lease reproduces the real handoff, without
   // relying on catalogue size or CPU speed to make a request take three seconds.
   const claim = await claimPlanOperation(app.store, operation.id, "held-worker", executionNow); assert.ok(claim);
-  for (const args of [payload, { planHandle: initial.planHandle }]) {
-    const pending = await rpc(app, "plan", args);
-    assert.equal(pending.ok, true, JSON.stringify(pending));
-    assert.equal(pending.status, "processing"); assert.equal(pending.planHandle, initial.planHandle);
-    assert.equal(pending.revision, "idempotencyKey" in args ? 2 : 1); assert.equal(pending.nextAction, "poll_plan");
-    const status = await rpc(app, "plan", { planHandle: initial.planHandle });
-    assert.equal(status.status, "processing"); assert.equal(status.revision, 1);
-    assert.equal((await app.store.getPlan(created.planId))?.currentRevision, 1);
-    assert.deepEqual(await app.store.getPlanRevision(created.planId, 1), before);
-    assert.equal(await app.store.getPlanRevision(created.planId, 2), null);
-    assert.equal((await app.store.getActivePlanOperation(created.planId))?.id, operation.id);
+  const held = await app.store.getPlanOperation(operation.id); assert.ok(held);
+  try {
+    for (const args of [payload, { planHandle: initial.planHandle }]) {
+      const pending = await rpc(app, "plan", args);
+      assert.equal(pending.ok, true, JSON.stringify(pending));
+      assert.equal(pending.status, "processing"); assert.equal(pending.planHandle, initial.planHandle);
+      assert.equal(pending.revision, 2); assert.equal(pending.nextAction, "poll_plan");
+      assert.equal(pending.choices, undefined, "Pending revision must not relabel the previous basket");
+      const status = await rpc(app, "plan", { planHandle: initial.planHandle });
+      assert.equal(status.status, "processing"); assert.equal(status.revision, 2);
+      assert.equal(status.nextAction, "poll_plan");
+      assert.equal((await app.store.getPlan(created.planId))?.currentRevision, 1);
+      assert.deepEqual(await app.store.getPlanRevision(created.planId, 1), before);
+      assert.equal(await app.store.getPlanRevision(created.planId, 2), null);
+      assert.equal((await app.store.getActivePlanOperation(created.planId))?.id, operation.id);
+      assert.deepEqual(await app.store.getPlanOperation(operation.id), held, "Reads and replay preserve the held owner and lease");
+    }
+  } finally {
+    assert.equal(await cancelPlanOperation(app.store, operation.id, app.now!), true);
   }
-  assert.equal(await cancelPlanOperation(app.store, operation.id, app.now!), true);
 });

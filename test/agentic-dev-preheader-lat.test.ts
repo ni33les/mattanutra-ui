@@ -16,6 +16,7 @@ import {
   TECH07_LIVE_BUDGET
 } from "../lib/agentic/qa/latency-score.ts";
 import { planTool } from "../lib/agentic/plan/service.ts";
+import { cancelPlanOperation } from "../lib/agentic/plan/operations.ts";
 import { resetMatchPlanCache } from "../lib/agentic/plan/matching.ts";
 import {
   beginDetRun,
@@ -69,8 +70,12 @@ function planBody(idempotencyKey: string) {
     params: {
       arguments: {
         idempotencyKey,
-        operation: "create",
-        request: MAGNESIUM_REQUEST
+        destinationCountry: MAGNESIUM_REQUEST.destinationCountry,
+        locale: MAGNESIUM_REQUEST.locale,
+        profile: MAGNESIUM_REQUEST.profile,
+        requirements: MAGNESIUM_REQUEST.requirements,
+        scoring: { profile: "balanced" },
+        targets: [{ amount: 300, name: "Magnesium", unit: "mg" }]
       },
       name: "plan"
     }
@@ -426,12 +431,12 @@ describe("DEV pre-header latency pack", () => {
     ] as const) assert.equal(owningStage({ directP95Ms, publicP95Ms, agentP95Ms, publicBodyP95Ms }), expected);
   });
 
-  it("DEV-LAT-003 thirty uncached public plans meet live p50/p95", async () => {
+  it("DEV-LAT-003 thirty real public admissions are measured separately and reach terminal state", async () => {
     const samples = await concurrent(30, 10, (index) =>
       stagedPost(
         PUBLIC,
         planBody(`dev-lat-003-${Date.now().toString(36)}-${String(index).padStart(10, "0")}`),
-        MIXED_ACCEPT,
+        "application/json",
         `dev-lat-003-${index}`
       )
     );
@@ -456,7 +461,15 @@ describe("DEV pre-header latency pack", () => {
       assert.equal(typeof admitted.planHandle, "string", "Admission must return a real durable plan receipt");
       assert.ok(["processing", "ready", "needs_input", "no_purchase"].includes(String(admitted.status)), JSON.stringify(admitted));
     }
-    observeBenchmark(scored, "public uncached plans");
+    observeBenchmark(scored, "public durable admission; excludes matching and polling");
+    // Drain every accepted operation through its public handle. Admission latency
+    // excludes this wait; no task is abandoned to contaminate following cases.
+    await Promise.all(samples.map(async sample => {
+      const admitted = liveStructured(sample.payload);
+      const terminal = await liveCompletedCall(PUBLIC, "plan", { planHandle: admitted.planHandle }, { accept: "application/json" });
+      assert.equal(terminal.structured.ok, true, JSON.stringify(terminal.structured));
+      assert.ok(["ready", "needs_input", "no_purchase"].includes(String(terminal.structured.status)), JSON.stringify(terminal.structured));
+    }));
   });
 
   it("DEV-LAT-004 handler pass cannot hide public pre-header excess", async () => {
@@ -505,7 +518,7 @@ describe("DEV-LAT-006 canonical A/B evidence", () => {
     endDetRun();
   });
 
-  it("isolated Run A and Run B canonical latency evidence is byte-identical", async () => {
+  it("isolated Run A and Run B canonical durable-admission evidence is byte-identical", async () => {
     async function runOnce(runId: string) {
       const runtime = createDetRuntime({ principal: `dev-lat-006-${runId}` });
       const samples: number[] = [];
@@ -516,7 +529,7 @@ describe("DEV-LAT-006 canonical A/B evidence", () => {
           next += 1;
           resetMatchPlanCache();
           const started = performance.now();
-          await planTool({
+          const admitted = await planTool({
             config: runtime.config,
             now: DET_V3_CLOCK,
             payload: {
@@ -527,6 +540,14 @@ describe("DEV-LAT-006 canonical A/B evidence", () => {
             store: runtime.store
           });
           samples.push(performance.now() - started);
+          assert.equal(admitted.ok, true, JSON.stringify(admitted));
+          assert.ok("status" in admitted && admitted.status === "processing", "Direct service benchmark measures durable admission");
+          const key = `dev-lat-006-${runId}-${String(index).padStart(10, "0")}`;
+          const operation = await runtime.store.getPlanOperationByKey(`dev:${runtime.scope.tenantScope}:dev-lat-006-${runId}-${index}`, key);
+          assert.ok(operation?.taskId); assert.equal(operation.status, "queued");
+          assert.equal(operation.leaseToken, null);
+          await cancelPlanOperation(runtime.store, operation.id, DET_V3_CLOCK);
+          assert.equal((await runtime.store.getPlanOperation(operation.id))?.status, "cancelled");
         }
       }
       await Promise.all(Array.from({ length: 10 }, () => worker()));

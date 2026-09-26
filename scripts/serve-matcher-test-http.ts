@@ -11,12 +11,15 @@ import { warmAgenticCatalogue } from "../lib/agentic/catalogue/warm.ts";
 import { refreshAdminSafetyCeilings } from "../lib/agentic/catalogue/load-safety-ceilings.ts";
 import { assertReleaseManifestReady } from "../lib/agentic/release-manifest.ts";
 import { closeSqlPool } from "../lib/db.ts";
+import { subscribeTaskQueue } from "../lib/task-wakeup.ts";
 import { isolatedValidationEnvironment } from "./run-dev-advisory-validation.mjs";
 
 isolatedValidationEnvironment(process.env);
 const identity = assertReleaseManifestReady();
 await warmAgenticCatalogue("dev");
 await refreshAdminSafetyCeilings();
+// Match production instrumentation: external worker completions wake SSE observers.
+const unsubscribeTaskQueue = await subscribeTaskQueue();
 const server = createServer(async (incoming, outgoing) => {
   const controller = new AbortController();
   incoming.once("aborted", () => controller.abort());
@@ -63,6 +66,14 @@ if (!workerIdentity.ready || workerIdentity.buildId !== identity.buildId) throw 
 const ready = { ready: true, origin: `http://127.0.0.1:${address.port}`, ...identity, worker: workerIdentity };
 process.send?.(ready);
 console.log(`MCP_TEST_SERVER_READY:${JSON.stringify(ready)}`);
-async function stop() { worker.kill("SIGTERM"); server.closeAllConnections(); await new Promise<void>(done => server.close(() => done())); await closeSqlPool(); process.exit(0); }
+let stopping: Promise<void> | undefined;
+function stop() {
+  return stopping ??= (async () => {
+    await unsubscribeTaskQueue();
+    worker.kill("SIGTERM"); server.closeAllConnections();
+    await new Promise<void>(done => server.close(() => done()));
+    await closeSqlPool(); process.exit(0);
+  })();
+}
 process.once("SIGTERM", () => { void stop(); });
 process.once("SIGINT", () => { void stop(); });

@@ -43,6 +43,7 @@ async function call(runtime: AgenticRuntime, args: Record<string, unknown>) {
     return response!.result!.structuredContent as Record<string, unknown> & {
         error: {
             reasonCode: string;
+            currentRevision?: number;
         };
     };
 }
@@ -90,17 +91,30 @@ describe("MCP reliability: catalogue persistence and cache isolation", () => {
     });
 });
 describe("MCP reliability: atomic plan and checkout commands", () => {
-    it("keeps the previous revision readable after an invalid edit", async () => {
+    it("preserves the committed result while exposing the attempted revision and typed invalid-edit error", async () => {
         const runtime = createAgenticRuntime();
         const created = await call(runtime, { idempotencyKey: "review-invalid-create", ...request });
         assert.equal(created.status, "no_purchase");
+        const owner = `${runtime.scope.environment}:${runtime.scope.tenantScope}:${runtime.scope.principalScope ?? "anon"}`;
+        const original = await runtime.store.getPlanOperationByKey(owner, "review-invalid-create");
+        assert.ok(original);
+        const committed = await runtime.store.getPlanRevision(original.planId, Number(created.revision));
+        assert.ok(committed);
         const invalid = await call(runtime, { idempotencyKey: "review-invalid-revise", planHandle: created.planHandle,
             expectedRevision: created.revision, ...{ ...request, targets: [{ name: "Magnesium", amount: 100, unit: "IU" }] } });
+        assert.equal(invalid.ok, false);
         assert.equal(invalid.error.reasonCode, "unsupported_unit");
+        assert.equal(invalid.error.currentRevision, 2);
         const read = await call(runtime, { planHandle: created.planHandle });
-        assert.equal(read.ok, true);
-        assert.equal(read.revision, created.revision);
-        assert.equal(read.status, "failed", "A failed admitted edit is visible while the committed revision remains unchanged");
+        assert.equal(read.ok, false);
+        assert.equal(read.error.reasonCode, "unsupported_unit");
+        assert.equal(read.error.currentRevision, 2, "Reads expose the failed attempted revision, not the previous basket as a new result");
+        assert.equal((await runtime.store.getPlan(original.planId))?.currentRevision, 1);
+        assert.deepEqual(await runtime.store.getPlanRevision(original.planId, 1), committed);
+        const recovered = await call(runtime, { planHandle: created.planHandle, expectedRevision: read.error.currentRevision,
+            idempotencyKey: "review-invalid-recovery", scoring: {} });
+        assert.equal(recovered.ok, true, JSON.stringify(recovered));
+        assert.equal(recovered.revision, 2, "The displayed failed revision is recoverable without inventing another counter");
     });
     it("can edit a stored plan after losing all process-local pins", async () => {
         const runtime = createAgenticRuntime();
@@ -130,16 +144,31 @@ describe("MCP reliability: atomic plan and checkout commands", () => {
         setMatcherEnteredForTests(() => { count += 1; entered.resolve(); });
         const edit = (amount: number) => call(runtime, { idempotencyKey: "review-race-edit-" + amount,
             planHandle: created.planHandle, expectedRevision: 1, ...{ ...request, targets: [{ ingredientId: fixtureSnapshot().supplements.find(row => row.name === "Vitamin D3")!.supplementId, amount }] } });
+        const owner = `${runtime.scope.environment}:${runtime.scope.tenantScope}:${runtime.scope.principalScope ?? "anon"}`;
+        const original = await runtime.store.getPlanOperationByKey(owner, "review-race-create");
+        assert.ok(original);
+        const committed = await runtime.store.getPlanRevision(original.planId, 1);
+        assert.ok(committed);
         const pending = [edit(1500), edit(2000)];
-        await entered.promise;
-        const reading = await call(runtime, { planHandle: created.planHandle });
-        assert.equal(reading.revision, 1);
-        assert.equal(reading.status, "processing");
-        gate.resolve();
-        const results = await Promise.all(pending);
+        let results: Awaited<ReturnType<typeof call>>[] = [];
+        try {
+            await entered.promise;
+            const reading = await call(runtime, { planHandle: created.planHandle });
+            assert.equal(reading.revision, 2, "Accepted work publishes its attempted revision while it is processing");
+            assert.equal(reading.status, "processing");
+            assert.equal((await runtime.store.getPlan(original.planId))?.currentRevision, 1);
+            assert.deepEqual(await runtime.store.getPlanRevision(original.planId, 1), committed);
+            assert.equal(await runtime.store.getPlanRevision(original.planId, 2), null);
+        } finally {
+            gate.resolve();
+            results = await Promise.all(pending);
+        }
         assert.equal(count, 1, "Only the admitted owner may enter matching");
         assert.equal(results.filter(r => r.ok).length, 1, JSON.stringify(results));
         assert.equal(results.find(r => !r.ok)?.error.reasonCode, "stale_revision");
+        assert.equal(results.find(r => !r.ok)?.error.currentRevision, 2);
+        assert.equal(results.find(r => r.ok)?.revision, 2);
+        assert.equal((await runtime.store.getPlan(original.planId))?.currentRevision, 2);
     });
     it("reuses one order across independent executor instances", async () => {
         const runtime = createAgenticRuntime();

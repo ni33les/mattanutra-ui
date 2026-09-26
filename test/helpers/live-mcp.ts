@@ -15,6 +15,8 @@ export const LIVE_CLIENT_HEADERS = isolatedMcpClientHeaders(target, process.pid)
 export type LiveMcpCall = Readonly<{
   headers: Record<string, string>;
   ms: number;
+  preHeaderMs: number;
+  bodyMs: number;
   status: number;
   structured: Record<string, unknown>;
 }>;
@@ -43,7 +45,7 @@ export function livePost(
   const target = new URL(url);
   const payload = JSON.stringify(body);
   const transport = target.protocol === "https:" ? https : http;
-  const started = Date.now();
+  const started = performance.now();
 
   return new Promise((resolve, reject) => {
     const request = transport.request(
@@ -61,6 +63,7 @@ export function livePost(
         port: target.port || undefined
       },
       (response) => {
+        const preHeaderMs = performance.now() - started;
         const chunks: Buffer[] = [];
         response.on("data", (chunk) => {
           chunks.push(Buffer.from(chunk));
@@ -84,9 +87,10 @@ export function livePost(
               headers[key.toLowerCase()] = value;
             }
           }
+          const ms = performance.now() - started;
           resolve({
             headers,
-            ms: Date.now() - started,
+            ms, preHeaderMs, bodyMs: ms - preHeaderMs,
             status: response.statusCode ?? 0,
             structured: liveStructured(decoded)
           });

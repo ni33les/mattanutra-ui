@@ -25,14 +25,16 @@ test("AXR-REL-03 polling reports failed refinement instead of returning the prev
   const polled = await rpc(instance, "plan", { planHandle: initial.planHandle });
   assert.equal(polled.ok, true);
   assert.equal(polled.status, "failed");
-  assert.equal(polled.revision, 1);
+  assert.equal(polled.revision, 2, "The failed attempted revision remains the client recovery revision");
   assert.equal(polled.nextAction, "change_request");
   assert.match(String(polled.summary), /scoring/);
   assert.equal((await instance.store.getPlanOperation(failed.id))?.error?.error.reasonCode, "stale_revision");
   const previous = await rpc(instance, "plan", { planHandle: initial.planHandle });
   assert.deepEqual(previous, polled);
+  const beforeReplay = await instance.store.getPlanOperation(failed.id);
   const replay = await rpc(instance, "plan", payload);
-  assert.equal(replay.ok, false); assert.equal(replay.error.reasonCode, "stale_revision");
+  assert.deepEqual(replay, polled, "Generic operation failure is consistent across reads and same-key replay");
+  assert.deepEqual(await instance.store.getPlanOperation(failed.id), beforeReplay, "Replay does not execute or replace failed work");
   assert.deepEqual(await instance.store.getPlanRevision(created.planId, 1), before);
   assert.equal((await instance.store.getPlan(created.planId))?.currentRevision, 1);
 });
