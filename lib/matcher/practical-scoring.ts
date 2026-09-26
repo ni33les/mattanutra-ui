@@ -226,7 +226,7 @@ export function overallMatchingScore(request: CanonicalRequest, exposure: Readon
   return displayOverall(numericalOverallMatchingScore(request, exposure, actual));
 }
 
-const stateScores = new WeakMap<SearchState["exposure"], { state: SearchState; actual: PracticalActuals; scores: NumericalOverallScore[] }[]>();
+const stateScores = new WeakMap<SearchState["exposure"], { state: SearchState; actual: PracticalActuals; scores: Map<CanonicalRequest, NumericalOverallScore> }[]>();
 function sameMeasurements(a: SearchState, b: SearchState) {
   return a.pills === b.pills && a.pillCountKnown === b.pillCountKnown && a.count === b.count && a.price === b.price &&
     a.uncertainAdministrationCount === b.uncertainAdministrationCount && a.monthlyPriceMinor === b.monthlyPriceMinor &&
@@ -236,24 +236,23 @@ function sameMeasurements(a: SearchState, b: SearchState) {
 }
 export function numericalSearchStateScore(request: CanonicalRequest, state: SearchState): NumericalOverallScore {
   let bucket = stateScores.get(state.exposure);
-  let row: NonNullable<typeof bucket>[number] | undefined;
-  if (bucket) for (const item of bucket) {
-    if (item.actual.currency === request.currency && (item.state === state || sameMeasurements(item.state, state))) { row = item; break; }
-  }
+  let row = bucket?.find(row => row.actual.currency === request.currency && (row.state === state || sameMeasurements(row.state, state)));
   if (!row) {
     const actual = { dailyPills: state.pillCountKnown === false ? null : state.pills,
       pillLowerBound: state.pills, productCount: state.count, priceMinor: state.price, currency: request.currency,
       servings: state.routineServings ?? [], servingBurdenExact: state.servingBurden, uncertainProductCount: state.uncertainAdministrationCount ?? state.count,
       monthlyPriceMinor: state.monthlyPriceMinor, monthlyPriceLowerBound: state.monthlyPriceLowerBound };
-    row = { state, actual, scores: [] };
+    row = { state, actual, scores: new Map() };
     if (!bucket) { bucket = []; stateScores.set(state.exposure, bucket); }
     if (bucket.length >= 8) bucket.shift();
     bucket.push(row);
   }
-  for (const score of row.scores) if (score.request === request) return score;
-  const result = numericalOverallMatchingScore(request, state.exposure, row.actual);
-  if (row.scores.length >= PRACTICAL_OBJECTIVES.length) row.scores.shift();
-  row.scores.push(result);
+  let result = row.scores.get(request);
+  if (!result) {
+    result = numericalOverallMatchingScore(request, state.exposure, row.actual);
+    if (row.scores.size >= PRACTICAL_OBJECTIVES.length) row.scores.delete(row.scores.keys().next().value!);
+    row.scores.set(request, result);
+  }
   return result;
 }
 export function searchStateScore(request: CanonicalRequest, state: SearchState): OverallMatchingScore {
