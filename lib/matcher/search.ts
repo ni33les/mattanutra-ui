@@ -34,7 +34,7 @@ export type SearchRun = Readonly<{
   trimmed: boolean;
 }>;
 
-const variantMeasurements = new WeakMap<DoseVariant, { product: ProductGroup["product"]; burden: ReturnType<typeof multiply>; monthly: number | null; uncertain: number }>();
+const variantMeasurements = new WeakMap<DoseVariant, { product: ProductGroup["product"]; burden: ReturnType<typeof multiply>; monthly: number | null; uncertain: number; contributionOnly: boolean }>();
 
 // Quantity arrays are immutable apart from append-only, physically compiled
 // probes. A resumed/replaced array gets a fresh index; traversal order is unchanged.
@@ -62,7 +62,7 @@ export function seedState(request: CanonicalRequest): SearchState {
   return {
     routineServings: [], servingBurden: ZERO, uncertainAdministrationCount: 0, monthlyPriceMinor: 0, monthlyPriceLowerBound: 0,
     count: 0,
-    delivered: new Map(exposure),
+    delivered: exposure,
     exposure,
     nextGroupIndex: 0,
     pills: 0,
@@ -101,37 +101,25 @@ export function tryAddVariant(
   // Checkout acquires one pack per selected product. Daily servings affect
   // depletion and replenishment, not the number of packs in this order.
   const price = state.price + group.product.unitPriceMinor;
+  const safetyExposure = variant.safetyExposure ?? labelledSafetyExposure(group.product, variant.dailyUnits, request);
   let measured = variantMeasurements.get(variant);
   if (measured?.product !== group.product) {
     const excess = positive(subtract(variant.dailyUnitsRatio ?? fromDecimal(variant.dailyUnits), fromDecimal(1)));
     measured = { product: group.product, burden: multiply(excess, excess),
-      monthly: monthlyGoodsPrice(group.product, variant.dailyUnits, variant.dailyUnitsRatio), uncertain: Number(!administrationBasisKnown(group.product)) };
+      monthly: monthlyGoodsPrice(group.product, variant.dailyUnits, variant.dailyUnitsRatio), uncertain: Number(!administrationBasisKnown(group.product)),
+      contributionOnly: safetyExposure.size === variant.contributions.size && [...safetyExposure].every(([id, amount]) => variant.contributions.get(id)?.units === amount.units) };
     variantMeasurements.set(variant, measured);
   }
   const monthly = measured.monthly;
 
-  const delivered = new Map(state.delivered);
   const exposure = new Map(state.exposure);
-  const safetyExposure =
-    variant.safetyExposure ??
-    labelledSafetyExposure(group.product, variant.dailyUnits, request);
-  const additions = new Map(safetyExposure);
-  for (const [id, amount] of variant.contributions) additions.set(id, amount);
-
-  for (const [subjectId, amount] of additions) {
-    const nextExposure =
-      (exposure.get(subjectId) ?? BigInt(0)) + amount.units;
-
-    exposure.set(subjectId, nextExposure);
+  for (const [id, amount] of safetyExposure) exposure.set(id, (state.exposure.get(id) ?? BigInt(0)) + amount.units);
+  // A verified contribution replaces the same label's amount; it is not added twice.
+  if (!measured.contributionOnly) for (const [id, amount] of variant.contributions) exposure.set(id, (state.exposure.get(id) ?? BigInt(0)) + amount.units);
+  const delivered = measured.contributionOnly && state.delivered === state.exposure ? exposure : new Map(state.delivered);
+  if (delivered !== exposure) for (const [id, amount] of variant.contributions) {
+    delivered.set(id, (delivered.get(id) ?? BigInt(0)) + amount.units);
   }
-
-  for (const [subjectId, amount] of variant.contributions) {
-    delivered.set(
-      subjectId,
-      (delivered.get(subjectId) ?? BigInt(0)) + amount.units
-    );
-  }
-
   return {
     routineServings: [...(state.routineServings ?? []), variant.dailyUnits],
     servingBurden: add(state.servingBurden ?? ZERO, measured.burden),

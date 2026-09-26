@@ -211,7 +211,7 @@ function add(cursor: SearchCursor, state: SearchState, groupIndex: number, id: s
   if (cursor.edges.has(edge)) { const key = cursor.edges.get(edge); return key != null ? restoreState(cursor, cursor.archive.get(key)!) : null; }
   cursor.expansionAttempts++;
   let next = tryAddVariant(state, variant(cursor, groupIndex, id), cursor.groups[groupIndex]!, request);
-  if (next && next.delivered.size === next.exposure.size && [...next.delivered].every(([key, value]) => next!.exposure.get(key) === value)) {
+  if (next && next.delivered !== next.exposure && next.delivered.size === next.exposure.size && [...next.delivered].every(([key, value]) => next!.exposure.get(key) === value)) {
     next = { ...next, delivered: next.exposure };
   }
   cursor.edges.set(edge, next ? remember(cursor, next) : null);
