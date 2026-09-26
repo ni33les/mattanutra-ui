@@ -433,7 +433,6 @@ export function revalidateState(
  * never the permitted number of products or quantities in a basket. */
 export function reviewFrontier(states: readonly SearchState[], request: CanonicalRequest, incumbents: readonly SearchState[], order = (a: SearchState, b: SearchState) => compareSearchStates(a, b, request), groups: readonly ProductGroup[] = []) {
   if (states.length <= 192) return [...states];
-  const fitOrder = [...states].sort((a, b) => order(a, b));
   const doseOrder = (a: SearchState, b: SearchState) => compareDoseFit(numericalDoseFitScore(request, a.exposure), numericalDoseFitScore(request, b.exposure)) || order(a, b);
   const chosen = new Set<SearchState>([...incumbents, ...smallest(states, 16, doseOrder)]);
   // A close fit on one target can become the best complete basket after a
@@ -466,12 +465,15 @@ export function reviewFrontier(states: readonly SearchState[], request: Canonica
     const protectedFit = (state: SearchState) => doseFitTargetDeviations(numericalDoseFitScore(request, state.exposure)).filter(row => protectedIds.has(row.subjectId)).reduce((sum, row) => sum + row.under + row.over, 0);
     for (const state of smallest(states, 48, (a, b) => protectedFit(a) - protectedFit(b) || order(a, b))) chosen.add(state);
   }
-  const patterns = new Set<string>();
-  for (const state of fitOrder) {
+  const patterns = new Map<string, { state: SearchState; index: number }>();
+  for (let index = 0; index < states.length; index++) {
+    const state = states[index]!;
     const key = residualPattern(state, request);
-    if (patterns.has(key)) continue;
-    patterns.add(key); chosen.add(state);
-    if (patterns.size >= 48) break;
+    const previous = patterns.get(key);
+    if (!previous || order(state, previous.state) < 0) patterns.set(key, { state, index });
   }
+  // The first member of each bin in a stable full sort is its stable minimum.
+  // Order only those representatives, retaining the original cross-bin tie order.
+  for (const row of smallest([...patterns.values()], 48, (a, b) => order(a.state, b.state) || a.index - b.index)) chosen.add(row.state);
   return [...chosen];
 }
