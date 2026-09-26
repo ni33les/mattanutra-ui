@@ -124,7 +124,7 @@ function coefficients(profile: Profile) {
 }
 
 type PracticalRequest = Pick<CanonicalRequest, "currency" | "maxDailyPills" | "maxProductCount" | "maxPriceMinor"> & ProfileRequest;
-const measuredActuals = new WeakMap<PracticalRequest, Map<string, ReturnType<typeof compileMeasurements>>>();
+const measuredActuals = new WeakMap<PracticalRequest, WeakMap<PracticalActuals, ReturnType<typeof compileMeasurements>>>();
 function compileMeasurements(request: PracticalRequest, actual: PracticalActuals, profile: Profile) {
   const pills = measurement(actual.pillLowerBound, "pillLowerBound"), products = measurement(actual.productCount, "productCount", true);
   if (actual.dailyPills !== null) {
@@ -156,16 +156,9 @@ function compileMeasurements(request: PracticalRequest, actual: PracticalActuals
 }
 function measurementsFor(request: PracticalRequest, actual: PracticalActuals, profile: Profile) {
   const source = doseRequest.get(request as CanonicalRequest) ?? request;
-  let cache = measuredActuals.get(source); if (!cache) { cache = new Map(); measuredActuals.set(source, cache); }
-  const key = [actual.dailyPills, actual.pillLowerBound, actual.productCount, actual.priceMinor, actual.priceLowerBound,
-    actual.monthlyPriceMinor, actual.monthlyPriceLowerBound, actual.uncertainProductCount,
-    actual.servingBurdenExact ? `${actual.servingBurdenExact.num}/${actual.servingBurdenExact.den}` : actual.servings.join(',')].map(String).join('|');
-  let result = cache.get(key);
-  if (!result) {
-    result = compileMeasurements(request, actual, profile);
-    if (cache.size >= 256) cache.delete(cache.keys().next().value!);
-    cache.set(key, result);
-  }
+  let cache = measuredActuals.get(source); if (!cache) { cache = new WeakMap(); measuredActuals.set(source, cache); }
+  let result = cache.get(actual);
+  if (!result) { result = compileMeasurements(request, actual, profile); cache.set(actual, result); }
   return result;
 }
 /** Exact ranking estimate, with incomplete observations explicitly distinct from known zero. */
