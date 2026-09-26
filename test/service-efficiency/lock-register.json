@@ -9,7 +9,7 @@
   "mechanisms": [
     {
       "number": 1,
-      "resource": "Plan row \u2014 FOR UPDATE",
+      "resource": "Plan row — FOR UPDATE",
       "disposition": "narrow",
       "invariant": "Serializes operation admission, revision publication and checkout against a single plan.",
       "acquisition": "Explicit mutation transaction or conditional write; ordinary reads never acquire this lock.",
@@ -67,7 +67,7 @@
     },
     {
       "number": 2,
-      "resource": "Operation row \u2014 conditional UPDATE",
+      "resource": "Operation row — conditional UPDATE",
       "disposition": "narrow",
       "invariant": "Claims/renews operation ownership, reserves attempts, saves checkpoints, expires/cancels work and records terminal publication.",
       "acquisition": "Explicit mutation transaction or conditional write; ordinary reads never acquire this lock.",
@@ -149,7 +149,7 @@
     },
     {
       "number": 4,
-      "resource": "Active-order lookup \u2014 FOR UPDATE on presentation reads",
+      "resource": "Active-order lookup — FOR UPDATE on presentation reads",
       "disposition": "remove",
       "invariant": "Finds an existing frozen order while producing plan status/details and checking compatibility.",
       "acquisition": "None in production. Reads use ordinary MVCC SELECT; removed process counters and chains cannot admit or serialize requests.",
@@ -188,7 +188,7 @@
     },
     {
       "number": 5,
-      "resource": "Order mutation / checkout reuse \u2014 FOR UPDATE",
+      "resource": "Order mutation / checkout reuse — FOR UPDATE",
       "disposition": "narrow",
       "invariant": "Serializes payment transitions, fulfilment events and reuse of an open checkout.",
       "acquisition": "Explicit mutation transaction or conditional write; ordinary reads never acquire this lock.",
@@ -233,7 +233,7 @@
     },
     {
       "number": 6,
-      "resource": "Catalogue epoch \u2014 FOR SHARE",
+      "resource": "Catalogue epoch — FOR SHARE",
       "disposition": "narrow",
       "invariant": "Selection and creation of new checkout validate current commercial facts atomically. Matching publication retains its immutable snapshot and ordinary reads take no epoch lock.",
       "acquisition": "Only explicit selection and new-checkout commercial validation take FOR SHARE. Reads and MCP/web result publication perform no catalogue row locking.",
@@ -324,7 +324,7 @@
     },
     {
       "number": 7,
-      "resource": "Global catalogue epoch writer \u2014 UPDATE / FOR UPDATE",
+      "resource": "Global catalogue epoch writer — UPDATE / FOR UPDATE",
       "disposition": "narrow",
       "invariant": "Advances one global content revision after catalogue/reference changes. Reviewed advisory-cache refresh explicitly takes the same row first.",
       "acquisition": "Explicit mutation transaction or conditional write; ordinary reads never acquire this lock.",
@@ -364,7 +364,7 @@
     },
     {
       "number": 8,
-      "resource": "Reviewed product corrections \u2014 FOR UPDATE NOWAIT",
+      "resource": "Reviewed product corrections — FOR UPDATE NOWAIT",
       "disposition": "narrow",
       "invariant": "Protects each product against an unexpected concurrent correction.",
       "acquisition": "Explicit mutation transaction or conditional write; ordinary reads never acquire this lock.",
@@ -402,19 +402,20 @@
     },
     {
       "number": 9,
-      "resource": "Safety-reference advisory transaction lock",
-      "disposition": "retain",
-      "invariant": "One pg_try_advisory_xact_lock per nutrient serializes version/scope edits.",
-      "acquisition": "Explicit mutation transaction or conditional write; ordinary reads never acquire this lock.",
-      "permittedWork": "Revalidate ownership, revision and affected row identities; apply necessary writes only. Prepare, calculate, serialize, render and perform external effects outside the protected phase.",
-      "release": "Until caller transaction ends; acquisition is immediate success or reference_review_in_progress, with no lock-wait queue.",
+      "resource": "Reference updates and catalogue maintenance advisory transaction guards",
+      "disposition": "narrow",
+      "invariant": "Per-nutrient guards serialize reference version/scope edits; the separate catalogue-sync guard prevents simultaneous catalogue writers.",
+      "acquisition": "Reference mutations acquire their nutrient guard; runPrdLiveCatalogueSync acquires its global guard only when apply is true. Dry-runs acquire neither guard.",
+      "permittedWork": "Validate current reference heads and publish atomic version/scope changes; catalogue application validates conflicts and protected data around its atomic writes. Snapshot parsing and report-file I/O run outside the transaction.",
+      "release": "Transaction commit/rollback. Both writer guards fail fast on contention; read-only dry-runs continue while the catalogue writer guard is held.",
       "callers": [
         "lib/supplement-safety-limit-versions.ts",
         "lib/prd-live-catalogue-sync.ts:acquireSyncLock",
         "lib/supplement-safety-limit-versions.ts:lockSupplementSafetyReference"
       ],
       "tests": [
-        "test/catalogue-safety-reference-integrity.integration.test.ts"
+        "test/catalogue-safety-reference-integrity.integration.test.ts",
+        "test/service-efficiency/catalogue-sync.integration.test.ts"
       ],
       "verification": "Required named cases reconciled with successful execution by lock-register-verification.json in the unchanged-source scoped gate; historical RED evidence remains separate.",
       "cases": [
@@ -433,6 +434,14 @@
         {
           "file": "test/catalogue-safety-reference-integrity.integration.test.ts",
           "name": "ANNA-REF-PG-08 concurrent writers fail fast without writes and can retry after the nutrient lock releases"
+        },
+        {
+          "file": "test/service-efficiency/catalogue-sync.integration.test.ts",
+          "name": "PERF-LOCK-09 catalogue dry-run is read-only and completes while its writer guard is held"
+        },
+        {
+          "file": "test/service-efficiency/catalogue-sync.integration.test.ts",
+          "name": "PERF-LOCK-10 catalogue apply retains its fail-fast exclusive writer guard"
         }
       ],
       "historicalCallers": [
@@ -441,7 +450,7 @@
     },
     {
       "number": 10,
-      "resource": "Queued task claim \u2014 FOR UPDATE SKIP LOCKED",
+      "resource": "Queued task claim — FOR UPDATE SKIP LOCKED",
       "disposition": "narrow",
       "invariant": "Ensures one worker reserves each eligible task.",
       "acquisition": "Explicit mutation transaction or conditional write; ordinary reads never acquire this lock.",
@@ -473,7 +482,7 @@
     },
     {
       "number": 11,
-      "resource": "Expired/offline/orphan task recovery \u2014 SKIP LOCKED",
+      "resource": "Expired/offline/orphan task recovery — SKIP LOCKED",
       "disposition": "narrow",
       "invariant": "Reclaims expired claims, failed leases and work owned by offline sessions.",
       "acquisition": "Explicit mutation transaction or conditional write; ordinary reads never acquire this lock.",
@@ -506,7 +515,7 @@
     },
     {
       "number": 12,
-      "resource": "Task lifecycle \u2014 FOR UPDATE",
+      "resource": "Task lifecycle — FOR UPDATE",
       "disposition": "narrow",
       "invariant": "Serializes completion claim/application/finalization, failure claim/application/finalization, progress, lease renewal and return to queue.",
       "acquisition": "Explicit mutation transaction or conditional write; ordinary reads never acquire this lock.",
@@ -622,7 +631,7 @@
     },
     {
       "number": 14,
-      "resource": "Assessment row \u2014 FOR NO KEY UPDATE",
+      "resource": "Assessment row — FOR NO KEY UPDATE",
       "disposition": "narrow",
       "invariant": "Fences answer/contact edits, replan, recovery, checkout and generation completion by assessment revision.",
       "acquisition": "Explicit mutation transaction or conditional write; ordinary reads never acquire this lock.",
@@ -733,7 +742,7 @@
     },
     {
       "number": 16,
-      "resource": "Funnel request receipt \u2014 FOR UPDATE",
+      "resource": "Funnel request receipt — FOR UPDATE",
       "disposition": "narrow",
       "invariant": "Serializes retries with the same capture/checkout idempotency key.",
       "acquisition": "Explicit mutation transaction or conditional write; ordinary reads never acquire this lock.",
@@ -763,7 +772,7 @@
     },
     {
       "number": 17,
-      "resource": "Web payment row \u2014 FOR UPDATE",
+      "resource": "Web payment row — FOR UPDATE",
       "disposition": "narrow",
       "invariant": "Protects reservation binding, cancellation/confirmation, checkout recovery and generation/accounting fulfilment.",
       "acquisition": "Explicit mutation transaction or conditional write; ordinary reads never acquire this lock.",
@@ -814,7 +823,7 @@
     },
     {
       "number": 18,
-      "resource": "HealthScore delivery request \u2014 FOR UPDATE",
+      "resource": "HealthScore delivery request — FOR UPDATE",
       "disposition": "narrow",
       "invariant": "Prevents duplicate queueing and fences sending state against assessment revision.",
       "acquisition": "Explicit mutation transaction or conditional write; ordinary reads never acquire this lock.",
@@ -854,7 +863,7 @@
     },
     {
       "number": 19,
-      "resource": "OMS outbox row \u2014 FOR UPDATE SKIP LOCKED",
+      "resource": "OMS outbox row — FOR UPDATE SKIP LOCKED",
       "disposition": "narrow",
       "invariant": "Claims a fulfilment event before applying it to its order.",
       "acquisition": "Explicit mutation transaction or conditional write; ordinary reads never acquire this lock.",
@@ -886,7 +895,7 @@
     },
     {
       "number": 20,
-      "resource": "Scheduled-task cron row \u2014 SKIP LOCKED",
+      "resource": "Scheduled-task cron row — SKIP LOCKED",
       "disposition": "narrow",
       "invariant": "Prevents two schedulers dispatching the same due cron entry.",
       "acquisition": "Explicit mutation transaction or conditional write; ordinary reads never acquire this lock.",
@@ -939,7 +948,7 @@
     },
     {
       "number": 22,
-      "resource": "Request admission permits \u2014 32",
+      "resource": "Request admission permits — 32",
       "disposition": "remove",
       "invariant": "Limits simultaneously admitted observed MCP requests per process.",
       "acquisition": "None in production. Reads use ordinary MVCC SELECT; removed process counters and chains cannot admit or serialize requests.",
@@ -976,7 +985,7 @@
     },
     {
       "number": 23,
-      "resource": "Request worker permits \u2014 32",
+      "resource": "Request worker permits — 32",
       "disposition": "remove",
       "invariant": "Second request-level admission counter, acquired after admission permit.",
       "acquisition": "None in production. Reads use ordinary MVCC SELECT; removed process counters and chains cannot admit or serialize requests.",
@@ -1011,7 +1020,7 @@
     },
     {
       "number": 24,
-      "resource": "Request connection permits \u2014 32",
+      "resource": "Request connection permits — 32",
       "disposition": "remove",
       "invariant": "Third request-level counter, acquired after admission and worker permits.",
       "acquisition": "None in production. Reads use ordinary MVCC SELECT; removed process counters and chains cannot admit or serialize requests.",
@@ -1046,7 +1055,7 @@
     },
     {
       "number": 25,
-      "resource": "Database-stage permits \u2014 32",
+      "resource": "Database-stage permits — 32",
       "disposition": "remove",
       "invariant": "Limits catalogue-load/pin sections and execute database sections.",
       "acquisition": "None in production. Reads use ordinary MVCC SELECT; removed process counters and chains cannot admit or serialize requests.",
@@ -1081,7 +1090,7 @@
     },
     {
       "number": 26,
-      "resource": "MCP CPU pool \u2014 2 slots / 16 queued jobs",
+      "resource": "MCP CPU pool — 2 slots / 16 queued jobs",
       "disposition": "narrow",
       "invariant": "Bounds worker-thread search concurrency per process.",
       "acquisition": "Bounds worker-thread search concurrency per process.",
@@ -1154,7 +1163,7 @@
     },
     {
       "number": 27,
-      "resource": "Web product CPU pool \u2014 2 slots / 8 queued jobs",
+      "resource": "Web product CPU pool — 2 slots / 8 queued jobs",
       "disposition": "narrow",
       "invariant": "Runs questionnaire product matching off the external worker event loop.",
       "acquisition": "Runs questionnaire product matching off the external worker event loop.",
@@ -1977,7 +1986,7 @@
       "mechanisms": [
         9
       ],
-      "justification": "One pg_try_advisory_xact_lock per nutrient serializes version/scope edits."
+      "justification": "Apply-only mutual exclusion prevents concurrent catalogue replacement; dry-run reporting must not participate."
     },
     {
       "file": "lib/product-advisory-cache-refresh.ts",

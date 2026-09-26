@@ -716,7 +716,7 @@ export async function runPrdLiveCatalogueSync(
   try {
     summary = await input.sql.begin(async transaction => {
       const sql = transaction as unknown as Db;
-      await acquireSyncLock(sql);
+      if (input.apply) await acquireSyncLock(sql);
     const conflicts = await findNaturalKeyConflicts(sql, tables);
     const beforeProtected = await captureProtectedDataSnapshot(sql);
     let afterProtected: ProtectedDataSnapshot | null = null;

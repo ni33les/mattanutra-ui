@@ -91,3 +91,14 @@ reconciliation in `phase-frontiers-incomplete-selection.json`. The corrected
 five-file selection executes 29 cases with no skips or retries. Benchmark reader
 execution currently requires a matching compiled application identity; its
 failed startup is preserved and is not read-performance evidence.
+
+### Catalogue dry-run writer-guard removal (PERF-LOCK-09–10)
+
+- A catalogue dry-run must not acquire the writer advisory guard. The maintained
+  PostgreSQL RED run fails on the former unconditional guard while a controlled
+  writer holds it. GREEN uses a database-enforced read-only connection with a
+  nonempty existing product; apply still fails fast under the same guard.
+- The register now distinguishes this maintenance guard from the independent
+  per-nutrient reference guards. No data or live catalogue synchronization ran.
+- Evidence: `catalogue-dry-run-maintained-red.tap` and
+  `catalogue-dry-run-green.{tap,events.jsonl}` in the performance evidence root.

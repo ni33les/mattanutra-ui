@@ -250,7 +250,7 @@
       "file": "test/service-efficiency/permit-removal.test.ts",
       "slice": "permits",
       "expectedCases": 3,
-      "reason": "Audits 22\u201325: remove artificial admission/worker/connection/database gates while preserving cancellation and deadlines"
+      "reason": "Audits 22–25: remove artificial admission/worker/connection/database gates while preserving cancellation and deadlines"
     },
     {
       "file": "test/agentic-catalogue-publish-v5.test.ts",
@@ -523,6 +523,13 @@
       "expectedCases": 4,
       "reason": "Required-target protection under shared search ranking",
       "slice": "matcher-hot-path"
+    },
+    {
+      "file": "test/service-efficiency/catalogue-sync.integration.test.ts",
+      "slice": "catalogue-dry-run",
+      "database": true,
+      "expectedCases": 2,
+      "reason": "Audit 9: read-only catalogue dry-run completes under held writer guard; apply retains fail-fast mutual exclusion."
     }
   ],
   "inputs": [
