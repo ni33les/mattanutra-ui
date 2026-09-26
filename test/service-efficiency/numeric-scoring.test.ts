@@ -135,6 +135,30 @@ test('REF-CPU-07 profile representatives share immutable quantity measurements',
   assert.equal(simpler.preferences.maxDailyPills.penalty, 169 / 9);
 });
 
+test('PERF-CPU-11 candidate addition avoids temporary maps without mixing product contribution and total exposure', async () => {
+  const { compileGroups } = await import('../../lib/matcher/candidates.ts');
+  const { product } = await import('../matcher/flexible-v5-fixtures.ts');
+  const { seedState, tryAddVariant } = await import('../../lib/matcher/search.ts');
+  const input=request(), listing=product('map-reuse',{a:50});
+  const [group]=compileGroups(input,{catalogueVersion:'maps',availabilityAsOf:'2026-09-26',products:[listing]});
+  assert.ok(group); const variant=group.variants[0]!;
+  const seed=seedState(input); assert.ok(tryAddVariant(seed,variant,group,input));
+  const map=globalThis.Map;let allocations=0;let result;
+  try {
+    globalThis.Map=new Proxy(map,{construct(target,args){allocations++;return Reflect.construct(target,args);}});
+    result=tryAddVariant(seed,variant,group,input);
+  } finally {globalThis.Map=map;}
+  assert.ok(result);
+  assert.equal(allocations,1,'Equal supplied/exposure facts need one child map, with no temporary merge map');
+  assert.equal(seed.exposure.size,0);assert.equal(seed.delivered.size,0,'Parent state remains immutable');
+  const incidental=product('incidental',{a:50,b:20});
+  const [second]=compileGroups(input,{catalogueVersion:'maps-2',availabilityAsOf:'2026-09-26',products:[incidental]});assert.ok(second);
+  const different=tryAddVariant(result,second.variants[0]!,second,input);assert.ok(different);
+  assert.equal(different.exposure.get('b'),20_000_000n);
+  assert.equal(different.delivered.get('b'),undefined,'An incidental label amount is not a requested contribution');
+  assert.equal(different.exposure.get('a'),result.exposure.get('a')!+50_000_000n,'Overlapping safety/target quantities are added once');
+});
+
 test('PERF-CPU-09 repeated physical-quantity lookup avoids rescanning old variants and retains new quantities', async () => {
   const { compileGroups, compileVariant } = await import('../../lib/matcher/candidates.ts');
   const { product } = await import('../matcher/flexible-v5-fixtures.ts');
