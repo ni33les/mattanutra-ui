@@ -55,6 +55,10 @@ test('REF-CPU-04 neutral rational operations reuse immutable values without chan
   assert.strictEqual(fractions.multiply(value, fractions.ONE), value);
   assert.strictEqual(fractions.add(value, fractions.ZERO), value);
   assert.strictEqual(fractions.divide(value, fractions.ONE), value);
+  assert.strictEqual(fractions.rational(0n, 13n), fractions.ZERO);
+  assert.strictEqual(fractions.add(value, fractions.rational(-7n, 13n)), fractions.ZERO, 'Cancelling penalties must reuse zero without allocating a denominator product');
+  assert.strictEqual(fractions.subtract(value, value), fractions.ZERO);
+  assert.deepEqual(fractions.add(value, fractions.rational(5n, 13n)), { num: 12n, den: 13n });
   assert.throws(() => fractions.divide(fractions.ZERO, fractions.ZERO));
   assert.deepEqual(fractions.fromDecimal(123), { num: 123n, den: 1n });
   assert.deepEqual(fractions.fromDecimal('1.25e-2'), { num: 1n, den: 80n });
