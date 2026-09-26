@@ -111,3 +111,28 @@ The report uses that identity and the verified 2-GiB runtime, not the retired
 hard no-regression checks against a newer control; the independent native
 sub-second release gate is unchanged. RED/GREEN evidence is in
 `benchmark-control-{red,green}.tap` with GREEN execution events alongside it.
+
+### Retired permit counters and real lifecycle checks (PERF-LIFETIME-01)
+
+The unused synthetic permit scheduler is deleted. Production requests had no
+remaining acquisition calls, so its zero counters could not prove cleanup.
+Affected cases retain their IDs and now inspect actual observed-request
+ownership, including cancellation before dependency cleanup finishes. Held
+requests prove independent admission beyond the retired 32-permit ceiling.
+This is request-lifetime evidence, not a replacement for PostgreSQL, thread
+capacity or durable ownership tests in the lock register.
+
+The first consumer run omitted the isolated catalogue environment; its 13
+UAT-NL prerequisite failures remain recorded. With the required environment,
+all 15 cases in that file pass. No empty fixture or automatic retry was allowed.
+RED and both consumer executions remain in `retired-permit-*` evidence.
+
+### Completed-cursor test observation (V5-SEARCH-06)
+
+Complete application acceptance exposed an assertion inspecting a frontier
+after intentional terminal cleanup. The test now records the practical
+incumbent when that phase begins, preserving the original priority assertion.
+Exact residual quantity, physical increments, one-attempt accounting, archive
+score and checkpoint equivalence assertions remain unchanged. The original
+failure and five-case GREEN run are preserved in `acceptance-1` and
+`residual-cleanup-green.*` respectively.

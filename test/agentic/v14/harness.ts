@@ -3,8 +3,8 @@ import {
   emptyExecuteLockState,
   restoreExecuteLockState
 } from "../../../lib/agentic/commerce/execute.ts";
-import { resetRequestTraces } from "../../../lib/agentic/qa/request-trace.ts";
-import { resetResourcePermits, snapshotResourcePermits } from "../../../lib/agentic/qa/resource-permits.ts";
+import { activeRequestCountForTests, resetRequestTraces } from "../../../lib/agentic/qa/request-trace.ts";
+
 import { resetServiceClock, useInjectedServiceClock as setInjectedServiceClock } from "../../../lib/agentic/qa/service-clock.ts";
 import {
   asRecord,
@@ -44,7 +44,7 @@ export function deferred<T = void>() {
   return { promise, resolve };
 }
 
-export { snapshotResourcePermits };
+export { activeRequestCountForTests };
 
 export async function qaCall(
   runtime: Parameters<typeof import("../v12/harness.ts").qaCall>[0],
@@ -73,7 +73,6 @@ export type { HandlerId, ReadyPlan };
 export function beginV14Run() {
   beginV13Run();
   resetRequestTraces();
-  resetResourcePermits();
   resetServiceClock();
   setInjectedServiceClock();
 }
@@ -81,7 +80,6 @@ export function beginV14Run() {
 export function endV14Run() {
   endV13Run();
   resetRequestTraces();
-  resetResourcePermits();
   resetServiceClock();
 }
 
@@ -96,7 +94,7 @@ export function createHandlerCluster() {
 
   const ready: Record<HandlerId, boolean> = { A: true, B: true, C: true, D: true };
 
-  async function asHandler<T>(id: HandlerId, work: Parameters<V13Cluster["asHandler"]>[1]) {
+  async function asHandler(id: HandlerId, work: Parameters<V13Cluster["asHandler"]>[1]) {
     if (!ready[id]) {
       throw new Error("worker_unready");
     }

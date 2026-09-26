@@ -11,7 +11,7 @@ import { handleCompletedJsonRpc } from "./helpers/completed-mcp-client.ts";
 import { cancelPlanOperation } from "../lib/agentic/plan/operations.ts";
 import { resetServiceClock } from "../lib/agentic/qa/service-clock.ts";
 import { resetRequestTraces } from "../lib/agentic/qa/request-trace.ts";
-import { resetResourcePermits } from "../lib/agentic/qa/resource-permits.ts";
+
 import { resetCataloguePins } from "../lib/agentic/catalogue/pin.ts";
 import { runAdmittedPlanOperation, resetPlanCreateInflightForTests, setMatcherEnteredForTests, setMatcherGateForTests } from "../lib/agentic/plan/service.ts";
 const request = {
@@ -81,7 +81,6 @@ beforeEach(() => {
     resetPlanCreateInflightForTests();
     resetServiceClock();
     resetRequestTraces();
-    resetResourcePermits();
 });
 afterEach(() => {
     setMatcherGateForTests(null);

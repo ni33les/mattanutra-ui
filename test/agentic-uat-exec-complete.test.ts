@@ -1,3 +1,4 @@
+import { activeRequestCountForTests } from "../lib/agentic/qa/request-trace.ts";
 import { CURRENT_CONTRACT_SCHEMA_CHECKSUM } from "./helpers/current-contract-lock.ts";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -13,7 +14,7 @@ import {
   setExecuteSerializeEnteredForTests,
   setExecuteSerializeGateForTests
 } from "../lib/agentic/commerce/execute.ts";
-import { snapshotResourcePermits } from "../lib/agentic/qa/resource-permits.ts";
+
 import {
   advanceServiceClock,
   CLIENT_READ_DEADLINE_MS,
@@ -118,13 +119,7 @@ describe("UAT execute/order request-completion", () => {
     assert.equal(third.ok, true, canonicalJson(third));
     assert.equal(second.orderHandle, first.orderHandle);
     assert.equal(third.orderHandle, first.orderHandle);
-    assert.deepEqual(snapshotResourcePermits(), {
-      admission: 0,
-      connection: 0,
-      database: 0,
-      lock: 0,
-      worker: 0
-    });
+    assert.deepEqual(activeRequestCountForTests(), 0);
   });
 
   it("UAT-EXEC-RED-02 stalled leader cannot swallow execute_2's 60s clock", async () => {
@@ -156,21 +151,13 @@ describe("UAT execute/order request-completion", () => {
     assert.equal(UAT_EXEC_SUCCESS_DEADLINE_MS < UAT_EXEC_CLIENT_DEADLINE_MS, true);
     // Request-stage permit gates were removed. Cancellation still prevents
     // either independently prepared request from creating an order.
-    assert.deepEqual(snapshotResourcePermits(), {
-      admission: 0, connection: 0, database: 0, lock: 0, worker: 0
-    });
+    assert.equal(activeRequestCountForTests(), 2, 'Both cancelled dependency calls still own cleanup until they settle');
     latch.resolve();
     await withHangBudget((async () => {
       const deadline = Date.now() + 1000;
-      while (Object.values(snapshotResourcePermits()).some(count => count > 0) && Date.now() < deadline) await nextTurn();
+      while (activeRequestCountForTests() > 0 && Date.now() < deadline) await nextTurn();
     })(), "cancelled execute resource cleanup");
-    assert.deepEqual(snapshotResourcePermits(), {
-      admission: 0,
-      connection: 0,
-      database: 0,
-      lock: 0,
-      worker: 0
-    });
+    assert.deepEqual(activeRequestCountForTests(), 0);
     const capability = await cluster.store.getCapabilityByHash(
       hashCapability(cluster.runtimes.A.config.capabilitySecret, ready.planHandle)
     );
@@ -279,7 +266,7 @@ describe("UAT execute/order request-completion", () => {
           retryable:
             (first.error as { retryable?: boolean } | undefined)?.retryable === true &&
             (second.error as { retryable?: boolean } | undefined)?.retryable === true,
-          permits: snapshotResourcePermits()
+          activeRequests: activeRequestCountForTests()
         })
       );
       setExecuteFreshGateForTests(null);

@@ -1,3 +1,4 @@
+import { activeRequestCountForTests } from "../lib/agentic/qa/request-trace.ts";
 import assert from "node:assert/strict";
 import { afterEach, beforeEach, describe, it } from "node:test";
 import { listCommittedFunnelEvents } from "../lib/agentic/funnel/ledger.ts";
@@ -9,7 +10,7 @@ import {
   setExecuteSerializeEnteredForTests,
   setExecuteSerializeGateForTests
 } from "../lib/agentic/commerce/execute.ts";
-import { snapshotResourcePermits } from "../lib/agentic/qa/resource-permits.ts";
+
 import {
   beginV14Run,
   canonicalHash,
@@ -108,13 +109,7 @@ describe("v1.4 duplicate execute completion", () => {
     const lead = await leader;
     assert.equal(lead.ok, true);
     assert.equal(follower.orderHandle, lead.orderHandle);
-    assert.deepEqual(snapshotResourcePermits(), {
-      admission: 0,
-      connection: 0,
-      database: 0,
-      lock: 0,
-      worker: 0
-    });
+    assert.deepEqual(activeRequestCountForTests(), 0);
   });
 
   it("EXEC-RC-RED-04 drop after commit then replay returns the original order", async () => {
@@ -182,13 +177,7 @@ describe("v1.4 duplicate execute completion", () => {
     setExecuteFailAtForTests(null);
     const replayAfter = await executeOn(cluster, "B", { ...readyAfter, suffix: "ex06c" });
     assert.equal(replayAfter.ok, true);
-    assert.deepEqual(snapshotResourcePermits(), {
-      admission: 0,
-      connection: 0,
-      database: 0,
-      lock: 0,
-      worker: 0
-    });
+    assert.deepEqual(activeRequestCountForTests(), 0);
   });
 
   it("EXEC-RC-RED-07 two fresh execute scenarios share one canonical hash", async () => {

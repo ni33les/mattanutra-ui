@@ -1,12 +1,13 @@
 import assert from "node:assert/strict";
 import { afterEach, beforeEach, describe, it } from "node:test";
 import {
+  activeRequestCountForTests,
   onRequestStageEntered,
   requestTrace,
   setRequestStageLatch,
   STAGE_OWNER
 } from "../lib/agentic/qa/request-trace.ts";
-import { setPermitCapacity, snapshotResourcePermits } from "../lib/agentic/qa/resource-permits.ts";
+
 import { advanceServiceClock } from "../lib/agentic/qa/service-clock.ts";
 import {
   beginV14Run,
@@ -71,25 +72,35 @@ describe("v1.4 deployment-path decision gate", () => {
     const cluster = createHandlerCluster();
     const first = await cluster.asHandler("A", (runtime) => qaCall(runtime, "beginRun", { runId: "conn-1" }));
     assert.equal(first.ok, true);
-    assert.deepEqual(snapshotResourcePermits().connection, 0);
+    assert.deepEqual(activeRequestCountForTests(), 0);
     const second = await cluster.asHandler("A", (runtime) => qaCall(runtime, "beginRun", { runId: "conn-2" }));
     assert.equal(second.ok, true);
     assert.notEqual(second.namespace, first.namespace);
   });
 
-  it("EDGE-RC-RED-04 overflow is admitted in order or fails before the service deadline", async () => {
+  it("EDGE-RC-RED-04 independent admission completes while an earlier request is waiting", async () => {
     const cluster = createHandlerCluster();
-    setPermitCapacity("admission", 1);
+
     const latch = deferred();
     const entered = deferred();
     setRequestStageLatch("handler_admitted", latch.promise);
-    onRequestStageEntered("handler_admitted", entered.resolve);
+    let admitted = 0;
+    const bothEntered = deferred();
+    onRequestStageEntered("handler_admitted", () => {
+      admitted++; entered.resolve(); if (admitted === 2) bothEntered.resolve();
+    });
     const first = cluster.asHandler("A", (runtime) => qaCall(runtime, "beginRun", { runId: "sat-1" }));
     await entered.promise;
     const extra = cluster.asHandler("B", (runtime) => qaCall(runtime, "beginRun", { runId: "sat-2" }));
-    latch.resolve();
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      await Promise.race([bothEntered.promise, new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error("Independent admission did not reach its barrier")), 2000);
+      })]);
+      assert.equal(admitted, 2);
+    } finally { clearTimeout(timer); latch.resolve(); }
     const [a, b] = await Promise.all([first, extra]);
     assert.equal(a.ok, true);
-    assert.equal(b.ok === true || (b.error as { reasonCode?: string })?.reasonCode === "SERVICE_DEADLINE_EXCEEDED", true, canonicalJson(b));
+    assert.equal(b.ok, true, canonicalJson(b));
   });
 });

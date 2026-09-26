@@ -1,4 +1,4 @@
-import { runObservedRequest, recordRequestStage } from "../../../lib/agentic/qa/request-trace.ts";
+import { activeRequestCountForTests, runObservedRequest, recordRequestStage } from "../../../lib/agentic/qa/request-trace.ts";
 import { completedPlanTool as domainPlan } from "../../helpers/completed-mcp-client.ts";
 import { CURRENT_CONTRACT_SCHEMA_CHECKSUM } from "../../helpers/current-contract-lock.ts";
 import { beginDeterministicIdsForTests, endDeterministicIdsForTests } from "../../../lib/agentic/capabilities.ts";
@@ -19,7 +19,6 @@ import {
   queryBudgetSnapshot,
   resetQueryBudget
 } from "../../../lib/agentic/plan/query-budget.ts";
-import { snapshotPlanInflightForTests } from "../../../lib/agentic/plan/service.ts";
 import { resetFunnelLedger } from "../../../lib/agentic/funnel/ledger.ts";
 import {
   persistedQueryCounts,
@@ -27,10 +26,7 @@ import {
 } from "../../../lib/agentic/qa/persist.ts";
 import { resetQaSessions } from "../../../lib/agentic/qa/session.ts";
 import { resetRequestTraces } from "../../../lib/agentic/qa/request-trace.ts";
-import {
-  resetResourcePermits,
-  snapshotResourcePermits
-} from "../../../lib/agentic/qa/resource-permits.ts";
+
 import { resetServiceClock, useInjectedServiceClock as setInjectedServiceClock } from "../../../lib/agentic/qa/service-clock.ts";
 import {
   createAgenticRuntime,
@@ -128,7 +124,6 @@ export function beginUatNlRun() {
   resetMatchPlanCache();
   resetInfoCache();
   resetRequestTraces();
-  resetResourcePermits();
   resetServiceClock();
   setInjectedServiceClock();
   if (frozenReal) {
@@ -146,7 +141,6 @@ export function endUatNlRun() {
   resetMatchPlanCache();
   resetInfoCache();
   resetRequestTraces();
-  resetResourcePermits();
   resetServiceClock();
 }
 
@@ -252,17 +246,7 @@ export function counterTuple(observed: Record<string, unknown>, namespace: strin
 }
 
 export function orphanCensus() {
-  const permits = snapshotResourcePermits();
-  const inflight = snapshotPlanInflightForTests();
-  return {
-    admission: permits.admission,
-    connection: permits.connection,
-    database: permits.database,
-    inflightIdempotency: inflight.idempotency,
-    inflightMatches: inflight.matches,
-    lock: permits.lock,
-    worker: permits.worker
-  };
+  return { activeRequests: activeRequestCountForTests() };
 }
 
 export function assertSchemaLock() {

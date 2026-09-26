@@ -249,8 +249,8 @@
     {
       "file": "test/service-efficiency/permit-removal.test.ts",
       "slice": "permits",
-      "expectedCases": 3,
-      "reason": "Audits 22\u201325: remove artificial admission/worker/connection/database gates while preserving cancellation and deadlines"
+      "expectedCases": 4,
+      "reason": "Audits 22–25: remove artificial admission/worker/connection/database gates while preserving cancellation and deadlines"
     },
     {
       "file": "test/agentic-catalogue-publish-v5.test.ts",
@@ -522,6 +522,72 @@
       "database": true,
       "expectedCases": 2,
       "reason": "Audit 9: read-only catalogue dry-run completes under held writer guard; apply retains fail-fast mutual exclusion."
+    },
+    {
+      "file": "test/agentic-plan-recovery.test.ts",
+      "slice": "request-lifetime",
+      "expectedCases": 8,
+      "reason": "Direct consumers of the removed unused permit scheduler; verify actual request cleanup, independent admission and cancellation with existing durable/commerce assertions."
+    },
+    {
+      "file": "test/agentic-reliability.test.ts",
+      "slice": "request-lifetime",
+      "expectedCases": 15,
+      "reason": "Direct consumers of the removed unused permit scheduler; verify actual request cleanup, independent admission and cancellation with existing durable/commerce assertions."
+    },
+    {
+      "file": "test/agentic-uat-exec-complete.test.ts",
+      "slice": "request-lifetime",
+      "expectedCases": 6,
+      "reason": "Direct consumers of the removed unused permit scheduler; verify actual request cleanup, independent admission and cancellation with existing durable/commerce assertions."
+    },
+    {
+      "file": "test/agentic-uat-nl-v10.test.ts",
+      "slice": "request-lifetime",
+      "expectedCases": 15,
+      "reason": "Direct consumers of the removed unused permit scheduler; verify actual request cleanup, independent admission and cancellation with existing durable/commerce assertions."
+    },
+    {
+      "file": "test/agentic-v14-attr.test.ts",
+      "slice": "request-lifetime",
+      "expectedCases": 5,
+      "reason": "Direct consumers of the removed unused permit scheduler; verify actual request cleanup, independent admission and cancellation with existing durable/commerce assertions."
+    },
+    {
+      "file": "test/agentic-v14-cap-rc.test.ts",
+      "slice": "request-lifetime",
+      "expectedCases": 6,
+      "reason": "Direct consumers of the removed unused permit scheduler; verify actual request cleanup, independent admission and cancellation with existing durable/commerce assertions."
+    },
+    {
+      "file": "test/agentic-v14-deadline.test.ts",
+      "slice": "request-lifetime",
+      "expectedCases": 5,
+      "reason": "Direct consumers of the removed unused permit scheduler; verify actual request cleanup, independent admission and cancellation with existing durable/commerce assertions."
+    },
+    {
+      "file": "test/agentic-v14-edge-rc.test.ts",
+      "slice": "request-lifetime",
+      "expectedCases": 4,
+      "reason": "Direct consumers of the removed unused permit scheduler; verify actual request cleanup, independent admission and cancellation with existing durable/commerce assertions."
+    },
+    {
+      "file": "test/agentic-v14-exec-rc.test.ts",
+      "slice": "request-lifetime",
+      "expectedCases": 7,
+      "reason": "Direct consumers of the removed unused permit scheduler; verify actual request cleanup, independent admission and cancellation with existing durable/commerce assertions."
+    },
+    {
+      "file": "test/agentic-v14-join.test.ts",
+      "slice": "request-lifetime",
+      "expectedCases": 7,
+      "reason": "Direct consumers of the removed unused permit scheduler; verify actual request cleanup, independent admission and cancellation with existing durable/commerce assertions."
+    },
+    {
+      "file": "test/agentic-v14-qa-rc.test.ts",
+      "slice": "request-lifetime",
+      "expectedCases": 7,
+      "reason": "Direct consumers of the removed unused permit scheduler; verify actual request cleanup, independent admission and cancellation with existing durable/commerce assertions."
     }
   ],
   "inputs": [

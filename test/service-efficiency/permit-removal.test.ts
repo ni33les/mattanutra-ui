@@ -1,23 +1,24 @@
 import assert from "node:assert/strict";
 import { afterEach, test } from "node:test";
 import { existsSync, readFileSync } from "node:fs";
-import { runObservedRequest, cancelRequest, resetRequestTraces } from "../../lib/agentic/qa/request-trace.ts";
-import { resetResourcePermits, setPermitCapacity, snapshotResourcePermits } from "../../lib/agentic/qa/resource-permits.ts";
+import { runObservedRequest, cancelRequest, resetRequestTraces, activeRequestCountForTests } from "../../lib/agentic/qa/request-trace.ts";
 import { advanceServiceClock, resetServiceClock } from "../../lib/agentic/qa/service-clock.ts";
 
-afterEach(() => { resetResourcePermits(); resetServiceClock(); resetRequestTraces(); });
+afterEach(() => { resetServiceClock(); resetRequestTraces(); });
 
 test("LOCK-PERMIT-01 production request execution never waits for synthetic admission, worker or connection permits", async () => {
-  for (const kind of ["admission", "worker", "connection"] as const) setPermitCapacity(kind, 0);
-  let entered = false;
-  const pending = runObservedRequest("no-artificial-gates", async () => { entered = true; return "done"; });
+  const gate = Promise.withResolvers<void>(); let entered = 0;
+  const pending = Array.from({ length: 40 }, (_, i) => runObservedRequest(`no-artificial-gates-${i}`, async () => {
+    entered++; await gate.promise; return "done";
+  }));
+  try {
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(entered, 40, 'Ordinary requests must pass the retired 32-permit ceiling without queueing');
+    assert.equal(activeRequestCountForTests(), 40);
+  } finally { gate.resolve(); }
+  assert.deepEqual(await Promise.all(pending), Array(40).fill('done'));
   await new Promise(resolve => setImmediate(resolve));
-  // Release the pre-fix blocked request without leaving pending promises in the test process.
-  if (!entered) cancelRequest("no-artificial-gates");
-  const result = await pending;
-  assert.equal(entered, true);
-  assert.equal(result, "done");
-  assert.deepEqual(snapshotResourcePermits(), { admission: 0, worker: 0, connection: 0, database: 0, lock: 0 });
+  assert.equal(activeRequestCountForTests(), 0);
 });
 
 test("LOCK-PERMIT-02 removing permit gates preserves cancellation and the request deadline", async () => {

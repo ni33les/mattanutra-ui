@@ -207,6 +207,8 @@ export function listRequestTraces() {
   return [...traces.keys()].map(requestTrace);
 }
 
+export function activeRequestCountForTests() { return aborts.size; }
+
 function finishRequest(correlationId: string) {
   aborts.delete(correlationId);
   completed.delete(correlationId);

@@ -57,7 +57,7 @@ import { resetInfoCache } from "../../../lib/agentic/info.ts";
 import { DET_V3_BUILD_ID } from "../det-v3/manifest.ts";
 import { resetExecuteLockState } from "../../../lib/agentic/commerce/execute.ts";
 import { resetRequestTraces } from "../../../lib/agentic/qa/request-trace.ts";
-import { resetResourcePermits } from "../../../lib/agentic/qa/resource-permits.ts";
+
 import { resetServiceClock, useInjectedServiceClock as setInjectedServiceClock } from "../../../lib/agentic/qa/service-clock.ts";
 import { setMatcherEnteredForTests, setMatcherGateForTests } from "../../../lib/agentic/plan/service.ts";
 import {
@@ -243,7 +243,6 @@ export function beginV12Run() {
   resetCatalogueSnapshotCache();
   resetExecuteLockState();
   resetRequestTraces();
-  resetResourcePermits();
   resetServiceClock();
   setInjectedServiceClock();
   setMatcherGateForTests(null);

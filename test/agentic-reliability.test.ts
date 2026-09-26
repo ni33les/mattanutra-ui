@@ -13,9 +13,9 @@ import { createAgenticRuntime, type AgenticRuntime } from "../lib/agentic/runtim
 import { handleCompletedJsonRpc as handleJsonRpc } from "./helpers/completed-mcp-client.ts";
 import { resetPlanCreateInflightForTests, setMatcherGateForTests, setMatcherEnteredForTests } from "../lib/agentic/plan/service.ts";
 import { resetExecuteLockState } from "../lib/agentic/commerce/execute.ts";
-import { runObservedRequest, recordRequestStage, listRequestTraces, resetRequestTraces, REQUEST_TRACE_LIMIT } from "../lib/agentic/qa/request-trace.ts";
+import { activeRequestCountForTests, runObservedRequest, recordRequestStage, listRequestTraces, resetRequestTraces, REQUEST_TRACE_LIMIT } from "../lib/agentic/qa/request-trace.ts";
 import { resetServiceClock, advanceServiceClock } from "../lib/agentic/qa/service-clock.ts";
-import { resetResourcePermits, setPermitCapacity, queuedPermitOrder, snapshotResourcePermits } from "../lib/agentic/qa/resource-permits.ts";
+
 import { withRequestLifetime } from "../lib/request-lifetime.ts";
 import { feedbackTool } from "../lib/agentic/feedback.ts";
 const request = {
@@ -27,7 +27,6 @@ beforeEach(() => {
     installGoldCatalogue();
     resetPlanCreateInflightForTests();
     resetExecuteLockState();
-    resetResourcePermits();
     resetServiceClock();
     resetRequestTraces();
 });
@@ -220,29 +219,26 @@ describe("MCP reliability: bounded request lifetimes", () => {
         await entered.promise;
         advanceServiceClock(60001);
         assert.equal((await pending).ok, false);
-        assert.equal(snapshotResourcePermits().admission, 0);
+        assert.equal(activeRequestCountForTests(), 1, "Cancelled work owns cleanup until it settles");
         gate.resolve();
         await new Promise(resolve => setImmediate(resolve));
-        assert.equal(snapshotResourcePermits().admission, 0);
+        assert.equal(activeRequestCountForTests(), 0);
     });
     it("removed admission counters cannot queue or prevent ordinary requests", async () => {
-        setPermitCapacity("admission", 0);
         let started = false;
         const result = await runObservedRequest("review-queued", async () => { started = true; return { ok: true }; });
         assert.equal(result.ok, true);
         assert.equal(started, true);
-        assert.deepEqual(queuedPermitOrder(), []);
-        assert.equal(Object.values(snapshotResourcePermits()).every(n => n === 0), true);
+        assert.equal(activeRequestCountForTests(), 0);
     });
     it("cancels admission when the HTTP request is already aborted", async () => {
-        setPermitCapacity("admission", 0);
         const controller = new AbortController();
         controller.abort();
         let started = false;
         const result = await withRequestLifetime({ signal: controller.signal }, () => runObservedRequest("review-http-abort", async () => { started = true; return { ok: true }; }));
         assert.equal(result.ok, false);
         assert.equal(started, false);
-        assert.deepEqual(queuedPermitOrder(), []);
+        assert.equal(activeRequestCountForTests(), 0);
     });
     it("bounds diagnostic retention after requests finish", async () => {
         for (let i = 0; i < REQUEST_TRACE_LIMIT + 10; i++) {

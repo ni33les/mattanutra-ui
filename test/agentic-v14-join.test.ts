@@ -1,9 +1,10 @@
+import { activeRequestCountForTests } from "../lib/agentic/qa/request-trace.ts";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { afterEach, beforeEach, describe, it } from "node:test";
 import { listCommittedFunnelEvents } from "../lib/agentic/funnel/ledger.ts";
 import { resolveCapability } from "../lib/agentic/capabilities.ts";
-import { snapshotResourcePermits } from "../lib/agentic/qa/resource-permits.ts";
+
 import {
   V14_BEGIN_RUN_GROUPS,
   V14_CLOCK_09,
@@ -129,11 +130,11 @@ describe("v1.4 joined deterministic developer gate", () => {
     void contributionOf(first);
   });
 
-  it("JOIN-RC-05 final permit counters equal the initial baseline", async () => {
-    const baseline = snapshotResourcePermits();
+  it("JOIN-RC-05 final request ownership returns to the initial baseline", async () => {
+    const baseline = activeRequestCountForTests();
     const cluster = createHandlerCluster();
     await cluster.asHandler("A", (runtime) => qaCall(runtime, "beginRun", { runId: "A" }));
-    assert.deepEqual(snapshotResourcePermits(), baseline);
+    assert.deepEqual(activeRequestCountForTests(), baseline);
   });
 
   it("JOIN-RC-06 two developer-suite evidence objects have one hash", async () => {
@@ -143,7 +144,7 @@ describe("v1.4 joined deterministic developer gate", () => {
       const cluster = createHandlerCluster();
       const ready = await setupDefaultExecuteContext(cluster, { suffix: `join06${pass}` });
       const executed = await executeOn(cluster, "A", { ...ready, suffix: `join06${pass}` });
-      hashes.push(canonicalHash({ ok: executed.ok, permits: snapshotResourcePermits() }));
+      hashes.push(canonicalHash({ ok: executed.ok, activeRequests: activeRequestCountForTests() }));
       endV14Run();
     }
     assert.equal(new Set(hashes).size, 1, canonicalJson(firstDiff(hashes[0], hashes[1])));

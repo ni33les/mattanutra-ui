@@ -1,12 +1,13 @@
 import assert from "node:assert/strict";
 import { afterEach, beforeEach, describe, it } from "node:test";
 import {
+  activeRequestCountForTests,
   onRequestStageEntered,
   requestTrace,
   setRequestStageLatch
 } from "../lib/agentic/qa/request-trace.ts";
 import { listCommittedQaNamespaces } from "../lib/agentic/qa/persist.ts";
-import { snapshotResourcePermits } from "../lib/agentic/qa/resource-permits.ts";
+
 import { advanceServiceClock, CLIENT_READ_DEADLINE_MS } from "../lib/agentic/qa/service-clock.ts";
 import {
   beginV14Run,
@@ -60,13 +61,7 @@ describe("v1.4 service deadline and typed failure", () => {
     latch.resolve();
     assert.equal(result.ok, false);
     assert.equal(listCommittedQaNamespaces().length, 0);
-    assert.deepEqual(snapshotResourcePermits(), {
-      admission: 0,
-      connection: 0,
-      database: 0,
-      lock: 0,
-      worker: 0
-    });
+    assert.deepEqual(activeRequestCountForTests(), 0);
   });
 
   it("DEADLINE-RED-03 deadline after commit replays the namespace", async () => {
@@ -146,7 +141,7 @@ describe("v1.4 service deadline and typed failure", () => {
           success: success.ok,
           deadline: (deadline.error as { reasonCode?: string }).reasonCode,
           retryable: (deadline.error as { retryable?: boolean }).retryable,
-          permits: snapshotResourcePermits(),
+          activeRequests: activeRequestCountForTests(),
           owner: requestTrace(`beginRun:dl${pass}:runner-1`).terminalOwner
         })
       );

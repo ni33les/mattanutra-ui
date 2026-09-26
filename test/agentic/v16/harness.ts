@@ -20,7 +20,7 @@ import { resetFunnelLedger } from "../../../lib/agentic/funnel/ledger.ts";
 import { resetQaPersistForTests } from "../../../lib/agentic/qa/persist.ts";
 import { resetQaSessions } from "../../../lib/agentic/qa/session.ts";
 import { resetRequestTraces } from "../../../lib/agentic/qa/request-trace.ts";
-import { resetResourcePermits } from "../../../lib/agentic/qa/resource-permits.ts";
+
 import { resetServiceClock, useInjectedServiceClock as setInjectedServiceClock } from "../../../lib/agentic/qa/service-clock.ts";
 import { resetInfoCache } from "../../../lib/agentic/info.ts";
 import {
@@ -118,7 +118,6 @@ export function beginV16Run() {
   resetMatchPlanCache();
   resetInfoCache();
   resetRequestTraces();
-  resetResourcePermits();
   resetServiceClock();
   setInjectedServiceClock();
   if (frozenReal) {
@@ -136,7 +135,6 @@ export function endV16Run() {
   resetMatchPlanCache();
   resetInfoCache();
   resetRequestTraces();
-  resetResourcePermits();
   resetServiceClock();
 }
 

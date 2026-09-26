@@ -121,11 +121,7 @@ describe("UAT-NL v1.0 TECH-02 and MKT-10", () => {
       }
     }
     const orphans = orphanCensus();
-    assert.equal(orphans.inflightIdempotency, 0, JSON.stringify(orphans));
-    assert.equal(orphans.inflightMatches, 0, JSON.stringify(orphans));
-    assert.equal(orphans.admission, 0, JSON.stringify(orphans));
-    assert.equal(orphans.worker, 0, JSON.stringify(orphans));
-    assert.equal(orphans.connection, 0, JSON.stringify(orphans));
+    assert.equal(orphans.activeRequests, 0, JSON.stringify(orphans));
     endUatNlRun();
   });
 
@@ -164,7 +160,7 @@ describe("UAT-NL v1.0 TECH-02 and MKT-10", () => {
     assertNoDeadline(results);
     assert.equal(new Set(results.map(canonicalTuple)).size, 1);
     assert.equal((await store.listPlanIdsByPrincipal(namespace)).length, 10);
-    assert.equal(orphanCensus().inflightIdempotency, 0);
+    assert.equal(orphanCensus().activeRequests, 0);
   });
 
   it("V5-UAT-NL-STORE-01 captured catalogue fixtures require their exact epoch inside a transaction", async () => {
@@ -203,7 +199,7 @@ describe("UAT-NL v1.0 TECH-02 and MKT-10", () => {
     assertReadyPlan(held, "held");
     const all = [...others, held];
     assert.equal(new Set(all.map(canonicalTuple)).size, 1);
-    assert.equal(orphanCensus().inflightIdempotency, 0);
+    assert.equal(orphanCensus().activeRequests, 0);
   });
 
   it("UAT-NL-T02-RED-03 one stalled request cannot starve its peers", async () => {
@@ -234,7 +230,7 @@ describe("UAT-NL v1.0 TECH-02 and MKT-10", () => {
     }
     const plansAfterRelease = (await store.listPlanIdsByPrincipal(namespace)).length;
     assert.equal(plansAfterRelease, plansBeforeRelease);
-    assert.equal(orphanCensus().inflightIdempotency, 0);
+    assert.equal(orphanCensus().activeRequests, 0);
   });
 
   it("UAT-NL-T02-RED-04 successful response requires durable completion", async () => {
@@ -415,15 +411,14 @@ describe("UAT-NL v1.0 TECH-02 and MKT-10", () => {
     await new Promise<void>(done => setImmediate(done));
     assert.deepEqual(await store.getPlanRevision(operation.planId, 1), before);
     assert.deepEqual(queryBudgetSnapshot(namespace), counts);
-    assert.equal(orphanCensus().inflightMatches, 0);
+    assert.equal(orphanCensus().activeRequests, 0);
   });
 
   it("UAT-NL-X-RED-02 namespace teardown detects orphans", async () => {
     const { runtime } = createUatNlRuntime();
     const { results } = await tenBurst(runtime, 1, deferred());
     assert.equal(results.length, 10);
-    assert.deepEqual(orphanCensus().inflightIdempotency, 0);
-    assert.deepEqual(orphanCensus().inflightMatches, 0);
+    assert.deepEqual(orphanCensus().activeRequests, 0);
   });
 
   it("UAT-NL-X-RED-03 original failures are detectable", async () => {

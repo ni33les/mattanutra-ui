@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { afterEach, beforeEach, describe, it } from "node:test";
 import {
+  activeRequestCountForTests,
   onRequestStageEntered,
   requestTrace,
   setDropConnectionAfterStage,
@@ -9,7 +10,7 @@ import {
   STAGE_OWNER,
   type RequestStage
 } from "../lib/agentic/qa/request-trace.ts";
-import { snapshotResourcePermits } from "../lib/agentic/qa/resource-permits.ts";
+
 import { advanceServiceClock } from "../lib/agentic/qa/service-clock.ts";
 import { listCommittedQaNamespaces } from "../lib/agentic/qa/persist.ts";
 import {
@@ -82,12 +83,12 @@ describe("v1.4 ATTR request-stage attribution", () => {
     }
   });
 
-  it("ATTR-RED-03 success and typed-error both release permits to baseline", async () => {
+  it("ATTR-RED-03 success and typed-error both release request ownership to baseline", async () => {
     const cluster = createHandlerCluster();
-    const baseline = snapshotResourcePermits();
+    const baseline = activeRequestCountForTests();
     const begun = await cluster.asHandler("A", (runtime) => qaCall(runtime, "beginRun", { runId: "A" }));
     assert.equal(begun.ok, true);
-    assert.deepEqual(snapshotResourcePermits(), baseline);
+    assert.deepEqual(activeRequestCountForTests(), baseline);
     const missing = await executeOn(cluster, "B", {
       namespace: String(begun.namespace),
       planHandle: "plan_missing_handle_000000000000",
@@ -96,7 +97,7 @@ describe("v1.4 ATTR request-stage attribution", () => {
       suffix: "attr03"
     });
     assert.equal(missing.ok, false);
-    assert.deepEqual(snapshotResourcePermits(), baseline);
+    assert.deepEqual(activeRequestCountForTests(), baseline);
   });
 
   it("ATTR-RED-04 public beginRun hash is identical with attribution disabled", async () => {

@@ -10,15 +10,12 @@ import {
   setCatalogueInitGateForTests
 } from "../lib/agentic/catalogue/snapshot.ts";
 import {
+  activeRequestCountForTests,
   cancelRequest,
   onRequestStageEntered,
   setRequestStageLatch
 } from "../lib/agentic/qa/request-trace.ts";
-import {
-  queuedPermitOrder,
-  setPermitCapacity,
-  snapshotResourcePermits
-} from "../lib/agentic/qa/resource-permits.ts";
+
 import { eightTargetRequest } from "../lib/agentic/plan/warm-dev.ts";
 import { goldenPlanRequest } from "../lib/agentic/qa/proofs.ts";
 import {
@@ -51,7 +48,7 @@ describe("v1.4 capacity cancellation and bounded completion", () => {
   it("CAP-RC-RED-01 locked concurrency phases all reach a terminal state", async () => {
     const cluster = createHandlerCluster();
     const workers: HandlerId[] = ["A", "B", "C", "D"];
-    const baseline = snapshotResourcePermits();
+    const baseline = activeRequestCountForTests();
 
     const namespaces = await Promise.all(
       Array.from({ length: 8 }, (_, index) =>
@@ -59,7 +56,7 @@ describe("v1.4 capacity cancellation and bounded completion", () => {
       )
     );
     assert.equal(namespaces.every((item) => item.ok === true), true);
-    assert.deepEqual(snapshotResourcePermits(), baseline);
+    assert.deepEqual(activeRequestCountForTests(), baseline);
 
     const identities = await Promise.all(
       Array.from({ length: 5 }, (_, index) =>
@@ -124,11 +121,11 @@ describe("v1.4 capacity cancellation and bounded completion", () => {
     assert.equal(first.ok, true);
     assert.equal(second.ok, true);
     assert.equal(second.orderHandle, first.orderHandle);
-    assert.deepEqual(snapshotResourcePermits(), baseline);
+    assert.deepEqual(activeRequestCountForTests(), baseline);
     void goldenPlanRequest;
   });
 
-  it("CAP-RC-RED-02 matcher wait holds no database permit", async () => {
+  it("CAP-RC-RED-02 matcher wait does not prevent an independent ordinary info read", async () => {
     const cluster = createHandlerCluster();
     const latch = deferred();
     const entered = deferred();
@@ -136,7 +133,8 @@ describe("v1.4 capacity cancellation and bounded completion", () => {
     setMatcherEnteredForTests(entered.resolve);
     const ready = setupDefaultExecuteContext(cluster, { suffix: "cap02" });
     await entered.promise;
-    assert.equal(snapshotResourcePermits().database, 0);
+    const information = await cluster.asHandler("B", runtime => infoTool({ config: runtime.config }));
+    assert.equal(information.ok, true);
     latch.resolve();
     await ready;
   });
@@ -179,7 +177,7 @@ describe("v1.4 capacity cancellation and bounded completion", () => {
 
   it("CAP-RC-RED-04 cancel at admission, dependency and response writing", async () => {
     const cluster = createHandlerCluster();
-    const baseline = snapshotResourcePermits();
+    const baseline = activeRequestCountForTests();
     for (const stage of ["handler_admitted", "durable_started", "serialization_completed"] as const) {
       const latch = deferred();
       const entered = deferred();
@@ -199,37 +197,44 @@ describe("v1.4 capacity cancellation and bounded completion", () => {
       assert.equal(next.ok, true, stage);
       setRequestStageLatch(stage, Promise.resolve());
     }
-    assert.deepEqual(snapshotResourcePermits(), baseline);
+    assert.deepEqual(activeRequestCountForTests(), baseline);
   });
 
-  it("CAP-RC-RED-05 exhausted pool admits the queued request in order", async () => {
+  it("CAP-RC-RED-05 a waiting ordinary request does not prevent independent admission", async () => {
     const cluster = createHandlerCluster();
-    setPermitCapacity("admission", 1);
+
     const latch = deferred();
     const entered = deferred();
     setRequestStageLatch("handler_admitted", latch.promise);
-    onRequestStageEntered("handler_admitted", entered.resolve);
+    let admitted = 0;
+    const bothEntered = deferred();
+    onRequestStageEntered("handler_admitted", () => {
+      admitted++; entered.resolve(); if (admitted === 2) bothEntered.resolve();
+    });
     const first = cluster.asHandler("A", (runtime) => qaCall(runtime, "beginRun", { runId: "pool-1" }));
     await entered.promise;
     const second = cluster.asHandler("B", (runtime) => qaCall(runtime, "beginRun", { runId: "pool-2" }));
-    await Promise.resolve();
-    await Promise.resolve();
-    void queuedPermitOrder;
-    latch.resolve();
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      await Promise.race([bothEntered.promise, new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error("Independent admission did not reach its barrier")), 2000);
+      })]);
+      assert.equal(admitted, 2, 'The second request enters before the first request releases its latch');
+    } finally { clearTimeout(timer); latch.resolve(); }
     const [a, b] = await Promise.all([first, second]);
     assert.equal(a.ok, true);
     assert.equal(b.ok, true);
-    assert.equal(snapshotResourcePermits().admission >= 0, true);
+    assert.equal(activeRequestCountForTests(), 0);
   });
 
-  it("CAP-RC-RED-06 three mixed cycles have identical permit snapshots", async () => {
+  it("CAP-RC-RED-06 three mixed cycles release every observed request", async () => {
     const hashes = [];
     for (const cycle of [1, 2, 3]) {
       beginV14Run();
       const cluster = createHandlerCluster();
       const begun = await cluster.asHandler("A", (runtime) => qaCall(runtime, "beginRun", { runId: `mix${cycle}` }));
       await cluster.asHandler("B", (runtime) => infoTool({ config: runtime.config }));
-      hashes.push(canonicalHash({ permits: snapshotResourcePermits(), ok: begun.ok }));
+      hashes.push(canonicalHash({ activeRequests: activeRequestCountForTests(), ok: begun.ok }));
       endV14Run();
     }
     assert.equal(new Set(hashes).size, 1, canonicalJson(hashes));

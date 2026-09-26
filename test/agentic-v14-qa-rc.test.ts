@@ -2,8 +2,9 @@ import assert from "node:assert/strict";
 import { afterEach, beforeEach, describe, it } from "node:test";
 import { infoTool } from "../lib/agentic/info.ts";
 import { listCommittedQaNamespaces } from "../lib/agentic/qa/persist.ts";
-import { snapshotResourcePermits } from "../lib/agentic/qa/resource-permits.ts";
+
 import {
+  activeRequestCountForTests,
   cancelRequest,
   onRequestStageEntered,
   setRequestStageLatch
@@ -148,13 +149,7 @@ describe("v1.4 QA beginRun completion", () => {
     );
     assert.equal(replayed.ok, true);
     assert.equal(listCommittedQaNamespaces().filter((item) => item.runId === "cancel-post").length, 1);
-    assert.deepEqual(snapshotResourcePermits(), {
-      admission: 0,
-      connection: 0,
-      database: 0,
-      lock: 0,
-      worker: 0
-    });
+    assert.deepEqual(activeRequestCountForTests(), 0);
   });
 
   it("QA-RC-RED-07 three fresh 11-group cycles share one evidence hash", async () => {
@@ -180,16 +175,10 @@ describe("v1.4 QA beginRun completion", () => {
         canonicalHash({
           clocks: begun.length,
           namespaces: 11,
-          permits: snapshotResourcePermits()
+          activeRequests: activeRequestCountForTests()
         })
       );
-      assert.deepEqual(snapshotResourcePermits(), {
-        admission: 0,
-        connection: 0,
-        database: 0,
-        lock: 0,
-        worker: 0
-      });
+      assert.deepEqual(activeRequestCountForTests(), 0);
       endV14Run();
     }
     assert.equal(new Set(hashes).size, 1, canonicalJson(hashes));
