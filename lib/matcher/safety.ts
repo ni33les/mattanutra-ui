@@ -25,13 +25,17 @@ function nameOf(request: CanonicalRequest, subjectId: string | null) {
     return "";
   }
 
-  return (
+  const names = labelledFactMemo.get(request)?.names, cached = names?.get(subjectId);
+  if (cached !== undefined) return cached;
+  const name = (
     request.targets.find((item) => item.subjectId === subjectId)?.name ??
     request.currentSupplements.find((item) => item.subjectId === subjectId)?.name ??
     request.dietaryIntake?.find((item) => item.subjectId === subjectId)?.name ??
     request.safetyCeilings?.find((item) => item.subjectId === subjectId)?.name ??
     subjectId
   );
+  names?.set(subjectId, name);
+  return name;
 }
 
 function unitOf(request: CanonicalRequest, subjectId: string | null) {
@@ -63,11 +67,11 @@ type ResolvedLabelledFact = Readonly<{
 
 // Requests and catalogue products are immutable during matching. Keep identity
 // resolution within that lifetime, including revisions and changed fact evidence.
-const labelledFactMemo = new WeakMap<CanonicalRequest, { products: WeakMap<MatcherProduct, readonly ResolvedLabelledFact[]>; subjects: Map<string, string> }>();
+const labelledFactMemo = new WeakMap<CanonicalRequest, { products: WeakMap<MatcherProduct, readonly ResolvedLabelledFact[]>; subjects: Map<string, string>; names: Map<string, string> }>();
 
 function resolvedLabelledFacts(product: MatcherProduct, request?: CanonicalRequest): readonly ResolvedLabelledFact[] {
   let session = request ? labelledFactMemo.get(request) : undefined;
-  if (request && !session) { session = { products: new WeakMap(), subjects: new Map() }; labelledFactMemo.set(request, session); }
+  if (request && !session) { session = { products: new WeakMap(), subjects: new Map(), names: new Map() }; labelledFactMemo.set(request, session); }
   const cached = session?.products.get(product);
   if (cached) return cached;
   const facts: ResolvedLabelledFact[] = [];

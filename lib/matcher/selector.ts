@@ -48,33 +48,9 @@ function factCoversTarget(
   );
 }
 
-export function incidentalNutrientCount(
-  groups: readonly ProductGroup[],
-  productIds: readonly string[],
-  request: CanonicalRequest
-) {
-  const byId = new Map(groups.map((item) => [item.productId, item.product]));
-  let count = 0;
-
-  for (const productId of productIds) {
-    const product = byId.get(productId);
-
-    if (!product) {
-      continue;
-    }
-
-    for (const fact of product.labelledContributions) {
-      if (fact.amount == null || fact.amount <= 0) {
-        continue;
-      }
-
-      if (!factCoversTarget(product, fact, request)) {
-        count += 1;
-      }
-    }
-  }
-
-  return count;
+function incidentalNutrientCount(products: readonly MatcherProduct[], request: CanonicalRequest) {
+  return products.reduce((count, product) => count + product.labelledContributions.filter(fact =>
+    fact.amount != null && fact.amount > 0 && !factCoversTarget(product, fact, request)).length, 0);
 }
 
 function coveredTargetCount(
@@ -86,66 +62,24 @@ function coveredTargetCount(
   ).length;
 }
 
-function titleExactCountFor(
-  groups: readonly ProductGroup[],
-  productIds: readonly string[],
-  request: CanonicalRequest
-) {
-  const byId = new Map(groups.map((item) => [item.productId, item.product]));
-  const normalize = (value: string) =>
-    value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
-  let count = 0;
-
-  for (const productId of productIds) {
-    const product = byId.get(productId);
-
-    if (!product) {
-      continue;
-    }
-
+function titleExactCountFor(products: readonly MatcherProduct[], request: CanonicalRequest) {
+  const normalize = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  return products.filter(product => {
     const title = normalize(product.title);
-    if (
-      request.targets.some(
-        (target) => title === normalize(target.name) && title.length >= 2
-      )
-    ) {
-      count += 1;
-    }
-  }
-
-  return count;
+    return title.length >= 2 && request.targets.some(target => title === normalize(target.name));
+  }).length;
 }
 
-function requestedLabelCountFor(
-  groups: readonly ProductGroup[],
-  productIds: readonly string[],
-  request: CanonicalRequest
-) {
-  const byId = new Map(groups.map((item) => [item.productId, item.product]));
-  let count = 0;
-
-  for (const productId of productIds) {
-    const product = byId.get(productId);
-
-    if (!product) {
-      continue;
-    }
-
-    count += request.targets.filter(
-      (target) => contributionFor(product, target.name, target.subjectId).length > 0
-    ).length;
-  }
-
-  return count;
+function requestedLabelCountFor(products: readonly MatcherProduct[], request: CanonicalRequest) {
+  return products.reduce((count, product) => count + request.targets.filter(target =>
+    contributionFor(product, target.name, target.subjectId).length > 0).length, 0);
 }
 
 function dedicatedPartialCountFor(
-  groups: readonly ProductGroup[],
-  productIds: readonly string[],
+  products: readonly MatcherProduct[],
   request: CanonicalRequest,
   coverageBySubject: ReadonlyMap<string, number>
 ) {
-  const byId = new Map(groups.map((item) => [item.productId, item.product]));
   let count = 0;
 
   for (const target of request.targets) {
@@ -153,12 +87,7 @@ function dedicatedPartialCountFor(
       continue;
     }
 
-    const hasDedicated = productIds.some((productId) => {
-      const product = byId.get(productId);
-
-      if (!product) {
-        return false;
-      }
+    const hasDedicated = products.some((product) => {
 
       if (
         /\bjoint\b/i.test(product.title) ||
@@ -206,6 +135,8 @@ export function scoreState(input: Readonly<{
   const productIds = [
     ...new Set(validated.variants.map((item) => item.productId))
   ].sort();
+  const selectedGroups = input.groups.filter(group => productIds.includes(group.productId));
+  const products = [...new Map(selectedGroups.map(group => [group.productId, group.product])).values()];
   const coverageBySubject = coverageMap(input.request, input.state.delivered);
 
   return {
@@ -214,15 +145,14 @@ export function scoreState(input: Readonly<{
     coverageSummary: coverageSummary(input.request, validated.exposure),
     coveredCount: coveredTargetCount(input.request, coverageBySubject),
     dailyPills: input.state.pills,
-    pillCountKnown: input.state.pillCountKnown !== false && input.groups.filter(group => productIds.includes(group.productId)).every(group => group.product.pillCountKnown !== false),
+    pillCountKnown: input.state.pillCountKnown !== false && selectedGroups.every(group => group.product.pillCountKnown !== false),
     dedicatedPartialCount: dedicatedPartialCountFor(
-      input.groups,
-      productIds,
+      products,
       input.request,
       coverageBySubject
     ),
     exposure: validated.exposure,
-    incidentalCount: incidentalNutrientCount(input.groups, productIds, input.request),
+    incidentalCount: incidentalNutrientCount(products, input.request),
     oversupplyScore: oversupplyScore(input.request, input.state.exposure),
     doseFit: withProductUncertainty(doseFitScore(input.request, input.state.exposure), validated.exposure.unknownSubjectIds),
     overallScore: searchStateScore(input.request, input.state),
@@ -231,13 +161,11 @@ export function scoreState(input: Readonly<{
     productIds,
     reason: selectedReason(input.request),
     titleExactCount: titleExactCountFor(
-      input.groups,
-      productIds,
+      products,
       input.request
     ),
     requestedLabelCount: requestedLabelCountFor(
-      input.groups,
-      productIds,
+      products,
       input.request
     ),
     safety: validated.safety,

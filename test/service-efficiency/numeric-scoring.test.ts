@@ -313,6 +313,7 @@ test('PERF-CPU-06 retained basket metadata examines unselected products only dur
   } }));
   assert.deepEqual(scoreState({ groups: observed, request: input, sellerId: selected.sellerId, state }), expected);
   assert.equal(unselectedReads, 1, 'Incidental, dedicated, title and label counts should share selected products rather than rebuilding the catalogue');
+  assert.equal(scoreState({ groups: [...groups, selected], request: input, sellerId: selected.sellerId, state })?.requestedLabelCount, 1, 'Repeated group references must not count a product label twice');
 });
 
 test('PERF-CPU-01 interior probes retain exact comparison facts without formatting discarded responses', async () => {
