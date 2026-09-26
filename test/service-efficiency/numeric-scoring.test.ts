@@ -33,24 +33,27 @@ test('PERF-CPU-59 an already larger complete score bounds profiles whose penalti
     const state = tryAddVariant(seedState(input), variant, group, input); assert.ok(state);
     numericalSearchStateScore(input, state); return [group.productId, state];
   }));
+  assert.equal(states.size, 2); assert.ok(states.has('costly') && states.has('cheap'));
   const expensive = states.get('costly')!, cheap = states.get('cheap')!;
   const profile = requestForProfile(input, 'fewest_pills'); numericalSearchStateScore(profile, cheap);
   linearEvaluations = 0;
   assert.ok(compareSearchStates(expensive, cheap, profile) > 0);
-  assert.equal(linearEvaluations, 0, "A complete validated baseline already exceeds the incumbent, and none of this profile's coefficients is smaller");
+  const redundantEvaluations = linearEvaluations;
   assert.ok(fractions.compare(numericalSearchStateScore(profile, expensive).exactTotal, numericalSearchStateScore(profile, cheap).exactTotal) > 0);
 
   const coverage = request({ optimization: 'best_coverage', scoring: { profile: 'best_coverage', weights: {} } });
-  const otherGroups = compileGroups(coverage, catalog([product('partial', { a: 75 }, 0), product('exact', { a: 100 }, 400000)]));
+  const otherGroups = compileGroups(coverage, catalog([product('partial', { a: 75 }, 100), product('exact', { a: 100 }, 400100)]));
   const other = new Map(otherGroups.map(group => {
     const variant = group.variants.find(row => row.dailyUnits === 1); assert.ok(variant);
     const state = tryAddVariant(seedState(coverage), variant, group, coverage); assert.ok(state);
     numericalSearchStateScore(coverage, state); return [group.productId, state];
   }));
+  assert.equal(other.size, 2); assert.ok(other.has('partial') && other.has('exact'));
   const practical = requestForProfile(coverage, 'lowest_cost'); numericalSearchStateScore(practical, other.get('exact')!);
   linearEvaluations = 0;
   assert.ok(compareSearchStates(other.get('partial')!, other.get('exact')!, practical) < 0, 'Lower nutrient importance can legitimately reverse the source ordering');
   assert.ok(linearEvaluations > 0, 'A decreasing coefficient cannot borrow the old total as a lower bound');
+  assert.equal(redundantEvaluations, 0, "A complete validated baseline already exceeds the incumbent, and none of this profile's coefficients is smaller");
 });
 
 test('PERF-CPU-33 numerical preference denominators compile once across basket evaluations', async () => {
