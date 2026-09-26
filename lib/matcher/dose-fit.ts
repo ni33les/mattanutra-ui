@@ -130,9 +130,10 @@ function subjectLoss(input: { target: CanonicalRequest["targets"][number] | unde
       const total = supplemental + (sourceScope === "total" ? food : BigInt(0));
       return { row, total, sourceScope, excess: excess(total, row.units) };
     });
-    const limitLoss = limits.reduce((sum, row) => add(sum, row.excess), ZERO);
-    const total = add(multiply(weight, add(shortfall, overshoot)), { num: limitLoss.num * BigInt(UPPER_LIMIT_EXTRA_WEIGHT), den: limitLoss.den });
-    return { supplemental, food, targetExposure, shortfall, overshoot, limits, limitLoss, total };
+    const fitting = sum([shortfall, overshoot]), limitLoss = sum(limits.map(row => row.excess));
+    const safety = sum([{ num: limitLoss.num * BigInt(UPPER_LIMIT_EXTRA_WEIGHT), den: limitLoss.den }]);
+    const total = add(multiply(weight, fitting), safety);
+    return { supplemental, food, targetExposure, shortfall, overshoot, limits, limitLoss, fitting, safety, total };
   };
   // Compare the complete penalty at each distinct interval endpoint. Preserve
   // endpoint order when losses tie, without temporary sets or Cartesian arrays.
@@ -191,7 +192,8 @@ function calculateDoseFit(request: CanonicalRequest, exposure: ReadonlyMap<strin
   if (!cache) { cache = new WeakMap(); memo.set(request, cache); }
   const previous = cache.get(exposure);
   if (previous && !materialize) return previous;
-  const underTerms: Fraction[] = [], overTerms: Fraction[] = [], limitTerms: Fraction[] = [], intentTerms: Fraction[] = [];
+  const fittingTerms: Fraction[] = [], safetyTerms: Fraction[] = [], intentTerms: Fraction[] = [];
+  const displayTerms: Fraction[][] | null = materialize ? [[], [], []] : null;
   const settings = applyWeights && request.scoring ? effectiveWeights(request.scoring) : null;
   const weights = settings ? exactWeights(settings) : null;
   const perTarget: DoseFitScore["perTarget"][number][] | null = materialize ? [] : null;
@@ -218,11 +220,11 @@ function calculateDoseFit(request: CanonicalRequest, exposure: ReadonlyMap<strin
     const weight = weights ? weights.subjects.get(subjectId) ?? weights.defaultWeight : ONE;
     const { minimum, maximum, added, continuedIncrease, worst, deviation } = cachedSubjectLoss(compiled, known, weight);
     if (settings) intentTerms.push(worst.total);
-    underTerms.push(worst.shortfall);
-    overTerms.push(worst.overshoot);
-    limitTerms.push(worst.limitLoss);
+    fittingTerms.push(worst.fitting);
+    safetyTerms.push(worst.safety);
     if (deviation) deviations.push(deviation);
     if (!materialize) continue;
+    displayTerms![0]!.push(worst.shortfall); displayTerms![1]!.push(worst.overshoot); displayTerms![2]!.push(worst.limitLoss);
     const estimated = minimum !== maximum || dietary.minimum !== dietary.maximum;
     const rowCertainty = certainty(request, subjectId) === "unknown" ? "unknown" : estimated ? "estimated" : certainty(request, subjectId);
     if (target && rowCertainty === "estimated") estimatedTargets.push(subjectId);
@@ -261,14 +263,15 @@ function calculateDoseFit(request: CanonicalRequest, exposure: ReadonlyMap<strin
         ruleId: catalogBandRuleId(row.ceiling), authorityUrl: row.ceiling.authorityUrl ?? null, certainty: rowCertainty });
     }
   }
-  const under = sum(underTerms), over = sum(overTerms), limit = sum(limitTerms);
-  const weighted = { num: limit.num * BigInt(UPPER_LIMIT_EXTRA_WEIGHT), den: limit.den };
-  const exact = settings ? sum(intentTerms) : add(add(under, over), weighted);
-  const facts = { exact, fitting: add(under, over), safety: weighted, deviations };
+  const fitting = fittingTerms.length === 1 ? fittingTerms[0]! : sum(fittingTerms);
+  const weighted = safetyTerms.length === 1 ? safetyTerms[0]! : sum(safetyTerms);
+  const exact = settings ? (intentTerms.length === 1 ? intentTerms[0]! : sum(intentTerms)) : add(fitting, weighted);
+  const facts = { exact, fitting, safety: weighted, deviations };
   if (!materialize) {
     deviations.sort((a, b) => a.subjectId < b.subjectId ? -1 : a.subjectId > b.subjectId ? 1 : 0);
     cache.set(exposure, facts); return facts;
   }
+  const [under, over, limit] = displayTerms!.map(sum);
   const score = { version: DOSE_FIT_VERSION, limitWeight: 2 as const, under: value(under), over: value(over),
     limit: value(limit), weightedLimit: value(weighted), total: value(exact), perTarget: perTarget!, perContinuedDose: perContinuedDose!, perLimit: perLimit!,
       unknownSubjectIds: [...new Set(request.unknownIntakeSubjectIds ?? [])].sort(),
