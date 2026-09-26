@@ -632,6 +632,12 @@
       "expectedCases": 9,
       "reason": "Independent dose-fit, quantity and ordering assertions remain effective without obsolete oversupply metadata",
       "slice": "numeric"
+    },
+    {
+      "file": "test/matcher/flexible-v5-safety-compilation.test.ts",
+      "expectedCases": 5,
+      "reason": "Directly affected physical quantity and labelled-exposure compilation preserves Omega-3 components, conflicting facts, and request isolation",
+      "slice": "numeric"
     }
   ],
   "inputs": [
