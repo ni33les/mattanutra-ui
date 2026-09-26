@@ -27,7 +27,7 @@ export function knownCurrentTargetExposure(request: CanonicalRequest, target: Ca
   return knownTargetExposure(request, target, supplemental);
 }
 
-type IntakeBounds = Readonly<{ minimum: bigint; maximum: bigint; nominal: bigint; supplemental: bigint; known: bigint }>;
+type IntakeBounds = Readonly<{ supplemental: bigint; endpoints: readonly bigint[] }>;
 const intakeBoundsCache = new WeakMap<CanonicalRequest, Map<CanonicalTarget, IntakeBounds>>();
 
 /** Candidate breakpoints may use quantified estimates. This does not make
@@ -50,7 +50,9 @@ function targetIntakeBounds(request: CanonicalRequest, target: CanonicalTarget):
   }
   const supplemental = request.currentSupplements.filter(row => row.subjectId === target.subjectId)
     .reduce((sum, row) => sum + row.daily.units, BigInt(0));
-  const result = { minimum, maximum, nominal, supplemental, known: knownCurrentTargetExposure(request, target) };
+  const twice = BigInt(2);
+  const result = { supplemental, endpoints: [...new Set([knownCurrentTargetExposure(request, target) * twice,
+    nominal * twice, minimum * twice, maximum * twice, minimum + maximum])] };
   cache.set(target, result);
   return result;
 }
@@ -63,15 +65,13 @@ export function targetDoseTicks(request: CanonicalRequest, target: CanonicalTarg
   const bounds = targetIntakeBounds(request, target);
   const added = supplementalExposure == null ? BigInt(0) : supplementalExposure - bounds.supplemental;
   const twice = BigInt(2);
-  const exposures = new Set([bounds.known * twice, bounds.nominal * twice, bounds.minimum * twice,
-    bounds.maximum * twice, bounds.minimum + bounds.maximum]);
-  const ticks = new Set<bigint>();
-  for (const exposure of exposures) {
+  const ticks: bigint[] = [];
+  for (const exposure of bounds.endpoints) {
     const remainder = reference * twice - exposure - added * twice;
     const floor = (remainder > 0 ? remainder : BigInt(0)) * step.den / (twice * perServing * step.num);
     for (const value of [floor - BigInt(1), floor, floor + BigInt(1)]) {
-      if (value > 0 && value <= BigInt(Number.MAX_SAFE_INTEGER)) ticks.add(value);
+      if (value > 0 && value <= BigInt(Number.MAX_SAFE_INTEGER) && !ticks.includes(value)) ticks.push(value);
     }
   }
-  return [...ticks].sort((a, b) => a < b ? -1 : a > b ? 1 : 0);
+  return ticks.sort((a, b) => a < b ? -1 : a > b ? 1 : 0);
 }
