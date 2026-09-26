@@ -115,3 +115,22 @@ test('HS-COUNT-08 an active task with conflicting health input cannot satisfy a 
   const after=await formulaTasks(id);assert.equal(after.length,2);assert.equal(after[1].status,'queued');
   assert.deepEqual(after[1].payload.generation,generation);
 });
+
+
+for(const completed of [true,false])test(`HS-COUNT-09 ${completed?'completed':'pending'} current work on a legacy assessment resolves its nullable stored hash`,async()=>{
+  const receipt=completed?await prepared():await captureAssessment({answers,locale:'en'},{idempotencyKey:randomUUID()}),id=receipt.planId;
+  await sql`update assessments set input_hash=null where plan_id=${id}::uuid`;
+  const generation=await loadGenerationInput(sql,id,'en');assert.ok(generation);
+  const original=(await formulaTasks(id))[0];assert.equal(original.status,completed?'completed':'queued');
+  // Current work admitted on a legacy assessment carries the resolved canonical
+  // generation identity, although that assessment has no persisted input hash.
+  await sql`update tasks set payload=${sql.json({...original.payload,generation})} where id=${original.id}::uuid`;
+  const before=await formulaTasks(id),formulas=await sql`select to_jsonb(f) as row from formulations f where plan_id=${id}::uuid`;
+  assert.equal((await sql`select input_hash from assessments where plan_id=${id}::uuid`)[0].input_hash,null);
+  assert.equal(before[0].payload.generation.inputHash,generation.inputHash);
+  assert.equal(formulas.length,completed?1:0);
+  await retryAssessmentHealthScore(id,'en');
+  assert.deepEqual(await formulaTasks(id),before,'A missing stored hash cannot invalidate matching canonical work');
+  assert.deepEqual(await sql`select to_jsonb(f) as row from formulations f where plan_id=${id}::uuid`,formulas);
+  assert.equal((await sql`select input_hash from assessments where plan_id=${id}::uuid`)[0].input_hash,null,'Readiness must not backfill historical assessment metadata');
+});
