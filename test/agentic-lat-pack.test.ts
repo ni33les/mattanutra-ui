@@ -1,5 +1,6 @@
 import { observeLatency, observeBenchmark, nonLatencyBenchmarkEvidence } from "./helpers/latency-observation.ts";
 import assert from "node:assert/strict";
+import { assertMcpSuccess } from "./helpers/mcp-success.ts";
 import { createHash } from "node:crypto";
 import { after, before, describe, it } from "node:test";
 import {
@@ -19,6 +20,7 @@ import {
   TECH07_LIVE_BUDGET
 } from "../lib/agentic/qa/latency-score.ts";
 import { planTool } from "../lib/agentic/plan/service.ts";
+import { cancelPlanOperation } from "../lib/agentic/plan/operations.ts";
 import { resetMatchPlanCache } from "../lib/agentic/plan/matching.ts";
 import {
   beginDetRun,
@@ -28,7 +30,7 @@ import {
 } from "./agentic/det-v3/harness.ts";
 import { DET_V3_CLOCK } from "./agentic/det-v3/manifest.ts";
 
-import { LIVE_ORIGIN as ORIGIN, LIVE_PUBLIC as PUBLIC, liveStructured } from "./helpers/live-mcp.ts";
+import { LIVE_ORIGIN as ORIGIN, LIVE_PUBLIC as PUBLIC, liveStructured, liveCompletedCall, LIVE_CLIENT_HEADERS } from "./helpers/live-mcp.ts";
 const MIXED_ACCEPT = "application/json, text/event-stream";
 const LIST_BODY = JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list" });
 const INFO_BODY = JSON.stringify({
@@ -55,8 +57,12 @@ function planBody(idempotencyKey: string) {
     params: {
       arguments: {
         idempotencyKey,
-        operation: "create",
-        request: MAGNESIUM_REQUEST
+        destinationCountry: MAGNESIUM_REQUEST.destinationCountry,
+        locale: MAGNESIUM_REQUEST.locale,
+        profile: MAGNESIUM_REQUEST.profile,
+        requirements: MAGNESIUM_REQUEST.requirements,
+        scoring: { profile: "balanced" },
+        targets: [{ amount: 300, name: "Magnesium", unit: "mg" }]
       },
       name: "plan"
     }
@@ -78,6 +84,7 @@ async function timedPost(
   const response = await fetch(url, {
     body,
     headers: {
+      ...LIVE_CLIENT_HEADERS,
       Accept: accept,
       "Cache-Control": "no-cache, no-store",
       "Content-Type": "application/json",
@@ -85,18 +92,25 @@ async function timedPost(
       "x-request-id": requestId,
       ...extraHeaders
     },
-    method: "POST"
+    method: "POST",
+    signal: AbortSignal.timeout(30_000)
   });
   const headersMs = performance.now() - started;
   const text = await response.text();
   const totalMs = performance.now() - started;
+  const payload = decodeMcpPayload(response.headers.get("content-type") ?? "", text);
+  const request = JSON.parse(body) as { method: string; params?: { name?: "info" | "plan" } };
+  const expected = request.method === "tools/list" ? "tools/list" : request.params?.name;
+  assert.ok(expected === "info" || expected === "plan" || expected === "tools/list", "Declare the successful MCP response under measurement");
+  assert.equal(response.status, 200);
+  assertMcpSuccess(payload, expected);
   return {
     bodyMs: totalMs - headersMs,
     connection: response.headers.get("connection"),
     contentType: response.headers.get("content-type") ?? "",
     handlerMs: Number(response.headers.get("x-mcp-handler-ms") ?? "NaN"),
     headersMs,
-    payload: decodeMcpPayload(response.headers.get("content-type") ?? "", text),
+    payload,
     requestId: response.headers.get("x-request-id") ?? requestId,
     status: response.status,
     text,
@@ -162,7 +176,7 @@ async function concurrentPlanSamples(
       next += 1;
       const result = await timedPost(
         url,
-        MIXED_ACCEPT,
+        "application/json",
         planBody(`${prefix}-${String(index).padStart(12, "0")}`)
       );
       samples.push(result.totalMs);
@@ -171,10 +185,33 @@ async function concurrentPlanSamples(
       assert.equal(admitted.ok, true, JSON.stringify(admitted));
       assert.equal(typeof admitted.planHandle, "string", "LAT samples require accepted plan work, not HTTP-200 tool errors");
       assert.ok(["processing", "ready", "needs_input", "no_purchase"].includes(String(admitted.status)), JSON.stringify(admitted));
+      await drainAcceptedPlan(url, admitted);
     }
   }
-  await Promise.all(Array.from({ length: workers }, () => worker()));
+  const outcomes = await Promise.allSettled(Array.from({ length: workers }, () => worker()));
+  const failures = outcomes.filter((outcome): outcome is PromiseRejectedResult => outcome.status === "rejected");
+  if (failures.length) throw new AggregateError(failures.map(outcome => outcome.reason), "Latency admission or terminal drain failed");
+  assert.equal(samples.length, total);
   return samples;
+}
+
+async function drainAcceptedPlan(url: string, admitted: Record<string, unknown>) {
+  const terminal = await liveCompletedCall(url, "plan", { planHandle: admitted.planHandle }, { accept: "application/json" });
+  assert.equal(terminal.structured.ok, true, JSON.stringify(terminal.structured));
+  assert.ok(["ready", "needs_input", "no_purchase"].includes(String(terminal.structured.status)), JSON.stringify(terminal.structured));
+}
+
+async function verifyAndCancelAdmission(runtime: ReturnType<typeof createDetRuntime>, principal: string, key: string, admitted: Awaited<ReturnType<typeof planTool>>) {
+  const operation = await runtime.store.getPlanOperationByKey(`dev:${runtime.scope.tenantScope}:${principal}`, key);
+  try {
+    assert.equal(admitted.ok, true, JSON.stringify(admitted));
+    assert.ok("status" in admitted && admitted.status === "processing", "Direct service timing measures durable admission, not matching");
+    assert.ok(operation?.taskId, "An admitted request must own durable work");
+    assert.equal(operation.status, "queued"); assert.equal(operation.leaseToken, null);
+  } finally {
+    if (operation) await cancelPlanOperation(runtime.store, operation.id, DET_V3_CLOCK);
+  }
+  assert.equal((await runtime.store.getPlanOperation(operation!.id))?.status, "cancelled");
 }
 
 describe("LAT transport contract", () => {
@@ -224,21 +261,26 @@ describe("LAT transport contract", () => {
   it("LAT-001 names RESPONSE_COMPLETION and requires a terminal one-shot", async () => {
     const requestId = "lat-001-info";
     const info = await timedPost(ORIGIN, MIXED_ACCEPT, INFO_BODY, { "x-request-id": requestId });
-    const plan = await timedPost(ORIGIN, MIXED_ACCEPT, planBody("lat-001-plan-00000001"), {
+    const plan = await timedPost(ORIGIN, "application/json", planBody("lat-001-plan-00000001"), {
       "x-request-id": "lat-001-plan"
     });
     assert.equal(liveStructured(info.payload).ok, true, JSON.stringify(info.payload));
     assert.equal(liveStructured(plan.payload).ok, true, JSON.stringify(plan.payload));
     assert.equal(typeof liveStructured(plan.payload).planHandle, "string");
-    const infoStage = classifyCompletion({ ...info, accept: MIXED_ACCEPT });
-    const planStage = classifyCompletion({ ...plan, accept: MIXED_ACCEPT });
-    assert.notEqual(infoStage.code, "LAT_STAGE_UNOBSERVABLE");
-    assert.notEqual(planStage.code, "LAT_STAGE_UNOBSERVABLE");
-    assert.equal(infoStage.code, "LAT_STAGE_OK", JSON.stringify(infoStage));
-    assert.equal(planStage.code, "LAT_STAGE_OK", JSON.stringify(planStage));
-    assert.equal(infoStage.stage, "RESPONSE_COMPLETION");
-    assert.match(info.contentType, /event-stream/i);
-    assert.equal(info.requestId, requestId);
+    try {
+      const infoStage = classifyCompletion({ ...info, accept: MIXED_ACCEPT });
+      const planStage = classifyCompletion({ ...plan, accept: "application/json" });
+      assert.notEqual(infoStage.code, "LAT_STAGE_UNOBSERVABLE");
+      assert.notEqual(planStage.code, "LAT_STAGE_UNOBSERVABLE");
+      assert.equal(infoStage.code, "LAT_STAGE_OK", JSON.stringify(infoStage));
+      assert.equal(planStage.code, "LAT_STAGE_OK", JSON.stringify(planStage));
+      assert.equal(infoStage.stage, "RESPONSE_COMPLETION");
+      assert.match(info.contentType, /event-stream/i);
+      assert.equal(info.requestId, requestId);
+      assert.match(plan.contentType, /application\/json/i);
+    } finally {
+      await drainAcceptedPlan(ORIGIN, liveStructured(plan.payload));
+    }
   });
 
   it("LAT-002 origin and public hashes match; excess is not INGRESS/APP", async () => {
@@ -320,7 +362,7 @@ describe("LAT Slice D handler and TECH-07 schema", () => {
     assert.equal(scored.failureStage, "NONE");
   });
 
-  it("LAT-030 thirty uncached in-process plans meet fixed p50/p95", async () => {
+  it("LAT-030 thirty in-process durable admissions meet fixed p50/p95 and are cancelled after observation", async () => {
     const runtime = createDetRuntime();
     const samples: number[] = [];
     const workers = 10;
@@ -343,10 +385,12 @@ describe("LAT Slice D handler and TECH-07 schema", () => {
           store: runtime.store
         });
         samples.push(performance.now() - started);
-        assert.equal((plan as { ok?: boolean }).ok, true);
+        await verifyAndCancelAdmission(runtime, `lat-030-${index}`, `lat-030-${String(index).padStart(12, "0")}`, plan);
       }
     }
-    await Promise.all(Array.from({ length: workers }, () => worker()));
+    const outcomes = await Promise.allSettled(Array.from({ length: workers }, () => worker()));
+    const failures = outcomes.filter((outcome): outcome is PromiseRejectedResult => outcome.status === "rejected");
+    if (failures.length) throw new AggregateError(failures.map(outcome => outcome.reason), "In-process durable admission failed");
     const scored = scoreUncachedPlanBenchmark({
       budgets: TECH07_FIXED_BUDGET,
       cacheMode: "uncached",
@@ -355,7 +399,7 @@ describe("LAT Slice D handler and TECH-07 schema", () => {
       samples
     });
     assert.equal(samples.length, 30);
-    observeBenchmark(scored, "uncached plans");
+    observeBenchmark(scored, "in-process durable admission; excludes matching");
   });
 
   it("LAT-043 one millisecond across a threshold flips only pass/fail and stage", () => {
@@ -382,26 +426,35 @@ describe("LAT Slice D handler and TECH-07 schema", () => {
     assert.equal(under.p95BudgetMs, over.p95BudgetMs);
   });
 
-  it("LAT-040/041/042 isolated A/B canonical evidence is byte-identical", async () => {
+  it("LAT-040/041/042 isolated A/B durable-admission evidence is byte-identical", async () => {
     async function runOnce(runId: string) {
       const runtime = createDetRuntime({ principal: runId });
       const proof = await latencyProof(runtime);
       const samples: number[] = [];
-      for (let index = 0; index < 30; index += 1) {
-        resetMatchPlanCache();
-        const started = performance.now();
-        await planTool({
-          config: runtime.config,
-          now: DET_V3_CLOCK,
-          payload: {
-            idempotencyKey: `lat-040-${runId}-${String(index).padStart(10, "0")}`,
-            request: MAGNESIUM_REQUEST
-          },
-          scope: { ...runtime.scope, principalScope: `lat-040-${runId}-${index}` },
-          store: runtime.store
-        });
-        samples.push(performance.now() - started);
+      let next = 0;
+      async function worker() {
+        while (next < 30) {
+          const index = next++;
+          resetMatchPlanCache();
+          const started = performance.now();
+          const admitted = await planTool({
+            config: runtime.config,
+            now: DET_V3_CLOCK,
+            payload: {
+              idempotencyKey: `lat-040-${runId}-${String(index).padStart(10, "0")}`,
+              request: MAGNESIUM_REQUEST
+            },
+            scope: { ...runtime.scope, principalScope: `lat-040-${runId}-${index}` },
+            store: runtime.store
+          });
+          samples.push(performance.now() - started);
+          await verifyAndCancelAdmission(runtime, `lat-040-${runId}-${index}`, `lat-040-${runId}-${String(index).padStart(10, "0")}`, admitted);
+        }
       }
+      const outcomes = await Promise.allSettled(Array.from({ length: 10 }, () => worker()));
+      const failures = outcomes.filter((outcome): outcome is PromiseRejectedResult => outcome.status === "rejected");
+      if (failures.length) throw new AggregateError(failures.map(outcome => outcome.reason), "Canonical durable admission failed");
+      assert.equal(samples.length, 30);
       const fixed = scoreUncachedPlanBenchmark({
         budgets: TECH07_FIXED_BUDGET,
         cacheMode: "uncached",
@@ -444,7 +497,7 @@ describe("LAT Slice D handler and TECH-07 schema", () => {
 });
 
 describe("LAT public DEV benchmarks", () => {
-  it("LAT-031 public 30 uncached plans meet live p50/p95", async () => {
+  it("LAT-031 thirty real public admissions are timed separately and all reach terminal state", async () => {
     const samples = await concurrentPlanSamples(PUBLIC, `lat-031-${Date.now().toString(36)}`);
     const scored = scoreUncachedPlanBenchmark({
       budgets: TECH07_LIVE_BUDGET,
@@ -453,7 +506,7 @@ describe("LAT public DEV benchmarks", () => {
       n: 30,
       samples
     });
-    observeBenchmark(scored, "public uncached plans");
+    observeBenchmark(scored, "public durable admission; excludes matching and terminal drain");
   });
 
   it("LAT-032 public tools/list and info are not stuck in a 10s+ band", async () => {
