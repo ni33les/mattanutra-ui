@@ -488,6 +488,11 @@ export function advanceSearchCursor(cursor: SearchCursor, request: CanonicalRequ
     if (!cursor.exact) {
       cursor.singles=[]; cursor.beam=[]; cursor.expanded=[]; cursor.repairJobs=[];
       cursor.repaired=[]; cursor.second=[]; cursor.secondReferences=[]; cursor.exactStack=[];
+      const retained = new Set(cursor.review);
+      for (const packed of cursor.archive.values()) {
+        const state = restoredStates.get(packed);
+        if (state && !retained.has(state)) restoredStates.delete(packed);
+      }
     }
   }
   return cursor;
