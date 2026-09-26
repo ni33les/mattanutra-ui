@@ -21,6 +21,38 @@ mock.module('../../lib/matcher/rational.ts', { namedExports: { ...fractions, lin
 const { request } = await import('../matcher/flexible-v5-fixtures.ts');
 const { doseFitScore, numericalDoseFitScore, exactDoseFit, compareDoseFit, weightedDoseFitScore, numericalWeightedDoseFitScore } = await import('../../lib/matcher/dose-fit.ts');
 
+test('PERF-CPU-59 an already larger complete score bounds profiles whose penalties only increase', async () => {
+  const { requestForProfile, numericalSearchStateScore } = await import('../../lib/matcher/practical-scoring.ts');
+  const { seedState, tryAddVariant, compareSearchStates } = await import('../../lib/matcher/search.ts');
+  const { compileGroups } = await import('../../lib/matcher/candidates.ts');
+  const { product, catalog } = await import('../matcher/flexible-v5-fixtures.ts');
+  const input = request({ scoring: { profile: 'balanced', weights: {} } });
+  const groups = compileGroups(input, catalog([product('costly', { a: 100 }, 1000000), product('cheap', { a: 100 }, 100)]));
+  const states = new Map(groups.map(group => {
+    const variant = group.variants.find(row => row.dailyUnits === 1); assert.ok(variant);
+    const state = tryAddVariant(seedState(input), variant, group, input); assert.ok(state);
+    numericalSearchStateScore(input, state); return [group.productId, state];
+  }));
+  const expensive = states.get('costly')!, cheap = states.get('cheap')!;
+  const profile = requestForProfile(input, 'fewest_pills'); numericalSearchStateScore(profile, cheap);
+  linearEvaluations = 0;
+  assert.ok(compareSearchStates(expensive, cheap, profile) > 0);
+  assert.equal(linearEvaluations, 0, "A complete validated baseline already exceeds the incumbent, and none of this profile's coefficients is smaller");
+  assert.ok(fractions.compare(numericalSearchStateScore(profile, expensive).exactTotal, numericalSearchStateScore(profile, cheap).exactTotal) > 0);
+
+  const coverage = request({ optimization: 'best_coverage', scoring: { profile: 'best_coverage', weights: {} } });
+  const otherGroups = compileGroups(coverage, catalog([product('partial', { a: 75 }, 0), product('exact', { a: 100 }, 400000)]));
+  const other = new Map(otherGroups.map(group => {
+    const variant = group.variants.find(row => row.dailyUnits === 1); assert.ok(variant);
+    const state = tryAddVariant(seedState(coverage), variant, group, coverage); assert.ok(state);
+    numericalSearchStateScore(coverage, state); return [group.productId, state];
+  }));
+  const practical = requestForProfile(coverage, 'lowest_cost'); numericalSearchStateScore(practical, other.get('exact')!);
+  linearEvaluations = 0;
+  assert.ok(compareSearchStates(other.get('partial')!, other.get('exact')!, practical) < 0, 'Lower nutrient importance can legitimately reverse the source ordering');
+  assert.ok(linearEvaluations > 0, 'A decreasing coefficient cannot borrow the old total as a lower bound');
+});
+
 test('PERF-CPU-33 numerical preference denominators compile once across basket evaluations', async () => {
   const { scorePracticalPenalties } = await import('../../lib/matcher/practical-scoring.ts');
   const input = request({ maxDailyPills: 7.75, maxProductCount: 37, maxPriceMinor: 123457 });
