@@ -20,6 +20,22 @@ mock.module('../../lib/matcher/rational.ts', { namedExports: { ...fractions, lin
 const { request } = await import('../matcher/flexible-v5-fixtures.ts');
 const { doseFitScore, numericalDoseFitScore, exactDoseFit, compareDoseFit, weightedDoseFitScore, numericalWeightedDoseFitScore } = await import('../../lib/matcher/dose-fit.ts');
 
+test('PERF-CPU-27 repeated endpoint facts do not renormalize unused display components', () => {
+  const input = request({ safetyCeilings: [{ subjectId: 'a', name: 'A', maxAmount: 100, maxUnit: 'mg', sourceScope: 'supplemental' }] });
+  const exposure = new Map([['a', 175_000_000n]]);
+  numericalDoseFitScore(input, exposure);
+  aggregateSums = 0;
+  const score = numericalDoseFitScore(input, new Map(exposure));
+  assert.deepEqual(exactDoseFit(score), { num: 9n, den: 4n });
+  assert.equal(fractions.compare(score.fitting, { num: 3n, den: 4n }), 0);
+  assert.equal(fractions.compare(score.safety, { num: 3n, den: 2n }), 0);
+  assert.equal(aggregateSums, 0, 'A repeated single endpoint already owns its normalized fitting and independent safety terms');
+  const display = doseFitScore(input, exposure);
+  assert.equal(display.under, 0); assert.equal(display.over, 0.75);
+  assert.equal(display.limit, 0.75); assert.equal(display.weightedLimit, 1.5);
+  assert.equal(display.total, 2.25);
+});
+
 test('PERF-CPU-26 candidate addition checks a quantity group once regardless of basket size', async () => {
   const { product, catalog } = await import('../matcher/flexible-v5-fixtures.ts');
   const { compileGroups } = await import('../../lib/matcher/candidates.ts');
