@@ -4,7 +4,7 @@ import { serializeExactValue } from "@/lib/matcher/exact-values";
 import { compileVariant, isDeferredConditional } from "@/lib/matcher/candidates";
 import { servingIncrement } from "@/lib/matcher/serving-grid";
 import { intakeIsKnown, knownTargetExposure, targetBasis, targetDoseTicks } from "@/lib/matcher/target-basis";
-import { compareOverallScores, resolvePracticalProfile, searchStateScore, type OverallMatchingScore } from "@/lib/matcher/practical-scoring";
+import { compareOverallScores, resolvePracticalProfile, numericalSearchStateScore, type ComparableOverallScore } from "@/lib/matcher/practical-scoring";
 import { divide, fromDecimal, multiply, rational, toNumber } from "@/lib/matcher/rational";
 import { fingerprintState } from "@/lib/matcher/dominance";
 import { compareDoseFit, numericalDoseFitScore, doseFitTargetDeviations } from "@/lib/matcher/dose-fit";
@@ -15,7 +15,7 @@ type ExactFrame = { state: SearchState; variantIds: string[] | null; position: n
 type ExactVector = (number | bigint)[];
 type ArchivedState = [number, number, number, number, boolean, number[], ExactVector, ExactVector, string[],
   [number[], number, number | null, number, { num: bigint; den: bigint }?]?];
-type QuantitySearch = { key: string; ids: string[]; low: bigint; high: bigint; steps: number; left?: OverallMatchingScore | null };
+type QuantitySearch = { key: string; ids: string[]; low: bigint; high: bigint; steps: number; left?: ComparableOverallScore | null };
 type RepairJob = { leader: SearchState; removal: number; base: SearchState | null; retained: string[]; build: number; group: number; variant: number; variants: string[] | null; stage: "prepare" | "build" | "add" | "done";
   fixedRemoval?: string[]; replacementGroups?: number[] };
 export type SearchCursor = {
@@ -188,8 +188,8 @@ function variantsFor(cursor: SearchCursor, index: number, state: SearchState, re
     if (candidate && cursor.phase === "beam") cursor.expanded.push({ ...candidate, nextGroupIndex: index + 1 });
     if (candidate && cursor.phase === "repair") cursor.repaired.push(candidate);
     if (exists && !job.ids.includes(id)) job.ids.push(id);
-    const score = candidate ? searchStateScore(request, candidate) : null;
-    if (job.left === undefined) { job.left = score; continue; }
+    const score = candidate ? numericalSearchStateScore(request, candidate) : null;
+    if (job.left === undefined) { job.left = score && { profile: score.profile, exactTotal: score.exactTotal }; continue; }
     if (job.left && (!score || compareOverallScores(job.left, score) <= 0)) job.high = middle;
     else job.low = middle + BigInt(1);
     job.left = undefined; job.steps++;

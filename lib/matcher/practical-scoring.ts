@@ -248,7 +248,8 @@ export function numericalSearchStateScore(request: CanonicalRequest, state: Sear
 export function searchStateScore(request: CanonicalRequest, state: SearchState): OverallMatchingScore {
   return displayOverall(numericalSearchStateScore(request, state));
 }
-export function compareOverallScores(left: OverallMatchingScore | NumericalOverallScore, right: OverallMatchingScore | NumericalOverallScore) {
+export type ComparableOverallScore = Pick<OverallMatchingScore, "profile" | "overallExact"> | Pick<NumericalOverallScore, "profile" | "exactTotal">;
+export function compareOverallScores(left: ComparableOverallScore, right: ComparableOverallScore) {
   if (left === right) return 0;
   if (left.profile.hash !== right.profile.hash) throw new Error("Cannot compare different matching profiles as one score");
   return compare("exactTotal" in left ? left.exactTotal : decoded(left.overallExact), "exactTotal" in right ? right.exactTotal : decoded(right.overallExact));
