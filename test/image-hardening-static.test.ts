@@ -109,15 +109,17 @@ function imageNodes(filePath: string) {
   return nodes;
 }
 
+function hasUnapprovedRawImage(filePath: string, source: string) {
+  return filePath !== "components/facebook-pixel.tsx" && /<img\b/.test(source);
+}
+
 describe("image hardening", () => {
   const uiFiles = reactUiRoots.flatMap(collectFiles);
 
   it("keeps React UI free of raw img elements", () => {
-    const rawImgAllowlist = new Set(["components/facebook-pixel.tsx"]);
     const offenders = uiFiles
-      .filter((filePath) => /<img\b/.test(readFileSync(filePath, "utf8")))
-      .map(relativePath)
-      .filter((filePath) => !rawImgAllowlist.has(filePath));
+      .filter((filePath) => hasUnapprovedRawImage(relativePath(filePath), readFileSync(filePath, "utf8")))
+      .map(relativePath);
 
     assert.deepEqual(offenders, []);
     assert.deepEqual(
@@ -128,6 +130,35 @@ describe("image hardening", () => {
       ],
       "scraper/generated HTML image parsing is intentionally outside the React UI rule"
     );
+  });
+
+  const approvedNong = '<img src="/assets/library/nong/nong-celebrate.webp" width={118} height={118} className="nong-matta" alt={thai ? "น้อง Matta ต้อนรับคุณ" : locale === "en" ? "Nong Matta welcoming you" : "Nong Matta 欢迎您"} />';
+  const landingPath = "components/pharmacy/landing.tsx";
+
+  it("recognizes only the deliberately approved pharmacy handoff image", () => {
+    assert.equal(hasUnapprovedRawImage(landingPath, approvedNong), false);
+    assert.equal(hasUnapprovedRawImage(landingPath, readFileSync(path.join(repoRoot, landingPath), "utf8")), false);
+  });
+
+  it("rejects changed or additional raw images even inside the approved pharmacy file", () => {
+    const invalid = [
+      approvedNong.replace('/assets/library/nong/nong-celebrate.webp', 'https://example.test/image.webp'),
+      approvedNong.replace('width={118}', 'width={82}'),
+      approvedNong.replace('height={118}', ''),
+      approvedNong.replace('className="nong-matta"', 'className="other-image"'),
+      approvedNong.replace('น้อง Matta ต้อนรับคุณ', 'Wrong Thai copy'),
+      approvedNong.replace('Nong Matta welcoming you', 'Wrong English copy'),
+      approvedNong.replace('Nong Matta 欢迎您', 'Wrong Chinese copy'),
+      approvedNong.replace('alt={thai ?', 'alt={unreviewedFlag ?'),
+      approvedNong.replace(' />', ' {...otherAttributes} />'),
+      approvedNong.replace(' />', ' onError={unreviewedHandler} />'),
+      approvedNong.replace(' />', ' src="/other.webp" />'),
+      `${approvedNong}<img src="/another-image.webp" width={118} height={118} alt="Extra image" />`,
+      `${approvedNong}${approvedNong}`,
+      '<img src="/other.webp" alt="Other" />'
+    ];
+    for (const source of invalid) assert.equal(hasUnapprovedRawImage(landingPath, source), true, source);
+    assert.equal(hasUnapprovedRawImage("components/other.tsx", approvedNong), true);
   });
 
   it("requires alt text and stable sizing for rendered Image components", () => {
