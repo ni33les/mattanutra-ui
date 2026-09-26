@@ -18,8 +18,33 @@ let preferenceParses = 0;
 let linearEvaluations = 0; let multiplications = 0; let measurements = 0; let additions = 0; let aggregateSums = 0; let conversionsToNumber = 0; let exactComparisons = 0;
 mock.module('../../lib/matcher/dose.ts', { namedExports: { ...dose, scaleAmount: (...args: Parameters<typeof dose.scaleAmount>) => { unitCompilations++; return dose.scaleAmount(...args); }, amountFromScaled: (...args: Parameters<typeof dose.amountFromScaled>) => { conversions++; return dose.amountFromScaled(...args); } } });
 mock.module('../../lib/matcher/rational.ts', { namedExports: { ...fractions, linearSum: (...args: Parameters<typeof fractions.linearSum>) => { linearEvaluations++; return fractions.linearSum(...args); }, toNumber: (...args: Parameters<typeof fractions.toNumber>) => { conversionsToNumber++; return fractions.toNumber(...args); }, compare: (...args: Parameters<typeof fractions.compare>) => { exactComparisons++; return fractions.compare(...args); }, sum: (...args: Parameters<typeof fractions.sum>) => { aggregateSums++; return fractions.sum(...args); }, add: (...args: Parameters<typeof fractions.add>) => { additions++; return fractions.add(...args); }, serialize: (...args: Parameters<typeof fractions.serialize>) => { exactEncodings++; return fractions.serialize(...args); }, fromDecimal: (...args: Parameters<typeof fractions.fromDecimal>) => { measurements++; if ([7.75, 37, 123457].includes(args[0] as number)) preferenceParses++; return fractions.fromDecimal(...args); }, multiply: (...args: Parameters<typeof fractions.multiply>) => { multiplications++; return fractions.multiply(...args); } } });
+const safetyModule = await import('../../lib/matcher/safety.ts');
+let labelExposureBuilds = 0;
+mock.module('../../lib/matcher/safety.ts', { namedExports: { ...safetyModule, labelledSafetyExposure: (...args: Parameters<typeof safetyModule.labelledSafetyExposure>) => {
+  labelExposureBuilds++; return safetyModule.labelledSafetyExposure(...args);
+} } });
 const { request } = await import('../matcher/flexible-v5-fixtures.ts');
 const { doseFitScore, numericalDoseFitScore, exactDoseFit, compareDoseFit, weightedDoseFitScore, numericalWeightedDoseFitScore } = await import('../../lib/matcher/dose-fit.ts');
+
+test('PERF-CPU-63 unrelated listings do not compile unusable physical quantities', async () => {
+  const { compileGroups } = await import('../../lib/matcher/candidates.ts');
+  const { product, catalog } = await import('../matcher/flexible-v5-fixtures.ts');
+  const unrelated = product('unrelated', { b: 50 });
+  labelExposureBuilds = 0;
+  assert.deepEqual(compileGroups(request(), catalog([unrelated])), []);
+  const redundant = labelExposureBuilds;
+  const relevant = compileGroups(request(), catalog([product('requested', { a: 25 })]));
+  assert.equal(relevant.length, 1); assert.ok(relevant[0].variants.some(row => row.contributions.get('a')?.units === 100_000_000n));
+  const retained = compileGroups(request({ retainProductIds: ['unrelated'] }), catalog([unrelated]));
+  assert.equal(retained.length, 1); assert.ok(retained[0].variants.some(row => row.safetyExposure.get('b')?.units === 50_000_000n));
+  const subject = compileGroups(request({ retainSubjectIds: ['b'] }), catalog([unrelated]));
+  assert.equal(subject.length, 1); assert.ok(subject[0].variants.length > 0);
+  const proposed = compileGroups(request({ productDoses: [{ productId: 'unrelated', servingsPerDay: 2 }] }), catalog([unrelated]));
+  assert.equal(proposed.length, 1); assert.equal(proposed[0].variants[0].dailyUnits, 2);
+  const uncertain = product('uncertain', { a: 50 }, 100, { unknownSafetyAmount: true, labelledContributions: [{ subjectId: 'a', name: 'A', amount: null, unit: 'mg' }] });
+  assert.equal(compileGroups(request(), catalog([uncertain])).length, 1, 'Declared but unquantified requested contributions remain available');
+  assert.equal(redundant, 0, 'No quantity can establish a missing requested contribution when no retained subject, product or proposal needs it');
+});
 
 test('PERF-CPU-59 an already larger complete score bounds profiles whose penalties only increase', async () => {
   const { requestForProfile, numericalSearchStateScore } = await import('../../lib/matcher/practical-scoring.ts');
