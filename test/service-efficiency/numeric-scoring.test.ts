@@ -21,6 +21,23 @@ mock.module('../../lib/matcher/rational.ts', { namedExports: { ...fractions, lin
 const { request } = await import('../matcher/flexible-v5-fixtures.ts');
 const { doseFitScore, numericalDoseFitScore, exactDoseFit, compareDoseFit, weightedDoseFitScore, numericalWeightedDoseFitScore } = await import('../../lib/matcher/dose-fit.ts');
 
+test('PERF-CPU-39 a validated practical lower bound can reject a costly candidate before nutrient aggregation', async () => {
+  const { compareSearchStateScores, numericalSearchStateScore } = await import('../../lib/matcher/practical-scoring.ts');
+  const { seedState } = await import('../../lib/matcher/search.ts');
+  const input = request(), base = seedState(input);
+  const winner = { ...base, exposure: new Map([['a', 100_000_000n]]), count: 1, pills: 1, price: 100, uncertainAdministrationCount: 0 };
+  numericalSearchStateScore(input, winner);
+  let reads = 0;
+  class CountedExposure extends Map<string, bigint> { get(id: string) { reads++; return super.get(id); } }
+  const loser = { ...winner, exposure: new CountedExposure([['a', 10_000_000n]]), routineServings: [100], servingBurden: fractions.fromDecimal(9801) };
+  assert.equal(compareSearchStateScores(input, loser, winner), 1);
+  assert.equal(reads, 0, 'A 490.05 serving penalty alone already exceeds the complete incumbent loss');
+  assert.throws(() => compareSearchStateScores(input, { ...loser, price: Number.NaN }, winner), /priceMinor/);
+  const competitive = { ...loser, routineServings: [1], servingBurden: fractions.ZERO };
+  assert.equal(compareSearchStateScores(input, competitive, winner), 1);
+  assert.ok(reads > 0, 'A competitive practical score still needs exact nutrient loss');
+});
+
 test('PERF-CPU-33 numerical preference denominators compile once across basket evaluations', async () => {
   const { scorePracticalPenalties } = await import('../../lib/matcher/practical-scoring.ts');
   const input = request({ maxDailyPills: 7.75, maxProductCount: 37, maxPriceMinor: 123457 });
