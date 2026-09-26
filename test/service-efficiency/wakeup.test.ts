@@ -1,12 +1,21 @@
 import assert from "node:assert/strict";
 import { beforeEach, test } from "node:test";
 import { signalTaskQueue, waitForTaskQueueWork, type TaskQueueSignal } from "../../lib/task-queue-signal.ts";
+import { waitForTaskQueueChange } from "../../lib/task-queue-signal.ts";
+import { getEventListeners } from "node:events";
 
 const state = globalThis as typeof globalThis & {
   mattanutraTaskQueuePending: TaskQueueSignal[];
   mattanutraTaskWakeupWaiters: Set<(signal: TaskQueueSignal) => void>;
+  mattanutraTaskQueueObservers?: Set<(signal: TaskQueueSignal) => void>;
 };
-beforeEach(() => { state.mattanutraTaskQueuePending = []; state.mattanutraTaskWakeupWaiters = new Set(); });
+beforeEach(() => { state.mattanutraTaskQueuePending = []; state.mattanutraTaskWakeupWaiters = new Set(); state.mattanutraTaskQueueObservers = new Set(); });
+
+const observeQueue = waitForTaskQueueChange as (
+  timeoutMs: number,
+  taskTypes?: readonly string[],
+  signal?: AbortSignal
+) => Promise<boolean>;
 
 test("EFF-WAKE-01 matching signal survives an unrelated waiting worker", async () => {
   const unrelated = waitForTaskQueueWork(20, ["email"]);
@@ -95,4 +104,53 @@ test("EFF-WAKE-08 a refused local wake falls through to a reachable current work
   const successful: string[] = [];
   await deliver(["https://one.invalid", "https://two.invalid"], signal, async url => { successful.push(url); });
   assert.equal(successful.length, 1);
+});
+
+test("EFF-WAKE-09 observers all see a change while exactly one matching worker receives its task", async () => {
+  for (const observersFirst of [true, false]) {
+    const observers: Promise<boolean>[] = [];
+    const workers: Promise<TaskQueueSignal | null>[] = [];
+    const observe = () => observers.push(observeQueue(25), observeQueue(25));
+    const work = () => workers.push(waitForTaskQueueWork(25, ["match"]), waitForTaskQueueWork(25, ["match"]));
+    if (observersFirst) { observe(); work(); } else { work(); observe(); }
+    const task = { taskType: "match", taskId: `observer-order-${observersFirst}` };
+    signalTaskQueue(task);
+    const [changes, deliveries] = await Promise.all([Promise.all(observers), Promise.all(workers)]);
+    assert.deepEqual(changes, [true, true]);
+    assert.deepEqual(deliveries.filter(Boolean), [task]);
+  }
+});
+
+test("EFF-WAKE-10 observers do not drain or repeatedly replay pending work", async () => {
+  const task = { taskType: "match", taskId: "pending-worker-task" };
+  signalTaskQueue(task);
+  // SSE already reads an initial snapshot. Observations wait for a future change,
+  // rather than repeatedly refreshing while durable work waits for a worker.
+  assert.equal(await observeQueue(5), false);
+  assert.equal(await observeQueue(5), false);
+  assert.deepEqual(await waitForTaskQueueWork(5, ["match"]), task);
+});
+
+test("EFF-WAKE-11 filtered observers see only relevant changes and cannot take work", async () => {
+  const matching = observeQueue(15, ["match"]);
+  const emails = observeQueue(15, ["email"]);
+  signalTaskQueue({ taskType: "email", taskId: "email-one" });
+  assert.equal(await emails, true);
+  assert.equal(await matching, false);
+  assert.deepEqual(await waitForTaskQueueWork(5, ["email"]), { taskType: "email", taskId: "email-one" });
+});
+
+test("EFF-WAKE-12 cancellation removes queue observers without consuming future work", async () => {
+  const controller = new AbortController();
+  const reason = new Error("Admin stream disconnected");
+  const pending = observeQueue(25, undefined, controller.signal);
+  const rejected = assert.rejects(pending, error => error === reason);
+  controller.abort(reason);
+  await rejected;
+  assert.equal(getEventListeners(controller.signal, "abort").length, 0);
+  assert.equal(state.mattanutraTaskQueueObservers?.size, 0);
+  assert.equal(state.mattanutraTaskWakeupWaiters.size, 0);
+  await assert.rejects(observeQueue(25, undefined, controller.signal), error => error === reason);
+  signalTaskQueue({ taskType: "match", taskId: "after-disconnect" });
+  assert.deepEqual(await waitForTaskQueueWork(5, ["match"]), { taskType: "match", taskId: "after-disconnect" });
 });
