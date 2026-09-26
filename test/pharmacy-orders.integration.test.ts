@@ -26,6 +26,7 @@ before(async () => {
 });
 after(async () => {
   try {
+    await sql`delete from public.organisations where id=${otherPharmacy.id}::uuid`;
     assert.deepEqual(await sql`select to_jsonb(o) as value from public.organisations o order by id`, originalPharmacies,
       "PERF-PACK-04 pharmacy fixtures must leave the original catalogue exactly unchanged");
   } finally { await closeSqlPool(); }
