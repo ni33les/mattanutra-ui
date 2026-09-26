@@ -145,6 +145,11 @@ test('PERF-CPU-02 repeated label identities resolve references once without mixi
   assert.equal(changed.get('a')?.units, 90_000_000n, 'A new request resolves its own requested identity');
   const conflict = labelledSafetyExposure(product('untrusted', { a: 80 }, 100, { labelledContributions: [{ subjectId: 'a', name: 'A', amount: 80, unit: 'mg', mappingStatus: 'conflicting' }] }), 1, input);
   assert.equal(conflict.size, 0, 'Cached identity must never upgrade conflicting product evidence');
+  const { evaluateSafety } = await import('../../lib/matcher/safety.ts');
+  const observations = { request: input, exposure: { totals: first, provenance: [] }, products: [], variants: [] };
+  const safety = evaluateSafety(observations); lookups = 0;
+  assert.deepEqual(evaluateSafety(observations), safety);
+  assert.equal(lookups, 0, 'Names in compiled reference facts must not be searched again for each retained basket');
 });
 
 test('PERF-CPU-03 repeated candidate additions reuse physical quantities and reprice changed offers', async () => {
@@ -289,6 +294,25 @@ test('PERF-CPU-05 safety reuses verified exposure facts but rejects inconsistent
   const corrected = evaluateSafety({ request: input, exposure: current, preparedExposure: supplied, products: [], variants: [] });
   assert.ok(!corrected.findings.some(row => row.code === 'dose_review_required'), 'A stale prepared amount cannot create a false reference breach');
   assert.ok(conversions > 0, 'Different validated facts require their own calculation');
+});
+
+test('PERF-CPU-06 retained basket metadata examines unselected products only during revalidation', async () => {
+  const { compileGroups } = await import('../../lib/matcher/candidates.ts');
+  const { product } = await import('../matcher/flexible-v5-fixtures.ts');
+  const { seedState, tryAddVariant } = await import('../../lib/matcher/search.ts');
+  const { scoreState } = await import('../../lib/matcher/selector.ts');
+  const input = request(), groups = compileGroups(input, { catalogueVersion: 'selected-metadata', availabilityAsOf: '2026-09-26', products: [product('chosen', { a: 100 }), product('unused', { a: 50 })] });
+  const selected = groups.find(group => group.productId === 'chosen'); assert.ok(selected);
+  const variant = selected.variants.find(row => row.dailyUnits === 1); assert.ok(variant);
+  const state = tryAddVariant(seedState(input), variant, selected, input); assert.ok(state);
+  const expected = scoreState({ groups, request: input, sellerId: selected.sellerId, state }); assert.ok(expected);
+  let unselectedReads = 0;
+  const observed = groups.map(group => group === selected ? group : new Proxy(group, { get(target, key, receiver) {
+    if (key === 'product') unselectedReads++;
+    return Reflect.get(target, key, receiver);
+  } }));
+  assert.deepEqual(scoreState({ groups: observed, request: input, sellerId: selected.sellerId, state }), expected);
+  assert.equal(unselectedReads, 1, 'Incidental, dedicated, title and label counts should share selected products rather than rebuilding the catalogue');
 });
 
 test('PERF-CPU-01 interior probes retain exact comparison facts without formatting discarded responses', async () => {
