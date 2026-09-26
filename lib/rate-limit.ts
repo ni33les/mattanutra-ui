@@ -41,6 +41,9 @@ type WindowEntry = {
   touchedAtMs: number;
 };
 
+/** Caller-owned storage for bounded proofs; never shares customer maintenance. */
+export type RateLimitStore = Map<string, WindowEntry>;
+
 /** Soft cap on distinct `{bucket}:{ip}` keys held in this process. */
 const DEFAULT_MAX_STORE_ENTRIES = 10_000;
 /** How often to walk the map for expired keys under normal load. */
@@ -167,23 +170,25 @@ export function rateLimitClientKey(
  */
 export function consumeRateLimit(
   key: string,
-  config: RateLimitConfig
+  config: RateLimitConfig,
+  isolatedStore?: RateLimitStore
 ): RateLimitResult {
   const now = nowMs();
-  maybeMaintainStore(now);
+  const buckets = isolatedStore ?? store;
+  if (!isolatedStore) maybeMaintainStore(now);
 
   const limit = Math.max(1, Math.floor(config.limit));
   const windowMs = Math.max(1, Math.floor(config.windowMs));
-  const existing = store.get(key);
+  const existing = buckets.get(key);
 
   if (!existing || existing.resetAtMs <= now) {
     // Ensure capacity before inserting a brand-new key (expired keys reuse the slot).
-    if (!existing && store.size >= maxStoreEntries) {
+    if (!isolatedStore && !existing && store.size >= maxStoreEntries) {
       pruneToCapacity(now);
     }
 
     const resetAtMs = now + windowMs;
-    store.set(key, { count: 1, resetAtMs, touchedAtMs: now });
+    buckets.set(key, { count: 1, resetAtMs, touchedAtMs: now });
 
     return {
       allowed: true,
@@ -212,7 +217,7 @@ export function consumeRateLimit(
   }
 
   existing.count += 1;
-  store.set(key, existing);
+  buckets.set(key, existing);
 
   return {
     allowed: true,
@@ -267,9 +272,10 @@ export function rateLimitExceededResponse(
  */
 export function enforceRateLimit(
   request: Request,
-  config: RateLimitConfig
+  config: RateLimitConfig,
+  isolatedStore?: RateLimitStore
 ): Response | null {
-  const result = consumeRateLimit(rateLimitClientKey(request, config.name), config);
+  const result = consumeRateLimit(rateLimitClientKey(request, config.name), config, isolatedStore);
 
   if (result.allowed) {
     return null;

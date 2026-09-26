@@ -5,7 +5,7 @@ import {
   resolveQaSession
 } from "@/lib/agentic/qa/session";
 import { getRequestClientIp } from "@/lib/request-client-ip";
-import { enforceRateLimit, publicRateLimits } from "@/lib/rate-limit";
+import { enforceRateLimit, publicRateLimits, type RateLimitStore } from "@/lib/rate-limit";
 
 export { qaNamespaceFromRequest };
 
@@ -61,21 +61,21 @@ export function publicMcpRateLimit(body?: unknown) {
 }
 
 /** Bounded in-process proof, isolated from ordinary clients and active QA packs.
- * The random bucket expires normally; never reset shared customer state. */
+ * Its private map lives for these 63 calls; customer capacity and counters are untouched. */
 export async function mutationRateLimitProof() {
   const tools = ["plan", "execute", "feedback"];
-  const namespace = `qa-rate-proof:${crypto.randomUUID()}`;
+  const proofStore: RateLimitStore = new Map();
   const request = new Request("https://mcp-proof.invalid/api/mcp", { method: "POST" });
   const configurations = tools.map(name => publicMcpRateLimit({ method: "tools/call", params: { name } }));
   let allowedRequests = 0;
   for (let index = 0; index < 60; index++) {
     const config = configurations[index % tools.length];
-    if (enforceRateLimit(request, { ...config, name: `${namespace}:${config.name}` }) === null) allowedRequests++;
+    if (enforceRateLimit(request, config, proofStore) === null) allowedRequests++;
   }
   const blocked = [];
   for (const [index, tool] of tools.entries()) {
     const config = configurations[index];
-    const response = enforceRateLimit(request, { ...config, name: `${namespace}:${config.name}` });
+    const response = enforceRateLimit(request, config, proofStore);
     let body: { retryAfterSeconds?: unknown } | null = null;
     try { body = response ? await response.json() : null; } catch { /* Invalid response fails the evidence checks below. */ }
     const retryAfterSeconds = Number(response?.headers.get("Retry-After"));
