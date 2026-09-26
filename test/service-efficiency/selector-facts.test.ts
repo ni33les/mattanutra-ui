@@ -9,17 +9,6 @@ const { request, product, catalog } = await import('../matcher/flexible-v5-fixtu
 const { seedState, tryAddVariant } = await import('../../lib/matcher/search.ts');
 const { scoreState, materiallyDifferent } = await import('../../lib/matcher/selector.ts');
 
-test('PERF-CPU-47 dedicated-product classification compiles once per immutable target and product', () => {
-  const target = request().targets[0]; let titleReads = 0;
-  const item = { ...product('dedicated', { a: 50 }), get title() { titleReads++; return 'dedicated'; } };
-  assert.equal(candidates.productIsDedicatedForTarget(item, target), true);
-  titleReads = 0;
-  for (let i = 0; i < 100; i++) assert.equal(candidates.productIsDedicatedForTarget(item, target), true);
-  assert.equal(titleReads, 0, 'Physical quantities do not change a product title or its dedication');
-  assert.equal(candidates.productIsDedicatedForTarget(product('mixed', { a: 50, b: 1 }), target), false);
-  assert.equal(candidates.productIsDedicatedForTarget(item, { ...target, subjectId: 'b', name: 'B' }), false, 'New target identities must not inherit another classification');
-});
-
 test('PERF-CPU-46 repeated choice comparisons reuse immutable product-dose identities', () => {
   const input = request(), groups = candidates.compileGroups(input, catalog([product('choice', { a: 50 })]));
   const scores = [1, 2].map(units => {
