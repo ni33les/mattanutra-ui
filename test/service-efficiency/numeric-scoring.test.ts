@@ -21,6 +21,26 @@ mock.module('../../lib/matcher/rational.ts', { namedExports: { ...fractions, lin
 const { request } = await import('../matcher/flexible-v5-fixtures.ts');
 const { doseFitScore, numericalDoseFitScore, exactDoseFit, compareDoseFit, weightedDoseFitScore, numericalWeightedDoseFitScore } = await import('../../lib/matcher/dose-fit.ts');
 
+test('PERF-CPU-55 one numerical basket resolves its shared input cache once regardless of target count', () => {
+  const base = request(), inputs = [1, 20].map(count => ({ ...base, targets: Array.from({ length: count }, (_, i) => ({
+    ...base.targets[0], subjectId: `subject${i}`, name: `Subject ${i}`, requested: { ...base.targets[0].requested, subjectId: `subject${i}` }
+  })) }));
+  const reads: number[] = [];
+  for (const input of inputs) {
+    const exposure = new Map(input.targets.map(row => [row.subjectId, 75000000n] as const));
+    numericalDoseFitScore(input, exposure);
+    const original = WeakMap.prototype.get; let lookups = 0;
+    try {
+      WeakMap.prototype.get = function (key) { if (key === input) lookups++; return original.call(this, key); };
+      const score = numericalDoseFitScore(input, new Map(exposure));
+      assert.equal(fractions.compare(score.exact, { num: BigInt(input.targets.length), den: 4n }), 0);
+      assert.equal(score.deviations.length, input.targets.length);
+    } finally { WeakMap.prototype.get = original; }
+    reads.push(lookups);
+  }
+  assert.equal(reads[1], reads[0], 'The shared request/cache lookup belongs outside the nutrient loop');
+});
+
 test('PERF-CPU-54 numerical nutrient rows reuse request ordering without sorting each basket', () => {
   const base = request(), input = { ...base, targets: ['z', 'a'].map(subjectId => ({ ...base.targets[0], subjectId,
     name: subjectId.toUpperCase(), requested: { ...base.targets[0].requested, subjectId } })) };
