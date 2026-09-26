@@ -140,7 +140,7 @@
     },
     {
       "file": "test/service-efficiency/selector-facts.test.ts",
-      "expectedCases": 2,
+      "expectedCases": 3,
       "reason": "PERF-CPU-35: exact incidental facts and request-isolated target resolution without per-label repeated lookups"
     },
     {
