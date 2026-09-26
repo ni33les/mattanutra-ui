@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { fullTestInventory, fullTestPreflight, nodeExecutionProof, browserExecutionProof, testSourceHygiene } from "../scripts/run-full-test-suite.mjs";
+import { fullTestInventory, fullTestPreflight, nodeExecutionProof, browserExecutionProof, testSourceHygiene, runBatch } from "../scripts/run-full-test-suite.mjs";
 import { allTestFiles } from "../scripts/dev-cycle-utils.mjs";
 import { semanticTestEvent } from "../scripts/test-semantic-reporter.mjs";
 
@@ -104,4 +104,51 @@ it("DISC-INFRA-01 complete MCP qualification includes refinement and matching ex
   const inventory=fullTestInventory();
   for (const file of ["test/ax-refinement/contract.test.ts", "test/ax-refinement/recovery.integration.test.ts", "test/service-efficiency/reads.test.ts", "test/service-efficiency/operations.integration.test.ts"]) assert.ok(inventory.mcp.includes(file),file);
   assert.deepEqual(unclassifiedMatcherConsumers(process.cwd(),inventory.node,inventory.mcp),[]);
+});
+
+it("QUALITY-DISC-04 full discovery includes JavaScript cases and keeps their PostgreSQL batch distinct", async () => {
+  const { mkdtempSync, mkdirSync, writeFileSync, rmSync } = await import("node:fs");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const directory = mkdtempSync(join(tmpdir(), "full-mixed-test-discovery-"));
+  try {
+    mkdirSync(join(directory, "test/nested"), { recursive: true });
+    const expected = ["test/nested/memory.test.mjs", "test/nested/postgres.integration.test.mjs", "test/root.test.ts"];
+    for (const file of expected) writeFileSync(join(directory, file), "");
+    const inventory = fullTestInventory(directory);
+    assert.deepEqual(inventory.node, expected);
+    assert.deepEqual(inventory.integration, ["test/nested/postgres.integration.test.mjs"]);
+    const current = fullTestInventory();
+    for (const file of ["test/delight-price-release.test.mjs", "test/delight-price-completion.test.mjs"]) assert.ok(current.node.includes(file), file);
+  } finally { rmSync(directory, { recursive: true, force: true }); }
+});
+
+it("QUALITY-DISC-05 maintained matcher discovery includes current HealthScore, pharmacy and reveal consumers", () => {
+  const inventory = fullTestInventory();
+  for (const file of [
+    "test/healthscore-performance/availability-catalogue.test.ts",
+    "test/pharmacy-followup/market.integration.test.ts",
+    "test/reveal-coverage-corrections.test.ts",
+    "test/web-matching-correctness/presentation.test.ts",
+    "test/web-matching-correctness/regressions.test.ts"
+  ]) assert.ok(inventory.mcp.includes(file), file);
+});
+
+it("QUALITY-DISC-06 batch execution reconciles a real JavaScript test with semantic proof", async () => {
+  const { mkdtempSync, mkdirSync, writeFileSync, rmSync } = await import("node:fs");
+  const { tmpdir } = await import("node:os");
+  const { join, relative } = await import("node:path");
+  const directory = mkdtempSync(join(tmpdir(), "javascript-execution-proof-"));
+  try {
+    const file = join(directory, "case.test.mjs"), evidence = join(directory, "evidence");
+    mkdirSync(evidence);
+    writeFileSync(file, "import assert from 'node:assert/strict'; import test from 'node:test'; test('JavaScript assertion executes', () => { assert.equal(2 + 2, 4); });\n");
+    const env = { ...process.env };
+    delete env.NODE_TEST_CONTEXT;
+    const result = await runBatch("node-javascript-proof", ["--test", relative(process.cwd(), file)], env, evidence);
+    assert.equal(result.tests, 1);
+    assert.equal(result.passed, true, JSON.stringify(result.execution));
+    assert.equal(result.execution.files, 1);
+    assert.equal(result.execution.cases, 1);
+  } finally { rmSync(directory, { recursive: true, force: true }); }
 });
