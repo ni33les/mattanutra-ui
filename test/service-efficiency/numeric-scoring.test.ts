@@ -35,6 +35,28 @@ test('PERF-CPU-18 repeated nutrient amounts reuse immutable frontier deviations'
   assert.deepEqual(doseFitTargetDeviations(first), [{ subjectId: 'a', under: 0.25, over: 0 }]);
 });
 
+test('PERF-CPU-19 retained concern comparisons do not rebuild immutable facts', async () => {
+  const { product, catalog } = await import('../matcher/flexible-v5-fixtures.ts');
+  const { compileGroups } = await import('../../lib/matcher/candidates.ts');
+  const { seedState, tryAddVariant } = await import('../../lib/matcher/search.ts');
+  const { scoreState, hasFewerConcerns } = await import('../../lib/matcher/selector.ts');
+  const input = request(), groups = compileGroups(input, catalog([product('exact', { a: 100 }), product('excess', { a: 200 })]));
+  let reads = 0;
+  const baskets = groups.map(group => {
+    const variant = group.variants.find(row => row.dailyUnits === 1); assert.ok(variant);
+    const state = tryAddVariant(seedState(input), variant, group, input); assert.ok(state);
+    const basket = scoreState({ groups, request: input, sellerId: group.sellerId, state }); assert.ok(basket?.doseFit);
+    return { ...basket, doseFit: new Proxy(basket.doseFit, { get(target, key, receiver) { if (key === 'perTarget') reads++; return Reflect.get(target, key, receiver); } }) };
+  });
+  const candidate = baskets.find(row => row.productIds.includes('exact'))!, selected = baskets.find(row => row.productIds.includes('excess'))!;
+  assert.ok(candidate && selected);
+  assert.equal(hasFewerConcerns(candidate, selected, input), true);
+  assert.equal(reads, 2, 'Both distinct measured baskets must be assessed');
+  assert.equal(hasFewerConcerns(candidate, selected, input), true);
+  assert.equal(reads, 2, 'Repeated final comparisons must reuse the same dose and safety facts');
+  assert.equal(hasFewerConcerns(selected, candidate, input), false, 'Measured excess cannot disappear through reuse');
+});
+
 test('REF-CPU-01 numerical ranking does not format display doses for losing candidates', () => {
   const input = request({ safetyCeilings: [{ subjectId: 'a', name: 'A', maxAmount: 100, maxUnit: 'mg', sourceScope: 'supplemental' }] });
   conversions = 0; additions = 0; aggregateSums = 0; conversionsToNumber = 0;
