@@ -21,6 +21,30 @@ mock.module('../../lib/matcher/rational.ts', { namedExports: { ...fractions, lin
 const { request } = await import('../matcher/flexible-v5-fixtures.ts');
 const { doseFitScore, numericalDoseFitScore, exactDoseFit, compareDoseFit, weightedDoseFitScore, numericalWeightedDoseFitScore } = await import('../../lib/matcher/dose-fit.ts');
 
+test('PERF-CPU-61 cursor edges reuse each immutable parent identity across its additions', async () => {
+  const { product, catalog } = await import('../matcher/flexible-v5-fixtures.ts');
+  const { compileGroups } = await import('../../lib/matcher/candidates.ts');
+  const { createSearchCursor, advanceSearchCursor, searchCursorResult } = await import('../../lib/matcher/search-cursor.ts');
+  const { DEFAULT_MATCHER_CONFIG } = await import('../../lib/matcher/config.ts');
+  const input = request(), groups = compileGroups(input, catalog(Array.from({ length: 8 }, (_, i) => product(`p${i}`, { a: i + 5 }))));
+  assert.equal(groups.length, 8);
+  const config = { ...DEFAULT_MATCHER_CONFIG, expansionBudget: 1000, exactGroupLimit: 0 };
+  const cursor = createSearchCursor(groups, input, config);
+  const original = Array.prototype.sort; let identitySorts = 0;
+  try {
+    Array.prototype.sort = function (...args) {
+      if (this.length > 0 && typeof this[0] === 'number') identitySorts++;
+      return Reflect.apply(original, this, args);
+    };
+    advanceSearchCursor(cursor, input, 1000);
+  } finally { Array.prototype.sort = original; }
+  assert.equal(cursor.expansionAttempts, 1000); assert.ok(cursor.archive.size > 100);
+  const result = searchCursorResult(cursor, input);
+  assert.ok(result.complete.length > 0);
+  assert.ok(identitySorts <= cursor.expansionAttempts + 1,
+    `Only newly attempted baskets need an identity sort: ${identitySorts} sorts for ${cursor.expansionAttempts} attempts`);
+});
+
 test('PERF-CPU-60 repeated exact endpoint components reuse one compiled aggregation scale', () => {
   const targets = [['a', 3], ['b', 7]].map(([id, amount]) => ({ subjectId: id as string, name: String(id).toUpperCase(),
     requestedAmount: amount as number, requestedUnit: 'mg' as const, requested: { subjectId: id as string, dim: 'mass_ng' as const, units: BigInt(amount) * 1_000_000n }, importance: 'required' as const }));
