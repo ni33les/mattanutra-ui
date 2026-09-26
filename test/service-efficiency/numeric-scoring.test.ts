@@ -26,6 +26,28 @@ mock.module('../../lib/matcher/safety.ts', { namedExports: { ...safetyModule, la
 const { request } = await import('../matcher/flexible-v5-fixtures.ts');
 const { doseFitScore, numericalDoseFitScore, exactDoseFit, compareDoseFit, weightedDoseFitScore, numericalWeightedDoseFitScore } = await import('../../lib/matcher/dose-fit.ts');
 
+test('PERF-MEM-03 request-owned numerical caches avoid per-candidate weak ownership and remain bounded', async () => {
+  const { numericalSearchStateScore } = await import('../../lib/matcher/practical-scoring.ts');
+  const { seedState } = await import('../../lib/matcher/search.ts');
+  const input = request({ scoring: { profile: 'balanced', weights: {} } });
+  const exposure = new Map([['a', 50_000_000n]]), state = { ...seedState(input), exposure, delivered: exposure };
+  const original = WeakMap.prototype.set; let candidateOwnershipEdges = 0, score;
+  try {
+    WeakMap.prototype.set = function (key, value) {
+      if (key === exposure) candidateOwnershipEdges++;
+      return original.call(this, key, value);
+    };
+    score = numericalSearchStateScore(input, state);
+  } finally { WeakMap.prototype.set = original; }
+  assert.equal(fractions.compare(score.doseExact, { num: 1n, den: 2n }), 0);
+  const first = numericalDoseFitScore(input, exposure);
+  for (let i = 0; i < 8193; i++) numericalDoseFitScore(input, new Map([['a', BigInt(i)]]));
+  const reloaded = numericalDoseFitScore(input, exposure);
+  assert.deepEqual(reloaded, first, 'Eviction must not change exact arithmetic or deviations');
+  assert.notStrictEqual(reloaded, first, 'One active request must not retain an unbounded numerical cache');
+  assert.equal(candidateOwnershipEdges, 0, 'The immutable request owns its bounded cache directly, without another weak GC boundary for every basket');
+});
+
 test('PERF-CPU-64 physical breakpoint preparation reuses its verified minimum-quantity exposure', async () => {
   const { supportedDoseDomain } = await import('../../lib/matcher/candidates.ts');
   const { product } = await import('../matcher/flexible-v5-fixtures.ts');
