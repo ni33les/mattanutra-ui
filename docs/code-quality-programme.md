@@ -209,3 +209,13 @@ use the existing isolated QA allowance for load samples. The wider audited
 HTTP test surface retains intentional error tests and fail-closed utilities.
 Meaningful RED failures, the 15-case LAT GREEN and six negative-envelope checks
 are retained under `test-speed/lat-pack-*` and `test-speed/mcp-success-audit/`.
+
+`acceptance-final-3` completed 3,210 application tests and 38 independent tests
+without failures. PostgreSQL acceptance exposed an omitted existing pharmacy-order
+schema prerequisite, which made one LINE ownership test depend on a later suite.
+The run was stopped and remains incomplete. The reviewed repair applies the
+existing pharmacy migration during isolated preparation and requires its receipt
+in acceptance; it does not change application code or live schemas. RED evidence
+and 18 passing affected checks are in `test-speed/line-schema-{red,green}/`.
+Final unchanged-source acceptance and DEV deployment remain outstanding at the
+user's stop boundary; these focused passes do not authorize deployment.
