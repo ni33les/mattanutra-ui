@@ -143,6 +143,7 @@ async function main() {
     await run("administration-schema", process.execPath, [...TS, "scripts/apply-product-administration-schema.ts"]);
     await run("payment-schema", process.execPath, [...TS, "scripts/apply-payment-schema.ts"]);
     await run("web-schema", process.execPath, [...TS, "scripts/apply-web-funnel-schema.ts"]);
+    await run("pharmacy-schema", process.execPath, [...TS, "scripts/apply-pharmacy-orders-schema.ts"]);
     await run("agentic-schema", process.execPath, [...TS, "scripts/apply-agentic-commerce-schema.ts"]);
     await run("matcher-runtime-schema", process.execPath, [...TS, "scripts/apply-matcher-v5-runtime-schema.ts"]);
     await run("reference-integrity-schema", process.execPath, [...TS, "scripts/apply-supplement-safety-reference-integrity-schema.ts"]);
