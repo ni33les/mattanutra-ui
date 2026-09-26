@@ -1181,7 +1181,7 @@ function computeMatchPlan(input: Readonly<{
   const result = match(request, {
     availabilityAsOf: snapshot.availabilityAsOf,
     catalogueVersion: snapshot.catalogueVersion,
-    products: matcherProductsFor(input.snapshot)
+    products: matcherProductsFor(snapshot)
   }, DEFAULT_MATCHER_CONFIG, input.prepared?.groups, undefined, input.completedCursor);
   const withSafety = (option: StackOption): StackOption => ({
     ...option,
@@ -1302,7 +1302,7 @@ export function matchPlanChunk(input: Parameters<typeof matchPlan>[0], options: 
   const session = createResidentPlanSession(input, options.checkpoint);
   const step = advanceResidentSearch(session, options);
   const checkpoint = { ...sessionCheckpoint(session), cursor: encodeMatchCursor(session.cursor) };
-  return { ...step, checkpoint, ...(step.done ? { result: computeMatchPlan({ ...input, completedCursor: session.cursor, prepared: { request: session.request, groups: session.compiledGroups } }) } : {}) };
+  return { ...step, checkpoint, ...(step.done ? { result: computeMatchPlan({ ...session.input, completedCursor: session.cursor, prepared: { request: session.request, groups: session.compiledGroups } }) } : {}) };
 }
 
 export function createResidentPlanSession(input: Parameters<typeof matchPlan>[0], checkpoint?: PlanSearchCheckpoint | BinaryPlanSearchCheckpoint) {
@@ -1310,8 +1310,11 @@ export function createResidentPlanSession(input: Parameters<typeof matchPlan>[0]
   try {
   const request = toCanonicalRequest(input.state);
   if ("error" in request) throw new Error(request.error);
-  const catalog = { availabilityAsOf: input.snapshot.availabilityAsOf, catalogueVersion: input.snapshot.catalogueVersion, products: matcherProductsFor(input.snapshot) };
-  const inputIdentity = planCheckpointInputIdentity(input);
+  // Own the nested facts once. The same immutable snapshot supplies compiled
+  // products, checkpoint identity and final response materialization.
+  const ownedInput = { ...input, snapshot: freezeCatalogueSnapshot(input.snapshot) };
+  const catalog = { availabilityAsOf: ownedInput.snapshot.availabilityAsOf, catalogueVersion: ownedInput.snapshot.catalogueVersion, products: matcherProductsFor(ownedInput.snapshot) };
+  const inputIdentity = planCheckpointInputIdentity(ownedInput);
   if (checkpoint && checkpoint.inputIdentity !== inputIdentity) throw new Error("Plan checkpoint input identity changed");
   // The search clones these groups before adding dynamic quantities. Keep the
   // original compilation for unchanged final diagnostics and seller facts.
@@ -1322,7 +1325,7 @@ export function createResidentPlanSession(input: Parameters<typeof matchPlan>[0]
     ? decodeMatchCursor(checkpoint.cursor, matchCursorIdentity(request, catalog, DEFAULT_MATCHER_CONFIG))
     : createMatchCursor(request, catalog, DEFAULT_MATCHER_CONFIG, compiledGroups);
   if (input.state.searchEffort === "expanded" && cursor.effort !== "expanded") expandMatchCursor(cursor);
-  return { input, request, cursor, inputIdentity, compiledGroups };
+  return { input: ownedInput, request, cursor, inputIdentity, compiledGroups };
   } finally { endCompilation(); }
 }
 type ResidentSession = ReturnType<typeof createResidentPlanSession>;
