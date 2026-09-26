@@ -23,8 +23,6 @@ import {
 } from "../lib/agentic/qa/session.ts";
 import { canonicalJson } from "./agentic/det-v3/harness.ts";
 import {
-  enforceRateLimit,
-  publicRateLimits,
   resetRateLimitStoreForTests,
   setRateLimitNowForTests
 } from "../lib/rate-limit.ts";
@@ -309,10 +307,14 @@ describe("UAT QA infrastructure Slice B rate allowance", () => {
     replaceCatalogueSnapshot(CATALOGUE_0);
     await beginQaRun("A", { clientKey: PACK_IP, environment: "uat", buildId: "build-a" });
     const customer = mcpRequest({ "x-forwarded-for": "198.51.100.20" });
+    const tools = ["plan", "execute", "feedback"];
     for (let index = 0; index < 60; index += 1) {
-      assert.equal(enforceRateLimit(customer, publicRateLimits.mcp), null);
+      const body = { method: "tools/call", params: { name: tools[index % tools.length] } };
+      assert.equal(await enforceMcpOrQaRateLimit(customer, "uat", body), null);
     }
-    assert.equal(enforceRateLimit(customer, publicRateLimits.mcp)?.status, 429);
+    const blocked = await enforceMcpOrQaRateLimit(customer, "uat", { method: "tools/call", params: { name: "plan" } });
+    assert.equal(blocked?.status, 429);
+    assert.equal(blocked?.headers.get("Retry-After"), "60");
     assert.equal(await qaPackRateLimitApplies(customer, "uat"), false);
   });
 

@@ -960,6 +960,7 @@ describe("agentic P1 pack fixes", () => {
             checks: Array<{
                 id: string;
                 passed: boolean;
+                evidence?: { allowedRequests?: number; blocked?: Array<{ tool: string; status: number | null; retryAfterPositive: boolean }> };
             }>;
             passed: boolean;
             untestedIds: string[];
@@ -970,6 +971,10 @@ describe("agentic P1 pack fixes", () => {
         assert.deepEqual(missing, []);
         const failed = body.checks.filter((item) => !item.passed).map((item) => item.id);
         assert.deepEqual(failed, [], failed.join(","));
+        const rate = body.checks.find(item => item.id === "D10-09");
+        assert.equal(rate?.evidence?.allowedRequests, 60, "D10-09 must execute its limiter proof, not publish an unconditional pass");
+        assert.deepEqual(rate?.evidence?.blocked?.map(item => item.tool), ["plan", "execute", "feedback"]);
+        assert.ok(rate?.evidence?.blocked?.every(item => item.status === 429 && item.retryAfterPositive));
     });
     it("accepts pregnant lifeStage with Folate and Folic acid aliases", async () => {
         const runtime = runtimeFor();

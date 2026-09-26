@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { afterEach, describe, it } from "node:test";
+import { afterEach, describe, it, mock } from "node:test";
 import {
   consumeRateLimit,
   enforceRateLimit,
@@ -13,6 +13,14 @@ import {
   setRateLimitNowForTests,
   setRateLimitPurgeIntervalForTests
 } from "../lib/rate-limit.ts";
+
+// Keep the real primitive available while observing the proof through the
+// same module boundary as production. Faults never become production options.
+const realLimiter = await import("../lib/rate-limit.ts");
+let proofEnforcer = realLimiter.enforceRateLimit;
+mock.module("../lib/rate-limit.ts", { namedExports: { ...realLimiter,
+  enforceRateLimit: (...args: Parameters<typeof enforceRateLimit>) => proofEnforcer(...args) } });
+const mcpLimiter = await import("../lib/agentic/qa/rate-limit.ts");
 
 function source(relativePath: string) {
   return readFileSync(new URL(relativePath, import.meta.url), "utf8");
@@ -31,6 +39,7 @@ const previousTrustProxy = process.env.TRUST_PROXY;
 const previousTrustedClientIpHeader = process.env.TRUSTED_CLIENT_IP_HEADER;
 
 afterEach(() => {
+  proofEnforcer = realLimiter.enforceRateLimit;
   resetRateLimitStoreForTests();
   setRateLimitNowForTests(null);
   if (previousTrustProxy === undefined) {
@@ -173,5 +182,50 @@ describe("rate limit", () => {
 
     assert.equal(publicRateLimits.checkoutSession.limit, 10);
     assert.equal(publicRateLimits.assessmentResumeLink.limit, 5);
+  });
+});
+
+
+describe("D10-09 mutation rate-limit proof", () => {
+  it("observes the actual 60-request boundary without consuming customer buckets", async () => {
+    setRateLimitNowForTests(1_000_000);
+    const customer = new Request("https://example.test/api/mcp", { method: "POST" });
+    assert.equal(enforceRateLimit(customer, publicRateLimits.mcp), null);
+    const before = getRateLimitStoreSizeForTests();
+    const proof = await mcpLimiter.mutationRateLimitProof();
+    assert.equal(proof.passed, true, JSON.stringify(proof));
+    assert.equal(proof.evidence.allowedRequests, 60);
+    assert.deepEqual(proof.evidence.blocked.map(item => item.tool), ["plan", "execute", "feedback"]);
+    for (const result of proof.evidence.blocked) {
+      assert.equal(result.status, 429); assert.equal(result.remaining, "0"); assert.equal(result.retryAfterPositive, true);
+      assert.equal(result.retryWithinWindow, true); assert.equal(result.retryMetadataConsistent, true); assert.equal(result.limit, "60");
+    }
+    assert.equal(getRateLimitStoreSizeForTests(), before + 1, "The proof creates one bounded expiring bucket");
+    assert.deepEqual(await mcpLimiter.mutationRateLimitProof(), proof, "Private bucket identities and raw retry clocks never enter semantic proof evidence");
+    for (let index = 1; index < 60; index++) assert.equal(enforceRateLimit(customer, publicRateLimits.mcp), null);
+    assert.equal(enforceRateLimit(customer, publicRateLimits.mcp)?.status, 429, "The customer's existing count was neither consumed nor cleared");
+  });
+  it("fails closed when enforcement is disabled, premature or loses retry metadata", async () => {
+    const unavailable = () => rateLimitExceededResponse({ allowed: false, limit: 60, remaining: 0, resetAtMs: 1_060_000, retryAfterSeconds: 60 });
+    for (const fault of ["disabled", "premature", "missing-retry"] as const) {
+      let calls = 0;
+      proofEnforcer = () => {
+        calls++;
+        if (fault === "disabled" || fault === "missing-retry" && calls <= 60) return null;
+        const response = unavailable();
+        if (fault === "missing-retry") response.headers.delete("Retry-After");
+        return response;
+      };
+      const proof = await mcpLimiter.mutationRateLimitProof();
+      assert.equal(proof.passed, false, `${fault}: ${JSON.stringify(proof)}`);
+      assert.equal(calls, 63, "Proof work stays bounded and does not retry through a failure");
+    }
+  });
+  it("shares current native and prefixed mutation routing while preserving the order-read budget", () => {
+    for (const name of ["plan", "execute", "feedback"]) for (const prefix of ["", "mattanutra_dev.", "mattanutra_dev.mattanutra_dev."]) {
+      assert.strictEqual(mcpLimiter.publicMcpRateLimit({ method: "tools/call", params: { name: prefix + name } }), publicRateLimits.mcp);
+    }
+    assert.strictEqual(mcpLimiter.publicMcpRateLimit({ method: "tools/call", params: { name: "order" } }), publicRateLimits.mcpRead);
+    assert.equal(publicRateLimits.mcpRead.limit, 300); assert.equal(publicRateLimits.mcpRead.windowMs, 60_000);
   });
 });
