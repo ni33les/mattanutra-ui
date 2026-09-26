@@ -155,7 +155,7 @@
     },
     {
       "file": "test/simple-plan/refinement-consistency.test.ts",
-      "expectedCases": 11,
+      "expectedCases": 16,
       "reason": "Pending revision, expired work and same-input recovery through the changed worker entry point"
     },
     {

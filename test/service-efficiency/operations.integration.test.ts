@@ -46,7 +46,7 @@ test("PERF-LOCK-41 healthy and completed worker operations issue no speculative 
 
   const current = await store.getPlanOperation(row.id); assert.ok(current);
   const response = { ok: true, revision: 2, status: "ready" };
-  assert.equal(await store.updatePlanOperation({ ...current, status: "complete", response }, current.version), true);
+  assert.equal(await store.updatePlanOperation({ ...current, status: "complete", deadlineAt: row.deadlineAt, response }, current.version), true);
   queries.length = 0;
   assert.deepEqual(await runAdmittedPlanOperation({ store, config, operationId: row.id }), response);
   assert.equal(business().filter(query => /^\s*update/i.test(query)).length, 0);
