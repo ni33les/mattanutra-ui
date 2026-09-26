@@ -25,13 +25,23 @@ const profiles = new Map<string, Profile>();
 const resolvedProfiles = new WeakMap<ProfileRequest, Profile>();
 const requestsByProfile = new WeakMap<CanonicalRequest, Map<OptimizationMode, CanonicalRequest>>();
 const doseRequest = new WeakMap<CanonicalRequest, CanonicalRequest>();
+const monotoneSources = new WeakMap<CanonicalRequest, CanonicalRequest>();
 export const PRACTICAL_OBJECTIVES = Object.freeze(Object.keys(PROFILES) as OptimizationMode[]);
 export function requestForProfile(request: CanonicalRequest, optimization: OptimizationMode): CanonicalRequest {
   if (request.optimization === optimization) return request;
   let variants = requestsByProfile.get(request); if (!variants) { variants = new Map(); requestsByProfile.set(request, variants); }
   let copy = variants.get(optimization);
-  if (!copy) { copy = { ...request, optimization, ...(request.scoring ? { scoring: { profile: optimization, weights: {} } } : {}) }; variants.set(optimization, copy); doseRequest.set(copy, doseRequest.get(request) ?? request); shareDoseFitInputs(copy, request); }
+  if (!copy) { copy = { ...request, optimization, ...(request.scoring ? { scoring: { profile: optimization, weights: {} } } : {}) }; variants.set(optimization, copy); const source = doseRequest.get(request) ?? request; doseRequest.set(copy, source); shareDoseFitInputs(copy, request); if (profileOnlyIncreases(copy, source)) monotoneSources.set(copy, source); }
   return copy;
+}
+
+function profileOnlyIncreases(request: CanonicalRequest, source: CanonicalRequest) {
+  const next = resolvePracticalProfile(request), previous = resolvePracticalProfile(source);
+  if (!(["pills", "products", "price", "servings"] as const).every(axis => next.multipliers[axis] >= previous.multipliers[axis])) return false;
+  if (!request.scoring || !source.scoring) return true;
+  const a = effectiveWeights(request.scoring), b = effectiveWeights(source.scoring);
+  return a.defaultNutrient >= b.defaultNutrient && [...new Set([...Object.keys(a.nutrients), ...Object.keys(b.nutrients)])]
+    .every(id => (a.nutrients[id] ?? a.defaultNutrient) >= (b.nutrients[id] ?? b.defaultNutrient));
 }
 
 export function resolvePracticalProfile(request: ProfileRequest): Profile {
@@ -264,6 +274,8 @@ export function searchStateScore(request: CanonicalRequest, state: SearchState):
 export function compareSearchStateScores(request: CanonicalRequest, left: SearchState, right: SearchState) {
   const score = numericalSearchStateScore(request, right), cached = cachedStateScore(request, left);
   if (cached) return compareOverallScores(cached, score);
+  const source = monotoneSources.get(request), lower = source && cachedStateScore(source, left);
+  if (lower && compare(lower.exactTotal, score.exactTotal) > 0) return 1;
   const actual = stateActuals.get(left);
   // All other loss terms are nonnegative. Only reuse a bound after the common
   // measurements have passed validation; an unassessed state takes the full path.
