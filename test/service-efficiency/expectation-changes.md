@@ -136,3 +136,22 @@ Exact residual quantity, physical increments, one-attempt accounting, archive
 score and checkpoint equivalence assertions remain unchanged. The original
 failure and five-case GREEN run are preserved in `acceptance-1` and
 `residual-cleanup-green.*` respectively.
+
+### Complete acceptance database prerequisite (PERF-PACK-03)
+
+The full runner now rejects a database name outside the stricter PostgreSQL
+inventory prefix before execution. The original run's 28 failures were database
+prerequisite rejections; a fresh isolated clone created by the maintained helper
+executes all 71 cases in those 20 files successfully. Original failure evidence,
+clone identity and execution reconciliation remain in `postgres-correction`.
+
+### Endpoint allocation and immutable compilation (PERF-CPU-13–14)
+
+The endpoint evaluator preserves full weighted losses and stable endpoint ties
+without temporary sets or Cartesian arrays. Shared immutable compilation uses
+the existing eight-MiB fact cache, with complete request/catalogue/reference,
+environment and effort identities. New calls still own separate cursors and
+execute their search attempts; this does not constitute completed-match reuse.
+Changed inputs and reset invalidate the compiled entry. Dynamic quantities
+cannot alter another search's compiled inputs. Frozen result/timing comparisons
+remain a separate release requirement.

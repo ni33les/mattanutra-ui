@@ -383,6 +383,19 @@ test('PERF-CPU-14 fresh searches reuse immutable compilation but never share cur
     const changed = structuredClone(value);
     changed.state.targets[0].amount += 1;
     assert.notStrictEqual(matching.createResidentPlanSession(changed).compiledGroups, fresh.compiledGroups);
+    for (const different of [
+      { ...value, state: { ...value.state, locale: 'th' as const } },
+      { ...value, state: { ...value.state, searchEffort: 'expanded' as const } },
+      { ...value, state: { ...value.state, requirements: { ...value.state.requirements, maxDailyPills: 1 } } },
+      { ...value, snapshot: { ...value.snapshot, products: value.snapshot.products.map((product, i) => i ? product : { ...product, unitPriceMinor: product.unitPriceMinor + 1 }) } }
+    ]) assert.notStrictEqual(matching.createResidentPlanSession(different).compiledGroups, fresh.compiledGroups);
+    assert.ok(Object.isFrozen(fresh.request.targets) && Object.isFrozen(fresh.compiledGroups![0].product));
+    const { runWithMatcherSafetySnapshot } = await import('../../lib/matcher/safety-ceilings-server.ts');
+    const { captureMatcherSafetySnapshot } = await import('../../lib/matcher/safety-ceilings.ts');
+    const references = captureMatcherSafetySnapshot();
+    await runWithMatcherSafetySnapshot({ ...references, unavailable: true }, async () => {
+      assert.notStrictEqual(matching.createResidentPlanSession(value).compiledGroups, fresh.compiledGroups);
+    });
     matching.resetMatchPlanCache();
     assert.notStrictEqual(matching.createResidentPlanSession(value).compiledGroups, fresh.compiledGroups);
   } finally { matching.resetMatchPlanCache(); uninstallGoldCatalogue(); }
