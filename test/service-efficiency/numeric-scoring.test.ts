@@ -108,6 +108,27 @@ test('REF-CPU-08 supported quantity probes reuse compiled subject and unit facts
   assert.equal(unitCompilations, 0, 'Changing supported quantities multiplies compiled units without resolving names again');
 });
 
+test('PERF-CPU-02 repeated label identities resolve references once without mixing product amounts or requests', async () => {
+  const { product } = await import('../matcher/flexible-v5-fixtures.ts');
+  const { labelledSafetyExposure } = await import('../../lib/matcher/safety.ts');
+  let lookups = 0;
+  const references = [{ subjectId: 'reference-a', name: 'A', maxAmount: 100, maxUnit: 'mg' as const }];
+  const ceilings = new Proxy(references, { get(target, key, receiver) {
+    if (key === 'find') return (...args: Parameters<typeof references.find>) => { lookups++; return references.find(...args); };
+    return Reflect.get(target, key, receiver);
+  } });
+  const input = request({ targets: [], safetyCeilings: ceilings });
+  const first = labelledSafetyExposure(product('first', { a: 35 }), 1, input);
+  const second = labelledSafetyExposure(product('second', { a: 60 }), 1, input);
+  assert.equal(first.get('reference-a')?.units, 35_000_000n);
+  assert.equal(second.get('reference-a')?.units, 60_000_000n);
+  assert.equal(lookups, 1, 'An identical label identity needs one reference resolution across the immutable catalogue');
+  const changed = labelledSafetyExposure(product('third', { a: 90 }), 1, request());
+  assert.equal(changed.get('a')?.units, 90_000_000n, 'A new request resolves its own requested identity');
+  const conflict = labelledSafetyExposure(product('untrusted', { a: 80 }, 100, { labelledContributions: [{ subjectId: 'a', name: 'A', amount: 80, unit: 'mg', mappingStatus: 'conflicting' }] }), 1, input);
+  assert.equal(conflict.size, 0, 'Cached identity must never upgrade conflicting product evidence');
+});
+
 test('REF-CPU-09 numerical matching compiles the subject set when incidental exposure has no applicable reference', () => {
   const input = request({ profileKnown: { ageYears: false, lifeStage: false, sex: false } });
   let traversals = 0;
