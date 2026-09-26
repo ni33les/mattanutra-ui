@@ -8,13 +8,14 @@ import { assertReleaseManifestReady } from "../lib/agentic/release-manifest.ts";
 import { registerWorkerSession, heartbeatWorkerSession } from "../lib/task-service-agents.ts";
 import { reserveNextTask, completeTask, failTask } from "../lib/task-service.ts";
 import { buildTaskWorkItem } from "../lib/task-work-items.ts";
-import { executeTaskWorkItem } from "../lib/task-execution.ts";
+import { executeTaskWorkItem, prepareTaskExecution } from "../lib/task-execution.ts";
 import { applyTaskCompletionResult, prepareTaskCompletionResult } from "../lib/task-result-applier.ts";
 import { SYSTEM_AGENTS } from "../lib/system-agents.ts";
 import { closeSqlPool } from "../lib/db.ts";
 
 isolatedValidationEnvironment(process.env);
 const identity = assertReleaseManifestReady();
+await prepareTaskExecution(["match_agentic_plan"]);
 const agent = { ...SYSTEM_AGENTS.productMatcher, id: randomUUID(), name: `Isolated MCP matcher ${process.pid}`, metadata: { isolatedAcceptance: true } };
 const controller = new AbortController();
 const sessions: Awaited<ReturnType<typeof registerWorkerSession>>[] = [];
