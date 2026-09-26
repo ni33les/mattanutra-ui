@@ -31,7 +31,7 @@ test('PERF-CPU-66 a narrow basket addition reevaluates only its changed nutrient
   const { seedState, tryAddVariant } = await import('../../lib/matcher/search.ts');
   const { product, catalog } = await import('../matcher/flexible-v5-fixtures.ts');
   const { canonicalizeTargets } = await import('../../lib/matcher/canonicalizer.ts');
-  const ids = Array.from({ length: 20 }, (_, i) => `nutrient-${i}`);
+  const ids = Array.from({ length: 20 }, (_, i) => String.fromCharCode(97 + i));
   const targets = canonicalizeTargets({ targets: ids.map(subjectId => ({ subjectId, name: subjectId.toUpperCase(), amount: 100, unit: 'mg' as const })) }).targets;
   const input = request({ targets, safetyCeilings: [{ subjectId: ids[0], name: ids[0].toUpperCase(), maxAmount: 100, maxUnit: 'mg', sourceScope: 'supplemental' }] });
   const groups = compileGroups(input, catalog([product('base', Object.fromEntries(ids.map(id => [id, 50]))), product('addition', { [ids[0]]: 75 })]));
@@ -42,6 +42,7 @@ test('PERF-CPU-66 a narrow basket addition reevaluates only its changed nutrient
   assert.equal(fractions.compare(numericalDoseFitScore(input, parent.exposure).exact, { num: 10n, den: 1n }), 0);
   const child = tryAddVariant(parent, addition.variants.find(row => row.dailyUnits === 1)!, addition, input)!;
   assert.ok(child); assert.equal(child.exposure.get(ids[0]), 125_000_000n);
+  assert.deepEqual(ids.filter(id => child.exposure.get(id) !== parent.exposure.get(id)), [ids[0]], 'The independent fixture must alter exactly one ingredient');
   const original = Map.prototype.get; let oldEndpointReads = 0, calculated;
   try {
     Map.prototype.get = function (key) {
