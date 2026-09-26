@@ -189,3 +189,12 @@ No scoring, input-isolation, checkpoint or historical arithmetic assertion is
 removed. RED/GREEN logs, the candidate patch and its rejection receipt remain
 outside the checkout. The earlier compilation entries above record the
 experiment's history rather than a retained release feature.
+
+### Exact score ownership (PERF-CPU-15)
+
+One score now holds its exact total, component terms and target deviations in
+one weakly owned record. The RED case observed three registrations for the same
+score; GREEN requires one and preserves public score fields and exact safety
+arithmetic. The first paired frozen comparison preserves all result hashes and
+8,000 attempts. Daniel improves in each warmed comparison; D3 is mixed, so this
+is not claimed as a universal latency improvement or the sub-second gate.

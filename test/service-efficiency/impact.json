@@ -484,8 +484,8 @@
     },
     {
       "file": "test/service-efficiency/numeric-scoring.test.ts",
-      "expectedCases": 29,
-      "reason": "Exact ranking must avoid allocating human display conversions while preserving complete serialized score facts and weighted penalties; resident sessions own catalogue facts once and preserve checkpoint invalidation after caller mutation; PERF-CPU-01 exact interior-probe comparison and historical checkpoint recovery without response materialization; PERF-CPU-02 repeated label identities share reference resolution without sharing quantities or confidence; PERF-CPU-03 physical variant reuse with changed-offer repricing; PERF-CPU-04 independent exact linear coefficients; PERF-CPU-05 safety and retained scores share verified quantities without trusting stale preparation; PERF-CPU-06 selected product metadata is shared across final scoring counts",
+      "expectedCases": 30,
+      "reason": "Exact ranking must avoid allocating human display conversions while preserving complete serialized score facts and weighted penalties; resident sessions own catalogue facts once and preserve checkpoint invalidation after caller mutation; PERF-CPU-01 exact interior-probe comparison and historical checkpoint recovery without response materialization; PERF-CPU-02 repeated label identities share reference resolution without sharing quantities or confidence; PERF-CPU-03 physical variant reuse with changed-offer repricing; PERF-CPU-04 independent exact linear coefficients; PERF-CPU-05 safety and retained scores share verified quantities without trusting stale preparation; PERF-CPU-06 selected product metadata is shared across final scoring counts; PERF-CPU-13 endpoint allocation; PERF-CPU-15 exact score facts share one lifetime record",
       "slice": "numeric"
     },
     {
