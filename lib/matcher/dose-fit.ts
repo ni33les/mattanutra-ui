@@ -209,7 +209,7 @@ function calculateDoseFit(request: CanonicalRequest, exposure: ReadonlyMap<strin
   // Display rows retain their historical ordering. Exact numeric sums are
   // order-independent; avoid allocating and sorting a set for every basket.
   let requested = requestedSubjects.get(request);
-  if (!requested) { requested = new Set([...(request.dietaryIntake ?? []).map(row => row.subjectId), ...request.targets.map(row => row.subjectId)]); requestedSubjects.set(request, requested); }
+  if (!requested) { requested = new Set([...(request.dietaryIntake ?? []).map(row => row.subjectId), ...request.targets.map(row => row.subjectId)].sort()); requestedSubjects.set(request, requested); }
   const subjects = fixed ?? (materialize ? [...new Set([...exposure.keys(), ...requested])].sort()
     : [...requested, ...exposure.keys()].filter((id, index) => index < requested.size || !requested.has(id)));
   for (const subjectId of subjects) {
@@ -268,7 +268,6 @@ function calculateDoseFit(request: CanonicalRequest, exposure: ReadonlyMap<strin
   const exact = settings ? (intentTerms.length === 1 ? intentTerms[0]! : sum(intentTerms)) : add(fitting, weighted);
   const facts = { exact, fitting, safety: weighted, deviations };
   if (!materialize) {
-    deviations.sort((a, b) => a.subjectId < b.subjectId ? -1 : a.subjectId > b.subjectId ? 1 : 0);
     cache.set(exposure, facts); return facts;
   }
   const [under, over, limit] = displayTerms!.map(sum);
