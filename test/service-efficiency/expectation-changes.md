@@ -178,3 +178,14 @@ remain a separate release requirement.
 - Fresh standard calculations remain above the 1,000 ms native terminal gate.
   Kernel timings cannot satisfy that gate. No release-ready or deployment claim
   is permitted while it remains unmet.
+
+### Compilation-cache withdrawal
+
+PERF-CPU-14 and its unshipped implementation are withdrawn together. The
+structural cases passed, but frozen comparisons showed no consistent overall
+latency improvement, and successful identical requests already reuse completed
+work. The original fact cache and request-owned resident compilation remain.
+No scoring, input-isolation, checkpoint or historical arithmetic assertion is
+removed. RED/GREEN logs, the candidate patch and its rejection receipt remain
+outside the checkout. The earlier compilation entries above record the
+experiment's history rather than a retained release feature.
