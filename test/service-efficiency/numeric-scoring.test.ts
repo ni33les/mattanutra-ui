@@ -7,18 +7,19 @@ mock.module('../../lib/agentic/value/canonical.ts', { namedExports: { ...canonic
 const dose = await import('../../lib/matcher/dose.ts');
 const fractions = await import('../../lib/matcher/rational.ts');
 let conversions = 0, unitCompilations = 0, exactEncodings = 0;
-let multiplications = 0; let measurements = 0; let additions = 0; let aggregateSums = 0;
+let multiplications = 0; let measurements = 0; let additions = 0; let aggregateSums = 0; let conversionsToNumber = 0; let exactComparisons = 0;
 mock.module('../../lib/matcher/dose.ts', { namedExports: { ...dose, scaleAmount: (...args: Parameters<typeof dose.scaleAmount>) => { unitCompilations++; return dose.scaleAmount(...args); }, amountFromScaled: (...args: Parameters<typeof dose.amountFromScaled>) => { conversions++; return dose.amountFromScaled(...args); } } });
-mock.module('../../lib/matcher/rational.ts', { namedExports: { ...fractions, sum: (...args: Parameters<typeof fractions.sum>) => { aggregateSums++; return fractions.sum(...args); }, add: (...args: Parameters<typeof fractions.add>) => { additions++; return fractions.add(...args); }, serialize: (...args: Parameters<typeof fractions.serialize>) => { exactEncodings++; return fractions.serialize(...args); }, fromDecimal: (...args: Parameters<typeof fractions.fromDecimal>) => { measurements++; return fractions.fromDecimal(...args); }, multiply: (...args: Parameters<typeof fractions.multiply>) => { multiplications++; return fractions.multiply(...args); } } });
+mock.module('../../lib/matcher/rational.ts', { namedExports: { ...fractions, toNumber: (...args: Parameters<typeof fractions.toNumber>) => { conversionsToNumber++; return fractions.toNumber(...args); }, compare: (...args: Parameters<typeof fractions.compare>) => { exactComparisons++; return fractions.compare(...args); }, sum: (...args: Parameters<typeof fractions.sum>) => { aggregateSums++; return fractions.sum(...args); }, add: (...args: Parameters<typeof fractions.add>) => { additions++; return fractions.add(...args); }, serialize: (...args: Parameters<typeof fractions.serialize>) => { exactEncodings++; return fractions.serialize(...args); }, fromDecimal: (...args: Parameters<typeof fractions.fromDecimal>) => { measurements++; return fractions.fromDecimal(...args); }, multiply: (...args: Parameters<typeof fractions.multiply>) => { multiplications++; return fractions.multiply(...args); } } });
 const { request } = await import('../matcher/flexible-v5-fixtures.ts');
 const { doseFitScore, numericalDoseFitScore, exactDoseFit, compareDoseFit, weightedDoseFitScore, numericalWeightedDoseFitScore } = await import('../../lib/matcher/dose-fit.ts');
 
 test('REF-CPU-01 numerical ranking does not format display doses for losing candidates', () => {
   const input = request({ safetyCeilings: [{ subjectId: 'a', name: 'A', maxAmount: 100, maxUnit: 'mg', sourceScope: 'supplemental' }] });
-  conversions = 0; additions = 0; aggregateSums = 0;
+  conversions = 0; additions = 0; aggregateSums = 0; conversionsToNumber = 0;
   const exposure = new Map([['a', 150_000_000n]]);
   const score = numericalDoseFitScore(input, exposure);
   assert.equal(score.total, 1.5, '50% target excess plus independent 2 × 50% reference excess');
+  assert.ok(conversionsToNumber > 0, 'Numerical projections must reuse the shared finite rational conversion');
   assert.deepEqual(exactDoseFit(score), { num: 3n, den: 2n });
   assert.ok(additions > 0, 'Nutrient aggregation must use the independently tested shared exact arithmetic');
   assert.ok(aggregateSums > 0, 'Aggregate penalties must reduce a sum once, not allocate a reduced fraction after every nutrient');
@@ -35,7 +36,8 @@ test('REF-CPU-02 exact ordering and uniform weighted scoring avoid display alloc
   conversions = 0;
   const below = numericalDoseFitScore(input, new Map([['a', 99_999_999n]]));
   const above = numericalDoseFitScore(input, new Map([['a', 100_000_001n]]));
-  assert.equal(compareDoseFit(below, above), 0);
+  exactComparisons = 0; assert.equal(compareDoseFit(below, above), 0);
+  assert.ok(exactComparisons > 0, 'Dose ordering must reuse the shared exact comparator');
   const exposure = new Map([['a', 75_000_000n]]);
   const weighted = numericalWeightedDoseFitScore(input, exposure); assert.equal(weighted.total, 0.5);
   assert.equal(conversions, 0);
