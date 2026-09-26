@@ -255,6 +255,16 @@ export function numericalSearchStateScore(request: CanonicalRequest, state: Sear
 export function searchStateScore(request: CanonicalRequest, state: SearchState): OverallMatchingScore {
   return displayOverall(numericalSearchStateScore(request, state));
 }
+export function compareSearchStateScores(request: CanonicalRequest, left: SearchState, right: SearchState) {
+  const score = numericalSearchStateScore(request, right), actual = stateActuals.get(left);
+  // All other loss terms are nonnegative. Only reuse a bound after the common
+  // measurements have passed validation; an unassessed state takes the full path.
+  if (left.servingBurden && actual && measuredActuals.get(doseRequest.get(request) ?? request)?.has(actual)) {
+    const weight = coefficients(score.profile).objectives.servings;
+    if (compare({ num: left.servingBurden.num * weight.num, den: left.servingBurden.den * weight.den }, score.exactTotal) > 0) return 1;
+  }
+  return compareOverallScores(numericalSearchStateScore(request, left), score);
+}
 export type ComparableOverallScore = Pick<OverallMatchingScore, "profile" | "overallExact"> | Pick<NumericalOverallScore, "profile" | "exactTotal">;
 export function compareOverallScores(left: ComparableOverallScore, right: ComparableOverallScore) {
   if (left === right) return 0;

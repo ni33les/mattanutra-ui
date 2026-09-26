@@ -4,7 +4,7 @@ import { servingIncrement } from "@/lib/matcher/serving-grid";
 import { comparePillCounts } from "@/lib/matcher/pill-burden";
 import { compileVariant, isDeferredConditional } from "@/lib/matcher/candidates";
 import { compareDoseFit, numericalDoseFitScore, doseFitTargetDeviations } from "@/lib/matcher/dose-fit";
-import { administrationBasisKnown, compareOverallScores, monthlyGoodsPrice, PRACTICAL_OBJECTIVES, requestForProfile, numericalSearchStateScore } from "@/lib/matcher/practical-scoring";
+import { administrationBasisKnown, compareSearchStateScores, monthlyGoodsPrice, PRACTICAL_OBJECTIVES, requestForProfile } from "@/lib/matcher/practical-scoring";
 import { DEFAULT_MATCHER_CONFIG } from "@/lib/matcher/config";
 import { fingerprintState } from "@/lib/matcher/dominance";
 import { aggregateDailyExposure, isDoseError } from "@/lib/matcher/dose";
@@ -146,7 +146,7 @@ function skipGroup(state: SearchState): SearchState {
 
 export function compareSearchStates(a: SearchState, b: SearchState, request: CanonicalRequest) {
   if (a === b) return 0;
-  const practical = compareOverallScores(numericalSearchStateScore(request, a), numericalSearchStateScore(request, b));
+  const practical = compareSearchStateScores(request, a, b);
   if (practical !== 0) return practical;
   const fit = compareDoseFit(numericalDoseFitScore(request, a.exposure), numericalDoseFitScore(request, b.exposure));
   if (fit !== 0) return fit;
