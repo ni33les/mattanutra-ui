@@ -249,3 +249,10 @@ advisory, life-stage, rational and MCP consumers join the reviewed inventory.
 One canonical-unit benchmark overlapped a source census. Its semantic hashes
 remain useful, but its timing is explicitly excluded; the bounded final-source
 measurement replaces timing only. This is not a discarded functional failure.
+
+The 80000ff1 consumer run found one wiring assertion that still required
+tryAddVariant in the selector's removed, uncalled greedy fallback. The same
+case now requires shared revalidation/dose scoring and forbids that duplicate
+addition path. All three behavioural life-stage/stack cases, including exact
+50 mg zinc against a 40 mg reference, remain unchanged. Preserve the original
+216-case failed run and replace only this affected whole file's execution.

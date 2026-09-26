@@ -316,7 +316,11 @@ describe("life-stage stack UL on every live matching flow", () => {
     assert.match(search, /const next = tryAddVariant\(state, variant, group, request\)/);
     assert.match(index, /advanceMatchCursor\(/);
     assert.doesNotMatch(index, /tryAddVariant\(/);
-    assert.match(selector, /tryAddVariant/);
+    // Selection revalidates and scores explored states. The uncalled greedy
+    // fallback is removed; selection must not own another addition loop.
+    assert.match(selector, /revalidateState\(/);
+    assert.match(selector, /doseFitScore\(input\.request, input\.state\.exposure\)/);
+    assert.doesNotMatch(selector, /salvagePartialBasket|tryAddVariant/);
     assert.match(web, /const result = match\(/);
     assert.match(plan, /const result = match\(request/);
     assert.match(recs, /return recommendWithMatcher\(input\)/);
