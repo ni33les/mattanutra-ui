@@ -39,7 +39,7 @@ const variantMeasurements = new WeakMap<DoseVariant, { product: ProductGroup["pr
 // Quantity arrays are immutable apart from append-only, physically compiled
 // probes. A resumed/replaced array gets a fresh index; traversal order is unchanged.
 const quantityIndices = new WeakMap<readonly DoseVariant[], { size: number; ids: Map<string, DoseVariant>; duplicates?: Map<string, DoseVariant> }>();
-export function quantityById(variants: readonly DoseVariant[], id: string, last = false) {
+function quantityIndex(variants: readonly DoseVariant[]) {
   let index = quantityIndices.get(variants);
   if (!index || index.size > variants.length) { index = { size: 0, ids: new Map() }; quantityIndices.set(variants, index); }
   while (index.size < variants.length) {
@@ -47,6 +47,10 @@ export function quantityById(variants: readonly DoseVariant[], id: string, last 
     if (!index.ids.has(variant.variantId)) index.ids.set(variant.variantId, variant);
     else (index.duplicates ??= new Map()).set(variant.variantId, variant);
   }
+  return index;
+}
+export function quantityById(variants: readonly DoseVariant[], id: string, last = false) {
+  const index = quantityIndex(variants);
   return (last ? index.duplicates?.get(id) : undefined) ?? index.ids.get(id);
 }
 
@@ -95,7 +99,8 @@ export function tryAddVariant(
     return null;
   }
 
-  if (state.selectedVariantIds.some((id) => quantityById(group.variants, id))) return null;
+  const quantities = quantityIndex(group.variants).ids;
+  if (state.selectedVariantIds.some((id) => quantities.has(id))) return null;
   const count = state.count + 1;
   const pills = state.pills + variant.dailyPills;
 
