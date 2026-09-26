@@ -65,6 +65,17 @@ test('REF-CPU-04 neutral rational operations reuse immutable values without chan
   assert.deepEqual(fractions.fromDecimal('1.25e-2'), { num: 1n, den: 80n });
 });
 
+test('PERF-CPU-04 compiled exact linear terms preserve fractional weights and reject mismatched axes', () => {
+  assert.equal(typeof fractions.compileLinearTerms, 'function');
+  const values = fractions.compileLinearTerms([fractions.rational(7n, 13n), fractions.rational(3n, 10n), fractions.rational(-2n, 7n)]);
+  const weights = fractions.compileLinearTerms([fractions.rational(1n, 2n), fractions.rational(2n), fractions.rational(1n, 4n)]);
+  assert.deepEqual(fractions.linearSum(values, weights), { num: 363n, den: 455n });
+  assert.deepEqual(fractions.linearSum(values, fractions.compileLinearTerms([fractions.ZERO, fractions.ONE, fractions.ZERO])), { num: 3n, den: 10n });
+  assert.deepEqual(fractions.linearSum(fractions.compileLinearTerms([]), fractions.compileLinearTerms([])), fractions.ZERO);
+  assert.throws(() => fractions.linearSum(values, fractions.compileLinearTerms([fractions.ONE])), /axes/);
+  assert.ok(Object.isFrozen(values) && Object.isFrozen(values.numerators));
+});
+
 test('REF-CPU-05 moving a basket through the frontier preserves its numerical score cache', async () => {
   const { seedState } = await import('../../lib/matcher/search.ts');
   const { searchStateScore } = await import('../../lib/matcher/practical-scoring.ts');
