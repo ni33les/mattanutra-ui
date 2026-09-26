@@ -20,6 +20,25 @@ mock.module('../../lib/matcher/rational.ts', { namedExports: { ...fractions, lin
 const { request } = await import('../matcher/flexible-v5-fixtures.ts');
 const { doseFitScore, numericalDoseFitScore, exactDoseFit, compareDoseFit, weightedDoseFitScore, numericalWeightedDoseFitScore } = await import('../../lib/matcher/dose-fit.ts');
 
+test('PERF-CPU-26 candidate addition checks a quantity group once regardless of basket size', async () => {
+  const { product, catalog } = await import('../matcher/flexible-v5-fixtures.ts');
+  const { compileGroups } = await import('../../lib/matcher/candidates.ts');
+  const { seedState, tryAddVariant } = await import('../../lib/matcher/search.ts');
+  const input = request(), groups = compileGroups(input, catalog(['a', 'b', 'c', 'd'].map(id => product(id, { a: 25 }))));
+  let state = seedState(input);
+  for (const group of groups.slice(0, 3)) { const next = tryAddVariant(state, group.variants[0], group, input); assert.ok(next); state = next; }
+  const group = groups[3], original = WeakMap.prototype.get;
+  let groupLookups = 0, next;
+  try {
+    WeakMap.prototype.get = function (key) { if (key === group.variants) groupLookups++; return original.call(this, key); };
+    next = tryAddVariant(state, group.variants[0], group, input);
+  } finally { WeakMap.prototype.get = original; }
+  assert.ok(next); assert.equal(next.count, 4);
+  assert.deepEqual(next.selectedProductIds, groups.map(row => row.productId));
+  assert.equal(groupLookups, 1, 'The duplicate-product check must not reacquire the same append-only quantity index for every selected item');
+  assert.equal(tryAddVariant(next, group.variants[1], group, input), null, 'A different quantity cannot add the same product twice');
+});
+
 test('PERF-CPU-23 retained exposure reuses sorted immutable variant facts', async () => {
   const { product, catalog } = await import('../matcher/flexible-v5-fixtures.ts');
   const { compileGroups } = await import('../../lib/matcher/candidates.ts');
