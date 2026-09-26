@@ -166,13 +166,13 @@ function numericalPracticalPenalties(request: PracticalRequest, actual: Practica
   if (actual.currency !== request.currency || actual.currency !== "THB") throw new Error("currency must match the THB profile normalization currency");
   const profile = resolvePracticalProfile(request), coefficient = coefficients(profile);
   const measured = measurementsFor(request, actual, profile);
-  return { request, actual, profile, measured, coefficient, total: linearSum(measured.linear, coefficient.linear) };
+  return linearSum(measured.linear, coefficient.linear);
 }
-type NumericalPracticalScore = ReturnType<typeof numericalPracticalPenalties>;
 export type NumericalOverallScore = Readonly<{ profile: Profile; request: CanonicalRequest; actual: PracticalActuals;
   doseExact: Rational; exactTotal: Rational }>;
-function displayPenalties(score: NumericalPracticalScore): PracticalPenaltyScore {
-  const { request, actual, profile, measured, coefficient, total } = score, m = profile.multipliers;
+function displayPenalties(request: PracticalRequest, actual: PracticalActuals): PracticalPenaltyScore {
+  const total = numericalPracticalPenalties(request, actual), profile = resolvePracticalProfile(request);
+  const measured = measurementsFor(request, actual, profile), coefficient = coefficients(profile), m = profile.multipliers;
   const missing = new Set<string>();
   if (actual.uncertainProductCount > 0) missing.add("administrationBasis");
   if (actual.dailyPills === null) missing.add("dailyPills");
@@ -204,13 +204,13 @@ function displayPenalties(score: NumericalPracticalScore): PracticalPenaltyScore
     }])) as Record<Field, PreferencePenalty>, missingComponents: [...missing].sort() };
 }
 export function scorePracticalPenalties(request: PracticalRequest, actual: PracticalActuals): PracticalPenaltyScore {
-  return displayPenalties(numericalPracticalPenalties(request, actual));
+  return displayPenalties(request, actual);
 }
 export function numericalOverallMatchingScore(request: CanonicalRequest, exposure: ReadonlyMap<string, bigint>, actual: PracticalActuals): NumericalOverallScore {
   const penalties = numericalPracticalPenalties(request, actual), dose = numericalDoseFitScore(doseRequest.get(request) ?? request, exposure);
   const nutrient = request.scoring ? numericalWeightedDoseFitScore(request, exposure) : dose;
-  const total = add(exactDoseFit(nutrient), penalties.total);
-  return { profile: penalties.profile, request, actual, doseExact: exactDoseFit(dose), exactTotal: total };
+  const total = add(exactDoseFit(nutrient), penalties);
+  return { profile: resolvePracticalProfile(request), request, actual, doseExact: exactDoseFit(dose), exactTotal: total };
 }
 const displayOverallScores = new WeakMap<NumericalOverallScore, OverallMatchingScore>();
 function displayOverall(score: NumericalOverallScore): OverallMatchingScore {
