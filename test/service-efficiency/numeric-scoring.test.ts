@@ -75,6 +75,26 @@ test('PERF-CPU-13 compiled endpoint scoring avoids temporary sets and preserves 
   assert.equal(display.perLimit[0].exposure, 175);
   assert.equal(display.perLimit[0].excess, 0.75);
 });
+test('PERF-CPU-15 one exact score owns its arithmetic and deviation facts together', () => {
+  const input = request({ safetyCeilings: [{ subjectId: 'a', name: 'A', maxAmount: 100, maxUnit: 'mg', sourceScope: 'supplemental' }] });
+  const exposure = new Map([['a', 175_000_000n]]);
+  const original = WeakMap.prototype.set, registrations = new Map<object, number>();
+  let score;
+  try {
+    WeakMap.prototype.set = function (key, value) {
+      registrations.set(key, (registrations.get(key) ?? 0) + 1);
+      return original.call(this, key, value);
+    };
+    score = numericalDoseFitScore(input, exposure);
+  } finally { WeakMap.prototype.set = original; }
+  assert.deepEqual(exactDoseFit(score), { num: 9n, den: 4n });
+  assert.equal(registrations.get(score), 1, 'Thousands of losing scores need one lifetime record, not three independent GC ownership edges');
+  const display = doseFitScore(input, exposure);
+  assert.equal(compareDoseFit(display, score), 0);
+  assert.equal(display.perTarget[0].over, 0.75);
+  assert.equal(display.perLimit[0].excess, 0.75);
+  assert.deepEqual(Object.keys(structuredClone(display)).sort(), Object.keys(display).sort(), 'No internal exact cache facts leak into the public result');
+});
 test('REF-CPU-04 neutral rational operations reuse immutable values without changing exact arithmetic', () => {
   const value = fractions.rational(7n, 13n);
   assert.strictEqual(fractions.fromDecimal(0), fractions.ZERO, 'Repeated zero coefficients need no allocation');
