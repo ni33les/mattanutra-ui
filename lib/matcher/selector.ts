@@ -38,74 +38,27 @@ function coverageMap(
   return map;
 }
 
-function incidentalNutrientCount(products: readonly MatcherProduct[], request: CanonicalRequest) {
-  return products.reduce((count, product) => {
-    const requested = new Set(request.targets.flatMap(target => contributionFor(product, target.name, target.subjectId)));
-    return count + product.labelledContributions.filter(fact => fact.amount != null && fact.amount > 0 && !requested.has(fact)).length;
-  }, 0);
-}
-
-function coveredTargetCount(
-  request: CanonicalRequest,
-  coverageBySubject: ReadonlyMap<string, number>
-) {
-  return request.targets.filter((target) =>
-    (coverageBySubject.get(target.subjectId) ?? 0) >= COVERED_THRESHOLD * 100
-  ).length;
-}
-
-function titleExactCountFor(products: readonly MatcherProduct[], request: CanonicalRequest) {
+type ProductClassification = { incidental: number; requested: number; titleExact: number; dedicated: Set<string> };
+const classifications = new WeakMap<CanonicalRequest, WeakMap<MatcherProduct, ProductClassification>>();
+function classifyProduct(product: MatcherProduct, request: CanonicalRequest): ProductClassification {
+  let cache = classifications.get(request);
+  if (!cache) { cache = new WeakMap(); classifications.set(request, cache); }
+  const previous = cache.get(product); if (previous) return previous;
+  const contributions = request.targets.map(target => contributionFor(product, target.name, target.subjectId));
+  const hits = request.targets.filter((_, index) => contributions[index]!.length > 0);
+  const requested = new Set(contributions.flat());
   const normalize = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
-  return products.filter(product => {
-    const title = normalize(product.title);
-    return title.length >= 2 && request.targets.some(target => title === normalize(target.name));
-  }).length;
-}
-
-function requestedLabelCountFor(products: readonly MatcherProduct[], request: CanonicalRequest) {
-  return products.reduce((count, product) => count + request.targets.filter(target =>
-    contributionFor(product, target.name, target.subjectId).length > 0).length, 0);
-}
-
-function dedicatedPartialCountFor(
-  products: readonly MatcherProduct[],
-  request: CanonicalRequest,
-  coverageBySubject: ReadonlyMap<string, number>
-) {
-  let count = 0;
-
-  for (const target of request.targets) {
-    if ((coverageBySubject.get(target.subjectId) ?? 0) >= COVERED_THRESHOLD * 100) {
-      continue;
-    }
-
-    const hasDedicated = products.some((product) => {
-
-      if (
-        /\bjoint\b/i.test(product.title) ||
-        /\b50\+|multivitamins for 50/i.test(product.title) ||
-        /\bextract\b|\bbacopa\b|\bturmeric\b/i.test(product.title)
-      ) {
-        return false;
-      }
-
-      if (productIsDedicatedForTarget(product, target)) {
-        return true;
-      }
-
-      const hits = request.targets.filter(
-        (item) => contributionFor(product, item.name, item.subjectId).length > 0
-      );
-
-      return hits.length === 1 && hits[0]?.subjectId === target.subjectId;
-    });
-
-    if (hasDedicated) {
-      count += 1;
-    }
-  }
-
-  return count;
+  const title = normalize(product.title);
+  const excluded = /\bjoint\b/i.test(product.title) || /\b50\+|multivitamins for 50/i.test(product.title) ||
+    /\bextract\b|\bbacopa\b|\bturmeric\b/i.test(product.title);
+  const value = {
+    incidental: product.labelledContributions.filter(fact => fact.amount != null && fact.amount > 0 && !requested.has(fact)).length,
+    requested: hits.length,
+    titleExact: Number(title.length >= 2 && request.targets.some(target => title === normalize(target.name))),
+    dedicated: new Set(excluded ? [] : request.targets.filter(target => productIsDedicatedForTarget(product, target) ||
+      hits.length === 1 && hits[0]!.subjectId === target.subjectId).map(target => target.subjectId))
+  };
+  cache.set(product, value); return value;
 }
 
 export function scoreState(input: Readonly<{
@@ -130,21 +83,19 @@ export function scoreState(input: Readonly<{
   const selectedGroups = input.groups.filter(group => productIds.includes(group.productId));
   const products = [...new Map(selectedGroups.map(group => [group.productId, group.product])).values()];
   const coverageBySubject = coverageMap(input.request, input.state.delivered);
+  const labels = products.map(product => classifyProduct(product, input.request));
 
   return {
     aggregateCoverage: aggregateCoverage(input.request, input.state.delivered),
     coverageBySubject,
     coverageSummary: coverageSummary(input.request, validated.exposure),
-    coveredCount: coveredTargetCount(input.request, coverageBySubject),
+    coveredCount: input.request.targets.filter(target => (coverageBySubject.get(target.subjectId) ?? 0) >= COVERED_THRESHOLD * 100).length,
     dailyPills: input.state.pills,
     pillCountKnown: input.state.pillCountKnown !== false && selectedGroups.every(group => group.product.pillCountKnown !== false),
-    dedicatedPartialCount: dedicatedPartialCountFor(
-      products,
-      input.request,
-      coverageBySubject
-    ),
+    dedicatedPartialCount: input.request.targets.filter(target => (coverageBySubject.get(target.subjectId) ?? 0) < COVERED_THRESHOLD * 100 &&
+      labels.some(label => label.dedicated.has(target.subjectId))).length,
     exposure: validated.exposure,
-    incidentalCount: incidentalNutrientCount(products, input.request),
+    incidentalCount: labels.reduce((count, label) => count + label.incidental, 0),
     oversupplyScore: oversupplyScore(input.request, input.state.exposure),
     doseFit: withProductUncertainty(doseFitScore(input.request, input.state.exposure), validated.exposure.unknownSubjectIds),
     overallScore: searchStateScore(input.request, input.state),
@@ -152,14 +103,8 @@ export function scoreState(input: Readonly<{
     productCount: input.state.count,
     productIds,
     reason: selectedReason(input.request),
-    titleExactCount: titleExactCountFor(
-      products,
-      input.request
-    ),
-    requestedLabelCount: requestedLabelCountFor(
-      products,
-      input.request
-    ),
+    titleExactCount: labels.reduce((count, label) => count + label.titleExact, 0),
+    requestedLabelCount: labels.reduce((count, label) => count + label.requested, 0),
     safety: validated.safety,
     sellerId: input.sellerId,
     variantIds: input.state.selectedVariantIds,

@@ -17,7 +17,7 @@ test('PERF-CPU-35 incidental classification resolves each requested product cont
   lookups = 0;
   const score = scoreState({ groups: [group], request: input, sellerId: 'seller', state }); assert.ok(score);
   assert.equal(score.incidentalCount, 30); assert.equal(score.requestedLabelCount, 1);
-  assert.equal(lookups, 2, 'One classification lookup plus one requested-label lookup; incidental facts do not repeat target resolution');
+  assert.equal(lookups, 1, 'One classification lookup also supplies the requested-label count; incidental facts do not repeat target resolution');
   const revised = { ...input, targets: [...input.targets, { ...input.targets[0]!, subjectId: 'b0', name: 'B0', requested: { ...input.targets[0]!.requested, subjectId: 'b0' } }] };
   const changed = scoreState({ groups: [group], request: revised, sellerId: 'seller', state }); assert.ok(changed);
   assert.equal(changed.incidentalCount, 29); assert.equal(changed.requestedLabelCount, 2);
