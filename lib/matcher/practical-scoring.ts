@@ -114,7 +114,7 @@ function coefficients(profile: Profile) {
   if (!value) {
     const m = profile.multipliers;
     const objective = (weight: number) => profile.version === CONVERSATIONAL_POLICY_VERSION ? multiply(fromDecimal(0.05), fromDecimal(weight)) : fromDecimal(0.05 * weight);
-    const objectives = { pills: divide(objective(m.pills), THREE), products: objective(m.products), price: divide(objective(m.price), PRICE_SCALE), servings: objective(m.servings) };
+    const objectives = { pills: objective(m.pills), products: objective(m.products), price: objective(m.price), servings: objective(m.servings) };
     const preferences = Object.fromEntries(FIELDS.map((field, index) => [field, multiply(multiply(QUARTER, fromDecimal([m.pills, m.products, m.price][index]!)), fromDecimal(IMPORTANCE[profile.importance[field]]))])) as Record<Field, Rational>;
     value = { objectives, preferences, linear: compileLinearTerms([objectives.pills, objectives.products, objectives.price, objectives.servings,
       ONE, fromDecimal(Math.max(1, m.pills * IMPORTANCE[profile.importance.maxDailyPills])), ...FIELDS.map(field => preferences[field])]) };
@@ -143,11 +143,11 @@ function compileMeasurements(request: PracticalRequest, actual: PracticalActuals
   const overruns = bases.map((basis, index) => basis
     ? square(divide(positive(subtract(fromDecimal(lowerBounds[index]!), basis.target)), basis.scale)) : ZERO);
   const servings = actual.servingBurdenExact ?? sum(actual.servings.map((n, i) => square(positive(subtract(measurement(n, `servings[${i}]`), ONE)))));
-  const uncertainty = multiply(QUARTER, uncertain);
+  const normalizedPills = divide(pills, THREE), normalizedPrice = divide(price, PRICE_SCALE), uncertainty = multiply(QUARTER, uncertain);
   const weightedUncertainty = profile.version === WEB_PRACTICAL_SCORING_VERSION && request.maxDailyPills != null;
-  return { pills, products, price, uncertainty, preferencePrice, preferencePriceLower, overruns, servings,
-    linear: compileLinearTerms([request.maxDailyPills == null ? pills : ZERO, request.maxProductCount == null ? products : ZERO,
-      request.maxPriceMinor == null || (profile.version === WEB_PRACTICAL_SCORING_VERSION && preferencePrice === null) ? price : ZERO,
+  return { pills: normalizedPills, products, price: normalizedPrice, uncertainty, preferencePrice, preferencePriceLower, overruns, servings,
+    linear: compileLinearTerms([request.maxDailyPills == null ? normalizedPills : ZERO, request.maxProductCount == null ? products : ZERO,
+      request.maxPriceMinor == null || (profile.version === WEB_PRACTICAL_SCORING_VERSION && preferencePrice === null) ? normalizedPrice : ZERO,
       servings, weightedUncertainty ? ZERO : uncertainty, weightedUncertainty ? uncertainty : ZERO, ...overruns]) };
 }
 function measurementsFor(request: PracticalRequest, actual: PracticalActuals, profile: Profile) {
