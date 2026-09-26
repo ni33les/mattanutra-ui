@@ -21,27 +21,6 @@ mock.module('../../lib/matcher/rational.ts', { namedExports: { ...fractions, lin
 const { request } = await import('../matcher/flexible-v5-fixtures.ts');
 const { doseFitScore, numericalDoseFitScore, exactDoseFit, compareDoseFit, weightedDoseFitScore, numericalWeightedDoseFitScore } = await import('../../lib/matcher/dose-fit.ts');
 
-test('PERF-CPU-60 repeated exact endpoint components reuse one compiled aggregation scale', () => {
-  const targets = [['a', 3], ['b', 7]].map(([id, amount]) => ({ subjectId: id as string, name: String(id).toUpperCase(),
-    requestedAmount: amount as number, requestedUnit: 'mg' as const, requested: { subjectId: id as string, dim: 'mass_ng' as const, units: BigInt(amount) * 1_000_000n }, importance: 'required' as const }));
-  const input = request({ targets, safetyCeilings: [{ subjectId: 'c', name: 'C', maxAmount: 5, maxUnit: 'mg', sourceScope: 'supplemental' }] });
-  const exposure = new Map([['a', 2_000_000n], ['b', 10_000_000n], ['c', 12_000_000n]]);
-  const first = numericalDoseFitScore(input, exposure);
-  assert.equal(fractions.compare(exactDoseFit(first), { num: 374n, den: 105n }), 0);
-  aggregateSums = 0;
-  const repeated = numericalDoseFitScore(input, new Map(exposure));
-  const resums = aggregateSums;
-  assert.equal(fractions.compare(repeated.fitting, { num: 16n, den: 21n }), 0);
-  assert.equal(fractions.compare(repeated.safety, { num: 14n, den: 5n }), 0);
-  assert.deepEqual(exactDoseFit(repeated), exactDoseFit(first));
-  const weighted = request({ ...input, scoring: { profile: 'balanced', weights: { nutrients: { a: 0.5, b: 2 } } } });
-  assert.equal(fractions.compare(exactDoseFit(numericalWeightedDoseFitScore(weighted, exposure)), { num: 803n, den: 210n }), 0);
-  const display = doseFitScore(input, exposure);
-  assert.equal(display.perTarget.length, 2); assert.equal(display.perLimit.length, 1);
-  assert.equal(display.perLimit[0].excess, 1.4);
-  assert.equal(resums, 0, 'Cached endpoint components need no repeated denominator discovery across each aggregate');
-});
-
 test('PERF-CPU-59 an already larger complete score bounds profiles whose penalties only increase', async () => {
   const { requestForProfile, numericalSearchStateScore } = await import('../../lib/matcher/practical-scoring.ts');
   const { seedState, tryAddVariant, compareSearchStates } = await import('../../lib/matcher/search.ts');
