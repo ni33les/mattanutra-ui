@@ -20,6 +20,20 @@ mock.module('../../lib/matcher/rational.ts', { namedExports: { ...fractions, lin
 const { request } = await import('../matcher/flexible-v5-fixtures.ts');
 const { doseFitScore, numericalDoseFitScore, exactDoseFit, compareDoseFit, weightedDoseFitScore, numericalWeightedDoseFitScore } = await import('../../lib/matcher/dose-fit.ts');
 
+test('PERF-CPU-29 equal single-subject penalties share an immutable numerical record', () => {
+  const input = request({ safetyCeilings: [{ subjectId: 'a', name: 'A', maxAmount: 100, maxUnit: 'mg', sourceScope: 'supplemental' }] });
+  const exposure = new Map([['a', 175_000_000n]]), other = new Map([...exposure, ['unassessed', 40n]] as [string, bigint][]);
+  const first = numericalDoseFitScore(input, exposure), second = numericalDoseFitScore(input, other);
+  assert.strictEqual(second, first, 'Equivalent exact endpoint facts must not allocate another aggregate record and deviation array');
+  assert.deepEqual(exactDoseFit(first), { num: 9n, den: 4n });
+  assert.deepEqual(doseFitScore(input, exposure), doseFitScore(input, other));
+  const changed = numericalDoseFitScore(input, new Map([['a', 150_000_000n]]));
+  assert.notStrictEqual(changed, first); assert.deepEqual(exactDoseFit(changed), { num: 3n, den: 2n });
+  const extra = request({ safetyCeilings: [...input.safetyCeilings!, { subjectId: 'unassessed', name: 'Unassessed', maxAmount: 0.00001, maxUnit: 'mg', sourceScope: 'supplemental' }] });
+  const assessed = numericalDoseFitScore(extra, other);
+  assert.equal(fractions.toNumber(exactDoseFit(assessed)), 8.25, 'An additional applicable limit remains a separate 2 × 300% excess');
+});
+
 test('PERF-CPU-28 exact comparison reuses identity and compares common denominators directly', () => {
   let reads = 0;
   const same = Object.freeze({ get num() { reads++; return 7n; }, get den() { reads++; return 13n; } });
