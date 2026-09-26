@@ -106,3 +106,18 @@ export function normalizeOwnership(rows){
   return {...row,relacl:acl?[...acl].sort():null};
  });
 }
+export function normalizeSchema(schema){
+ const next=structuredClone(schema);const positions=new Map();
+ next.columns=next.columns.map(column=>{const key=column.table_schema+'.'+column.table_name;const position=(positions.get(key)??0)+1;positions.set(key,position);return {...column,ordinal_position:position};});
+ next.triggers=next.triggers?.map(trigger=>{
+  if(trigger.nspname!=='public'||trigger.relname!=='organisations'||trigger.tgname!=='catalogue_runtime_revision_org_changed')return trigger;
+  // pg_dump/reparse flattens nested OR nodes. Accept only this exact, OR-only predicate.
+  const terms=['name','organisation_type','status','country_code','currency','slug'].map(f=>`old.${f} IS DISTINCT FROM new.${f}`);
+  terms.push("old.metadata -> 'customerPriceMarginPercent'::text IS DISTINCT FROM new.metadata -> 'customerPriceMarginPercent'::text");
+  const expected=`CREATE TRIGGER catalogue_runtime_revision_org_changed AFTER UPDATE ON public.organisations FOR EACH ROW WHEN ${terms.join(' OR ')} EXECUTE FUNCTION bump_catalogue_runtime_revision`;
+  const flattened=trigger.definition.replace(/[()]/g,'');
+  return flattened===expected?{...trigger,definition:expected}:trigger;
+ });
+ if(next.triggers===undefined)delete next.triggers;
+ return next;
+}
