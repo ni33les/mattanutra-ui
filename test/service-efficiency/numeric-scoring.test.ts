@@ -21,6 +21,32 @@ mock.module('../../lib/matcher/rational.ts', { namedExports: { ...fractions, lin
 const { request } = await import('../matcher/flexible-v5-fixtures.ts');
 const { doseFitScore, numericalDoseFitScore, exactDoseFit, compareDoseFit, weightedDoseFitScore, numericalWeightedDoseFitScore } = await import('../../lib/matcher/dose-fit.ts');
 
+test('PERF-CPU-44 live archive ownership does not register a weak entry for every basket', async () => {
+  const { createSearchCursor, advanceSearchCursor, archivedSearchStates } = await import('../../lib/matcher/search-cursor.ts');
+  const { compileGroups } = await import('../../lib/matcher/candidates.ts');
+  const { DEFAULT_MATCHER_CONFIG } = await import('../../lib/matcher/config.ts');
+  const { product, catalog } = await import('../matcher/flexible-v5-fixtures.ts');
+  const input = request(), groups = compileGroups(input, catalog([product('first', { a: 37 }), product('second', { a: 19 })]));
+  const original = WeakMap.prototype.set; let packedRegistrations = 0;
+  let cursor;
+  try {
+    WeakMap.prototype.set = function (key, value) {
+      if (Array.isArray(key) && value?.selectedVariantIds && value.exposure instanceof Map) packedRegistrations++;
+      return original.call(this, key, value);
+    };
+    cursor = createSearchCursor(groups, input, DEFAULT_MATCHER_CONFIG);
+    advanceSearchCursor(cursor, input, 200);
+    const first = [...archivedSearchStates(cursor)];
+    assert.ok(first.filter(row => row.count > 0).length > 3, 'Exercise multiple real evaluated baskets');
+    const repeated = [...archivedSearchStates(cursor)];
+    first.forEach((row, index) => assert.strictEqual(repeated[index], row));
+    const recovered = [...archivedSearchStates(structuredClone(cursor))];
+    assert.deepEqual(recovered, first);
+    first.forEach((row, index) => assert.notStrictEqual(recovered[index], row));
+  } finally { WeakMap.prototype.set = original; }
+  assert.equal(packedRegistrations, 0, 'The bounded archive already owns every packed row; one cursor owner avoids redundant weak ownership');
+});
+
 test('PERF-CPU-33 numerical preference denominators compile once across basket evaluations', async () => {
   const { scorePracticalPenalties } = await import('../../lib/matcher/practical-scoring.ts');
   const input = request({ maxDailyPills: 7.75, maxProductCount: 37, maxPriceMinor: 123457 });
