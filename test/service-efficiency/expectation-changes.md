@@ -300,5 +300,3 @@ work still takes the tested conditional retirement path.
 - PERF-CPU-44 cursor-owned archive-map experiment withdrawn: exact frozen results and 45 cases passed, but repeated adjacent-control timings did not demonstrate consistent improvement. Preserve the patch, meaningful RED/GREEN, timing results and withdrawal receipt outside the checkout; remove only the experiment-exclusive allocation assertion. Its first unavailable-loader invocation is retained as invalid harness evidence.
 
 - PERF-CPU-45 shared-denominator micro-optimization withdrawn with its exclusive structural assertion: exact arithmetic and frozen outputs passed, but its timing benefit was not demonstrated. RED/GREEN, patch and timing evidence remain outside the checkout.
-
-- PERF-MEM-01: after a real 2,000-attempt frontier reduction, discarded live basket cache entries must be released while all compact archive values and repeated-read identity remain recoverable. RED proves no such release; this is a bounded lifetime experiment rather than changing archive contents or search traversal.
