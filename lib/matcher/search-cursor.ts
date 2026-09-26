@@ -467,7 +467,15 @@ export function advanceSearchCursor(cursor: SearchCursor, request: CanonicalRequ
     } else cursor.done=true;
   }
   if (cursor.expansionAttempts >= cursor.expansionBudget && !cursor.done) { cursor.done=true; cursor.trimmed=true; }
-  if (cursor.done) reduceReview(cursor, request);
+  if (cursor.done) {
+    reduceReview(cursor, request);
+    // Bounded expansion restarts from the archive. Obsolete phase frontiers
+    // must not be copied into every subsequent durable checkpoint.
+    if (!cursor.exact) {
+      cursor.singles=[]; cursor.beam=[]; cursor.expanded=[]; cursor.repairJobs=[];
+      cursor.repaired=[]; cursor.second=[]; cursor.secondReferences=[]; cursor.exactStack=[];
+    }
+  }
   return cursor;
 }
 
