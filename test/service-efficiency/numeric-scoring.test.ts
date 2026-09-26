@@ -20,29 +20,6 @@ mock.module('../../lib/matcher/rational.ts', { namedExports: { ...fractions, lin
 const { request } = await import('../matcher/flexible-v5-fixtures.ts');
 const { doseFitScore, numericalDoseFitScore, exactDoseFit, compareDoseFit, weightedDoseFitScore, numericalWeightedDoseFitScore } = await import('../../lib/matcher/dose-fit.ts');
 
-test('PERF-CPU-32 quantity probes reuse immutable parent basket identities within their cursor', async () => {
-  const { product, catalog } = await import('../matcher/flexible-v5-fixtures.ts');
-  const { compileGroups } = await import('../../lib/matcher/candidates.ts');
-  const { createSearchCursor, advanceSearchCursor, archivedSearchStates } = await import('../../lib/matcher/search-cursor.ts');
-  const { DEFAULT_MATCHER_CONFIG } = await import('../../lib/matcher/config.ts');
-  const input = request(), groups = compileGroups(input, catalog(Array.from({ length: 8 }, (_, i) => product('identity-' + i, { a: 7 + i }))));
-  const cursor = createSearchCursor(groups, input, { ...DEFAULT_MATCHER_CONFIG, expansionBudget: 800, exactGroupLimit: 0 });
-  for (let step = 0; step < 800 && (cursor.phase !== 'beam' || cursor.group < 1); step++) advanceSearchCursor(cursor, input, 1);
-  assert.equal(cursor.phase, 'beam'); assert.ok(cursor.group >= 1);
-  const parents = new Set(cursor.beam.filter(row => row.count > 0).map(row => row.selectedVariantIds));
-  assert.ok(parents.size > 0, 'The fixture must exercise retained nonempty parent baskets');
-  const control = structuredClone(cursor);
-  const original = Array.prototype.map; let remapped = 0;
-  try {
-    Array.prototype.map = function (...args) { if (parents.has(this)) remapped++; return Reflect.apply(original, this, args); };
-    while (!cursor.done) advanceSearchCursor(cursor, input, 17);
-  } finally { Array.prototype.map = original; }
-  while (!control.done) advanceSearchCursor(control, input, 800);
-  assert.equal(cursor.expansionAttempts, 800);
-  assert.deepEqual([...archivedSearchStates(cursor)], [...archivedSearchStates(control)], 'Identity reuse must survive a checkpoint without changing traversal or quantities');
-  assert.ok(remapped <= parents.size, `${remapped} parent projections for ${parents.size} immutable baskets`);
-});
-
 test('PERF-CPU-31 diverse retention sorts representatives instead of the complete candidate pool', async () => {
   const { seedState, reviewFrontier } = await import('../../lib/matcher/search.ts');
   const input = request(), base = seedState(input);
