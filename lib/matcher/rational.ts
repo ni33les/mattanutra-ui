@@ -33,7 +33,8 @@ export function sum(values: readonly Rational[]): Rational {
   let num = BigInt(0), den = BigInt(1);
   for (const value of values) {
     if (value.num === BigInt(0)) continue;
-    const common = den === value.den ? den : gcd(den, value.den);
+    if (den === value.den) { num += value.num; continue; }
+    const common = gcd(den, value.den);
     num = num * (value.den / common) + value.num * (den / common);
     den *= value.den / common;
   }
