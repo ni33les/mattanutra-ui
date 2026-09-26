@@ -4,7 +4,7 @@ import { catalogBandRuleId, safetyCeilingFor } from "@/lib/matcher/safety-ceilin
 import { intakeIsKnown, targetBasis } from "@/lib/matcher/target-basis";
 import { zeroTargetScale } from "@/lib/matcher/zero-target-policy";
 import { effectiveWeights } from "@/lib/matcher/scoring-policy";
-import { add, compare as compareFractions, fromDecimal, multiply, sum, rational, compileLinearTerms, toNumber as value } from "@/lib/matcher/rational";
+import { add, compare as compareFractions, fromDecimal, multiply, sum, toNumber as value } from "@/lib/matcher/rational";
 import type { CanonicalRequest, DoseDimension, DoseFitScore, MatcherUnit, SafetyCeiling } from "@/lib/matcher/types";
 
 type Fraction = Readonly<{ num: bigint; den: bigint }>;
@@ -159,31 +159,6 @@ function cachedSubjectLoss(input: ReturnType<typeof compileSubject>, known: bigi
   return value;
 }
 
-// Every loss denominator divides a request's target, continued-dose or reference
-// scale. Compile their common basis once; baskets only add exact integer terms.
-const aggregationScales = new WeakMap<CanonicalRequest, { base: bigint; weighted: bigint }>();
-function aggregationScale(request: CanonicalRequest, weights: ReturnType<typeof exactWeights> | null) {
-  let scales = aggregationScales.get(request);
-  if (!scales) {
-    const ids = new Set([...request.targets, ...request.currentSupplements, ...(request.dietaryIntake ?? [])].map(row => row.subjectId));
-    const denominators: Fraction[] = [];
-    for (const id of ids) {
-      const input = subjectInputs(request, id);
-      for (const den of [input.target?.requested.units, input.scale, input.reference]) {
-        if (den && den > BigInt(0)) denominators.push({ num: BigInt(1), den });
-      }
-    }
-    for (const ceiling of request.safetyCeilings ?? []) {
-      const amount = scaleAmount({ amount: ceiling.maxAmount, subjectId: ceiling.subjectId, subjectName: ceiling.name, unit: ceiling.maxUnit });
-      if (!isDoseError(amount) && amount.units > BigInt(0)) denominators.push({ num: BigInt(1), den: amount.units });
-    }
-    const base = compileLinearTerms(denominators).denominator;
-    scales = { base, weighted: base }; aggregationScales.set(request, scales);
-  }
-  if (weights && scales.weighted === scales.base) scales.weighted = scales.base * compileLinearTerms([weights.defaultWeight, ...weights.subjects.values()]).denominator;
-  return weights ? scales.weighted : scales.base;
-}
-
 export function numericalDoseFitScore(request: CanonicalRequest, exposure: ReadonlyMap<string, bigint>): NumericalDoseFitScore {
   return calculateDoseFit(sharedInputs.get(request) ?? request, exposure, false);
 }
@@ -217,11 +192,10 @@ function calculateDoseFit(request: CanonicalRequest, exposure: ReadonlyMap<strin
   if (!cache) { cache = new WeakMap(); memo.set(request, cache); }
   const previous = cache.get(exposure);
   if (previous && !materialize) return previous;
-  let fittingNumerator = BigInt(0), safetyNumerator = BigInt(0), intentNumerator = BigInt(0);
+  const fittingTerms: Fraction[] = [], safetyTerms: Fraction[] = [], intentTerms: Fraction[] = [];
   const displayTerms: Fraction[][] | null = materialize ? [[], [], []] : null;
   const settings = applyWeights && request.scoring ? effectiveWeights(request.scoring) : null;
   const weights = settings ? exactWeights(settings) : null;
-  const denominator = aggregationScale(request, weights);
   const perTarget: DoseFitScore["perTarget"][number][] | null = materialize ? [] : null;
   const perContinuedDose: NonNullable<DoseFitScore["perContinuedDose"]>[number][] | null = materialize ? [] : null;
   const perLimit: DoseFitScore["perLimit"][number][] | null = materialize ? [] : null;
@@ -245,9 +219,9 @@ function calculateDoseFit(request: CanonicalRequest, exposure: ReadonlyMap<strin
     const known = exposure.get(subjectId) ?? BigInt(0);
     const weight = weights ? weights.subjects.get(subjectId) ?? weights.defaultWeight : ONE;
     const { minimum, maximum, added, continuedIncrease, worst, deviation } = cachedSubjectLoss(compiled, known, weight);
-    if (settings && worst.total.num) intentNumerator += worst.total.num * (denominator / worst.total.den);
-    if (worst.fitting.num) fittingNumerator += worst.fitting.num * (denominator / worst.fitting.den);
-    if (worst.safety.num) safetyNumerator += worst.safety.num * (denominator / worst.safety.den);
+    if (settings) intentTerms.push(worst.total);
+    fittingTerms.push(worst.fitting);
+    safetyTerms.push(worst.safety);
     if (deviation) deviations.push(deviation);
     if (!materialize) continue;
     displayTerms![0]!.push(worst.shortfall); displayTerms![1]!.push(worst.overshoot); displayTerms![2]!.push(worst.limitLoss);
@@ -289,8 +263,9 @@ function calculateDoseFit(request: CanonicalRequest, exposure: ReadonlyMap<strin
         ruleId: catalogBandRuleId(row.ceiling), authorityUrl: row.ceiling.authorityUrl ?? null, certainty: rowCertainty });
     }
   }
-  const fitting = rational(fittingNumerator, denominator), weighted = rational(safetyNumerator, denominator);
-  const exact = rational(settings ? intentNumerator : fittingNumerator + safetyNumerator, denominator);
+  const fitting = fittingTerms.length === 1 ? fittingTerms[0]! : sum(fittingTerms);
+  const weighted = safetyTerms.length === 1 ? safetyTerms[0]! : sum(safetyTerms);
+  const exact = settings ? (intentTerms.length === 1 ? intentTerms[0]! : sum(intentTerms)) : add(fitting, weighted);
   const facts = { exact, fitting, safety: weighted, deviations };
   if (!materialize) {
     deviations.sort((a, b) => a.subjectId < b.subjectId ? -1 : a.subjectId > b.subjectId ? 1 : 0);
