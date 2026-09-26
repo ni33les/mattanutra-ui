@@ -111,11 +111,8 @@ function fitOf(basket: ScoredBasket, request: CanonicalRequest) {
   return basket.doseFit ?? doseFitScore(request, new Map([...basket.exposure.totals].map(([id, row]) => [id, row.units])));
 }
 
-const basketSignatures = new WeakMap<Pick<ScoredBasket, "sellerId" | "variantIds">, string>();
 export function basketSignature(basket: Pick<ScoredBasket, "sellerId" | "variantIds">) {
-  const cached = basketSignatures.get(basket); if (cached !== undefined) return cached;
-  const value = [basket.sellerId, ...[...basket.variantIds].sort()].join("|");
-  basketSignatures.set(basket, value); return value;
+  return [basket.sellerId, ...[...basket.variantIds].sort()].join("|");
 }
 
 /** One total ordering shared by ranking, salvage and the final selection. */
