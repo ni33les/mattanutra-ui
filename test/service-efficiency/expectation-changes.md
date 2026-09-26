@@ -306,3 +306,5 @@ work still takes the tested conditional retirement path.
 - PERF-CPU-46: repeated material-difference checks must reuse immutable basket identity while keeping seller-only differences equivalent and physically different quantities distinct. RED performs 400 sorts for three baskets; the expected work is three. No choice eligibility, order or scoring change is intended.
 
 - PERF-CPU-47 dedicated-product memoization withdrawn after exact result parity but increased total CPU and five slower frozen trials. The narrower cache did not justify another retained ownership structure. Patch and RED/GREEN evidence are preserved externally.
+
+- PERF-CPU-48: once candidate measurements are validated, the existing complete weighted nutrient loss is a lower bound on its overall score. RED repeats practical arithmetic even when that bound already exceeds the incumbent. Zero weights and invalid measurements remain explicit regressions; closest-dose calculations, uncertainty endpoints and search work are unchanged.
