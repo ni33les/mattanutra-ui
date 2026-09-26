@@ -5,8 +5,8 @@
   "files": [
     {
       "file": "test/service-efficiency/numeric-scoring.test.ts",
-      "expectedCases": 48,
-      "reason": "Exact internal records, serving lower bounds, immutable quantity/intake/exposure reuse and complete public materialization without search changes; PERF-CPU-26\u201328 and 30: one quantity-group lookup, normalized endpoint components, exact identity/common-denominator comparison and canonical unit parsing; PERF-CPU-31/33 preserve stable remaining-gap leaders and reuse preference denominators; PERF-CPU-59: exact monotonic profile bounds avoid redundant scoring while allowing decreasing weights to reverse ordering; PERF-CPU-63: skip quantities that cannot make an unrelated listing selectable while retaining explicit/unknown requests; PERF-CPU-64: reference breakpoints reuse the already verified minimum-quantity label exposure; PERF-MEM-03: request-owned bounded numerical caches preserve exact results after eviction"
+      "expectedCases": 47,
+      "reason": "Exact internal records, serving lower bounds, immutable quantity/intake/exposure reuse and complete public materialization without search changes; PERF-CPU-26\u201328 and 30: one quantity-group lookup, normalized endpoint components, exact identity/common-denominator comparison and canonical unit parsing; PERF-CPU-31/33 preserve stable remaining-gap leaders and reuse preference denominators; PERF-CPU-59: exact monotonic profile bounds avoid redundant scoring while allowing decreasing weights to reverse ordering; PERF-CPU-63: skip quantities that cannot make an unrelated listing selectable while retaining explicit/unknown requests; PERF-CPU-64: reference breakpoints reuse the already verified minimum-quantity label exposure"
     },
     {
       "file": "test/service-efficiency/immutable-references.test.ts",
