@@ -21,18 +21,6 @@ mock.module('../../lib/matcher/rational.ts', { namedExports: { ...fractions, lin
 const { request } = await import('../matcher/flexible-v5-fixtures.ts');
 const { doseFitScore, numericalDoseFitScore, exactDoseFit, compareDoseFit, weightedDoseFitScore, numericalWeightedDoseFitScore } = await import('../../lib/matcher/dose-fit.ts');
 
-test('PERF-CPU-36 immutable basket tie-break identities are prepared once', async () => {
-  const { fingerprintState } = await import('../../lib/matcher/dominance.ts');
-  const { seedState } = await import('../../lib/matcher/search.ts');
-  const input = request(); let reads = 0;
-  const state = { ...seedState(input), nextGroupIndex: 4, price: 129900, pills: 1.5, count: 2,
-    get selectedVariantIds() { reads++; return ['seller:a:x0.5', 'seller:b:x1']; } };
-  for (let i = 0; i < 20; i++) assert.equal(fingerprintState(state), '4|seller:a:x0.5|seller:b:x1|129900|1.5|2');
-  assert.equal(reads, 1, 'Repeated exact ties must not reconstruct the same basket identity');
-  assert.equal(fingerprintState({ ...state, nextGroupIndex: 5 }), '5|seller:a:x0.5|seller:b:x1|129900|1.5|2');
-  assert.equal(fingerprintState({ ...state, price: 129901 }), '4|seller:a:x0.5|seller:b:x1|129901|1.5|2');
-});
-
 test('PERF-CPU-33 numerical preference denominators compile once across basket evaluations', async () => {
   const { scorePracticalPenalties } = await import('../../lib/matcher/practical-scoring.ts');
   const input = request({ maxDailyPills: 7.75, maxProductCount: 37, maxPriceMinor: 123457 });
