@@ -372,6 +372,7 @@ test('PERF-CPU-14 fresh searches reuse immutable compilation but never share cur
     while (!result.done) result = matching.advanceResidentPlanSession(first, { chunkBudget: 4000 });
     const fresh = matching.createResidentPlanSession(structuredClone(value));
     assert.strictEqual(fresh.compiledGroups, first.compiledGroups, 'Equal immutable inputs compile once within the bounded fact cache');
+    assert.notStrictEqual(fresh.request, first.request, 'Numerical request-local caches must remain confined to one execution');
     assert.deepEqual(fresh.compiledGroups, compiled, 'Dynamic quantities cannot mutate shared compilation');
     assert.notStrictEqual(fresh.cursor, first.cursor);
     assert.equal(fresh.cursor.sellers.reduce((n, seller) => n + seller.cursor.expansionAttempts, 0), 0);
@@ -389,7 +390,7 @@ test('PERF-CPU-14 fresh searches reuse immutable compilation but never share cur
       { ...value, state: { ...value.state, requirements: { ...value.state.requirements, maxDailyPills: 1 } } },
       { ...value, snapshot: { ...value.snapshot, products: value.snapshot.products.map((product, i) => i ? product : { ...product, unitPriceMinor: product.unitPriceMinor + 1 }) } }
     ]) assert.notStrictEqual(matching.createResidentPlanSession(different).compiledGroups, fresh.compiledGroups);
-    assert.ok(Object.isFrozen(fresh.request.targets) && Object.isFrozen(fresh.compiledGroups![0].product));
+    assert.ok(Object.isFrozen(fresh.compiledGroups![0].product));
     const { runWithMatcherSafetySnapshot } = await import('../../lib/matcher/safety-ceilings-server.ts');
     const { captureMatcherSafetySnapshot } = await import('../../lib/matcher/safety-ceilings.ts');
     const references = captureMatcherSafetySnapshot();
