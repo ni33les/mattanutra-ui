@@ -217,10 +217,6 @@ function calculateDoseFit(request: CanonicalRequest, exposure: ReadonlyMap<strin
     const { target, dietary, referenceRows, reference, bounds } = compiled;
     if (!target && reference === BigInt(0) && bounds.length === 0) continue;
     const known = exposure.get(subjectId) ?? BigInt(0);
-    // Without a fitting objective, only applicable limit excess contributes.
-    // Retained display still includes every reference and its factual exposure.
-    if (!materialize && !target && reference === BigInt(0) && bounds.every(row =>
-      known + compiled.ranges.maximum - compiled.ranges.base + ((row.ceiling.sourceScope ?? "supplemental") === "total" ? dietary.maximum : BigInt(0)) <= row.units)) continue;
     const weight = weights ? weights.subjects.get(subjectId) ?? weights.defaultWeight : ONE;
     const { minimum, maximum, added, continuedIncrease, worst, deviation } = cachedSubjectLoss(compiled, known, weight);
     if (settings) intentTerms.push(worst.total);
