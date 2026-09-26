@@ -124,8 +124,9 @@ function coefficients(profile: Profile) {
 }
 
 type PracticalRequest = Pick<CanonicalRequest, "currency" | "maxDailyPills" | "maxProductCount" | "maxPriceMinor"> & ProfileRequest;
-const measuredActuals = new WeakMap<PracticalRequest, WeakMap<PracticalActuals, ReturnType<typeof compileMeasurements>>>();
-function compileMeasurements(request: PracticalRequest, actual: PracticalActuals, profile: Profile) {
+type PreferenceBases = readonly ({ target: Rational; scale: Rational } | null)[];
+const measuredActuals = new WeakMap<PracticalRequest, { values: WeakMap<PracticalActuals, ReturnType<typeof compileMeasurements>>; bases: PreferenceBases }>();
+function compileMeasurements(request: PracticalRequest, actual: PracticalActuals, profile: Profile, bases: PreferenceBases) {
   const pills = measurement(actual.pillLowerBound, "pillLowerBound"), products = measurement(actual.productCount, "productCount", true);
   if (actual.dailyPills !== null) {
     measurement(actual.dailyPills, "dailyPills");
@@ -139,13 +140,8 @@ function compileMeasurements(request: PracticalRequest, actual: PracticalActuals
   const preferencePriceLower = preferencePrice ?? (profile.pricePreferenceBasis === "monthly_30_days" ? actual.monthlyPriceLowerBound ?? 0 : priceValue);
   if (profile.pricePreferenceBasis === "monthly_30_days") measurement(preferencePriceLower, "monthlyPriceMinor", true);
   const lowerBounds = [actual.pillLowerBound, actual.productCount, preferencePriceLower];
-  const overruns = FIELDS.map((field, index) => {
-    const preferred = request[field] ?? null;
-    if (preferred === null) return ZERO;
-    const target = measurement(preferred, field, field !== "maxDailyPills");
-    return square(divide(positive(subtract(fromDecimal(lowerBounds[index]!), target)),
-      fromDecimal(preferred > 0 ? preferred : field === "maxPriceMinor" ? 10000 : 1)));
-  });
+  const overruns = bases.map((basis, index) => basis
+    ? square(divide(positive(subtract(fromDecimal(lowerBounds[index]!), basis.target)), basis.scale)) : ZERO);
   const servings = actual.servingBurdenExact ?? sum(actual.servings.map((n, i) => square(positive(subtract(measurement(n, `servings[${i}]`), ONE)))));
   const normalizedPills = divide(pills, THREE), normalizedPrice = divide(price, PRICE_SCALE), uncertainty = multiply(QUARTER, uncertain);
   const weightedUncertainty = profile.version === WEB_PRACTICAL_SCORING_VERSION && request.maxDailyPills != null;
@@ -156,9 +152,15 @@ function compileMeasurements(request: PracticalRequest, actual: PracticalActuals
 }
 function measurementsFor(request: PracticalRequest, actual: PracticalActuals, profile: Profile) {
   const source = doseRequest.get(request as CanonicalRequest) ?? request;
-  let cache = measuredActuals.get(source); if (!cache) { cache = new WeakMap(); measuredActuals.set(source, cache); }
-  let result = cache.get(actual);
-  if (!result) { result = compileMeasurements(request, actual, profile); cache.set(actual, result); }
+  let cache = measuredActuals.get(source);
+  if (!cache) {
+    const bases = FIELDS.map(field => source[field] == null ? null : {
+      target: measurement(source[field], field, field !== "maxDailyPills"),
+      scale: fromDecimal(source[field] > 0 ? source[field] : field === "maxPriceMinor" ? 10000 : 1) });
+    cache = { values: new WeakMap(), bases }; measuredActuals.set(source, cache);
+  }
+  let result = cache.values.get(actual);
+  if (!result) { result = compileMeasurements(request, actual, profile, cache.bases); cache.values.set(actual, result); }
   return result;
 }
 /** Exact ranking estimate, with incomplete observations explicitly distinct from known zero. */
@@ -265,7 +267,7 @@ export function compareSearchStateScores(request: CanonicalRequest, left: Search
   const actual = stateActuals.get(left);
   // All other loss terms are nonnegative. Only reuse a bound after the common
   // measurements have passed validation; an unassessed state takes the full path.
-  if (left.servingBurden && actual && measuredActuals.get(doseRequest.get(request) ?? request)?.has(actual)) {
+  if (left.servingBurden && actual && measuredActuals.get(doseRequest.get(request) ?? request)?.values.has(actual)) {
     const weight = coefficients(score.profile).objectives.servings;
     if (compare({ num: left.servingBurden.num * weight.num, den: left.servingBurden.den * weight.den }, score.exactTotal) > 0) return 1;
   }
