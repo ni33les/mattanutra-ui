@@ -56,9 +56,15 @@ it('V5-SEARCH-06: one completion attempt preserves the supported exact residual 
   for (const unitsPerServing of [1, 2, 9]) {
     const { cursor, r, exactQuantity, practical } = completionBoundary({ unitsPerServing });
     const resumed = decodeSearchCursor(encodeSearchCursor(cursor), cursor.identity);
+    // Observe the active completion phase; terminal cleanup deliberately frees
+    // this frontier after its attempts have been archived.
+    let second = cursor.second, firstBase: readonly string[] | undefined;
+    Object.defineProperty(cursor, 'second', { enumerable: true, get: () => second, set: value => {
+      second = value; if (value.length) firstBase ??= value[0].selectedVariantIds;
+    } });
     advanceSearchCursor(cursor, r, 1); advanceSearchCursor(resumed, r, 1);
     assert.deepEqual(searchCursorResult(resumed, r), searchCursorResult(cursor, r));
-    assert.deepEqual(cursor.second[0]?.selectedVariantIds, practical.selectedVariantIds, 'The practical incumbent keeps first priority');
+    assert.deepEqual(firstBase, practical.selectedVariantIds, 'The practical incumbent keeps first priority');
     assert.equal(cursor.expansionAttempts, 1);
     assert.equal(cursor.edges.size, 1);
     const attempted = cursor.variantIds[Number([...cursor.edges.keys()][0]!.split('>')[1])];
