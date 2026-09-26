@@ -318,3 +318,5 @@ work still takes the tested conditional retirement path.
 - PERF-CPU-52 getter-based presentation deferral withdrawn after exact parity but higher total CPU. Keep plain basket records; no lazy getters remain. Patch and RED/GREEN remain external.
 
 - PERF-CPU-53 removes three private ScoredBasket counters with no production readers: dedicatedPartialCount, titleExactCount and oversupplyScore. Active doseFit, coverage, advice, priorities and customer projections remain unchanged. Historical phase-2 and phase-3 tests still inject obsolete metadata to prove it cannot override active ranking; only their fixture type carries those optional historical fields. The phase-6 fixture drops unused counters without changing its coverage assertions. RED: unused-ranking-counters-red.tap.
+
+- PERF-CPU-54/55/56 (row ordering, request-cache lookup hoisting and stable basket signature caching) were withdrawn after exact parity and passing structural cases but higher combined CPU and slower D3 trials. Their exclusive cases, patches and RED/GREEN evidence are retained outside the checkout; active original semantic tests remain unchanged.
