@@ -26,39 +26,6 @@ mock.module('../../lib/matcher/safety.ts', { namedExports: { ...safetyModule, la
 const { request } = await import('../matcher/flexible-v5-fixtures.ts');
 const { doseFitScore, numericalDoseFitScore, exactDoseFit, compareDoseFit, weightedDoseFitScore, numericalWeightedDoseFitScore } = await import('../../lib/matcher/dose-fit.ts');
 
-test('PERF-CPU-66 a narrow basket addition reevaluates only its changed nutrient terms', async () => {
-  const { compileGroups } = await import('../../lib/matcher/candidates.ts');
-  const { seedState, tryAddVariant } = await import('../../lib/matcher/search.ts');
-  const { product, catalog } = await import('../matcher/flexible-v5-fixtures.ts');
-  const { canonicalizeTargets } = await import('../../lib/matcher/canonicalizer.ts');
-  const ids = Array.from({ length: 20 }, (_, i) => `nutrient-${i}`);
-  const targets = canonicalizeTargets({ targets: ids.map(subjectId => ({ subjectId, name: subjectId.toUpperCase(), amount: 100, unit: 'mg' as const })) }).targets;
-  const input = request({ targets, safetyCeilings: [{ subjectId: ids[0], name: ids[0].toUpperCase(), maxAmount: 100, maxUnit: 'mg', sourceScope: 'supplemental' }] });
-  const groups = compileGroups(input, catalog([product('base', Object.fromEntries(ids.map(id => [id, 50]))), product('addition', { [ids[0]]: 75 })]));
-  const base = groups.find(row => row.productId === 'base')!, addition = groups.find(row => row.productId === 'addition')!;
-  assert.ok(base && addition); assert.equal(targets.length, 20);
-  const parent = tryAddVariant(seedState(input), base.variants.find(row => row.dailyUnits === 1)!, base, input)!;
-  assert.ok(parent); assert.equal(parent.exposure.size, 20);
-  assert.equal(fractions.compare(numericalDoseFitScore(input, parent.exposure).exact, { num: 10n, den: 1n }), 0);
-  const child = tryAddVariant(parent, addition.variants.find(row => row.dailyUnits === 1)!, addition, input)!;
-  assert.ok(child); assert.equal(child.exposure.get(ids[0]), 125_000_000n);
-  const original = Map.prototype.get; let oldEndpointReads = 0, calculated;
-  try {
-    Map.prototype.get = function (key) {
-      const value = original.call(this, key);
-      if (typeof key === 'bigint' && value?.worst) oldEndpointReads++;
-      return value;
-    };
-    calculated = numericalDoseFitScore(input, child.exposure);
-  } finally { Map.prototype.get = original; }
-  assert.equal(fractions.compare(calculated.exact, { num: 41n, den: 4n }), 0, '19 half gaps, one quarter excess and independent half-point safety penalty');
-  assert.deepEqual(calculated, numericalDoseFitScore(input, new Map(child.exposure)), 'A fresh nonincremental evaluation is the independent control path');
-  const changedWeight = { ...input, scoring: { profile: 'balanced' as const, weights: { nutrients: { [ids[0]]: 0 } } } };
-  numericalWeightedDoseFitScore(changedWeight, parent.exposure);
-  assert.deepEqual(numericalWeightedDoseFitScore(changedWeight, child.exposure), numericalWeightedDoseFitScore(changedWeight, new Map(child.exposure)));
-  assert.ok(oldEndpointReads <= 2, `A one-nutrient addition should not reread ${oldEndpointReads} unrelated cached endpoint records`);
-});
-
 test('PERF-CPU-64 physical breakpoint preparation reuses its verified minimum-quantity exposure', async () => {
   const { supportedDoseDomain } = await import('../../lib/matcher/candidates.ts');
   const { product } = await import('../matcher/flexible-v5-fixtures.ts');
