@@ -5,7 +5,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync, createWriteStream }
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { recursiveTestFiles, isNodeTestFile, matcherTestInventory, unclassifiedMatcherConsumers, SEMANTIC_REPLAY_FIXTURES, INDEPENDENT_NODE_TESTS } from "./matcher-test-inventory.mjs";
-import { nodeExecutionProof, browserExecutionProof, testSourceHygiene } from "./test-execution-proof.mjs";
+import { nodeExecutionProof, browserExecutionProof, mergeBrowserReports, testSourceHygiene } from "./test-execution-proof.mjs";
 import { normalizePublishedClientResult } from "./published-client-semantics.mjs";
 export { nodeExecutionProof, browserExecutionProof, testSourceHygiene };
 
@@ -19,6 +19,19 @@ export function fullTestInventory(root = ROOT) {
   return { node, browser, integration: node.filter(file => file.includes(".integration.test.")),
     mcp: matcher.files, matcherGroups: matcher.groups,
     semanticReplay: SEMANTIC_REPLAY_FIXTURES.filter(row => node.includes(row.file)) };
+}
+
+/** Reuse the reviewed classic fallback inventory; every discovered file belongs to one mode. */
+export function browserTestPartitions(files) {
+  const classic = JSON.parse(readFileSync(join(ROOT, "test/pharmacy-reveal/impact.json"), "utf8")).classicBrowser;
+  if (!Array.isArray(classic) || !classic.length || new Set(files).size !== files.length ||
+      new Set(classic.map(row => row.file)).size !== classic.length ||
+      classic.some(row => !files.includes(row.file) || !Number.isSafeInteger(row.expectedCases) || row.expectedCases <= 0 || !row.grep)) {
+    throw new Error("Invalid or undiscovered classic browser inventory");
+  }
+  const standard = files.filter(file => !classic.some(row => row.file === file));
+  if (!standard.length) throw new Error("Default browser inventory must remain nonempty");
+  return { standard, classic };
 }
 
 export function sourceManifest() {
@@ -211,7 +224,7 @@ async function main() {
   const before = sourceManifest();
   writeFileSync(join(evidence, "source-before.json"), JSON.stringify(before, null, 2), { flag: "wx" });
   const common = { ...process.env, DB_WORKER_URL: process.env.TEST_DB_URL, MATTANUTRA_ENV: "dev", STRIPE_PAYMENT_MODE: "mock", NODE_ENV: "test", DB_POOL_IDLE_TIMEOUT_SECONDS: "1" };
-  const nodeArgs = ["--test", "--test-timeout=600000", "--test-concurrency=1", "--experimental-strip-types", "--import", "./test/helpers/offline-network.mjs", "--import", "./scripts/register-ts-path-loader.mjs"];
+  const nodeArgs = ["--test", "--test-timeout=600000", "--test-concurrency=1", "--experimental-strip-types", "--import", "./test/helpers/offline-network.mjs", "--import", "./scripts/register-ts-path-loader.mjs", "--import", "./scripts/register-matcher-http-loader.mjs"];
   const { startHttpCandidate } = await import("./run-matcher-test-suite.mjs");
   const { results, semanticReplay } = await runCanonicalNodeSuite({ common, evidence, inventory, args: nodeArgs, start: startHttpCandidate, sourceSha256: before.sha256 });
   // PostgreSQL cases may advance catalogue epochs while creating/removing their
@@ -222,18 +235,38 @@ async function main() {
     const fixtures = JSON.parse(readFileSync(join(evidence, "browser-fixtures-refreshed.json"), "utf8"));
     Object.assign(browserEnv, browserFixtureEnvironment(fixtures, new URL(common.PLAYWRIGHT_BASE_URL).origin));
   } catch (error) { results.push({ label: "browser-fixture-identity", passed: false, error: error.message }); }
-  results.push(await runBatch("browser-discovery", ["node_modules/@playwright/test/cli.js", "test", "--list", "--reporter=json"],
+  const browserModes = browserTestPartitions(inventory.browser);
+  writeFileSync(join(evidence, "browser-mode-inventory.json"), JSON.stringify({
+    discovered: inventory.browser, standard: browserModes.standard, classic: browserModes.classic,
+    classicOrigin: "http://127.0.0.1:3101", classicFlags: { NEXT_PUBLIC_CHAT_QUESTIONNAIRE_V6: "0", NEXT_PUBLIC_CHAT_QUESTIONNAIRE_V5: "0" }
+  }, null, 2), { flag: "wx" });
+  results.push(await runBatch("browser-discovery", ["node_modules/@playwright/test/cli.js", "test", ...browserModes.standard, "--list", "--reporter=json"],
     { ...browserEnv, CI: "1", PLAYWRIGHT_JSON_OUTPUT_FILE: join(evidence, "browser-discovery.json") }, evidence));
-  results.push(await runBatch("browser", ["--import", "./test/helpers/offline-network.mjs", "node_modules/@playwright/test/cli.js", "test", "--workers=1", "--retries=0", "--reporter=json"],
+  results.push(await runBatch("browser", ["--import", "./test/helpers/offline-network.mjs", "node_modules/@playwright/test/cli.js", "test", ...browserModes.standard, "--workers=1", "--retries=0", "--reporter=json"],
     { ...browserEnv, DB_URL: common.TEST_DB_URL, CI: "1", PLAYWRIGHT_JSON_OUTPUT_FILE: join(evidence, "browser.json") }, evidence));
   const browser = results.at(-1);
   try {
     const report = JSON.parse(readFileSync(join(evidence, "browser.json"), "utf8"));
     const discovery = JSON.parse(readFileSync(join(evidence, "browser-discovery.json"), "utf8"));
-    browser.execution = browserExecutionProof(inventory.browser, discovery, report);
+    browser.execution = browserExecutionProof(browserModes.standard, discovery, report);
     browser.passed = browser.passed && browser.execution.passed;
     browser.stats = report.stats;
   } catch (error) { browser.passed = false; browser.reportError = error.message; }
+  const classicOutput = join(evidence, "browser-classic"); mkdirSync(classicOutput);
+  try {
+    const { runEfficiencyBrowser } = await import("./service-efficiency/release-stages.mjs");
+    // Full acceptance executes every case in each owned file, without a grep filter.
+    const classic = await runEfficiencyBrowser(classicOutput, { ...browserEnv,
+      NEXT_PUBLIC_CHAT_QUESTIONNAIRE_V6: "0", NEXT_PUBLIC_CHAT_QUESTIONNAIRE_V5: "0"
+    }, browserModes.classic.map(row => ({ ...row, grep: ".*" })), 3101);
+    results.push({ label: "browser-classic", ...classic });
+    const report = name => JSON.parse(readFileSync(join(evidence, name), "utf8"));
+    const combinedReport = mergeBrowserReports([report("browser.json"), report("browser-classic/browser.json")]);
+    browser.execution = browserExecutionProof(inventory.browser,
+      mergeBrowserReports([report("browser-discovery.json"), report("browser-classic/browser-discovery.json")]), combinedReport);
+    browser.stats = combinedReport.stats;
+    browser.passed = browser.passed && classic.passed && browser.execution.passed;
+  } catch (error) { results.push({ label: "browser-classic", passed: false, error: error.message }); }
   const after = sourceManifest();
   writeFileSync(join(evidence, "source-after.json"), JSON.stringify(after, null, 2), { flag: "wx" });
   const unchangedSource = before.sha256 === after.sha256;

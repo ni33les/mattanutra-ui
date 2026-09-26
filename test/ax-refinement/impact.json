@@ -342,6 +342,7 @@
     },
     {
       "file": "test/dev-validation-proof.test.ts",
+      "expectedCases": 10,
       "slice": "release",
       "reason": "Maintains current v7 identity checks on the unchanged ordinary full-verification deployment path; only its proof unit tests run.",
       "database": false

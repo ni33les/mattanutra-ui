@@ -1,7 +1,7 @@
 {
   "releaseBase": "fc0b08ad36683cba2db5f97933fe6ce065e0c874",
   "files": [
-    {"file":"test/healthscore-count/reuse.integration.test.ts","reason":"HS-COUNT-01–08: completed formula reuse across concurrent retry, checkout, payment fulfillment, locales and changed answers; missing-output repair; stable generation identity despite omitted web fields; conflicting provenance rejection legacy exact-hash fallback and pending-task deduplication"},
+    {"file":"test/healthscore-count/reuse.integration.test.ts","reason":"HS-COUNT-01–09: completed formula reuse across concurrent retry, checkout, payment fulfillment, locales and changed answers; missing-output repair; stable generation identity despite omitted web fields; conflicting provenance rejection legacy exact-hash fallback, nullable assessment identity and pending-task deduplication"},
     {"file":"test/healthscore-parallel/readiness.integration.test.ts","reason":"Independent parallel admission, failed formula recovery and complete advice plus reveal readiness"},
     {"file":"test/assessment-capture.integration.test.ts","reason":"Capture and retry generation admission remains transactional and preserves input identity"},
     {"file":"test/assessment-revisions.integration.test.ts","reason":"Revision fencing and generation snapshots remain valid"},

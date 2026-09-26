@@ -76,6 +76,10 @@ it("V5-INFRA-03 browser evidence reconciles discovered cases and rejects empty, 
   assert.equal(browserExecutionProof(files, discovery, entry("skipped")).passed, false);
   assert.equal(browserExecutionProof(files, discovery, entry("expected", [])).passed, false);
   assert.equal(browserExecutionProof(files, discovery, { suites: [], stats: { expected: 1 } }).passed, false);
+  const duplicated = entry("expected");
+  duplicated.suites[0].specs.push(duplicated.suites[0].specs[0]);
+  duplicated.stats.expected = 2;
+  assert.equal(browserExecutionProof(files, duplicated, duplicated).passed, false, "Duplicated discovery and execution cannot cancel each other out");
 });
 
 it("V5-INFRA-04 test hygiene detects executable focus, quarantine, todo and empty tests without matching assertion strings", () => {

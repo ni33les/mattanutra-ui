@@ -54,7 +54,7 @@
     },
     {
       "file": "test/full-test-suite-discovery.test.ts",
-      "expectedCases": 11,
+      "expectedCases": 16,
       "reason": "Complete MCP inventory must include current refinement and execution consumers; regression cannot silently omit them."
     }
   ],

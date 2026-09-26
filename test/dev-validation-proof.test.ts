@@ -63,6 +63,15 @@ function evidence() {
   named["full-suite/browser-classic/browser-results.json"] = classic;
   const suite = named["full-suite/results.json"] as { results: Array<Record<string, unknown>> };
   suite.results.push({ label: "browser-classic", ...classic });
+  const standardReport = { ...browser, suites: [{ specs: browser.suites[0].specs.filter(row => standardFiles.includes(row.file)) }],
+    stats: { expected: standardFiles.length, skipped: 0, unexpected: 0, flaky: 0 } };
+  named["full-suite/browser-discovery.json"] = standardReport;
+  named["full-suite/browser.json"] = standardReport;
+  const discoveryRow = suite.results.find(row => row.label === "browser-discovery")!;
+  discoveryRow.args = [...standardFiles, "--list"];
+  const browserRow = suite.results.find(row => row.label === "browser")!;
+  browserRow.args = [...standardFiles, "--retries=0", "--workers=1"];
+  browserRow.execution = { passed: true, cases: inventoryContent.browser.length, files: inventoryContent.browser.length, failures: [] };
   const artifacts = [...new Set([...REQUIRED_VALIDATION_ARTIFACTS, "full-suite/browser-discovery.json", "full-suite/browser.json",
     "full-suite/browser-mode-inventory.json", "full-suite/browser-classic/browser-discovery.json", "full-suite/browser-classic/browser.json", "full-suite/browser-classic/browser-results.json"])].map(file => {
     const path = join(directory, file);

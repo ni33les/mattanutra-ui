@@ -2,9 +2,9 @@ import { createHash } from "node:crypto";
 import { readFileSync, readdirSync } from "node:fs";
 import { dirname, isAbsolute, relative, resolve } from "node:path";
 import { SEMANTIC_REPLAY_FIXTURES, isNodeTestFile } from "./matcher-test-inventory.mjs";
-import { nodeExecutionProof, browserExecutionProof } from "./test-execution-proof.mjs";
+import { nodeExecutionProof, browserExecutionProof, mergeBrowserReports } from "./test-execution-proof.mjs";
 import { normalizePublishedClientResult } from "./published-client-semantics.mjs";
-import { fullTestInventory } from "./run-full-test-suite.mjs";
+import { fullTestInventory, browserTestPartitions } from "./run-full-test-suite.mjs";
 
 /** Identity comes from generated publications, shared by readiness and release proofs. */
 export function validationContractIdentity() {
@@ -28,7 +28,8 @@ export const REQUIRED_VALIDATION_STAGES = [
 ];
 const canonicalLabels = ["node-application-independent", "node-application", "node-postgres"];
 export const REQUIRED_VALIDATION_ARTIFACTS = ["source-before.json", "source-after.json", "stage-results.json", "build-identity.json", "release-lint.json", "test-inventory.json", "data-before.json", "data-after.json", "public-catalogue-fixtures.json",
-  "candidate-identity.json", "full-suite/results.json", "full-suite/semantic-replay.json", "full-suite/browser-discovery.json", "full-suite/browser.json", "client-comparison.json",
+  "candidate-identity.json", "full-suite/results.json", "full-suite/semantic-replay.json", "full-suite/browser-discovery.json", "full-suite/browser.json", "full-suite/browser-mode-inventory.json",
+  "full-suite/browser-classic/browser-discovery.json", "full-suite/browser-classic/browser.json", "full-suite/browser-classic/browser-results.json", "client-comparison.json",
   ...[...canonicalLabels, "node-semantic-replay"].flatMap(label => [`full-suite/${label}-events.jsonl`, `full-suite/${label}-timings.jsonl`]),
   ...["a", "b"].flatMap(run => SEMANTIC_REPLAY_FIXTURES.map(row => `full-suite/semantic-${run}/${row.artifact}`)),
   ...clientSuffixes.flatMap(suffix => ["a", "b"].flatMap(run => VALIDATION_CLIENT_LOCALES.flatMap(locale => [`fixture-settlement-${run}-${locale}${suffix}.json`, `client-${run}-${locale}${suffix}/receipt.json`, `client-${run}-${locale}${suffix}/semantic.json`, `client-${run}-${locale}${suffix}-paid/receipt.json`, `client-${run}-${locale}${suffix}-paid/semantic.json`])))];
@@ -131,9 +132,29 @@ function validateCanonicalEvidence(directory, inventory, sourceSha256) {
   });
   if (comparisons.some(row => !row.identical) || !same(replay.comparisons, comparisons)) throw new Error("DEV validation bounded replay business values changed.");
   const browser = suite.results.filter(row => row.label === "browser"), discovery = suite.results.filter(row => row.label === "browser-discovery");
-  if (browser.length !== 1 || discovery.length !== 1 || !discovery[0].args?.includes("--list") ||
-      !browser[0].args?.includes("--retries=0") || !browser[0].args?.includes("--workers=1") ||
-      !browserExecutionProof(inventory.browser, json("browser-discovery.json"), json("browser.json")).passed) {
-    throw new Error("DEV validation browser discovery or execution is incomplete.");
+  const classicRows = suite.results.filter(row => row.label === "browser-classic");
+  const modes = browserTestPartitions(inventory.browser), recordedModes = json("browser-mode-inventory.json");
+  const classic = json("browser-classic/browser-results.json"), classicFiles = modes.classic.map(row => row.file);
+  const flags = { NEXT_PUBLIC_CHAT_QUESTIONNAIRE_V6: "0", NEXT_PUBLIC_CHAT_QUESTIONNAIRE_V5: "0" };
+  const files = row => row?.args?.filter(arg => arg.startsWith("test/e2e/") && arg.endsWith(".spec.ts"));
+  const validRun = row => row?.passed === true && row.args?.includes("--retries=0") && row.args?.includes("--workers=1");
+  if (browser.length !== 1 || discovery.length !== 1 || classicRows.length !== 1 ||
+      !same(recordedModes, { discovered: inventory.browser, standard: modes.standard, classic: modes.classic,
+        classicOrigin: "http://127.0.0.1:3101", classicFlags: flags }) ||
+      !discovery[0].args?.includes("--list") || !same(files(discovery[0]), modes.standard) ||
+      !validRun(browser[0]) || !same(files(browser[0]), modes.standard) ||
+      classic.passed !== true || !classic.discovery?.passed || !classic.discovery.args?.includes("--list") ||
+      !same(files(classic.discovery), classicFiles) || !validRun(classic.run) || !same(files(classic.run), classicFiles) ||
+      !same(classic.runtime, { origin: "http://127.0.0.1:3101", questionnaireFlags: flags }) ||
+      !same(classicRows[0], { label: "browser-classic", ...classic })) {
+    throw new Error("DEV validation browser mode discovery or execution is incomplete.");
+  }
+  const classicProof = browserExecutionProof(classicFiles, json("browser-classic/browser-discovery.json"), json("browser-classic/browser.json"));
+  const combined = browserExecutionProof(inventory.browser,
+    mergeBrowserReports([json("browser-discovery.json"), json("browser-classic/browser-discovery.json")]),
+    mergeBrowserReports([json("browser.json"), json("browser-classic/browser.json")]));
+  if (!classicProof.passed || classicProof.cases !== modes.classic.reduce((n, row) => n + row.expectedCases, 0) ||
+      !same(classic.execution, classicProof) || !combined.passed || !same(browser[0].execution, combined)) {
+    throw new Error("DEV validation raw browser coverage is incomplete or duplicated.");
   }
 }

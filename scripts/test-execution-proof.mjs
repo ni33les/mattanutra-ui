@@ -83,6 +83,7 @@ export function browserExecutionProof(expectedFiles, discovery, report) {
   const expected = browserCases(discovery), actual = browserCases(report);
   const failures = [];
   const expectedKeys = expected.map(row => row.key).sort(), actualKeys = actual.map(row => row.key).sort();
+  if (new Set(expectedKeys).size !== expectedKeys.length || new Set(actualKeys).size !== actualKeys.length) failures.push("Browser cases were discovered or executed more than once");
   if (JSON.stringify(expectedKeys) !== JSON.stringify(actualKeys)) failures.push("Browser discovery and execution case identities differ");
   if (!actual.length) failures.push("No browser cases executed");
   const files = new Set(actual.map(row => row.file));
@@ -94,4 +95,14 @@ export function browserExecutionProof(expectedFiles, discovery, report) {
   if (report.errors?.length) failures.push("Browser run reported errors");
   if (!report.stats?.expected || report.stats.skipped || report.stats.unexpected || report.stats.flaky) failures.push("Browser totals are not completely green");
   return { passed: failures.length === 0, cases: actual.length, files: files.size, failures };
+}
+
+/** Preserve raw reports; combine their suites only for complete multi-mode coverage proof. */
+export function mergeBrowserReports(reports) {
+  return {
+    suites: reports.flatMap(report => report.suites ?? []),
+    errors: reports.flatMap(report => report.errors ?? []),
+    stats: Object.fromEntries(["expected", "skipped", "unexpected", "flaky"].map(key =>
+      [key, reports.reduce((total, report) => total + Number(report.stats?.[key] ?? 0), 0)]))
+  };
 }

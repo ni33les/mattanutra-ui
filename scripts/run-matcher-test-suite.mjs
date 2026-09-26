@@ -79,7 +79,7 @@ async function main() {
     MATTANUTRA_ENV: "dev", STRIPE_PAYMENT_MODE: "mock", NODE_ENV: "test", DB_POOL_IDLE_TIMEOUT_SECONDS: "1" };
   // This is the file/container ceiling. Named journey, operation and D3
   // deadlines remain stricter; 18 serialized locale journeys exceed five minutes.
-  const args = ["--test", "--test-timeout=600000", "--test-concurrency=1", "--experimental-strip-types", "--import", "./test/helpers/offline-network.mjs", "--import", "./scripts/register-ts-path-loader.mjs"];
+  const args = ["--test", "--test-timeout=600000", "--test-concurrency=1", "--experimental-strip-types", "--import", "./test/helpers/offline-network.mjs", "--import", "./scripts/register-ts-path-loader.mjs", "--import", "./scripts/register-matcher-http-loader.mjs"];
   const prerequisites = await runBatch("catalogue-prerequisites", ["scripts/matcher-fixture-prerequisites.mjs", join(evidence, "catalogue-prerequisites.json")], common, evidence);
   if (!prerequisites.passed) throw new Error("Maintained MCP catalogue/reference prerequisites are incomplete; inspect catalogue-prerequisites.log");
   const fixture = await runBatch("public-catalogue-fixtures", ["scripts/seed-matcher-public-fixtures.mjs", join(evidence, "public-catalogue-fixtures.json")], common, evidence);

@@ -36,17 +36,18 @@ export async function prepareEfficiencyDatabase(templateUrl, output, env) {
   return isolated;
 }
 
-export async function runEfficiencyBrowser(output, env, inventory) {
-  const origin = "http://127.0.0.1:3100";
+export async function runEfficiencyBrowser(output, env, inventory, port = 3100) {
+  assert.ok(Number.isSafeInteger(port) && port > 0 && port <= 65535, "Browser port must be a positive valid TCP port");
+  const origin = `http://127.0.0.1:${port}`;
   const browserEnv = { ...env, NODE_ENV: "production", PLAYWRIGHT_BASE_URL: origin, NEXT_PUBLIC_SITE_URL: origin, SITE_URL: origin,
     CI: "1", STRIPE_PAYMENT_MODE: "mock", AGENTIC_PAYMENT_PROVIDER: "mock", INTERNAL_QA_HARNESS: "true", DB_POOL_IDLE_TIMEOUT_SECONDS: "1",
     ADMIN_SESSION_SECRET: "service-efficiency-isolated-browser-secret-0001", AGENTIC_CAPABILITY_KEY: "service-efficiency-isolated-capability-key-0001",
     GROK_API_KEY: "", ANTHROPIC_API_KEY: "", XAI_API_KEY: "", SMTP_HOST: "", SMTP_USER: "", SMTP_PASS: "",
     NODE_OPTIONS: `--max-old-space-size=2500 --import=${resolve("test/helpers/offline-network.mjs")}` };
   const { createServer } = await import("node:net");
-  await new Promise((done, reject) => { const socket = createServer(); socket.once("error", reject); socket.listen(3100, "127.0.0.1", () => socket.close(done)); });
+  await new Promise((done, reject) => { const socket = createServer(); socket.once("error", reject); socket.listen(port, "127.0.0.1", () => socket.close(done)); });
   const fd = openSync(resolve(output, "browser-server.log"), "wx", 0o600);
-  const server = spawn(process.execPath, ["node_modules/next/dist/bin/next", "start", "--hostname", "127.0.0.1", "--port", "3100"], { env: browserEnv, stdio: ["ignore", fd, fd], detached: true });
+  const server = spawn(process.execPath, ["node_modules/next/dist/bin/next", "start", "--hostname", "127.0.0.1", "--port", String(port)], { env: browserEnv, stdio: ["ignore", fd, fd], detached: true });
   let startupError;
   const exited = new Promise(resolve => { server.once("exit", resolve); server.once("error", error => { startupError = error; resolve(); }); });
   try {
@@ -64,7 +65,11 @@ export async function runEfficiencyBrowser(output, env, inventory) {
     assert.ok(discovery.passed);
     const execution = await runBatch("browser-affected", args, { ...browserEnv, PLAYWRIGHT_JSON_OUTPUT_FILE: resolve(output, "browser.json") }, output);
     const proof = browserExecutionProof(files, JSON.parse(readFileSync(resolve(output, "browser-discovery.json"))), JSON.parse(readFileSync(resolve(output, "browser.json"))));
-    const result = { passed: execution.passed && proof.passed && proof.cases === inventory.reduce((sum, row) => sum + row.expectedCases, 0), execution: proof };
+    const result = { passed: execution.passed && proof.passed && proof.cases === inventory.reduce((sum, row) => sum + row.expectedCases, 0), execution: proof,
+      discovery, run: execution, runtime: { origin, questionnaireFlags: {
+        NEXT_PUBLIC_CHAT_QUESTIONNAIRE_V6: browserEnv.NEXT_PUBLIC_CHAT_QUESTIONNAIRE_V6 ?? null,
+        NEXT_PUBLIC_CHAT_QUESTIONNAIRE_V5: browserEnv.NEXT_PUBLIC_CHAT_QUESTIONNAIRE_V5 ?? null
+      } } };
     writeFileSync(resolve(output, "browser-results.json"), JSON.stringify(result, null, 2), { flag: "wx" }); assert.ok(result.passed, "Scoped browser execution failed or was incomplete");
     return result;
   } finally { try { process.kill(-server.pid, "SIGTERM"); } catch { /* already exited */ } const kill = setTimeout(() => { try { process.kill(-server.pid, "SIGKILL"); } catch { /* exited */ } }, 5000);
