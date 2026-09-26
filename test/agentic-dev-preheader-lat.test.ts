@@ -1,3 +1,4 @@
+import { assertMcpSuccess } from "./helpers/mcp-success.ts";
 import { observeLatency, observeBenchmark, nonLatencyBenchmarkEvidence } from "./helpers/latency-observation.ts";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
@@ -231,16 +232,12 @@ function p50(values: readonly number[]) {
   return interpolatePercentile(values, 50);
 }
 
-function isValidMcp(payload: unknown) {
-  if (!payload || typeof payload !== "object") {
-    return false;
-  }
-  const record = payload as { jsonrpc?: unknown; error?: unknown; result?: unknown };
-  return record.jsonrpc === "2.0" && (record.result != null || record.error != null);
+function isValidMcp(payload: unknown, expected: "info" | "plan" | "tools/list") {
+  try { assertMcpSuccess(payload, expected); return true; } catch { return false; }
 }
 
-function classifySimple(samples: readonly StageSample[]) {
-  const statusesOk = samples.every((item) => item.status === 200 && isValidMcp(item.payload));
+function classifySimple(samples: readonly StageSample[], expected: "info" | "tools/list") {
+  const statusesOk = samples.every((item) => item.status === 200 && isValidMcp(item.payload, expected));
   if (!statusesOk) {
     return "PAYLOAD";
   }
@@ -335,8 +332,8 @@ describe("DEV pre-header latency pack", () => {
     const list = await concurrent(10, 10, (index) =>
       stagedPost(PUBLIC, LIST_BODY, MIXED_ACCEPT, `dev-lat-001-list-${index}`)
     );
-    const infoCode = classifySimple(info);
-    const listCode = classifySimple(list);
+    const infoCode = classifySimple(info, "info");
+    const listCode = classifySimple(list, "tools/list");
     const liveInfoPreHeader = p95(info.map((item) => item.preHeaderMs));
     const liveListPreHeader = p95(list.map((item) => item.preHeaderMs));
     const agentInfoPreHeader = Math.max(
@@ -367,8 +364,8 @@ describe("DEV pre-header latency pack", () => {
       INFO_PRE_HEADER_P95_MS: Math.round(agentInfoPreHeader),
       NEUTRAL_PUBLIC_INFO_PRE_HEADER_P95_MS: Math.round(liveInfoPreHeader),
       NEUTRAL_PUBLIC_TOOLS_LIST_PRE_HEADER_P95_MS: Math.round(liveListPreHeader),
-      PAYLOAD_VALID: info.every((item) => isValidMcp(item.payload)) &&
-        list.every((item) => isValidMcp(item.payload)),
+      PAYLOAD_VALID: info.every((item) => isValidMcp(item.payload, "info")) &&
+        list.every((item) => isValidMcp(item.payload, "tools/list")),
       SNAPSHOT_PINNED: /^snap_[0-9a-f]{16}$/.test(liveSnapshotId),
       TOOLS_LIST_PRE_HEADER_P95_MS: Math.round(agentListPreHeader)
     };
@@ -449,7 +446,7 @@ describe("DEV pre-header latency pack", () => {
       samples: totals
     });
     assert.equal(
-      samples.every((item) => item.status === 200 && isValidMcp(item.payload)),
+      samples.every((item) => item.status === 200 && isValidMcp(item.payload, "plan")),
       true,
       JSON.stringify({
         statuses: samples.map((item) => item.status)
@@ -502,8 +499,8 @@ describe("DEV pre-header latency pack", () => {
       const list = await stagedPost(PUBLIC, LIST_BODY, accept, `dev-lat-005-list-${accept}`);
       assert.equal(info.status, 200);
       assert.equal(list.status, 200);
-      assert.equal(isValidMcp(info.payload), true);
-      assert.equal(isValidMcp(list.payload), true);
+      assert.equal(isValidMcp(info.payload, "info"), true);
+      assert.equal(isValidMcp(list.payload, "tools/list"), true);
       samples.push(info.bodyMs, list.bodyMs);
     }
     observeLatency(p95(samples), BODY_P95_MS, "body p95");

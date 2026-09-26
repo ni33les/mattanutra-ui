@@ -118,10 +118,10 @@
     },
     {
       "file": "test/agentic-live-timing.test.ts",
-      "expectedCases": 1,
+      "expectedCases": 6,
       "slice": "transport",
       "database": false,
-      "reason": "LIVE-LAT-TIMING-01: real local HTTP headers and deliberately delayed body are measured independently with a monotonic clock."
+      "reason": "LIVE-LAT-TIMING-01 preserves distinct headers/body timing; LIVE-SUCCESS-01–05 reject RPC/tool errors and malformed business/discovery payloads as successful measurements."
     }
   ]
 }
