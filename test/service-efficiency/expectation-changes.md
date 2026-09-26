@@ -198,3 +198,33 @@ score; GREEN requires one and preserves public score fields and exact safety
 arithmetic. The first paired frozen comparison preserves all result hashes and
 8,000 attempts. Daniel improves in each warmed comparison; D3 is mixed, so this
 is not claimed as a universal latency improvement or the sub-second gate.
+
+### Numerical work retained after source a8f721d9
+
+PERF-CPU-16 and 18–24 preserve exact basket results while removing repeated
+quantity scans, per-endpoint deviation construction, concern-map reconstruction,
+fixed quantity-basis reconstruction, endpoint sets and variant-fact sorting.
+The serving lower-bound comparator skips full arithmetic only when an exact,
+validated nonnegative component already proves that a candidate loses.
+
+Internal numerical records now contain exact facts only. Rounded display totals
+and serialized fractions are produced for retained public results. PERF-CPU-15
+therefore expects zero auxiliary weak records instead of one; PERF-CPU-18
+expects zero warm display conversions instead of five. Independent public
+arithmetic, uncertainty, safety and serialization assertions remain intact.
+
+The uncalled requestWithoutOptionalPurchases identity shim and orphan
+salvagePartialBasket search are removed after repository-wide caller review.
+The existing bounded search, repair, quantity and oracle consumers remain.
+
+The profile-ownership, symbol-backed facts and larger endpoint-window experiments
+were withdrawn after frozen comparisons failed to show useful improvements.
+Their patches and RED/GREEN/benchmark receipts remain outside the checkout;
+exclusive structural assertions were withdrawn with those implementations.
+The endpoint bound stays at 256. No arithmetic or behavioural case was removed.
+
+The reviewed hot-path inventory now includes all 38 numerical cases and directly
+affected dose, quantity, reference, recovery and MCP weight consumers. The main
+inventory's checkpoint count is corrected from four to five to include the
+already-maintained PERF-CKPT-02; no case is skipped. Frozen whole-result hashes,
+attempt counts and native terminal timings remain separate release conditions.

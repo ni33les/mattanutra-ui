@@ -1,8 +1,43 @@
 {
-  "version": 1,
-  "releaseBase": "6fd7a63b062975ba3937e08a79286a24fe4de095",
+  "version": 2,
+  "releaseBase": "a71d609d910bb41a02f782e6823820c0b4edc106",
   "scope": "matcher CPU and checkpoint overhead only",
   "files": [
+    {
+      "file": "test/service-efficiency/numeric-scoring.test.ts",
+      "expectedCases": 38,
+      "reason": "Exact internal records, serving lower bounds, immutable quantity/intake/exposure reuse and complete public materialization without search changes"
+    },
+    {
+      "file": "test/service-efficiency/immutable-references.test.ts",
+      "expectedCases": 2,
+      "reason": "Reference isolation across concurrent and restarted resident calculations"
+    },
+    {
+      "file": "test/matcher/dose.test.ts",
+      "expectedCases": 7,
+      "reason": "Exact exposure aggregation, units, current intake and provenance after variant-fact reuse"
+    },
+    {
+      "file": "test/matcher/flexible-v5-doses.test.ts",
+      "expectedCases": 6,
+      "reason": "Physical quantities, fractional servings and validated product-dose proposals"
+    },
+    {
+      "file": "test/matcher/flexible-v5-search.test.ts",
+      "expectedCases": 4,
+      "reason": "Complementary discovery, deterministic effort and expansion preservation"
+    },
+    {
+      "file": "test/simple-plan/search.test.ts",
+      "expectedCases": 4,
+      "reason": "Shared MCP ranking and retained alternatives under all supported weights"
+    },
+    {
+      "file": "test/simple-plan/cost-weight.test.ts",
+      "expectedCases": 4,
+      "reason": "Public cost weights retain their exact search and reset semantics"
+    },
     {
       "file": "test/service-efficiency/scoring-hot-path.test.ts",
       "expectedCases": 4,
