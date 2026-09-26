@@ -3,7 +3,7 @@ import {readFileSync} from "node:fs";
 export function validateUatResources(value) {
   const [quota,period]=value.cpuMax.split(/\s+/).map(Number);
   assert.ok(Number.isFinite(quota) && quota>0 && quota===period,"Runtime must have exactly one CPU of quota");
-  assert.equal(value.memoryMax,"1073741824","Runtime must have the UAT 1-GiB memory limit");
+  assert.equal(value.memoryMax,"2147483648","Runtime must have the verified UAT 2-GiB memory limit");
   assert.equal(value.swapMax,"0","Swap cannot hide a UAT memory failure");
   assert.equal(value.events.oom,0);assert.equal(value.events.oom_kill,0);
   assert.ok(Number.isFinite(value.peakBytes) && value.peakBytes>0 && value.peakBytes<=Number(value.memoryMax));
@@ -20,5 +20,5 @@ export function runtimeResourceSnapshot() {
 export function scopedBenchmarkCommand(name,args) {
   assert.match(name,/^[a-z0-9-]+$/);
   return {command:"systemd-run",args:["--scope","--quiet",`--unit=mattanutra-lock-benchmark-${process.pid}-${name}`,
-    "--property=CPUQuota=100%","--property=MemoryMax=1G","--property=MemorySwapMax=0",...args]};
+    "--property=CPUQuota=100%","--property=MemoryMax=2G","--property=MemorySwapMax=0",...args]};
 }
