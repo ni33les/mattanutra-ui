@@ -26,6 +26,16 @@ mock.module('../../lib/matcher/safety.ts', { namedExports: { ...safetyModule, la
 const { request } = await import('../matcher/flexible-v5-fixtures.ts');
 const { doseFitScore, numericalDoseFitScore, exactDoseFit, compareDoseFit, weightedDoseFitScore, numericalWeightedDoseFitScore } = await import('../../lib/matcher/dose-fit.ts');
 
+test('PERF-CPU-64 physical breakpoint preparation reuses its verified minimum-quantity exposure', async () => {
+  const { supportedDoseDomain } = await import('../../lib/matcher/candidates.ts');
+  const { product } = await import('../matcher/flexible-v5-fixtures.ts');
+  const input = request({ safetyCeilings: [{ subjectId: 'a', name: 'A', maxAmount: 125, maxUnit: 'mg', sourceScope: 'supplemental' }] });
+  labelExposureBuilds = 0;
+  const quantities = supportedDoseDomain(product('a-dose', { a: 25 }), input);
+  assert.deepEqual(quantities, [1n, 2n, 3n, 4n, 5n, 6n].map(num => ({ num, den: 1n })));
+  assert.equal(labelExposureBuilds, 1, 'The already verified minimum quantity owns the same label exposure needed for reference breakpoints');
+});
+
 test('PERF-CPU-63 unrelated listings do not compile unusable physical quantities', async () => {
   const { compileGroups } = await import('../../lib/matcher/candidates.ts');
   const { product, catalog } = await import('../matcher/flexible-v5-fixtures.ts');
