@@ -63,11 +63,12 @@ type ResolvedLabelledFact = Readonly<{
 
 // Requests and catalogue products are immutable during matching. Keep identity
 // resolution within that lifetime, including revisions and changed fact evidence.
-const labelledFactMemo = new WeakMap<CanonicalRequest, WeakMap<MatcherProduct, readonly ResolvedLabelledFact[]>>();
+const labelledFactMemo = new WeakMap<CanonicalRequest, { products: WeakMap<MatcherProduct, readonly ResolvedLabelledFact[]>; subjects: Map<string, string> }>();
 
 function resolvedLabelledFacts(product: MatcherProduct, request?: CanonicalRequest): readonly ResolvedLabelledFact[] {
   let session = request ? labelledFactMemo.get(request) : undefined;
-  const cached = session?.get(product);
+  if (request && !session) { session = { products: new WeakMap(), subjects: new Map() }; labelledFactMemo.set(request, session); }
+  const cached = session?.products.get(product);
   if (cached) return cached;
   const facts: ResolvedLabelledFact[] = [];
 
@@ -76,16 +77,21 @@ function resolvedLabelledFacts(product: MatcherProduct, request?: CanonicalReque
       continue;
     }
 
-    const target = request?.targets.find((row) =>
-      nutrientNameMatchesTarget(row.name, fact.name));
-    const current = request?.currentSupplements.find((row) =>
-      nutrientNameMatchesTarget(row.name, fact.name));
-    const reference = request?.safetyCeilings?.find((row) =>
-      row.subjectId === fact.subjectId || productKeysMatch(row.name, fact.name));
-    const resolvedId = target?.subjectId ?? current?.subjectId ?? reference?.subjectId ??
-      (fact.subjectId || canonicalNutrientKey(fact.name)).trim();
-    const conflictsWithTarget = request?.targets.some((row) => row.subjectId === resolvedId && !nutrientNameMatchesTarget(row.name, fact.name));
-    const subjectId = conflictsWithTarget ? `incidental:${canonicalNutrientKey(fact.name)}` : resolvedId;
+    const key = JSON.stringify([fact.subjectId, fact.name]);
+    let subjectId = session?.subjects.get(key);
+    if (subjectId === undefined) {
+      const target = request?.targets.find((row) =>
+        nutrientNameMatchesTarget(row.name, fact.name));
+      const current = request?.currentSupplements.find((row) =>
+        nutrientNameMatchesTarget(row.name, fact.name));
+      const reference = request?.safetyCeilings?.find((row) =>
+        row.subjectId === fact.subjectId || productKeysMatch(row.name, fact.name));
+      const resolvedId = target?.subjectId ?? current?.subjectId ?? reference?.subjectId ??
+        (fact.subjectId || canonicalNutrientKey(fact.name)).trim();
+      const conflictsWithTarget = request?.targets.some((row) => row.subjectId === resolvedId && !nutrientNameMatchesTarget(row.name, fact.name));
+      subjectId = conflictsWithTarget ? `incidental:${canonicalNutrientKey(fact.name)}` : resolvedId;
+      session?.subjects.set(key, subjectId);
+    }
 
     if (!subjectId) {
       continue;
@@ -107,13 +113,7 @@ function resolvedLabelledFacts(product: MatcherProduct, request?: CanonicalReque
     });
   }
 
-  if (request) {
-    if (!session) {
-      session = new WeakMap();
-      labelledFactMemo.set(request, session);
-    }
-    session.set(product, facts);
-  }
+  session?.products.set(product, facts);
   return facts;
 }
 
