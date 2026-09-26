@@ -1,4 +1,5 @@
 /** Public connector documents and responses are this client's only contract source. */
+import { validationContractIdentity } from "./dev-validation-proof.mjs";
 export function contractFromToolDiscovery(info, tools, guide) {
   const examples = [];
   for (const match of guide.matchAll(/^### ([^\n]+)\n+(?:(\w+)\n+)?```json\n([\s\S]*?)\n```/gm)) {
@@ -27,7 +28,10 @@ export async function runConversationalJourney({ rpc, locale = "en", discovery =
   const { default: Ajv } = await import("ajv");
   const assert = (await import("node:assert/strict")).default;
   const listing = await rpc("tools/list", {});
-  assert.equal(listing.contractVersion, "11.0.0"); assert.equal(listing.tools.length, 6);
+  const expected = validationContractIdentity();
+  assert.equal(listing.contractVersion, expected.contractVersion);
+  assert.equal(listing.schemaChecksum, expected.schemaChecksum);
+  assert.equal(listing.tools.length, 6);
   const nameOf = name => listing.tools.find(row => row.name === name || row.name.endsWith(`___${name}`))?.name;
   const ajv = new Ajv({ multipleOfPrecision: 8, strict: false, allErrors: true, validateFormats: false, useDefaults: false });
   const schemas = new Map(listing.tools.map(row => [row.name, { input: ajv.compile(row.inputSchema), output: ajv.compile(row.outputSchema) }]));

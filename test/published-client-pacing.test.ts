@@ -42,7 +42,9 @@ it("ANNA-CLIENT-PACE-03 clears the earlier public window in bounded waits before
   assert.ok(waits.every(value => value > 0 && value <= 60_000));
   const gate = readFileSync("scripts/run-dev-advisory-validation.mjs", "utf8");
   const cooldown = gate.indexOf('run("documented-client-rate-window"');
-  assert.ok(cooldown > gate.indexOf('run("matcher-two-runs"'));
+  const canonical = gate.indexOf('run("test-full"');
+  assert.ok(canonical >= 0);
+  assert.ok(cooldown > canonical);
   assert.ok(cooldown < gate.indexOf("of validationClientMatrix()"));
   assert.match(gate.slice(cooldown, gate.indexOf("of validationClientMatrix()")), /published-client-pacing\.mjs.*--clear-window/);
   const { REQUIRED_VALIDATION_STAGES } = await import("../scripts/dev-validation-proof.mjs");

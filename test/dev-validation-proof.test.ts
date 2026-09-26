@@ -36,7 +36,8 @@ function evidence() {
     comparisons: fixtures.map(row => ({ file: row.artifact, identical: true })) };
   named["full-suite/semantic-replay.json"] = replay;
   named["full-suite/results.json"] = { passed: true, unchangedSource: true, sourceSha256: source, semanticReplay: replay,
-    results: labels.map((label, index) => ({ label, passed: true, args: ["--test", ...selections[index]] })) };
+    results: [...labels.map((label, index) => ({ label, passed: true, args: ["--test", ...selections[index]] })),
+      { label: "browser-discovery", passed: true, args: ["--list"] }, { label: "browser", passed: true, args: ["--retries=0", "--workers=1"] }] };
   const lines = Object.fromEntries(labels.flatMap((label, index) => [
     [`full-suite/${label}-events.jsonl`, events(selections[index]).map(row => JSON.stringify(row)).join("\n") + "\n"],
     [`full-suite/${label}-timings.jsonl`, events(selections[index]).map(row => JSON.stringify({ ...row, durationMs: 1 })).join("\n") + "\n"]

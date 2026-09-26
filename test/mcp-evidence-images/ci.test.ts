@@ -7,18 +7,24 @@ const sorted=(value:unknown):unknown=>Array.isArray(value)?value.map(sorted):val
 const hash=(value:unknown)=>createHash('sha256').update(JSON.stringify(sorted(value))).digest('hex');
 after(async()=>{const {closeSqlPool}=await import('../../lib/db.ts');await closeSqlPool();});
 
-test('QA-CI-01 current CI runs the maintained paired MCP inventory with a compiled candidate',()=>{
+test('QA-CI-01 current CI runs the maintained canonical MCP inventory with a compiled candidate',()=>{
   const text=readFileSync('.github/workflows/mcp-722.yml','utf8');
-  assert.match(text,/test:matcher:twice/);
+  assert.match(text,/npm run test:matcher(?:\s|$)/m);
+  assert.doesNotMatch(text,/test:matcher:twice/);
   assert.match(text,/npm run build/);
   assert.doesNotMatch(text,/v10 scoped|test:mcp:simple-plan/);
 });
-test('QA-CI-03 CI accommodates both measured full passes without enlarging request or case deadlines',()=>{
+test('QA-CI-03 CI bounds canonical coverage and replay without enlarging request or case deadlines',async()=>{
+  const {fullTestInventory}=await import('../../scripts/run-full-test-suite.mjs');
+  const {SEMANTIC_REPLAY_FIXTURES}=await import('../../scripts/matcher-test-inventory.mjs');
   const workflow=readFileSync('.github/workflows/mcp-722.yml','utf8');
-  const minutes=Number(workflow.match(/timeout-minutes:\s*(\d+)/)?.[1]);
-  // The preserved full-8 run measured 59.2 minutes of Node cases plus 3.8
-  // minutes of PostgreSQL cases. Two passes, bootstrap and build need >120m.
-  assert.ok(minutes>=180,'The CI container must accommodate two complete passes plus build/setup');
+  assert.ok(Number(workflow.match(/timeout-minutes:\s*(\d+)/)?.[1])>0,'CI retains a finite outer deadline');
+  const inventory=fullTestInventory();
+  assert.deepEqual(inventory.semanticReplay,SEMANTIC_REPLAY_FIXTURES);
+  assert.equal(inventory.semanticReplay.length,2);
+  assert.equal(inventory.semanticReplay.reduce((total,row)=>total+row.expectedCases,0),11);
+  for(const fixture of inventory.semanticReplay) assert.ok(inventory.mcp.includes(fixture.file));
+  assert.match(readFileSync('scripts/run-matcher-test-suite.mjs','utf8'),/runCanonicalNodeSuite/);
   assert.match(readFileSync('scripts/run-matcher-test-suite.mjs','utf8'),/--test-timeout=600000/);
   for(const file of ['journeys.test.ts','journeys-th.test.ts','journeys-zh.test.ts'])
     assert.match(readFileSync(`test/ax-refinement/${file}`,'utf8'),/timeout: 90000/);

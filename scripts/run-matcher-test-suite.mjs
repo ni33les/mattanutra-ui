@@ -4,7 +4,7 @@ import { createHash } from "node:crypto";
 import { createWriteStream, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { cloneIsolatedDatabase, fullTestInventory, isolatedDatabasePreflight, runBatch, runNodePair, sourceManifest, testSourceHygiene } from "./run-full-test-suite.mjs";
+import { cloneIsolatedDatabase, fullTestInventory, isolatedDatabasePreflight, runBatch, runNodePair, runCanonicalNodeSuite, sourceManifest, testSourceHygiene } from "./run-full-test-suite.mjs";
 import { isolatedValidationEnvironment } from "./run-dev-advisory-validation.mjs";
 import { normalizePublishedClientResult } from "./published-client-semantics.mjs";
 import { unclassifiedMatcherConsumers } from "./matcher-test-inventory.mjs";
@@ -61,7 +61,7 @@ export async function runMatcherBatches({ common, evidence, inventory, args, run
 async function main() {
   process.chdir(ROOT);
   const all = fullTestInventory();
-  const inventory = { version: 1, groups: all.matcherGroups, files: all.mcp, integration: all.mcp.filter(file => all.integration.includes(file)) };
+  const inventory = { version: 2, groups: all.matcherGroups, files: all.mcp, integration: all.mcp.filter(file => all.integration.includes(file)), semanticReplay: all.semanticReplay };
   if (process.argv.includes("--list")) { console.log(JSON.stringify(inventory, null, 2)); return; }
   const problems = isolatedDatabasePreflight(process.env);
   if (!inventory.files.length || !inventory.integration.length || Object.values(inventory.groups).some(files => !files.length)) problems.push("Matcher inventory unexpectedly omitted a subsystem");
@@ -104,9 +104,18 @@ async function main() {
   if (runs.length === 2 && (initialInputs.a.database === initialInputs.b.database ||
       initialInputs.a.schemaSha256 !== initialInputs.b.schemaSha256 || initialInputs.a.catalogueSha256 !== initialInputs.b.catalogueSha256)) throw new Error("Acceptance runs do not have independent identical initial inputs");
   writeFileSync(join(evidence, "independent-initial-state.json"), JSON.stringify(initialInputs, null, 2), { flag: "wx" });
-  const results = [prerequisites, fixture, fingerprints, ...preparations,
-    ...await runMatcherBatches({ common, environments, evidence, inventory, args, runs })];
-  let identicalNonLatency = null;
+  const results = [prerequisites, fixture, fingerprints, ...preparations];
+  let semanticReplay = null;
+  if (runs.length === 1) {
+    const canonical = await runCanonicalNodeSuite({ common: environments.a, evidence,
+      inventory: { ...inventory, node: inventory.files }, args, start: startHttpCandidate, sourceSha256: before.sha256 });
+    results.push(...canonical.results);
+    semanticReplay = canonical.semanticReplay;
+  } else {
+    // Explicit --twice remains a manual diagnostic; CI and release use canonical coverage.
+    results.push(...await runMatcherBatches({ common, environments, evidence, inventory, args, runs }));
+  }
+  let identicalNonLatency = semanticReplay?.identicalNonLatency ?? null;
   if (runs.length === 2) {
     const canonical = run => ["node-matcher", "node-matcher-postgres"].flatMap(batch => readFileSync(join(evidence, `${batch}-${run}-events.jsonl`), "utf8").trim().split("\n").filter(Boolean).map(line => JSON.stringify(JSON.parse(line)))).sort();
     const a = canonical("a"), b = canonical("b");
@@ -125,7 +134,7 @@ async function main() {
   } catch (error) { semanticComparison = { files: semanticFiles, runs: runs.length, passed: false, error: error.message }; }
   const after = sourceManifest(), unchangedSource = before.sha256 === after.sha256;
   writeFileSync(join(evidence, "source-after.json"), JSON.stringify(after, null, 2), { flag: "wx" });
-  const result = { results, sourceCommit, sourceSha256: before.sha256, inventorySha256, unchangedSource, identicalNonLatency, semanticComparison, initialInputs,
+  const result = { results, sourceCommit, sourceSha256: before.sha256, inventorySha256, unchangedSource, identicalNonLatency, semanticComparison, semanticReplay, initialInputs,
     passed: unchangedSource && semanticComparison.passed && identicalNonLatency !== false && results.every(row => row.passed) };
   writeFileSync(join(evidence, "results.json"), JSON.stringify(result, null, 2), { flag: "wx" });
   console.log(JSON.stringify({ evidence, passed: result.passed, unchangedSource, identicalNonLatency }));

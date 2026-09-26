@@ -11,5 +11,5 @@ test('SPLAN-REL-01 historical scoped entry points remain available; current CI r
   const stages = packageStages('simple-plan');
   assert.ok(stages.includes('documented-journeys-paired')); assert.ok(stages.includes('no-new-locks'));
   assert.ok(!stages.includes('complete-mcp-regression'));
-  assert.match(readFileSync('.github/workflows/mcp-722.yml', 'utf8'), /test:matcher:twice/);
+  assert.match(readFileSync('.github/workflows/mcp-722.yml', 'utf8'), /npm run test:matcher(?:\s|$)/m);
 });

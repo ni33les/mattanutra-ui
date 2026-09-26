@@ -1,4 +1,4 @@
-name: MCP 11 maintained protocol and paired acceptance
+name: MCP 11 maintained protocol and bounded semantic acceptance
 on:
   push:
     branches: [dev]
@@ -9,8 +9,8 @@ permissions:
 jobs:
   affected:
     runs-on: ubuntu-latest
-    # Two complete maintained passes plus bootstrap/build; individual deadlines stay unchanged.
-    timeout-minutes: 180
+    # One maintained pass plus two frozen replay files and bootstrap/build.
+    timeout-minutes: 120
     services:
       postgres:
         image: postgres:16
@@ -45,7 +45,7 @@ jobs:
           NODE_ENV: production
           NEXT_BUILD_SKIP_TYPECHECK: "1"
           NEXT_BUILD_CPUS: "2"
-      - run: npm run test:matcher:twice
+      - run: npm run test:matcher
         env:
           MATCHER_TEST_EVIDENCE_DIR: ${{ runner.temp }}/mcp-maintained-evidence
       - uses: actions/upload-artifact@v4

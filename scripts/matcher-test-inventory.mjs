@@ -1,7 +1,7 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 
-/** Maintained by subsystem, so new suites in a supported family join every replay. */
+/** Maintained by subsystem, so new suites in a supported family join canonical coverage. */
 export const MATCHER_TEST_FAMILIES = Object.freeze({
   core: /^test\/(?:matcher(?:\/|-)|practical-matching\/)/,
   connector: /^test\/(?:agentic(?:\/|-)|mcp-|simple-plan\/|published-client-)/,
@@ -12,6 +12,24 @@ export const MATCHER_TEST_FAMILIES = Object.freeze({
   refinementInfrastructure: /^test\/(?:ax-refinement|service-efficiency)\//,
   infrastructure: /^test\/(?:code-quality-deduplication|full-test-suite-discovery|mcp-test-discovery|latency-acceptance-policy|dev-advisory-validation|dev-validation-(?:proof|fingerprints))/
 });
+
+/** These frozen, in-memory fixtures retain business equality without replaying every suite. */
+export const SEMANTIC_REPLAY_FIXTURES = Object.freeze([
+  Object.freeze({ file: "test/mcp-evidence-images/contracts.test.ts", artifact: "real-plan-journey.json", expectedCases: 7,
+    reason: "Frozen real-product create, refine and read preserve images, quantities, prices and delivery equality.",
+    inputs: ["test/fixtures/mcp-evidence-images/manifest.json", "test/fixtures/mcp-evidence-images/dev-20260911.json.gz"] }),
+  Object.freeze({ file: "test/simple-plan/documented.test.ts", artifact: "documented-inventory-run.json", expectedCases: 4,
+    reason: "Documented clients use independent memory stores and frozen catalogues across three locales and checkout recovery.",
+    inputs: ["lib/agentic/catalogue/fixtures.ts", "test/helpers/gold-catalogue.ts"] })
+]);
+
+/** Reviewed pure functions: no shared database, HTTP executor or filesystem writes. */
+export const INDEPENDENT_NODE_TESTS = Object.freeze([
+  "test/bounded-lru.test.ts", "test/sha256.test.ts", "test/dose-conversion.test.ts",
+  "test/food-nutrients.test.ts", "test/food-tags.test.ts", "test/plan-feedback.test.ts",
+  "test/vo2-estimate.test.ts", "test/product-form.test.ts", "test/nutrient-identity.test.ts",
+  "test/task-sequence.test.ts", "test/retail-order-workflow-rules.test.ts"
+]);
 
 export function isNodeTestFile(file) {
   return /\.test\.(?:[cm]?[jt]s|[jt]sx)$/.test(file);

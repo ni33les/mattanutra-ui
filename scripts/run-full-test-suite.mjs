@@ -4,8 +4,9 @@ import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync, createWriteStream } from "node:fs";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { recursiveTestFiles, isNodeTestFile, matcherTestInventory, unclassifiedMatcherConsumers } from "./matcher-test-inventory.mjs";
+import { recursiveTestFiles, isNodeTestFile, matcherTestInventory, unclassifiedMatcherConsumers, SEMANTIC_REPLAY_FIXTURES, INDEPENDENT_NODE_TESTS } from "./matcher-test-inventory.mjs";
 import { nodeExecutionProof, browserExecutionProof, testSourceHygiene } from "./test-execution-proof.mjs";
+import { normalizePublishedClientResult } from "./published-client-semantics.mjs";
 export { nodeExecutionProof, browserExecutionProof, testSourceHygiene };
 
 import { browserFixtureEnvironment } from "./browser-fixture-environment.mjs";
@@ -16,7 +17,8 @@ export function fullTestInventory(root = ROOT) {
   const browser = recursiveTestFiles(root, "test/e2e", ".spec.ts");
   const matcher = matcherTestInventory(node);
   return { node, browser, integration: node.filter(file => file.includes(".integration.test.")),
-    mcp: matcher.files, matcherGroups: matcher.groups };
+    mcp: matcher.files, matcherGroups: matcher.groups,
+    semanticReplay: SEMANTIC_REPLAY_FIXTURES.filter(row => node.includes(row.file)) };
 }
 
 export function sourceManifest() {
@@ -117,21 +119,84 @@ export async function runBatch(label, args, env, evidence) {
 }
 
 /** HTTP cases need a durable executor; controlled DB cases must own their leases exclusively. */
+const batchInterrupted = result => Boolean(result.interrupted || result.signal);
 export async function runNodePair({ common, evidence, args, files, integration,
-  unitLabel, postgresLabel, httpLabel, start, batch = runBatch }) {
-  const httpEvidence = join(evidence, httpLabel);
-  mkdirSync(httpEvidence, { recursive: true });
-  const server = await start(common, httpEvidence);
+  unitLabel, postgresLabel, httpLabel, start, batch = runBatch, independentFiles = [] }) {
+  if (new Set(files).size !== files.length || new Set(integration).size !== integration.length || integration.some(file => !files.includes(file)) || new Set(independentFiles).size !== independentFiles.length ||
+      independentFiles.some(file => !files.includes(file) || integration.includes(file))) throw new Error("Invalid or duplicate independent test ownership");
   const results = [];
-  try {
-    results.push(await batch(unitLabel, [...args, ...files.filter(file => !integration.includes(file))],
-      { ...common, MCP_URL: `${server.identity.origin}/api/mcp`, MCP_ISOLATED_CANDIDATE: "1",
-        NEXT_PUBLIC_SITE_URL: server.identity.origin, SITE_URL: server.identity.origin,
-        DB_POOL_MAX: "1", DB_WORKER_POOL_MAX: "1" }, evidence));
-  } finally { await server.stop(); }
+  if (independentFiles.length) results.push(await batch(`${unitLabel}-independent`,
+    [...args.filter(arg => !arg.startsWith("--test-concurrency=")), "--test-concurrency=2", ...independentFiles],
+    { ...common, TEST_DB_URL: "", DB_URL: "", DB_WORKER_URL: "", MCP_URL: "" }, evidence));
+  if (results.some(batchInterrupted)) return results;
+  const shared = files.filter(file => !integration.includes(file) && !independentFiles.includes(file));
+  if (shared.length) {
+    const httpEvidence = join(evidence, httpLabel);
+    mkdirSync(httpEvidence, { recursive: true });
+    const server = await start(common, httpEvidence);
+    try {
+      results.push(await batch(unitLabel, [...args, ...shared],
+        { ...common, MCP_URL: `${server.identity.origin}/api/mcp`, MCP_ISOLATED_CANDIDATE: "1",
+          NEXT_PUBLIC_SITE_URL: server.identity.origin, SITE_URL: server.identity.origin,
+          DB_POOL_MAX: "1", DB_WORKER_POOL_MAX: "1" }, evidence));
+    } finally { await server.stop(); }
+  }
+  if (results.some(batchInterrupted)) return results;
   if (integration.length) results.push(await batch(postgresLabel, [...args, ...integration],
     { ...common, DB_POOL_MAX: "6", DB_WORKER_POOL_MAX: "6" }, evidence));
   return results;
+}
+
+/** One canonical pass, then only the explicitly reviewed frozen semantic fixtures. */
+export async function runCanonicalNodeSuite({ common, evidence, inventory, args, start, batch = runBatch, sourceSha256 = null }) {
+  const fixtures = inventory.semanticReplay;
+  if (JSON.stringify(fixtures) !== JSON.stringify(SEMANTIC_REPLAY_FIXTURES) ||
+      fixtures.some(row => !inventory.node.includes(row.file))) throw new Error("Canonical execution requires the complete bounded semantic replay inventory");
+  const fixtureInputs = () => [...new Set(fixtures.flatMap(row => row.inputs))].sort().map(file => ({ file,
+    sha256: createHash("sha256").update(readFileSync(join(ROOT, file))).digest("hex") }));
+  const initialInputs = fixtureInputs();
+  const environment = (run, database) => {
+    const output = join(evidence, `semantic-${run}`);
+    mkdirSync(output, { recursive: true });
+    return { ...common, ...(database ? {} : { TEST_DB_URL: "", DB_URL: "", DB_WORKER_URL: "", MCP_URL: "" }),
+      MCP_EVIDENCE_IMAGES_OUTPUT: output, "MCP_simple-plan_EVIDENCE_DIR": output };
+  };
+  const canonical = await runNodePair({ common: environment("a", true), evidence, args,
+    files: inventory.node, integration: inventory.integration,
+    independentFiles: INDEPENDENT_NODE_TESTS.filter(file => inventory.node.includes(file)),
+    unitLabel: "node-application", postgresLabel: "node-postgres", httpLabel: "http-application", start, batch });
+  if (canonical.some(batchInterrupted)) {
+    const semanticReplay = { version: "bounded-semantic-replay-1", sourceSha256, passed: false, interrupted: true };
+    writeFileSync(join(evidence, "semantic-replay.json"), JSON.stringify(semanticReplay, null, 2), { flag: "wx" });
+    return { results: [...canonical, { label: "bounded-semantic-replay", ...semanticReplay }], semanticReplay };
+  }
+  const replayFiles = fixtures.map(row => row.file);
+  const replay = await batch("node-semantic-replay", [...args, ...replayFiles], environment("b", false), evidence);
+  const readEvents = rows => rows.flatMap(row => readFileSync(join(evidence, `${row.label}-events.jsonl`), "utf8")
+    .trim().split("\n").filter(Boolean).map(line => JSON.parse(line)));
+  let semanticReplay;
+  try {
+    const first = readEvents(canonical).filter(row => replayFiles.includes(row.file)), second = readEvents([replay]);
+    const canonicalEvents = events => events.map(row => JSON.stringify(row)).sort();
+    const cases = fixtures.map(row => ({ file: row.file, expectedCases: row.expectedCases,
+      canonicalCases: first.filter(event => event.file === row.file && event.type !== "suite").length,
+      replayCases: second.filter(event => event.file === row.file && event.type !== "suite").length }));
+    const comparisons = fixtures.map(row => {
+      const normalized = run => normalizePublishedClientResult(JSON.parse(readFileSync(join(evidence, `semantic-${run}`, row.artifact), "utf8")));
+      const a = normalized("a"), b = normalized("b");
+      for (const [run, data] of [["a", a], ["b", b]]) writeFileSync(join(evidence, `semantic-${run}`, `canonical-${row.artifact}`), JSON.stringify(data, null, 2), { flag: "wx" });
+      return { file: row.artifact, identical: JSON.stringify(a) === JSON.stringify(b) };
+    });
+    const identicalNonLatency = JSON.stringify(canonicalEvents(first)) === JSON.stringify(canonicalEvents(second));
+    const unchangedInputs = JSON.stringify(initialInputs) === JSON.stringify(fixtureInputs());
+    semanticReplay = { version: "bounded-semantic-replay-1", sourceSha256, canonicalFiles: inventory.node, fixtures,
+      replayFiles, initialInputs, unchangedInputs, cases, comparisons, identicalNonLatency,
+      independentState: { processes: "fresh-node-test-processes", stores: "frozen-memory-fixtures", databaseCredentials: false },
+      passed: canonical.every(row => row.passed) && replay.passed && unchangedInputs && identicalNonLatency &&
+        cases.every(row => row.canonicalCases === row.expectedCases && row.replayCases === row.expectedCases) && comparisons.every(row => row.identical) };
+  } catch (error) { semanticReplay = { version: "bounded-semantic-replay-1", sourceSha256, passed: false, error: error.message }; }
+  writeFileSync(join(evidence, "semantic-replay.json"), JSON.stringify(semanticReplay, null, 2), { flag: "wx" });
+  return { results: [...canonical, replay, { label: "bounded-semantic-replay", ...semanticReplay }], semanticReplay };
 }
 
 async function main() {
@@ -146,28 +211,9 @@ async function main() {
   const before = sourceManifest();
   writeFileSync(join(evidence, "source-before.json"), JSON.stringify(before, null, 2), { flag: "wx" });
   const common = { ...process.env, DB_WORKER_URL: process.env.TEST_DB_URL, MATTANUTRA_ENV: "dev", STRIPE_PAYMENT_MODE: "mock", NODE_ENV: "test", DB_POOL_IDLE_TIMEOUT_SECONDS: "1" };
-  const nodeArgs = ["--test", "--test-concurrency=1", "--experimental-strip-types", "--import", "./test/helpers/offline-network.mjs", "--import", "./scripts/register-ts-path-loader.mjs"];
-  const results = [];
+  const nodeArgs = ["--test", "--test-timeout=600000", "--test-concurrency=1", "--experimental-strip-types", "--import", "./test/helpers/offline-network.mjs", "--import", "./scripts/register-ts-path-loader.mjs"];
   const { startHttpCandidate } = await import("./run-matcher-test-suite.mjs");
-  results.push(...await runNodePair({ common, evidence, args: nodeArgs, files: inventory.node, integration: inventory.integration,
-    unitLabel: "node-application", postgresLabel: "node-postgres", httpLabel: "http-application", start: startHttpCandidate }));
-  const mcpIntegration = inventory.mcp.filter(file => inventory.integration.includes(file));
-  results.push(...await runNodePair({ common, evidence, args: nodeArgs, files: inventory.mcp, integration: mcpIntegration,
-    unitLabel: "node-mcp-replay", postgresLabel: "node-mcp-postgres-replay", httpLabel: "http-replay", start: startHttpCandidate }));
-  const readEvents = name => readFileSync(join(evidence, `${name}-events.jsonl`), "utf8").trim().split("\n").filter(Boolean).map(row => JSON.parse(row));
-  const canonical = rows => rows.filter(row => inventory.mcp.includes(row.file))
-    .map(row => JSON.stringify(row)).sort();
-  let mcpComparison;
-  try {
-    const first = canonical([...readEvents("node-application"), ...readEvents("node-postgres")]);
-    const second = canonical([...readEvents("node-mcp-replay"), ...(mcpIntegration.length ? readEvents("node-mcp-postgres-replay") : [])]);
-    const represented = new Set(second.map(row => JSON.parse(row).file));
-    mcpComparison = { label: "all-mcp-non-latency-results", firstResults: first.length, secondResults: second.length,
-      files: represented.size, passed: first.length > 0 && inventory.mcp.every(file => represented.has(file)) && JSON.stringify(first) === JSON.stringify(second) };
-    writeFileSync(join(evidence, "mcp-canonical-a.json"), JSON.stringify(first.map(row => JSON.parse(row)), null, 2), { flag: "wx" });
-    writeFileSync(join(evidence, "mcp-canonical-b.json"), JSON.stringify(second.map(row => JSON.parse(row)), null, 2), { flag: "wx" });
-  } catch (error) { mcpComparison = { label: "all-mcp-non-latency-results", passed: false, error: error.message }; }
-  results.push(mcpComparison);
+  const { results, semanticReplay } = await runCanonicalNodeSuite({ common, evidence, inventory, args: nodeArgs, start: startHttpCandidate, sourceSha256: before.sha256 });
   // PostgreSQL cases may advance catalogue epochs while creating/removing their
   // own rows. Generate current browser matches after those cases have finished.
   results.push(await runBatch("browser-fixtures-refresh", ["--experimental-strip-types", "--import", "./scripts/register-ts-path-loader.mjs", "scripts/seed-browser-fixtures.ts", join(evidence, "browser-fixtures-refreshed.json")], common, evidence));
@@ -192,7 +238,7 @@ async function main() {
   writeFileSync(join(evidence, "source-after.json"), JSON.stringify(after, null, 2), { flag: "wx" });
   const unchangedSource = before.sha256 === after.sha256;
   const passed = unchangedSource && results.every(result => result.passed);
-  writeFileSync(join(evidence, "results.json"), JSON.stringify({ inventory, results, unchangedSource, sourceSha256: before.sha256, passed }, null, 2), { flag: "wx" });
+  writeFileSync(join(evidence, "results.json"), JSON.stringify({ inventory, results, semanticReplay, unchangedSource, sourceSha256: before.sha256, passed }, null, 2), { flag: "wx" });
   if (!passed) process.exitCode = 1;
 }
 

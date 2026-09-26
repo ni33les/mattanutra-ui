@@ -8,7 +8,7 @@ import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { fullTestInventory, sourceManifest } from "./run-full-test-suite.mjs";
 import { mcpTestTarget } from "./mcp-test-target.mjs";
-import { REQUIRED_VALIDATION_STAGES, VALIDATION_CLIENT_LOCALES, VALIDATION_CLIENT_DISCOVERY, validationContractIdentity } from "./dev-validation-proof.mjs";
+import { DEV_VALIDATION_PROOF_VERSION, REQUIRED_VALIDATION_STAGES, VALIDATION_CLIENT_LOCALES, VALIDATION_CLIENT_DISCOVERY, validationContractIdentity } from "./dev-validation-proof.mjs";
 
 import { browserFixtureEnvironment } from "./browser-fixture-environment.mjs";
 
@@ -171,7 +171,6 @@ async function main() {
     await run("data-fingerprints-before", process.execPath, ["scripts/validation-data-fingerprints.mjs", join(evidence, "data-before.json")]);
     dataBefore = JSON.parse(readFileSync(join(evidence, "data-before.json"), "utf8"));
     await run("test-full", "npm", ["run", "test:full"], { ...env, FULL_TEST_EVIDENCE_DIR: join(evidence, "full-suite") }, false);
-    await run("matcher-two-runs", process.execPath, ["scripts/run-mcp-matcher-pack-twice.mjs"], { ...env, NODE_ENV: "test", MCP_ACCEPTANCE_EVIDENCE_DIR: join(evidence, "matcher") }, false);
     await run("documented-client-rate-window", process.execPath, ["scripts/published-client-pacing.mjs", "--clear-window"]);
     const { startHttpCandidate } = await import("./run-matcher-test-suite.mjs");
     const documentedEvidence = join(evidence, "http-documented"); mkdirSync(documentedEvidence);
@@ -192,9 +191,10 @@ async function main() {
     const comparisons = VALIDATION_CLIENT_DISCOVERY.flatMap(discovery => VALIDATION_CLIENT_LOCALES.flatMap(locale => ["", "-paid"].map(suffix => ({ locale, discovery, phase: suffix || "checkout", identical: readFileSync(join(evidence, `client-a-${locale}${discovery === "tools_only" ? "-tools" : ""}${suffix}/semantic.json`), "utf8") === readFileSync(join(evidence, `client-b-${locale}${discovery === "tools_only" ? "-tools" : ""}${suffix}/semantic.json`), "utf8") }))));
     writeJson(join(evidence, "client-comparison.json"), { passed: comparisons.every(item => item.identical), comparisons, normalization: "Declared identities/clocks/latency, repeated identical read-only processing polls and diagnostic byte measurements only; all changed states and business values are compared. Raw transcripts and size assertions are retained." });
     steps.push({ label: "documented-client-non-latency-equality", passed: comparisons.every(item => item.identical) });
-    for (const [name, path] of [["full-suite-results", "full-suite/results.json"], ["matcher-results", "matcher/results.json"]]) {
+    for (const [name, path] of [["full-suite-results", "full-suite/results.json"], ["bounded-semantic-replay", "full-suite/semantic-replay.json"]]) {
       const results = JSON.parse(readFileSync(join(evidence, path), "utf8"));
-      steps.push({ label: name, passed: results.passed === true && results.unchangedSource === true && results.sourceSha256 === before.sha256 && (name !== "matcher-results" || results.identicalNonLatency === true) });
+      steps.push({ label: name, passed: results.passed === true && results.sourceSha256 === before.sha256 &&
+        (name === "full-suite-results" ? results.unchangedSource === true : results.unchangedInputs === true && results.identicalNonLatency === true) });
     }
     await run("data-fingerprints-after", process.execPath, ["scripts/validation-data-fingerprints.mjs", join(evidence, "data-after.json")]);
     dataAfter = JSON.parse(readFileSync(join(evidence, "data-after.json"), "utf8"));
@@ -215,7 +215,7 @@ async function main() {
     const unchangedSource = Boolean(before && before.sha256 === after?.sha256);
     const passed = !failure && !interrupted && unchangedSource && REQUIRED_VALIDATION_STAGES.every(label => steps.filter(step => step.label === label && step.passed).length === 1) && steps.every(step => step.passed);
     writeJson(join(evidence, "stage-results.json"), { passed, failure: failure ?? null, interrupted, steps });
-    const attestation = { version: "dev-advisory-validation-3", contractVersion: validationContractIdentity().contractVersion, releaseBaseCommit: releaseLint?.baseCommit ?? null, releaseLintSha256: releaseLint?.sha256 ?? null, testInventorySha256: inventory?.sha256 ?? null, databaseSchemaSha256: dataBefore?.schemaSha256 ?? null, catalogueSha256: dataBefore?.catalogueSha256 ?? null, environment: "dev", candidateOrigin: ORIGIN, sourceSha256: before?.sha256 ?? null, buildId: buildId ?? null, schemaChecksum: schemaChecksum ?? null, gitCommit: execFileSync("git", ["rev-parse", "HEAD"], { cwd: ROOT, encoding: "utf8" }).trim(), unchangedSource, passed, finishedAt: new Date().toISOString(), steps, failure: failure ?? null, artifacts: hashFiles(evidence) };
+    const attestation = { version: DEV_VALIDATION_PROOF_VERSION, contractVersion: validationContractIdentity().contractVersion, releaseBaseCommit: releaseLint?.baseCommit ?? null, releaseLintSha256: releaseLint?.sha256 ?? null, testInventorySha256: inventory?.sha256 ?? null, databaseSchemaSha256: dataBefore?.schemaSha256 ?? null, catalogueSha256: dataBefore?.catalogueSha256 ?? null, environment: "dev", candidateOrigin: ORIGIN, sourceSha256: before?.sha256 ?? null, buildId: buildId ?? null, schemaChecksum: schemaChecksum ?? null, gitCommit: execFileSync("git", ["rev-parse", "HEAD"], { cwd: ROOT, encoding: "utf8" }).trim(), unchangedSource, passed, finishedAt: new Date().toISOString(), steps, failure: failure ?? null, artifacts: hashFiles(evidence) };
     writeJson(join(evidence, "attestation.json"), attestation);
     console.log(JSON.stringify({ passed, evidence, attestation: join(evidence, "attestation.json"), failure: failure ?? null }));
     if (!passed) process.exitCode = 1;

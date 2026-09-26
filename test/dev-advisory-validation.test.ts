@@ -155,7 +155,8 @@ it("FULL-CYCLE-02 readiness and attestation identify the current published contr
   const validation = await import("../scripts/run-dev-advisory-validation.mjs");
   const identity = (validation as unknown as { validationContractIdentity: () => { contractVersion: string; schemaChecksum: string } }).validationContractIdentity;
   assert.equal(typeof identity, "function");
-  const expected = JSON.parse((await import("node:fs")).readFileSync("contract/mcp/11.0.0/tools.json", "utf8"));
+  const { AGENTIC_CONTRACT_VERSION } = await import("../lib/agentic/config.ts");
+  const expected = JSON.parse((await import("node:fs")).readFileSync(`contract/mcp/${AGENTIC_CONTRACT_VERSION}/tools.json`, "utf8"));
   assert.deepEqual(identity(), { contractVersion: expected.contractVersion, schemaChecksum: expected.schemaChecksum });
 });
 
