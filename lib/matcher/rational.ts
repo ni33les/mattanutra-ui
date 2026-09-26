@@ -2,14 +2,17 @@
 export type Rational = Readonly<{ num: bigint; den: bigint }>;
 export type Decimal = string | number;
 
+function gcd(a: bigint, b: bigint): bigint {
+  if (a < BigInt(0)) a = -a;
+  while (b !== BigInt(0)) [a, b] = [b, a % b];
+  return a || BigInt(1);
+}
 export function rational(num: bigint, den = BigInt(1)): Rational {
   if (den === BigInt(0)) throw new Error("Rational denominator is zero");
   if (den < BigInt(0)) { num = -num; den = -den; }
   if (num === BigInt(0)) return ZERO;
   if (den === BigInt(1)) return num === BigInt(1) ? ONE : Object.freeze({ num, den });
-  let a = num < BigInt(0) ? -num : num, b = den;
-  while (b !== BigInt(0)) [a, b] = [b, a % b];
-  const divisor = a || BigInt(1);
+  const divisor = gcd(num, den);
   return Object.freeze({ num: num / divisor, den: den / divisor });
 }
 
@@ -25,7 +28,16 @@ export function compare(a: Rational, b: Rational): number {
 }
 export const abs = (value: Rational): Rational => value.num < BigInt(0) ? rational(-value.num, value.den) : value;
 export const positive = (value: Rational): Rational => value.num > BigInt(0) ? value : ZERO;
-export const sum = (values: readonly Rational[]): Rational => values.reduce(add, ZERO);
+export function sum(values: readonly Rational[]): Rational {
+  let num = BigInt(0), den = BigInt(1);
+  for (const value of values) {
+    if (value.num === BigInt(0)) continue;
+    const common = den === value.den ? den : gcd(den, value.den);
+    num = num * (value.den / common) + value.num * (den / common);
+    den *= value.den / common;
+  }
+  return rational(num, den);
+}
 export const serialize = (value: Rational) => ({ numerator: String(value.num), denominator: String(value.den) });
 
 export function fromDecimal(value: unknown): Rational {

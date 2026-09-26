@@ -4,7 +4,7 @@ import { catalogBandRuleId, safetyCeilingFor } from "@/lib/matcher/safety-ceilin
 import { intakeIsKnown, targetBasis } from "@/lib/matcher/target-basis";
 import { zeroTargetScale } from "@/lib/matcher/zero-target-policy";
 import { effectiveWeights } from "@/lib/matcher/scoring-policy";
-import { add, fromDecimal, multiply } from "@/lib/matcher/rational";
+import { add, fromDecimal, multiply, sum } from "@/lib/matcher/rational";
 import type { CanonicalRequest, DoseDimension, DoseFitScore, MatcherUnit, SafetyCeiling } from "@/lib/matcher/types";
 
 type Fraction = Readonly<{ num: bigint; den: bigint }>;
@@ -206,7 +206,7 @@ function calculateDoseFit(request: CanonicalRequest, exposure: ReadonlyMap<strin
   if (!cache) { cache = new WeakMap(); memo.set(request, cache); }
   const previous = cache.get(exposure);
   if (previous && !materialize) return previous;
-  let under = ZERO, over = ZERO, limit = ZERO, intentTotal = ZERO;
+  const underTerms: Fraction[] = [], overTerms: Fraction[] = [], limitTerms: Fraction[] = [], intentTerms: Fraction[] = [];
   const settings = applyWeights && request.scoring ? effectiveWeights(request.scoring) : null;
   const weights = settings ? exactWeights(settings) : null;
   const perTarget: DoseFitScore["perTarget"][number][] | null = materialize ? [] : null;
@@ -232,10 +232,10 @@ function calculateDoseFit(request: CanonicalRequest, exposure: ReadonlyMap<strin
     const known = exposure.get(subjectId) ?? BigInt(0);
     const weight = weights ? weights.subjects.get(subjectId) ?? weights.defaultWeight : ONE;
     const { minimum, maximum, added, continuedIncrease, worst } = cachedSubjectLoss(compiled, known, weight);
-    if (settings) intentTotal = add(intentTotal, worst.total);
-    under = add(under, worst.shortfall);
-    over = add(over, worst.overshoot);
-    limit = add(limit, worst.limitLoss);
+    if (settings) intentTerms.push(worst.total);
+    underTerms.push(worst.shortfall);
+    overTerms.push(worst.overshoot);
+    limitTerms.push(worst.limitLoss);
     if (target) deviations.push({ subjectId, under: value(worst.shortfall), over: value(worst.overshoot) });
     if (!materialize) continue;
     const estimated = minimum !== maximum || dietary.minimum !== dietary.maximum;
@@ -276,8 +276,9 @@ function calculateDoseFit(request: CanonicalRequest, exposure: ReadonlyMap<strin
         ruleId: catalogBandRuleId(row.ceiling), authorityUrl: row.ceiling.authorityUrl ?? null, certainty: rowCertainty });
     }
   }
+  const under = sum(underTerms), over = sum(overTerms), limit = sum(limitTerms);
   const weighted = { num: limit.num * BigInt(UPPER_LIMIT_EXTRA_WEIGHT), den: limit.den };
-  const exact = settings ? intentTotal : add(add(under, over), weighted);
+  const exact = settings ? sum(intentTerms) : add(add(under, over), weighted);
   const score = { version: DOSE_FIT_VERSION, limitWeight: 2 as const, under: value(under), over: value(over),
     limit: value(limit), weightedLimit: value(weighted), total: value(exact), ...(materialize ? { perTarget: perTarget!, perContinuedDose: perContinuedDose!, perLimit: perLimit!,
       unknownSubjectIds: [...new Set(request.unknownIntakeSubjectIds ?? [])].sort(),
