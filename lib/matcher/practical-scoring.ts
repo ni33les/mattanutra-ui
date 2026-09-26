@@ -235,18 +235,22 @@ function sameMeasurements(a: SearchState, b: SearchState) {
       ? a.servingBurden.num === b.servingBurden.num && a.servingBurden.den === b.servingBurden.den
       : a.routineServings === b.routineServings);
 }
-export function numericalSearchStateScore(request: CanonicalRequest, state: SearchState): NumericalOverallScore {
-  let cache = stateScores.get(request); if (!cache) { cache = new WeakMap(); stateScores.set(request, cache); }
-  let bucket = cache.get(state.exposure);
+function cachedStateScore(request: CanonicalRequest, state: SearchState) {
+  const bucket = stateScores.get(request)?.get(state.exposure);
   if (bucket) for (const row of bucket) {
     if (row.state === state || sameMeasurements(row.state, state)) return row.score;
   }
+}
+export function numericalSearchStateScore(request: CanonicalRequest, state: SearchState): NumericalOverallScore {
+  const cached = cachedStateScore(request, state); if (cached) return cached;
   let actual = stateActuals.get(state);
   if (!actual) { actual = { dailyPills: state.pillCountKnown === false ? null : state.pills,
       pillLowerBound: state.pills, productCount: state.count, priceMinor: state.price, currency: request.currency,
       servings: state.routineServings ?? [], servingBurdenExact: state.servingBurden, uncertainProductCount: state.uncertainAdministrationCount ?? state.count,
       monthlyPriceMinor: state.monthlyPriceMinor, monthlyPriceLowerBound: state.monthlyPriceLowerBound }; stateActuals.set(state, actual); }
   const result = numericalOverallMatchingScore(request, state.exposure, actual);
+  let cache = stateScores.get(request); if (!cache) { cache = new WeakMap(); stateScores.set(request, cache); }
+  let bucket = cache.get(state.exposure);
   if (!bucket) { bucket = []; cache.set(state.exposure, bucket); }
   if (bucket.length >= 8) bucket.shift();
   bucket.push({ state, score: result });
@@ -256,7 +260,9 @@ export function searchStateScore(request: CanonicalRequest, state: SearchState):
   return displayOverall(numericalSearchStateScore(request, state));
 }
 export function compareSearchStateScores(request: CanonicalRequest, left: SearchState, right: SearchState) {
-  const score = numericalSearchStateScore(request, right), actual = stateActuals.get(left);
+  const score = numericalSearchStateScore(request, right), cached = cachedStateScore(request, left);
+  if (cached) return compareOverallScores(cached, score);
+  const actual = stateActuals.get(left);
   // All other loss terms are nonnegative. Only reuse a bound after the common
   // measurements have passed validation; an unassessed state takes the full path.
   if (left.servingBurden && actual && measuredActuals.get(doseRequest.get(request) ?? request)?.has(actual)) {
