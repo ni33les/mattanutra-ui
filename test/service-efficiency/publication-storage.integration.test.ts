@@ -41,6 +41,18 @@ test("LOCK-STORAGE-02 order state transitions cannot reserialize or replace froz
     currency:"THB",destinationCountry:"TH",totalPriceMinor:100,frozenPlan:frozen,orderStatus:"open",paymentStatus:"unpaid",fulfilmentStatus:"not_started",stateVersion:1,
     cancelledAt:null,expiredAt:null,completedAt:null,checkoutAccessHash:null,checkoutExpiresAt:null,checkoutUrl:null,latestPaymentAttempt:null,latestPaymentReason:null,providerSessionId:null});
   try {
+    const items=Array.from({length:8},(_,index)=>({id:randomUUID(),orderId,productId:`frozen-${index}`,productName:`Frozen product ${index}`,
+      sellerId:'fixture-seller',sellerName:'Fixture seller',retailerSku:`sku-${index}`,quantity:index+1,form:'tablet',dailyPills:index+1,
+      unitPriceMinor:107+index,lineTotalMinor:(107+index)*(index+1),currency:'THB'}));
+    queries.length=0;
+    await store.transaction(async tx=>{await tx.getOrderForUpdate(orderId);await tx.insertOrderItems(items);});
+    assert.equal(queries.filter(query=>/insert into public.agentic_order_items/i.test(query)).length,1,
+      'All frozen order lines must be written in one statement while the order fence is held');
+    const ordered=(rows:typeof items)=>[...rows].sort((a,b)=>a.productId.localeCompare(b.productId));
+    assert.deepEqual(ordered(await store.getOrderItems(orderId)),ordered(items),'Amounts, quantities and seller attribution must survive batching exactly');
+    queries.length=0;await store.insertOrderItems([]);assert.equal(queries.length,0,'An empty batch needs no statement');
+    await assert.rejects(store.transaction(tx=>tx.insertOrderItems([{...items[0],id:randomUUID()},items[0]])),/duplicate/i);
+    assert.deepEqual(ordered(await store.getOrderItems(orderId)),ordered(items),'One invalid line rolls back the complete batch');
     const order=await store.getOrder(orderId);assert.ok(order);queries.length=0;
     await store.transaction(async tx=>{await tx.getOrderForUpdate(orderId);await tx.updateOrder({...order,stateVersion:2,frozenPlan:{toJSON(){throw new Error("Frozen basket revisited by state update");}}});});
     assert.equal((await store.getOrder(orderId))?.stateVersion,2);
