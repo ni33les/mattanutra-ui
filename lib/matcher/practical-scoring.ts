@@ -124,7 +124,7 @@ function coefficients(profile: Profile) {
 }
 
 type PracticalRequest = Pick<CanonicalRequest, "currency" | "maxDailyPills" | "maxProductCount" | "maxPriceMinor"> & ProfileRequest;
-const measuredActuals = new WeakMap<PracticalRequest, Map<PracticalActuals, ReturnType<typeof compileMeasurements>>>();
+const measuredActuals = new WeakMap<PracticalRequest, WeakMap<PracticalActuals, ReturnType<typeof compileMeasurements>>>();
 function compileMeasurements(request: PracticalRequest, actual: PracticalActuals, profile: Profile) {
   const pills = measurement(actual.pillLowerBound, "pillLowerBound"), products = measurement(actual.productCount, "productCount", true);
   if (actual.dailyPills !== null) {
@@ -156,7 +156,7 @@ function compileMeasurements(request: PracticalRequest, actual: PracticalActuals
 }
 function measurementsFor(request: PracticalRequest, actual: PracticalActuals, profile: Profile) {
   const source = doseRequest.get(request as CanonicalRequest) ?? request;
-  let cache = measuredActuals.get(source); if (!cache) { cache = new Map(); measuredActuals.set(source, cache); }
+  let cache = measuredActuals.get(source); if (!cache) { cache = new WeakMap(); measuredActuals.set(source, cache); }
   let result = cache.get(actual);
   if (!result) { result = compileMeasurements(request, actual, profile); cache.set(actual, result); }
   return result;
@@ -227,7 +227,7 @@ export function overallMatchingScore(request: CanonicalRequest, exposure: Readon
 }
 
 const stateActuals = new WeakMap<SearchState, PracticalActuals>();
-const stateScores = new WeakMap<CanonicalRequest, Map<SearchState["exposure"], { state: SearchState; score: NumericalOverallScore }[]>>();
+const stateScores = new WeakMap<CanonicalRequest, WeakMap<SearchState["exposure"], { state: SearchState; score: NumericalOverallScore }[]>>();
 function sameMeasurements(a: SearchState, b: SearchState) {
   return a.pills === b.pills && a.pillCountKnown === b.pillCountKnown && a.count === b.count && a.price === b.price &&
     a.uncertainAdministrationCount === b.uncertainAdministrationCount && a.monthlyPriceMinor === b.monthlyPriceMinor &&
@@ -236,7 +236,7 @@ function sameMeasurements(a: SearchState, b: SearchState) {
       : a.routineServings === b.routineServings);
 }
 export function numericalSearchStateScore(request: CanonicalRequest, state: SearchState): NumericalOverallScore {
-  let cache = stateScores.get(request); if (!cache) { cache = new Map(); stateScores.set(request, cache); }
+  let cache = stateScores.get(request); if (!cache) { cache = new WeakMap(); stateScores.set(request, cache); }
   let bucket = cache.get(state.exposure);
   if (bucket) for (const row of bucket) {
     if (row.state === state || sameMeasurements(row.state, state)) return row.score;

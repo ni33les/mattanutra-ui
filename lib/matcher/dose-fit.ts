@@ -17,8 +17,8 @@ const targetDeviations = new WeakMap<NumericalDoseFitScore, readonly TargetDevia
 /** Frontier comparisons need deviations, not unit-converted display rows. */
 export function doseFitTargetDeviations(score: NumericalDoseFitScore) { return targetDeviations.get(score) ?? (score as DoseFitScore).perTarget; }
 const fixedWeights = new WeakMap<CanonicalRequest, number | null>();
-const scoreCache = new WeakMap<CanonicalRequest, Map<object, NumericalDoseFitScore>>();
-const weightedCache = new WeakMap<CanonicalRequest, Map<object, NumericalDoseFitScore>>();
+const scoreCache = new WeakMap<CanonicalRequest, WeakMap<object, NumericalDoseFitScore>>();
+const weightedCache = new WeakMap<CanonicalRequest, WeakMap<object, NumericalDoseFitScore>>();
 const sharedInputs = new WeakMap<CanonicalRequest, CanonicalRequest>();
 /** Only the internal profile copier calls this: all intake, target and reference
  * objects are shared immutable inputs, while weighted endpoint caches stay separate. */
@@ -176,7 +176,7 @@ export function numericalWeightedDoseFitScore(request: CanonicalRequest, exposur
     fixedWeights.set(request, uniform);
   }
   if (uniform !== null) {
-    let cache = weightedCache.get(request); if (!cache) { cache = new Map(); weightedCache.set(request, cache); }
+    let cache = weightedCache.get(request); if (!cache) { cache = new WeakMap(); weightedCache.set(request, cache); }
     const found = cache.get(exposure); if (found) return found;
     const base = numericalDoseFitScore(request, exposure), parts = exactParts.get(base)!;
     const exact = add(multiply(exactWeights(settings).defaultWeight, parts.fitting), parts.safety);
@@ -191,7 +191,7 @@ function calculateDoseFit(request: CanonicalRequest, exposure: ReadonlyMap<strin
 function calculateDoseFit(request: CanonicalRequest, exposure: ReadonlyMap<string, bigint>, applyWeights: boolean, materialize = false): NumericalDoseFitScore | DoseFitScore {
   const memo = applyWeights ? weightedCache : scoreCache;
   let cache = memo.get(request);
-  if (!cache) { cache = new Map(); memo.set(request, cache); }
+  if (!cache) { cache = new WeakMap(); memo.set(request, cache); }
   const previous = cache.get(exposure);
   if (previous && !materialize) return previous;
   const underTerms: Fraction[] = [], overTerms: Fraction[] = [], limitTerms: Fraction[] = [], intentTerms: Fraction[] = [];
