@@ -5,6 +5,9 @@ import { cleanup, create, install, plan, rpc, runtime } from "../mcp-evidence-im
 import { planCompletionResponse } from "../../lib/agentic/mcp/plan-stream.ts";
 import { signalPlanOperationChange } from "../../lib/agentic/plan/completion-signals.ts";
 import { runAdmittedPlanOperation } from "../../lib/agentic/plan/service.ts";
+import { isAgenticErrorResult } from "../../lib/agentic/contract/errors.ts";
+import { AGENTIC_OUTPUT_SCHEMAS } from "../../lib/agentic/contract/outputs.ts";
+import { validateToolIssues } from "../../lib/agentic/contract/validate.ts";
 import type { AgenticRuntime } from "../../lib/agentic/runtime.ts";
 import type { JsonRpcResponse } from "../../lib/agentic/mcp/rpc.ts";
 
@@ -79,4 +82,39 @@ test("STREAM-PLAN-ownership revalidates read access without disclosing another o
   const stream = await planCompletionResponse({ request: request(), initial, runtime: other }); assert.ok(stream);
   const denied = await message(stream); assert.equal(denied.result?.structuredContent?.ok, false);
   assert.equal(denied.result?.structuredContent?.choices, undefined);
+});
+
+
+for (const resultContent of ['structured', 'text'] as const) test(`STREAM-PLAN-validation-${resultContent} delivers one precise typed terminal error with its attempted revision`, async () => {
+  const app = runtime(), first = await plan(app, create());
+  app.resultContent = resultContent;
+  const args = { planHandle: first.planHandle, expectedRevision: first.revision, idempotencyKey: `stream-invalid-duration-${resultContent}`,
+    intake: [{ ...create().intake[0], daysRemaining: 30 }] };
+  const initial = await rpc(app, 'plan', args); assert.ok(initial);
+  const op = await operation(app, args.idempotencyKey); assert.equal(op.status, 'queued'); assert.equal(op.revision, 2);
+  const abort = new AbortController();
+  const stream = await planCompletionResponse({ request: new Request('https://dev.example/api/mcp',
+    { method: 'POST', headers: { accept: 'text/event-stream' }, signal: abort.signal }), initial, runtime: app });
+  assert.ok(stream);
+  try {
+    const rejected = await runAdmittedPlanOperation({ store: app.store, config: app.config, operationId: op.id });
+    assert.ok(isAgenticErrorResult(rejected)); assert.equal(rejected.error.category, 'INVALID_ARGUMENT');
+    const failed = await operation(app, args.idempotencyKey); assert.equal(failed.status, 'failed');
+    signalPlanOperationChange({ operationId: op.id, version: failed.version });
+    const delivered = await message(stream);
+    const read = await rpc(app, 'plan', { planHandle: first.planHandle }), replay = await rpc(app, 'plan', args);
+    assert.deepEqual(delivered, read); assert.deepEqual(delivered, replay);
+    assert.equal(delivered.result?.isError, true); assert.equal(delivered.id, initial.id);
+    const result = resultContent === 'structured' ? delivered.result?.structuredContent
+      : JSON.parse(String((delivered.result?.content as Array<{ text: string }>)[0].text));
+    assert.deepEqual(validateToolIssues(AGENTIC_OUTPUT_SCHEMAS.plan, result), []);
+    assert.ok(isAgenticErrorResult(result)); assert.deepEqual(Object.keys(result).sort(), ['error', 'ok']);
+    assert.equal(result.error.category, 'INVALID_ARGUMENT'); assert.equal(result.error.reasonCode, 'invalid_request');
+    assert.equal(result.error.retryable, false); assert.equal(result.error.fieldPath, 'intake[0].daysRemaining');
+    assert.equal(result.error.currentRevision, 2); assert.equal(result.error.requestedRevision, 2);
+    assert.deepEqual(result.error.issues, [{ fieldPath: 'intake[0].daysRemaining', reasonCode: 'out_of_range',
+      messageKey: 'mcp.errors.out_of_range', permittedLimit: 'omit for diet', actual: 30 }]);
+    assert.deepEqual(await operation(app, args.idempotencyKey), failed, 'Stream and read observers never retry a validation failure');
+    assert.equal((await app.store.getPlan(op.planId))?.currentRevision, 1);
+  } finally { abort.abort(); }
 });

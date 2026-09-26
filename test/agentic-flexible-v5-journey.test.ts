@@ -88,10 +88,11 @@ describe("Current flat conversational plan mutations and immutable purchase", ()
         assert.equal(bad.ok, false);
         assert.equal(bad.error.fieldPath, "requirements.productDoses[0].servingsPerDay");
         const current = await call(runtime, "plan", { planHandle: created.planHandle });
-        assert.equal(current.ok, true);
-        assert.equal(current.revision, revised.revision);
-        assert.equal(current.status, "failed");
-        const clear = await call(runtime, "plan", { ...proposal, expectedRevision: current.revision, idempotencyKey: "v5-journey-clear-01", ...{ requirements: { productDoses: [], maxProductCount: null } } });
+        assert.equal(current.ok, false);
+        assert.deepEqual(current, bad, "Polling retains the precise quantity error returned by same-key replay");
+        assert.equal(current.error.currentRevision, Number(revised.revision) + 1);
+        assert.equal(current.error.requestedRevision, Number(revised.revision) + 1);
+        const clear = await call(runtime, "plan", { ...proposal, expectedRevision: current.error.currentRevision, idempotencyKey: "v5-journey-clear-01", ...{ requirements: { productDoses: [], maxProductCount: null } } });
         assert.equal(clear.ok, true, JSON.stringify(clear));
         assert.deepEqual((await saved(runtime, clear)).originalRequest?.medicationCodes, request.medicationCodes);
     });

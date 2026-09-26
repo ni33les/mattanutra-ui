@@ -2,6 +2,9 @@ import assert from 'node:assert/strict';
 import test, { beforeEach, afterEach } from 'node:test';
 import { create, install, cleanup, runtime, plan, rpc } from '../mcp-evidence-images/helpers.ts';
 import { runAdmittedPlanOperation, setMatcherGateForTests, setMatcherEnteredForTests } from '../../lib/agentic/plan/service.ts';
+import { businessError, isAgenticErrorResult } from '../../lib/agentic/contract/errors.ts';
+import { AGENTIC_OUTPUT_SCHEMAS } from '../../lib/agentic/contract/outputs.ts';
+import { validateToolIssues } from '../../lib/agentic/contract/validate.ts';
 import type { PlanOperationRecord } from '../../lib/agentic/store/types.ts';
 beforeEach(install); afterEach(cleanup);
 const owner = (app: ReturnType<typeof runtime>) => `${app.scope.environment}:${app.scope.tenantScope}:${app.scope.principalScope ?? 'anon'}`;
@@ -138,4 +141,50 @@ test('REF-IO-03 create and refinement each resolve one immutable catalogue for a
     const refined = await value(app, { planHandle: created.planHandle, expectedRevision: 1, idempotencyKey: 'single-snapshot-refine', scoring: { weights: { price: 0.5 } } });
     assert.equal(refined.status, 'processing'); assert.equal(loads, 1);
   } finally { setCatalogueInitEnteredForTests(null); }
+});
+
+
+test('REF-VALID-01 typed validation errors survive replay and polling with the attempted revision', async () => {
+  const app = runtime(), first = await plan(app, create());
+  const args = { planHandle: first.planHandle, expectedRevision: first.revision, idempotencyKey: 'refinement-invalid-duration',
+    intake: [{ ...create().intake[0], daysRemaining: 30 }] };
+  const accepted = await value(app, args); assert.equal(accepted.status, 'processing'); assert.equal(accepted.revision, 2);
+  const operation = await app.store.getPlanOperationByKey(owner(app), args.idempotencyKey); assert.ok(operation);
+  const rejected = await runAdmittedPlanOperation({ store: app.store, config: app.config, operationId: operation.id });
+  assert.ok(isAgenticErrorResult(rejected));
+  assert.equal(rejected.error.category, 'INVALID_ARGUMENT'); assert.equal(rejected.error.retryable, false);
+  const failed = await app.store.getPlanOperation(operation.id); assert.equal(failed?.status, 'failed');
+  const expected = { ...rejected, error: { ...rejected.error, fieldPath: 'intake[0].daysRemaining', currentRevision: 2, requestedRevision: 2,
+    nextActions: ['refresh_plan'], issues: [{ fieldPath: 'intake[0].daysRemaining', reasonCode: 'out_of_range',
+      messageKey: 'mcp.errors.out_of_range', permittedLimit: 'omit for diet', actual: 30 }] } };
+  for (const input of [args, { planHandle: first.planHandle }]) {
+    const response = await rpc(app, 'plan', input), result = response?.result?.structuredContent;
+    assert.equal(response?.result?.isError, true);
+    assert.deepEqual(validateToolIssues(AGENTIC_OUTPUT_SCHEMAS.plan, result), []);
+    assert.deepEqual(result, expected, 'Return the precise stored validation error using the existing public error fields');
+    assert.deepEqual(await app.store.getPlanOperation(operation.id), failed, 'Observing rejection never retries or rewrites admitted work');
+    assert.equal((await app.store.getPlan(operation.planId))?.currentRevision, 1, 'Invalid input cannot replace the committed routine');
+  }
+  const correction = { planHandle: first.planHandle, expectedRevision: expected.error.currentRevision,
+    idempotencyKey: 'refinement-correct-duration', intake: create().intake };
+  const recovering = await value(app, correction); assert.equal(recovering.status, 'processing'); assert.equal(recovering.revision, 2);
+  const recovery = await app.store.getPlanOperationByKey(owner(app), correction.idempotencyKey); assert.ok(recovery);
+  assert.equal((await runAdmittedPlanOperation({ store: app.store, config: app.config, operationId: recovery.id })).ok, true);
+  const ready = await value(app, { planHandle: first.planHandle }); assert.equal(ready.status, 'ready'); assert.equal(ready.revision, 2);
+});
+
+test('REF-VALID-02 retryable and operational failures retain their existing processing and recovery responses', async () => {
+  const { app, args, first, operation } = await pending();
+  let current = operation;
+  for (const status of ['retryable', 'failed'] as const) {
+    const changed = { ...current, status, version: current.version + 1,
+      error: businessError({ reasonCode: 'temporarily_unavailable', message: 'Controlled executor interruption.' }) };
+    assert.equal(await app.store.updatePlanOperation(changed, current.version), true); current = changed;
+    for (const input of [args, { planHandle: first.planHandle }]) {
+      const result = await value(app, input);
+      assert.equal(result.ok, true); assert.equal(result.revision, 2); assert.equal(result.planHandle, first.planHandle);
+      assert.equal(result.status, status === 'retryable' ? 'processing' : 'failed');
+      assert.deepEqual(await app.store.getPlanOperation(operation.id), changed);
+    }
+  }
 });
