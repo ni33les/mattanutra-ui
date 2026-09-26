@@ -4,7 +4,7 @@ import { catalogBandRuleId, safetyCeilingFor } from "@/lib/matcher/safety-ceilin
 import { intakeIsKnown, targetBasis } from "@/lib/matcher/target-basis";
 import { zeroTargetScale } from "@/lib/matcher/zero-target-policy";
 import { effectiveWeights } from "@/lib/matcher/scoring-policy";
-import { fromDecimal, multiply } from "@/lib/matcher/rational";
+import { add, fromDecimal, multiply } from "@/lib/matcher/rational";
 import type { CanonicalRequest, DoseDimension, DoseFitScore, MatcherUnit, SafetyCeiling } from "@/lib/matcher/types";
 
 type Fraction = Readonly<{ num: bigint; den: bigint }>;
@@ -34,21 +34,6 @@ function exactWeights(settings: ReturnType<typeof effectiveWeights>) {
     weightCache.set(settings, value);
   }
   return value;
-}
-
-function gcd(a: bigint, b: bigint): bigint {
-  while (b !== BigInt(0)) [a, b] = [b, a % b];
-  return a || BigInt(1);
-}
-
-function add(a: Fraction, b: Fraction): Fraction {
-  if (a.num === BigInt(0)) return b;
-  if (b.num === BigInt(0)) return a;
-  const common = gcd(a.den, b.den);
-  const num = a.num * (b.den / common) + b.num * (a.den / common);
-  const den = a.den * (b.den / common);
-  const divisor = gcd(num, den);
-  return { num: num / divisor, den: den / divisor };
 }
 
 function excess(amount: bigint, limit: bigint): Fraction {
