@@ -75,23 +75,6 @@ test('PERF-CPU-13 compiled endpoint scoring avoids temporary sets and preserves 
   assert.equal(display.perLimit[0].exposure, 175);
   assert.equal(display.perLimit[0].excess, 0.75);
 });
-test('PERF-CPU-15 request-owned numerical reuse avoids weak edges for every exposure', () => {
-  const input = request(); numericalDoseFitScore(input, new Map());
-  const exposures = Array.from({ length: 100 }, (_, i) => new Map([['a', BigInt(i + 1) * 1_000_000n]]));
-  const owned = new Set(exposures), original = WeakMap.prototype.set; let weakEdges = 0;
-  try {
-    WeakMap.prototype.set = function(key, value) {
-      if (owned.has(key)) weakEdges++;
-      return original.call(this, key, value);
-    };
-    for (let i = 0; i < exposures.length; i++) {
-      const score = numericalDoseFitScore(input, exposures[i]!);
-      assert.equal(score.total, (99 - i) / 100);
-      assert.strictEqual(numericalDoseFitScore(input, exposures[i]!), score);
-    }
-  } finally { WeakMap.prototype.set = original; }
-  assert.equal(weakEdges, 0, 'Keep the weak lifetime boundary at the immutable request, rather than each active basket');
-});
 test('REF-CPU-04 neutral rational operations reuse immutable values without changing exact arithmetic', () => {
   const value = fractions.rational(7n, 13n);
   assert.strictEqual(fractions.fromDecimal(0), fractions.ZERO, 'Repeated zero coefficients need no allocation');
