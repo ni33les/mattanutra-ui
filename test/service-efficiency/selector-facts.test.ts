@@ -7,7 +7,26 @@ mock.module('../../lib/matcher/candidates.ts', { namedExports: { ...candidates,
 } });
 const { request, product, catalog } = await import('../matcher/flexible-v5-fixtures.ts');
 const { seedState, tryAddVariant } = await import('../../lib/matcher/search.ts');
-const { scoreState } = await import('../../lib/matcher/selector.ts');
+const { scoreState, materiallyDifferent } = await import('../../lib/matcher/selector.ts');
+
+test('PERF-CPU-46 repeated choice comparisons reuse immutable product-dose identities', () => {
+  const input = request(), groups = candidates.compileGroups(input, catalog([product('choice', { a: 50 })]));
+  const scores = [1, 2].map(units => {
+    const variant = groups[0].variants.find(row => row.dailyUnits === units); assert.ok(variant);
+    const state = tryAddVariant(seedState(input), variant, groups[0], input); assert.ok(state);
+    const score = scoreState({ groups, request: input, sellerId: 'seller', state }); assert.ok(score); return score;
+  });
+  const alternateSeller = { ...scores[0], sellerId: 'another', variantIds: scores[0].variantIds.map(id => id.replace('seller:', 'another:')) };
+  const original = Array.prototype.sort; let identitySorts = 0;
+  try {
+    Array.prototype.sort = function (...args) { if (typeof this[0] === 'string' && this[0].startsWith('choice:x')) identitySorts++; return Reflect.apply(original, this, args); };
+    for (let i = 0; i < 100; i++) {
+      assert.equal(materiallyDifferent(scores[0], scores[1]), true);
+      assert.equal(materiallyDifferent(scores[0], alternateSeller), false, 'Seller changes do not invent a product alternative');
+    }
+  } finally { Array.prototype.sort = original; }
+  assert.equal(identitySorts, 3, 'Each immutable basket needs one identity, regardless of the number of comparisons');
+});
 
 test('PERF-CPU-35 incidental classification resolves each requested product contribution once per basket', () => {
   const input = request(), item = product('wide', { a: 100, ...Object.fromEntries(Array.from({ length: 30 }, (_, i) => [`b${i}`, 1])) });
