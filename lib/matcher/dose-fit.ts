@@ -119,28 +119,33 @@ function subjectInputs(request: CanonicalRequest, subjectId: string) {
  * same amount of one nutrient; profile weights and uncertain endpoints stay isolated. */
 function subjectLoss(input: { target: CanonicalRequest["targets"][number] | undefined; ranges: ReturnType<typeof rangeOffsets>; dietary: ReturnType<typeof rangeOffsets>; reference: bigint; scale: bigint | undefined; bounds: readonly Limit[] }, known: bigint, weight: Fraction) {
   const { target, ranges, dietary, reference, scale, bounds } = input;
-    const minimum = known + ranges.minimum - ranges.base, maximum = known + ranges.maximum - ranges.base;
-    const added = known > ranges.base ? known - ranges.base : BigInt(0);
-    const continuedIncrease = reference > BigInt(0) ? { num: added, den: reference } : ZERO;
-    const cases = [...new Set([minimum, maximum])].flatMap((supplemental) =>
-      [...new Set([dietary.minimum, dietary.maximum])].map((food) => {
-        const want = target?.requested.units ?? BigInt(0);
-        const targetExposure = supplemental + (target && targetBasis(target) === "total_daily" ? food : BigInt(0));
-        const shortfall = want > BigInt(0) && targetExposure < want ? { num: want - targetExposure, den: want } : ZERO;
-        const overshoot = add(target && want === BigInt(0) && scale ? { num: targetExposure, den: scale } : excess(targetExposure, want), continuedIncrease);
-        const limits = bounds.map((row) => {
-          const sourceScope = row.ceiling.sourceScope ?? "supplemental";
-          const total = supplemental + (sourceScope === "total" ? food : BigInt(0));
-          return { row, total, sourceScope, excess: excess(total, row.units) };
-        });
-        const limitLoss = limits.reduce((sum, row) => add(sum, row.excess), ZERO);
-        const total = add(multiply(weight, add(shortfall, overshoot)), { num: limitLoss.num * BigInt(UPPER_LIMIT_EXTRA_WEIGHT), den: limitLoss.den });
-        return { supplemental, food, targetExposure, shortfall, overshoot, limits, limitLoss, total };
-      }));
-    // Convex absolute deviation plus hinge penalties attains its worst value at
-    // an interval endpoint. Choose the whole penalty, not max intake alone.
-    const worst = cases.reduce((a, b) => compareFractions(b.total, a.total) > 0 ? b : a);
-  return { minimum, maximum, added, continuedIncrease, worst };
+  const minimum = known + ranges.minimum - ranges.base, maximum = known + ranges.maximum - ranges.base;
+  const added = known > ranges.base ? known - ranges.base : BigInt(0);
+  const continuedIncrease = reference > BigInt(0) ? { num: added, den: reference } : ZERO;
+  const endpoint = (supplemental: bigint, food: bigint) => {
+    const want = target?.requested.units ?? BigInt(0);
+    const targetExposure = supplemental + (target && targetBasis(target) === "total_daily" ? food : BigInt(0));
+    const shortfall = want > BigInt(0) && targetExposure < want ? { num: want - targetExposure, den: want } : ZERO;
+    const overshoot = add(target && want === BigInt(0) && scale ? { num: targetExposure, den: scale } : excess(targetExposure, want), continuedIncrease);
+    const limits = bounds.map((row) => {
+      const sourceScope = row.ceiling.sourceScope ?? "supplemental";
+      const total = supplemental + (sourceScope === "total" ? food : BigInt(0));
+      return { row, total, sourceScope, excess: excess(total, row.units) };
+    });
+    const limitLoss = limits.reduce((sum, row) => add(sum, row.excess), ZERO);
+    const total = add(multiply(weight, add(shortfall, overshoot)), { num: limitLoss.num * BigInt(UPPER_LIMIT_EXTRA_WEIGHT), den: limitLoss.den });
+    return { supplemental, food, targetExposure, shortfall, overshoot, limits, limitLoss, total };
+  };
+  // Compare the complete penalty at each distinct interval endpoint. Preserve
+  // endpoint order when losses tie, without temporary sets or Cartesian arrays.
+  let worst: ReturnType<typeof endpoint> | undefined;
+  for (let supply = 0; supply < (minimum === maximum ? 1 : 2); supply++) {
+    for (let diet = 0; diet < (dietary.minimum === dietary.maximum ? 1 : 2); diet++) {
+      const candidate = endpoint(supply ? maximum : minimum, diet ? dietary.maximum : dietary.minimum);
+      if (!worst || compareFractions(candidate.total, worst.total) > 0) worst = candidate;
+    }
+  }
+  return { minimum, maximum, added, continuedIncrease, worst: worst! };
 }
 function cachedSubjectLoss(input: ReturnType<typeof compileSubject>, known: bigint, weight: Fraction) {
   let cache = input.losses.get(weight);
