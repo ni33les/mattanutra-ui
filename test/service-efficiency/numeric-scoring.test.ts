@@ -20,6 +20,27 @@ mock.module('../../lib/matcher/rational.ts', { namedExports: { ...fractions, lin
 const { request } = await import('../matcher/flexible-v5-fixtures.ts');
 const { doseFitScore, numericalDoseFitScore, exactDoseFit, compareDoseFit, weightedDoseFitScore, numericalWeightedDoseFitScore } = await import('../../lib/matcher/dose-fit.ts');
 
+test('PERF-CPU-24 exact search records defer unused display totals until retention', async () => {
+  const { numericalOverallMatchingScore, overallMatchingScore } = await import('../../lib/matcher/practical-scoring.ts');
+  const input = request(), exposure = new Map([['a', 75_000_000n]]);
+  numericalDoseFitScore(input, exposure);
+  const actual = { currency: 'THB', dailyPills: 1, pillLowerBound: 1, productCount: 1, priceMinor: 50000, servings: [1], uncertainProductCount: 0 };
+  numericalOverallMatchingScore(input, exposure, actual);
+  conversionsToNumber = 0;
+  const numeric = numericalDoseFitScore(input, new Map(exposure));
+  const practical = numericalOverallMatchingScore(input, exposure, actual);
+  assert.equal(conversionsToNumber, 0, 'Exact ordering does not consume rounded display totals');
+  assert.equal(Object.hasOwn(numeric, 'total'), false);
+  assert.equal(Object.hasOwn(practical, 'overallPenalty'), false);
+  assert.deepEqual(exactDoseFit(numeric), { num: 1n, den: 4n });
+  assert.deepEqual(practical.exactTotal, { num: 41n, den: 120n });
+  assert.equal(doseFitScore(input, exposure).total, 0.25);
+  const shown = overallMatchingScore(input, exposure, actual);
+  assert.equal(shown.dosePenalty, 0.25);
+  assert.equal(shown.overallPenalty, 41 / 120);
+  assert.deepEqual(shown.overallExact, { numerator: '41', denominator: '120' });
+});
+
 test('PERF-CPU-22 exact serving lower bounds avoid unnecessary profile evaluation', async () => {
   const { seedState, compareSearchStates } = await import('../../lib/matcher/search.ts');
   const { numericalSearchStateScore, requestForProfile } = await import('../../lib/matcher/practical-scoring.ts');
