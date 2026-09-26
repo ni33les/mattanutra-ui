@@ -140,7 +140,7 @@
     },
     {
       "file": "test/service-efficiency/selector-facts.test.ts",
-      "expectedCases": 3,
+      "expectedCases": 4,
       "reason": "PERF-CPU-35/46/53: exact incidental facts, immutable choice identities and removal of unused internal ranking calculations without changing active dose or coverage facts"
     },
     {
