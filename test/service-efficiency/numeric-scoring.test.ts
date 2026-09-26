@@ -21,6 +21,27 @@ mock.module('../../lib/matcher/rational.ts', { namedExports: { ...fractions, lin
 const { request } = await import('../matcher/flexible-v5-fixtures.ts');
 const { doseFitScore, numericalDoseFitScore, exactDoseFit, compareDoseFit, weightedDoseFitScore, numericalWeightedDoseFitScore } = await import('../../lib/matcher/dose-fit.ts');
 
+test('PERF-CPU-62 compiled incidental thresholds avoid endpoint allocation below every applicable limit', () => {
+  const input = request({ safetyCeilings: [{ subjectId: 'b', name: 'B', maxAmount: 100, maxUnit: 'mg', sourceScope: 'supplemental' }] });
+  numericalDoseFitScore(input, new Map([['a', 50000000n], ['b', 0n]]));
+  aggregateSums = 0;
+  const exposure = new Map([['a', 50000000n], ['b', 75000000n]]);
+  const score = numericalDoseFitScore(input, exposure);
+  assert.equal(fractions.compare(score.exact, { num: 1n, den: 2n }), 0);
+  assert.deepEqual(score.deviations.map(row => row.subjectId), ['a']);
+  assert.equal(aggregateSums, 0, 'A proven zero incidental term does not need endpoint or aggregate penalty objects');
+  const displayed = doseFitScore(input, exposure);
+  assert.equal(displayed.perLimit.length, 1); assert.equal(displayed.perLimit[0].subjectId, 'b');
+  assert.equal(displayed.perLimit[0].exposure, 75); assert.equal(displayed.perLimit[0].limit, 100); assert.equal(displayed.perLimit[0].excess, 0);
+  const crossed = numericalDoseFitScore(input, new Map([['a', 50000000n], ['b', 100000001n]]));
+  assert.equal(fractions.compare(crossed.exact, { num: 25000001n, den: 50000000n }), 0, 'Even a one-ng excess retains the independent 2x penalty');
+  const current = { subjectId: 'b', sourceId: 'continued-b', name: 'B', dailyAmount: 50, unit: 'mg' as const,
+    daily: { subjectId: 'b', units: 50000000n, dim: 'mass_ng' as const }, certainty: 'estimated' as const, minimumDailyAmount: 0, maximumDailyAmount: 100 };
+  const uncertain = request({ currentSupplements: [current], dietaryIntake: [{ ...current, sourceId: 'food-b', minimumDailyAmount: 25, maximumDailyAmount: 75 }],
+    safetyCeilings: [{ subjectId: 'b', name: 'B', maxAmount: 150, maxUnit: 'mg', sourceScope: 'total' }] });
+  assert.equal(fractions.compare(numericalDoseFitScore(uncertain, exposure).exact, { num: 7n, den: 6n }), 0, 'Both intake maxima remain assessed against the total reference');
+});
+
 test('PERF-CPU-61 cursor edges reuse each immutable parent identity across its additions', async () => {
   const { product, catalog } = await import('../matcher/flexible-v5-fixtures.ts');
   const { compileGroups } = await import('../../lib/matcher/candidates.ts');
