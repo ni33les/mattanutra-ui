@@ -60,3 +60,29 @@ test('PERF-CKPT-01 completed bounded search releases obsolete frontiers while re
   assert.deepEqual(restored,cursor);assert.deepEqual(historical,cursor);
   assert.equal(matchCursorAttempts(cursor),700,'Cleanup must not alter or consume search attempts');
 });
+
+
+test('PERF-CKPT-02 checkpoints retain only the frontiers needed by the active phase', () => {
+  const input=request(), products=catalog(Array.from({length:12},(_,i)=>product(`phase-${i}`,{a:15+i})));
+  const config={...DEFAULT_MATCHER_CONFIG,exactGroupLimit:0,expansionBudget:2400};
+  const cursor=createMatchCursor(input,products,config);
+  const observed=new Set<string>();
+  while(!cursor.done) {
+    advanceMatchCursor(cursor,input,32);
+    const active=cursor.sellers[0]!.cursor;
+    if(active.done || !['repair','second'].includes(active.phase) || observed.has(active.phase)) continue;
+    observed.add(active.phase);
+    for(const field of ['singles','beam','expanded','exactStack'] as const)
+      assert.equal(active[field].length,0,`${active.phase} no longer consumes ${field}`);
+    if(active.phase==='second') {
+      assert.equal(active.repairJobs.length,0);assert.equal(active.repaired.length,0);
+      assert.ok(active.second.length>0,'Live second-addition bases must survive');
+    } else assert.ok(active.repairJobs.length>0,'Live repair jobs must survive');
+    const restored=decodeMatchCursor(encodeMatchCursorBytes(cursor),cursor.identity);
+    advanceMatchCursor(restored,input,2400);
+    const uninterrupted=structuredClone(cursor);advanceMatchCursor(uninterrupted,input,2400);
+    assert.deepEqual(restored,uninterrupted,'Phase cleanup preserves exact checkpoint recovery');
+  }
+  assert.deepEqual([...observed],['repair','second'],'Both active phases must actually be exercised');
+  assert.equal(matchCursorAttempts(cursor),2400);
+});

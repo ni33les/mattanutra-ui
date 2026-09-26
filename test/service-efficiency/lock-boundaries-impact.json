@@ -472,7 +472,7 @@
     },
     {
       "file": "test/service-efficiency/checkpoint-hot-path.test.ts",
-      "expectedCases": 4,
+      "expectedCases": 5,
       "reason": "Terminal checkpoint, old cursor recovery and expanded accounting",
       "slice": "matcher-hot-path"
     },
