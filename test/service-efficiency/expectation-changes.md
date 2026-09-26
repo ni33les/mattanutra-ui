@@ -73,3 +73,21 @@ patch/timings remain in evidence; the Number fast paths were withdrawn. The
 shared implementation retains BigInt arithmetic and a scalar remainder loop.
 
 - PERF-CPU-08 incremental parent-score prototype withdrawn before release: all 69 affected assertions passed and Daniel retained its exact result identity, but constrained warm trials (2615/2269/2513 ms) did not improve over the retained implementation (2338/2083/2405 ms). The additional WeakMap and delta bookkeeping are removed. RED/GREEN and the patch remain in performance-20260926 evidence; existing scoring and recovery contracts remain unchanged.
+
+
+### 2026-09-26 — bounded numerical and checkpoint overhead
+
+- `PERF-CPU-09` indexes append-only physical quantities without changing their order. Dynamic quantities remain visible, and replaced immutable arrays retain separate identities. Original prices and supported quantities are unchanged.
+- `PERF-CPU-10` materializes each raw-dose leader's comparison facts once and selects the same stable completion prefix. The independent former algorithm remains in the regression case; no ranking expectation was weakened.
+- `PERF-CPU-11` shares equal contribution/exposure maps and removes a temporary merged map. Incidental exposure remains separate from requested contribution; parent states stay immutable.
+- `PERF-CKPT-01/02` omit obsolete frontiers from completed/advanced phases only. Archive, active jobs, old checkpoint reading, expansion order and attempt accounting remain covered.
+- `PERF-CPU-12` moves completeness/preference presentation metadata out of numerical evaluation. Exact penalty components and unknown actual/lower-bound reporting remain unchanged.
+- `PERF-PACK-01` replaces retired operation/responseView benchmark inputs with the current handle-only public request. Internal lightweight projection measurements are explicitly separate from full public decision retrieval.
+
+RED/GREEN logs and source-bound frozen comparisons are retained under
+`/root/.codex/deploy/performance-20260926/`. The first phase-frontier selection
+named two nonexistent files; its zero-exit result is rejected by execution
+reconciliation in `phase-frontiers-incomplete-selection.json`. The corrected
+five-file selection executes 29 cases with no skips or retries. Benchmark reader
+execution currently requires a matching compiled application identity; its
+failed startup is preserved and is not read-performance evidence.
