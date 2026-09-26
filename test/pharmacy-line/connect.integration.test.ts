@@ -58,6 +58,8 @@ it("PHARM-LINE concurrent redelivery reuses one connection and message; groups a
   }finally{globalThis.fetch=savedFetch;}
 });
 it("PHARM-LINE validates pharmacy/order ownership and pins the received link to the frozen order and display language",async()=>{
+  const [guard]=await sql`select pg_get_constraintdef(oid) as definition from pg_constraint where conrelid='public.retail_customer_orders'::regclass and conname='retail_customer_orders_source_check'`;
+  assert.match(String(guard?.definition??""),/'pharmacy'/,"Isolated preparation must apply the pharmacy source migration before any order consumer runs");
   const f=await seedPharmacyFixture(),other=await seedPharmacyFixture("en",false);
   const order=await createPharmacyOrder({planId:f.planId,pharmacy:f.slug,locale:"en",expectedRevision:f.revision,productIds:f.productIds,customerName:"QR Test"},randomUUID());
   assert.equal((await prepare(other,"en",order.id)).status,404);
