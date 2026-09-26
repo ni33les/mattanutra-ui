@@ -192,6 +192,11 @@ it("QUALITY-DISC-08 classic fallback has one owned browser batch without omittin
     standard: string[]; classic: Array<{ file: string; expectedCases: number; grep: string }> } }).browserTestPartitions;
   assert.equal(typeof split, "function", "The full browser gate must dispatch each maintained mode");
   const inventory = fullTestInventory();
+  const { assertIsolatedBrowserOrigin } = await import("./helpers/offline-browser.ts");
+  for (const port of [3100, 3101]) assert.equal(assertIsolatedBrowserOrigin(`http://127.0.0.1:${port}`).port, String(port));
+  for (const origin of ["https://127.0.0.1:3101", "http://localhost:3101", "http://127.0.0.1:3102", "http://127.0.0.1.example:3101", "https://example.com", "http://user:pass@127.0.0.1:3101"]) {
+    assert.throws(() => assertIsolatedBrowserOrigin(origin), /isolated application/, origin);
+  }
   const modes = split(inventory.browser);
   assert.deepEqual(modes.classic.map(row => row.file), ["test/e2e/pharmacy-classic.spec.ts"]);
   assert.equal(modes.classic[0].expectedCases, 1);
