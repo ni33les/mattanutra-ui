@@ -20,6 +20,18 @@ mock.module('../../lib/matcher/rational.ts', { namedExports: { ...fractions, lin
 const { request } = await import('../matcher/flexible-v5-fixtures.ts');
 const { doseFitScore, numericalDoseFitScore, exactDoseFit, compareDoseFit, weightedDoseFitScore, numericalWeightedDoseFitScore } = await import('../../lib/matcher/dose-fit.ts');
 
+test('PERF-CPU-28 exact comparison reuses identity and compares common denominators directly', () => {
+  let reads = 0;
+  const same = Object.freeze({ get num() { reads++; return 7n; }, get den() { reads++; return 13n; } });
+  assert.equal(fractions.compare(same, same), 0);
+  assert.equal(reads, 0, 'An immutable exact value equals itself without reading coefficients');
+  for (const den of [1n, 97n, 2n ** 100n + 17n]) for (const left of [-123456789n, 0n, 9007199254740993n]) for (const delta of [-1n, 0n, 1n]) {
+    const a = { num: left, den }, b = { num: left + delta, den };
+    assert.equal(fractions.compare(a, b), delta < 0n ? 1 : delta > 0n ? -1 : 0);
+    assert.equal(fractions.compare(a, { num: b.num * 31n, den: den * 31n }), fractions.compare(a, b));
+  }
+});
+
 test('PERF-CPU-27 repeated endpoint facts do not renormalize unused display components', () => {
   const input = request({ safetyCeilings: [{ subjectId: 'a', name: 'A', maxAmount: 100, maxUnit: 'mg', sourceScope: 'supplemental' }] });
   const exposure = new Map([['a', 175_000_000n]]);
