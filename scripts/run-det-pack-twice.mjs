@@ -20,7 +20,7 @@ if (!process.execArgv.includes(strip)) {
     process.exit(code ?? 1);
   });
 } else {
-  const { freezeKey, loadDetCatalog, runDetPack } = await import(
+  const { canonicalDetReport, freezeKey, loadDetCatalog, runDetPack } = await import(
     "../test/agentic-det-pack.test.ts"
   );
   const catA = await loadDetCatalog();
@@ -36,8 +36,8 @@ if (!process.execArgv.includes(strip)) {
   const catalog = { ...catA, freezePeer: catB };
   const a = await runDetPack(catalog);
   const b = await runDetPack(catalog);
-  const left = JSON.stringify(a);
-  const right = JSON.stringify(b);
+  const left = canonicalDetReport(a);
+  const right = canonicalDetReport(b);
 
   if (left !== right) {
     console.error("FAIL drift");
@@ -45,7 +45,7 @@ if (!process.execArgv.includes(strip)) {
     process.exit(1);
   }
 
-  assert.deepEqual(a, b);
+  assert.equal(left, right);
   console.log(JSON.stringify(a.scores));
   console.log("PASS identical");
 }

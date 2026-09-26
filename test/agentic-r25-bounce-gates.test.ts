@@ -1,13 +1,12 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { afterEach, describe, it } from "node:test";
-import { AGENTIC_POLL_AFTER_SECONDS } from "../lib/agentic/config.ts";
 import { DEFAULT_SHIPPING_MINOR, payableSnapshot } from "../lib/agentic/money.ts";
 import { applyVerifiedPaymentEvent, orderPollView } from "../lib/agentic/commerce/state.ts";
 import { mockEventForScenario } from "../lib/agentic/commerce/payment.ts";
 import { publicPlanFields, publicSafetyGuidance } from "../lib/agentic/public-mapper.ts";
 import { evaluateSafety } from "../lib/agentic/plan/safety.ts";
-import { PLAN_MATCH_RETURN_BUDGET_MS } from "../lib/agentic/plan/service.ts";
+import { durableAdmissionProbe, loadDetCatalog } from "./agentic-det-pack.test.ts";
 import { createMemoryStore } from "../lib/agentic/store/memory.ts";
 import type { OrderRecord } from "../lib/agentic/store/types.ts";
 import type {
@@ -27,7 +26,7 @@ const MAG_BAND_ID = "3e13d7f5-3649-4e4b-b648-70f5470c2c89";
 const MAG_SKU = "prd_ae75035d257051658a606e8d4c28b6d2";
 const MAG_D3_SKU = "prd_202c5e0936e8575f9d95dcb35a8d2965";
 const PACK_P95_MS = 2500;
-const DEVELOPER_OFFICIAL_P95_MS = 506;
+const HISTORICAL_DEVELOPER_OFFICIAL_P95_MS = 506;
 
 function packTimeToReady(matchMs: number, budgetMs: number, pollAfterSeconds: number) {
   if (matchMs <= budgetMs) {
@@ -172,26 +171,18 @@ afterEach(() => {
 });
 
 describe("R25 bounce gates — R24 crash class", () => {
-  it("counts pollAfterSeconds in pack time-to-ready (400ms processing + 3s poll is a FAIL)", () => {
-    const r24Crash = packTimeToReady(DEVELOPER_OFFICIAL_P95_MS, 400, 3);
+  it("counts the historical 400ms + 3s polling failure and measures current durable acknowledgement", async () => {
+    const r24Crash = packTimeToReady(HISTORICAL_DEVELOPER_OFFICIAL_P95_MS, 400, 3);
     assert.equal(r24Crash, 3400);
     assert.ok(r24Crash > PACK_P95_MS);
 
-    assert.notEqual(PLAN_MATCH_RETURN_BUDGET_MS, 400);
-    assert.ok(PLAN_MATCH_RETURN_BUDGET_MS >= PACK_P95_MS);
-    assert.equal(AGENTIC_POLL_AFTER_SECONDS, 3);
-
-    const live = packTimeToReady(
-      DEVELOPER_OFFICIAL_P95_MS,
-      PLAN_MATCH_RETURN_BUDGET_MS,
-      AGENTIC_POLL_AFTER_SECONDS
-    );
-    assert.equal(live, DEVELOPER_OFFICIAL_P95_MS);
-    assert.ok(live <= PACK_P95_MS);
-
-    const source = readFileSync(new URL("../lib/agentic/plan/service.ts", import.meta.url), "utf8");
-    assert.match(source, /PLAN_MATCH_RETURN_BUDGET_MS = 3_000/);
-    assert.equal(/PLAN_MATCH_RETURN_BUDGET_MS = 400/.test(source), false);
+    const { snapshot } = await loadDetCatalog();
+    const current = await durableAdmissionProbe(snapshot);
+    assert.ok(current.create.ackMs <= PACK_P95_MS);
+    assert.ok(current.replay.ackMs <= PACK_P95_MS);
+    assert.equal(current.queued, true); assert.equal(current.unleased, true);
+    assert.equal(current.sameOperation, true);
+    assert.equal(current.matcherExecutions, 0); assert.equal(current.workerDispatches, 0);
   });
 
   it("publishes catalog rule, real exposure, and contributors on limit advice", () => {

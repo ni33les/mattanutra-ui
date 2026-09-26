@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { describe, it } from "node:test";
 import { AGENTIC_PUBLIC_TOOLS } from "../lib/agentic/contract/index.ts";
+import { durableAdmissionProbe, loadDetCatalog } from "./agentic-det-pack.test.ts";
 
 function extractBalancedCalls(source: string, marker: RegExp) {
   const bodies: string[] = [];
@@ -72,8 +73,11 @@ describe("consistency r2 regression guards", () => {
       assert.doesNotMatch(body, /\bmatch\s*\(/);
     }
 
-    assert.match(source, /PLAN_MATCH_RETURN_BUDGET_MS = 3_000/);
-    assert.match(source, /Promise\.race/);
+    const current = await durableAdmissionProbe((await loadDetCatalog()).snapshot);
+    assert.equal(current.queued, true); assert.equal(current.unleased, true);
+    assert.equal(current.sameOperation, true);
+    assert.equal(current.matcherExecutions, 0); assert.equal(current.workerDispatches, 0);
+    assert.ok(current.create.ackMs < current.deadlineMs);
     assert.match(source, /status: "processing"/);
     // Completion must preserve the original receipt's request identity. Handle
     // polling and subsequent create replay are tested in agentic-plan-recovery;

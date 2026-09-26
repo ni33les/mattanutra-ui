@@ -6,7 +6,6 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
-import { AGENTIC_POLL_AFTER_SECONDS } from "../lib/agentic/config.ts";
 import { loadAgenticConfig } from "../lib/agentic/config.ts";
 import { catalogueSnapshotId } from "../lib/agentic/catalogue/freeze.ts";
 import {
@@ -15,8 +14,10 @@ import {
 import type { CatalogueSnapshot } from "../lib/agentic/catalogue/types.ts";
 import { completedPlanTool as planTool } from "./helpers/completed-mcp-client.ts";
 import { matchPlan, evaluateSafety } from "./helpers/recording-mcp-dispatcher.ts";
-import { PLAN_MATCH_RETURN_BUDGET_MS } from "../lib/agentic/plan/service.ts";
-import { captureMcpTranscript, type RecordedMcpTranscript } from "./helpers/mcp-evidence.ts";
+import { planTool as admitPlan, setMatcherEnteredForTests } from "../lib/agentic/plan/service.ts";
+import { cancelPlanOperation } from "../lib/agentic/plan/operations.ts";
+import { serviceMeasurements, withServiceMeasurements } from "../lib/service-metrics.ts";
+import { captureMcpTranscript, recordMcpCall, type RecordedMcpTranscript } from "./helpers/mcp-evidence.ts";
 import { normalizePublishedClientResult } from "../scripts/published-client-semantics.mjs";
 import { createSnapshotMemoryStore } from "./agentic/value/snapshot-store.ts";
 import type {
@@ -55,15 +56,12 @@ export type DetPackReport = Readonly<{
   }>;
   cases: readonly unknown[];
   efficiency: Readonly<{
-    agenticUsesWeb400: boolean;
-    budgetMs: number;
+    acknowledgement: Awaited<ReturnType<typeof durableAdmissionProbe>> | null;
     fixtureInBasket: boolean;
     freezeOk: boolean;
     liveMissIsEmptyRetail: boolean;
-    packTimeToReady400: number;
     pinKeptOption: boolean;
     pinWithoutRematch: boolean;
-    pollAfterSeconds: number;
   }>;
   scores: Readonly<{
     efficiency: number;
@@ -71,14 +69,6 @@ export type DetPackReport = Readonly<{
     safety: number;
   }>;
 }>;
-
-function packTimeToReady(matchMs: number, budgetMs: number, pollAfterSeconds: number) {
-  if (matchMs <= budgetMs) {
-    return matchMs;
-  }
-
-  return budgetMs + pollAfterSeconds * 1000;
-}
 
 function sortedJson(value: unknown): unknown {
   if (Array.isArray(value)) {
@@ -418,8 +408,49 @@ export async function loadDetCatalog(): Promise<DetPackCatalog> {
   return { snapshot, ceilings: references.ceilings, references: captureMatcherSafetySnapshot(snapshot.runtimeRevision) };
 }
 
-export function canonicalDetReport(report: DetPackReport) {
+/** Measured admission, without invoking the separately owned matcher executor. */
+export async function durableAdmissionProbe(snapshot: CatalogueSnapshot) {
+  replaceCatalogueSnapshot(snapshot);
+  const store = createSnapshotMemoryStore(snapshot), config = loadAgenticConfig();
+  const scope = { environment: "dev" as const, tenantScope: "mattanutra", principalScope: "det-admission" };
+  const now = new Date().toISOString(), key = `det-admission-${randomUUID()}`;
+  const payload = { idempotencyKey: key, request: officialRequest() };
+  let matcherExecutions = 0, operationId: string | undefined;
+  setMatcherEnteredForTests(() => { matcherExecutions++; });
+  try {
+    return await withServiceMeasurements(async () => {
+      const invoke = () => recordMcpCall({ method: "plan", payload }, () => admitPlan({ config, now, payload, scope, store }));
+      const started = performance.now(), first = await invoke(), ackMs = performance.now() - started;
+      const operation = await store.getPlanOperationByKey("dev:mattanutra:det-admission", key);
+      assert.ok(operation, "Acknowledgement must follow committed durable admission");
+      operationId = operation.id;
+      assert.equal(first.ok, true); assert.equal(first.status, "processing");
+      assert.equal(operation.status, "queued"); assert.equal(operation.leaseToken, null);
+      assert.equal(operation.checkpoint, null); assert.ok(operation.taskId);
+      const replayStarted = performance.now(), replay = await invoke(), replayAckMs = performance.now() - replayStarted;
+      const same = await store.getPlanOperationByKey("dev:mattanutra:det-admission", key);
+      assert.deepEqual(replay, first, "Same-key recovery returns the committed receipt");
+      assert.equal(same?.id, operation.id); assert.equal(same?.status, "queued"); assert.equal(same?.leaseToken, null);
+      const workerDispatches = serviceMeasurements()["worker.queue_ms"]?.count ?? 0;
+      assert.equal(matcherExecutions, 0, "Admission cannot run matching in the request process");
+      assert.equal(workerDispatches, 0, "Admission cannot dispatch a matcher worker");
+      // Same bound as the maintained service-efficiency admission benchmark.
+      const deadlineMs = 1000;
+      for (const elapsed of [ackMs, replayAckMs]) assert.ok(Number.isFinite(elapsed) && elapsed >= 0 && elapsed < deadlineMs,
+        `Measured acknowledgement ${elapsed}ms must be below ${deadlineMs}ms`);
+      return { create: { ackMs }, replay: { ackMs: replayAckMs }, deadlineMs, queued: operation.status === "queued",
+        unleased: operation.leaseToken === null, sameOperation: same?.id === operation.id,
+        matcherExecutions, workerDispatches, pollAfterSeconds: first.pollAfterSeconds };
+    });
+  } finally {
+    setMatcherEnteredForTests(null);
+    if (operationId) await cancelPlanOperation(store, operationId, new Date().toISOString());
+  }
+}
+
+export function canonicalDetReport<T extends { efficiency: unknown; mcpTranscript?: RecordedMcpTranscript }>(report: T) {
   return JSON.stringify({ ...report,
+    efficiency: normalizePublishedClientResult(report.efficiency),
     ...(report.mcpTranscript ? { mcpTranscript: normalizePublishedClientResult(report.mcpTranscript, "https://fixture.example/api/mcp") } : {})
   });
 }
@@ -435,12 +466,10 @@ async function runDetPackRecorded(input: DetPackCatalog): Promise<DetPackReport>
   const snapshot = input.snapshot;
   const freezePeer = input.freezePeer ?? (await loadDetCatalog());
   const freezeOk = freezeKey(input) === freezeKey(freezePeer);
-  const serviceSource = readFileSync(new URL("../lib/agentic/plan/service.ts", import.meta.url), "utf8");
   const snapshotSource = readFileSync(
     new URL("../lib/agentic/catalogue/snapshot.ts", import.meta.url),
     "utf8"
   );
-  const agenticUsesWeb400 = /WEB_MATCHER_CONFIG/.test(serviceSource);
   const liveMissIsEmptyRetail =
     /emptyRetailSnapshot/.test(snapshotSource) && !/fixtureSnapshot/.test(snapshotSource);
 
@@ -455,15 +484,12 @@ async function runDetPackRecorded(input: DetPackCatalog): Promise<DetPackReport>
       catalog,
       cases: [],
       efficiency: {
-        agenticUsesWeb400,
-        budgetMs: PLAN_MATCH_RETURN_BUDGET_MS,
+        acknowledgement: null,
         fixtureInBasket: false,
         freezeOk,
         liveMissIsEmptyRetail,
-        packTimeToReady400: packTimeToReady(506, 400, 3),
         pinKeptOption: false,
-        pinWithoutRematch: false,
-        pollAfterSeconds: AGENTIC_POLL_AFTER_SECONDS
+        pinWithoutRematch: false
       },
       scores: { efficiency: 0, matching: 0, safety: 0 }
     }) as DetPackReport;
@@ -509,6 +535,7 @@ async function runDetPackRecorded(input: DetPackCatalog): Promise<DetPackReport>
     state: ckdState
   });
   const pin = await pinWithoutRematch(snapshot);
+  const acknowledgement = await durableAdmissionProbe(snapshot);
 
   const liveRetail =
     snapshot.catalogueVersion.startsWith("retail-TH-") &&
@@ -596,17 +623,16 @@ async function runDetPackRecorded(input: DetPackCatalog): Promise<DetPackReport>
   }
 
   let efficiencyScore = 0;
-  if (PLAN_MATCH_RETURN_BUDGET_MS !== 400 && packTimeToReady(506, 400, 3) === 3400) {
+  if (acknowledgement.queued && acknowledgement.unleased) {
     efficiencyScore += 2;
   }
   if (
-    packTimeToReady(4000, PLAN_MATCH_RETURN_BUDGET_MS, AGENTIC_POLL_AFTER_SECONDS) ===
-      PLAN_MATCH_RETURN_BUDGET_MS + AGENTIC_POLL_AFTER_SECONDS * 1000 &&
-    /PLAN_MATCH_RETURN_BUDGET_MS = 3_000/.test(serviceSource)
+    acknowledgement.sameOperation && acknowledgement.create.ackMs < acknowledgement.deadlineMs &&
+    acknowledgement.replay.ackMs < acknowledgement.deadlineMs
   ) {
     efficiencyScore += 2;
   }
-  if (!agenticUsesWeb400 && (official.selected != null || official.leftovers.length > 0)) {
+  if (acknowledgement.matcherExecutions === 0 && acknowledgement.workerDispatches === 0 && (official.selected != null || official.leftovers.length > 0)) {
     efficiencyScore += 2;
   }
   if (pin.pinKeptOption && pin.pinWithoutRematch) {
@@ -642,15 +668,12 @@ async function runDetPackRecorded(input: DetPackCatalog): Promise<DetPackReport>
       }
     ],
     efficiency: {
-      agenticUsesWeb400,
-      budgetMs: PLAN_MATCH_RETURN_BUDGET_MS,
+      acknowledgement,
       fixtureInBasket,
       freezeOk,
       liveMissIsEmptyRetail,
-      packTimeToReady400: packTimeToReady(506, 400, 3),
       pinKeptOption: pin.pinKeptOption,
-      pinWithoutRematch: pin.pinWithoutRematch,
-      pollAfterSeconds: AGENTIC_POLL_AFTER_SECONDS
+      pinWithoutRematch: pin.pinWithoutRematch
     },
     scores: {
       efficiency: efficiencyScore,

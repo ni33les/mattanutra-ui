@@ -186,6 +186,11 @@ it('MCP-TRANSCRIPT-10: DET canonical reports compare complete values even when s
     if (key === 'advice') body.safetyGuidance[0]!.message = 'No concern';
     assert.notEqual(canonicalDetReport(base), canonicalDetReport(changed), key);
   }
+  const measured = { ...base, efficiency: { acknowledgement: { create: { ackMs: 5 }, queued: true, matcherExecutions: 0 } } };
+  const slower = structuredClone(measured); slower.efficiency.acknowledgement.create.ackMs = 10;
+  assert.equal(canonicalDetReport(measured), canonicalDetReport(slower), 'Only measured acknowledgement duration is excluded');
+  slower.efficiency.acknowledgement.matcherExecutions = 1;
+  assert.notEqual(canonicalDetReport(measured), canonicalDetReport(slower), 'Matcher execution during admission remains a semantic failure');
 });
 
 it('MCP-TRANSCRIPT-11: paired acceptance reuses exact captured catalogues and checks input immutability', async () => {

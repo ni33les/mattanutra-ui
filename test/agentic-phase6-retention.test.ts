@@ -11,7 +11,7 @@ import { normalizePlanRequest } from "../lib/agentic/plan/normalize.ts";
 import { CLIENT_GUIDE_URI, readContractResource } from "../lib/agentic/contract/guide.ts";
 import { matcherTelemetryFor } from "../lib/agentic/plan/matching.ts";
 import { publicPlanFields } from "../lib/agentic/public-mapper.ts";
-import { PLAN_MATCH_RETURN_BUDGET_MS } from "../lib/agentic/plan/service.ts";
+import { durableAdmissionProbe, loadDetCatalog } from "./agentic-det-pack.test.ts";
 import { aug25PlanState } from "../lib/agentic/plan/mode-d.ts";
 import { DEFAULT_MATCHER_CONFIG } from "../lib/matcher/config.ts";
 import { match } from "../lib/matcher/index.ts";
@@ -147,8 +147,10 @@ describe("Phase 6 B12 retention, K2 copy, and latency split", () => {
     );
   });
 
-  it("records ackMs, matchMs and searchDeadlineMs on DEV matcher telemetry", () => {
-    assert.equal(PLAN_MATCH_RETURN_BUDGET_MS, 3_000);
+  it("records ackMs, matchMs and searchDeadlineMs on DEV matcher telemetry", async () => {
+    const current = await durableAdmissionProbe((await loadDetCatalog()).snapshot);
+    assert.ok(current.create.ackMs < current.deadlineMs);
+    assert.equal(current.queued, true); assert.equal(current.matcherExecutions, 0);
     const telemetry = matcherTelemetryFor({
       ackMs: 180,
       leftovers: [],

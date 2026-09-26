@@ -5,6 +5,7 @@ import { randomUUID } from "node:crypto";
 import { runAdmittedPlanOperation } from "../lib/agentic/plan/service.ts";
 import { infoTool } from "../lib/agentic/info.ts";
 import { observeLatency } from "./helpers/latency-observation.ts";
+import { durableAdmissionProbe, loadDetCatalog } from "./agentic-det-pack.test.ts";
 
 import {
   closeSession,
@@ -80,10 +81,14 @@ describe("Customer value speed pack", () => {
     }
   });
 
-  it("does not cut the first create short to force a 3s poll", () => {
+  it("does not cut the first create short to force a 3s poll", async () => {
     const source = readFileSync(new URL("../lib/agentic/plan/service.ts", import.meta.url), "utf8");
-    assert.match(source, /PLAN_MATCH_RETURN_BUDGET_MS = 3_000/);
-    assert.equal(source.includes("sleep(PLAN_MATCH_RETURN_BUDGET_MS)"), false);
+    const current = await durableAdmissionProbe((await loadDetCatalog()).snapshot);
+    assert.ok(current.create.ackMs < current.deadlineMs);
+    assert.equal(current.pollAfterSeconds, 1);
+    assert.equal(current.queued, true); assert.equal(current.unleased, true);
+    assert.equal(current.sameOperation, true);
+    assert.equal(current.matcherExecutions, 0); assert.equal(current.workerDispatches, 0);
     assert.match(source, /PLAN_PROCESSING_POLL_AFTER_SECONDS = 1/);
     assert.match(source, /writeProcessingRevision/);
     assert.doesNotMatch(source, /inflightPlanIdempotency/);
