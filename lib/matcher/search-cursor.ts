@@ -42,6 +42,15 @@ function indexFor(values: string[], indices: Map<string, number>, id: string) {
   const found = indices.get(id); if (found != null) return found;
   const next = values.length; values.push(id); indices.set(id, next); return next;
 }
+function variantKey(ids: number[]) {
+  if (ids.length > 16) return ids.sort((a, b) => a - b).join(",");
+  for (let i = 1; i < ids.length; i++) {
+    const value = ids[i]!; let j = i;
+    while (j > 0 && ids[j - 1]! > value) { ids[j] = ids[j - 1]!; j--; }
+    ids[j] = value;
+  }
+  return ids.join(",");
+}
 function packedExposure(cursor: SearchCursor, values: ReadonlyMap<string, bigint>): ExactVector {
   const packed: ExactVector = [];
   for (const [id, value] of values) packed.push(indexFor(cursor.subjects, cursor.subjectIndex, id), value);
@@ -73,7 +82,7 @@ export function* archivedSearchStates(cursor: SearchCursor) {
 }
 function remember(cursor: SearchCursor, state: SearchState) {
   const ids = state.selectedVariantIds.map(id => indexFor(cursor.variantIds, cursor.variantIndex, id));
-  const key = [...ids].sort((a, b) => a - b).join(",");
+  const key = variantKey([...ids]);
   if (!cursor.archive.has(key)) {
     const exposure = packedExposure(cursor, state.exposure);
     cursor.archive.set(key, [state.nextGroupIndex, state.price, state.pills, state.count, state.pillCountKnown !== false,
@@ -218,8 +227,7 @@ function completedAttempt(cursor: SearchCursor, request: CanonicalRequest) {
   if (cursor.expansionAttempts % 1000 === 0) reduceReview(cursor, request);
 }
 function add(cursor: SearchCursor, state: SearchState, groupIndex: number, id: string, request: CanonicalRequest) {
-  const ids = state.selectedVariantIds.map(selected => indexFor(cursor.variantIds, cursor.variantIndex, selected)).sort((a, b) => a - b);
-  const edge = ids.join(",") + ">" + indexFor(cursor.variantIds, cursor.variantIndex, id);
+  const edge = variantKey(state.selectedVariantIds.map(selected => indexFor(cursor.variantIds, cursor.variantIndex, selected))) + ">" + indexFor(cursor.variantIds, cursor.variantIndex, id);
   if (cursor.edges.has(edge)) { const key = cursor.edges.get(edge); return key != null ? restoreState(cursor, cursor.archive.get(key)!) : null; }
   cursor.expansionAttempts++;
   let next = tryAddVariant(state, variant(cursor, groupIndex, id), cursor.groups[groupIndex]!, request);
