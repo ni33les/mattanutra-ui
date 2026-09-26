@@ -34,8 +34,16 @@ test('PRACTICAL-CHECKOUT-02 read selection returns the chosen option advice befo
 
 test('PRACTICAL-CHECKOUT-03 only new checkout publication takes its existing commercial snapshot fence', async () => {
   assert.equal(typeof checkout.lockCurrentWebCheckoutRecommendations, 'function');
-  const {sql, queries} = database(); await checkout.lockCurrentWebCheckoutRecommendations(sql, input);
-  assert.equal(queries.filter(q => /for share/i.test(q)).length, 1);
+  const {sql, queries} = database();
+  const prepared = await checkout.currentWebCheckoutSelection(sql, input);
+  const before = queries.length;
+  const rows = await Reflect.apply(checkout.lockCurrentWebCheckoutRecommendations, null, [sql, input, prepared]);
+  assert.deepEqual(rows, prepared.recommendations);
+  const publication = queries.slice(before);
+  assert.equal(publication.filter(q => /for share/i.test(q)).length, 1);
+  assert.equal(publication.length, 2, 'Only epoch fencing and a narrow revision check belong under checkout locks');
+  assert.ok(publication.every(q => !q.includes('r.diagnostics,') && !q.includes('product_recommendation_items')),
+    'Product/advice decoding and rendering are completed before the checkout transaction');
 });
 
 test('PRACTICAL-CHECKOUT-04 old unexecuted profile results require refresh before new checkout', async () => {
