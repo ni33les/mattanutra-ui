@@ -296,6 +296,7 @@ function finishBeamLayer(cursor: SearchCursor, request: CanonicalRequest) {
 }
 function startRepair(cursor: SearchCursor, request: CanonicalRequest) {
   cursor.phase = "repair";
+  cursor.singles=[]; cursor.beam=[]; cursor.expanded=[]; cursor.exactStack=[];
   cursor.repairLimit = cursor.expansionAttempts + Math.floor((cursor.expansionBudget - cursor.expansionAttempts) * .75);
   const candidates = [...cursor.review, ...cursor.unreviewed].sort((a,b) => compareSearchStates(a,b,request));
   const leaders = profileLeaders(candidates, request, 5);
@@ -415,6 +416,7 @@ export function advanceSearchCursor(cursor: SearchCursor, request: CanonicalRequ
           if (!cursor.second.includes(row)) cursor.second.push(row);
         }
         for (const row of ranked) { if (cursor.second.length >= width(cursor)) break; if (!cursor.second.includes(row)) cursor.second.push(row); }
+        cursor.repairJobs=[]; cursor.repaired=[];
         cursor.secondIndex=0; cursor.group=0; cursor.variant=0; cursor.variants=null; cursor.groupLimit=-1; continue;
       }
       const job=cursor.repairJobs[cursor.repairJob++ % cursor.repairJobs.length]!;
