@@ -3,7 +3,7 @@ import { sha256Hex } from "@/lib/sha256";
 import { serializeExactValue } from "@/lib/matcher/exact-values";
 import { compileVariant, isDeferredConditional } from "@/lib/matcher/candidates";
 import { servingIncrement } from "@/lib/matcher/serving-grid";
-import { targetDoseTicks } from "@/lib/matcher/target-basis";
+import { intakeIsKnown, knownTargetExposure, targetBasis, targetDoseTicks } from "@/lib/matcher/target-basis";
 import { compareOverallScores, resolvePracticalProfile, searchStateScore, type OverallMatchingScore } from "@/lib/matcher/practical-scoring";
 import { divide, fromDecimal, multiply, rational, toNumber } from "@/lib/matcher/rational";
 import { fingerprintState } from "@/lib/matcher/dominance";
@@ -31,7 +31,7 @@ export type SearchCursor = {
   parent: number; variants: string[] | null; groupLimit: number; beamLimit: number;
   pairSum: number; pairLeft: number;
   repairJobs: RepairJob[]; repairJob: number; repairLimit: number;
-  repaired: SearchState[]; second: SearchState[]; secondIndex: number;
+  repaired: SearchState[]; second: SearchState[]; secondIndex: number; secondReferences: string[];
   exactStack: ExactFrame[];
   /** Resumable quantity probes; partial probe pairs survive checkpoint boundaries. */
   quantitySearch?: QuantitySearch;
@@ -100,7 +100,7 @@ export function createSearchCursor(groups: readonly ProductGroup[], request: Can
     done: false, exhausted: false, trimmed: false, exact, phase: exact ? "exact" : "single", archive: new Map(), edges: new Map(), review: [], unreviewed: [],
     subjects: [], subjectIndex: new Map(), variantIds: [], variantIndex: new Map(),
     singles: [], group: 0, variant: 0, beam: [seed], expanded: [], parent: 0, variants: null, groupLimit: -1, beamLimit: 0,
-    pairSum: 1, pairLeft: 0, repairJobs: [], repairJob: 0, repairLimit: 0, repaired: [], second: [], secondIndex: 0,
+    pairSum: 1, pairLeft: 0, repairJobs: [], repairJob: 0, repairLimit: 0, repaired: [], second: [], secondIndex: 0, secondReferences: [],
     exactStack: [{ state: seed, variantIds: null, position: -1 }] };
   remember(cursor, seed); return cursor;
 }
@@ -218,6 +218,19 @@ function add(cursor: SearchCursor, state: SearchState, groupIndex: number, id: s
   cursor.edges.set(edge, next ? remember(cursor, next) : null);
   completedAttempt(cursor, request);
   return next;
+}
+
+function completionKey(state: SearchState) { return [...state.selectedVariantIds].sort().join("|"); }
+function residualCompletions(initial: readonly DoseVariant[], state: SearchState, request: CanonicalRequest) {
+  return request.targets.filter(target => !isDeferredConditional(target)).flatMap(target => {
+    const intake = [...request.currentSupplements, ...(targetBasis(target) === "total_daily" ? request.dietaryIntake ?? [] : [])];
+    if (intake.some(row => row.subjectId === target.subjectId && !intakeIsKnown(row))) return [];
+    const residual = target.requested.units - knownTargetExposure(request, target, state.exposure.get(target.subjectId) ?? BigInt(0));
+    if (residual <= BigInt(0)) return [];
+    // Use immutable, physically compiled quantities. Reconsidering quantities
+    // created by interior probes after a yield would change checkpoint order.
+    return initial.filter(row => row.contributions.get(target.subjectId)?.units === residual);
+  });
 }
 
 function resetGroup(cursor: SearchCursor) { cursor.parent = 0; cursor.variant = 0; cursor.variants = null; cursor.groupLimit = -1; }
@@ -388,7 +401,12 @@ export function advanceSearchCursor(cursor: SearchCursor, request: CanonicalRequ
         }).filter((row): row is SearchState => Boolean(row));
         // Complete the practical incumbent before the raw-dose lane can spend
         // the remaining allowance on an already excessive routine.
-        cursor.second=[...new Set([...ranked.slice(0,1), ...profileLeaders(ranked,request,width(cursor)), ...references.slice(0,Math.ceil(width(cursor)/4))])];
+        const complementary = references.slice(0,Math.ceil(width(cursor)/4));
+        // The primary practical incumbent retains its labelled quantity order,
+        // even when the same basket is also a target reference.
+        const primary = ranked[0] ? completionKey(ranked[0]) : null;
+        cursor.secondReferences = [...new Set(complementary.map(completionKey))].filter(key => key !== primary);
+        cursor.second=[...new Set([...ranked.slice(0,1), ...profileLeaders(ranked,request,width(cursor)), ...complementary])];
         for (const row of rawDoseLeaders(ranked,request,Math.ceil(width(cursor)/2))) {
           if (cursor.second.length >= width(cursor)) break;
           if (!cursor.second.includes(row)) cursor.second.push(row);
@@ -431,7 +449,9 @@ export function advanceSearchCursor(cursor: SearchCursor, request: CanonicalRequ
         // can consume this group's small repair allowance. Completed edges are
         // reused after a yield, so these attempts remain checkpoint-safe.
         const initial=cursor.baseline[cursor.group]!.map(id=>variant(cursor,cursor.group,id));
-        const labelled=[...new Set([initial[0], ...[1,2,3].map(amount=>initial.find(row=>row.dailyUnits===amount))].filter((row): row is DoseVariant=>Boolean(row)))];
+        const residual = cursor.secondReferences.includes(completionKey(base)) && !request.productDoses?.some(row => row.productId === cursor.groups[cursor.group]!.productId)
+          ? residualCompletions(initial, base, request) : [];
+        const labelled=[...new Set([...residual, initial[0], ...[1,2,3].map(amount=>initial.find(row=>row.dailyUnits===amount))].filter((row): row is DoseVariant=>Boolean(row)))];
         for (const row of labelled) {
           if (cursor.expansionAttempts >= Math.min(stop,cursor.groupLimit)) break;
           add(cursor,base,cursor.group,row.variantId,request);
@@ -456,7 +476,7 @@ export function extendSearchCursor(cursor: SearchCursor, expansionBudget: number
   cursor.done=false;
   if (!cursor.exact) {
     cursor.phase="single"; cursor.group=0; cursor.variant=0; cursor.singles=[]; cursor.expanded=[]; cursor.parent=0; cursor.variants=null;
-    cursor.repaired=[]; cursor.repairJobs=[]; cursor.repairJob=0; cursor.second=[]; cursor.secondIndex=0;
+    cursor.repaired=[]; cursor.repairJobs=[]; cursor.repairJob=0; cursor.second=[]; cursor.secondIndex=0; cursor.secondReferences=[];
     // Completed edges remain cached and incumbents stay in the archive. Wider
     // exploration evaluates only edges absent from the standard pass.
     cursor.beam=[restoreState(cursor, cursor.archive.values().next().value!)];

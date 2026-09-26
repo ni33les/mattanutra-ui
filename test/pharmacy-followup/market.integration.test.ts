@@ -10,6 +10,7 @@ import { getTaskBundle } from "../../lib/task-service.ts";
 import { loadAdminSafetyReferenceSnapshot } from "../../lib/agentic/catalogue/load-safety-ceilings.ts";
 import { loadProductRecommendationFreshnessSnapshot } from "../../lib/product-recommendation-freshness.ts";
 import { prepareTaskCompletionResult } from "../../lib/task-result-applier.ts";
+import { MATCHER_VERSION } from "../../lib/matcher/config.ts";
 import { recommendWithMatcher } from "../../lib/matcher/adapters/web.ts";
 import { pharmacyOrderQuote } from "../../lib/pharmacy-orders.ts";
 fixtureDatabaseUrl();
@@ -25,7 +26,7 @@ test("PHARM-FOLLOWUP-MARKET visiting customer uses pharmacy catalogue through pr
   const original = (await getTaskBundle({taskId: row.id})).task;
   const {runtimeRevision,fingerprint} = await loadAdminSafetyReferenceSnapshot(sql);
   const task = {...original, payload: {...original.payload as Record<string,unknown>, catalogueRevision: runtimeRevision, safetyReferenceIdentity: {runtimeRevision,fingerprint}}};
-  const freshness = await loadProductRecommendationFreshnessSnapshot(sql, {planId:saved.planId,algorithmVersion:"importance-matching-4",stackPreference:"balanced"});
+  const freshness = await loadProductRecommendationFreshnessSnapshot(sql, {planId:saved.planId,algorithmVersion:MATCHER_VERSION,stackPreference:"balanced"});
   assert.equal(freshness?.countryCode,"TH");
   // Exercise the actual immutable catalogue loader, not its empty unit-test stub.
   const marker = process.env.NODE_TEST_CONTEXT;
