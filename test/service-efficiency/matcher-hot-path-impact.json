@@ -187,6 +187,11 @@
       "file": "test/matcher/flexible-v5-safety-compilation.test.ts",
       "expectedCases": 5,
       "reason": "Directly affected physical quantity and labelled-exposure compilation preserves Omega-3 components, conflicting facts, and request isolation"
+    },
+    {
+      "file": "test/service-efficiency/harness.test.ts",
+      "expectedCases": 9,
+      "reason": "PERF-PACK-03 binds each benchmark child to its own source/build identity, preserving runtime guards and isolated fixture settings"
     }
   ],
   "exclusions": "No full application/MCP, live database, payment or unrelated browser suites; no contract or scoring-policy changes."

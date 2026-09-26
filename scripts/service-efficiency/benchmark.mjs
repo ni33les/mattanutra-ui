@@ -8,6 +8,10 @@ import { compareBenchmarkRuns, verifyBenchmarkOverheads } from "./benchmark-proo
 import { scopedBenchmarkCommand } from "./runtime-resources.mjs";
 
 const git = (root, ...args) => execFileSync("git", ["-C", root, ...args], { encoding: "utf8" }).trim();
+export function benchmarkEnvironment(env, root) {
+  const source = git(root, "rev-parse", "HEAD");
+  return { ...env, ...Object.fromEntries(["AGENTIC_BUILD_ID", "AGENTIC_WORKER_VERSION", "WORKER_VERSION", "COMMIT_SHA", "COMMIT_HASH"].map(key => [key, source])) };
+}
 export function benchmarkControl(env) {
   const control = env.EFFICIENCY_CONTROL_WORKTREE, releaseBase = env.EFFICIENCY_CONTROL_COMMIT;
   assert.ok(control && /^[a-f0-9]{40}$/.test(releaseBase ?? ""), "Explicit benchmark control worktree and commit are required");
@@ -26,7 +30,7 @@ export async function benchmarkServices(output, env, inventory) {
         const launch = scopedBenchmarkCommand(name, [process.execPath,"--experimental-strip-types", "--import", resolve(cwd, "scripts/register-ts-path-loader.mjs"),
           "--import", resolve(cwd, "test/helpers/offline-network.mjs"), resolve("scripts/service-efficiency/benchmark-worker.mjs"), id, file]);
         const child = spawn(launch.command, launch.args, {
-          cwd, env: { ...env, NODE_OPTIONS: "", EFFICIENCY_RESOURCE_BOUND:"uat" }, detached: true, stdio: ["ignore", fd, fd] });
+          cwd, env: { ...benchmarkEnvironment(env, cwd), NODE_OPTIONS: "", EFFICIENCY_RESOURCE_BOUND:"uat" }, detached: true, stdio: ["ignore", fd, fd] });
         const cancel = () => { try { process.kill(-child.pid, "SIGKILL"); } catch { /* exited */ } };
         const timer = setTimeout(cancel, 200_000);
         process.once("SIGTERM", cancel); process.once("SIGINT", cancel);
