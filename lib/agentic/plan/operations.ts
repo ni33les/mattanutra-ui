@@ -92,8 +92,12 @@ export async function admitPlanOperation(store: AgenticStore, input: Readonly<{
 }
 
 export async function claimPlanOperation(store: AgenticStore, id: string, leaseToken: string, now: string) {
+  if (store.claimOperation) {
+    const claimed = await store.claimOperation(id, leaseToken, now, new Date(Date.parse(now) + PLAN_OPERATION_LEASE_MS).toISOString());
+    if (!claimed) await expirePlanOperation(store, id, now);
+    return claimed;
+  }
   if (await expirePlanOperation(store, id, now)) return null;
-  if (store.claimOperation) return store.claimOperation(id, leaseToken, now, new Date(Date.parse(now) + PLAN_OPERATION_LEASE_MS).toISOString());
   const claimed = await store.transaction(async tx => {
     const current = await tx.getPlanOperation(id, { includeCursor: false });
     if (!current || ["complete", "cancelled", "failed"].includes(current.status)) return null;
