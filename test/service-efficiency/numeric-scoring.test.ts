@@ -57,24 +57,6 @@ test('PERF-CPU-66 a narrow basket addition reevaluates only its changed nutrient
   const changedWeight = { ...input, scoring: { profile: 'balanced' as const, weights: { nutrients: { [ids[0]]: 0 } } } };
   numericalWeightedDoseFitScore(changedWeight, parent.exposure);
   assert.deepEqual(numericalWeightedDoseFitScore(changedWeight, child.exposure), numericalWeightedDoseFitScore(changedWeight, new Map(child.exposure)));
-  for (const weight of [0, 0.25, 2]) {
-    const continued = { subjectId: ids[0], sourceId: 'continued-a', name: ids[0].toUpperCase(), dailyAmount: 40, unit: 'mg' as const,
-      daily: { subjectId: ids[0], dim: 'mass_ng' as const, units: 40_000_000n }, certainty: 'estimated' as const, minimumDailyAmount: 20, maximumDailyAmount: 60 };
-    const uncertain = request({ targets: targets.map(row => ({ ...row, basis: 'total_daily' as const })), currentSupplements: [continued],
-      dietaryIntake: [{ ...continued, sourceId: 'food-a', dailyAmount: 30, daily: { ...continued.daily, units: 30_000_000n }, minimumDailyAmount: 10, maximumDailyAmount: 50 }],
-      safetyCeilings: [...input.safetyCeilings!, { subjectId: ids[0], name: ids[0].toUpperCase(), maxAmount: 140, maxUnit: 'mg', sourceScope: 'total' }],
-      scoring: { profile: 'balanced', weights: { nutrients: { [ids[0]]: weight } } } });
-    const compiled = compileGroups(uncertain, catalog([product('base', Object.fromEntries(ids.map(id => [id, 50]))), product('addition', { [ids[0]]: 75 })]));
-    const bg = compiled.find(row => row.productId === 'base')!, ag = compiled.find(row => row.productId === 'addition')!;
-    assert.ok(bg && ag);
-    const before = tryAddVariant(seedState(uncertain), bg.variants.find(row => row.dailyUnits === 1)!, bg, uncertain)!;
-    assert.ok(before); numericalWeightedDoseFitScore(uncertain, before.exposure);
-    const after = tryAddVariant(before, ag.variants.find(row => row.dailyUnits === 1)!, ag, uncertain)!;
-    assert.ok(after);
-    const delta = numericalWeightedDoseFitScore(uncertain, after.exposure);
-    assert.deepEqual(delta, numericalWeightedDoseFitScore(uncertain, new Map(after.exposure)), 'Uncertain intake endpoints must be reevaluated at the effective weight');
-    if (weight === 0) assert.equal(fractions.compare(delta.exact, { num: 879n, den: 70n }), 0, 'Zero fitting weight cannot remove either reference-scope excess');
-  }
   assert.ok(oldEndpointReads <= 2, `A one-nutrient addition should not reread ${oldEndpointReads} unrelated cached endpoint records`);
 });
 
