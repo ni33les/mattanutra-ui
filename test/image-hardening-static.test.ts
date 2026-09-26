@@ -109,14 +109,35 @@ function imageNodes(filePath: string) {
   return nodes;
 }
 
+const approvedNong = '<img src="/assets/library/nong/nong-celebrate.webp" width={118} height={118} className="nong-matta" alt={thai ? "น้อง Matta ต้อนรับคุณ" : locale === "en" ? "Nong Matta welcoming you" : "Nong Matta 欢迎您"} />';
+const landingPath = "components/pharmacy/landing.tsx";
+
+function rawImageMarkup(source: string) {
+  const syntax = ts.createSourceFile(landingPath, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+  const printer = ts.createPrinter({ removeComments: true });
+  const images: string[] = [];
+  function visit(node: ts.Node) {
+    if ((ts.isJsxSelfClosingElement(node) || ts.isJsxOpeningElement(node)) && jsxTagName(node.tagName) === "img") {
+      images.push(printer.printNode(ts.EmitHint.Unspecified, node, syntax));
+    }
+    ts.forEachChild(node, visit);
+  }
+  visit(syntax);
+  return images;
+}
+
 function hasUnapprovedRawImage(filePath: string, source: string) {
-  return filePath !== "components/facebook-pixel.tsx" && /<img\b/.test(source);
+  if (filePath === "components/facebook-pixel.tsx" || !/<img\b/.test(source)) return false;
+  if (filePath !== landingPath) return true;
+  const images = rawImageMarkup(source);
+  // Handoff 9c626504: preserve this single exact tag, including localized alt text.
+  return images.length !== 1 || images[0] !== rawImageMarkup(approvedNong)[0];
 }
 
 describe("image hardening", () => {
   const uiFiles = reactUiRoots.flatMap(collectFiles);
 
-  it("keeps React UI free of raw img elements", () => {
+  it("keeps React UI free of unapproved raw img elements", () => {
     const offenders = uiFiles
       .filter((filePath) => hasUnapprovedRawImage(relativePath(filePath), readFileSync(filePath, "utf8")))
       .map(relativePath);
@@ -131,9 +152,6 @@ describe("image hardening", () => {
       "scraper/generated HTML image parsing is intentionally outside the React UI rule"
     );
   });
-
-  const approvedNong = '<img src="/assets/library/nong/nong-celebrate.webp" width={118} height={118} className="nong-matta" alt={thai ? "น้อง Matta ต้อนรับคุณ" : locale === "en" ? "Nong Matta welcoming you" : "Nong Matta 欢迎您"} />';
-  const landingPath = "components/pharmacy/landing.tsx";
 
   it("recognizes only the deliberately approved pharmacy handoff image", () => {
     assert.equal(hasUnapprovedRawImage(landingPath, approvedNong), false);

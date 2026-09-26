@@ -50,7 +50,7 @@ function Connection({ planId, slug, locale, orderId }: {
   return <div className={styles.connect} data-testid="pharmacy-line-connect">
     {prepared ? <>
       <a href={prepared.lineUrl} target="_blank" rel="noopener noreferrer" aria-label={c.alt} className={styles.qr}>
-        <Image src={prepared.qrDataUrl} width={176} height={176} unoptimized alt={c.alt} />
+        <Image src={prepared.qrDataUrl} width={176} height={176} alt={c.alt} />
       </a>
       <p className={styles.instruction}>{c.instruction}</p>
       <a className={styles.open} href={prepared.lineUrl} target="_blank" rel="noopener noreferrer">{c.open}</a>
