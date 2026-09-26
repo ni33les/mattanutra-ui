@@ -129,6 +129,28 @@ test('PERF-CPU-02 repeated label identities resolve references once without mixi
   assert.equal(conflict.size, 0, 'Cached identity must never upgrade conflicting product evidence');
 });
 
+test('PERF-CPU-03 repeated candidate additions reuse physical quantities and reprice changed offers', async () => {
+  const { product } = await import('../matcher/flexible-v5-fixtures.ts');
+  const { compileGroups } = await import('../../lib/matcher/candidates.ts');
+  const { seedState, tryAddVariant } = await import('../../lib/matcher/search.ts');
+  const input = request();
+  const listing = product('repeat-dose', { a: 50 }, 100, { administration: {
+    route: 'oral', physicalUnit: 'tablet', unitsPerServing: 1, doseIncrement: 1, packQuantity: 30,
+    provenance: { status: 'verified', sourceUrl: 'https://example.test/label', sourceText: 'One tablet per serving; 30 tablets', verifiedAt: '2026-09-26' }
+  } });
+  const [group] = compileGroups(input, { catalogueVersion: 'repeat-dose', availabilityAsOf: '2026-09-26', products: [listing] });
+  assert.ok(group); const variant = group.variants.find(row => row.dailyUnits === 2); assert.ok(variant);
+  const first = tryAddVariant(seedState(input), variant, group, input); assert.ok(first);
+  assert.equal(first.monthlyPriceMinor, 200); assert.deepEqual(first.servingBurden, fractions.ONE);
+  measurements = 0;
+  const next = tryAddVariant({ ...seedState(input), price: 1000 }, variant, group, input); assert.ok(next);
+  assert.equal(measurements, 0, 'A supported variant has the same exact serving and pack basis in every basket');
+  assert.equal(next.price, 1100); assert.equal(next.monthlyPriceMinor, 200);
+  const repriced = tryAddVariant(seedState(input), variant, { ...group, product: { ...listing, unitPriceMinor: 150 } }, input);
+  assert.ok(repriced); assert.equal(repriced.monthlyPriceMinor, 300); assert.equal(repriced.price, 150);
+  assert.ok(measurements > 0, 'A changed offer must invalidate the cached commercial measurements');
+});
+
 test('REF-CPU-09 numerical matching compiles the subject set when incidental exposure has no applicable reference', () => {
   const input = request({ profileKnown: { ageYears: false, lifeStage: false, sex: false } });
   let traversals = 0;
