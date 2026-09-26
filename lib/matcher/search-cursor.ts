@@ -54,9 +54,14 @@ function unpackedExposure(cursor: SearchCursor, packed: ExactVector) {
 }
 // Packed rows are immutable and scoped to one cursor. Re-reading an edge must
 // not rebuild the same maps (and discard all numerical WeakMap caches).
-const restoredStates = new WeakMap<ArchivedState, SearchState>();
+const restoredStates = new WeakMap<SearchCursor, Map<ArchivedState, SearchState>>();
+function stateCache(cursor: SearchCursor) {
+  let cache = restoredStates.get(cursor);
+  if (!cache) { cache = new Map(); restoredStates.set(cursor, cache); }
+  return cache;
+}
 function restoreState(cursor: SearchCursor, packed: ArchivedState): SearchState {
-  const cached = restoredStates.get(packed); if (cached) return cached;
+  const cache = stateCache(cursor), cached = cache.get(packed); if (cached) return cached;
   const selectedVariantIds = packed[5].map(index => cursor.variantIds[index]!);
   const exposure = unpackedExposure(cursor, packed[6]);
   const state: SearchState = { nextGroupIndex: packed[0], price: packed[1], pills: packed[2], count: packed[3], pillCountKnown: packed[4],
@@ -66,7 +71,7 @@ function restoreState(cursor: SearchCursor, packed: ArchivedState): SearchState 
       return group.productId;
     }), exposure, delivered: packed[7] === packed[6] ? exposure : unpackedExposure(cursor, packed[7]), unknownProductIds: packed[8],
     ...(packed[9] ? { routineServings: packed[9][0], uncertainAdministrationCount: packed[9][1], monthlyPriceMinor: packed[9][2], monthlyPriceLowerBound: packed[9][3], servingBurden: packed[9][4] } : {}) };
-  restoredStates.set(packed, state); return state;
+  cache.set(packed, state); return state;
 }
 export function* archivedSearchStates(cursor: SearchCursor) {
   for (const packed of cursor.archive.values()) yield restoreState(cursor, packed);
@@ -80,7 +85,7 @@ function remember(cursor: SearchCursor, state: SearchState) {
       ids, exposure,
       state.delivered === state.exposure ? exposure : packedExposure(cursor, state.delivered), [...(state.unknownProductIds ?? [])],
       [[...(state.routineServings ?? [])], state.uncertainAdministrationCount ?? state.count, state.monthlyPriceMinor ?? null, state.monthlyPriceLowerBound ?? 0, state.servingBurden]]);
-    if (state.count > 0) restoredStates.set(cursor.archive.get(key)!, state);
+    if (state.count > 0) stateCache(cursor).set(cursor.archive.get(key)!, state);
     cursor.unreviewed.push(state);
   }
   return key;
