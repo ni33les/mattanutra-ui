@@ -208,11 +208,14 @@ export function compareClosestDose(left: ScoredBasket, right: ScoredBasket, requ
     basketSignature(left).localeCompare(basketSignature(right));
 }
 
+const productDoseSignatures = new WeakMap<ScoredBasket, string>();
 function productDoseSignature(basket: ScoredBasket) {
-  return basket.variantIds.map(variantId => {
+  const cached = productDoseSignatures.get(basket); if (cached !== undefined) return cached;
+  const value = basket.variantIds.map(variantId => {
     const productId = basket.productIds?.find(id => variantId.includes(`:${id}:x`));
     return productId ? variantId.slice(variantId.lastIndexOf(`:${productId}:x`) + 1) : variantId;
   }).sort().join("|");
+  productDoseSignatures.set(basket, value); return value;
 }
 
 export function materiallyDifferent(left: ScoredBasket, right: ScoredBasket) {
