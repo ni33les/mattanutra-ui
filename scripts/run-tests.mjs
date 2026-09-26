@@ -7,6 +7,7 @@ import {
   printList,
   run
 } from "./dev-cycle-utils.mjs";
+import { isSharedMatcherSource, matcherTestInventory } from "./matcher-test-inventory.mjs";
 
 const TEST_ARGS = [
   "--experimental-test-module-mocks",
@@ -84,6 +85,7 @@ const assessmentTests = [
 ];
 
 const directTestByFile = new Map(allTestFiles().map((file) => [file, file]));
+const matcherTests = matcherTestInventory([...directTestByFile.keys()]).files;
 
 function addAll(target, tests) {
   for (const test of tests) {
@@ -106,6 +108,11 @@ function selectChangedTests(files) {
   for (const file of meaningfulFiles) {
     if (directTestByFile.has(file)) {
       tests.add(file);
+      continue;
+    }
+
+    if (isSharedMatcherSource(file)) {
+      addAll(tests, matcherTests);
       continue;
     }
 

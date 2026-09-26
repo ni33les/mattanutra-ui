@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
-import { existsSync, readdirSync } from "node:fs";
-import { extname, join } from "node:path";
+import { existsSync } from "node:fs";
+import { extname } from "node:path";
+import { recursiveTestFiles } from "./matcher-test-inventory.mjs";
 
 export const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
 
@@ -82,16 +83,7 @@ export async function changedFiles() {
 }
 
 export function allTestFiles() {
-  function collect(directory) {
-    return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
-      const path = join(directory, entry.name);
-      if (entry.isDirectory()) return collect(path);
-      return entry.isFile() && entry.name.endsWith(".test.ts")
-        ? [normalizePath(path)]
-        : [];
-    });
-  }
-  return collect("test").sort();
+  return recursiveTestFiles(process.cwd());
 }
 
 export function existingFiles(files) {

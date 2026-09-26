@@ -8,17 +8,29 @@ export const MATCHER_TEST_FAMILIES = Object.freeze({
   catalogue: /^test\/(?:catalogue-|dose-conversion|nutrient-identity|magnesium-ul-source|pack-facts|product-(?:advisory-cache-refresh|catalogue|countries|fact-canonical|form|health-advisory|validation)|retail-(?:listing-availability|sellability-pricing)|sale-states-catalogue)/,
   web: /^test\/(?:web-advisory|web-journey-fix\/|web-reveal-tidy|product-(?:matcher|matching|recommendation|recommendations|coverage)|recommendation-selection|assessment-(?:revisions|store-product-coverage)|formulation-|consistency-r|plan-(?:guidance-adjustments|reveal)|reveal-final|nutrition-(?:journey|report-reveal))/, 
   commerce: /^test\/(?:commerce-transactions|retail-(?:checkout-|cart-availability|order-workflow|product-checkout|plan-insert)|web-payment-|payment-confirmation-return)/,
-  additionalConsumers: /^test\/(?:admin-product-(?:facts|reference-retirement)|phase3-t01-t08-static|plan-keep-warm-static|product-card-layout|retail-stock-fx|v9-product-master)\.test\.ts$/,
+  additionalConsumers: /^test\/(?:admin-product-(?:facts|reference-retirement)|phase3-t01-t08-static|plan-keep-warm-static|product-card-layout|retail-stock-fx|v9-product-master|healthscore-performance\/availability-catalogue|pharmacy-followup\/market\.integration|reveal-coverage-corrections|web-matching-correctness\/(?:presentation|regressions))\.test\.ts$/,
   refinementInfrastructure: /^test\/(?:ax-refinement|service-efficiency)\//,
   infrastructure: /^test\/(?:full-test-suite-discovery|mcp-test-discovery|latency-acceptance-policy|dev-advisory-validation|dev-validation-(?:proof|fingerprints))/
 });
 
-export function recursiveTestFiles(root, directory = "test", suffix = ".test.ts") {
+export function isNodeTestFile(file) {
+  return /\.test\.(?:[cm]?[jt]s|[jt]sx)$/.test(file);
+}
+
+/** Shared matching and MCP entry points affect the maintained consumer inventory.
+ * Resolve these source paths before the development runner's generic categories. */
+export function isSharedMatcherSource(file) {
+  return /^lib\/(?:matcher\/|agentic\/|product-match|product-recommendation)/.test(file) ||
+    /^workers\/product-matcher(?:[-./])/.test(file) ||
+    /^app\/api\/(?:mcp|agentic)\//.test(file);
+}
+
+export function recursiveTestFiles(root, directory = "test", suffix = null) {
   const absolute = join(root, directory);
   if (!existsSync(absolute)) return [];
   const collect = folder => readdirSync(folder, { withFileTypes: true }).flatMap(entry => {
     const path = join(folder, entry.name);
-    return entry.isDirectory() ? collect(path) : entry.isFile() && entry.name.endsWith(suffix)
+    return entry.isDirectory() ? collect(path) : entry.isFile() && (suffix === null ? isNodeTestFile(entry.name) : entry.name.endsWith(suffix))
       ? [relative(root, path).replaceAll("\\", "/")] : [];
   });
   return collect(absolute).sort();

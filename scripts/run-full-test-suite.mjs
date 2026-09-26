@@ -4,7 +4,7 @@ import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync, createWriteStream } from "node:fs";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { recursiveTestFiles, matcherTestInventory, unclassifiedMatcherConsumers } from "./matcher-test-inventory.mjs";
+import { recursiveTestFiles, isNodeTestFile, matcherTestInventory, unclassifiedMatcherConsumers } from "./matcher-test-inventory.mjs";
 import { nodeExecutionProof, browserExecutionProof, testSourceHygiene } from "./test-execution-proof.mjs";
 export { nodeExecutionProof, browserExecutionProof, testSourceHygiene };
 
@@ -15,7 +15,7 @@ export function fullTestInventory(root = ROOT) {
   const node = recursiveTestFiles(root);
   const browser = recursiveTestFiles(root, "test/e2e", ".spec.ts");
   const matcher = matcherTestInventory(node);
-  return { node, browser, integration: node.filter(file => file.endsWith(".integration.test.ts")),
+  return { node, browser, integration: node.filter(file => file.includes(".integration.test.")),
     mcp: matcher.files, matcherGroups: matcher.groups };
 }
 
@@ -104,7 +104,7 @@ export async function runBatch(label, args, env, evidence) {
   if (label.startsWith("node-")) {
     try {
       const events = readFileSync(join(evidence, `${label}-events.jsonl`), "utf8").trim().split("\n").filter(Boolean).map(row => JSON.parse(row));
-      execution = nodeExecutionProof(args.filter(arg => arg.endsWith(".test.ts")), events);
+      execution = nodeExecutionProof(args.filter(isNodeTestFile), events);
       if (execution.cases !== tests) { execution.passed = false; execution.failures.push(`TAP case count ${tests} differs from semantic events ${execution.cases}`); }
     } catch (error) { execution = { passed: false, failures: [error.message] }; }
   }
