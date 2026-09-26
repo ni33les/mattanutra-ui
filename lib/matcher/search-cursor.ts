@@ -261,24 +261,18 @@ function diverseSingles(cursor: SearchCursor, request: CanonicalRequest) {
   return result;
 }
 export function rawDoseLeaders(states: readonly SearchState[], request: CanonicalRequest, limit: number) {
-  const facts = new Map(states.map((state, index) => {
+  const facts = new Map(states.map(state => {
     const dose = numericalDoseFitScore(request, state.exposure);
-    return [state, { index, dose, met: doseFitTargetDeviations(dose).filter(row => row.under === 0 && row.over === 0).length }] as const;
+    return [state, { dose, met: doseFitTargetDeviations(dose).filter(row => row.under === 0 && row.over === 0).length }] as const;
   }));
   const order = (a: SearchState, b: SearchState) => compareDoseFit(facts.get(a)!.dose, facts.get(b)!.dose) || compareSearchStates(a, b, request);
-  const ranked = smallest(states, Math.max(1, limit), order);
+  const ranked = [...states].sort(order);
   // Exact-target completion bases retain the same stable prefix without a
   // second complete sort or repeated exposure/deviation reads per comparison.
-  const exact = smallest(states, 2, (a,b) => facts.get(b)!.met - facts.get(a)!.met || order(a,b));
+  const exact = smallest(ranked, 2, (a,b) => facts.get(b)!.met - facts.get(a)!.met || order(a,b));
   const chosen: SearchState[] = [...new Set([ranked[0], ...exact].filter((row): row is SearchState => Boolean(row)))].slice(0,limit);
   const patterns = new Set(chosen.map(state => residualPattern(state,request)));
-  const minima = new Map<string, SearchState>();
-  for (const state of states) {
-    const pattern = residualPattern(state, request), previous = minima.get(pattern);
-    if (!patterns.has(pattern) && (!previous || order(state, previous) < 0)) minima.set(pattern, state);
-  }
-  for (const state of smallest([...minima.values()], Math.max(1, limit - chosen.length), (a,b) => order(a,b) || facts.get(a)!.index - facts.get(b)!.index)) {
-    if (chosen.length >= limit && limit > 0) break;
+  for (const state of ranked) {
     const pattern = residualPattern(state, request);
     if (!patterns.has(pattern)) { chosen.push(state); patterns.add(pattern); }
     if (chosen.length >= limit) break;
