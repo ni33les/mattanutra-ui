@@ -634,7 +634,7 @@
         "lib/funnel-recovery.ts:recoverFunnelWork",
         "lib/healthscore-delivery.ts:deliverHealthScore",
         "lib/healthscore-delivery.ts:requestHealthScoreDelivery",
-        "lib/retail-product-checkout.ts:createRetailCheckoutSession",
+        "lib/retail-product-checkout.ts:lockWebCheckoutAssessment",
         "lib/stripe-payments.ts:createStripeCheckoutSession",
         "lib/task-result-applier.ts:applyTaskCompletionResult",
         "lib/task-result-applier.ts:applyTaskFailureResult",
@@ -1864,8 +1864,8 @@
     {
       "file": "lib/assessment-capture.ts",
       "owner": "captureAssessment",
-      "key": "f611d5fbf208473ce100fe05613d4b7804e2a482e2221c94122ae8c982fb3146",
-      "statement": "`select selected_plan, input_revision from public.assessments where plan_id = ${planId}::uuid for no key update`",
+      "key": "0a6ab8b011bb0839eccd068ca10cfd5d263420854b2cbbb9a01a44e21a566170",
+      "statement": "`select selected_plan, input_revision, answers from public.assessments where plan_id = ${planId}::uuid for no key update`",
       "mechanisms": [
         14
       ],
@@ -1994,9 +1994,9 @@
     },
     {
       "file": "lib/retail-product-checkout.ts",
-      "owner": "createRetailCheckoutSession",
-      "key": "59cbfb4153900f07e40feb9e174a94f310f8daf295fc549e609840cb19fef647",
-      "statement": "`select plan_id from public.assessments where plan_id = ${input.planId}::uuid for no key update`",
+      "owner": "lockWebCheckoutAssessment",
+      "key": "a27e9d303dcfbfe0a458b75780766696aa23bba8499d5b0e6ba000336a90ca43",
+      "statement": "`select plan_id from public.assessments where plan_id = ${planId}::uuid for no key update`",
       "mechanisms": [
         14
       ],
