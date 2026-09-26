@@ -5,8 +5,8 @@
   "files": [
     {
       "file": "test/service-efficiency/numeric-scoring.test.ts",
-      "expectedCases": 45,
-      "reason": "Exact internal records, serving lower bounds, immutable quantity/intake/exposure reuse and complete public materialization without search changes; PERF-CPU-26\u201328 and 30: one quantity-group lookup, normalized endpoint components, exact identity/common-denominator comparison and canonical unit parsing; PERF-CPU-31/33 preserve stable remaining-gap leaders and reuse preference denominators; PERF-CPU-59: exact monotonic profile bounds avoid redundant scoring while allowing decreasing weights to reverse ordering"
+      "expectedCases": 46,
+      "reason": "Exact internal records, serving lower bounds, immutable quantity/intake/exposure reuse and complete public materialization without search changes; PERF-CPU-26\u201328 and 30: one quantity-group lookup, normalized endpoint components, exact identity/common-denominator comparison and canonical unit parsing; PERF-CPU-31/33 preserve stable remaining-gap leaders and reuse preference denominators; PERF-CPU-59: exact monotonic profile bounds avoid redundant scoring while allowing decreasing weights to reverse ordering; PERF-CPU-60: common exact aggregation scale avoids repeated denominator discovery"
     },
     {
       "file": "test/service-efficiency/immutable-references.test.ts",
