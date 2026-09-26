@@ -145,8 +145,7 @@ function subjectLoss(input: { target: CanonicalRequest["targets"][number] | unde
     }
   }
   return { minimum, maximum, added, continuedIncrease, worst: worst!,
-    score: { exact: worst!.total, fitting: worst!.fitting, safety: worst!.safety,
-      deviations: target ? [{ subjectId: target.subjectId, under: value(worst!.shortfall), over: value(worst!.overshoot) }] : [] } };
+    deviation: target ? { subjectId: target.subjectId, under: value(worst!.shortfall), over: value(worst!.overshoot) } : null };
 }
 function cachedSubjectLoss(input: ReturnType<typeof compileSubject>, known: bigint, weight: Fraction) {
   let cache = input.losses.get(weight);
@@ -193,14 +192,14 @@ function calculateDoseFit(request: CanonicalRequest, exposure: ReadonlyMap<strin
   if (!cache) { cache = new WeakMap(); memo.set(request, cache); }
   const previous = cache.get(exposure);
   if (previous && !materialize) return previous;
-  const pieces: NumericalDoseFitScore[] = [];
+  const fittingTerms: Fraction[] = [], safetyTerms: Fraction[] = [], intentTerms: Fraction[] = [];
   const displayTerms: Fraction[][] | null = materialize ? [[], [], []] : null;
   const settings = applyWeights && request.scoring ? effectiveWeights(request.scoring) : null;
   const weights = settings ? exactWeights(settings) : null;
   const perTarget: DoseFitScore["perTarget"][number][] | null = materialize ? [] : null;
   const perContinuedDose: NonNullable<DoseFitScore["perContinuedDose"]>[number][] | null = materialize ? [] : null;
   const perLimit: DoseFitScore["perLimit"][number][] | null = materialize ? [] : null;
-  const estimatedTargets: string[] = [];
+  const deviations: TargetDeviation[] = [], estimatedTargets: string[] = [];
   let fixed = fixedSubjects.get(request);
   if (fixed === undefined) {
     fixed = request.currentSupplements.length === 0 && (!knownLimitProfile(request) || !request.safetyCeilings?.length)
@@ -219,8 +218,11 @@ function calculateDoseFit(request: CanonicalRequest, exposure: ReadonlyMap<strin
     if (!target && reference === BigInt(0) && bounds.length === 0) continue;
     const known = exposure.get(subjectId) ?? BigInt(0);
     const weight = weights ? weights.subjects.get(subjectId) ?? weights.defaultWeight : ONE;
-    const { minimum, maximum, added, continuedIncrease, worst, score } = cachedSubjectLoss(compiled, known, weight);
-    pieces.push(score);
+    const { minimum, maximum, added, continuedIncrease, worst, deviation } = cachedSubjectLoss(compiled, known, weight);
+    if (settings) intentTerms.push(worst.total);
+    fittingTerms.push(worst.fitting);
+    safetyTerms.push(worst.safety);
+    if (deviation) deviations.push(deviation);
     if (!materialize) continue;
     displayTerms![0]!.push(worst.shortfall); displayTerms![1]!.push(worst.overshoot); displayTerms![2]!.push(worst.limitLoss);
     const estimated = minimum !== maximum || dietary.minimum !== dietary.maximum;
@@ -261,18 +263,17 @@ function calculateDoseFit(request: CanonicalRequest, exposure: ReadonlyMap<strin
         ruleId: catalogBandRuleId(row.ceiling), authorityUrl: row.ceiling.authorityUrl ?? null, certainty: rowCertainty });
     }
   }
-  let facts = pieces[0];
-  if (pieces.length !== 1) {
-    const fitting = sum(pieces.map(row => row.fitting)), safety = sum(pieces.map(row => row.safety));
-    facts = { fitting, safety, exact: settings ? sum(pieces.map(row => row.exact)) : add(fitting, safety),
-      deviations: pieces.flatMap(row => row.deviations).sort((a, b) => a.subjectId < b.subjectId ? -1 : a.subjectId > b.subjectId ? 1 : 0) };
-  }
+  const fitting = fittingTerms.length === 1 ? fittingTerms[0]! : sum(fittingTerms);
+  const weighted = safetyTerms.length === 1 ? safetyTerms[0]! : sum(safetyTerms);
+  const exact = settings ? (intentTerms.length === 1 ? intentTerms[0]! : sum(intentTerms)) : add(fitting, weighted);
+  const facts = { exact, fitting, safety: weighted, deviations };
   if (!materialize) {
+    deviations.sort((a, b) => a.subjectId < b.subjectId ? -1 : a.subjectId > b.subjectId ? 1 : 0);
     cache.set(exposure, facts); return facts;
   }
   const [under, over, limit] = displayTerms!.map(sum);
   const score = { version: DOSE_FIT_VERSION, limitWeight: 2 as const, under: value(under), over: value(over),
-    limit: value(limit), weightedLimit: value(facts.safety), total: value(facts.exact), perTarget: perTarget!, perContinuedDose: perContinuedDose!, perLimit: perLimit!,
+    limit: value(limit), weightedLimit: value(weighted), total: value(exact), perTarget: perTarget!, perContinuedDose: perContinuedDose!, perLimit: perLimit!,
       unknownSubjectIds: [...new Set(request.unknownIntakeSubjectIds ?? [])].sort(),
       estimatedSubjectIds: [...new Set([...(request.estimatedIntakeSubjectIds ?? []), ...estimatedTargets])].sort() };
   exactFacts.set(score, facts);
