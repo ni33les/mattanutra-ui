@@ -226,7 +226,8 @@ export function overallMatchingScore(request: CanonicalRequest, exposure: Readon
   return displayOverall(numericalOverallMatchingScore(request, exposure, actual));
 }
 
-const stateScores = new WeakMap<SearchState["exposure"], { state: SearchState; actual: PracticalActuals; scores: Map<CanonicalRequest, NumericalOverallScore> }[]>();
+const stateActuals = new WeakMap<SearchState, PracticalActuals>();
+const stateScores = new WeakMap<CanonicalRequest, WeakMap<SearchState["exposure"], { state: SearchState; score: NumericalOverallScore }[]>>();
 function sameMeasurements(a: SearchState, b: SearchState) {
   return a.pills === b.pills && a.pillCountKnown === b.pillCountKnown && a.count === b.count && a.price === b.price &&
     a.uncertainAdministrationCount === b.uncertainAdministrationCount && a.monthlyPriceMinor === b.monthlyPriceMinor &&
@@ -235,24 +236,20 @@ function sameMeasurements(a: SearchState, b: SearchState) {
       : a.routineServings === b.routineServings);
 }
 export function numericalSearchStateScore(request: CanonicalRequest, state: SearchState): NumericalOverallScore {
-  let bucket = stateScores.get(state.exposure);
-  let row = bucket?.find(row => row.actual.currency === request.currency && (row.state === state || sameMeasurements(row.state, state)));
-  if (!row) {
-    const actual = { dailyPills: state.pillCountKnown === false ? null : state.pills,
+  let cache = stateScores.get(request); if (!cache) { cache = new WeakMap(); stateScores.set(request, cache); }
+  let bucket = cache.get(state.exposure);
+  if (bucket) for (const row of bucket) {
+    if (row.state === state || sameMeasurements(row.state, state)) return row.score;
+  }
+  let actual = stateActuals.get(state);
+  if (!actual) { actual = { dailyPills: state.pillCountKnown === false ? null : state.pills,
       pillLowerBound: state.pills, productCount: state.count, priceMinor: state.price, currency: request.currency,
       servings: state.routineServings ?? [], servingBurdenExact: state.servingBurden, uncertainProductCount: state.uncertainAdministrationCount ?? state.count,
-      monthlyPriceMinor: state.monthlyPriceMinor, monthlyPriceLowerBound: state.monthlyPriceLowerBound };
-    row = { state, actual, scores: new Map() };
-    if (!bucket) { bucket = []; stateScores.set(state.exposure, bucket); }
-    if (bucket.length >= 8) bucket.shift();
-    bucket.push(row);
-  }
-  let result = row.scores.get(request);
-  if (!result) {
-    result = numericalOverallMatchingScore(request, state.exposure, row.actual);
-    if (row.scores.size >= PRACTICAL_OBJECTIVES.length) row.scores.delete(row.scores.keys().next().value!);
-    row.scores.set(request, result);
-  }
+      monthlyPriceMinor: state.monthlyPriceMinor, monthlyPriceLowerBound: state.monthlyPriceLowerBound }; stateActuals.set(state, actual); }
+  const result = numericalOverallMatchingScore(request, state.exposure, actual);
+  if (!bucket) { bucket = []; cache.set(state.exposure, bucket); }
+  if (bucket.length >= 8) bucket.shift();
+  bucket.push({ state, score: result });
   return result;
 }
 export function searchStateScore(request: CanonicalRequest, state: SearchState): OverallMatchingScore {
