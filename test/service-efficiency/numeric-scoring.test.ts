@@ -135,6 +135,31 @@ test('REF-CPU-07 profile representatives share immutable quantity measurements',
   assert.equal(simpler.preferences.maxDailyPills.penalty, 169 / 9);
 });
 
+test('PERF-CPU-09 repeated physical-quantity lookup avoids rescanning old variants and retains new quantities', async () => {
+  const { compileGroups, compileVariant } = await import('../../lib/matcher/candidates.ts');
+  const { product } = await import('../matcher/flexible-v5-fixtures.ts');
+  const { seedState, tryAddVariant, reconstructVariants } = await import('../../lib/matcher/search.ts');
+  const input = request(), listing = product('indexed', { a: 5 });
+  const [compiled] = compileGroups(input, { catalogueVersion: 'index', availabilityAsOf: '2026-09-26', products: [listing] });
+  assert.ok(compiled && compiled.variants.length > 2, 'Fixture must contain several supported quantities');
+  let reads = 0;
+  const variants = compiled.variants.map((value, i) => i === 0 ? value : new Proxy(value, {get(target,key,receiver) {
+    if(key === 'variantId') reads++; return Reflect.get(target,key,receiver);
+  }}));
+  const group = {...compiled, variants}, first = variants[0]!;
+  const unrelated = {...seedState(input), selectedVariantIds:['unrelated:x1'], selectedProductIds:['unrelated']};
+  assert.ok(tryAddVariant(unrelated, first, group, input)); reads = 0;
+  assert.ok(tryAddVariant(unrelated, first, group, input));
+  assert.equal(reads, 0, 'Existing physical quantities must be indexed once, not scanned on every addition');
+  const extra = compileVariant({product:listing,request:input,dailyUnits:71}); assert.ok(extra);
+  variants.push(extra);
+  assert.equal(tryAddVariant({...unrelated,selectedVariantIds:[extra.variantId]}, first, group, input),null,
+    'A dynamically appended physical quantity still prevents selecting a second quantity of that product');
+  assert.deepEqual(reconstructVariants([group], [extra.variantId, first.variantId]), [extra,first]);
+  assert.deepEqual(reconstructVariants([{...group,variants:[{...first,dailyPills:91}]}], [first.variantId])[0]?.dailyPills,91,
+    'Replaced immutable quantity arrays carry their own values');
+});
+
 test('REF-CPU-08 supported quantity probes reuse compiled subject and unit facts', async () => {
   const { compileVariant } = await import('../../lib/matcher/candidates.ts');
   const { product } = await import('../matcher/flexible-v5-fixtures.ts');
