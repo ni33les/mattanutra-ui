@@ -190,7 +190,7 @@ async function concurrentPlanSamples(
   }
   const outcomes = await Promise.allSettled(Array.from({ length: workers }, () => worker()));
   const failures = outcomes.filter((outcome): outcome is PromiseRejectedResult => outcome.status === "rejected");
-  if (failures.length) throw new AggregateError(failures.map(outcome => outcome.reason), "Latency admission or terminal drain failed");
+  if (failures.length) throw new AggregateError(failures.map(outcome => outcome.reason), `Latency admission or terminal drain failed: ${failures.map(outcome => String(outcome.reason)).join("; ")}`);
   assert.equal(samples.length, total);
   return samples;
 }
