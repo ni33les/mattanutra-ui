@@ -20,6 +20,35 @@ mock.module('../../lib/matcher/rational.ts', { namedExports: { ...fractions, lin
 const { request } = await import('../matcher/flexible-v5-fixtures.ts');
 const { doseFitScore, numericalDoseFitScore, exactDoseFit, compareDoseFit, weightedDoseFitScore, numericalWeightedDoseFitScore } = await import('../../lib/matcher/dose-fit.ts');
 
+test('PERF-CPU-31 diverse retention sorts representatives instead of the complete candidate pool', async () => {
+  const { seedState, reviewFrontier } = await import('../../lib/matcher/search.ts');
+  const input = request(), base = seedState(input);
+  const states = Array.from({ length: 384 }, (_, i) => {
+    const exposure = new Map([['a', BigInt((i * 19) % 64) * 10_000_000n]]);
+    return { ...base, count: 1, pills: 1, price: (i * 7) % 23, exposure, delivered: exposure,
+      selectedVariantIds: [`retention-${i}`], selectedProductIds: [`product-${i}`], routineServings: [1] };
+  });
+  // Independent stable-sort oracle for the 48 distinct proportional-gap bins.
+  const expected = [], seen = new Set<bigint>();
+  for (const row of [...states].sort((a, b) => a.price - b.price)) {
+    const bin = row.delivered.get('a')! / 10_000_000n;
+    if (!seen.has(bin)) { seen.add(bin); expected.push(row); }
+    if (expected.length === 48) break;
+  }
+  assert.equal(expected.length, 48);
+  const original = Array.prototype.sort; let fullSorts = 0, selected;
+  try {
+    Array.prototype.sort = function (...args) {
+      if (this.length > 192 && this[0]?.selectedVariantIds) fullSorts++;
+      return Reflect.apply(original, this, args);
+    };
+    selected = reviewFrontier(states, input, [], (a, b) => a.price - b.price);
+  } finally { Array.prototype.sort = original; }
+  for (const row of expected) assert.ok(selected.includes(row), `Lost stable gap representative ${row.selectedVariantIds[0]}`);
+  assert.equal(new Set(selected).size, selected.length);
+  assert.equal(fullSorts, 0, 'Only the bounded gap representatives need ordering; the entire pool does not');
+});
+
 test('PERF-CPU-30 canonical dose units do not repeat alias-rewriting work', () => {
   const original = String.prototype.replace; let rewrites = 0;
   const expected = [['mg', 1000000n], ['mcg', 1000n], ['g', 1000000000n], ['cfu', 1n], ['million_cfu', 1000000n], ['billion_cfu', 1000000000n], ['ml', 1000n], ['serving', 1000n]] as const;
