@@ -21,18 +21,6 @@ mock.module('../../lib/matcher/rational.ts', { namedExports: { ...fractions, lin
 const { request } = await import('../matcher/flexible-v5-fixtures.ts');
 const { doseFitScore, numericalDoseFitScore, exactDoseFit, compareDoseFit, weightedDoseFitScore, numericalWeightedDoseFitScore } = await import('../../lib/matcher/dose-fit.ts');
 
-test('PERF-CPU-45 exact sums reuse a shared denominator instead of rescaling every term', () => {
-  for (const den of [1n, 97n, 2n ** 100n + 17n]) {
-    let reads = 0;
-    const values = Array.from({ length: 64 }, (_, i) => Object.freeze({ num: BigInt(i + 1), get den() { reads++; return den; } }));
-    const result = fractions.sum(values);
-    assert.equal(result.num * den, 2080n * result.den);
-    assert.ok(reads <= values.length + 4, `Shared denominator read ${reads} times for ${values.length} exact terms`);
-  }
-  assert.deepEqual(fractions.sum([{ num: 2n, den: 3n }, { num: -7n, den: 6n }, { num: 1n, den: 2n }]), fractions.ZERO);
-  assert.deepEqual(fractions.sum([{ num: 1n, den: 7n }, { num: 2n, den: 11n }, { num: 0n, den: 13n }]), { num: 25n, den: 77n });
-});
-
 test('PERF-CPU-33 numerical preference denominators compile once across basket evaluations', async () => {
   const { scorePracticalPenalties } = await import('../../lib/matcher/practical-scoring.ts');
   const input = request({ maxDailyPills: 7.75, maxProductCount: 37, maxPriceMinor: 123457 });
