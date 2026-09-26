@@ -532,7 +532,7 @@ export function supportedDoseDomain(product: MatcherProduct, request: CanonicalR
       }
     }
   }
-  const labelled = labelledSafetyExposure(product, Number(step.num) / Number(step.den), request, step);
+  const labelled = compiled?.safetyExposure ?? labelledSafetyExposure(product, Number(step.num) / Number(step.den), request, step);
   for (const ceiling of request.safetyCeilings ?? []) {
     const increment = labelled.get(ceiling.subjectId)?.units;
     if (!increment || increment <= 0) continue;
