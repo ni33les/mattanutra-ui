@@ -5,6 +5,14 @@ import { allTestFiles } from "../scripts/dev-cycle-utils.mjs";
 import { semanticTestEvent } from "../scripts/test-semantic-reporter.mjs";
 
 describe("full repository test gate", () => {
+  it("PERF-PACK-03 rejects a database name outside the complete PostgreSQL inventory before executing cases", () => {
+    const database = "postgres://127.0.0.1:55441/mattanutra_lock_review_performance_acceptance";
+    const invalid = fullTestPreflight({ TEST_DB_URL: database, DB_URL: database });
+    assert.ok(invalid.some(message => message.includes("mattanutra_lock_review_ax_")));
+    const compatible = database.replace("lock_review_performance_acceptance", "lock_review_ax_performance");
+    assert.ok(!fullTestPreflight({ TEST_DB_URL: compatible, DB_URL: compatible })
+      .some(message => message.includes("mattanutra_lock_review_ax_")));
+  });
   it("includes all Node and browser suites, with a distinct PostgreSQL batch", () => {
     const inventory = fullTestInventory();
     assert.deepEqual(inventory.node, allTestFiles());
