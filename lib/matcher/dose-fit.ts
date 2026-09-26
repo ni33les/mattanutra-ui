@@ -152,7 +152,7 @@ function cachedSubjectLoss(input: ReturnType<typeof compileSubject>, known: bigi
   let value = cache.get(known);
   if (!value) {
     value = subjectLoss(input, known, weight);
-    if (cache.size >= 256) cache.delete(cache.keys().next().value!);
+    if (cache.size >= 512) cache.delete(cache.keys().next().value!);
     cache.set(known, value);
   }
   return value;
