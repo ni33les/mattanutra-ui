@@ -44,9 +44,10 @@ An individual focused pass does not establish final acceptance.
 
 ## Behaviour boundaries
 
-Keep matching scoring, traversal, physical quantities, advisory preferences,
-eligibility, public MCP contract, six tools, pricing, financial invariants and
-frozen checkout contents unchanged. Keep ordinary web and pharmacy designs.
+Keep matching scoring, physical quantities, advisory preferences, eligibility,
+public MCP contract 11.1.0, six tools, pricing, financial invariants and frozen
+checkout contents unchanged. Traversal is preserved except for the explicitly
+reviewed A4 residual-completion repair below. Keep ordinary web and pharmacy designs.
 No new application locks or scheduling queues are introduced. Existing short
 atomic transitions and managed-pool timeout/cancellation protections remain.
 
@@ -150,3 +151,51 @@ approved landing markup or its appearance. Its exact Nong image is now a narrow
 element-level exception with negative mutation checks. The pharmacy LINE QR
 lost a redundant Next Image property; installed-framework output is identical
 in English, Thai and Chinese. Existing browser geometry checks remain required.
+
+
+## Integrated-run findings and reviewed exceptions
+
+The first integrated attempt, `acceptance-final-1`, used source `546e1adf` and is
+**failed and interrupted**, not green or deployable. Its original logs, failed
+assertions, raw execution records and partial client evidence remain outside
+the checkout. Focused repair passes do not replace a new complete gate on final
+unchanged source.
+
+The following repairs address diagnosed behaviour, rather than deleting failing
+cases:
+
+| Finding | Repair and maintained evidence |
+| --- | --- |
+| Terminal plan reads obscured precise validation errors | Preserve typed field/limit errors through JSON, SSE, polling and replay; `simple-plan/refinement-consistency` and streaming cases |
+| Resident matching rehashed an unowned mutable catalogue | Own and freeze one snapshot at the resident-session boundary; mutation/recovery and REF-CPU-14 regressions |
+| Completed or pending formula work was duplicated after web-answer projection | Reuse canonical generation identity with revision, locale and generator fences; preserve missing-output recovery and legacy NULL hashes without backfill; HS-COUNT-01–09 |
+| Service metadata advertised an older version | Derive initialize service version from contract 11.1.0; generated schemas and six tools are unchanged |
+| A LINE connection-code collision aborted another allocation | Retry within a fixed bound using the existing unique index; preserve other plans and caller transactions |
+| Rate-limit proof could disturb customer storage | Run the actual limiter against private bounded proof storage; require observed rejection and preserve customer counters/capacity |
+
+The A4 test exposed a supported complementary quantity that bounded search did
+not reach. The approved exception tries exact remaining-gap quantities earlier
+for complementary reference baskets. It uses only immutable, physically compiled
+quantities, leaves the primary practical incumbent's labelled ordering intact,
+and retains scoring, eligibility and the 8,000/64,000 attempt budgets. Fixed-dose
+proposals and unknown intake do not acquire invented residual quantities.
+`flexible-v5-residual` and `ax-refinement/retention` protect the restored A4
+closest-dose alternative, exact arithmetic, checkpoint order and named controls.
+This is a search-order change, not a claim of universal output equivalence or a
+global optimum. Its internal matcher identity is **importance-matching-5**;
+public contract 11.1.0 remains unchanged.
+
+Old matcher checkpoints must not resume under identity 5. DEV rollout drains all
+nonterminal MCP operations as well as leased tasks, checks again after shutdown,
+and stops if work remains. It neither deletes cursors nor resets attempt budgets.
+Completed results and frozen checkouts remain stored. Formula reuse changes need
+no schema migration or historical update.
+
+Test maintenance also corrected stale delivery/prompt/browser expectations
+against current behaviour. The WEB-JOURNEY-08 change is supported by independent
+arithmetic for the already-approved WM-09 uncertainty penalty; fixture prices
+and historical results remain intact. Its expectation ledger records the exact
+trade-off rather than weakening that penalty. Classic-fallback browser cases now
+select the fallback explicitly, raw browser evidence must reconcile with
+execution, and HTTP notification/timing checks observe real events instead of a
+synthetic acknowledgement. These changes remain subject to final acceptance.
