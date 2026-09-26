@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { afterEach, test } from "node:test";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { runObservedRequest, cancelRequest, resetRequestTraces } from "../../lib/agentic/qa/request-trace.ts";
 import { resetResourcePermits, setPermitCapacity, snapshotResourcePermits } from "../../lib/agentic/qa/resource-permits.ts";
 import { advanceServiceClock, resetServiceClock } from "../../lib/agentic/qa/service-clock.ts";
@@ -34,4 +34,17 @@ test("LOCK-PERMIT-03 matching preparation and checkout do not use synthetic data
   for (const file of ["lib/agentic/plan/service.ts", "lib/agentic/commerce/execute.ts"]) {
     assert.doesNotMatch(readFileSync(file, "utf8"), /(?:acquirePermit|releasePermit|qa\/resource-permits)/, file);
   }
+});
+
+test('PERF-LIFETIME-01 release checks observe actual request ownership instead of retired permit counters', async () => {
+  assert.equal(existsSync('lib/agentic/qa/resource-permits.ts'), false, 'Unused permit scheduling machinery must be removed');
+  const { activeRequestCountForTests } = await import('../../lib/agentic/qa/request-trace.ts');
+  const entered = Promise.withResolvers<void>(), gate = Promise.withResolvers<void>();
+  const pending = runObservedRequest('real-resource-census', async () => { entered.resolve(); await gate.promise; return 'done'; });
+  await entered.promise; assert.equal(activeRequestCountForTests(), 1);
+  cancelRequest('real-resource-census');
+  const result = await pending; assert.equal(typeof result, 'object');
+  assert.equal(activeRequestCountForTests(), 1, 'Cancelled computation still owns its cleanup until it stops');
+  gate.resolve(); await new Promise(resolve => setImmediate(resolve));
+  assert.equal(activeRequestCountForTests(), 0);
 });
