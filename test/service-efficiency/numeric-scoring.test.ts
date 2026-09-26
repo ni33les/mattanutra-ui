@@ -74,6 +74,20 @@ test('REF-CPU-04 neutral rational operations reuse immutable values without chan
   assert.deepEqual(fractions.fromDecimal('1.25e-2'), { num: 1n, den: 80n });
 });
 
+test('PERF-CPU-07 rational normalization allocates no iterator per Euclidean step and preserves wide integers', () => {
+  let iterations = 0;
+  const iterator = Array.prototype[Symbol.iterator];
+  let small, wide;
+  try {
+    Array.prototype[Symbol.iterator] = function() { iterations++; return iterator.call(this); };
+    small = fractions.rational(1836311903n, 1134903170n);
+    wide = fractions.rational((2n ** 90n + 1n) * 17n, (2n ** 90n - 1n) * 17n);
+  } finally { Array.prototype[Symbol.iterator] = iterator; }
+  assert.deepEqual(small, {num: 1836311903n, den: 1134903170n});
+  assert.deepEqual(wide, {num: 2n ** 90n + 1n, den: 2n ** 90n - 1n});
+  assert.equal(iterations, 0, 'Normalization must not allocate an iterable pair per exact remainder');
+});
+
 test('PERF-CPU-04 compiled exact linear terms preserve fractional weights and reject mismatched axes', () => {
   assert.equal(typeof fractions.compileLinearTerms, 'function');
   const values = fractions.compileLinearTerms([fractions.rational(7n, 13n), fractions.rational(3n, 10n), fractions.rational(-2n, 7n)]);
