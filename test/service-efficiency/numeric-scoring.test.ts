@@ -95,6 +95,30 @@ test('PERF-CPU-15 one exact score owns its arithmetic and deviation facts togeth
   assert.equal(display.perLimit[0].excess, 0.75);
   assert.deepEqual(Object.keys(structuredClone(display)).sort(), Object.keys(display).sort(), 'No internal exact cache facts leak into the public result');
 });
+test('PERF-CPU-16 retained baskets reuse quantity lookup without rescanning unrelated variants', async () => {
+  const { compileGroups } = await import('../../lib/matcher/candidates.ts');
+  const { reconstructVariants, quantityById } = await import('../../lib/matcher/search.ts');
+  const { product } = await import('../matcher/flexible-v5-fixtures.ts');
+  const groups = compileGroups(request(), { catalogueVersion: 'quantity-lookup', availabilityAsOf: '2026-09-26', products:
+    Array.from({ length: 12 }, (_, i) => product('quantity-' + i, { a: 10 + i })) });
+  assert.ok(groups.length === 12 && groups.every(group => group.variants.length > 1));
+  let reads = 0;
+  const watched = groups.map(group => ({ ...group, variants: group.variants.map(variant => new Proxy(variant, {
+    get(target, field, receiver) { if (field === 'variantId') reads++; return Reflect.get(target, field, receiver); }
+  })) }));
+  const first = watched[0].variants[0], id = first.variantId;
+  for (const group of watched) quantityById(group.variants, id);
+  reads = 0;
+  const result = reconstructVariants(watched, [id, 'absent', id]);
+  assert.equal(reads, 0, 'An already indexed immutable catalogue must not be rescanned for every retained basket');
+  assert.deepEqual(result, [first, first], 'Selection order, duplicate requests and omitted unknown IDs stay compatible');
+  const last = { ...first, dailyPills: first.dailyPills + 1 };
+  watched[0].variants.push(last);
+  assert.strictEqual(quantityById(watched[0].variants, id), first, 'Search preserves its first duplicate identity');
+  assert.deepEqual(reconstructVariants(watched, [id]), [last], 'Historical revalidation preserves its last duplicate identity');
+  watched[0].variants.pop();
+  assert.deepEqual(reconstructVariants(watched, [id]), [first], 'A truncated quantity domain invalidates the prior index');
+});
 test('REF-CPU-04 neutral rational operations reuse immutable values without changing exact arithmetic', () => {
   const value = fractions.rational(7n, 13n);
   assert.strictEqual(fractions.fromDecimal(0), fractions.ZERO, 'Repeated zero coefficients need no allocation');
