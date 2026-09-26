@@ -30,7 +30,24 @@ import {
 } from "./agentic/det-v3/harness.ts";
 import { DET_V3_CLOCK } from "./agentic/det-v3/manifest.ts";
 
-import { LIVE_ORIGIN as ORIGIN, LIVE_PUBLIC as PUBLIC, liveStructured, liveCompletedCall, LIVE_CLIENT_HEADERS } from "./helpers/live-mcp.ts";
+import { LIVE_ORIGIN as ORIGIN, LIVE_PUBLIC as PUBLIC, LIVE_QA, livePost, liveStructured, liveCompletedCall, LIVE_CLIENT_HEADERS } from "./helpers/live-mcp.ts";
+// Register this bounded benchmark with the existing QA allowance. Real public
+// customer limits stay unchanged; every accepted operation is still drained.
+let qaNamespace = "";
+before(async () => {
+  const begun = await livePost(LIVE_QA, { runId: `lat-pack-${process.pid}` }, { accept: "application/json" });
+  assert.equal(begun.status, 200); assert.equal(begun.structured.ok, true, JSON.stringify(begun.structured));
+  assert.equal(typeof begun.structured.namespace, "string");
+  qaNamespace = String(begun.structured.namespace); assert.ok(qaNamespace.length > 0);
+  assert.equal((begun.structured.preflight as { ok?: boolean } | undefined)?.ok, true);
+});
+after(async () => {
+  if (qaNamespace) {
+    const reset = await livePost(LIVE_QA, { reset: true, namespace: qaNamespace }, { accept: "application/json" });
+    assert.equal(reset.status, 200); assert.equal(reset.structured.ok, true, JSON.stringify(reset.structured));
+  }
+});
+
 const MIXED_ACCEPT = "application/json, text/event-stream";
 const LIST_BODY = JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list" });
 const INFO_BODY = JSON.stringify({
