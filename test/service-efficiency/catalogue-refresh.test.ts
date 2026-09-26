@@ -18,7 +18,7 @@ function probe(scenario: string) {
       loadLiveSupplementsForCountry: async () => [{ uuid: 'fixture', supplementId: 'fixture', name: 'Load ' + (++loads), aliases: [], acceptedUnits: ['mg'] }],
       buildContributionIndex: () => new Map()
     } });
-    const { cachedLiveRetailSnapshot: read, requireCachedLiveRetailSnapshot: current, resetLiveCatalogueCache: reset } = await import('./lib/agentic/catalogue/live.ts');
+    const { cachedLiveRetailSnapshot: read, warmLiveRetailSnapshot: warm, requireCachedLiveRetailSnapshot: current, resetLiveCatalogueCache: reset } = await import('./lib/agentic/catalogue/live.ts');
     const deferred = () => { let resolve; const promise = new Promise(yes => { resolve = yes; }); return { promise, resolve }; };
     reset();
     ${scenario}
@@ -36,13 +36,15 @@ test("QUALITY-CACHE-01 failed background refresh is observed while same-epoch fa
     clock += 600_001;
     const failures = [];
     process.on('unhandledRejection', error => failures.push(error));
-    query = async () => { throw new Error('Controlled refresh failure'); };
+    const failedQuery = deferred();
+    query = async () => { failedQuery.resolve(); throw new Error('Controlled refresh failure'); };
     assert.equal(await read('TH'), original);
+    await failedQuery.promise;
     await nextTurn(); await nextTurn();
     assert.deepEqual(failures, [], 'A background refresh must not reject an unobserved promise');
     query = async () => [];
     assert.equal(await read('TH'), original);
-    await nextTurn();
+    await warm('TH');
     assert.equal(current('TH').supplements[0].name, 'Load 3');
   `));
 });
