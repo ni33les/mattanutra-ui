@@ -377,10 +377,31 @@ export async function lockWebCheckoutAssessment(sql: RetailCheckoutDb, planId: s
   await sql`select plan_id from public.assessments where plan_id = ${planId}::uuid for no key update`;
 }
 /** Existing new-checkout publication fence: retain current commercial facts until the intent commits. */
-export async function lockCurrentWebCheckoutRecommendations(sql: RetailCheckoutDb, input: WebCheckoutSelectionInput) {
+export async function lockCurrentWebCheckoutRecommendations(sql: RetailCheckoutDb, input: WebCheckoutSelectionInput,
+  prepared: Awaited<ReturnType<typeof currentWebCheckoutSelection>>) {
+  const proof = prepared.proof;
+  if (proof.planId !== input.planId || proof.locale !== input.locale ||
+    input.selectedItemIds.length !== prepared.recommendations.length ||
+    input.selectedItemIds.some(id => !prepared.recommendations.some(row => row.product_id === id))) {
+    throw new FunnelError("Prepared checkout does not match the selected products.", 409, "invalid_product_selection");
+  }
   const [catalogue] = await sql<Array<{ revision: number | string }>>`
     select revision from public.catalogue_runtime_revision where singleton = true for share`;
-  return (await readCurrentWebCheckoutSelection(sql, input, catalogue?.revision)).recommendations;
+  // Runs are append-only. Revalidate the latest run and mutable heads, without
+  // fetching their advice, options or products again while writers are fenced.
+  const [current] = await sql`select r.id::text from public.product_recommendation_runs r
+    join public.assessments a on a.plan_id = r.plan_id
+    left join public.assessment_product_preferences p on p.plan_id = a.plan_id
+    where r.plan_id = ${proof.planId}::uuid and r.assessment_revision = a.input_revision
+      and a.input_revision = ${proof.assessmentRevision} and coalesce(p.revision, 0) = ${proof.selectionRevision}
+      and r.selection_revision = coalesce(p.revision, 0) and r.generation_locale = ${proof.locale}
+      and r.generator_version = ${FUNNEL_GENERATOR_VERSION} and r.status in ('completed', 'partial')
+      and coalesce(r.diagnostics ->> 'stackPreference', 'balanced') = ${proof.stackPreference}
+    order by r.generated_at desc, r.id desc limit 1`;
+  if (current?.id !== proof.runId || String(catalogue?.revision) !== proof.catalogueRevision) {
+    throw new FunnelError("Product options changed. Reload and confirm the current recommendation stack.", 409, "stale_product_selection");
+  }
+  return prepared.recommendations;
 }
 async function readCurrentWebCheckoutSelection(sql: RetailCheckoutDb, input: WebCheckoutSelectionInput, catalogueRevision: number | string | undefined) {
   const runs = await sql`select distinct on (coalesce(r.diagnostics ->> 'stackPreference', 'balanced'))
@@ -422,7 +443,9 @@ async function readCurrentWebCheckoutSelection(sql: RetailCheckoutDb, input: Web
         currency: String(row?.currency ?? alternative?.product.currency ?? "THB")
       };
     });
-    return { recommendations, advice: option?.advice ?? [] };
+    return { recommendations, advice: option?.advice ?? [], proof: { planId: input.planId, locale: input.locale,
+      runId: String(run.id), assessmentRevision: Number(run.input_revision), selectionRevision: Number(run.current_selection_revision),
+      catalogueRevision: String(catalogueRevision), stackPreference: String(objectValue(run.diagnostics).stackPreference ?? "balanced") } };
   }
   throw new FunnelError("Product options changed. Reload and confirm the current recommendation stack.", 409, "stale_product_selection");
 }
@@ -810,6 +833,7 @@ export async function createRetailCheckoutSession(input: RetailCheckoutQuoteInpu
   let subtotalAmount = 0;
   let totalAmount = 0;
   let platformMarginPercent: number | null = null;
+  let preparedSelection: Awaited<ReturnType<typeof currentWebCheckoutSelection>> | undefined;
 
   if (checkoutMode === "agentic") {
     const frozen = input.frozenLines ?? [];
@@ -875,7 +899,8 @@ export async function createRetailCheckoutSession(input: RetailCheckoutQuoteInpu
       throw new Error("Select at least one product before checkout");
     }
 
-    const recommendations = await currentWebCheckoutRecommendations(sql, { ...input, selectedItemIds: selectedProductIds });
+    preparedSelection = await currentWebCheckoutSelection(sql, { ...input, selectedItemIds: selectedProductIds });
+    const { recommendations } = preparedSelection;
     runId = recommendations[0]?.run_id ?? null;
     const resolved = await resolveRegionalBasketAvailability({
       lines: selectedProductIds.map((productId) => ({ productId, quantity: 1 })),
@@ -977,7 +1002,7 @@ export async function createRetailCheckoutSession(input: RetailCheckoutQuoteInpu
       if (checkoutMode === "web") {
         // Only new intents require the current revision and catalogue. Exact
         // retries retain their existing payment and frozen commercial facts.
-        await lockCurrentWebCheckoutRecommendations(tx, { ...input, recommendationRunId: runId, selectedItemIds: selectedProductIds });
+        await lockCurrentWebCheckoutRecommendations(tx, { ...input, recommendationRunId: runId, selectedItemIds: selectedProductIds }, preparedSelection!);
       }
       const rows = await tx<CheckoutPaymentRow[]>`
         insert into public.retail_checkout_payments (

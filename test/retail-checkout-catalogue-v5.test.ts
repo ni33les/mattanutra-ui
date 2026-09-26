@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import { it } from 'node:test';
 import { MATCHER_VERSION } from '../lib/matcher/config.ts';
 import * as checkout from '../lib/retail-product-checkout.ts';
-const { lockCurrentWebCheckoutRecommendations, findReusableWebCheckoutPayment } = checkout;
+const { currentWebCheckoutSelection, lockCurrentWebCheckoutRecommendations, findReusableWebCheckoutPayment } = checkout;
 const planId = '10000000-0000-4000-8000-000000000001';
 const runId = '10000000-0000-4000-8000-000000000002';
 const productIds = Array.from({ length: 8 }, (_, i) => `20000000-0000-4000-8000-${String(i + 1).padStart(12, '0')}`);
@@ -12,7 +12,7 @@ function database(runRevision: string | null, currentRevision = '7') {
   const calls: string[] = [];
   const sql = async (parts: TemplateStringsArray) => {
     const query = parts.join('?'); calls.push(query);
-    if (query.includes('catalogue_runtime_revision')) { assert.match(query, /for share/i, 'new checkout serializes its epoch check with catalogue updates'); return [{ revision: currentRevision }]; }
+    if (query.includes('catalogue_runtime_revision')) return [{ revision: currentRevision }];
     if (query.includes('product_recommendation_runs')) return [{ id: runId, catalogue_revision: runRevision, selection_revision: 0, input_revision: 1, current_selection_revision: 0, excluded_product_ids: [],
       diagnostics: { algorithmVersion: MATCHER_VERSION, matching: { selectedCandidateKey: 'option', options: [{ candidateKey: 'option', productIds, recommendations: [] }] } } }];
     if (query.includes('product_recommendation_items')) return productIds.map((product_id, rank) => ({ product_id, rank, price_amount: 10 + rank, currency: 'THB', title: `Product ${rank}` }));
@@ -24,13 +24,13 @@ const selection = { planId, locale: 'en' as const, selectedItemIds: productIds, 
 it('V5-CHECKOUT-01: changed or unproven catalogue provenance rejects new checkout before reading purchase lines', async () => {
   for (const revision of ['6', null]) {
     const { sql, calls } = database(revision);
-    await assert.rejects(lockCurrentWebCheckoutRecommendations(sql, selection), (error: unknown) => error instanceof Error && 'code' in error && error.code === 'stale_product_selection');
+    await assert.rejects(currentWebCheckoutSelection(sql, selection), (error: unknown) => error instanceof Error && 'code' in error && error.code === 'stale_product_selection');
     assert.equal(calls.some(query => query.includes('product_recommendation_items')), false);
   }
 });
 it('V5-CHECKOUT-02: current provenance accepts all eight selected products and keeps their quote rows', async () => {
   const { sql } = database('7');
-  const rows = await lockCurrentWebCheckoutRecommendations(sql, selection);
+  const rows = await lockCurrentWebCheckoutRecommendations(sql, selection, await currentWebCheckoutSelection(sql, selection));
   assert.deepEqual(rows.map(row => row.product_id), productIds);
   assert.deepEqual(rows.map(row => row.price_amount), productIds.map((_, i) => 10 + i));
 });
@@ -51,12 +51,12 @@ it('NOID-COM-01 previously saved web recommendations preserve their selected pro
   const base = database('7');
   const sql = (async (parts: TemplateStringsArray, ...values: unknown[]) => {
     const rows = await (base.sql as (parts: TemplateStringsArray, ...values: unknown[]) => Promise<Array<{diagnostics: Record<string, unknown>}>>)(parts, ...values);
-    if (parts.join('?').includes('product_recommendation_runs')) rows[0].diagnostics.matching = {
+    if (parts.join('?').includes('r.diagnostics,')) rows[0].diagnostics.matching = {
       selectedOptionId: 'option', options: [{ optionId: 'option', productIds, recommendations: [] }]
     };
     return rows;
   }) as typeof base.sql;
-  const rows = await lockCurrentWebCheckoutRecommendations(sql, selection);
+  const rows = await lockCurrentWebCheckoutRecommendations(sql, selection, await currentWebCheckoutSelection(sql, selection));
   assert.deepEqual(rows.map(row => row.product_id), productIds);
   assert.deepEqual(rows.map(row => row.price_amount), productIds.map((_, rank) => 10 + rank));
 });

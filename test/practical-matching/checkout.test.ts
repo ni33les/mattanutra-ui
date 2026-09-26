@@ -37,7 +37,7 @@ test('PRACTICAL-CHECKOUT-03 only new checkout publication takes its existing com
   const {sql, queries} = database();
   const prepared = await checkout.currentWebCheckoutSelection(sql, input);
   const before = queries.length;
-  const rows = await Reflect.apply(checkout.lockCurrentWebCheckoutRecommendations, null, [sql, input, prepared]);
+  const rows = await checkout.lockCurrentWebCheckoutRecommendations(sql, input, prepared);
   assert.deepEqual(rows, prepared.recommendations);
   const publication = queries.slice(before);
   assert.equal(publication.filter(q => /for share/i.test(q)).length, 1);

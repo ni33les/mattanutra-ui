@@ -487,6 +487,34 @@
       "expectedCases": 24,
       "reason": "Exact ranking must avoid allocating human display conversions while preserving complete serialized score facts and weighted penalties; resident sessions own catalogue facts once and preserve checkpoint invalidation after caller mutation; PERF-CPU-01 exact interior-probe comparison and historical checkpoint recovery without response materialization; PERF-CPU-02 repeated label identities share reference resolution without sharing quantities or confidence; PERF-CPU-03 physical variant reuse with changed-offer repricing; PERF-CPU-04 independent exact linear coefficients; PERF-CPU-05 safety and retained scores share verified quantities without trusting stale preparation; PERF-CPU-06 selected product metadata is shared across final scoring counts",
       "slice": "numeric"
+    },
+    {
+      "file": "test/practical-matching/checkout.test.ts",
+      "slice": "checkout-fence",
+      "database": false,
+      "expectedCases": 5,
+      "reason": "Prepared checkout publication, immutable frozen replay, short current catalogue/revision checks and pharmacy ownership/read contention"
+    },
+    {
+      "file": "test/retail-checkout-catalogue-v5.test.ts",
+      "slice": "checkout-fence",
+      "database": false,
+      "expectedCases": 4,
+      "reason": "Prepared checkout publication, immutable frozen replay, short current catalogue/revision checks and pharmacy ownership/read contention"
+    },
+    {
+      "file": "test/retail-checkout-catalogue-v5.integration.test.ts",
+      "slice": "checkout-fence",
+      "database": true,
+      "expectedCases": 1,
+      "reason": "Prepared checkout publication, immutable frozen replay, short current catalogue/revision checks and pharmacy ownership/read contention"
+    },
+    {
+      "file": "test/pharmacy-orders.integration.test.ts",
+      "slice": "checkout-fence",
+      "database": true,
+      "expectedCases": 7,
+      "reason": "Prepared checkout publication, immutable frozen replay, short current catalogue/revision checks and pharmacy ownership/read contention"
     }
   ],
   "inputs": [

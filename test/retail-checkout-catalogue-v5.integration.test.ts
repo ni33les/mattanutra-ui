@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { it } from 'node:test';
 import postgres from 'postgres';
-import { lockCurrentWebCheckoutRecommendations } from '../lib/retail-product-checkout.ts';
+import { currentWebCheckoutSelection, lockCurrentWebCheckoutRecommendations } from '../lib/retail-product-checkout.ts';
 import { MATCHER_VERSION } from '../lib/matcher/config.ts';
 import { FUNNEL_GENERATOR_VERSION } from '../lib/assessment-revisions.ts';
 
@@ -31,11 +31,12 @@ it('V5-CHECKOUT-PG-01: new checkout holds catalogue epoch stable until its short
     for (const [rank, productId] of productIds.entries()) await sql`insert into public.product_recommendation_items (run_id, product_id, rank, url_used, price_amount)
       values (${runId}::uuid, ${productId}::uuid, ${rank + 1}, ${`https://fixture.invalid/${productId}`}, ${rank + 10})`;
     const input = { planId, locale: 'en' as const, selectedItemIds: productIds, recommendationRunId: runId, candidateKey: 'eight', assessmentRevision: 1, selectionRevision: 0 };
+    const prepared = await currentWebCheckoutSelection(sql, input);
     let ready!: () => void;
     const checkoutReady = new Promise<void>(resolve => { ready = resolve; });
     const hold = new Promise<void>(resolve => { release = resolve; });
     holding = sql.begin(async tx => {
-      const rows = await lockCurrentWebCheckoutRecommendations(tx, input);
+      const rows = await lockCurrentWebCheckoutRecommendations(tx, input, prepared);
       assert.equal(rows.length, 8);
       ready(); await hold;
     });
@@ -62,9 +63,22 @@ it('V5-CHECKOUT-PG-01: new checkout holds catalogue epoch stable until its short
     assert.equal(after!.revision, epoch.revision, 'The concurrency probe never commits a catalogue mutation');
     await sql.begin(async tx => {
       await tx`update public.catalogue_runtime_revision set revision = revision + 1 where singleton = true`;
-      await assert.rejects(lockCurrentWebCheckoutRecommendations(tx, input), (error: unknown) => error instanceof Error && 'code' in error && error.code === 'stale_product_selection');
+      await assert.rejects(lockCurrentWebCheckoutRecommendations(tx, input, prepared), (error: unknown) => error instanceof Error && 'code' in error && error.code === 'stale_product_selection');
       throw rollback;
     }).catch(error => { if (error !== rollback) throw error; });
+    for (const change of ['assessment', 'exclusions', 'new-run']) {
+      await sql.begin(async tx => {
+        if (change === 'assessment') await tx`update public.assessments set input_revision=input_revision+1 where plan_id=${planId}::uuid`;
+        if (change === 'exclusions') await tx`insert into public.assessment_product_preferences (plan_id, revision, excluded_product_ids)
+          values (${planId}::uuid, 1, ${productIds}::uuid[])`;
+        if (change === 'new-run') await tx`insert into public.product_recommendation_runs
+          (id, plan_id, assessment_revision, generation_locale, generator_version, selection_revision, catalogue_revision, diagnostics, generated_at)
+          select ${randomUUID()}::uuid, plan_id, assessment_revision, generation_locale, generator_version, selection_revision, catalogue_revision, diagnostics, generated_at + interval '1 second'
+          from public.product_recommendation_runs where id=${runId}::uuid`;
+        await assert.rejects(lockCurrentWebCheckoutRecommendations(tx, input, prepared), { code: 'stale_product_selection' }, change);
+        throw rollback;
+      }).catch(error => { if (error !== rollback) throw error; });
+    }
   } finally {
     release?.();
     await holding?.catch(() => {}); await updating?.catch(() => {});

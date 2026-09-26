@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import postgres from "postgres";
 import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { before, after, it } from "node:test";
@@ -15,7 +16,12 @@ import { buildAssessmentResumeUrl } from "../lib/assessment-resume-email.ts";
 import { inStorePharmacyFromAnswers } from "../lib/pharmacy-in-store.ts";
 fixtureDatabaseUrl();
 const sql = getSql()!;
-before(async () => { const migration = await readFile("db-rollout/pharmacy-orders.sql", "utf8"); await sql.begin(tx => tx.unsafe(migration)); });
+const otherPharmacy = { id: randomUUID(), slug: `pharmacy-order-isolation-${randomUUID()}` };
+before(async () => {
+  const migration = await readFile("db-rollout/pharmacy-orders.sql", "utf8"); await sql.begin(tx => tx.unsafe(migration));
+  await sql`insert into public.organisations (id, name, slug, organisation_type, status, country_code, currency)
+    values (${otherPharmacy.id}::uuid, 'Isolated cross-store ownership fixture', ${otherPharmacy.slug}, 'tenant', 'active', 'TH', 'THB')`;
+});
 after(closeSqlPool);
 async function counters() {
   return (await sql`select (select count(*) from public.payments)::int as payments,
@@ -62,7 +68,7 @@ it("PHARM-PG-03 store rebinding and stale or injected products fail before an or
   await assert.rejects(createPharmacyOrder({...input,expectedRevision:99},randomUUID()),{code:"assessment_changed"});
   await assert.rejects(createPharmacyOrder({...input,productIds:[randomUUID()]},randomUUID()),{code:"stale_product_selection"});
   await assert.rejects(pharmacyOrderQuote(fixture.planId,"missing-store","en"),{code:"assessment_not_found"});
-  const [other] = await sql`select slug from public.organisations where organisation_type='tenant' and status='active' and id<>${fixture.pharmacyId}::uuid limit 1`;
+  const [other] = await sql`select slug from public.organisations where organisation_type='tenant' and status='active' and id=${otherPharmacy.id}::uuid limit 1`;
   assert.ok(other,"Cross-store fixture prerequisite");
   await assert.rejects(captureAssessment({answers:{sex:"male",age:"36-45",goals:["energy"]},locale:"en",pharmacyId:other.slug},
     {planId:fixture.planId,idempotencyKey:randomUUID()}),{code:"pharmacy_conflict"});
@@ -72,11 +78,12 @@ it("PHARM-PG-04 order reads finish while an order writer is locked and do not ch
   const fixture=await seedPharmacyFixture();
   const receipt=await createPharmacyOrder({planId:fixture.planId,pharmacy:fixture.slug,locale:"en",expectedRevision:fixture.revision,productIds:fixture.productIds,customerName:"Reader"},randomUUID());
   const before=await sql`select * from public.retail_customer_orders where id=${receipt.id}::uuid`;
-  await sql.begin(async tx=>{
+  const writer = postgres(fixtureDatabaseUrl().toString(), { max: 1 });
+  try { await writer.begin(async tx=>{
     await tx`select id from public.retail_customer_orders where id=${receipt.id}::uuid for update`;
     const result=await Promise.race([readPharmacyOrder(fixture.planId,fixture.slug,receipt.id),new Promise<never>((_,reject)=>{const timer=setTimeout(()=>reject(new Error("Read blocked")),1500);timer.unref();})]);
     assert.deepEqual(result?.receipt,receipt);
-  });
+  }); } finally { await writer.end(); }
   assert.deepEqual(await sql`select * from public.retail_customer_orders where id=${receipt.id}::uuid`,before);
 });
 it("PHARM-PG-05 pharmacy orders never enter online settlement during later workflow replay", async () => {
@@ -102,7 +109,7 @@ it("PHARM-PG-07 a fresh resume link retains its pharmacy and cannot capture into
   const saved = await getAssessmentResumeDraft(draft.token);
   assert.equal(inStorePharmacyFromAnswers(saved?.answers)?.id, fixture.pharmacyId);
   assert.ok(buildAssessmentResumeUrl("th", draft.token, draft.pharmacySlug).includes(`/th/retail/${fixture.slug}/quiz?resume=`));
-  const [other] = await sql`select slug from public.organisations where organisation_type='tenant' and status='active' and id<>${fixture.pharmacyId}::uuid limit 1`;
+  const [other] = await sql`select slug from public.organisations where organisation_type='tenant' and status='active' and id=${otherPharmacy.id}::uuid limit 1`;
   assert.ok(other,"Cross-store resume fixture prerequisite");
   await assert.rejects(captureAssessment({answers:saved!.answers,locale:"th",pharmacyId:other.slug,resumeToken:draft.token}, {idempotencyKey:randomUUID()}), {code:"pharmacy_conflict"});
   assert.equal((await sql`select count(*)::int as n from public.assessments where plan_id=${draft.planId}::uuid`)[0].n,0);

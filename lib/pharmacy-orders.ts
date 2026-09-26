@@ -8,7 +8,7 @@ import { inStorePharmacyFromAnswers, resolvePharmacyOrganisation } from "@/lib/p
 import { pharmacyOrganisationSlug } from "@/lib/pharmacy-journey";
 import { preparePharmacyOrder, type PharmacyOrderProduct } from "@/lib/pharmacy-order-input";
 import { claimFunnelRequest, completeFunnelRequest } from "@/lib/funnel-idempotency";
-import { currentWebCheckoutRecommendations, lockCurrentWebCheckoutRecommendations, lockWebCheckoutAssessment } from "@/lib/retail-product-checkout";
+import { currentWebCheckoutSelection, lockCurrentWebCheckoutRecommendations, lockWebCheckoutAssessment } from "@/lib/retail-product-checkout";
 import { queueAdminOrganisationCommunication } from "@/lib/communications";
 import { FunnelError } from "@/lib/funnel-errors";
 import { isLocale, type Locale } from "@/lib/i18n";
@@ -39,7 +39,7 @@ export async function pharmacyOrderQuote(planId: string, slug: string, locale: L
     recommendationRunId: result.productRecommendations?.runId, assessmentRevision: context.assessment.revision,
     selectionRevision: result.selectionRevision };
   const sql = getSql()!;
-  if (products.length) await currentWebCheckoutRecommendations(sql, selection);
+  const preparedSelection = products.length ? await currentWebCheckoutSelection(sql, selection) : null;
   const ids = selection.selectedItemIds;
   const rows = ids.length ? await sql`select s.product_id::text, s.rrp_price_amount, s.currency, s.backorder_policy,
       s.status, p.status as product_status,
@@ -64,7 +64,7 @@ export async function pharmacyOrderQuote(planId: string, slug: string, locale: L
     return { productId: id, name: product.name, quantity: 1, unitPrice: price,
       currency: String(row.currency ?? context.pharmacy.currency ?? "THB"), imageUrl: product.imageUrl ?? null };
   });
-  return { ...context, result, lines, selection };
+  return { ...context, result, lines, selection, preparedSelection };
 }
 
 export async function readPharmacyOrder(planId: string, slug: string, orderId?: string) {
@@ -97,7 +97,6 @@ export async function createPharmacyOrder(value: unknown, key: string): Promise<
   const quote = await pharmacyOrderQuote(planId, slug, locale);
   if (quote.assessment.revision !== input.expectedRevision) throw new FunnelError("Assessment changed", 409, "assessment_changed");
   const prepared = preparePharmacyOrder({ customerName: input.customerName, productIds: input.productIds }, quote.lines);
-  const selected = { ...quote.selection, selectedItemIds: prepared.lines.map(p => p.productId) };
   const orderId = randomUUID();
   const preparedReceipt: PharmacyOrderReceipt = { id: orderId, reference: `PH-${orderId.slice(0, 8).toUpperCase()}`,
     status: "unpaid", pharmacyName: quote.pharmacy.name, customerName: prepared.customerName,
@@ -110,7 +109,7 @@ export async function createPharmacyOrder(value: unknown, key: string): Promise<
     const claim = await claimFunnelRequest(tx, "pharmacy-order", key, input, orderId);
     if (claim.response) return claim.response as PharmacyOrderReceipt;
     await lockWebCheckoutAssessment(tx, planId);
-    await lockCurrentWebCheckoutRecommendations(tx, selected);
+    await lockCurrentWebCheckoutRecommendations(tx, quote.selection, quote.preparedSelection!);
     const receipt = preparedReceipt;
     await tx`insert into public.retail_customer_orders (id, organisation_id, order_number, source, customer_name, status, currency, placed_at, metadata)
       values (${receipt.id}::uuid, ${quote.pharmacy.id}::uuid, ${receipt.reference}, 'pharmacy', ${receipt.customerName}, 'placed', ${receipt.currency}, now(),

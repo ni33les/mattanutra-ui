@@ -44,3 +44,18 @@ the frozen D3 control. The scoped consumer inventory is
 - REF-CPU-19/20 resident archive representation was withdrawn before release. Some warm trials improved, but terminal compressed checkpoints increased from 782,215 to 956,129 bytes and cold calculation remained 2.38 seconds. That trade-off does not demonstrate the required native publication improvement. Keep the original packed checkpoint format/readers and all original recovery assertions. RED/GREEN, the candidate patch and the discard decision remain in `unretained-resident-archive.json`; the two tests added exclusively for the unshipped representation are withdrawn with it.
 
 - Performance programme, 2026-09-26: withdrawing optional unreduced `multiply` components and their four representation assertions from REF-CPU-04. All original neutral-operation and exact arithmetic assertions remain. The UAT-resource-bounded diagnostic did not improve (last two trials 2,413/2,399 ms versus 2,247/2,254 ms before). RED/GREEN evidence, complete unchanged result hashes and the patch remain in `/root/.codex/deploy/performance-20260926/weighted-sum-*` and `unretained-weighted-components.patch`. These timings are kernel diagnostics, not native release acceptance.
+
+### 2026-09-26 — prepared web/pharmacy checkout fence
+
+`PRACTICAL-CHECKOUT-03` now asserts that product rows and recommendation/advice
+JSON are prepared before the existing catalogue fence. The RED execution made
+three publication SELECTs; the candidate makes two narrow SELECTs. All prior
+catalogue, revision, ownership, replay and eight-line financial assertions remain.
+`V5-CHECKOUT-PG-01` also checks assessment, exclusion and latest-run drift after
+preparation. The internal prepared proof is not a public response field.
+
+The isolated pharmacy consumer checks exposed missing fixture ownership context
+and a contention test attempting two sessions through a one-connection pool.
+They now create their own second pharmacy and use an independent writer session.
+Neither prerequisite is skipped; the timeout and complete row-equality assertions
+remain. Original failed executions are retained outside the checkout.
