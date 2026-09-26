@@ -97,8 +97,8 @@
     },
     {
       "file": "test/service-efficiency/numeric-scoring.test.ts",
-      "expectedCases": 18,
-      "reason": "Exact ranking must avoid allocating human display conversions while preserving complete serialized score facts and weighted penalties",
+      "expectedCases": 19,
+      "reason": "Exact ranking must avoid allocating human display conversions while preserving complete serialized score facts and weighted penalties; PERF-CPU-01 exact interior-probe comparison and historical checkpoint recovery without response materialization",
       "slice": "matching"
     },
     {

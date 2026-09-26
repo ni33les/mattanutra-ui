@@ -210,6 +210,37 @@ test('REF-CPU-16 numerical nutrient scores omit display-only trees and retain ex
   assert.equal(display.perTarget[0].exposure, 75);
 });
 
+test('PERF-CPU-01 interior probes retain exact comparison facts without formatting discarded responses', async () => {
+  const { product } = await import('../matcher/flexible-v5-fixtures.ts');
+  const { compileGroups } = await import('../../lib/matcher/candidates.ts');
+  const { createSearchCursor, advanceSearchCursor, archivedSearchStates } = await import('../../lib/matcher/search-cursor.ts');
+  const { DEFAULT_MATCHER_CONFIG } = await import('../../lib/matcher/config.ts');
+  const input = request();
+  const listing = product('powder', { a: 170 }, 100, { administration: {
+    route: 'oral', physicalUnit: 'g', unitsPerServing: 10, doseIncrement: 1, packQuantity: 100,
+    provenance: { status: 'verified', sourceUrl: 'https://example.test/powder', sourceText: '10 g per labelled serving', verifiedAt: '2026-09-26' }
+  } });
+  const groups = compileGroups(input, { catalogueVersion: 'probe', availabilityAsOf: '2026-09-26T00:00:00Z', products: [listing] });
+  assert.ok(groups[0]?.variants.length, 'Physical quantities must be available');
+  const cursor = createSearchCursor(groups, input, DEFAULT_MATCHER_CONFIG);
+  exactEncodings = 0;
+  for (let n = 0; n < 100 && !cursor.quantitySearch?.left && !cursor.done; n++) advanceSearchCursor(cursor, input, 1);
+  const left = cursor.quantitySearch?.left;
+  assert.ok(left, 'The fixture must stop after a real interior probe');
+  assert.equal(exactEncodings, 0, 'Losing probes must not materialise human-readable score fields');
+  assert.deepEqual(Object.keys(left).sort(), ['exactTotal', 'profile'], 'Recovery needs only exact comparison facts');
+  const restored = structuredClone(cursor);
+  const historical = structuredClone(cursor);
+  const score = left as unknown as { profile: unknown; exactTotal: { num: bigint; den: bigint } };
+  Object.assign(historical.quantitySearch!, { left: { profile: score.profile, overallExact: {
+    numerator: String(score.exactTotal.num), denominator: String(score.exactTotal.den)
+  } } });
+  for (const item of [cursor, restored, historical]) while (!item.done) advanceSearchCursor(item, input, 100);
+  assert.deepEqual([...archivedSearchStates(restored)], [...archivedSearchStates(cursor)]);
+  assert.deepEqual([...archivedSearchStates(historical)], [...archivedSearchStates(cursor)]);
+  assert.equal(historical.expansionAttempts, cursor.expansionAttempts);
+});
+
 
 test('QC-RES-01 resident publication preserves the admitted catalogue when its caller changes nested inputs', async () => {
   const { input } = await import('./support.ts');
