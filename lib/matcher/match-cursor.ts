@@ -21,11 +21,14 @@ export function createMatchCursor(request: CanonicalRequest, catalog: CatalogSna
   request = orderInvariantRequest(request);
   const groups = groupsBySeller(compiledGroups ?? compileGroups(request, catalog), request, config.sellerGroupLimit);
   const standardBudget = Math.max(0, Math.floor(config.expansionBudget)), effort = request.searchEffort ?? "standard";
-  return { version: "match-cursor-1", identity: matchCursorIdentity(request, catalog, config), effort, standardBudget,
+  const identity = matchCursorIdentity(request, catalog, config);
+  return { version: "match-cursor-1", identity, effort, standardBudget,
     expansionBudget: effort === "expanded" ? Math.max(64_000, standardBudget) : standardBudget,
     seller: 0, expanded: false, done: groups.length === 0,
     sellers: groups.map((seller, index) => ({ sellerId: seller.sellerId,
-      cursor: createSearchCursor(seller.groups, request, { ...config, expansionBudget: allocation(standardBudget, groups.length, index) }) })) };
+      // The parent binds all catalogue, request and configuration facts. Its
+      // seller position also binds this cursor's deterministic budget share.
+      cursor: createSearchCursor(seller.groups, request, { ...config, expansionBudget: allocation(standardBudget, groups.length, index) }, `${identity}:${index}:${seller.sellerId}`) })) };
 }
 export function matchCursorAttempts(cursor: MatchCursor) {
   return cursor.sellers.reduce((sum, seller) => sum + seller.cursor.expansionAttempts, 0);

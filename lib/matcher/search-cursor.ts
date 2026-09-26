@@ -87,10 +87,10 @@ function remember(cursor: SearchCursor, state: SearchState) {
 function width(cursor: SearchCursor) { return Math.max(1, Math.min(cursor.passStart ? cursor.config.maxBeamWidth : cursor.config.initialBeamWidth, cursor.config.maxBeamWidth)); }
 function explorationLimit(cursor: SearchCursor) { return cursor.expansionBudget - Math.floor((cursor.expansionBudget - cursor.passStart) / 5); }
 
-export function createSearchCursor(groups: readonly ProductGroup[], request: CanonicalRequest, config: MatcherConfig): SearchCursor {
+export function createSearchCursor(groups: readonly ProductGroup[], request: CanonicalRequest, config: MatcherConfig, identity?: string): SearchCursor {
   // Product and variant facts are immutable; only each group's quantity list grows.
   const copy = groups.map(group => ({ ...group, variants: [...group.variants] }));
-  const identity = sha256Hex(JSON.stringify(serializeExactValue({ version: "search-cursor-1", scoringProfileHash: resolvePracticalProfile(request).hash, groups, request: { ...request, searchEffort: undefined }, config: { ...config, expansionBudget: undefined } })));
+  identity ??= sha256Hex(JSON.stringify(serializeExactValue({ version: "search-cursor-1", scoringProfileHash: resolvePracticalProfile(request).hash, groups, request: { ...request, searchEffort: undefined }, config: { ...config, expansionBudget: undefined } })));
   const exact = groups.length <= config.exactGroupLimit && groups.reduce((sum, group) => sum + group.variants.length, 0) <= config.exactVariantLimit;
   const seed = seedState(request);
   const cursor: SearchCursor = { version: "search-cursor-1", identity, groups: copy, baseline: copy.map(group => group.variants.map(row => row.variantId)), config: { ...config },
