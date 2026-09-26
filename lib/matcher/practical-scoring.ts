@@ -170,7 +170,7 @@ function numericalPracticalPenalties(request: PracticalRequest, actual: Practica
 }
 type NumericalPracticalScore = ReturnType<typeof numericalPracticalPenalties>;
 export type NumericalOverallScore = Readonly<{ profile: Profile; request: CanonicalRequest; actual: PracticalActuals;
-  dosePenalty: number; overallPenalty: number; exactTotal: Rational }>;
+  doseExact: Rational; exactTotal: Rational }>;
 function displayPenalties(score: NumericalPracticalScore): PracticalPenaltyScore {
   const { request, actual, profile, measured, coefficient, total } = score, m = profile.multipliers;
   const missing = new Set<string>();
@@ -210,14 +210,14 @@ export function numericalOverallMatchingScore(request: CanonicalRequest, exposur
   const penalties = numericalPracticalPenalties(request, actual), dose = numericalDoseFitScore(doseRequest.get(request) ?? request, exposure);
   const nutrient = request.scoring ? numericalWeightedDoseFitScore(request, exposure) : dose;
   const total = add(exactDoseFit(nutrient), penalties.total);
-  return { profile: penalties.profile, request, actual, dosePenalty: dose.total, overallPenalty: toNumber(total), exactTotal: total };
+  return { profile: penalties.profile, request, actual, doseExact: exactDoseFit(dose), exactTotal: total };
 }
 const displayOverallScores = new WeakMap<NumericalOverallScore, OverallMatchingScore>();
 function displayOverall(score: NumericalOverallScore): OverallMatchingScore {
   let value = displayOverallScores.get(score);
   if (!value) {
-    value = { ...scorePracticalPenalties(score.request, score.actual), dosePenalty: score.dosePenalty,
-      overallPenalty: score.overallPenalty, overallExact: encoded(score.exactTotal) };
+    value = { ...scorePracticalPenalties(score.request, score.actual), dosePenalty: toNumber(score.doseExact),
+      overallPenalty: toNumber(score.exactTotal), overallExact: encoded(score.exactTotal) };
     displayOverallScores.set(score, value);
   }
   return value;

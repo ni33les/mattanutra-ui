@@ -52,7 +52,7 @@ test('PERF-CPU-22 exact serving lower bounds avoid unnecessary profile evaluatio
   linearEvaluations = 0;
   assert.equal(Math.sign(compareSearchStates(large, small, profile)), 1);
   assert.equal(linearEvaluations, 1, 'A verified 2000-point serving penalty already exceeds the complete smaller-routine score');
-  assert.equal(numericalSearchStateScore(profile, large).overallPenalty - numericalSearchStateScore(profile, small).overallPenalty, 2000);
+  assert.deepEqual(fractions.subtract(numericalSearchStateScore(profile, large).exactTotal, numericalSearchStateScore(profile, small).exactTotal), { num: 2000n, den: 1n });
   assert.equal(Math.sign(compareSearchStates(small, large, profile)), -1);
   const zero = request({ scoring: { profile: 'balanced', weights: { servings: 0 } } });
   assert.equal(compareSearchStates(large, small, zero), 0, 'Zero-weight servings cannot be used to reject a routine');
@@ -68,7 +68,7 @@ test('PERF-CPU-18 repeated nutrient amounts reuse immutable frontier deviations'
   conversionsToNumber = 0;
   const second = numericalDoseFitScore(input, new Map([['a', 75_000_000n], ['incidental', 20n]]));
   assert.deepEqual(exactDoseFit(second), { num: 1n, den: 4n });
-  assert.equal(conversionsToNumber, 5, 'Only aggregate score fields need conversion when the nutrient endpoint was already evaluated');
+  assert.equal(conversionsToNumber, 0, 'Reused nutrient endpoints and exact totals need no display conversion during search');
   assert.strictEqual(doseFitTargetDeviations(first)[0], doseFitTargetDeviations(second)[0]);
   assert.deepEqual(doseFitTargetDeviations(second), [{ subjectId: 'a', under: 0.25, over: 0 }]);
   const changed = numericalDoseFitScore(input, new Map([['a', 125_000_000n]]));
@@ -140,7 +140,7 @@ test('REF-CPU-01 numerical ranking does not format display doses for losing cand
   conversions = 0; additions = 0; aggregateSums = 0; conversionsToNumber = 0;
   const exposure = new Map([['a', 150_000_000n]]);
   const score = numericalDoseFitScore(input, exposure);
-  assert.equal(score.total, 1.5, '50% target excess plus independent 2 × 50% reference excess');
+  assert.equal(fractions.toNumber(exactDoseFit(score)), 1.5, '50% target excess plus independent 2 × 50% reference excess');
   assert.ok(conversionsToNumber > 0, 'Numerical projections must reuse the shared finite rational conversion');
   assert.deepEqual(exactDoseFit(score), { num: 3n, den: 2n });
   assert.ok(additions > 0, 'Nutrient aggregation must use the independently tested shared exact arithmetic');
@@ -161,7 +161,7 @@ test('REF-CPU-02 exact ordering and uniform weighted scoring avoid display alloc
   exactComparisons = 0; assert.equal(compareDoseFit(below, above), 0);
   assert.ok(exactComparisons > 0, 'Dose ordering must reuse the shared exact comparator');
   const exposure = new Map([['a', 75_000_000n]]);
-  const weighted = numericalWeightedDoseFitScore(input, exposure); assert.equal(weighted.total, 0.5);
+  const weighted = numericalWeightedDoseFitScore(input, exposure); assert.equal(fractions.toNumber(exactDoseFit(weighted)), 0.5);
   assert.equal(conversions, 0);
   assert.equal(weightedDoseFitScore(input, exposure).perTarget[0].under, 0.25);
 });
@@ -182,7 +182,7 @@ test('PERF-CPU-13 compiled endpoint scoring avoids temporary sets and preserves 
     globalThis.Set = new Proxy(OriginalSet, { construct(target, args) { allocations++; return Reflect.construct(target, args); } });
     result = numericalDoseFitScore(input, exposure);
   } finally { globalThis.Set = OriginalSet; }
-  assert.equal(result.total, 2.25);
+  assert.equal(fractions.toNumber(exactDoseFit(result)), 2.25);
   assert.deepEqual(exactDoseFit(result), { num: 9n, den: 4n });
   assert.equal(allocations, 0, 'Fixed endpoint facts need no per-candidate sets or endpoint deduplication');
   const display = doseFitScore(input, exposure);
@@ -203,7 +203,7 @@ test('PERF-CPU-15 one exact score owns its arithmetic and deviation facts togeth
     score = numericalDoseFitScore(input, exposure);
   } finally { WeakMap.prototype.set = original; }
   assert.deepEqual(exactDoseFit(score), { num: 9n, den: 4n });
-  assert.equal(registrations.get(score), 1, 'Thousands of losing scores need one lifetime record, not three independent GC ownership edges');
+  assert.equal(registrations.get(score) ?? 0, 0, 'The exact record owns its facts directly; only public display scores need auxiliary provenance');
   const display = doseFitScore(input, exposure);
   assert.equal(compareDoseFit(display, score), 0);
   assert.equal(display.perTarget[0].over, 0.75);
@@ -468,7 +468,7 @@ test('REF-CPU-12 frontier numerical records contain no response getters or displ
   assert.equal(Object.hasOwn(score, 'penalties'), false, 'Losing scores must not retain per-component preference trees through a nested field');
   assert.equal(Object.hasOwn(score, 'overallExact'), false);
   assert.equal(scoring.compareOverallScores(score, score), 0);
-  assert.equal(scoring.searchStateScore(input, state).overallPenalty, score.overallPenalty);
+  assert.equal(scoring.searchStateScore(input, state).overallPenalty, fractions.toNumber(score.exactTotal));
 });
 
 
