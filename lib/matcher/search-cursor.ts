@@ -247,7 +247,7 @@ function diverseSingles(cursor: SearchCursor, request: CanonicalRequest) {
   for (let depth=0; result.length < cursor.singles.length; depth++) for (const rows of buckets) if (rows[depth]) result.push(rows[depth]!);
   return result;
 }
-function rawDoseLeaders(states: readonly SearchState[], request: CanonicalRequest, limit: number) {
+export function rawDoseLeaders(states: readonly SearchState[], request: CanonicalRequest, limit: number) {
   const ranked = [...states].sort((a,b) => compareDoseFit(numericalDoseFitScore(request,a.exposure),numericalDoseFitScore(request,b.exposure)) || compareSearchStates(a,b,request));
   // A basket that exactly meets several targets is a useful completion base,
   // even when one remaining gap gives it a larger aggregate dose loss.

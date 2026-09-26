@@ -23,3 +23,28 @@ test('EFF-HOT-09 selecting a small frontier reduces comparisons against a comple
   assert.deepEqual(result, expected);
   assert.ok(partial < full / 2, `${partial} comparisons must be less than half of ${full}`);
 });
+
+
+test('PERF-CPU-10 raw-dose leaders read each exact dose once and preserve the former stable selection', async () => {
+  const { rawDoseLeaders } = await import('../../lib/matcher/search-cursor.ts');
+  const { seedState, compareSearchStates, residualPattern } = await import('../../lib/matcher/search.ts');
+  const { numericalDoseFitScore, doseFitTargetDeviations, compareDoseFit } = await import('../../lib/matcher/dose-fit.ts');
+  const { request } = await import('../matcher/flexible-v5-fixtures.ts');
+  const input = request(); let reads=0;
+  const candidates=Array.from({length:1000},(_,id)=>{
+    const exposure=new Map([['a',BigInt((id*7919)%1000+1)*99000n]]);
+    return {...seedState(input),get exposure(){reads++;return exposure;},selectedVariantIds:[String(id)]};
+  });
+  const order=(a: typeof candidates[number],b: typeof candidates[number])=>compareDoseFit(numericalDoseFitScore(input,a.exposure),numericalDoseFitScore(input,b.exposure))||compareSearchStates(a,b,input);
+  const ranked=[...candidates].sort(order);
+  const met=(state:typeof candidates[number])=>doseFitTargetDeviations(numericalDoseFitScore(input,state.exposure)).filter(row=>row.under===0&&row.over===0).length;
+  const exact=[...ranked].sort((a,b)=>met(b)-met(a)||order(a,b));
+  const expected=[...new Set([ranked[0],...exact.slice(0,2)])].filter(Boolean) as typeof candidates;
+  const patterns=new Set(expected.map(state=>residualPattern(state,input)));
+  for(const state of ranked){const pattern=residualPattern(state,input);if(!patterns.has(pattern)){expected.push(state);patterns.add(pattern);}if(expected.length>=6)break;}
+  for(const state of ranked){if(expected.length>=6)break;if(!expected.includes(state))expected.push(state);}
+  reads=0;const actual=rawDoseLeaders(candidates,input,6);
+  assert.deepEqual(actual,expected);
+  assert.ok(reads<2*candidates.length,`${reads} exposure reads must not scale with sort comparisons`);
+  assert.deepEqual(rawDoseLeaders([],input,6),[]);
+});

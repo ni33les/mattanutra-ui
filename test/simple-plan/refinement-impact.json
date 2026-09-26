@@ -26,7 +26,7 @@
     {
       "file": "test/service-efficiency/frontier-hot-path.test.ts",
       "slice": "matching",
-      "expectedCases": 2,
+      "expectedCases": 3,
       "reason": "Bounded candidate retention matches a stable full sort, preserves ties and inputs, and demonstrably reduces comparison calls"
     },
     {
