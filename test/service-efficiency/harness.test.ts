@@ -85,3 +85,21 @@ test("EFF-PACK-06 database benchmarks exclude background setup queries and retai
   await measured.observe(async () => { const fragment = measured.sql`current_timestamp`; assert.ok(fragment); });
   assert.equal(measured.measurements().sqlStatements, 0);
 });
+
+
+test("PERF-PACK-01 read benchmarks use the current public request and identify internal projections separately", async () => {
+  const { seedPlanReader } = await import("../../scripts/service-efficiency/benchmark-readers.mjs");
+  const { createSnapshotMemoryStore } = await import("../agentic/value/snapshot-store.ts");
+  const { fixtureSnapshot } = await import("../../lib/agentic/catalogue/fixtures.ts");
+  const store=createSnapshotMemoryStore(fixtureSnapshot());
+  const load=async(file:string)=>file==="lib/agentic/store/postgres.ts"?{createPostgresStore:()=>store}:import(new URL(`../../${file}`,import.meta.url).href);
+  const reader=await seedPlanReader(load,undefined);
+  const decision=await reader.poll();
+  assert.equal(decision.ok,true);assert.equal(decision.status,"ready");assert.ok(decision.choices.length===1);
+  assert.equal(typeof reader.projection,"function");
+  store.getPlanRevision=async()=>{throw new Error("Projection benchmark loaded full result JSON");};
+  const projection=await reader.projection();
+  assert.equal(projection.revision,1);assert.ok(projection.resultVersion);
+  assert.equal(projection.decision.status,"ready");
+  assert.equal(Object.hasOwn(projection,"choices"),false);
+});
