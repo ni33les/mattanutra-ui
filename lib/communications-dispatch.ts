@@ -1,3 +1,4 @@
+import { safetyFollowupMessage } from "@/lib/safety-followup-message";
 /**
  * Plan channel CRUD, message send/retry, and provider dispatch.
  * Re-exported from the communications facade for stable call sites.
@@ -48,8 +49,7 @@ import {
   type Db,
   type DeliveryTargetRow,
   type MessageRow,
-  type PreparedRetryMessage,
-  type SafetyFollowupItem
+  type PreparedRetryMessage
 } from "@/lib/communications-shared";
 import { queueCommunicationMessageDispatchTask } from "@/lib/communications-organisation";
 
@@ -1073,53 +1073,6 @@ export async function dispatchQueuedCommunicationMessages(input: Readonly<{
   }
 
   return results;
-}
-
-function safetyFollowupMessage(input: Readonly<{
-  clientDose?: string | null;
-  decision: string;
-  reviewedItems?: SafetyFollowupItem[];
-  supplementName: string;
-}>) {
-  const reviewedItems = input.reviewedItems ?? [];
-
-  if (reviewedItems.length > 1) {
-    const summary = reviewedItems
-      .map((item) => {
-        if (item.decision === "approve") {
-          return item.clientDose
-            ? `${item.supplementName} approved at ${item.clientDose}`
-            : `${item.supplementName} approved`;
-        }
-
-        if (item.decision === "disapprove") {
-          return `${item.supplementName} removed`;
-        }
-
-        return `${item.supplementName} reviewed`;
-      })
-      .join("; ");
-
-    return `Your human safety review is complete. We have updated your nutrition plan after reviewing ${reviewedItems.length} supplements: ${summary}.`;
-  }
-
-  const singleItem = reviewedItems[0];
-
-  if (singleItem) {
-    return safetyFollowupMessage({
-      clientDose: singleItem.clientDose,
-      decision: singleItem.decision,
-      supplementName: singleItem.supplementName
-    });
-  }
-
-  if (input.decision === "approve") {
-    return input.clientDose
-      ? `Your human safety review for ${input.supplementName} is complete. The reviewed dose is ${input.clientDose}. Your nutrition plan has been updated.`
-      : `Your human safety review for ${input.supplementName} is complete. Your nutrition plan has been updated.`;
-  }
-
-  return `Your human safety review for ${input.supplementName} is complete. We have removed that suggestion from your nutrition plan.`;
 }
 
 export async function sendClientSafetyFollowupTask(reserved: ReservedTask) {

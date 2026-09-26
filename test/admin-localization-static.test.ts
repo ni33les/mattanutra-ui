@@ -93,10 +93,11 @@ test("admin access management exposes people, organisations, memberships, agents
   assert.match(dashboard, /view === "audit"/);
   assert.match(dashboard, /view === "memberships"/);
   assert.match(dashboard, /view === "settings"/);
-  assert.match(dashboard, /function AdminSessionBar/);
-  assert.match(dashboard, /context\.effectiveOrganisation\.name/);
-  assert.match(dashboard, /context\.effectiveOrganisation\.currency/);
-  assert.match(dashboard, /\/api\/admin\/impersonation\/stop/);
+  const sessionBar = source("components/admin/session-bar.tsx");
+  assert.match(sessionBar, /function AdminSessionBar/);
+  assert.match(sessionBar, /context\.effectiveOrganisation\.name/);
+  assert.match(sessionBar, /context\.effectiveOrganisation\.currency/);
+  assert.match(sessionBar, /\/api\/admin\/impersonation\/stop/);
   assert.doesNotMatch(accessView, /labels\.access\.session[\s\S]*context\.actorOrganisation\.name/);
   assert.match(accessView, /view === "access-agents"/);
   assert.match(accessView, /view === "audit"/);

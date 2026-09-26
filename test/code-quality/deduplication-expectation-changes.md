@@ -16,3 +16,9 @@ Four pairs currently contain identical function bodies. Consolidation keeps one 
 | `safetyFollowupMessage` in communications dispatch and task-work-items | `lib/safety-followup-message.ts` | Both callers import the same formatter. Payload normalization, safety-review IDs, subject, dispatch ownership and delivery/audit writes remain in their existing callers. New single/grouped text cases preserve all formatter branches. |
 
 No test cases, business assertions, historical fixtures or evidence are retired in this slice. The only existing-test edits change the file inspected for the moved implementation. `implementation-bodies.json` records original source-body hashes to verify the extracted functions and all unaffected callers remain byte-identical.
+
+## Implemented verification
+
+RED was committed as `3861715e` before source changes. The four implementations now have one owner apiece, with public re-exports preserved. `body-parity.json` compares all 155 recorded function bodies, including both original copies of each extracted function and every unaffected caller, with zero mismatches. `size.json` measures a net reduction of **306 application lines**; this excludes tests and documentation.
+
+The candidate run in `green.tap` records 96/97 passes, zero skips/cancellations. All eight new tests pass; its sole failure is the same unrelated lock-registry failure recorded before extraction. This file's name is not a claim of complete green acceptance. `lint-final.log` has zero errors and the same seven communication-module warnings demonstrated by `lint-baseline-communications.log`; no new warnings remain. `git diff --check` passes. Broader type/build gates and correction of the independently owned registry failure remain programme-level checks.

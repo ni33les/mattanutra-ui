@@ -482,7 +482,7 @@ describe("database transaction boundaries", () => {
   });
 
   it("keeps product fact replacement transaction-free and statement-atomic", async () => {
-    const source = await readFile("lib/admin-products.ts", "utf8");
+    const source = await readFile("lib/admin-product-facts.ts", "utf8");
     const helper = functionBody(source, "replaceProductFacts");
 
     assert.equal(

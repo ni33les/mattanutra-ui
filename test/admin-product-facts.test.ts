@@ -75,8 +75,7 @@ describe("admin product facts", () => {
     assert.match(factMatcher, /supplements\.normalized_name/);
 
     for (const file of [
-      "lib/admin-product-writes.ts",
-      "lib/admin-products.ts",
+      "lib/admin-product-facts.ts",
     ]) {
       const source = await readFile(file, "utf8");
       const helper = functionBody(source, "replaceProductFacts");
