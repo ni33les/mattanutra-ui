@@ -209,3 +209,47 @@ test('REF-CPU-16 numerical nutrient scores omit display-only trees and retain ex
   assert.equal(compareDoseFit(display, numeric), 0);
   assert.equal(display.perTarget[0].exposure, 75);
 });
+
+
+test('QC-RES-01 resident publication preserves the admitted catalogue when its caller changes nested inputs', async () => {
+  const { input } = await import('./support.ts');
+  const { uninstallGoldCatalogue } = await import('../helpers/gold-catalogue.ts');
+  const matching = await import('../../lib/agentic/plan/matching.ts');
+  try {
+    const value = structuredClone(await input()); matching.resetMatchPlanCache();
+    const expected = matching.matchPlan({ ...value, snapshot: structuredClone(value.snapshot) });
+    assert.ok(expected.selected?.basket.length, 'The control must select an actual catalogue product');
+    const changed = value.snapshot.products.find(product => product.productId === expected.selected!.basket[0].productId);
+    assert.ok(changed?.candidate.facts.length, 'Mutation must affect a selected product and its nested fact');
+    const originalCatalogue = structuredClone(value.snapshot);
+    const session = matching.createResidentPlanSession(value);
+    let step = matching.advanceResidentPlanSession(session, { chunkBudget: 1 });
+    assert.equal(step.done, false, 'The controlled change occurs between real search chunks');
+    Object.assign(changed, { unitPriceMinor: changed.unitPriceMinor + 1234 });
+    Object.assign(changed.candidate, { title: 'Changed after admission', priceAmount: changed.unitPriceMinor / 100 });
+    const fact = changed.candidate.facts[0];
+    Object.assign(fact, { amount: 99999, comparableAmount: 99999 });
+    while (!step.done) step = matching.advanceResidentPlanSession(session, { chunkBudget: 4000 });
+    assert.deepEqual(step.result, expected, 'Basket, doses, money, advice and catalogue identity belong to the admitted snapshot');
+    assert.deepEqual(session.input.snapshot, originalCatalogue, 'The resident session owns its original nested facts');
+    assert.equal(step.expansionAttempts, expected.searchSummary!.expansionAttempts);
+  } finally { uninstallGoldCatalogue(); }
+});
+
+test('QC-RES-02 changed caller facts still invalidate an old checkpoint instead of reusing a stale identity', async () => {
+  const { input } = await import('./support.ts');
+  const { uninstallGoldCatalogue } = await import('../helpers/gold-catalogue.ts');
+  const matching = await import('../../lib/agentic/plan/matching.ts');
+  try {
+    const value = structuredClone(await input()); matching.resetMatchPlanCache();
+    const session = matching.createResidentPlanSession(value);
+    const first = matching.advanceResidentPlanSession(session, { chunkBudget: 1 });
+    assert.equal(first.done, false);
+    const resumed = matching.createResidentPlanSession(structuredClone(value), first.checkpoint);
+    assert.equal(resumed.inputIdentity, session.inputIdentity, 'Unchanged immutable values recover the same acknowledged work');
+    assert.ok(value.snapshot.products[0]?.candidate.facts.length, 'A concrete nested fact is required for the identity regression');
+    Object.assign(value.snapshot.products[0].candidate.facts[0], { amount: 123456, comparableAmount: 123456 });
+    assert.throws(() => matching.createResidentPlanSession(value, first.checkpoint), /Plan checkpoint input identity changed/,
+      'Mutable external snapshots must never receive an unsafe permanent identity memo');
+  } finally { uninstallGoldCatalogue(); }
+});
