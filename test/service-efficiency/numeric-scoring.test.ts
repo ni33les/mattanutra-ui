@@ -196,6 +196,7 @@ test('REF-CPU-15 archive recovery in a live cursor preserves original numerical 
   advanceSearchCursor(cursor, input, 10);
   const original = [...cursor.unreviewed, ...cursor.review].find(row => row.count > 0); assert.ok(original);
   const restored = [...archivedSearchStates(cursor)].find(row => row.selectedVariantIds.join('|') === original.selectedVariantIds.join('|')); assert.ok(restored);
+  assert.strictEqual(restored, original, 'Live archive reads must reuse the evaluated basket, not allocate a second state and measurement cache');
   assert.strictEqual(restored.exposure, original.exposure, 'An already-calculated immutable basket must not lose all exact term caches when restored locally');
   assert.deepEqual([...archivedSearchStates(structuredClone(cursor))], [...archivedSearchStates(cursor)], 'Durable recovery retains the same state values');
 });
