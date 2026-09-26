@@ -199,3 +199,13 @@ trade-off rather than weakening that penalty. Classic-fallback browser cases now
 select the fallback explicitly, raw browser evidence must reconcile with
 execution, and HTTP notification/timing checks observe real events instead of a
 synthetic acknowledgement. These changes remain subject to final acceptance.
+
+A second integrated attempt, `acceptance-final-2` at `dd27ac13`, was stopped
+when review found latency checks treating HTTP 200 error envelopes as success.
+Its interrupted attestation remains non-deployable. The maintained LAT and
+DEV-LAT checks now require successful current-contract payloads, distinguish
+admission from matching, reconcile accepted work with terminal outcomes, and
+use the existing isolated QA allowance for load samples. The wider audited
+HTTP test surface retains intentional error tests and fail-closed utilities.
+Meaningful RED failures, the 15-case LAT GREEN and six negative-envelope checks
+are retained under `test-speed/lat-pack-*` and `test-speed/mcp-success-audit/`.
