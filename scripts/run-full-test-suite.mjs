@@ -76,9 +76,11 @@ let interruptedSignal = null;
 export async function runBatch(label, args, env, evidence) {
   if (interruptedSignal) return { label, passed: false, interrupted: true, signal: interruptedSignal };
   if (label.startsWith("node-")) args = ["--experimental-test-module-mocks", "--test-reporter=tap", "--test-reporter-destination=stdout",
-    "--test-reporter=./scripts/test-semantic-reporter.mjs", `--test-reporter-destination=${join(evidence, `${label}-events.jsonl`)}`, ...args];
+    "--test-reporter=./scripts/test-semantic-reporter.mjs", `--test-reporter-destination=${join(evidence, `${label}-events.jsonl`)}`,
+    "--test-reporter=./scripts/test-timing-reporter.mjs", `--test-reporter-destination=${join(evidence, `${label}-timings.jsonl`)}`, ...args];
   const output = createWriteStream(join(evidence, `${label}.log`), { flags: "wx", mode: 0o600 });
   const startedAt = new Date().toISOString();
+  const started = performance.now();
   let tail = "";
   const child = spawn(process.execPath, args, { cwd: ROOT, env, detached: process.platform !== "win32", stdio: ["ignore", "pipe", "pipe"] });
   const interrupt = signal => {
@@ -109,7 +111,7 @@ export async function runBatch(label, args, env, evidence) {
     } catch (error) { execution = { passed: false, failures: [error.message] }; }
   }
   const passed = status.code === 0 && (tests == null || tests > 0) && !skipped && !todo && !cancelled && (execution?.passed ?? true);
-  const result = { label, args, startedAt, finishedAt: new Date().toISOString(), ...status, tests, skipped, todo, cancelled, execution, passed };
+  const result = { label, args, startedAt, finishedAt: new Date().toISOString(), timing: { elapsedMs: performance.now() - started }, ...status, tests, skipped, todo, cancelled, execution, passed };
   console.log(JSON.stringify(result));
   return result;
 }

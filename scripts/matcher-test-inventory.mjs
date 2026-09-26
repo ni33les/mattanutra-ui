@@ -10,7 +10,7 @@ export const MATCHER_TEST_FAMILIES = Object.freeze({
   commerce: /^test\/(?:commerce-transactions|retail-(?:checkout-|cart-availability|order-workflow|product-checkout|plan-insert)|web-payment-|payment-confirmation-return)/,
   additionalConsumers: /^test\/(?:admin-product-(?:facts|reference-retirement)|phase3-t01-t08-static|plan-keep-warm-static|product-card-layout|retail-stock-fx|v9-product-master|healthscore-performance\/availability-catalogue|pharmacy-followup\/market\.integration|reveal-coverage-corrections|web-matching-correctness\/(?:presentation|regressions))\.test\.ts$/,
   refinementInfrastructure: /^test\/(?:ax-refinement|service-efficiency)\//,
-  infrastructure: /^test\/(?:full-test-suite-discovery|mcp-test-discovery|latency-acceptance-policy|dev-advisory-validation|dev-validation-(?:proof|fingerprints))/
+  infrastructure: /^test\/(?:code-quality-deduplication|full-test-suite-discovery|mcp-test-discovery|latency-acceptance-policy|dev-advisory-validation|dev-validation-(?:proof|fingerprints))/
 });
 
 export function isNodeTestFile(file) {

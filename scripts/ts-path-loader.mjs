@@ -5,7 +5,6 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 const root = resolvePath(fileURLToPath(new URL("..", import.meta.url)));
 const require = createRequire(import.meta.url);
-const ts = require("typescript");
 
 async function firstExistingPath(basePath) {
   const candidates = extname(basePath)
@@ -65,6 +64,7 @@ export async function load(url, context, nextLoad) {
   }
 
   const source = await readFile(new URL(url), "utf8");
+  const ts = require("typescript");
   const result = ts.transpileModule(source, {
     compilerOptions: {
       esModuleInterop: true,
