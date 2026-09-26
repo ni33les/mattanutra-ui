@@ -1,7 +1,7 @@
 import { FORMULATION_AVAILABILITY_POLICY } from '@/lib/formulation-availability';
 import { loadAdminSafetyReferenceSnapshot } from "@/lib/agentic/catalogue/load-safety-ceilings";
 import { getAssessmentProductPreferences } from "@/lib/assessment-product-preferences";
-import { generationLocale, ASSESSMENT_GENERATION_TASKS, loadGenerationInput, FUNNEL_GENERATOR_VERSION } from "@/lib/assessment-revisions";
+import { assessmentInputHash as canonicalAssessmentInputHash, generationLocale, ASSESSMENT_GENERATION_TASKS, loadGenerationInput, FUNNEL_GENERATOR_VERSION } from "@/lib/assessment-revisions";
 import { deferUntilDatabaseCommit } from "@/lib/db";
 import type postgres from "postgres";
 import {
@@ -356,24 +356,41 @@ export async function enqueueHealthScoreAnalysisTask({
   });
 }
 
+type AssessmentTaskIdentity = Readonly<{ revision: number; inputHash: string }>;
+
+async function assessmentTaskIdentity(sql: postgres.Sql, planId: string): Promise<AssessmentTaskIdentity | null> {
+  const [row] = await sql`
+    select input_revision, input_hash,
+      case when input_hash is null then answers end as legacy_answers
+    from public.assessments where plan_id = ${planId}::uuid
+  `;
+  if (!row) return null;
+  return {
+    revision: Number(row.input_revision),
+    inputHash: row.input_hash ?? canonicalAssessmentInputHash(row.legacy_answers)
+  };
+}
+
 async function activePlanTaskId(
   sql: postgres.Sql,
   planId: string,
-  taskType: WorkTaskType
+  taskType: WorkTaskType,
+  identity: AssessmentTaskIdentity
 ) {
   const rows = await sql<Array<{ id: string }>>`
-    select id::text
+    select tasks.id::text
     from public.tasks
-    where plan_id = ${planId}::uuid
-      and payload #>> '{generation,revision}' = (select input_revision::text from public.assessments where plan_id = ${planId}::uuid)
-      and payload #>> '{generation,locale}' = coalesce(${generationLocale(planId)}, (select locale from public.assessments where plan_id = ${planId}::uuid))
+    join public.assessments on assessments.plan_id = tasks.plan_id
+    where tasks.plan_id = ${planId}::uuid
+      and assessments.input_revision = ${identity.revision}
+      and coalesce(assessments.input_hash, ${identity.inputHash}) = ${identity.inputHash}
+      and payload #>> '{generation,revision}' = assessments.input_revision::text
+      and payload #>> '{generation,locale}' = coalesce(${generationLocale(planId)}, assessments.locale)
       and payload #>> '{generation,generatorVersion}' = ${FUNNEL_GENERATOR_VERSION}
       and task_type = ${taskType}
-      and status not in ('completed', 'failed', 'cancelled', 'skipped')
-      and payload #>> '{generation,inputHash}' = (
-        select input_hash from public.assessments where plan_id = ${planId}::uuid
-      )
-    order by business_value desc, scheduled_for asc, created_at asc
+      and tasks.status not in ('completed', 'failed', 'cancelled', 'skipped')
+      and payload #>> '{generation,inputHash}' = ${identity.inputHash}
+    order by business_value desc, scheduled_for asc, tasks.created_at asc
     limit 1
   `;
 
@@ -383,7 +400,8 @@ async function activePlanTaskId(
 async function nutritionOutputReadiness(
   sql: postgres.Sql,
   planId: string,
-  inputHash?: string | readonly string[] | null
+  inputHash?: string | readonly string[] | null,
+  identity?: AssessmentTaskIdentity
 ) {
   const inputHashes = Array.isArray(inputHash)
     ? inputHash.filter(Boolean)
@@ -423,9 +441,10 @@ async function nutritionOutputReadiness(
                     tasks.payload #>> '{generation,revision}' = formulations.assessment_revision::text
                     and tasks.payload #>> '{generation,locale}' = formulations.generation_locale
                     and tasks.payload #>> '{generation,generatorVersion}' = formulations.generator_version
-                    and tasks.payload #>> '{generation,inputHash}' = (
-                      select input_hash from public.assessments where plan_id = ${planId}::uuid
-                    )
+                    and formulations.assessment_revision = ${identity?.revision ?? null}
+                    and tasks.payload #>> '{generation,inputHash}' = ${identity?.inputHash ?? null}
+                    and coalesce((select input_hash from public.assessments where plan_id = ${planId}::uuid),
+                      ${identity?.inputHash ?? null}) = ${identity?.inputHash ?? null}
                   )
                   or (
                     not (tasks.payload ? 'generation')
@@ -462,16 +481,8 @@ export async function enqueueAssessmentPregenerationTasks({
     return null;
   }
 
-  const assessmentRows = await sql`
-    select plan_id
-    from public.assessments
-    where plan_id = ${planId}::uuid
-    limit 1
-  `;
-
-  if (!assessmentRows[0]) {
-    return null;
-  }
+  const identity = await assessmentTaskIdentity(sql, planId);
+  if (!identity) return null;
 
   const catalogueCountry = productCountryCodeFromAnswers(answers);
 
@@ -483,7 +494,7 @@ export async function enqueueAssessmentPregenerationTasks({
 
   const plan = DEFAULT_ASSESSMENT_PLAN;
   const inputHash = stableHash({ answers, locale });
-  const readiness = await nutritionOutputReadiness(sql, planId, inputHash);
+  const readiness = await nutritionOutputReadiness(sql, planId, inputHash, identity);
   const taskGroupId = deterministicUuid(
     `mattanutra:task-group:assessment-pregeneration:${planId}:${inputHash}`
   );
@@ -501,7 +512,7 @@ export async function enqueueAssessmentPregenerationTasks({
   // Reuse the formula already shown on HealthScore. Active-task deduplication
   // alone does not protect completed outputs from being regenerated on retry.
   const formulationTaskId = readiness.formulationReady ? null :
-    (await activePlanTaskId(sql, planId, "generate_supplement_guidance")) ?? await createWorkTask({
+    (await activePlanTaskId(sql, planId, "generate_supplement_guidance", identity)) ?? await createWorkTask({
     actorType: "deterministic",
     businessValue: TASK_BUSINESS_VALUES.precision,
     groupLabel: "Pre-generate nutrition guidance",
@@ -567,16 +578,8 @@ export async function enqueueNutritionPlanTasks({
     return null;
   }
 
-  const assessmentRows = await sql`
-    select plan_id
-    from public.assessments
-    where plan_id = ${planId}::uuid
-    limit 1
-  `;
-
-  if (!assessmentRows[0]) {
-    return null;
-  }
+  const identity = await assessmentTaskIdentity(sql, planId);
+  if (!identity) return null;
 
   const inputHash = stableHash({ answers, locale });
   const checkoutInputHash = paymentId
@@ -593,7 +596,8 @@ export async function enqueueNutritionPlanTasks({
   const readiness = await nutritionOutputReadiness(
     sql,
     planId,
-    reusableInputHashes
+    reusableInputHashes,
+    identity
   );
   const taskGroupId =
     (await latestNutritionTaskGroupId(sql, planId)) ??
@@ -604,7 +608,8 @@ export async function enqueueNutritionPlanTasks({
     : (await activePlanTaskId(
         sql,
         planId,
-        "generate_supplement_guidance"
+        "generate_supplement_guidance",
+        identity
       )) ??
       await createWorkTask({
         actorType: "ai",
@@ -779,16 +784,8 @@ export async function enqueuePaymentCheckoutPregenerationTasks({
     return null;
   }
 
-  const assessmentRows = await sql`
-    select plan_id
-    from public.assessments
-    where plan_id = ${planId}::uuid
-    limit 1
-  `;
-
-  if (!assessmentRows[0]) {
-    return null;
-  }
+  const identity = await assessmentTaskIdentity(sql, planId);
+  if (!identity) return null;
 
   const assessmentInputHash = stableHash({ answers, locale });
   const inputHash = stableHash({
@@ -801,13 +798,15 @@ export async function enqueuePaymentCheckoutPregenerationTasks({
   const readiness = await nutritionOutputReadiness(
     sql,
     planId,
-    reusableInputHashes
+    reusableInputHashes,
+    identity
   );
   const activeFormulationTaskId =
     await activePlanTaskId(
       sql,
       planId,
-      "generate_supplement_guidance"
+      "generate_supplement_guidance",
+      identity
     );
   const existingTaskGroupId =
     (await latestNutritionTaskGroupId(sql, planId)) ??
