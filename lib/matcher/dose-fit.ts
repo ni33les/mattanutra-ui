@@ -16,6 +16,12 @@ const exactFacts = new WeakMap<DoseFitScore, NumericalDoseFitScore>();
 export function doseFitTargetDeviations(score: NumericalDoseFitScore | DoseFitScore) { return "deviations" in score ? score.deviations : exactFacts.get(score)?.deviations ?? score.perTarget; }
 const fixedWeights = new WeakMap<CanonicalRequest, number | null>();
 const scoreCache = new WeakMap<CanonicalRequest, WeakMap<object, NumericalDoseFitScore>>();
+const additions = new WeakMap<ReadonlyMap<string, bigint>, { parent: ReadonlyMap<string, bigint>; subjects: readonly string[] }>();
+/** Only immutable search additions register provenance; recovery and direct
+ * callers use the same complete calculation without requiring cached parents. */
+export function recordDoseFitAddition(exposure: ReadonlyMap<string, bigint>, parent: ReadonlyMap<string, bigint>, subjects: readonly string[]) {
+  if (subjects.length < parent.size / 2) additions.set(exposure, { parent, subjects });
+}
 const weightedCache = new WeakMap<CanonicalRequest, WeakMap<object, NumericalDoseFitScore>>();
 const sharedInputs = new WeakMap<CanonicalRequest, CanonicalRequest>();
 /** Only the internal profile copier calls this: all intake, target and reference
@@ -192,14 +198,15 @@ function calculateDoseFit(request: CanonicalRequest, exposure: ReadonlyMap<strin
   if (!cache) { cache = new WeakMap(); memo.set(request, cache); }
   const previous = cache.get(exposure);
   if (previous && !materialize) return previous;
-  const fittingTerms: Fraction[] = [], safetyTerms: Fraction[] = [], intentTerms: Fraction[] = [];
+  const addition = materialize ? undefined : additions.get(exposure), inherited = addition && cache.get(addition.parent);
+  const fittingTerms: Fraction[] = inherited ? [inherited.fitting] : [], safetyTerms: Fraction[] = inherited ? [inherited.safety] : [], intentTerms: Fraction[] = inherited ? [inherited.exact] : [];
   const displayTerms: Fraction[][] | null = materialize ? [[], [], []] : null;
   const settings = applyWeights && request.scoring ? effectiveWeights(request.scoring) : null;
   const weights = settings ? exactWeights(settings) : null;
   const perTarget: DoseFitScore["perTarget"][number][] | null = materialize ? [] : null;
   const perContinuedDose: NonNullable<DoseFitScore["perContinuedDose"]>[number][] | null = materialize ? [] : null;
   const perLimit: DoseFitScore["perLimit"][number][] | null = materialize ? [] : null;
-  const deviations: TargetDeviation[] = [], estimatedTargets: string[] = [];
+  const deviations: TargetDeviation[] = [...(inherited?.deviations ?? [])], estimatedTargets: string[] = [];
   let fixed = fixedSubjects.get(request);
   if (fixed === undefined) {
     fixed = request.currentSupplements.length === 0 && (!knownLimitProfile(request) || !request.safetyCeilings?.length)
@@ -210,7 +217,7 @@ function calculateDoseFit(request: CanonicalRequest, exposure: ReadonlyMap<strin
   // order-independent; avoid allocating and sorting a set for every basket.
   let requested = requestedSubjects.get(request);
   if (!requested) { requested = new Set([...(request.dietaryIntake ?? []).map(row => row.subjectId), ...request.targets.map(row => row.subjectId)]); requestedSubjects.set(request, requested); }
-  const subjects = fixed ?? (materialize ? [...new Set([...exposure.keys(), ...requested])].sort()
+  const subjects = inherited ? addition!.subjects : fixed ?? (materialize ? [...new Set([...exposure.keys(), ...requested])].sort()
     : [...requested, ...exposure.keys()].filter((id, index) => index < requested.size || !requested.has(id)));
   for (const subjectId of subjects) {
     const compiled = subjectInputs(request, subjectId);
@@ -218,6 +225,14 @@ function calculateDoseFit(request: CanonicalRequest, exposure: ReadonlyMap<strin
     if (!target && reference === BigInt(0) && bounds.length === 0) continue;
     const known = exposure.get(subjectId) ?? BigInt(0);
     const weight = weights ? weights.subjects.get(subjectId) ?? weights.defaultWeight : ONE;
+    if (inherited) {
+      const old = cachedSubjectLoss(compiled, addition!.parent.get(subjectId) ?? BigInt(0), weight).worst;
+      fittingTerms.push({ num: -old.fitting.num, den: old.fitting.den });
+      safetyTerms.push({ num: -old.safety.num, den: old.safety.den });
+      if (settings) intentTerms.push({ num: -old.total.num, den: old.total.den });
+      const index = deviations.findIndex(row => row.subjectId === subjectId);
+      if (index >= 0) deviations.splice(index, 1);
+    }
     const { minimum, maximum, added, continuedIncrease, worst, deviation } = cachedSubjectLoss(compiled, known, weight);
     if (settings) intentTerms.push(worst.total);
     fittingTerms.push(worst.fitting);
