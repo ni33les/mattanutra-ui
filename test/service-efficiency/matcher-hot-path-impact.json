@@ -72,11 +72,6 @@
       "file": "test/service-efficiency/reference-browser.test.ts",
       "expectedCases": 1,
       "reason": "Shared matcher bundles without Node-only browser imports"
-    },
-    {
-      "file": "test/service-efficiency/numeric-scoring.test.ts",
-      "expectedCases": 30,
-      "reason": "Exact endpoint arithmetic, compilation sharing, identity isolation, and separate fresh search state without completed-result reuse."
     }
   ],
   "exclusions": "No full application/MCP, live database, payment or unrelated browser suites; no contract or scoring-policy changes."

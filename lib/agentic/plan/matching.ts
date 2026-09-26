@@ -81,9 +81,7 @@ export { toMatcherProduct };
 import { ByteBoundedCache } from "@/lib/match-work-cache";
 
 const matchPlanCache = new ByteBoundedCache<ReturnType<typeof computeMatchPlan>>(16 * 1024 * 1024);
-const matcherProductCache = new ByteBoundedCache<
-  { products: ReturnType<typeof toMatcherProduct>[] } | { request: CanonicalRequest; groups: ProductGroup[] }
->(8 * 1024 * 1024, true);
+const matcherProductCache = new ByteBoundedCache<ReturnType<typeof toMatcherProduct>[]>(8 * 1024 * 1024, true);
 
 export function resetMatchPlanCache() {
   matchPlanCache.clear();
@@ -93,11 +91,11 @@ export function resetMatchPlanCache() {
 function matcherProductsFor(snapshot: CatalogueSnapshot) {
   const id = matchingSnapshotId(snapshot);
   const hit = matcherProductCache.get(id);
-  if (hit && "products" in hit) {
-    return hit.products;
+  if (hit) {
+    return hit;
   }
   const products = snapshot.products.map(toMatcherProduct);
-  matcherProductCache.set(id, { products });
+  matcherProductCache.set(id, products);
   return products;
 }
 
@@ -1310,7 +1308,7 @@ export function matchPlanChunk(input: Parameters<typeof matchPlan>[0], options: 
 export function createResidentPlanSession(input: Parameters<typeof matchPlan>[0], checkpoint?: PlanSearchCheckpoint | BinaryPlanSearchCheckpoint) {
   const endCompilation = measureService("match.compilation_ms");
   try {
-  let request = toCanonicalRequest(input.state);
+  const request = toCanonicalRequest(input.state);
   if ("error" in request) throw new Error(request.error);
   // Own the nested facts once. The same immutable snapshot supplies compiled
   // products, checkpoint identity and final response materialization.
@@ -1322,18 +1320,7 @@ export function createResidentPlanSession(input: Parameters<typeof matchPlan>[0]
   // original compilation for unchanged final diagnostics and seller facts.
   // Recovery already has compiled dynamic groups in its cursor. Defer the
   // original compilation until finalization instead of rebuilding it per replay.
-  const compilationKey = `compiled:${process.env.MATTANUTRA_ENV ?? "unspecified"}:${inputIdentity}:${input.state.searchEffort ?? "standard"}:${matcherSafetyCeilingsUnavailable()}`;
-  let compiled = checkpoint ? undefined : matcherProductCache.get(compilationKey);
-  if (!checkpoint && !compiled) {
-    compiled = { request, groups: compileGroups(orderInvariantRequest(request), catalog) };
-    matcherProductCache.set(compilationKey, compiled);
-    compiled = matcherProductCache.get(compilationKey) ?? compiled;
-  }
-  // Share only immutable preparation within the existing byte budget. Every
-  // invocation still creates its own cursor and consumes its full work budget.
-  const prepared = compiled && "groups" in compiled ? compiled : undefined;
-  if (prepared) request = prepared.request;
-  const compiledGroups = prepared?.groups;
+  const compiledGroups = checkpoint ? undefined : compileGroups(orderInvariantRequest(request), catalog);
   const cursor = checkpoint
     ? decodeMatchCursor(checkpoint.cursor, matchCursorIdentity(request, catalog, DEFAULT_MATCHER_CONFIG))
     : createMatchCursor(request, catalog, DEFAULT_MATCHER_CONFIG, compiledGroups);
