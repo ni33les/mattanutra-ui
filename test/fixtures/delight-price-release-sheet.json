@@ -1,0 +1,1176 @@
+{
+  "workbookSha256": "20caf578c9b6e01797428088fc4f9cd373aae9558e3bd0432540d7e99f764035",
+  "sheet": "Definitive Price List (2)",
+  "rows": [
+    {
+      "sheet_row": 2,
+      "row_colour": "FFFCE4EC",
+      "price_colour": "FFC6EFCE",
+      "sheet_name": "Abhaibhubejhr Turmeric Capsules 60'S",
+      "retail_proposed": "85.00",
+      "wholesale_proposed": "58.00",
+      "formula": null,
+      "original_product_id": "f0b92f35-cd0b-542b-8ac2-70c63d95c44a"
+    },
+    {
+      "sheet_row": 3,
+      "row_colour": "FFFFF2CC",
+      "price_colour": "FFC6EFCE",
+      "sheet_name": "BLACKMORE JOINPLUS 30'S(UC2)",
+      "retail_proposed": "660.00",
+      "wholesale_proposed": "530.00",
+      "formula": null,
+      "original_product_id": "1cb381be-68df-56ec-9a01-9b58643a8fd3"
+    },
+    {
+      "sheet_row": 4,
+      "row_colour": "FFFFF2CC",
+      "price_colour": "FFC6EFCE",
+      "sheet_name": "BLACKMORE MAGNESIUM+D3 50'S",
+      "retail_proposed": "380.00",
+      "wholesale_proposed": "269.00",
+      "formula": null,
+      "original_product_id": "202c5e09-36e8-575f-9d95-dcb35a8d2965"
+    },
+    {
+      "sheet_row": 5,
+      "row_colour": "00000000",
+      "price_colour": "FFC6EFCE",
+      "sheet_name": "BLACKMORES ASTAXANTHIN 6MG PLUS",
+      "retail_proposed": "550.00",
+      "wholesale_proposed": "445.00",
+      "formula": null,
+      "original_product_id": "70a207e6-b1b5-5e4b-9de2-cfdc30a4f1cc"
+    },
+    {
+      "sheet_row": 6,
+      "row_colour": "00000000",
+      "price_colour": "FFC6EFCE",
+      "sheet_name": "BLACKMORES BIO C 1000MG DAILY IMU+ 30'S",
+      "retail_proposed": "280.00",
+      "wholesale_proposed": "216.00",
+      "formula": null,
+      "original_product_id": "b267f258-8ff1-4195-abbe-02e769d5aa1d"
+    },
+    {
+      "sheet_row": 7,
+      "row_colour": "00000000",
+      "price_colour": "FFC6EFCE",
+      "sheet_name": "BLACKMORES BIO C 1000MG DAILY IMU+ 60'S",
+      "retail_proposed": "438.00",
+      "wholesale_proposed": "369.00",
+      "formula": null,
+      "original_product_id": "dc960caa-de03-4999-aef4-b0e8d7cecbc9"
+    },
+    {
+      "sheet_row": 8,
+      "row_colour": "00000000",
+      "price_colour": "FFC6EFCE",
+      "sheet_name": "BLACKMORES BIO C 500MG DAILY IMU+ CHEWABLE 30'S",
+      "retail_proposed": "255.00",
+      "wholesale_proposed": "180.00",
+      "formula": null,
+      "original_product_id": "ec278e48-ab6d-4a12-a385-3aa62d22c378"
+    },
+    {
+      "sheet_row": 9,
+      "row_colour": "FFFFF2CC",
+      "price_colour": "FFC6EFCE",
+      "sheet_name": "Blackmores Bio Calcium+D3",
+      "retail_proposed": "334.00",
+      "wholesale_proposed": "250.00",
+      "formula": null,
+      "original_product_id": "2c9107c2-db62-4475-9755-c683ff46a98e"
+    },
+    {
+      "sheet_row": 10,
+      "row_colour": "00000000",
+      "price_colour": "FFC6EFCE",
+      "sheet_name": "BLACKMORES BIO C GLUTA IMU+",
+      "retail_proposed": "650.00",
+      "wholesale_proposed": "520.00",
+      "formula": null,
+      "original_product_id": "71b5f9e8-198e-4ac2-a4e1-6971ebf0fb7a"
+    },
+    {
+      "sheet_row": 11,
+      "row_colour": "00000000",
+      "price_colour": "FFC6EFCE",
+      "sheet_name": "BLACKMORES BIO-E 500MG 60'S",
+      "retail_proposed": "755.00",
+      "wholesale_proposed": "600.00",
+      "formula": null,
+      "original_product_id": "24ac9f23-07fe-5db9-8ae1-c726b0562490"
+    },
+    {
+      "sheet_row": 12,
+      "row_colour": "00000000",
+      "price_colour": "FFC6EFCE",
+      "sheet_name": "BLACKMORES BIO FOLIC 90'S",
+      "retail_proposed": "354.00",
+      "wholesale_proposed": "265.00",
+      "formula": null,
+      "original_product_id": "1add87e5-c8bd-4a2b-afc8-d14d9b7a2a28"
+    },
+    {
+      "sheet_row": 13,
+      "row_colour": "FFFFF2CC",
+      "price_colour": "FFC6EFCE",
+      "sheet_name": "Blackmores Bio Magnesium",
+      "retail_proposed": "380.00",
+      "wholesale_proposed": "269.00",
+      "formula": null,
+      "original_product_id": "7f51a7a9-1c70-44d3-bd50-ef4194d241ec"
+    },
+    {
+      "sheet_row": 14,
+      "row_colour": "FFFFF2CC",
+      "price_colour": "FFC6EFCE",
+      "sheet_name": "Blackmores Biotin H+",
+      "retail_proposed": "689.00",
+      "wholesale_proposed": "545.00",
+      "formula": null,
+      "original_product_id": "461232a2-8b3d-4c14-b337-09b5752a4ba0"
+    },
+    {
+      "sheet_row": 15,
+      "row_colour": "FFFFF2CC",
+      "price_colour": "FFC6EFCE",
+      "sheet_name": "Blackmores Bio Zinc A Chelate",
+      "retail_proposed": "484.00",
+      "wholesale_proposed": "355.00",
+      "formula": null,
+      "original_product_id": "c13bd416-4a85-4d54-a3c5-669f310c2afb"
+    },
+    {
+      "sheet_row": 16,
+      "row_colour": "00000000",
+      "price_colour": "FFC6EFCE",
+      "sheet_name": "Blackmores Choles-Bloc",
+      "retail_proposed": "775.00",
+      "wholesale_proposed": "605.00",
+      "formula": null,
+      "original_product_id": "56f119ad-5e96-460e-a299-d88aa6596f3a"
+    },
+    {
+      "sheet_row": 17,
+      "row_colour": "FFFFC7CE",
+      "price_colour": "FFFFC7CE",
+      "sheet_name": "Blackmores Conceive Well™ Gold",
+      "retail_proposed": "891.00",
+      "wholesale_proposed": null,
+      "formula": null,
+      "original_product_id": "12411f18-9354-4a39-bdd6-9335bad9a91e"
+    },
+    {
+      "sheet_row": 18,
+      "row_colour": "00000000",
+      "price_colour": "FFC6EFCE",
+      "sheet_name": "BLACKMORES CO-Q10 50MG 30'S",
+      "retail_proposed": "739.00",
+      "wholesale_proposed": "570.00",
+      "formula": null,
+      "original_product_id": "57669f54-739d-5970-b320-ce4ffbd61fe3"
+    },
+    {
+      "sheet_row": 19,
+      "row_colour": "00000000",
+      "price_colour": "FFC6EFCE",
+      "sheet_name": "BLACKMORES EPO 1000MG 60'S",
+      "retail_proposed": "530.00",
+      "wholesale_proposed": "425.00",
+      "formula": null,
+      "original_product_id": "7b70f063-0676-5518-9b81-7224c4230e0a"
+    },
+    {
+      "sheet_row": 20,
+      "row_colour": "00000000",
+      "price_colour": "FFC6EFCE",
+      "sheet_name": "BLACKMORES EXEC B 30'S",
+      "retail_proposed": "315.00",
+      "wholesale_proposed": "236.00",
+      "formula": null,
+      "original_product_id": "d44ca534-c77b-4d50-865b-2ab7b856e678"
+    },
+    {
+      "sheet_row": 21,
+      "row_colour": "00000000",
+      "price_colour": "FFC6EFCE",
+      "sheet_name": "BLACKMORES FISH OIL 1000MG 80'S",
+      "retail_proposed": "494.00",
+      "wholesale_proposed": "410.00",
+      "formula": null,
+      "original_product_id": "9a552c67-34b2-514a-87a7-ce02f9d758de"
+    },
+    {
+      "sheet_row": 22,
+      "row_colour": "FFFFF2CC",
+      "price_colour": "FFC6EFCE",
+      "sheet_name": "Blackmores Ginkgo",
+      "retail_proposed": "348.00",
+      "wholesale_proposed": "270.00",
+      "formula": null,
+      "original_product_id": "3ec6da20-8b4a-435f-924e-d54f874d8a70"
+    },
+    {
+      "sheet_row": 23,
+      "row_colour": "00000000",
+      "price_colour": "FFC6EFCE",
+      "sheet_name": "BLACKMORES HYPERIFORTE 30'S",
+      "retail_proposed": "390.00",
+      "wholesale_proposed": "322.00",
+      "formula": null,
+      "original_product_id": "24115b3d-88d0-45f5-9bf7-a2eef194972f"
+    },
+    {
+      "sheet_row": 24,
+      "row_colour": "FFFFC7CE",
+      "price_colour": "FFFFC7CE",
+      "sheet_name": "Blackmores Joint Mobility Plus",
+      "retail_proposed": "441.00",
+      "wholesale_proposed": null,
+      "formula": null,
+      "original_product_id": "f829101b-28c7-40af-a5cc-334321374a09"
+    },
+    {
+      "sheet_row": 25,
+      "row_colour": "FFFFF2CC",
+      "price_colour": "FFC6EFCE",
+      "sheet_name": "Blackmores Marine Collagen Absolute",
+      "retail_proposed": "999.00",
+      "wholesale_proposed": "795.00",
+      "formula": null,
+      "original_product_id": "ed03def6-3586-4f1b-b101-c7930800c41d"
+    },
+    {
+      "sheet_row": 26,
+      "row_colour": "FFFFC7CE",
+      "price_colour": "FFFFC7CE",
+      "sheet_name": "Blackmores Mega B Complex",
+      "retail_proposed": "420.00",
+      "wholesale_proposed": null,
+      "formula": null,
+      "original_product_id": "ec476337-cff3-4cba-8b42-65342d964669"
+    },
+    {
+      "sheet_row": 27,
+      "row_colour": "FFFFF2CC",
+      "price_colour": "FFC6EFCE",
+      "sheet_name": "Blackmores Multivitamin Active 30'S",
+      "retail_proposed": "329.00",
+      "wholesale_proposed": "255.00",
+      "formula": null,
+      "original_product_id": "e261adbe-890a-485a-a81e-784608625d11"
+    },
+    {
+      "sheet_row": 28,
+      "row_colour": "FFFFF2CC",
+      "price_colour": "FFC6EFCE",
+      "sheet_name": "Blackmores Multivitamins for 50+",
+      "retail_proposed": "399.00",
+      "wholesale_proposed": "308.00",
+      "formula": null,
+      "original_product_id": "59b7b3c3-265f-450a-8cf6-fdb62a3a5963"
+    },
+    {
+      "sheet_row": 29,
+      "row_colour": "FFFFF2CC",
+      "price_colour": "FFC6EFCE",
+      "sheet_name": "Blackmores Omega DHA 60'S",
+      "retail_proposed": "948.00",
+      "wholesale_proposed": "730.00",
+      "formula": null,
+      "original_product_id": "d87a37c3-b9da-4a86-a3be-49fb2c39fdad"
+    },
+    {
+      "sheet_row": 30,
+      "row_colour": "FFFFC7CE",
+      "price_colour": "FFFFC7CE",
+      "sheet_name": "Blackmores Pre 9+ Care Gold",
+      "retail_proposed": "606.00",
+      "wholesale_proposed": null,
+      "formula": null,
+      "original_product_id": "39994f28-818d-4ad7-954e-c2bcd43cd6eb"
+    },
+    {
+      "sheet_row": 31,
+      "row_colour": "FFFFC7CE",
+      "price_colour": "FFFFC7CE",
+      "sheet_name": "Blackmores Pregnancy & Breast-Feeding Gold",
+      "retail_proposed": "891.00",
+      "wholesale_proposed": null,
+      "formula": null,
+      "original_product_id": "7cdf7657-0df0-4991-ad92-8ecac3a35dd2"
+    },
+    {
+      "sheet_row": 32,
+      "row_colour": "FFFFF2CC",
+      "price_colour": "FFC6EFCE",
+      "sheet_name": "Blackmores Probiotics+ Daily Health",
+      "retail_proposed": "1189.00",
+      "wholesale_proposed": "955.00",
+      "formula": null,
+      "original_product_id": "a7de86f0-f7f8-43fe-8118-d16ca506c350"
+    },
+    {
+      "sheet_row": 33,
+      "row_colour": "FFFFF2CC",
+      "price_colour": "FFC6EFCE",
+      "sheet_name": "BLACKMORES VIS’ CARE PRO + LUTEIN (Dietary Supplement with Lutein and Astaxanthin)",
+      "retail_proposed": "615.00",
+      "wholesale_proposed": "490.00",
+      "formula": null,
+      "original_product_id": "58ecb2a0-8899-4736-b2ee-d000fbc7ea76"
+    },
+    {
+      "sheet_row": 34,
+      "row_colour": "FFFFC7CE",
+      "price_colour": "FFFFC7CE",
+      "sheet_name": "Be Proud",
+      "retail_proposed": "690.00",
+      "wholesale_proposed": null,
+      "formula": null,
+      "original_product_id": "a520f712-57e0-4a64-9127-4cbd2332dc77"
+    },
+    {
+      "sheet_row": 35,
+      "row_colour": "FFFFC7CE",
+      "price_colour": "FFFFC7CE",
+      "sheet_name": "DNAe Andro plus",
+      "retail_proposed": "690.00",
+      "wholesale_proposed": null,
+      "formula": null,
+      "original_product_id": "c6af4cc2-dba7-477b-94f8-50694b9c6956"
+    },
+    {
+      "sheet_row": 36,
+      "row_colour": "FFFFC7CE",
+      "price_colour": "FFFFC7CE",
+      "sheet_name": "Dr.PONG CALCIUM 500 PLUS D3 & K2",
+      "retail_proposed": null,
+      "wholesale_proposed": null,
+      "formula": null,
+      "original_product_id": "51cacfa1-c4bd-4071-ac66-63e436f28dd5"
+    },
+    {
+      "sheet_row": 37,
+      "row_colour": "00000000",
+      "price_colour": "FFC6EFCE",
+      "sheet_name": "I-CAL PLUS  30'S (COLLAGEN TYPE 2)",
+      "retail_proposed": "455.00",
+      "wholesale_proposed": "345.00",
+      "formula": null,
+      "original_product_id": "71c09fa8-a5c6-5835-b52b-047d572d4c22"
+    },
+    {
+      "sheet_row": 38,
+      "row_colour": "FFFFC7CE",
+      "price_colour": "FFFFC7CE",
+      "sheet_name": "RHEUTRIL-1500 30's",
+      "retail_proposed": "241.00",
+      "wholesale_proposed": null,
+      "formula": null,
+      "original_product_id": "f5f65725-cf3d-5a80-9539-d1444c1e97c4"
+    },
+    {
+      "sheet_row": 39,
+      "row_colour": "FFFCE4EC",
+      "price_colour": "FFFCE4EC",
+      "sheet_name": "Hair Rise hair spray 20m",
+      "retail_proposed": "450.00",
+      "wholesale_proposed": null,
+      "formula": null,
+      "original_product_id": "13d0bb70-218d-4181-9fe9-26f7b5d077d2"
+    },
+    {
+      "sheet_row": 40,
+      "row_colour": "FFFCE4EC",
+      "price_colour": "FFC6EFCE",
+      "sheet_name": "Khaolaor CURMIN 500 Turmeric powder capsule 100 capsule/Box",
+      "retail_proposed": "99.00",
+      "wholesale_proposed": "63.00",
+      "formula": null,
+      "original_product_id": "04caddce-e95f-495a-a5ef-36e758600ac4"
+    },
+    {
+      "sheet_row": 41,
+      "row_colour": "00000000",
+      "price_colour": "FFC6EFCE",
+      "sheet_name": "MAXXLIFE MAGNESIUM PLUS 60'S",
+      "retail_proposed": "450.00",
+      "wholesale_proposed": "350.00",
+      "formula": null,
+      "original_product_id": "bd64eeb4-fcf4-422a-af2a-5bb4afc5271f"
+    },
+    {
+      "sheet_row": 42,
+      "row_colour": "00000000",
+      "price_colour": "FFC6EFCE",
+      "sheet_name": "MAXXLIFE MULTIMINERAL 30'S",
+      "retail_proposed": "285.00",
+      "wholesale_proposed": "220.00",
+      "formula": null,
+      "original_product_id": "9b3333f7-afcc-4d80-a436-46d98e2663fb"
+    },
+    {
+      "sheet_row": 43,
+      "row_colour": "00000000",
+      "price_colour": "FFC6EFCE",
+      "sheet_name": "MEGA Flexsa 1,500MG",
+      "retail_proposed": "578.00",
+      "wholesale_proposed": "445.00",
+      "formula": null,
+      "original_product_id": "cbe586db-a6fd-583e-a0c0-eaace4cd12a3"
+    },
+    {
+      "sheet_row": 44,
+      "row_colour": "FFFCE4EC",
+      "price_colour": "FFC6EFCE",
+      "sheet_name": "AB Pre&Pro 10 sachets",
+      "retail_proposed": "319.00",
+      "wholesale_proposed": "233.00",
+      "formula": null,
+      "original_product_id": "a0c11439-ec98-411d-b1f7-c06b2310433a"
+    },
+    {
+      "sheet_row": 45,
+      "row_colour": "FFFFF2CC",
+      "price_colour": "FFC6EFCE",
+      "sheet_name": "ASTAX 6 mg Natural Astaxanthin",
+      "retail_proposed": "599.00",
+      "wholesale_proposed": "397.00",
+      "formula": null,
+      "original_product_id": "b2be5ae1-058b-4fe6-80ed-0b001a328d18"
+    },
+    {
+      "sheet_row": 46,
+      "row_colour": "FFFCE4EC",
+      "price_colour": "FFC6EFCE",
+      "sheet_name": "ASTAX Astaxanthin 4 mg Capsules",
+      "retail_proposed": "599.00",
+      "wholesale_proposed": "456.00",
+      "formula": null,
+      "original_product_id": "d55c1c36-e85b-438a-a6cc-54a863c8c1d7"
+    },
+    {
+      "sheet_row": 47,
+      "row_colour": "FFFFF2CC",
+      "price_colour": "FFC6EFCE",
+      "sheet_name": "Calcium-D",
+      "retail_proposed": "257.00",
+      "wholesale_proposed": "180.00",
+      "formula": null,
+      "original_product_id": "e4630eca-24fe-4d97-9694-4590ba2c12b7"
+    },
+    {
+      "sheet_row": 48,
+      "row_colour": "FFFFC7CE",
+      "price_colour": "FFFFC7CE",
+      "sheet_name": "DHA-125 Tuna Oil 500 mg",
+      "retail_proposed": "351.00",
+      "wholesale_proposed": null,
+      "formula": null,
+      "original_product_id": "cbb02bb6-c61f-424c-8502-2a37c017f935"
+    },
+    {
+      "sheet_row": 49,
+      "row_colour": "00000000",
+      "price_colour": "FFC6EFCE",
+      "sheet_name": "D-Toxi",
+      "retail_proposed": "419.00",
+      "wholesale_proposed": "313.00",
+      "formula": null,
+      "original_product_id": "818fe1ce-44c5-46a4-b4d9-728109ccf8a8"
+    },
+    {
+      "sheet_row": 50,
+      "row_colour": "00000000",
+      "price_colour": "FFC6EFCE",
+      "sheet_name": "Evening Primrose Oil 1000 mg",
+      "retail_proposed": "189.00",
+      "wholesale_proposed": "120.00",
+      "formula": null,
+      "original_product_id": "61782885-97ff-45dd-aa60-099467926b55"
+    },
+    {
+      "sheet_row": 51,
+      "row_colour": "FFFFF2CC",
+      "price_colour": "FFC6EFCE",
+      "sheet_name": "Garlic Oil Capsules 100'S",
+      "retail_proposed": "174.00",
+      "wholesale_proposed": "104.00",
+      "formula": null,
+      "original_product_id": "7df0e6b1-b61f-4d05-b0ee-c381e415b23b"
+    },
+    {
+      "sheet_row": 52,
+      "row_colour": "00000000",
+      "price_colour": "FFC6EFCE",
+      "sheet_name": "GILOMAX Omega-3 with Ginkgo Biloba",
+      "retail_proposed": "299.00",
+      "wholesale_proposed": "225.00",
+      "formula": null,
+      "original_product_id": "ed6d2992-221b-4447-ae55-e88beea0410a"
+    },
+    {
+      "sheet_row": 53,
+      "row_colour": "FFFFF2CC",
+      "price_colour": "FFC6EFCE",
+      "sheet_name": "Ginkgo Biloba Extract 40 mg 60'S",
+      "retail_proposed": "259.00",
+      "wholesale_proposed": "183.00",
+      "formula": null,
+      "original_product_id": "589b5714-c775-457b-9c76-40a42deb2ce2"
+    },
+    {
+      "sheet_row": 54,
+      "row_colour": "FFFFF2CC",
+      "price_colour": "FFC6EFCE",
+      "sheet_name": "Ginsomin Korean Panax Ginseng Extract 20x8'S",
+      "retail_proposed": "1468.00",
+      "wholesale_proposed": "1183.00",
+      "formula": null,
+      "original_product_id": "263290fb-2084-4cd4-b9e7-b95d78d727de"
+    },
+    {
+      "sheet_row": 55,
+      "row_colour": "FFFCE4EC",
+      "price_colour": "FFC6EFCE",
+      "sheet_name": "Glow Collagen 30 sachets",
+      "retail_proposed": "999.00",
+      "wholesale_proposed": "731.00",
+      "formula": null,
+      "original_product_id": "8e72318a-5355-4333-8607-6108d997177c"
+    },
+    {
+      "sheet_row": 56,
+      "row_colour": "FFFCE4EC",
+      "price_colour": "FFC6EFCE",
+      "sheet_name": "ii-Care",
+      "retail_proposed": "299.00",
+      "wholesale_proposed": "216.00",
+      "formula": null,
+      "original_product_id": "fae4c960-08a3-4b67-85b1-2a4a168a848b"
+    },
+    {
+      "sheet_row": 57,
+      "row_colour": "FFFCE4EC",
+      "price_colour": "FFC6EFCE",
+      "sheet_name": "ii Care Daily",
+      "retail_proposed": "590.00",
+      "wholesale_proposed": "429.00",
+      "formula": null,
+      "original_product_id": "d1d8f842-a9b8-483e-904b-907b0fa8d4fc"
+    },
+    {
+      "sheet_row": 58,
+      "row_colour": "FFFCE4EC",
+      "price_colour": "FFC6EFCE",
+      "sheet_name": "Immuplex Plain 300g",
+      "retail_proposed": "950.00",
+      "wholesale_proposed": "755.00",
+      "formula": null,
+      "original_product_id": "541d1019-261e-4381-8280-b877e2df3199"
+    },
+    {
+      "sheet_row": 59,
+      "row_colour": "FFFCE4EC",
+      "price_colour": "FFC6EFCE",
+      "sheet_name": "Lipo-X",
+      "retail_proposed": "499.00",
+      "wholesale_proposed": "377.00",
+      "formula": null,
+      "original_product_id": "a3a8ce05-e9d9-45ca-b7d6-5e32f60f8419"
+    },
+    {
+      "sheet_row": 60,
+      "row_colour": "FFFCE4EC",
+      "price_colour": "FFC6EFCE",
+      "sheet_name": "Maxx Omega 3 60'S",
+      "retail_proposed": "611.00",
+      "wholesale_proposed": "458.00",
+      "formula": null,
+      "original_product_id": "da88814a-f1c3-4ad0-bbad-887cf0820ef6"
+    },
+    {
+      "sheet_row": 61,
+      "row_colour": "00000000",
+      "price_colour": "FFC6EFCE",
+      "sheet_name": "MEGA SAMETTO 30'S",
+      "retail_proposed": "650.00",
+      "wholesale_proposed": "500.00",
+      "formula": null,
+      "original_product_id": "9c457777-c1bb-4f2d-a406-3bb15a6ccd3e"
+    },
+    {
+      "sheet_row": 62,
+      "row_colour": "00000000",
+      "price_colour": "FFC6EFCE",
+      "sheet_name": "Mega We Care Fish Oil 1000 mg",
+      "retail_proposed": "152.00",
+      "wholesale_proposed": "111.00",
+      "formula": null,
+      "original_product_id": "e1c918dc-e2f5-47a9-b7da-bdd3868518fb"
+    },
+    {
+      "sheet_row": 63,
+      "row_colour": "FFFCE4EC",
+      "price_colour": "FFC6EFCE",
+      "sheet_name": "Multilives",
+      "retail_proposed": "799.00",
+      "wholesale_proposed": "627.00",
+      "formula": null,
+      "original_product_id": "3dc57564-e623-4262-b9f3-4f4a1c72ec21"
+    },
+    {
+      "sheet_row": 64,
+      "row_colour": "FFFCE4EC",
+      "price_colour": "FFC6EFCE",
+      "sheet_name": "Nat Cal Plus",
+      "retail_proposed": "649.00",
+      "wholesale_proposed": "491.00",
+      "formula": null,
+      "original_product_id": "e4c06d96-34c2-4edb-ad05-11c70c1c2076"
+    },
+    {
+      "sheet_row": 65,
+      "row_colour": "FFFCE4EC",
+      "price_colour": "FFC6EFCE",
+      "sheet_name": "Nat C Yummy Gummyz 50'S",
+      "retail_proposed": "119.00",
+      "wholesale_proposed": "86.00",
+      "formula": null,
+      "original_product_id": "bac4b77f-2200-40f9-a1e7-3fbf8c68f080"
+    },
+    {
+      "sheet_row": 66,
+      "row_colour": "00000000",
+      "price_colour": "FFC6EFCE",
+      "sheet_name": "Nat Mag",
+      "retail_proposed": "230.00",
+      "wholesale_proposed": "158.00",
+      "formula": null,
+      "original_product_id": "52b0c7fd-e344-49a2-9cf6-c65d8616b789"
+    },
+    {
+      "sheet_row": 67,
+      "row_colour": "FFFCE4EC",
+      "price_colour": "FFC6EFCE",
+      "sheet_name": "Pro Amino 10 sachets",
+      "retail_proposed": "829.00",
+      "wholesale_proposed": "662.00",
+      "formula": null,
+      "original_product_id": "a6bd4a16-b8d5-4ba4-96ba-767aa4233b48"
+    },
+    {
+      "sheet_row": 68,
+      "row_colour": "00000000",
+      "price_colour": "FFC6EFCE",
+      "sheet_name": "Prodefenz 30 capsules",
+      "retail_proposed": "853.00",
+      "wholesale_proposed": "725.00",
+      "formula": "=ROUND(G68/Method!$B$4,0)",
+      "original_product_id": "e69796f5-87f9-4ff5-b5a2-8c7dbdd5335c"
+    },
+    {
+      "sheet_row": 69,
+      "row_colour": "FFFCE4EC",
+      "price_colour": "FFC6EFCE",
+      "sheet_name": "Pynocare White",
+      "retail_proposed": "427.00",
+      "wholesale_proposed": "320.00",
+      "formula": null,
+      "original_product_id": "adb38fac-eb02-4b57-84c0-cf0571fde579"
+    },
+    {
+      "sheet_row": 70,
+      "row_colour": "00000000",
+      "price_colour": "FFC6EFCE",
+      "sheet_name": "Regenez Capsules",
+      "retail_proposed": "379.00",
+      "wholesale_proposed": "284.00",
+      "formula": null,
+      "original_product_id": "1422a62f-b12a-4ba8-b8f6-5cb0cb2c9176"
+    },
+    {
+      "sheet_row": 71,
+      "row_colour": "FFFCE4EC",
+      "price_colour": "FFC6EFCE",
+      "sheet_name": "Soygerm Cal D",
+      "retail_proposed": "499.00",
+      "wholesale_proposed": "377.00",
+      "formula": null,
+      "original_product_id": "e88bbf06-5c48-434a-b0df-078db38f604a"
+    },
+    {
+      "sheet_row": 72,
+      "row_colour": "FFFCE4EC",
+      "price_colour": "FFC6EFCE",
+      "sheet_name": "Ultrapro Chocolate",
+      "retail_proposed": "2331.00",
+      "wholesale_proposed": "1981.00",
+      "formula": null,
+      "original_product_id": "2ee9d599-e16e-420b-b0e6-36726415edc3"
+    },
+    {
+      "sheet_row": 73,
+      "row_colour": "00000000",
+      "price_colour": "FFC6EFCE",
+      "sheet_name": "Zemax SX",
+      "retail_proposed": "479.00",
+      "wholesale_proposed": "356.00",
+      "formula": null,
+      "original_product_id": "6dffff99-0aad-4a86-bacd-63eda60033f5"
+    },
+    {
+      "sheet_row": 74,
+      "row_colour": "FFFCE4EC",
+      "price_colour": "FFC6EFCE",
+      "sheet_name": "CURCARE - Megawecare",
+      "retail_proposed": "466.00",
+      "wholesale_proposed": "349.00",
+      "formula": null,
+      "original_product_id": "29b246bf-cee1-4e3c-8738-2576d5194a89"
+    },
+    {
+      "sheet_row": 75,
+      "row_colour": "FFFFC7CE",
+      "price_colour": "FFFFC7CE",
+      "sheet_name": "Optimum Nutrition Micronized Creatine Monohydrate Powder",
+      "retail_proposed": "1060.00",
+      "wholesale_proposed": null,
+      "formula": null,
+      "original_product_id": "2c298ab5-2a80-5626-8aed-426a29dda3aa"
+    },
+    {
+      "sheet_row": 76,
+      "row_colour": "FFFFC7CE",
+      "price_colour": "FFFFC7CE",
+      "sheet_name": "Nativ mushroom 500mg",
+      "retail_proposed": null,
+      "wholesale_proposed": null,
+      "formula": null,
+      "original_product_id": "fa12c447-db79-41d0-9dc1-0c1e7be999af"
+    },
+    {
+      "sheet_row": 77,
+      "row_colour": "FFFCE4EC",
+      "price_colour": "FFC6EFCE",
+      "sheet_name": "Collagen Gold 60'S",
+      "retail_proposed": "899.00",
+      "wholesale_proposed": "690.00",
+      "formula": null,
+      "original_product_id": "24babd68-2570-4003-a6c3-15e7a568cc01"
+    },
+    {
+      "sheet_row": 78,
+      "row_colour": "FFFCE4EC",
+      "price_colour": "FFC6EFCE",
+      "sheet_name": "Lecithin 150'S",
+      "retail_proposed": "979.00",
+      "wholesale_proposed": "742.00",
+      "formula": null,
+      "original_product_id": "1e851f46-6be5-4984-9e83-41964c4bdfd2"
+    },
+    {
+      "sheet_row": 79,
+      "row_colour": "FFFFF2CC",
+      "price_colour": "FFC6EFCE",
+      "sheet_name": "MAGNESIUM GLYCINATE 60t",
+      "retail_proposed": "615.00",
+      "wholesale_proposed": "520.00",
+      "formula": null,
+      "original_product_id": "ae75035d-2570-5165-8a60-6e8d4c28b6d2"
+    },
+    {
+      "sheet_row": 80,
+      "row_colour": "FFFCE4EC",
+      "price_colour": "FFC6EFCE",
+      "sheet_name": "Swisse Probiotic+ Gummies",
+      "retail_proposed": "499.00",
+      "wholesale_proposed": "378.00",
+      "formula": null,
+      "original_product_id": "79ca5ee6-e2c8-43cc-afcb-5791712855b6"
+    },
+    {
+      "sheet_row": 81,
+      "row_colour": "FFFFF2CC",
+      "price_colour": "FFC6EFCE",
+      "sheet_name": "Swisse Collagen + Grape Seed 60'S",
+      "retail_proposed": "759.00",
+      "wholesale_proposed": "524.00",
+      "formula": null,
+      "original_product_id": "0974be22-fcc7-42bd-a446-5e36ed0dd1b4"
+    },
+    {
+      "sheet_row": 82,
+      "row_colour": "FFFCE4EC",
+      "price_colour": "FFC6EFCE",
+      "sheet_name": "Swisse Ultibiotic Daily Balance Probiotic",
+      "retail_proposed": "1099.00",
+      "wholesale_proposed": "882.00",
+      "formula": null,
+      "original_product_id": "0a76b5f3-5996-41e1-9ad0-48badb15f016"
+    },
+    {
+      "sheet_row": 83,
+      "row_colour": "FFFFF2CC",
+      "price_colour": "FFC6EFCE",
+      "sheet_name": "Vistra Collagen Type II 1000 mg Plus Turmeric Extract 10G 10 sachets",
+      "retail_proposed": "589.00",
+      "wholesale_proposed": "427.00",
+      "formula": null,
+      "original_product_id": "2ed6b86e-1e07-486d-8ad6-5d1f15c6c6b4"
+    },
+    {
+      "sheet_row": 84,
+      "row_colour": "00000000",
+      "price_colour": "FFC6EFCE",
+      "sheet_name": "VISTRA Advanced Telopro Vita Plus",
+      "retail_proposed": "849.00",
+      "wholesale_proposed": "610.00",
+      "formula": null,
+      "original_product_id": "947325dc-b9ec-4e44-973c-44133d357199"
+    },
+    {
+      "sheet_row": 85,
+      "row_colour": "FFFFF2CC",
+      "price_colour": "FFC6EFCE",
+      "sheet_name": "VISTRA Astaxanthin 6 mg Advanced Plus CoQ10",
+      "retail_proposed": "665.00",
+      "wholesale_proposed": "515.00",
+      "formula": null,
+      "original_product_id": "d4823f19-ff68-4351-9751-50e39f549179"
+    },
+    {
+      "sheet_row": 86,
+      "row_colour": "00000000",
+      "price_colour": "FFC6EFCE",
+      "sheet_name": "VISTRA BACOPA EXTRACT 300 mg",
+      "retail_proposed": "259.00",
+      "wholesale_proposed": "195.00",
+      "formula": null,
+      "original_product_id": "65fd0d62-45a0-4430-aae7-54932a9c3f28"
+    },
+    {
+      "sheet_row": 87,
+      "row_colour": "00000000",
+      "price_colour": "FFC6EFCE",
+      "sheet_name": "VISTRA B-COMPLEX 30'S",
+      "retail_proposed": "199.00",
+      "wholesale_proposed": "135.00",
+      "formula": null,
+      "original_product_id": "0685856d-8ba4-44e9-b461-30cc8d827f2a"
+    },
+    {
+      "sheet_row": 88,
+      "row_colour": "FFFFF2CC",
+      "price_colour": "FFC6EFCE",
+      "sheet_name": "VISTRA Beta Glucan",
+      "retail_proposed": "569.00",
+      "wholesale_proposed": "415.00",
+      "formula": null,
+      "original_product_id": "635eff91-e95c-42c9-8a3a-4ad10a92bf86"
+    },
+    {
+      "sheet_row": 89,
+      "row_colour": "00000000",
+      "price_colour": "FFC6EFCE",
+      "sheet_name": "VISTRA Bilberry Extract Plus Lutein Beta-Carotene",
+      "retail_proposed": "398.00",
+      "wholesale_proposed": "288.00",
+      "formula": null,
+      "original_product_id": "040f1897-554e-4daf-9405-dbed3afe513c"
+    },
+    {
+      "sheet_row": 90,
+      "row_colour": "00000000",
+      "price_colour": "FFC6EFCE",
+      "sheet_name": "VISTRA CALPLEX CALCIUM 600 mg & MENAQUINONE-7 PLUS 30'S",
+      "retail_proposed": "214.00",
+      "wholesale_proposed": "146.00",
+      "formula": null,
+      "original_product_id": "f0ac13e7-57b3-4fdb-b6f7-206ad8b6f0ef"
+    },
+    {
+      "sheet_row": 91,
+      "row_colour": "FFFFF2CC",
+      "price_colour": "FFC6EFCE",
+      "sheet_name": "VISTRA COLLAGEN 1300mg 30's",
+      "retail_proposed": "399.00",
+      "wholesale_proposed": "294.00",
+      "formula": null,
+      "original_product_id": "54b85e7e-1232-55e9-ad38-a15548b69231"
+    },
+    {
+      "sheet_row": 92,
+      "row_colour": "FFFFC7CE",
+      "price_colour": "FFFFC7CE",
+      "sheet_name": "Vistra Collagen 4000mg ชง ส้ม",
+      "retail_proposed": "216.00",
+      "wholesale_proposed": null,
+      "formula": null,
+      "original_product_id": "b682e829-ac20-5de2-990e-b04b8e4c59d8"
+    },
+    {
+      "sheet_row": 93,
+      "row_colour": "FFFFF2CC",
+      "price_colour": "FFC6EFCE",
+      "sheet_name": "VISTRA COLLAGEN TYPE-2 / UC-II 40mg 30'S",
+      "retail_proposed": "729.00",
+      "wholesale_proposed": "509.00",
+      "formula": null,
+      "original_product_id": "a5e389b9-ae4f-53cc-95ac-79769596b438"
+    },
+    {
+      "sheet_row": 94,
+      "row_colour": "00000000",
+      "price_colour": "FFC6EFCE",
+      "sheet_name": "VISTRA Cranberry 600",
+      "retail_proposed": "306.00",
+      "wholesale_proposed": "235.00",
+      "formula": null,
+      "original_product_id": "18f9442d-faa0-403a-8c06-5a6feecc0a35"
+    },
+    {
+      "sheet_row": 95,
+      "row_colour": "00000000",
+      "price_colour": "FFC6EFCE",
+      "sheet_name": "VISTRA ELASTIN COLLAGEN",
+      "retail_proposed": "440.00",
+      "wholesale_proposed": "330.00",
+      "formula": null,
+      "original_product_id": "0f0905ec-d925-5ab2-8406-38edee67de16"
+    },
+    {
+      "sheet_row": 96,
+      "row_colour": "00000000",
+      "price_colour": "FFC6EFCE",
+      "sheet_name": "VISTRA EVENING PRIMROSE OIL 1000 mg PLUS VITAMIN E",
+      "retail_proposed": "365.00",
+      "wholesale_proposed": "239.00",
+      "formula": null,
+      "original_product_id": "e19ebbb0-798a-48e4-9a53-b61db247946b"
+    },
+    {
+      "sheet_row": 97,
+      "row_colour": "00000000",
+      "price_colour": "FFC6EFCE",
+      "sheet_name": "VISTRA Ginkgo 120",
+      "retail_proposed": "239.00",
+      "wholesale_proposed": "173.00",
+      "formula": null,
+      "original_product_id": "0b9888f7-30f5-44ef-a32e-62d35a03ff3b"
+    },
+    {
+      "sheet_row": 98,
+      "row_colour": "00000000",
+      "price_colour": "FFC6EFCE",
+      "sheet_name": "VISTRA GOTU KOLA EXTRACT 30'S",
+      "retail_proposed": "229.00",
+      "wholesale_proposed": "172.00",
+      "formula": null,
+      "original_product_id": "d2cfcdaf-c7ee-4483-9468-fc5800aec06c"
+    },
+    {
+      "sheet_row": 99,
+      "row_colour": "00000000",
+      "price_colour": "FFC6EFCE",
+      "sheet_name": "VISTRA L-CARNITINE 500MG (3L) 30'S",
+      "retail_proposed": "339.00",
+      "wholesale_proposed": "230.00",
+      "formula": null,
+      "original_product_id": "3c744ec2-52fe-5215-a755-2d3bb3b10175"
+    },
+    {
+      "sheet_row": 100,
+      "row_colour": "00000000",
+      "price_colour": "FFC6EFCE",
+      "sheet_name": "VISTRA L-CARNITINE PLUS SAFFRON EXTRACT 30'S",
+      "retail_proposed": "499.00",
+      "wholesale_proposed": "360.00",
+      "formula": null,
+      "original_product_id": "019a2521-7d4f-5658-9096-03a0390e981c"
+    },
+    {
+      "sheet_row": 101,
+      "row_colour": "00000000",
+      "price_colour": "FFC6EFCE",
+      "sheet_name": "VISTRA LIVOTOX",
+      "retail_proposed": "449.00",
+      "wholesale_proposed": "308.00",
+      "formula": null,
+      "original_product_id": "dcb59353-b7eb-4325-9ee6-7ba835e6a537"
+    },
+    {
+      "sheet_row": 102,
+      "row_colour": "00000000",
+      "price_colour": "FFC6EFCE",
+      "sheet_name": "VISTRA MAGNESIUM COMPLEX 30'S",
+      "retail_proposed": "249.00",
+      "wholesale_proposed": "155.00",
+      "formula": null,
+      "original_product_id": "a6adf61e-def7-4ace-b3ec-6dbff6ad705e"
+    },
+    {
+      "sheet_row": 103,
+      "row_colour": "FFFFF2CC",
+      "price_colour": "FFC6EFCE",
+      "sheet_name": "VISTRA Odorless Fish Oil 1000 mg 100'S",
+      "retail_proposed": "320.00",
+      "wholesale_proposed": "254.00",
+      "formula": null,
+      "original_product_id": "ec8953ee-188d-41c3-adeb-558581dd6fc2"
+    },
+    {
+      "sheet_row": 104,
+      "row_colour": "FFFFF2CC",
+      "price_colour": "FFC6EFCE",
+      "sheet_name": "Vistra Omega Concentrate X3 rTG Omega-3 from Fish Oil",
+      "retail_proposed": "589.00",
+      "wholesale_proposed": "425.00",
+      "formula": null,
+      "original_product_id": "5c7c94ab-ea40-4f7e-81be-849c96e8dbca"
+    },
+    {
+      "sheet_row": 105,
+      "row_colour": "00000000",
+      "price_colour": "FFC6EFCE",
+      "sheet_name": "VISTRA OMEGA MINI rTG",
+      "retail_proposed": "263.00",
+      "wholesale_proposed": "178.00",
+      "formula": null,
+      "original_product_id": "dfe27d99-612b-426f-a532-7d0ff6bab3c2"
+    },
+    {
+      "sheet_row": 106,
+      "row_colour": "00000000",
+      "price_colour": "FFC6EFCE",
+      "sheet_name": "VISTRA Plant AMIPRO PLUS VITAMIN B",
+      "retail_proposed": "249.00",
+      "wholesale_proposed": "154.00",
+      "formula": null,
+      "original_product_id": "26f57ca5-212b-452a-ac0e-03bf45d8a481"
+    },
+    {
+      "sheet_row": 107,
+      "row_colour": "00000000",
+      "price_colour": "FFC6EFCE",
+      "sheet_name": "VISTRA PURE COLLAGEN DIPEPTIDE",
+      "retail_proposed": "933.00",
+      "wholesale_proposed": "655.00",
+      "formula": null,
+      "original_product_id": "f172802d-12f6-55ca-90d2-457451371c00"
+    },
+    {
+      "sheet_row": 108,
+      "row_colour": "00000000",
+      "price_colour": "FFC6EFCE",
+      "sheet_name": "VISTRA Q10 ใหญ่ 60'C",
+      "retail_proposed": "355.00",
+      "wholesale_proposed": "239.00",
+      "formula": null,
+      "original_product_id": "53533cd8-ee50-5581-a8b7-bc21c8917750"
+    },
+    {
+      "sheet_row": 109,
+      "row_colour": "FFFFC7CE",
+      "price_colour": "FFFFC7CE",
+      "sheet_name": "VISTRA Relacza PLUS",
+      "retail_proposed": "307.00",
+      "wholesale_proposed": null,
+      "formula": null,
+      "original_product_id": "44f3a282-8c3e-4f9d-898a-a68d9b27ccbc"
+    },
+    {
+      "sheet_row": 110,
+      "row_colour": "FFFFF2CC",
+      "price_colour": "FFC6EFCE",
+      "sheet_name": "VISTRA SESAMIN DHA & EPA",
+      "retail_proposed": "593.00",
+      "wholesale_proposed": "535.00",
+      "formula": null,
+      "original_product_id": "5651fa1b-f6b5-42f7-a18b-260c42aab52d"
+    },
+    {
+      "sheet_row": 111,
+      "row_colour": "00000000",
+      "price_colour": "FFC6EFCE",
+      "sheet_name": "VISTRA SESAMIN NIGHT TIME",
+      "retail_proposed": "593.00",
+      "wholesale_proposed": "515.00",
+      "formula": null,
+      "original_product_id": "8a023f8f-007f-4f7a-bd84-27a4b6653e2e"
+    },
+    {
+      "sheet_row": 112,
+      "row_colour": "00000000",
+      "price_colour": "FFC6EFCE",
+      "sheet_name": "VISTRA SESAMIN VITAL",
+      "retail_proposed": "593.00",
+      "wholesale_proposed": "535.00",
+      "formula": null,
+      "original_product_id": "bf82696d-4282-4a70-bd6c-3bcb60ff941e"
+    },
+    {
+      "sheet_row": 113,
+      "row_colour": "FFFFC7CE",
+      "price_colour": "FFFFC7CE",
+      "sheet_name": "VISTRA Soy Germ Powder Plus Dong Quai Extract, Multivitamins and Evening Primrose Oil",
+      "retail_proposed": "530.00",
+      "wholesale_proposed": null,
+      "formula": null,
+      "original_product_id": "8286d8a1-8620-4748-be2f-90803cd4f8bb"
+    },
+    {
+      "sheet_row": 114,
+      "row_colour": "00000000",
+      "price_colour": "FFC6EFCE",
+      "sheet_name": "VISTRA VITAL-PRO DAILY PROBIOTICS 30'S",
+      "retail_proposed": "679.00",
+      "wholesale_proposed": "517.00",
+      "formula": null,
+      "original_product_id": "b64a615a-3f11-5aff-8cc9-667f60e16a9b"
+    },
+    {
+      "sheet_row": 115,
+      "row_colour": "00000000",
+      "price_colour": "FFC6EFCE",
+      "sheet_name": "VISTRA VITAL-PRO Multivitamins Ultra Plus Amino Acid",
+      "retail_proposed": "299.00",
+      "wholesale_proposed": "210.00",
+      "formula": null,
+      "original_product_id": "463ab90c-cdda-5d10-9ca2-0e1922ce288e"
+    },
+    {
+      "sheet_row": 116,
+      "row_colour": "FFFFF2CC",
+      "price_colour": "FFC6EFCE",
+      "sheet_name": "VISTRA VITAL-PRO PRE-CARE MULTI PLUS",
+      "retail_proposed": "382.00",
+      "wholesale_proposed": "215.00",
+      "formula": null,
+      "original_product_id": "6ce9942b-1a9f-4a58-ba98-c33711f612bd"
+    },
+    {
+      "sheet_row": 117,
+      "row_colour": "FFFFF2CC",
+      "price_colour": "FFC6EFCE",
+      "sheet_name": "VISTRA VITAL-PRO RELACZA PLUS 30'S",
+      "retail_proposed": "365.00",
+      "wholesale_proposed": "261.00",
+      "formula": null,
+      "original_product_id": "50265f47-8be5-51c4-96f9-07a01d746dab"
+    },
+    {
+      "sheet_row": 118,
+      "row_colour": "00000000",
+      "price_colour": "FFC6EFCE",
+      "sheet_name": "VISTRA Zinc 15mg",
+      "retail_proposed": "239.00",
+      "wholesale_proposed": "153.00",
+      "formula": null,
+      "original_product_id": "2df0d7c4-3e17-455c-9b83-620a313e25fb"
+    }
+  ]
+}
