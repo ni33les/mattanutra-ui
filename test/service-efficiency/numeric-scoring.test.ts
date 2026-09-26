@@ -60,6 +60,10 @@ test('REF-CPU-04 neutral rational operations reuse immutable values without chan
   assert.strictEqual(fractions.add(value, fractions.rational(-7n, 13n)), fractions.ZERO, 'Cancelling penalties must reuse zero without allocating a denominator product');
   assert.strictEqual(fractions.subtract(value, value), fractions.ZERO);
   assert.deepEqual(fractions.add(value, fractions.rational(5n, 13n)), { num: 12n, den: 13n });
+  const deferred = fractions.multiply(value, fractions.rational(5n, 7n), false);
+  assert.deepEqual(deferred, { num: 35n, den: 91n }, 'Terms for a later sum may defer reduction without rounding');
+  assert.ok(Object.isFrozen(deferred));
+  assert.deepEqual(fractions.sum([deferred, fractions.rational(1n, 13n)]), { num: 6n, den: 13n });
   assert.throws(() => fractions.divide(fractions.ZERO, fractions.ZERO));
   assert.deepEqual(fractions.fromDecimal(123), { num: 123n, den: 1n });
   assert.deepEqual(fractions.fromDecimal('1.25e-2'), { num: 1n, den: 80n });
