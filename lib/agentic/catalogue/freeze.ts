@@ -42,28 +42,34 @@ export function catalogueSnapshotId(snapshot: CatalogueSnapshot) {
   return `snap_${hash.digest("hex").slice(0, 16)}`;
 }
 
-// Matching inputs are immutable for a request/session. Keep the identity with
-// that object, including presentation consumers; mutable writers use the fresh
-// catalogueSnapshotId function above and must never reuse this memo.
+// Only snapshots whose nested contents we own may retain their identity. A
+// readonly type or externally frozen shell does not make its nested facts safe.
 const matchingIdentities = new WeakMap<CatalogueSnapshot, string>();
 export function matchingSnapshotId(snapshot: CatalogueSnapshot): string {
-  let id = matchingIdentities.get(snapshot);
-  if (!id) { id = catalogueSnapshotId(snapshot); matchingIdentities.set(snapshot, id); }
-  return id;
+  return matchingIdentities.get(snapshot) ?? catalogueSnapshotId(snapshot);
+}
+
+function freezeOwnedFacts<T>(value: T): T {
+  if (value && typeof value === "object" && !Object.isFrozen(value)) {
+    for (const child of Object.values(value)) freezeOwnedFacts(child);
+    Object.freeze(value);
+  }
+  return value;
 }
 
 export function freezeCatalogueSnapshot(
   snapshot: CatalogueSnapshot
 ): CatalogueSnapshot {
-  const frozen = Object.freeze({
+  if (matchingIdentities.has(snapshot)) return snapshot;
+  const frozen = freezeOwnedFacts(structuredClone({
     ...(snapshot.runtimeRevision === undefined ? {} : { runtimeRevision: snapshot.runtimeRevision }),
     availabilityAsOf: snapshot.availabilityAsOf,
     catalogueVersion: snapshot.catalogueVersion,
-    products: Object.freeze([...snapshot.products]),
-    supplements: Object.freeze([...snapshot.supplements]),
-    ...(snapshot.disallowedSupplements ? { disallowedSupplements: Object.freeze([...snapshot.disallowedSupplements]) } : {}),
-    ...(snapshot.disallowedProductIds ? { disallowedProductIds: Object.freeze([...snapshot.disallowedProductIds]) } : {})
-  });
-  matchingIdentities.set(frozen, matchingSnapshotId(snapshot));
+    products: snapshot.products,
+    supplements: snapshot.supplements,
+    ...(snapshot.disallowedSupplements ? { disallowedSupplements: snapshot.disallowedSupplements } : {}),
+    ...(snapshot.disallowedProductIds ? { disallowedProductIds: snapshot.disallowedProductIds } : {})
+  }));
+  matchingIdentities.set(frozen, catalogueSnapshotId(frozen));
   return frozen;
 }

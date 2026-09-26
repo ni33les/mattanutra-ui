@@ -60,6 +60,9 @@ export function createMemoryStore(): AgenticStore {
   const maps = [catalogues, capabilities, checkouts, feedback, fulfilment, idempotency, orderItems, orders, outbox, paymentAttempts, paymentAudits, plans, operations, providerEvents, retailLinks, revisions, supportCases, supportMessages] as Map<string, unknown>[];
 
   const store: AgenticStore = {
+    // Transactions roll back whole maps, including async inserts begun by a
+    // different owner. This test store cannot promise independent durability.
+    catalogueWritesCommitIndependently: () => false,
     async getPlanReadState(planId, requestedRevision, includeResult = false) {
       const plan = plans.get(planId); if (!plan) return null;
       const revision = revisions.get(revisionKey(planId, requestedRevision ?? plan.currentRevision)); if (!revision) return null;

@@ -38,6 +38,14 @@ type PoolKind = "interactive" | "worker";
 const transactionScope = new AsyncLocalStorage<postgres.Sql>();
 const commitEffects = new AsyncLocalStorage<Array<() => void>>();
 
+export function databaseTransactionActive() {
+  return transactionScope.getStore() !== undefined;
+}
+
+export function databasePhaseTimeoutMs() {
+  return dbStatementTimeoutMs() || DEFAULT_DB_STATEMENT_TIMEOUT_MS;
+}
+
 export function deferUntilDatabaseCommit(effect: () => void) {
   const effects = commitEffects.getStore();
   if (!effects) return false;
@@ -50,7 +58,7 @@ export function deferUntilDatabaseCommit(effect: () => void) {
 export async function withDatabaseTransaction<T>(
   sql: postgres.Sql,
   work: (tx: postgres.Sql) => Promise<T>,
-  timeoutMs = dbStatementTimeoutMs() || DEFAULT_DB_STATEMENT_TIMEOUT_MS
+  timeoutMs = databasePhaseTimeoutMs()
 ): Promise<T> {
   const existing = transactionScope.getStore();
   if (existing) return work(existing);

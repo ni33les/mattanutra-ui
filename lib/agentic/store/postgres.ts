@@ -1,7 +1,7 @@
 import { operationCursor, operationCursorBytes, withoutOperationCursor, withOperationCursor } from "@/lib/agentic/store/operation-checkpoint";
 import { operationCommands } from "@/lib/agentic/store/operation-commands";
 import { notifyPlanOperationChanged } from "@/lib/agentic/plan/completion-notify";
-import { getSql, keepDatabaseWarm, withDatabaseTransaction } from "@/lib/db";
+import { databaseTransactionActive, getSql, keepDatabaseWarm, withDatabaseTransaction } from "@/lib/db";
 import {preparePlanRevisionRecord} from "@/lib/agentic/store/prepared-revision";
 import type {
   AgenticStore,
@@ -69,6 +69,7 @@ export function createPostgresStore(inputSql: Sql, inTransaction = false, notifi
   // shape rather than leaking untyped columns into the store interface.
   const sql = inputSql as unknown as StoreSql;
   const store: AgenticStore = {
+    catalogueWritesCommitIndependently: () => !inTransaction && !databaseTransactionActive(),
     ...operationCommands(inputSql, notificationSql),
     async getPlanRevisionHeader(planId,revision) {
       const [row]=await sql<{revision:number;status:PlanRevisionRecord["status"];created_at:DatabaseTimestamp}>`

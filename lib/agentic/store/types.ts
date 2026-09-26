@@ -244,6 +244,8 @@ export type AgenticStore = {
   insertPlanOperation(record: PlanOperationRecord, preparedJson?: string): Promise<void>;
   updatePlanOperation(record: PlanOperationRecord, expectedVersion: number): Promise<boolean>;
   getCatalogueSnapshot(id: string): Promise<import("@/lib/agentic/catalogue/types").CatalogueSnapshot | null>;
+  /** True only when a catalogue insert resolves after its independent commit. */
+  catalogueWritesCommitIndependently?(): boolean;
   insertCatalogueSnapshot(id: string, snapshot: import("@/lib/agentic/catalogue/types").CatalogueSnapshot): Promise<void>;
   deleteAll(): Promise<void>;
   deletePrincipalScope(principalScope: string): Promise<void>;

@@ -7,7 +7,7 @@ import { readPlanPresentation } from "@/lib/agentic/presentation/plan-read";
 import { planContractCompatible } from "@/lib/agentic/presentation/compatibility";
 import { withoutOperationCursor } from "@/lib/agentic/store/operation-checkpoint";
 import { expirePlanOperation, operationDeadlineRemaining, planOperationDeadlineError } from "@/lib/agentic/plan/operations";
-import { catalogueSnapshotId } from "@/lib/agentic/catalogue/freeze";
+import { matchingSnapshotId } from "@/lib/agentic/catalogue/freeze";
 import { validateProductDoseProposals } from "@/lib/matcher/serving-grid";
 import { toMatcherProduct } from "@/lib/agentic/plan/to-matcher-product";
 import { requestLifetime, withRequestLifetime } from "@/lib/request-lifetime";
@@ -1629,6 +1629,7 @@ async function completePreparedPlan(
       GUIDANCE_RULES_VERSION, input.store
     );
   }
+  const snapshotIdentity = matchingSnapshotId(snapshot);
   if (!isolated && !savedReferences && matcherSafetyCeilings().length < 1) await refreshAdminSafetyCeilings();
   // Capture before any asynchronous matching work. A concurrent refresh changes
   // the process cache, never this operation's advice, score or continuation input.
@@ -1687,7 +1688,7 @@ async function completePreparedPlan(
       });
     }
 
-    if (!isolated && option.snapshotId && option.snapshotId !== catalogueSnapshotId(snapshot)) {
+    if (!isolated && option.snapshotId && option.snapshotId !== snapshotIdentity) {
       return businessError({ fieldPath: "planHandle", reasonCode: "availability_changed", message: "Catalogue facts changed after this recommendation was evaluated. Refine with scoring:{} and the current revision, review the refreshed recommendation, then confirm it.", nextActions: ["refresh_plan"] });
     }
     const nextResult = buildPinnedResult({
@@ -1722,7 +1723,7 @@ async function completePreparedPlan(
       const merged = applyPlanAnswers(prepared.state, { answers });
       pinPrevious = Boolean(
         previous && planContractCompatible(previous.contractVersion) &&
-        (isolated || previous.selected?.snapshotId === catalogueSnapshotId(snapshot)) &&
+        (isolated || previous.selected?.snapshotId === snapshotIdentity) &&
           planRematchFingerprint(previous.requestSnapshot) ===
             planRematchFingerprint(merged)
       );
@@ -1757,7 +1758,7 @@ async function completePreparedPlan(
     const merged = applyPlanAnswers(normalized.state, { answers });
     pinPrevious = Boolean(
       previous && planContractCompatible(previous.contractVersion) &&
-        (isolated || previous.selected?.snapshotId === catalogueSnapshotId(snapshot)) &&
+        (isolated || previous.selected?.snapshotId === snapshotIdentity) &&
         planRematchFingerprint(previous.requestSnapshot) ===
           planRematchFingerprint(merged)
     );
@@ -1794,7 +1795,7 @@ async function completePreparedPlan(
     state = applyPlanAnswers(normalized.state, { answers });
   } else if (previous) {
     const merged = applyPlanAnswers(previous.requestSnapshot, { answers });
-    pinPrevious = (isolated || previous.selected?.snapshotId === catalogueSnapshotId(snapshot)) &&
+    pinPrevious = (isolated || previous.selected?.snapshotId === snapshotIdentity) &&
       planRematchFingerprint(previous.requestSnapshot) ===
       planRematchFingerprint(merged);
     state = pinPrevious
@@ -1854,13 +1855,13 @@ async function completePreparedPlan(
       const { planCheckpointInputIdentity } = await import("@/lib/agentic/plan/matching");
       if (candidate?.search?.inputIdentity === planCheckpointInputIdentity({ snapshot, state })) checkpoint = candidate;
     }
-    if (checkpoint && (checkpoint.catalogueId !== catalogueSnapshotId(snapshot) ||
+    if (checkpoint && (checkpoint.catalogueId !== snapshotIdentity ||
       activeOperation.referenceIdentity && activeOperation.referenceIdentity !== matcherSafetyReferenceIdentity()?.fingerprint)) {
       return businessError({ reasonCode: "stale_revision", message: "Catalogue or reference inputs changed during matching. Reload the plan." });
     }
     const saved = await updateClaimedOperation(input.store, activeOperation, {
-      catalogueIdentity: catalogueSnapshotId(snapshot), referenceIdentity: matcherSafetyReferenceIdentity()?.fingerprint ?? null,
-      checkpoint: { ...(activeOperation.checkpoint ? withoutOperationCursor(activeOperation).checkpoint as DurableSearchCheckpoint : checkpoint ?? { stage: "normalized", state, catalogueId: catalogueSnapshotId(snapshot) }), references: undefined, referencesJson: JSON.stringify(references) }
+      catalogueIdentity: snapshotIdentity, referenceIdentity: matcherSafetyReferenceIdentity()?.fingerprint ?? null,
+      checkpoint: { ...(activeOperation.checkpoint ? withoutOperationCursor(activeOperation).checkpoint as DurableSearchCheckpoint : checkpoint ?? { stage: "normalized", state, catalogueId: snapshotIdentity }), references: undefined, referencesJson: JSON.stringify(references) }
     }, new Date().toISOString());
     if (!saved) return businessError({ reasonCode: "stale_revision", message: "This matching operation was cancelled or superseded. Reload the plan." });
   }
