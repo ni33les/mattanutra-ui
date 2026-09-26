@@ -276,6 +276,21 @@ test('REF-CPU-16 numerical nutrient scores omit display-only trees and retain ex
   assert.equal(display.perTarget[0].exposure, 75);
 });
 
+test('PERF-CPU-05 safety reuses verified exposure facts but rejects inconsistent prepared quantities', async () => {
+  const { evaluateSafety } = await import('../../lib/matcher/safety.ts');
+  const input = request({ safetyCeilings: [{ subjectId: 'a', name: 'A', maxAmount: 150, maxUnit: 'mg', sourceScope: 'supplemental' }] });
+  const supplied = new Map([['a', 200_000_000n]]);
+  doseFitScore(input, supplied); conversions = 0;
+  const observations = { totals: new Map([['a', { subjectId: 'a', dim: 'mass_ng' as const, units: 200_000_000n }]]), provenance: [] };
+  const result = evaluateSafety({ request: input, exposure: observations, preparedExposure: supplied, products: [], variants: [] });
+  assert.equal(conversions, 0, 'Validated safety and candidate scoring must share the same materialized dose facts');
+  assert.ok(result.findings.some(row => row.code === 'dose_review_required' && row.exposureUnits === 200_000_000n));
+  const current = { ...observations, totals: new Map([['a', { subjectId: 'a', dim: 'mass_ng' as const, units: 100_000_000n }]]) };
+  const corrected = evaluateSafety({ request: input, exposure: current, preparedExposure: supplied, products: [], variants: [] });
+  assert.ok(!corrected.findings.some(row => row.code === 'dose_review_required'), 'A stale prepared amount cannot create a false reference breach');
+  assert.ok(conversions > 0, 'Different validated facts require their own calculation');
+});
+
 test('PERF-CPU-01 interior probes retain exact comparison facts without formatting discarded responses', async () => {
   const { product } = await import('../matcher/flexible-v5-fixtures.ts');
   const { compileGroups } = await import('../../lib/matcher/candidates.ts');
