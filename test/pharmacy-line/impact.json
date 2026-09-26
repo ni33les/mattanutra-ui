@@ -4,6 +4,7 @@
   "inputs": ["test/helpers/pharmacy-fixture.ts", "lib/pharmacy-line-copy.ts"],
   "files": [
     {"file":"test/pharmacy-line/connect.integration.test.ts","expectedCases":8,"database":true,"reason":"Local QR, signature-verified private connection, three locales, frozen order ownership, atomic outbox, retries and ordinary route compatibility"},
+    {"file":"test/pharmacy-line/token-collision.test.ts","expectedCases":5,"reason":"Bounded fresh-code allocation, cross-plan and concurrent collisions, exact failure and one creation event without external services"},
     {"file":"test/communications.test.ts","expectedCases":9,"reason":"Shared channel and dispatch changes preserve ordinary customer/admin routing and message formatting"},
     {"file":"test/panya-line-cta-static.test.ts","expectedCases":1,"reason":"Ordinary website LINE entry and existing command remain compatible with the shared endpoint"},
     {"file":"test/panya-welcome.test.ts","expectedCases":3,"reason":"Ordinary customer welcome stays unchanged when pharmacy uses the deterministic delivery path"}
