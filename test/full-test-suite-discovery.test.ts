@@ -152,3 +152,53 @@ it("QUALITY-DISC-06 batch execution reconciles a real JavaScript test with seman
     assert.equal(result.execution.cases, 1);
   } finally { rmSync(directory, { recursive: true, force: true }); }
 });
+
+it("QUALITY-DISC-07 maintained Node batches resolve real Next server entry points without eagerly loading the TSX compiler", async () => {
+  const { readFileSync } = await import("node:fs");
+  const { spawnSync } = await import("node:child_process");
+  for (const file of ["scripts/run-full-test-suite.mjs", "scripts/run-matcher-test-suite.mjs"]) {
+    // Exercise the actual launch flags used by each maintained batch, including
+    // the PostgreSQL batch. No database, route invocation or provider is needed.
+    const declaration = /const (?:nodeArgs|args) = (\[[^;]+\]);/.exec(readFileSync(file, "utf8"));
+    assert.ok(declaration, `${file}: maintained Node launch arguments`);
+    const args = (JSON.parse(declaration[1]) as string[]).filter(arg => !arg.startsWith("--test"));
+    const env = { ...process.env, DB_URL: "", TEST_DB_URL: "", DB_WORKER_URL: "" };
+    delete env.NODE_TEST_CONTEXT;
+    const result = spawnSync(process.execPath, [...args, "--input-type=module", "--eval", `
+      import assert from 'node:assert/strict';
+      import { createRequire } from 'node:module';
+      const require = createRequire(import.meta.url);
+      const { NextResponse, NextRequest } = await import('next/server');
+      const response = NextResponse.json({ connected: true }, { status: 201 });
+      assert.equal(response.status, 201);
+      assert.deepEqual(await response.json(), { connected: true });
+      assert.equal(new NextRequest('https://fixture.example/line').nextUrl.pathname, '/line');
+      assert.equal(require.cache[require.resolve('typescript')], undefined);
+      await assert.rejects(import('missing-package-next-resolver-proof'), { code: 'ERR_MODULE_NOT_FOUND' });
+      console.log('NEXT_SERVER_RESOLVED');
+    `], { env, encoding: "utf8", timeout: 10_000 });
+    assert.equal(result.status, 0, `${file}: ${result.error?.message ?? result.stderr}`);
+    assert.equal(result.stdout.trim(), "NEXT_SERVER_RESOLVED", `${file}: real response assertion must execute`);
+  }
+});
+
+it("QUALITY-DISC-08 classic fallback has one owned browser batch without omitting or duplicating discovered files", async () => {
+  const full = await import("../scripts/run-full-test-suite.mjs");
+  const split = (full as unknown as { browserTestPartitions: (files: string[]) => {
+    standard: string[]; classic: Array<{ file: string; expectedCases: number; grep: string }> } }).browserTestPartitions;
+  assert.equal(typeof split, "function", "The full browser gate must dispatch each maintained mode");
+  const inventory = fullTestInventory();
+  const modes = split(inventory.browser);
+  assert.deepEqual(modes.classic.map(row => row.file), ["test/e2e/pharmacy-classic.spec.ts"]);
+  assert.equal(modes.classic[0].expectedCases, 1);
+  assert.equal(modes.classic[0].grep, "PHARM-CLASSIC");
+  assert.ok(modes.standard.includes("test/e2e/web-preferences.spec.ts"), "The ordinary/chat browser journey remains selected");
+  assert.deepEqual([...modes.standard, ...modes.classic.map(row => row.file)].sort(), inventory.browser);
+  assert.equal(new Set([...modes.standard, ...modes.classic.map(row => row.file)]).size, inventory.browser.length);
+  assert.throws(() => split(modes.standard), /undiscovered classic/);
+  assert.throws(() => split([...inventory.browser, inventory.browser[0]]), /Invalid/);
+  const { runEfficiencyBrowser } = await import("../scripts/service-efficiency/release-stages.mjs");
+  for (const port of [0, -1, 65536, 3100.5]) {
+    await assert.rejects(runEfficiencyBrowser("/must-not-start", {}, [], port), /Browser port/);
+  }
+});

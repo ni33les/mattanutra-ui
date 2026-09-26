@@ -47,7 +47,24 @@ function evidence() {
     tests: [{ projectName: "chromium", status: "expected", results: [{ status: "passed" }] }] })) }], stats: { expected: inventoryContent.browser.length, skipped: 0, unexpected: 0, flaky: 0 } };
   named["full-suite/browser-discovery.json"] = browser;
   named["full-suite/browser.json"] = browser;
-  const artifacts = [...new Set([...REQUIRED_VALIDATION_ARTIFACTS, "full-suite/browser-discovery.json", "full-suite/browser.json"])].map(file => {
+  const classicFiles = ["test/e2e/pharmacy-classic.spec.ts"];
+  const classicReport = { ...browser, suites: [{ specs: browser.suites[0].specs.filter(row => classicFiles.includes(row.file)) }],
+    stats: { expected: 1, skipped: 0, unexpected: 0, flaky: 0 } };
+  const standardFiles = inventoryContent.browser.filter(file => !classicFiles.includes(file));
+  const classic = { passed: true, execution: { passed: true, cases: 1, files: 1, failures: [] },
+    discovery: { passed: true, args: [...classicFiles, "--list"] },
+    run: { passed: true, args: [...classicFiles, "--retries=0", "--workers=1"] },
+    runtime: { origin: "http://127.0.0.1:3101", questionnaireFlags: { NEXT_PUBLIC_CHAT_QUESTIONNAIRE_V6: "0", NEXT_PUBLIC_CHAT_QUESTIONNAIRE_V5: "0" } } };
+  named["full-suite/browser-mode-inventory.json"] = { discovered: inventoryContent.browser, standard: standardFiles,
+    classic: JSON.parse(readFileSync("test/pharmacy-reveal/impact.json", "utf8")).classicBrowser,
+    classicOrigin: classic.runtime.origin, classicFlags: classic.runtime.questionnaireFlags };
+  named["full-suite/browser-classic/browser-discovery.json"] = classicReport;
+  named["full-suite/browser-classic/browser.json"] = classicReport;
+  named["full-suite/browser-classic/browser-results.json"] = classic;
+  const suite = named["full-suite/results.json"] as { results: Array<Record<string, unknown>> };
+  suite.results.push({ label: "browser-classic", ...classic });
+  const artifacts = [...new Set([...REQUIRED_VALIDATION_ARTIFACTS, "full-suite/browser-discovery.json", "full-suite/browser.json",
+    "full-suite/browser-mode-inventory.json", "full-suite/browser-classic/browser-discovery.json", "full-suite/browser-classic/browser.json", "full-suite/browser-classic/browser-results.json"])].map(file => {
     const path = join(directory, file);
     mkdirSync(dirname(path), { recursive: true });
     writeFileSync(path, lines[file] ?? JSON.stringify(named[file] ?? { passed: true }));
@@ -208,3 +225,33 @@ for (const mode of ["inventory-omit", "browser-omit", "timing-drift"]) {
     } finally { rmSync(fixture.directory, { recursive: true, force: true }); }
   });
 }
+
+it("QUALITY-GATE-03 rehashed classic omissions, duplicated cases and wrong questionnaire flags cannot hide behind a green default batch", () => {
+  for (const mode of ["omitted", "duplicated", "wrong-flags"]) {
+    const fixture = evidence();
+    try {
+      const json = (name: string) => JSON.parse(readFileSync(join(fixture.directory, name), "utf8"));
+      const updates: Record<string, unknown> = {};
+      if (mode === "wrong-flags") {
+        const name = "full-suite/browser-classic/browser-results.json", classic = json(name);
+        classic.runtime.questionnaireFlags.NEXT_PUBLIC_CHAT_QUESTIONNAIRE_V6 = "1";
+        updates[name] = classic;
+        const suite = json("full-suite/results.json");
+        suite.results = suite.results.map((row: { label: string }) => row.label === "browser-classic" ? { label: row.label, ...classic } : row);
+        updates["full-suite/results.json"] = suite;
+      } else {
+        const name = "full-suite/browser-classic/browser.json", report = json(name);
+        assert.equal(report.suites[0].specs.length, 1, "The classic case must exist before tampering");
+        if (mode === "omitted") { report.suites[0].specs = []; report.stats.expected = 0; }
+        else { report.suites[0].specs.push(report.suites[0].specs[0]); report.stats.expected = 2; }
+        updates[name] = report;
+      }
+      for (const [name, value] of Object.entries(updates)) {
+        const contents = JSON.stringify(value); writeFileSync(join(fixture.directory, name), contents);
+        fixture.proof.artifacts.find(row => row.file === name)!.sha256 = createHash("sha256").update(contents).digest("hex");
+      }
+      writeFileSync(fixture.file, JSON.stringify(fixture.proof));
+      assert.throws(() => readDevValidationProof(fixture.file, fixture.source), /browser/, mode);
+    } finally { rmSync(fixture.directory, { recursive: true, force: true }); }
+  }
+});
