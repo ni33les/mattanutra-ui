@@ -20,6 +20,19 @@ mock.module('../../lib/matcher/rational.ts', { namedExports: { ...fractions, lin
 const { request } = await import('../matcher/flexible-v5-fixtures.ts');
 const { doseFitScore, numericalDoseFitScore, exactDoseFit, compareDoseFit, weightedDoseFitScore, numericalWeightedDoseFitScore } = await import('../../lib/matcher/dose-fit.ts');
 
+test('PERF-CPU-25 bounded endpoint reuse survives a normal quantity working set', () => {
+  const input = request(), exposure = new Map([['a', 25_000_000n]]);
+  assert.deepEqual(exactDoseFit(numericalDoseFitScore(input, exposure)), { num: 3n, den: 4n });
+  for (let i = 1; i <= 400; i++) numericalDoseFitScore(input, new Map([['a', BigInt(i) * 1_000_000n]]));
+  multiplications = 0;
+  assert.deepEqual(exactDoseFit(numericalDoseFitScore(input, new Map(exposure))), { num: 3n, den: 4n });
+  assert.equal(multiplications, 0, 'Recurring quantities must not be evicted before a 400-amount working set is revisited');
+  for (let i = 401; i <= 600; i++) numericalDoseFitScore(input, new Map([['a', BigInt(i) * 1_000_000n]]));
+  multiplications = 0;
+  assert.deepEqual(exactDoseFit(numericalDoseFitScore(input, new Map(exposure))), { num: 3n, den: 4n });
+  assert.ok(multiplications > 0, 'Endpoint retention remains bounded, rather than growing with all expanded attempts');
+});
+
 test('PERF-CPU-23 retained exposure reuses sorted immutable variant facts', async () => {
   const { product, catalog } = await import('../matcher/flexible-v5-fixtures.ts');
   const { compileGroups } = await import('../../lib/matcher/candidates.ts');
