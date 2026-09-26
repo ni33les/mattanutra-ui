@@ -132,6 +132,11 @@
       "file": "test/service-efficiency/native-worker-readiness.test.ts",
       "expectedCases": 1,
       "reason": "PERF-NATIVE-01: isolated external executor warms the production matching threads before registration and readiness"
+    },
+    {
+      "file": "test/service-efficiency/native-worker-idle.test.ts",
+      "expectedCases": 1,
+      "reason": "PERF-NATIVE-02: production wake endpoint and signals avoid artificial idle reservation contention in native measurements"
     }
   ],
   "exclusions": "No full application/MCP, live database, payment or unrelated browser suites; no contract or scoring-policy changes."

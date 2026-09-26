@@ -22,6 +22,7 @@ test('PERF-NATIVE-01 isolated external workers prepare real execution before adv
   } });
   mock.module('../../lib/task-result-applier.ts', { namedExports: { applyTaskCompletionResult() {}, prepareTaskCompletionResult() {} } });
   mock.module('../../lib/db.ts', { namedExports: { closeSqlPool: async () => { events.push('closed'); } } });
+  mock.module('../../workers/wake-server.ts', { namedExports: { startWorkerWakeServer: async () => ({ url: 'http://127.0.0.1:9999/wake', close() {} }) } });
   const send = process.send, signalListeners = process.listeners('SIGINT');
   process.send = ((message: { ready?: boolean }) => {
     assert.equal(message.ready, true); events.push('ready'); process.emit('SIGTERM'); return true;
