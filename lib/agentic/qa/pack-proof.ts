@@ -14,6 +14,7 @@ import {
   replaceCatalogueSnapshot,
   runWithCatalogueSnapshot
 } from "@/lib/agentic/catalogue/snapshot";
+import { mutationRateLimitProof } from "@/lib/agentic/qa/rate-limit";
 import { sanitizeLogFields } from "@/lib/logger";
 import { nowIso, type AgenticRuntime } from "@/lib/agentic/runtime";
 import {
@@ -731,7 +732,8 @@ export async function packProof(runtime: AgenticRuntime) {
     )
   );
   checks.push(check("D10-08", typeof sanitizeLogFields === "function"));
-  checks.push(check("D10-09", true, { mutationRateLimit: "mcp 60/min on plan/execute/feedback" }));
+  const mutationRateLimit = await mutationRateLimitProof();
+  checks.push(check("D10-09", mutationRateLimit.passed, mutationRateLimit.evidence, mutationRateLimit.passed ? undefined : "mutation_rate_limit_unverified"));
 
   const concurrentPlan = await readyPlan(runtime, `qa-pack-cc-${stamp}`);
   let concurrentOk = false;

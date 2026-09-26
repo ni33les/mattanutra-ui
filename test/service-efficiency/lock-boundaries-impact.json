@@ -157,7 +157,7 @@
       "file": "test/agentic-match-worker.test.ts",
       "slice": "worker-consumers",
       "database": false,
-      "expectedCases": 6,
+      "expectedCases": 8,
       "reason": "Shared ThreadPool retains reference validation, deterministic matching, cancellation and queue bounds"
     },
     {
@@ -294,7 +294,7 @@
     {
       "file": "test/rate-limit.test.ts",
       "slice": "retained-locks",
-      "expectedCases": 7,
+      "expectedCases": 10,
       "reason": "Direct verification of retained audited writer, pool, rate-limit and maintenance invariants"
     },
     {
