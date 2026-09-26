@@ -27,12 +27,23 @@ export function rowDisposition(row){
  if(row.retail_proposed==null||row.wholesale_proposed==null)return 'PHARMACY_CLARIFICATION';
  return 'READY';
 }
-export function mergePackMetadata(existing,pack){
+export function commercialFields(row){
+ const prices={};
+ for(const [field,value] of [['rrp_price_amount',row.retail_proposed],['wholesale_price_amount',row.wholesale_proposed]]){
+  if(value==null||value==='')continue;
+  assert.ok(!decimalIdentity(value).startsWith('-'),'Negative price');prices[field]=String(value);
+ }
+ const supplied=row.proposed_pack_from_C??row.source_N_pack_for_review;
+ const pack=supplied?{packQuantity:Number(supplied.quantity),physicalUnit:supplied.unit==='unit_unspecified'?'unknown':supplied.unit,sourceColumn:row.proposed_pack_from_C?'C':'N'}:null;
+ if(pack)assert.ok(Number.isFinite(pack.packQuantity)&&pack.packQuantity>0,'Invalid pack quantity');
+ return {title:row.sheet_name?.trim()||null,prices,pack};
+}
+export function mergePackMetadata(existing,pack,{replacePack=false}={}){
  assert.ok(Number.isFinite(pack.packQuantity)&&pack.packQuantity>0,'Invalid pack quantity');
  const unit=pack.physicalUnit??'unknown';
  assert.ok(['capsule','tablet','softgel','gummy','drop','ml','g','scoop','sachet','other','unknown'].includes(unit),'Invalid physical unit');
  if(existing){
-  if(existing.packQuantity!=null&&existing.packQuantity!==pack.packQuantity)throw Error('Pack quantity conflict');
+  if(existing.packQuantity!=null&&existing.packQuantity!==pack.packQuantity&&!replacePack)throw Error('Pack quantity conflict');
   if(existing.physicalUnit&&existing.physicalUnit!=='unknown'&&unit!=='unknown'&&existing.physicalUnit!==unit)throw Error('Physical unit conflict');
   if(existing.packQuantity===pack.packQuantity)return structuredClone(existing);
   // Existing manufacturer serving evidence stays intact; the pharmacy identifies its sold pack.
@@ -41,14 +52,17 @@ export function mergePackMetadata(existing,pack){
  return {route:'unknown',physicalUnit:unit,unitsPerServing:null,doseIncrement:null,packQuantity:pack.packQuantity,provenance:{status:'unverified',sourceUrl:null,sourceText:pack.sourceText??null,verifiedAt:null}};
 }
 export function validateAction(action,target){
+ assert.ok(target.policy==null||target.policy==='sheet-commercial-fields-v2','Unknown commercial policy');
+ const commercial=target.policy==='sheet-commercial-fields-v2';
  assert.ok(columns[action.table],'Unsupported action table');
  assert.ok(action.key&&Object.keys(action.key).length,'Missing identity');
  assert.ok(Object.keys(action.patch??{}).length,'Empty action');
- assert.ok(!pharmacyRows.has(action.sheetRow)&&!reviewRows.has(action.sheetRow),'Held row cannot execute');
+ assert.ok(commercial||(!pharmacyRows.has(action.sheetRow)&&!reviewRows.has(action.sheetRow)),'Held row cannot execute');
  const insertion=action.before===null;
  for(const name of Object.keys(action.patch)){
   const insertOnly=insertion&&['retail_sellable_products','retail_product_stock'].includes(action.table)&&['id','organisation_id','product_id','currency','lead_time_days','backorder_policy','stock_quantity','metadata'].includes(name);
-  assert.ok(columns[action.table].has(name)||insertOnly,`Forbidden field ${action.table}.${name}`);
+  const mirroredRetail=commercial&&action.table==='retail_product_stock'&&name==='retail_price_amount';
+  assert.ok(columns[action.table].has(name)||insertOnly||mirroredRetail,`Forbidden field ${action.table}.${name}`);
  }
  if(insertion){
   assert.ok(action.table.startsWith('retail_'),'Only missing retailer offer/profile inserts allowed');
@@ -60,7 +74,7 @@ export function validateAction(action,target){
   assert.ok((action.before??action.patch).product_id,'Missing product identity');
  }
  if(Object.hasOwn(action.patch,'status'))assert.ok(['active','disabled'].includes(action.patch.status),'Unsupported status transition');
- for(const field of ['rrp_price_amount','wholesale_price_amount'])if(Object.hasOwn(action.patch,field)){
+ for(const field of ['rrp_price_amount','retail_price_amount','wholesale_price_amount'])if(Object.hasOwn(action.patch,field)){
   const value=decimalIdentity(action.patch[field]);assert.ok(!value.startsWith('-'),'Negative price');
  }
  return true;
@@ -84,7 +98,7 @@ export function verifyExecutionCases(expected,cases){
 }
 export function fieldEqual(name,a,b){
  if(a==null||b==null)return a==null&&b==null;
- if(['rrp_price_amount','wholesale_price_amount','stock_quantity'].includes(name))return decimalIdentity(a)===decimalIdentity(b);
+ if(['rrp_price_amount','retail_price_amount','wholesale_price_amount','stock_quantity'].includes(name))return decimalIdentity(a)===decimalIdentity(b);
  return fingerprint(a)===fingerprint(b);
 }
 export function actionState(action,current){

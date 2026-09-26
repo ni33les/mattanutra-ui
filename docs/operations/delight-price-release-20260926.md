@@ -13,3 +13,9 @@ Run focused core safeguards with `node --test test/delight-price-release.test.mj
 Executor imports are deliberately inert: calling `executeManifest` defaults to read-only review. The release application wrapper requires the environment-specific manifest, proven maintenance/quiescence, a matching decryptable restore-tested backup, indefinite retention and passing rehearsal. PRD must pass before UAT. Recovery receipts are never inferred from filenames.
 
 Use compensating changes after traffic reopens. A full database reset is restricted to the affected database with writers stopped and explicit reconciliation of any later legitimate customer activity. Never restore the shared cluster. Retain backup/configuration/key/source and restoration evidence indefinitely until the user explicitly authorizes deletion.
+
+## Superseding field-wise completion
+
+The user's subsequent instruction authorizes every supplied commercial price, name and pack quantity, regardless of prior row hold or listing state. The separate `delight-price-completion-20260926` manifests use explicit policy `sheet-commercial-fields-v2`; the original manifest and its held-row evidence remain unchanged. Blank fields preserve existing values. Pack corrections retain serving basis and fact confidence. Edited C-column quantities override older N-column quantities. Distinct formulations use their existing exact variant IDs without approval changes. Red rows stay unavailable; approved non-red listings can resume. Both stock-profile price copies mirror Delight's offer, with stock counts untouched. Historical frozen prices remain unchanged.
+
+New maintained cases: `test/delight-price-completion.test.mjs`. Recovery, field preservation, replay and isolated catalogue checks reuse the original release tools; fresh indefinitely retained backups are required before each environment's writes. DEV remains excluded.
