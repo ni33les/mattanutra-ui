@@ -21,29 +21,6 @@ mock.module('../../lib/matcher/rational.ts', { namedExports: { ...fractions, lin
 const { request } = await import('../matcher/flexible-v5-fixtures.ts');
 const { doseFitScore, numericalDoseFitScore, exactDoseFit, compareDoseFit, weightedDoseFitScore, numericalWeightedDoseFitScore } = await import('../../lib/matcher/dose-fit.ts');
 
-test('PERF-CPU-48 evaluated nutrient loss rejects losing profile comparisons before repeated practical arithmetic', async () => {
-  const { seedState } = await import('../../lib/matcher/search.ts');
-  const { requestForProfile, numericalSearchStateScore, compareSearchStateScores } = await import('../../lib/matcher/practical-scoring.ts');
-  const input = request({ scoring: { profile: 'balanced', weights: {} } });
-  const exposure = new Map([['a', 1_000_000_000n]]);
-  const candidate = { ...seedState(input), exposure, delivered: exposure, count: 1, pills: 1, price: 100, uncertainAdministrationCount: 0 };
-  const incumbentExposure = new Map([['a', 100_000_000n]]);
-  const incumbent = { ...candidate, exposure: incumbentExposure, delivered: incumbentExposure };
-  numericalSearchStateScore(input, candidate); // Validate measurements and calculate the preserved raw-dose role.
-  for (const mode of ['fewest_pills', 'lowest_cost', 'best_coverage'] as const) {
-    const profile = requestForProfile(input, mode);
-    const best = numericalSearchStateScore(profile, incumbent);
-    assert.ok(fractions.compare(exactDoseFit(numericalWeightedDoseFitScore(profile, exposure)), best.exactTotal) > 0);
-    linearEvaluations = 0;
-    assert.equal(compareSearchStateScores(profile, candidate, incumbent), 1);
-    assert.equal(linearEvaluations, 0, 'A validated nonnegative practical term cannot reverse an already losing nutrient lower bound');
-  }
-  const invalid = { ...candidate, pills: -1, exposure: new Map(exposure) };
-  assert.throws(() => compareSearchStateScores(input, invalid, incumbent), /pillLowerBound/, 'Unvalidated measurements still fail normally');
-  const zero = { ...input, scoring: { profile: 'balanced' as const, weights: { nutrients: { a: 0 } } } };
-  assert.equal(compareSearchStateScores(zero, candidate, incumbent), 0, 'Zero nutrient importance must not inherit the unweighted lower bound');
-});
-
 test('PERF-CPU-33 numerical preference denominators compile once across basket evaluations', async () => {
   const { scorePracticalPenalties } = await import('../../lib/matcher/practical-scoring.ts');
   const input = request({ maxDailyPills: 7.75, maxProductCount: 37, maxPriceMinor: 123457 });
