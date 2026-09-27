@@ -202,6 +202,11 @@
       "file": "test/service-efficiency/score-storage.test.ts",
       "expectedCases": 1,
       "reason": "PERF-CPU-68: shared exposure must preserve distinct routine measurements; PERF-CPU-67 withdrawn with the slower singleton-cache experiment; evidence retained outside checkout"
+    },
+    {
+      "file": "test/service-efficiency/search-strategy.test.ts",
+      "expectedCases": 6,
+      "reason": "SEARCH-WORK-01–06: conservative additive pruning, explicit-purchase/unknown-intake exceptions and residual-first exploration with one-attempt checkpoint equivalence"
     }
   ],
   "exclusions": "No full application/MCP, live database, payment or unrelated browser suites; no contract or scoring-policy changes."

@@ -16,7 +16,7 @@ type ExactFrame = { state: SearchState; variantIds: string[] | null; position: n
 type ExactVector = (number | bigint)[];
 type ArchivedState = [number, number, number, number, boolean, number[], ExactVector, ExactVector, string[],
   [number[], number, number | null, number, { num: bigint; den: bigint }?]?];
-type QuantitySearch = { key: string; ids: string[]; low: bigint; high: bigint; steps: number; left?: ComparableOverallScore | null };
+type QuantitySearch = { key: string; ids: string[]; low: bigint; high: bigint; steps: number; first?: string[]; position?: number; left?: ComparableOverallScore | null };
 type RepairJob = { leader: SearchState; removal: number; base: SearchState | null; retained: string[]; build: number; group: number; variant: number; variants: string[] | null; stage: "prepare" | "build" | "add" | "done";
   fixedRemoval?: string[]; replacementGroups?: number[] };
 export type SearchCursor = {
@@ -197,6 +197,22 @@ function variantsFor(cursor: SearchCursor, index: number, state: SearchState, re
         addTick(below); addTick(below + BigInt(1));
       }
     }
+    // Give exact residuals and labelled quantities a turn before distant convex
+    // probes can spend a small beam/repair allowance. The rest of the domain and
+    // all probe budgets remain available; position survives checkpoint yields.
+    if (cursor.phase === "beam" || cursor.phase === "repair") {
+      const rows = job.ids.map(id => variant(cursor, index, id));
+      job.first = [...new Set([...residualCompletions(rows, state, request), initial[0],
+        ...[1, 2, 3].map(amount => initial.find(row => row.dailyUnits === amount))]
+        .filter((row): row is DoseVariant => Boolean(row)).map(row => row.variantId))];
+      job.position = 0;
+    }
+  }
+  while (job.first && (job.position ?? 0) < job.first.length) {
+    if (cursor.expansionAttempts >= stop) return null;
+    const position = job.position ?? 0;
+    job.position = position + 1;
+    retainProbe(cursor, add(cursor, state, index, job.first[position]!, request), index);
   }
   // Bounded discrete convex probes add useful interior quantities. First-order
   // price is constant in this context. Monthly pack-price steps are sampled,
@@ -212,8 +228,7 @@ function variantsFor(cursor: SearchCursor, index: number, state: SearchState, re
     const candidate = exists ? add(cursor, state, index, id, request) : (cursor.expansionAttempts++, completedAttempt(cursor, request), null);
     // Probes are productive expansions too. Preserve their continuation when
     // probing consumes the rest of this group's allowance.
-    if (candidate && cursor.phase === "beam") cursor.expanded.push({ ...candidate, nextGroupIndex: index + 1 });
-    if (candidate && cursor.phase === "repair") cursor.repaired.push(candidate);
+    retainProbe(cursor, candidate, index);
     if (exists && !job.ids.includes(id)) job.ids.push(id);
     const score = candidate ? numericalSearchStateScore(request, candidate) : null;
     if (job.left === undefined) { job.left = score && { profile: score.profile, exactTotal: score.exactTotal }; continue; }
@@ -222,6 +237,29 @@ function variantsFor(cursor: SearchCursor, index: number, state: SearchState, re
     job.left = undefined; job.steps++;
   }
   return job.ids;
+}
+
+function retainProbe(cursor: SearchCursor, candidate: SearchState | null, index: number) {
+  if (candidate && cursor.phase === "beam") cursor.expanded.push({ ...candidate, nextGroupIndex: index + 1 });
+  if (candidate && cursor.phase === "repair") cursor.repaired.push(candidate);
+}
+
+/** Conservative additive dominance: no affected target can benefit at any
+ * intake endpoint, and routine burden only increases. This is search pruning,
+ * never eligibility: keep explicit proposals, retained facts, purchase fallbacks
+ * and cases whose unknown facts or monthly cost prevent that proof. */
+function coveredAddition(state: SearchState, row: DoseVariant, request: CanonicalRequest) {
+  if (!state.count || row.unknownSafetyAmount || request.pricePreferenceBasis === "monthly_30_days" ||
+    request.retainSubjectIds.length || request.retainProductIds.includes(row.productId) ||
+    request.productDoses?.some(item => item.productId === row.productId)) return false;
+  let affected = false;
+  for (const target of request.targets) {
+    if ((row.contributions.get(target.subjectId)?.units ?? BigInt(0)) <= BigInt(0) &&
+      (row.safetyExposure?.get(target.subjectId)?.units ?? BigInt(0)) <= BigInt(0)) continue;
+    affected = true;
+    if (knownTargetExposure(request, target, state.delivered.get(target.subjectId) ?? BigInt(0)) < target.requested.units) return false;
+  }
+  return affected;
 }
 
 function reduceReview(cursor: SearchCursor, request: CanonicalRequest) {
@@ -238,7 +276,8 @@ function add(cursor: SearchCursor, state: SearchState, groupIndex: number, id: s
   const edge = ids.join(",") + ">" + indexFor(cursor.variantIds, cursor.variantIndex, id);
   if (cursor.edges.has(edge)) { const key = cursor.edges.get(edge); return key != null ? restoreState(cursor, cursor.archive.get(key)!) : null; }
   cursor.expansionAttempts++;
-  let next = tryAddVariant(state, variant(cursor, groupIndex, id), cursor.groups[groupIndex]!, request);
+  const row = variant(cursor, groupIndex, id);
+  let next = coveredAddition(state, row, request) ? null : tryAddVariant(state, row, cursor.groups[groupIndex]!, request);
   if (next && next.delivered !== next.exposure && next.delivered.size === next.exposure.size && [...next.delivered].every(([key, value]) => next!.exposure.get(key) === value)) {
     next = { ...next, delivered: next.exposure };
   }

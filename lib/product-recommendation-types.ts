@@ -119,6 +119,7 @@ export type ProductRecommendationAlgorithmVersion =
   | "importance-matching-3"
   | "importance-matching-4"
   | "importance-matching-5"
+  | "importance-matching-6"
   | "importance-matching-2"
   | "practical-matching-1"
   | "flexible-dose-fit-9"

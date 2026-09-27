@@ -662,6 +662,12 @@
       "expectedCases": 3,
       "reason": "PERF-CKPT-05–06: combine checkpoint-off progress with the next reservation, preserving commit-before-dispatch, interruption accounting and opt-in acknowledgements",
       "slice": "sessions"
+    },
+    {
+      "file": "test/service-efficiency/search-strategy.test.ts",
+      "expectedCases": 6,
+      "reason": "SEARCH-WORK-01–06: conservative additive pruning, explicit-purchase/unknown-intake exceptions and residual-first exploration with one-attempt checkpoint equivalence",
+      "slice": "matcher-hot-path"
     }
   ],
   "inputs": [
