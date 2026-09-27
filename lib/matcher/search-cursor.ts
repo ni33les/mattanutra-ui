@@ -24,7 +24,7 @@ export type SearchCursor = {
   config: MatcherConfig; expansionBudget: number; expansionAttempts: number;
   passStart: number; done: boolean; exhausted: boolean; trimmed: boolean; exact: boolean;
   phase: "exact" | "single" | "beam" | "pairs" | "repair" | "second" | "finished";
-  archive: Map<string, ArchivedState>; edges: Map<string, string | null>;
+  archive: Map<string, ArchivedState | SearchState>; edges: Map<string, string | null>;
   subjects: string[]; subjectIndex: Map<string, number>; variantIds: string[]; variantIndex: Map<string, number>;
   review: SearchState[]; unreviewed: SearchState[];
   singles: { state: SearchState; group: number; variant: string }[];
@@ -55,7 +55,8 @@ function unpackedExposure(cursor: SearchCursor, packed: ExactVector) {
 // Packed rows are immutable and scoped to one cursor. Re-reading an edge must
 // not rebuild the same maps (and discard all numerical WeakMap caches).
 const restoredStates = new WeakMap<ArchivedState, SearchState>();
-function restoreState(cursor: SearchCursor, packed: ArchivedState): SearchState {
+function restoreState(cursor: SearchCursor, packed: ArchivedState | SearchState): SearchState {
+  if (!Array.isArray(packed)) return packed;
   const cached = restoredStates.get(packed); if (cached) return cached;
   const selectedVariantIds = packed[5].map(index => cursor.variantIds[index]!);
   const exposure = unpackedExposure(cursor, packed[6]);
@@ -75,15 +76,30 @@ function remember(cursor: SearchCursor, state: SearchState) {
   const ids = state.selectedVariantIds.map(id => indexFor(cursor.variantIds, cursor.variantIndex, id));
   const key = [...ids].sort((a, b) => a - b).join(",");
   if (!cursor.archive.has(key)) {
-    const exposure = packedExposure(cursor, state.exposure);
-    cursor.archive.set(key, [state.nextGroupIndex, state.price, state.pills, state.count, state.pillCountKnown !== false,
-      ids, exposure,
-      state.delivered === state.exposure ? exposure : packedExposure(cursor, state.delivered), [...(state.unknownProductIds ?? [])],
-      [[...(state.routineServings ?? [])], state.uncertainAdministrationCount ?? state.count, state.monthlyPriceMinor ?? null, state.monthlyPriceLowerBound ?? 0, state.servingBurden]]);
-    if (state.count > 0) restoredStates.set(cursor.archive.get(key)!, state);
+    cursor.archive.set(key, state.count > 0 ? state : { ...state, unknownProductIds: state.unknownProductIds ?? [] });
     cursor.unreviewed.push(state);
   }
   return key;
+}
+
+// Only opt-in checkpoint encoding needs the historical packed representation.
+// Keep immutable live candidates once; do not duplicate every losing state.
+const packedStates = new WeakMap<SearchState, ArchivedState>();
+export function checkpointSearchCursor(cursor: SearchCursor): SearchCursor {
+  const archive = new Map<string, ArchivedState>();
+  for (const [key, value] of cursor.archive) {
+    let packed = Array.isArray(value) ? value : packedStates.get(value);
+    if (!packed) {
+      const state = value as SearchState, exposure = packedExposure(cursor, state.exposure);
+      packed = [state.nextGroupIndex, state.price, state.pills, state.count, state.pillCountKnown !== false,
+        state.selectedVariantIds.map(id => indexFor(cursor.variantIds, cursor.variantIndex, id)), exposure,
+        state.delivered === state.exposure ? exposure : packedExposure(cursor, state.delivered), [...(state.unknownProductIds ?? [])],
+        [[...(state.routineServings ?? [])], state.uncertainAdministrationCount ?? state.count, state.monthlyPriceMinor ?? null, state.monthlyPriceLowerBound ?? 0, state.servingBurden]];
+      packedStates.set(state, packed);
+    }
+    archive.set(key, packed);
+  }
+  return { ...cursor, archive };
 }
 function width(cursor: SearchCursor) { return Math.max(1, Math.min(cursor.passStart ? cursor.config.maxBeamWidth : cursor.config.initialBeamWidth, cursor.config.maxBeamWidth)); }
 function explorationLimit(cursor: SearchCursor) { return cursor.expansionBudget - Math.floor((cursor.expansionBudget - cursor.passStart) / 5); }

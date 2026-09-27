@@ -1,11 +1,11 @@
 /** Worker-only checkpoint envelope. The browser matcher never imports this module. */
 import { serialize, deserialize } from "node:v8";
 import { deflateSync, inflateSync } from "node:zlib";
-import type { SearchCursor } from "@/lib/matcher/search-cursor";
+import { checkpointSearchCursor, type SearchCursor } from "@/lib/matcher/search-cursor";
 import { matchCursorAttempts, type MatchCursor } from "@/lib/matcher/match-cursor";
 import { measureService, recordServiceMetric } from "@/lib/service-metrics";
 
-export function encodeSearchCursor(cursor: SearchCursor) { return serialize(cursor).toString("base64"); }
+export function encodeSearchCursor(cursor: SearchCursor) { return serialize(checkpointSearchCursor(cursor)).toString("base64"); }
 export function decodeSearchCursor(text: string, expectedIdentity: string): SearchCursor {
   const cursor = deserialize(Buffer.from(text, "base64")) as SearchCursor;
   if (cursor.version !== "search-cursor-1" || cursor.identity !== expectedIdentity) throw new Error("Search cursor identity changed");
@@ -14,7 +14,7 @@ export function decodeSearchCursor(text: string, expectedIdentity: string): Sear
 }
 export function encodeMatchCursorBytes(cursor: MatchCursor) {
   const measured = measureService("checkpoint.encode_ms");
-  try { const bytes = deflateSync(serialize(cursor), { level: 1 }); recordServiceMetric("checkpoint.bytes", bytes.byteLength); return bytes; }
+  try { const bytes = deflateSync(serialize({ ...cursor, sellers: cursor.sellers.map(seller => ({ ...seller, cursor: checkpointSearchCursor(seller.cursor) })) }), { level: 1 }); recordServiceMetric("checkpoint.bytes", bytes.byteLength); return bytes; }
   finally { measured(); }
 }
 export function encodeMatchCursor(cursor: MatchCursor) { return encodeMatchCursorBytes(cursor).toString("base64"); }
