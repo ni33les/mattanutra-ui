@@ -1291,8 +1291,8 @@ export type PlanMatchChunk = Readonly<{
   done: boolean; checkpoint: PlanSearchCheckpoint; expansionAttempts: number;
   result?: ReturnType<typeof matchPlan>;
 }>;
-export type BinaryPlanSearchCheckpoint = Omit<PlanSearchCheckpoint, "cursor"> & { cursor: Uint8Array };
-export type ResidentChunkOptions = { checkpoint?: PlanSearchCheckpoint | BinaryPlanSearchCheckpoint; chunkBudget: number; lostAttempts?: number };
+export type BinaryPlanSearchCheckpoint = Omit<PlanSearchCheckpoint, "cursor"> & { cursor?: Uint8Array };
+export type ResidentChunkOptions = { checkpoint?: PlanSearchCheckpoint | BinaryPlanSearchCheckpoint; chunkBudget: number; lostAttempts?: number; persistCheckpoint?: boolean };
 export type ResidentPlanMatchChunk = Omit<PlanMatchChunk, "checkpoint"> & { checkpoint: BinaryPlanSearchCheckpoint; inputTransferred?: boolean };
 /** Worker-sized increments use the identical search and projection as synchronous
  * consumers. The checkpoint is an internal operation fact, never a public job. */
@@ -1316,13 +1316,14 @@ export function createResidentPlanSession(input: Parameters<typeof matchPlan>[0]
   const catalog = { availabilityAsOf: ownedInput.snapshot.availabilityAsOf, catalogueVersion: ownedInput.snapshot.catalogueVersion, products: matcherProductsFor(ownedInput.snapshot) };
   const inputIdentity = planCheckpointInputIdentity(ownedInput);
   if (checkpoint && checkpoint.inputIdentity !== inputIdentity) throw new Error("Plan checkpoint input identity changed");
+  if (checkpoint && !checkpoint.cursor) throw new Error("Search checkpoint unavailable; resident work cannot be recovered");
   // The search clones these groups before adding dynamic quantities. Keep the
   // original compilation for unchanged final diagnostics and seller facts.
   // Recovery already has compiled dynamic groups in its cursor. Defer the
   // original compilation until finalization instead of rebuilding it per replay.
   const compiledGroups = checkpoint ? undefined : compileGroups(orderInvariantRequest(request), catalog);
   const cursor = checkpoint
-    ? decodeMatchCursor(checkpoint.cursor, matchCursorIdentity(request, catalog, DEFAULT_MATCHER_CONFIG))
+    ? decodeMatchCursor(checkpoint.cursor!, matchCursorIdentity(request, catalog, DEFAULT_MATCHER_CONFIG))
     : createMatchCursor(request, catalog, DEFAULT_MATCHER_CONFIG, compiledGroups);
   if (input.state.searchEffort === "expanded" && cursor.effort !== "expanded") expandMatchCursor(cursor);
   return { input: ownedInput, request, cursor, inputIdentity, compiledGroups };
@@ -1350,9 +1351,9 @@ function advanceResidentSearch(session: ResidentSession, options: { chunkBudget:
   return { done: cursor.done, expansionAttempts };
 }
 
-export function advanceResidentPlanSession(session: ResidentSession, options: { chunkBudget: number; lostAttempts?: number }): ResidentPlanMatchChunk {
+export function advanceResidentPlanSession(session: ResidentSession, options: { chunkBudget: number; lostAttempts?: number; persistCheckpoint?: boolean }): ResidentPlanMatchChunk {
   const step = advanceResidentSearch(session, options);
-  const checkpoint = { ...sessionCheckpoint(session), cursor: Uint8Array.from(encodeMatchCursorBytes(session.cursor)) };
+  const checkpoint = { ...sessionCheckpoint(session), ...(options.persistCheckpoint === false ? {} : { cursor: Uint8Array.from(encodeMatchCursorBytes(session.cursor)) }) };
   return { ...step, checkpoint, ...(step.done ? { result: computeMatchPlan({ ...session.input, completedCursor: session.cursor, prepared: { request: session.request, groups: session.compiledGroups } }) } : {}) };
 }
 

@@ -22,7 +22,7 @@ type Job<Input, Result> = {
 type Slot<Input, Result> = { worker: Worker; job?: Job<Input, Result>; affinity?: string; acknowledged?: { releaseMessage: Input }; releaseCpu?: () => void };
 
 export class ThreadPoolUnavailableError extends Error {
-  readonly reason: "capacity" | "timeout" | "worker_failure" | "checkpoint_mismatch";
+  readonly reason: "capacity" | "timeout" | "worker_failure" | "checkpoint_mismatch" | "checkpoint_unavailable";
   constructor(message: string, reason?: ThreadPoolUnavailableError["reason"]) {
     super(message);
     this.reason = reason ?? (/capacity/i.test(message) ? "capacity" : /deadline/i.test(message) ? "timeout" : "worker_failure");

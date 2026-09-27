@@ -1,7 +1,7 @@
 import { MATCH_WORKER_PROTOCOL } from "@/lib/agentic/plan/match-worker-protocol";
 import { resolve } from "node:path";
 import { Worker } from "node:worker_threads";
-import { ThreadPool } from "@/lib/thread-pool";
+import { ThreadPool, ThreadPoolUnavailableError } from "@/lib/thread-pool";
 import type { matchPlan, PlanMatchChunk, PlanSearchCheckpoint, ResidentChunkOptions, ResidentPlanMatchChunk } from "@/lib/agentic/plan/matching";
 import { matcherSafetyCeilings, matcherSafetyCeilingsUnavailable } from "@/lib/matcher/safety-ceilings";
 import { requestLifetime } from "@/lib/request-lifetime";
@@ -17,7 +17,7 @@ export type MatchJob = MatchInput & {
 };
 type MatchValue = MatchResult | PlanMatchChunk | ResidentPlanMatchChunk;
 export type MatchCommand = MatchJob | (Omit<MatchJob, "chunk"> & { protocol: typeof MATCH_WORKER_PROTOCOL; kind: "session-start"; sessionId: string; chunk: ResidentChunkOptions })
-  | { protocol: typeof MATCH_WORKER_PROTOCOL; kind: "session-continue"; sessionId: string; expectedAttempts: number; chunkBudget: number; lostAttempts?: number }
+  | { protocol: typeof MATCH_WORKER_PROTOCOL; kind: "session-continue"; sessionId: string; expectedAttempts: number; chunkBudget: number; lostAttempts?: number; persistCheckpoint?: boolean }
   | { protocol: typeof MATCH_WORKER_PROTOCOL; kind: "session-release"; sessionId: string }
   | { protocol: typeof MATCH_WORKER_PROTOCOL; kind: "prepare" };
 type MatchCompletion = ReferenceJobCompletion<MatchValue> | { prepared: true };
@@ -74,23 +74,27 @@ export class MatchWorkerPool {
     const existing = this.sessions.get(sessionId);
     clearTimeout(existing?.idleTimer);
     const reuse = Boolean(existing && this.pool.hasAffinity(sessionId) && existing.input.state === input.state && existing.input.snapshot === input.snapshot);
+    if (!reuse && chunk.checkpoint && !chunk.checkpoint.cursor) {
+      this.closeResidentSession(sessionId);
+      throw new ThreadPoolUnavailableError("Search checkpoint unavailable; start a new matching operation", "checkpoint_unavailable");
+    }
     const referenceIdentity = reuse ? existing!.referenceIdentity : captureReferenceJobIdentity(input.snapshot.runtimeRevision,
       input.snapshot.products.length > 0 && input.snapshot.products.every(product => product.source === "fixture"));
-    const checkpoint = reuse ? undefined : chunk.checkpoint && typeof chunk.checkpoint.cursor !== "string"
+    const checkpoint = reuse ? undefined : chunk.checkpoint?.cursor instanceof Uint8Array
       ? { ...chunk.checkpoint, cursor: Uint8Array.from(chunk.checkpoint.cursor) } : chunk.checkpoint;
     const command: MatchCommand = reuse ? { protocol: MATCH_WORKER_PROTOCOL, kind: "session-continue", sessionId, expectedAttempts: chunk.checkpoint?.expansionAttempts ?? 0,
-      chunkBudget: chunk.chunkBudget, lostAttempts: chunk.lostAttempts }
+      chunkBudget: chunk.chunkBudget, lostAttempts: chunk.lostAttempts, persistCheckpoint: chunk.persistCheckpoint }
       : { ...input, protocol: MATCH_WORKER_PROTOCOL, kind: "session-start", sessionId, chunk: { ...chunk, checkpoint }, referenceIdentity,
         ceilings: matcherSafetyCeilings(), safetyUnavailable: matcherSafetyCeilingsUnavailable() };
     this.sessions.set(sessionId, { input, referenceIdentity });
     try {
       const result = await this.pool.run(command, signal, 15_000, { affinity: sessionId, beforeStart,
-        ...(!reuse && checkpoint && typeof checkpoint.cursor !== "string" ? { transferList: [checkpoint.cursor.buffer as ArrayBuffer] } : {}) });
+        ...(!reuse && checkpoint?.cursor instanceof Uint8Array ? { transferList: [checkpoint.cursor.buffer as ArrayBuffer] } : {}) });
       if ("prepared" in result) throw new Error("Unexpected matcher preparation response");
       const value = checkedReferenceCompletion(result, referenceIdentity);
-      if (!("done" in value) || !(value.checkpoint.cursor instanceof Uint8Array)) throw new Error("Missing binary session checkpoint");
+      if (!("done" in value) || (chunk.persistCheckpoint === false ? value.checkpoint.cursor !== undefined : !(value.checkpoint.cursor instanceof Uint8Array))) throw new Error("Unexpected session checkpoint format");
       if (value.done) this.closeResidentSession(sessionId);
-      return { ...value, checkpoint: { ...value.checkpoint, cursor: value.checkpoint.cursor }, inputTransferred: !reuse };
+      return { ...value, checkpoint: { ...value.checkpoint, cursor: value.checkpoint.cursor instanceof Uint8Array ? value.checkpoint.cursor : undefined }, inputTransferred: !reuse };
     } catch (error) { this.closeResidentSession(sessionId); throw error; }
   }
   acknowledgeResidentSession(sessionId: string) {

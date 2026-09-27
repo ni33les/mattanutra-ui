@@ -449,6 +449,7 @@ type DurableSearchCheckpoint = {
   // otherwise reorders fact fields. Keep the old object reader for recovery.
   referencesJson?: string;
   references?: MatcherSafetySnapshot;
+  persistSearchCheckpoints?: boolean;
   search?: import("@/lib/agentic/plan/matching").ResidentChunkOptions["checkpoint"];
   reservedAttempts?: number;
 };
@@ -461,10 +462,15 @@ async function durableMatch(input: { snapshot: CatalogueSnapshot; state: Canonic
   const current = await store.getPlanOperation(claim.id);
   const initial = current?.checkpoint as DurableSearchCheckpoint | null;
   if (!initial) throw new Error("Missing normalized operation checkpoint");
+  const persistCheckpoint = initial.persistSearchCheckpoints === true;
+  if (!persistCheckpoint && (initial.search || initial.reservedAttempts)) {
+    throw new MatcherUnavailableError("Search checkpoint unavailable; start a new matching operation", "checkpoint_unavailable");
+  }
   // Recovery with reserved/lost work has its own history and never joins a fresh
   // computation. Fully completed facts can be reused only under identical inputs.
   const scope = claim.command.scope;
   const key = matchingResultIdentity(input, `${scope.environment}:${scope.tenantScope}`)
+    + `:checkpoints:${persistCheckpoint}`
     + (initial.search || initial.reservedAttempts ? `:recovery:${claim.id}:${claim.leaseToken}` : "");
   return durableMatchingWork.run(key, { signal: requestLifetime()?.signal, checkpoint: async event => {
     const checkpoint = { ...event.checkpoint, state: initial.state, catalogueId: initial.catalogueId,
@@ -491,14 +497,16 @@ async function durableMatch(input: { snapshot: CatalogueSnapshot; state: Canonic
       const chunkBudget = Math.min(4_000, Math.max(0, remaining));
       const reserved = { ...checkpoint, stage: "search" as const, reservedAttempts: chunkBudget + lostAttempts };
       const reply = await matchPlanResidentChunkInWorker(sessionId, input,
-        { checkpoint: checkpoint.search, chunkBudget: Math.max(1, chunkBudget), lostAttempts },
+        { checkpoint: checkpoint.search, chunkBudget: Math.max(1, chunkBudget), lostAttempts, persistCheckpoint },
         () => context.notify({ checkpoint: reserved, reserve: true, restoreReservedAttempts: lostAttempts }), context.signal);
       checkpoint = { ...checkpoint, stage: "search", search: reply.checkpoint, reservedAttempts: 0 };
       await context.notify({ checkpoint, reserve: false });
-      acknowledgePlanMatchSession(sessionId);
+      // Only persisted cursors permit eviction/recovery between chunks. With
+      // checkpoints off, keep the existing bounded session until completion.
+      if (persistCheckpoint) acknowledgePlanMatchSession(sessionId);
       lostAttempts = 0;
       console.info("[agentic-plan-checkpoint]", { operationId: claim.id, attempts: reply.expansionAttempts,
-        budget: reply.checkpoint.expansionBudget, checkpointBytes: reply.checkpoint.cursor.length, complete: reply.done });
+        budget: reply.checkpoint.expansionBudget, checkpointBytes: reply.checkpoint.cursor?.length ?? 0, complete: reply.done });
       if (reply.done) {
         if (!reply.result) throw new Error("Completed matcher chunk has no result");
         return reply.result;
@@ -1849,11 +1857,15 @@ async function completePreparedPlan(
   if (activeOperation) {
     const { matcherSafetyReferenceIdentity } = await import("@/lib/matcher/safety-ceilings");
     let checkpoint = activeOperation.checkpoint as DurableSearchCheckpoint | null;
-    if (!checkpoint && state.searchEffort === "expanded" && activeOperation.expectedRevision > 0) {
+    // Pin the policy for this operation. Already-saved legacy cursors retain
+    // their recovery path; new operations default to no cursor serialization.
+    const persistSearchCheckpoints = checkpoint?.persistSearchCheckpoints ??
+      (Boolean(checkpoint?.search?.cursor) || process.env.MATCHER_DURABLE_CHECKPOINTS_ENABLED === "true");
+    if (persistSearchCheckpoints && !checkpoint && state.searchEffort === "expanded" && activeOperation.expectedRevision > 0) {
       const predecessor = await input.store.getCompletedPlanOperation(activeOperation.planId, activeOperation.expectedRevision);
       const candidate = predecessor?.checkpoint as DurableSearchCheckpoint | null;
       const { planCheckpointInputIdentity } = await import("@/lib/agentic/plan/matching");
-      if (candidate?.search?.inputIdentity === planCheckpointInputIdentity({ snapshot, state })) checkpoint = candidate;
+      if (candidate?.search?.cursor && candidate.search.inputIdentity === planCheckpointInputIdentity({ snapshot, state })) checkpoint = candidate;
     }
     if (checkpoint && (checkpoint.catalogueId !== snapshotIdentity ||
       activeOperation.referenceIdentity && activeOperation.referenceIdentity !== matcherSafetyReferenceIdentity()?.fingerprint)) {
@@ -1861,7 +1873,7 @@ async function completePreparedPlan(
     }
     const saved = await updateClaimedOperation(input.store, activeOperation, {
       catalogueIdentity: snapshotIdentity, referenceIdentity: matcherSafetyReferenceIdentity()?.fingerprint ?? null,
-      checkpoint: { ...(activeOperation.checkpoint ? withoutOperationCursor(activeOperation).checkpoint as DurableSearchCheckpoint : checkpoint ?? { stage: "normalized", state, catalogueId: snapshotIdentity }), references: undefined, referencesJson: JSON.stringify(references) }
+      checkpoint: { ...(activeOperation.checkpoint ? withoutOperationCursor(activeOperation).checkpoint as DurableSearchCheckpoint : checkpoint ?? { stage: "normalized", state, catalogueId: snapshotIdentity }), persistSearchCheckpoints, references: undefined, referencesJson: JSON.stringify(references) }
     }, new Date().toISOString());
     if (!saved) return businessError({ reasonCode: "stale_revision", message: "This matching operation was cancelled or superseded. Reload the plan." });
   }
@@ -1904,6 +1916,8 @@ async function completePreparedPlan(
         });
   } catch (error) {
     if (error instanceof MatcherUnavailableError) {
+      if (error.reason === "checkpoint_unavailable") return businessError({ reasonCode: "temporarily_unavailable", retryable: false,
+        nextActions: ["refresh_plan"], message: "Matching was interrupted without a saved search checkpoint. Read the plan and submit an unchanged refinement with a new idempotency key." });
       return businessError({
         message: error.reason === "checkpoint_mismatch" ? "Matching inputs changed. Reload the plan before refining it."
           : error.reason === "capacity" ? "Matching capacity is temporarily occupied. Retry with the same idempotency key."
