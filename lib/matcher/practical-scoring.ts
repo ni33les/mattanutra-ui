@@ -239,7 +239,8 @@ export function overallMatchingScore(request: CanonicalRequest, exposure: Readon
 }
 
 const stateActuals = new WeakMap<SearchState, PracticalActuals>();
-const stateScores = new WeakMap<CanonicalRequest, WeakMap<SearchState["exposure"], { state: SearchState; score: NumericalOverallScore }[]>>();
+type StateScore = { state: SearchState; score: NumericalOverallScore };
+const stateScores = new WeakMap<CanonicalRequest, WeakMap<SearchState["exposure"], StateScore | StateScore[]>>();
 function sameMeasurements(a: SearchState, b: SearchState) {
   return a.pills === b.pills && a.pillCountKnown === b.pillCountKnown && a.count === b.count && a.price === b.price &&
     a.uncertainAdministrationCount === b.uncertainAdministrationCount && a.monthlyPriceMinor === b.monthlyPriceMinor &&
@@ -249,12 +250,15 @@ function sameMeasurements(a: SearchState, b: SearchState) {
 }
 function cachedStateScore(request: CanonicalRequest, state: SearchState) {
   const bucket = stateScores.get(request)?.get(state.exposure);
+  if (bucket && !Array.isArray(bucket)) return bucket.state === state || sameMeasurements(bucket.state, state) ? bucket.score : undefined;
   if (bucket) for (const row of bucket) {
     if (row.state === state || sameMeasurements(row.state, state)) return row.score;
   }
 }
 export function numericalSearchStateScore(request: CanonicalRequest, state: SearchState): NumericalOverallScore {
-  const cached = cachedStateScore(request, state); if (cached) return cached;
+  return cachedStateScore(request, state) ?? calculateSearchStateScore(request, state);
+}
+function calculateSearchStateScore(request: CanonicalRequest, state: SearchState): NumericalOverallScore {
   let actual = stateActuals.get(state);
   if (!actual) { actual = { dailyPills: state.pillCountKnown === false ? null : state.pills,
       pillLowerBound: state.pills, productCount: state.count, priceMinor: state.price, currency: request.currency,
@@ -262,10 +266,10 @@ export function numericalSearchStateScore(request: CanonicalRequest, state: Sear
       monthlyPriceMinor: state.monthlyPriceMinor, monthlyPriceLowerBound: state.monthlyPriceLowerBound }; stateActuals.set(state, actual); }
   const result = numericalOverallMatchingScore(request, state.exposure, actual);
   let cache = stateScores.get(request); if (!cache) { cache = new WeakMap(); stateScores.set(request, cache); }
-  let bucket = cache.get(state.exposure);
-  if (!bucket) { bucket = []; cache.set(state.exposure, bucket); }
-  if (bucket.length >= 8) bucket.shift();
-  bucket.push({ state, score: result });
+  const bucket = cache.get(state.exposure), row = { state, score: result };
+  if (!bucket) cache.set(state.exposure, row);
+  else if (!Array.isArray(bucket)) cache.set(state.exposure, [bucket, row]);
+  else { if (bucket.length >= 8) bucket.shift(); bucket.push(row); }
   return result;
 }
 export function searchStateScore(request: CanonicalRequest, state: SearchState): OverallMatchingScore {
@@ -283,7 +287,7 @@ export function compareSearchStateScores(request: CanonicalRequest, left: Search
     const weight = coefficients(score.profile).objectives.servings;
     if (compare({ num: left.servingBurden.num * weight.num, den: left.servingBurden.den * weight.den }, score.exactTotal) > 0) return 1;
   }
-  return compareOverallScores(numericalSearchStateScore(request, left), score);
+  return compareOverallScores(calculateSearchStateScore(request, left), score);
 }
 export type ComparableOverallScore = Pick<OverallMatchingScore, "profile" | "overallExact"> | Pick<NumericalOverallScore, "profile" | "exactTotal">;
 export function compareOverallScores(left: ComparableOverallScore, right: ComparableOverallScore) {
