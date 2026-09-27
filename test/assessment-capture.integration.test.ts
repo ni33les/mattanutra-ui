@@ -7,6 +7,7 @@ import { createAssessmentResumeDraft, getAssessmentResumeDraft } from "../lib/as
 import { closeSqlPool, getSql, withDatabaseTransaction } from "../lib/db.ts";
 import { createServerQuestionnaireCoordinator } from "../lib/questionnaire/server.ts";
 import { createInitialState, fastForwardQuestionnaire, serializeState } from "../lib/questionnaire/engine.ts";
+import { whileWriterHeld } from "./helpers/held-writer.ts";
 
 const databaseUrl = process.env.TEST_DB_URL;
 assert.ok(databaseUrl, "Assessment capture tests require isolated PostgreSQL");
@@ -70,6 +71,21 @@ describe("shared assessment capture on PostgreSQL", () => {
     await assert.rejects(updateAssessmentContact(randomUUID(), "invalid"), { code: "invalid_email" });
     const first = await captureAssessment(body, request()); plans.push(first.planId);
     await assert.rejects(captureAssessment({ ...body, expectedRevision: 0 }, request(first.planId)), { code: "assessment_changed" });
+  });
+  it("LOCK-REDUNDANT-03 completed capture replays without locking its receipt or session", async () => {
+    const options = request(), first = await captureAssessment(body, options); plans.push(first.planId);
+    const result = await whileWriterHeld(getSql()!, tx => tx`select request_key from funnel_requests
+      where scope='assessment-capture' and request_key=${options.idempotencyKey} for update`,
+    () => captureAssessment(body, options));
+    assert.deepEqual(result, first);
+    await assert.rejects(captureAssessment({ ...body, answers: { ...body.answers, goals: ["sleep"] } }, options), { code: "idempotency_conflict" });
+  });
+  it("LOCK-REDUNDANT-05 generation retry uses its immutable revision without an assessment read lock", async () => {
+    const first = await captureAssessment(body, request()); plans.push(first.planId);
+    const result = await whileWriterHeld(getSql()!, tx => tx`select plan_id from assessments where plan_id=${first.planId} for no key update`,
+      () => retryAssessmentHealthScore(first.planId, "en"));
+    assert.equal(result.revision, first.revision); assert.ok(result.taskId);
+    assert.equal((await retryAssessmentHealthScore(first.planId, "en")).taskId, result.taskId);
   });
   it("creates only the ID reserved by a valid resume token and preserves payment context", async () => {
     const paymentId = randomUUID(); payments.push(paymentId);

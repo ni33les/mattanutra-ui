@@ -6,8 +6,9 @@ import { closeSqlPool, getSql, withDatabaseTransaction } from "../lib/db.ts";
 import { claimPaidReservation, markPaymentCancelled, updatePaymentState } from "../lib/stripe-payments.ts";
 
 const databaseUrl = process.env.TEST_DB_URL;
+assert.ok(databaseUrl, "Payment transition tests require isolated PostgreSQL");
 
-describe("web payment integrity on PostgreSQL", { skip: !databaseUrl }, () => {
+describe("web payment integrity on PostgreSQL", () => {
   const ids: string[] = [];
   const plans: string[] = [];
   before(async () => {
@@ -96,5 +97,15 @@ describe("web payment integrity on PostgreSQL", { skip: !databaseUrl }, () => {
     const [row] = await sql`select status, plan_id from public.payments where id = ${id}::uuid`;
     assert.deepEqual(row, { status: "paid", plan_id: null });
     assert.equal((await sql`select count(*)::int as n from public.payment_versions where payment_id = ${id}::uuid`)[0].n, 0);
+  });
+
+  it("LOCK-REDUNDANT-01 binding reads its payment under one fence and appends one version", async () => {
+    const { withServiceMeasurements, serviceMeasurements } = await import("../lib/service-metrics.ts");
+    const id = await seed(), planId = await seedPlan(), sql = getSql()!;
+    await withServiceMeasurements(async () => {
+      assert.equal((await claimPaidReservation(sql, id, planId))?.payment.status, "bound");
+      assert.equal(serviceMeasurements()["db.lock_statement_client_ms"]?.count, 1);
+    });
+    assert.equal((await sql`select count(*)::int as n from payment_versions where payment_id=${id}`)[0].n, 1);
   });
 });

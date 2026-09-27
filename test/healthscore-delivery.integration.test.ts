@@ -9,9 +9,11 @@ import { FUNNEL_GENERATOR_VERSION } from "../lib/assessment-revisions.ts";
 import { applyTaskCompletionResult } from "../lib/task-result-applier.ts";
 import { getTaskBundle } from "../lib/task-service.ts";
 import { completeHealthScoreFixture } from "./fixtures/healthscore.ts";
+import { whileWriterHeld } from "./helpers/held-writer.ts";
 
 const databaseUrl = process.env.TEST_DB_URL;
-describe("durable HealthScore delivery", { skip: !databaseUrl }, () => {
+assert.ok(databaseUrl, "Delivery tests require isolated PostgreSQL");
+describe("durable HealthScore delivery", () => {
   const plans: string[] = [];
   before(async () => {
     const url = new URL(databaseUrl!);
@@ -101,5 +103,30 @@ describe("durable HealthScore delivery", { skip: !databaseUrl }, () => {
     }
     assert.match(healthScoreDeliveryEmail("zh-CN", "fixture-plan").subject, /你的/);
     assert.match(healthScoreDeliveryEmail("th", "fixture-plan").subject, /ของคุณ/);
+  });
+  it("LOCK-REDUNDANT-04 terminal email replay never locks or sends again", async () => {
+    const p = await plan(), sql = getSql()!;
+    const request = await requestHealthScoreDelivery(p.planId, { locale: "en", email: "terminal@fixture.test" });
+    for (const status of ["sent", "unknown", "superseded"]) {
+      await sql`update healthscore_delivery_requests set status=${status} where id=${request.id}`;
+      const result = await whileWriterHeld(sql, async tx => {
+        await tx`select plan_id from assessments where plan_id=${p.planId} for no key update`;
+        await tx`select id from healthscore_delivery_requests where id=${request.id} for update`;
+      }, () => deliverHealthScore(request.id, async () => { throw new Error("Terminal delivery must not send"); }));
+      assert.equal(result.status, status);
+    }
+  });
+  it("LOCK-REDUNDANT-04B ready delivery admission claims by update and reuses its durable task", async () => {
+    const p = await plan(true), sql = getSql()!, id = randomUUID();
+    await sql`insert into healthscore_delivery_requests(id,plan_id,revision,locale,email) values(${id},${p.planId},${p.revision},'en','queue@fixture.test')`;
+    const { withServiceMeasurements, serviceMeasurements } = await import("../lib/service-metrics.ts");
+    await withServiceMeasurements(async () => {
+      await withDatabaseTransaction(sql, tx => enqueueReadyHealthScoreDeliveries(tx, p.planId, p.revision, "en"));
+      assert.equal(serviceMeasurements()["db.lock_statement_client_ms"]?.count ?? 0, 0);
+    });
+    const [before] = await sql`select status,task_id from healthscore_delivery_requests where id=${id}`;
+    assert.equal(before.status, "queued"); assert.ok(before.task_id);
+    await withDatabaseTransaction(sql, tx => enqueueReadyHealthScoreDeliveries(tx, p.planId, p.revision, "en"));
+    assert.deepEqual((await sql`select status,task_id from healthscore_delivery_requests where id=${id}`)[0], before);
   });
 });

@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { after, before, describe, it } from "node:test";
 import { closeSqlPool, getSql, getWorkerSql, withDatabaseTransaction } from "../lib/db.ts";
-import { completeTask, reserveNextTask, releaseExpiredReservations, renewTaskLease, failTask, releaseReservedTaskToQueue } from "../lib/task-service.ts";
+import { completeTask, reserveNextTask, releaseExpiredReservations, renewTaskLease, reportTaskProgress, failTask, releaseReservedTaskToQueue } from "../lib/task-service.ts";
 import type { TaskAgentAccessScope } from "../lib/task-service-types.ts";
 import postgres from "postgres";
 
@@ -86,6 +86,26 @@ describe("task lifecycle transactions on PostgreSQL", () => {
       assert.equal(completed.status, "completed");
       assert.equal(serviceMeasurements()["db.lock_statement_client_ms"]?.count, 1);
     });
+  });
+  it("LOCK-REDUNDANT-06 renewal and progress need no separate locking read", async () => {
+    const input = await reserved();
+    const { withServiceMeasurements, serviceMeasurements } = await import("../lib/service-metrics.ts");
+    await withServiceMeasurements(async () => {
+      const renewed = await renewTaskLease({ ...input, leaseSeconds: 300 });
+      assert.equal(renewed.reservationId, input.reservationId);
+      const progressed = await reportTaskProgress({ ...input, resultPayload: { progress: 12 } });
+      assert.equal((progressed.task.resultPayload as {progress: number}).progress, 12);
+      assert.equal(serviceMeasurements()["db.lock_statement_client_ms"]?.count ?? 0, 0);
+    });
+  });
+  it("LOCK-REDUNDANT-06B an old reservation cannot renew a same-agent replacement", async () => {
+    const input = await reserved();
+    await releaseReservedTaskToQueue(input);
+    const next = await reserveNextTask({accessScope: scope, agent: {id: agentId, name: scope.agentName}, workerSessionId: sessionId, taskId: input.taskId});
+    assert.ok(next); assert.notEqual(next.reservationId, input.reservationId);
+    await assert.rejects(renewTaskLease(input), /renewable/);
+    await assert.rejects(reportTaskProgress({ ...input, resultPayload: { stale: true } }), /progress-reportable/);
+    assert.equal((await renewTaskLease({ ...input, reservationId: next.reservationId })).reservationId, next.reservationId);
   });
 
   it("LOCK-TASK-01 result preparation occurs before the task lock and the prepared payload is used once", async () => {

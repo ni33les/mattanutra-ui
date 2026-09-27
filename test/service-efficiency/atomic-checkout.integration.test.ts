@@ -13,6 +13,7 @@ import {matcherSafetyCeilings,setMatcherSafetyCeilings} from "../../lib/matcher/
 import {catalogueRecordFingerprint} from "../../lib/catalogue-corrections.ts";
 import {installGoldCatalogue,uninstallGoldCatalogue} from "../helpers/gold-catalogue.ts";
 import {runtime,rpcWithTaskExecutor} from "../ax-refinement/helpers.ts";
+import { whileWriterHeld } from "../helpers/held-writer.ts";
 assert.ok(process.env.TEST_DB_URL,"Isolated PostgreSQL is mandatory");
 const url=new URL(process.env.TEST_DB_URL);assert.equal(url.hostname,"127.0.0.1");assert.match(url.pathname,/^\/mattanutra_lock_review_ax_/);
 const sql=postgres(url.href,{max:4,prepare:false});after(async()=>{uninstallGoldCatalogue();resetExecuteLockState();await closeSqlPool();await sql.end();});
@@ -67,4 +68,31 @@ test("LOCK-ATOMIC-02 simultaneous checkout owns one frozen order and stale catal
       throw rollback;
     }),error=>error===rollback);
   } finally {release();resetExecuteLockState();await Promise.allSettled(calls);await app.store.deletePrincipalScope(app.scope.principalScope!);}
+});
+
+test("LOCK-REDUNDANT-02 existing checkout reuse reads its immutable receipt while the order is locked", {timeout:15000}, async () => {
+  const app = await fixture();
+  try {
+    const plan = await rpcWithTaskExecutor(app, "plan", { idempotencyKey:"locking-reuse-read", ...publicRequest({...request, requirements:{productDoses:[{productId:"prd_b1111111111111111111111111111111",servingsPerDay:1}]}}) });
+    assert.equal(plan.status, "ready", JSON.stringify(plan));
+    const call = { ...app, now:app.now!, planHandle:String(plan.planHandle), expectedRevision:Number(plan.revision), idempotencyKey:"locking-reuse-create" };
+    const first = await executeTool(call); assert.equal(first.ok, true, JSON.stringify(first));
+    const [planId] = await app.store.listPlanIdsByPrincipal(app.scope.principalScope!);
+    const [order] = await sql`select id from agentic_orders where plan_id=${planId}`; assert.ok(order);
+    const replay = await whileWriterHeld(sql, tx => tx`select id from agentic_orders where id=${order.id} for update`,
+      () => executeTool({...call,idempotencyKey:"locking-reuse-new-key"}));
+    assert.deepEqual(JSON.parse(JSON.stringify(replay)), JSON.parse(JSON.stringify(first)));
+  } finally { await app.store.deletePrincipalScope(app.scope.principalScope!); }
+});
+
+test("LOCK-REDUNDANT-07 checkout observes a committed catalogue snapshot without waiting for its writer", {timeout:15000}, async () => {
+  const app = await fixture();
+  try {
+    const plan = await rpcWithTaskExecutor(app, "plan", { idempotencyKey:"locking-snapshot-read", ...publicRequest({...request, requirements:{productDoses:[{productId:"prd_b1111111111111111111111111111111",servingsPerDay:1}]}}) });
+    assert.equal(plan.status, "ready", JSON.stringify(plan));
+    const call = { ...app, now:app.now!, planHandle:String(plan.planHandle), expectedRevision:Number(plan.revision), idempotencyKey:"locking-snapshot-checkout" };
+    const first = await whileWriterHeld(sql, tx => tx`update catalogue_runtime_revision set revision=revision+1 where singleton`, () => executeTool(call));
+    assert.equal(first.ok, true, JSON.stringify(first));
+    assert.deepEqual(JSON.parse(JSON.stringify(await executeTool({...call,idempotencyKey:"locking-snapshot-replay"}))), JSON.parse(JSON.stringify(first)));
+  } finally { await app.store.deletePrincipalScope(app.scope.principalScope!); }
 });

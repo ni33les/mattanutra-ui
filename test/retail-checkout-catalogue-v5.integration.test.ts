@@ -7,7 +7,7 @@ import { currentWebCheckoutSelection, lockCurrentWebCheckoutRecommendations } fr
 import { MATCHER_VERSION } from '../lib/matcher/config.ts';
 import { FUNNEL_GENERATOR_VERSION } from '../lib/assessment-revisions.ts';
 
-it('V5-CHECKOUT-PG-01: new checkout holds catalogue epoch stable until its short intent transaction commits', async () => {
+it('V5-CHECKOUT-PG-01: new checkout validates its snapshot without fencing unrelated catalogue writers', async () => {
   const databaseUrl = process.env.TEST_DB_URL;
   assert.ok(databaseUrl, 'The maintained PostgreSQL gate must provide an isolated TEST_DB_URL');
   fixtureDatabaseUrl();
@@ -49,15 +49,12 @@ it('V5-CHECKOUT-PG-01: new checkout holds catalogue epoch stable until its short
       await tx`update public.catalogue_runtime_revision set revision = revision + 1 where singleton = true`;
       throw rollback;
     }).catch(error => { if (error !== rollback) throw error; });
-    const pid = await updaterReady;
-    let blocked = false;
-    const deadline = Date.now() + 2000;
-    while (Date.now() < deadline) {
-      const [row] = await sql<Array<{ blockers: number[] }>>`select pg_blocking_pids(${pid}) as blockers`;
-      if (row!.blockers.length) { blocked = true; break; }
-      await new Promise(resolve => setTimeout(resolve, 10));
-    }
-    assert.equal(blocked, true, 'A concurrent catalogue update must wait for the new checkout intent transaction');
+    await updaterReady;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      const finished = await Promise.race([updating.then(() => true), new Promise<false>(resolve => { timer=setTimeout(() => resolve(false),1000); })]);
+      assert.equal(finished, true, 'An unrelated catalogue writer must finish before the checkout transaction commits');
+    } finally { if (timer) clearTimeout(timer); }
     release(); await holding; await updating;
     const [after] = await sql<Array<{ revision: string }>>`select revision::text from public.catalogue_runtime_revision where singleton = true`;
     assert.equal(after!.revision, epoch.revision, 'The concurrency probe never commits a catalogue mutation');
