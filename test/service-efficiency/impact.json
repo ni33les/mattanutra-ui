@@ -4,6 +4,12 @@
   "testPolicy": "Scoped RED/GREEN and affected consumers only. No skipped, focused, todo, cancelled, retried or empty cases. Full application/MCP acceptance excluded.",
   "files": [
     {
+      "file": "test/service-efficiency/checkpoint-flag.test.ts",
+      "slice": "checkpoint-flag",
+      "expectedCases": 6,
+      "reason": "CKPT-FLAG-01–03: default-off durable cursors, zero checkpoint encoding, identical standard/expanded search, explicit lost-session failure and opt-in persistence"
+    },
+    {
       "file": "test/service-efficiency/measurements.test.ts",
       "slice": "measurements",
       "expectedCases": 5,
