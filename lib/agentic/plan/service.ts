@@ -500,7 +500,10 @@ async function durableMatch(input: { snapshot: CatalogueSnapshot; state: Canonic
         { checkpoint: checkpoint.search, chunkBudget: Math.max(1, chunkBudget), lostAttempts, persistCheckpoint },
         () => context.notify({ checkpoint: reserved, reserve: true, restoreReservedAttempts: lostAttempts }), context.signal);
       checkpoint = { ...checkpoint, stage: "search", search: reply.checkpoint, reservedAttempts: 0 };
-      await context.notify({ checkpoint, reserve: false });
+      // Without a recoverable cursor, the previous reservation already accounts
+      // for this chunk. Persist its progress with the next capacity-granted
+      // reservation, or now on completion; never reserve future work early.
+      if (persistCheckpoint || reply.done) await context.notify({ checkpoint, reserve: false });
       // Only persisted cursors permit eviction/recovery between chunks. With
       // checkpoints off, keep the existing bounded session until completion.
       if (persistCheckpoint) acknowledgePlanMatchSession(sessionId);
