@@ -15,9 +15,15 @@ const url = new URL(process.env.TEST_DB_URL);
 assert.equal(url.hostname, "127.0.0.1"); assert.match(url.pathname, /^\/mattanutra_lock_review_ax_/);
 assert.ok(url.port && url.port !== "5432");
 const sql = postgres(url.href, { max: 3, prepare: false });
-after(async () => { resetPlanCreateInflightForTests(); uninstallRealCatalogue(); await sql.end(); await closeSqlPool(); });
+const originalCheckpointFlag = process.env.MATCHER_DURABLE_CHECKPOINTS_ENABLED;
+after(async () => {
+  if (originalCheckpointFlag === undefined) delete process.env.MATCHER_DURABLE_CHECKPOINTS_ENABLED;
+  else process.env.MATCHER_DURABLE_CHECKPOINTS_ENABLED = originalCheckpointFlag;
+  resetPlanCreateInflightForTests(); uninstallRealCatalogue(); await sql.end(); await closeSqlPool();
+});
 
 test("AXR-REL-03 expanded PostgreSQL refinement resumes a lost checkpoint at a refreshed observation clock", { timeout: 200000 }, async () => {
+  process.env.MATCHER_DURABLE_CHECKPOINTS_ENABLED = "true";
   process.env.AX_REFINEMENT_REAL_WORKERS = "1";
   const frozen = await installRealCatalogue("dev"); useLiveServiceClock();
   const [epoch] = await sql`select revision from public.catalogue_runtime_revision where singleton=true`;

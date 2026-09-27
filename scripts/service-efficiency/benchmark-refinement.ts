@@ -20,6 +20,7 @@ const session = createResidentPlanSession(frozen), initializationMs = performanc
 const chunks = []; let result;
 do {
   const t = performance.now(); result = advanceResidentPlanSession(session, { chunkBudget: 4000 });
+  assert.ok(result.checkpoint.cursor, 'This diagnostic exercises the explicit checkpoint path');
   chunks.push({ durationMs: performance.now() - t, attempts: result.expansionAttempts, checkpointBytes: result.checkpoint.cursor.byteLength });
   assert.ok(chunks.length <= 17, 'Unexpected extra continuation');
 } while (!result.done);

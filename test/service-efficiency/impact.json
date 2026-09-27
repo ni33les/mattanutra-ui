@@ -6,8 +6,8 @@
     {
       "file": "test/service-efficiency/checkpoint-flag.test.ts",
       "slice": "checkpoint-flag",
-      "expectedCases": 6,
-      "reason": "CKPT-FLAG-01–03: default-off durable cursors, zero checkpoint encoding, identical standard/expanded search, explicit lost-session failure and opt-in persistence"
+      "expectedCases": 7,
+      "reason": "CKPT-FLAG-01–04: default-off durable cursors, zero checkpoint encoding, identical standard/expanded search, explicit interruption/replay failure and opt-in persistence"
     },
     {
       "file": "test/service-efficiency/measurements.test.ts",
