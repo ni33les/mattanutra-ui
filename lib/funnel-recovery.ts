@@ -8,6 +8,7 @@ import { enqueueAssessmentPregenerationTasks, enqueueHealthScoreAnalysisTask, en
 import { enqueueWebPaymentFulfillment } from "@/lib/web-payment-fulfillment";
 import { fulfillCheckoutSession, type PaymentRow } from "@/lib/stripe-payments";
 import { FunnelError } from "@/lib/funnel-errors";
+import { preparePaymentFulfillment } from "@/lib/payment-fulfillment-evidence";
 
 /** Explicit recovery: no charge creation, and no render-time task scheduling. */
 export async function recoverFunnelWork(planId: string, locale: unknown, refreshOnly = false) {
@@ -16,22 +17,23 @@ export async function recoverFunnelWork(planId: string, locale: unknown, refresh
   const [legacy] = await sql<PaymentRow[]>`select * from public.payments where plan_id = ${planId}::uuid
     and paid_at is not null and status = 'fulfillment_failed' order by created_at desc limit 1`;
   if (legacy?.stripe_checkout_session_id) await fulfillCheckoutSession(legacy.stripe_checkout_session_id, { source: "return_page" });
-  await withDatabaseTransaction(sql, async tx => {
-    const [assessment] = await tx`select selected_plan, answers from public.assessments where plan_id = ${planId}::uuid for no key update`;
-    if (!assessment) throw new FunnelError("Assessment not found", 404, "assessment_not_found");
-    const generation = await loadGenerationInput(tx, planId, locale);
-    if (!generation) throw new FunnelError("Assessment changed; please retry", 409, "assessment_changed");
-    await withGenerationInput(planId, generation, async () => {
-      const [payment] = await tx<PaymentRow[]>`select * from public.payments where plan_id = ${planId}::uuid
-        and status in ('paid', 'bound') order by created_at desc limit 1 for update`;
-      if (payment) await enqueueWebPaymentFulfillment(tx, payment);
-      if (!refreshOnly) {
-        await enqueueHealthScoreAnalysisTask({ planId, locale });
-        if (assessment.selected_plan) await enqueueNutritionPlanTasks({ planId, plan: assessment.selected_plan, answers: generation.answers, locale });
-        else if (payment) await enqueueAssessmentPregenerationTasks({ planId, answers: generation.answers, locale });
-      }
-      if (assessment.selected_plan) await ensureFreshProductRecommendationsForReveal(planId);
-    });
+  const [assessment] = await sql`select selected_plan from public.assessments where plan_id = ${planId}::uuid`;
+  if (!assessment) throw new FunnelError("Assessment not found", 404, "assessment_not_found");
+  const generation = await loadGenerationInput(sql, planId, locale);
+  if (!generation) throw new FunnelError("Assessment changed; please retry", 409, "assessment_changed");
+  await withGenerationInput(planId, generation, async () => {
+    const [payment] = await sql<PaymentRow[]>`select * from public.payments where plan_id = ${planId}::uuid
+      and status in ('paid', 'bound') order by created_at desc limit 1`;
+    if (payment) {
+      const prepared = await preparePaymentFulfillment(sql, payment);
+      if (prepared.evidence.status !== "complete") await withDatabaseTransaction(sql, tx => enqueueWebPaymentFulfillment(tx, payment, prepared));
+    }
+    if (!refreshOnly) {
+      await enqueueHealthScoreAnalysisTask({ planId, locale });
+      if (assessment.selected_plan) await enqueueNutritionPlanTasks({ planId, plan: assessment.selected_plan, answers: generation.answers, locale, recovery: generation });
+      else if (payment) await enqueueAssessmentPregenerationTasks({ planId, answers: generation.answers, locale });
+    }
+    if (assessment.selected_plan) await ensureFreshProductRecommendationsForReveal(planId);
   });
   const readiness = await getFunnelReadiness(planId, locale);
   if (refreshOnly && readiness) await recoverMissingFunnelGeneration({ planId, locale,

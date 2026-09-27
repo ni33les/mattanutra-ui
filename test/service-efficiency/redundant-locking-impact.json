@@ -1,0 +1,298 @@
+{
+  "scope": "redundant_locking_reads",
+  "releaseBase": "c8c67d299702824cd9f206f5da0bbb2b0ee7a492",
+  "testPolicy": "Run the reviewed affected files through the existing runBatch/execution-proof utilities. No automatic retries, skipped/focused/todo/cancelled or missing cases. No full suite.",
+  "files": [
+    {
+      "file": "test/web-payment-transitions.integration.test.ts",
+      "expectedCases": 5,
+      "database": true,
+      "slice": "consumers",
+      "reason": "Cancellation versus confirmation and atomic reservation binding"
+    },
+    {
+      "file": "test/assessment-capture.integration.test.ts",
+      "reason": "Capture and retry generation admission remains transactional and preserves input identity",
+      "expectedCases": 11
+    },
+    {
+      "file": "test/healthscore-delivery.integration.test.ts",
+      "slice": "email",
+      "database": true,
+      "expectedCases": 6,
+      "reason": "Persisted advice readiness must preserve durable delivery, rejection, ambiguous acceptance and provider acknowledgement"
+    },
+    {
+      "file": "test/task-transactions.integration.test.ts",
+      "slice": "task-transactions",
+      "database": true,
+      "expectedCases": 17,
+      "reason": "Task admission/rollback, reservation fencing, deferred matching ownership and exact replay through the existing worker completion boundary"
+    },
+    {
+      "file": "test/service-efficiency/atomic-checkout.integration.test.ts",
+      "slice": "atomic-checkout",
+      "expectedCases": 4,
+      "database": true,
+      "reason": "Actual concurrent PostgreSQL admission and checkout preserve one durable resource and immutable frozen recovery without process queues"
+    },
+    {
+      "file": "test/retail-checkout-catalogue-v5.integration.test.ts",
+      "slice": "checkout-fence",
+      "database": true,
+      "expectedCases": 1,
+      "reason": "Prepared checkout publication, immutable frozen replay, short current catalogue/revision checks and pharmacy ownership/read contention"
+    },
+    {
+      "file": "test/practical-matching/checkout.test.ts",
+      "slice": "checkout-fence",
+      "database": false,
+      "expectedCases": 5,
+      "reason": "Prepared checkout publication, immutable frozen replay, short current catalogue/revision checks and pharmacy ownership/read contention"
+    },
+    {
+      "file": "test/retail-checkout-catalogue-v5.test.ts",
+      "slice": "checkout-fence",
+      "database": false,
+      "expectedCases": 4,
+      "reason": "Prepared checkout publication, immutable frozen replay, short current catalogue/revision checks and pharmacy ownership/read contention"
+    },
+    {
+      "file": "test/service-efficiency/reads.integration.test.ts",
+      "expectedCases": 6,
+      "slice": "reads",
+      "database": true,
+      "reason": "Shared read projections remain nonlocking under held writer locks and retain two-small-SELECT behaviour."
+    },
+    {
+      "file": "test/service-efficiency/reads.test.ts",
+      "slice": "reads",
+      "expectedCases": 6,
+      "reason": "Lockless projection reads, unchanged versions, preserved expiry state and full conversation compatibility"
+    },
+    {
+      "file": "test/service-efficiency/funnel-reads.integration.test.ts",
+      "slice": "funnel-reads",
+      "database": true,
+      "expectedCases": 2,
+      "reason": "Read-only funnel status under held assessment writes, compact locale-specific advice gates and invalidated legacy projections"
+    },
+    {
+      "file": "test/service-efficiency/checkout-preparation.test.ts",
+      "slice": "checkout-preparation",
+      "expectedCases": 2,
+      "reason": "Audits 2/3/6/15: external payment preparation before locks, current commercial publication fence, unchanged frozen checkout recovery"
+    },
+    {
+      "file": "test/service-efficiency/transactions.test.ts",
+      "expectedCases": 4,
+      "slice": "signals",
+      "database": false,
+      "reason": "Shared transaction context, rollback and dependency retries preserve after-commit effect ownership."
+    },
+    {
+      "file": "test/service-efficiency/lock-register.test.ts",
+      "slice": "lock-register",
+      "expectedCases": 4,
+      "reason": "All 39 mechanisms have reviewed boundaries and tests; discover SQL locks and reject unregistered additions"
+    },
+    {
+      "file": "test/service-efficiency/result-preparation.test.ts",
+      "slice": "result-preparation",
+      "expectedCases": 5,
+      "reason": "Audits 1/10/11: prepare immutable product rows, localized presentation and HealthScore hashes outside task/assessment publication locks"
+    },
+    {
+      "file": "test/service-efficiency/retained-claims.integration.test.ts",
+      "slice": "retained-claims",
+      "database": true,
+      "expectedCases": 4,
+      "reason": "Audits 19/20/21: actual outbox and scheduled-action disjoint claims, dependency cycle serialization, FK protection and nonblocking reads"
+    },
+    {
+      "file": "test/worker-boundary.test.ts",
+      "slice": "worker-boundary",
+      "expectedCases": 12,
+      "reason": "Preserve the external worker API boundary, real profile registrations and direct platform import restrictions"
+    },
+    {
+      "file": "test/db-transactions.integration.test.ts",
+      "slice": "db-consumers",
+      "database": true,
+      "expectedCases": 6,
+      "reason": "Managed-pool transaction-local timeouts, shared transaction ownership and cancellation recovery"
+    },
+    {
+      "file": "test/web-payment-fulfillment.integration.test.ts",
+      "expectedCases": 4,
+      "database": true,
+      "slice": "consumers",
+      "reason": "Atomic confirmation, interrupted scheduling and duplicate checkout recovery"
+    },
+    {
+      "file": "test/web-payment-webhooks.integration.test.ts",
+      "expectedCases": 1,
+      "database": true,
+      "slice": "consumers",
+      "reason": "Duplicate webhook event resumes incomplete confirmation"
+    },
+    {
+      "file": "test/funnel-readiness.integration.test.ts",
+      "expectedCases": 6,
+      "database": true,
+      "slice": "consumers",
+      "reason": "Effective fulfillment readiness with unchanged generation and payment gating"
+    },
+    {
+      "file": "test/retail-checkout-session.integration.test.ts",
+      "expectedCases": 9,
+      "reason": "Existing online checkout session replay remains intact beside unpaid pharmacy orders",
+      "database": true,
+      "slice": "orders"
+    },
+    {
+      "file": "test/pharmacy-orders.integration.test.ts",
+      "expectedCases": 7,
+      "reason": "Existing unpaid order replay, ownership and frozen receipt recovery",
+      "database": true
+    },
+    {
+      "file": "test/web-advisory.integration.test.ts",
+      "slice": "web-publication",
+      "database": true,
+      "expectedCases": 9,
+      "reason": "Web catalogue snapshot publication, preserved immutable reference identities, preferences/revision concurrency and explicit recovery without read maintenance"
+    },
+    {
+      "file": "test/agentic-catalogue-publish-v5.integration.test.ts",
+      "slice": "snapshots-pg",
+      "database": true,
+      "expectedCases": 1,
+      "reason": "V5-PUBLISH-PG-01: publication completes behind epoch writer while immutable result remains stale after writer commits"
+    },
+    {
+      "file": "test/payment-replay/accounting.integration.test.ts",
+      "expectedCases": 5,
+      "database": true,
+      "slice": "accounting",
+      "reason": "Write-once revenue and fee accounting, exact conflicts and FX preservation"
+    },
+    {
+      "file": "test/payment-replay/concurrency.integration.test.ts",
+      "expectedCases": 7,
+      "database": true,
+      "slice": "accounting",
+      "reason": "Concurrent unique booking, prepared admission and nonlocking ordinary reads"
+    },
+    {
+      "file": "test/payment-replay/recovery.integration.test.ts",
+      "expectedCases": 9,
+      "database": true,
+      "slice": "recovery",
+      "reason": "Same-payment historical recovery, webhook replay, binding and stale workers"
+    },
+    {
+      "file": "test/stripe-payments.test.ts",
+      "expectedCases": 11,
+      "reason": "Read-only session recovery shares the existing payment store; preserve confirmation, accounting and checkout invariants",
+      "database": false,
+      "slice": "payment-return"
+    },
+    {
+      "file": "test/mock-payment-static.test.ts",
+      "expectedCases": 1,
+      "reason": "Mock confirmation uses the existing owned payment transition and durable admission."
+    }
+  ],
+  "requirements": {
+    "LOCK-REDUNDANT-01": {
+      "changed": [
+        "lib/stripe-payments.ts"
+      ],
+      "tests": [
+        "test/web-payment-transitions.integration.test.ts",
+        "test/payment-replay/recovery.integration.test.ts",
+        "test/web-payment-fulfillment.integration.test.ts",
+        "test/web-payment-webhooks.integration.test.ts"
+      ],
+      "reason": "Reuse already-owned payment rows; keep state, accounting and binding invariants."
+    },
+    "LOCK-REDUNDANT-02": {
+      "changed": [
+        "lib/agentic/commerce/execute.ts",
+        "lib/agentic/store/postgres.ts",
+        "lib/agentic/store/memory.ts",
+        "lib/agentic/store/types.ts"
+      ],
+      "tests": [
+        "test/service-efficiency/atomic-checkout.integration.test.ts",
+        "test/service-efficiency/reads.integration.test.ts"
+      ],
+      "reason": "Receipt reuse is a snapshot read; creation and order mutation remain atomic."
+    },
+    "LOCK-REDUNDANT-03": {
+      "changed": [
+        "lib/funnel-idempotency.ts",
+        "lib/assessment-capture.ts"
+      ],
+      "tests": [
+        "test/assessment-capture.integration.test.ts",
+        "test/retail-checkout-session.integration.test.ts"
+      ],
+      "reason": "Read completed receipts directly; preserve conflicting/incomplete claims."
+    },
+    "LOCK-REDUNDANT-04": {
+      "changed": [
+        "lib/healthscore-delivery.ts"
+      ],
+      "tests": [
+        "test/healthscore-delivery.integration.test.ts"
+      ],
+      "reason": "Terminal no-op reads; conditional queue claim, task rollback and ambiguous delivery semantics."
+    },
+    "LOCK-REDUNDANT-05": {
+      "changed": [
+        "lib/funnel-recovery.ts",
+        "lib/funnel-generation-recovery.ts",
+        "lib/task-worker.ts",
+        "lib/domain-versions.ts"
+      ],
+      "tests": [
+        "test/assessment-capture.integration.test.ts",
+        "test/web-advisory.integration.test.ts",
+        "test/funnel-readiness.integration.test.ts",
+        "test/service-efficiency/result-preparation.test.ts"
+      ],
+      "reason": "Prepare outside assessment locks; condition publication on unchanged revision, tuple and recovery selection."
+    },
+    "LOCK-REDUNDANT-06": {
+      "changed": [
+        "lib/task-service.ts"
+      ],
+      "tests": [
+        "test/task-transactions.integration.test.ts",
+        "test/worker-boundary.test.ts",
+        "test/service-efficiency/retained-claims.integration.test.ts"
+      ],
+      "reason": "Single-statement normal activity with existing task-fence fallback on a raced tuple; stale generation cannot be admitted unversioned."
+    },
+    "LOCK-REDUNDANT-07": {
+      "changed": [
+        "lib/retail-product-checkout.ts",
+        "lib/pharmacy-orders.ts",
+        "lib/agentic/store/postgres.ts"
+      ],
+      "tests": [
+        "test/retail-checkout-catalogue-v5.integration.test.ts",
+        "test/service-efficiency/atomic-checkout.integration.test.ts",
+        "test/pharmacy-orders.integration.test.ts",
+        "test/practical-matching/checkout.test.ts"
+      ],
+      "reason": "Accept a committed catalogue snapshot without blocking writers; reject already-stale admission and preserve frozen quotes."
+    }
+  },
+  "benchmarks": {
+    "database": "30 trials per changed path, identical isolated PostgreSQL and host; first warm-up excluded, two runs each",
+    "matcher": "Frozen D3, Daniel initial/refinement, Maya initial/expanded with identical CPU/memory limits and completed cache misses. Full semantic hashes, budgets and checkpoint flags must match."
+  }
+}

@@ -196,18 +196,17 @@
     },
     {
       "number": 5,
-      "resource": "Order mutation / checkout reuse \u2014 FOR UPDATE",
+      "resource": "Order mutation \u2014 FOR UPDATE; receipt reuse is nonlocking",
       "disposition": "narrow",
-      "invariant": "Serializes payment transitions, fulfilment events and reuse of an open checkout.",
+      "invariant": "Serializes payment and fulfilment transitions. Plan revision and order uniqueness protect creation; frozen receipt reuse needs no order lock.",
       "acquisition": "Explicit mutation transaction or conditional write; ordinary reads never acquire this lock.",
-      "permittedWork": "Prepare checkout rows and provider result before plan/order fences; under the fence validate current state, reuse frozen receipt or write one order. OMS consumes the already-owned order without re-locking.",
+      "permittedWork": "Prepare rows and provider results outside fences. Reuse frozen receipts through ordinary reads; getOrderForUpdate remains only for mutations.",
       "release": "Mutation transaction; order reads inside outbox handling hold it through that event transaction.",
       "callers": [
         "lib/agentic/commerce/state.ts",
         "lib/agentic/commerce/stripe-adapter.ts",
         "lib/agentic/retail/mock-thailand.ts",
         "lib/agentic/store/postgres.ts",
-        "lib/agentic/store/postgres.ts:getActiveOrderForPlanRevisionForUpdate",
         "lib/agentic/store/postgres.ts:getOrderForUpdate",
         "scripts/apply-service-efficiency-schema.ts:module"
       ],
@@ -229,6 +228,10 @@
         {
           "file": "test/service-efficiency/publication-storage.integration.test.ts",
           "name": "LOCK-STORAGE-02 order state transitions cannot reserialize or replace frozen checkout contents"
+        },
+        {
+          "file": "test/service-efficiency/atomic-checkout.integration.test.ts",
+          "name": "LOCK-REDUNDANT-02 existing checkout reuse reads its immutable receipt while the order is locked"
         }
       ],
       "historicalCallers": [
@@ -241,12 +244,12 @@
     },
     {
       "number": 6,
-      "resource": "Catalogue epoch \u2014 FOR SHARE",
-      "disposition": "narrow",
-      "invariant": "Selection and creation of new checkout validate current commercial facts atomically. Matching publication retains its immutable snapshot and ordinary reads take no epoch lock.",
-      "acquisition": "Only explicit selection and new-checkout commercial validation take FOR SHARE. Reads and MCP/web result publication perform no catalogue row locking.",
-      "permittedWork": "Revalidate ownership, revision and affected row identities; apply necessary writes only. Prepare, calculate, serialize, render and perform external effects outside the protected phase. New web/pharmacy checkout prepares recommendation bodies and products before mutation; the catalogue fence covers only its epoch plus latest-run/assessment/selection revision validation and required intent writes.",
-      "release": "Acquisition to transaction end. In result completion this includes subsequent result-item writes.",
+      "resource": "Catalogue epoch \u2014 ordinary committed-snapshot reads",
+      "disposition": "remove",
+      "invariant": "Reject quotes already stale at validation. A later catalogue commit cannot replace an accepted frozen quote; subsequent new intents revalidate.",
+      "acquisition": "No application row lock for catalogue reads, selection, checkout validation or result publication.",
+      "permittedWork": "Read the committed epoch and narrow assessment/run revisions. Plan or assessment mutation fences protect revision and unique order admission.",
+      "release": "No catalogue read fence is held. Writer-side version publication retains its existing atomic writes.",
       "callers": [
         "lib/agentic/plan/service.ts",
         "lib/agentic/presentation/plan-read.ts",
@@ -254,7 +257,7 @@
         "lib/retail-product-checkout.ts",
         "lib/task-result-applier.ts",
         "lib/agentic/store/postgres.ts:isCatalogueRevisionCurrent",
-        "lib/retail-product-checkout.ts:lockCurrentWebCheckoutRecommendations",
+        "lib/retail-product-checkout.ts:validateCurrentWebCheckoutRecommendations",
         "lib/matcher/safety-ceilings-server.ts"
       ],
       "tests": [
@@ -265,7 +268,8 @@
         "test/practical-matching/checkout.test.ts",
         "test/retail-checkout-catalogue-v5.test.ts",
         "test/retail-checkout-catalogue-v5.integration.test.ts",
-        "test/pharmacy-orders.integration.test.ts"
+        "test/pharmacy-orders.integration.test.ts",
+        "test/service-efficiency/atomic-checkout.integration.test.ts"
       ],
       "verification": "Required named cases reconciled with successful execution by lock-register-verification.json in the unchanged-source scoped gate; historical RED evidence remains separate.",
       "cases": [
@@ -319,7 +323,11 @@
         },
         {
           "file": "test/practical-matching/checkout.test.ts",
-          "name": "PRACTICAL-CHECKOUT-03 only new checkout publication takes its existing commercial snapshot fence"
+          "name": "PRACTICAL-CHECKOUT-03 new checkout validates commercial provenance without locking the catalogue"
+        },
+        {
+          "file": "test/service-efficiency/atomic-checkout.integration.test.ts",
+          "name": "LOCK-REDUNDANT-07 checkout observes a committed catalogue snapshot without waiting for its writer"
         }
       ],
       "historicalCallers": [
@@ -525,9 +533,9 @@
       "number": 12,
       "resource": "Task lifecycle \u2014 FOR UPDATE",
       "disposition": "narrow",
-      "invariant": "Serializes completion claim/application/finalization, failure claim/application/finalization, progress, lease renewal and return to queue.",
+      "invariant": "Only current owned work may publish or renew, including same-agent reclamation. No new ownership queue or lock is introduced.",
       "acquisition": "Explicit mutation transaction or conditional write; ordinary reads never acquire this lock.",
-      "permittedWork": "Revalidate ownership, revision and affected row identities; apply necessary writes only. Prepare, calculate, serialize, render and perform external effects outside the protected phase.",
+      "permittedWork": "Normal heartbeat/progress is one conditional CTE using the task xmin and reservation identity. On a raced tuple only, reuse the existing task fence and revalidate. Completion/failure retain their multi-row fence.",
       "release": "Outer withDatabaseTransaction ends only after the callback/applier finishes. Configured database-phase deadline is 15 seconds; actual holds were not measured.",
       "callers": [
         "lib/task-service.ts",
@@ -576,6 +584,18 @@
         {
           "file": "test/service-efficiency/result-preparation.test.ts",
           "name": "LOCK-PREP-04 formulation and food advice are prepared before publication and audit effects remain deferred"
+        },
+        {
+          "file": "test/task-transactions.integration.test.ts",
+          "name": "LOCK-REDUNDANT-06 renewal and progress need no separate locking read"
+        },
+        {
+          "file": "test/task-transactions.integration.test.ts",
+          "name": "LOCK-REDUNDANT-06B an old reservation cannot renew a same-agent replacement"
+        },
+        {
+          "file": "test/task-transactions.integration.test.ts",
+          "name": "LOCK-REDUNDANT-06C a waiting activity write rechecks same-agent ownership after a tuple changes"
         }
       ],
       "historicalCallers": [
@@ -643,20 +663,15 @@
       "disposition": "narrow",
       "invariant": "Fences answer/contact edits, replan, recovery, checkout and generation completion by assessment revision.",
       "acquisition": "Explicit mutation transaction or conditional write; ordinary reads never acquire this lock.",
-      "permittedWork": "Revalidate ownership, revision and affected row identities; apply necessary writes only. Prepare, calculate, serialize, render and perform external effects outside the protected phase.",
-      "release": "Capture/recovery/checkout or completion transaction. Uses shared database-phase deadline where withDatabaseTransaction owns the transaction.",
+      "permittedWork": "Recovery prepares snapshots/readiness/tasks outside assessment locks. A short conditional UPDATE fences projection and audit by revision and xmin; reject changed recovery selection or generation. Capture and paid adoption retain atomic transactions.",
+      "release": "Capture, checkout or result-completion commit. Independent recovery holds only the projection/audit transaction.",
       "callers": [
         "app/api/assessment/[planId]/product-recommendations/route.ts",
         "lib/assessment-capture.ts",
-        "lib/funnel-generation-recovery.ts",
-        "lib/funnel-recovery.ts",
         "lib/retail-product-checkout.ts",
         "lib/task-result-applier.ts",
         "app/api/assessment/[planId]/product-recommendations/route.ts:POST",
         "lib/assessment-capture.ts:captureAssessment",
-        "lib/assessment-capture.ts:retryAssessmentHealthScore",
-        "lib/funnel-generation-recovery.ts:recoverMissingFunnelGeneration",
-        "lib/funnel-recovery.ts:recoverFunnelWork",
         "lib/healthscore-delivery.ts:deliverHealthScore",
         "lib/healthscore-delivery.ts:requestHealthScoreDelivery",
         "lib/retail-product-checkout.ts:lockWebCheckoutAssessment",
@@ -664,7 +679,8 @@
         "lib/task-result-applier.ts:applyTaskCompletionResult",
         "lib/task-result-applier.ts:applyTaskFailureResult",
         "lib/web-payment-fulfillment.ts:fulfillWebPayment",
-        "scripts/apply-service-efficiency-schema.ts:module"
+        "scripts/apply-service-efficiency-schema.ts:module",
+        "lib/task-worker.ts:enqueueNutritionPlanTasks (conditional publication only)"
       ],
       "tests": [
         "test/assessment-capture.integration.test.ts",
@@ -695,6 +711,26 @@
         {
           "file": "test/service-efficiency/result-preparation.test.ts",
           "name": "LOCK-PREP-04 formulation and food advice are prepared before publication and audit effects remain deferred"
+        },
+        {
+          "file": "test/assessment-capture.integration.test.ts",
+          "name": "LOCK-REDUNDANT-05 generation retry uses its immutable revision without an assessment read lock"
+        },
+        {
+          "file": "test/assessment-capture.integration.test.ts",
+          "name": "LOCK-REDUNDANT-05B recovery cannot overwrite a newer assessment after preparing tasks"
+        },
+        {
+          "file": "test/assessment-capture.integration.test.ts",
+          "name": "LOCK-REDUNDANT-05C recovery audit retains the pre-publication snapshot"
+        },
+        {
+          "file": "test/assessment-capture.integration.test.ts",
+          "name": "LOCK-REDUNDANT-05D recovery preserves a plan selected after its input was read"
+        },
+        {
+          "file": "test/assessment-capture.integration.test.ts",
+          "name": "LOCK-REDUNDANT-05E a changed generation cannot be admitted as an unversioned task"
         }
       ],
       "historicalCallers": [
@@ -754,7 +790,7 @@
       "disposition": "narrow",
       "invariant": "Serializes retries with the same capture/checkout idempotency key.",
       "acquisition": "Explicit mutation transaction or conditional write; ordinary reads never acquire this lock.",
-      "permittedWork": "Revalidate ownership, revision and affected row identities; apply necessary writes only. Prepare, calculate, serialize, render and perform external effects outside the protected phase.",
+      "permittedWork": "Completed capture receipts use ordinary reads with hash validation. INSERT RETURNING owns new receipts; only conflicting incomplete claims use SELECT FOR UPDATE. Receipt writes remain atomic.",
       "release": "Admission/capture/checkout transaction; duplicate insert can first wait on the unique key.",
       "callers": [
         "lib/funnel-idempotency.ts",
@@ -772,6 +808,10 @@
         {
           "file": "test/assessment-capture.integration.test.ts",
           "name": "keeps a single assessment if language changes before the capture receipt arrives"
+        },
+        {
+          "file": "test/assessment-capture.integration.test.ts",
+          "name": "LOCK-REDUNDANT-03 completed capture replays without locking its receipt or session"
         }
       ],
       "historicalCallers": [
@@ -784,13 +824,11 @@
       "disposition": "narrow",
       "invariant": "Protects reservation binding, cancellation/confirmation, checkout recovery and generation/accounting fulfilment.",
       "acquisition": "Explicit mutation transaction or conditional write; ordinary reads never acquire this lock.",
-      "permittedWork": "Revalidate ownership, revision and affected row identities; apply necessary writes only. Prepare, calculate, serialize, render and perform external effects outside the protected phase.",
+      "permittedWork": "Existing owners pass their locked payment into private transition logic; standalone calls acquire once. Recovery evidence is read outside transactions and unfinished work uses the existing conditional payment write.",
       "release": "Short database mutation transaction, including required generation-task creation where applicable.",
       "callers": [
-        "lib/funnel-recovery.ts",
         "lib/stripe-payments.ts",
         "lib/web-payment-fulfillment.ts",
-        "lib/funnel-recovery.ts:recoverFunnelWork",
         "lib/stripe-payments.ts:claimPaidReservation",
         "lib/stripe-payments.ts:completeMockPayment",
         "lib/stripe-payments.ts:fulfillCheckoutSession",
@@ -818,6 +856,10 @@
         {
           "file": "test/web-payment-transitions.integration.test.ts",
           "name": "rolls binding and its audit version back with the caller transaction"
+        },
+        {
+          "file": "test/web-payment-transitions.integration.test.ts",
+          "name": "LOCK-REDUNDANT-01 binding reads its payment under one fence and appends one version"
         }
       ],
       "historicalCallers": [
@@ -835,7 +877,7 @@
       "disposition": "narrow",
       "invariant": "Prevents duplicate queueing and fences sending state against assessment revision.",
       "acquisition": "Explicit mutation transaction or conditional write; ordinary reads never acquire this lock.",
-      "permittedWork": "Revalidate ownership, revision and affected row identities; apply necessary writes only. Prepare, calculate, serialize, render and perform external effects outside the protected phase.",
+      "permittedWork": "Terminal sent/unknown/superseded reads return unchanged. Queueing claims waiting rows with UPDATE RETURNING and commits task creation atomically. Sending protection is released before SMTP.",
       "release": "Queue/admission/pre-send transaction; released before SMTP/provider send.",
       "callers": [
         "lib/healthscore-delivery.ts",
@@ -862,6 +904,14 @@
         {
           "file": "test/healthscore-delivery.integration.test.ts",
           "name": "provides localized links and notification text without questionnaire answers"
+        },
+        {
+          "file": "test/healthscore-delivery.integration.test.ts",
+          "name": "LOCK-REDUNDANT-04 terminal email replay never locks or sends again"
+        },
+        {
+          "file": "test/healthscore-delivery.integration.test.ts",
+          "name": "LOCK-REDUNDANT-04B ready delivery admission claims by update and reuses its durable task"
         }
       ],
       "historicalCallers": [
@@ -1828,28 +1878,6 @@
       "justification": "Fences answer/contact edits, replan, recovery, checkout and generation completion by assessment revision."
     },
     {
-      "file": "db-rollout/db-rollout.sql",
-      "owner": "public.prevent_task_dependency_cycle",
-      "key": "31796ebfe0fea5c0408f69aa33ef7f1c58dd00f35b5de3a048a1a733ae284da4",
-      "statement": "begin perform pg_advisory_xact_lock(1413563211, 1145393235)",
-      "mechanisms": [
-        12,
-        21
-      ],
-      "justification": "Serialize dependency edge writes to prevent cycles formed by concurrent transactions; no read or matcher acquires this trigger lock."
-    },
-    {
-      "file": "db-schema.sql",
-      "owner": "public.prevent_task_dependency_cycle",
-      "key": "6e3b67b5e1e382835f531f2c19749b42a3bc9a332bd2d02135a61ab50ee21bb9",
-      "statement": "begin perform pg_advisory_xact_lock(1413563211, 1145393235)",
-      "mechanisms": [
-        12,
-        21
-      ],
-      "justification": "Serialize dependency edge writes to prevent cycles formed by concurrent transactions; no read or matcher acquires this trigger lock."
-    },
-    {
       "file": "lib/agentic/store/postgres.ts",
       "owner": "claimOutboxBatch",
       "key": "195c690f2a06cec5f6d7bf35080d362f3608797a8162a741b4486c2bc43dcace",
@@ -1858,16 +1886,6 @@
         19
       ],
       "justification": "Claims a fulfilment event before applying it to its order."
-    },
-    {
-      "file": "lib/agentic/store/postgres.ts",
-      "owner": "getActiveOrderForPlanRevisionForUpdate",
-      "key": "81f2549b3c197433ecdf37c2b012dd370e6227d17f61ac6cebb187171c45a446",
-      "statement": "` select * from public.agentic_orders where plan_id = ${planId}::uuid and plan_revision = ${planRevision} and order_status not in ('expired', 'cancelled') and checkout_reuse_eligible and cancelled_at is null and expired_at is null order by created_at asc limit 1 for update `",
-      "mechanisms": [
-        5
-      ],
-      "justification": "Serializes payment transitions, fulfilment events and reuse of an open checkout."
     },
     {
       "file": "lib/agentic/store/postgres.ts",
@@ -1890,70 +1908,10 @@
       "justification": "Serializes operation admission, revision publication and checkout against a single plan."
     },
     {
-      "file": "lib/agentic/store/postgres.ts",
-      "owner": "isCatalogueRevisionCurrent",
-      "key": "516e872eada0ba98ba7e2ded050e7cb24ecd23b2100ab5c9557467a6d9d34eea",
-      "statement": "` select revision from public.catalogue_runtime_revision where singleton = true for share`",
-      "mechanisms": [
-        6
-      ],
-      "justification": "Selection and creation of new checkout validate current commercial facts atomically. Matching publication retains its immutable snapshot and ordinary reads take no epoch lock."
-    },
-    {
       "file": "lib/assessment-capture.ts",
       "owner": "captureAssessment",
       "key": "0a6ab8b011bb0839eccd068ca10cfd5d263420854b2cbbb9a01a44e21a566170",
       "statement": "`select selected_plan, input_revision, answers from public.assessments where plan_id = ${planId}::uuid for no key update`",
-      "mechanisms": [
-        14
-      ],
-      "justification": "Fences answer/contact edits, replan, recovery, checkout and generation completion by assessment revision."
-    },
-    {
-      "file": "lib/assessment-capture.ts",
-      "owner": "retryAssessmentHealthScore",
-      "key": "500a8eb8556f6a6ef9aa89cab32e2a16e887055c2f0e878568a2d2e10f56f131",
-      "statement": "`select input_revision from public.assessments where plan_id = ${planId}::uuid for no key update`",
-      "mechanisms": [
-        14
-      ],
-      "justification": "Fences answer/contact edits, replan, recovery, checkout and generation completion by assessment revision."
-    },
-    {
-      "file": "lib/funnel-generation-recovery.ts",
-      "owner": "recoverMissingFunnelGeneration",
-      "key": "71a9701170806cd1072b65b2e1756e580646f94248771b801c60e79acba577f4",
-      "statement": "`select selected_plan from public.assessments where plan_id = ${input.planId}::uuid for no key update`",
-      "mechanisms": [
-        14
-      ],
-      "justification": "Fences answer/contact edits, replan, recovery, checkout and generation completion by assessment revision."
-    },
-    {
-      "file": "lib/funnel-idempotency.ts",
-      "owner": "claimFunnelRequest",
-      "key": "e0c75ee29fb38a7e9ec09da400a69d20c2dcf0659a6f3b1120edfe9f45faccd7",
-      "statement": "`select * from public.funnel_requests where scope = ${scope} and request_key = ${key} for update`",
-      "mechanisms": [
-        16
-      ],
-      "justification": "Serializes retries with the same capture/checkout idempotency key."
-    },
-    {
-      "file": "lib/funnel-recovery.ts",
-      "owner": "recoverFunnelWork",
-      "key": "0137144ac5d893b3b89fbb2fbe65564c3053d4cc2c498763824818e43e410616",
-      "statement": "`select * from public.payments where plan_id = ${planId}::uuid and status in ('paid', 'bound') order by created_at desc limit 1 for update`",
-      "mechanisms": [
-        17
-      ],
-      "justification": "Protects reservation binding, cancellation/confirmation, checkout recovery and generation/accounting fulfilment."
-    },
-    {
-      "file": "lib/funnel-recovery.ts",
-      "owner": "recoverFunnelWork",
-      "key": "652fed46a5a35abaeedf9891811d3348461f4b6f9a6eac7f2a9b5cef7747e7c5",
-      "statement": "`select selected_plan, answers from public.assessments where plan_id = ${planId}::uuid for no key update`",
       "mechanisms": [
         14
       ],
@@ -1978,16 +1936,6 @@
         14
       ],
       "justification": "Fences answer/contact edits, replan, recovery, checkout and generation completion by assessment revision."
-    },
-    {
-      "file": "lib/healthscore-delivery.ts",
-      "owner": "enqueueReadyHealthScoreDeliveries",
-      "key": "51affe33bf6824ae1b8dce0ea68cf8607acdc963f6f7f61ccdd92eeafacef2a7",
-      "statement": "`select * from public.healthscore_delivery_requests where plan_id = ${planId}::uuid and revision = ${revision} and locale = ${locale} and status = 'waiting' for update`",
-      "mechanisms": [
-        18
-      ],
-      "justification": "Prevents duplicate queueing and fences sending state against assessment revision."
     },
     {
       "file": "lib/healthscore-delivery.ts",
@@ -2039,16 +1987,6 @@
         14
       ],
       "justification": "Fences answer/contact edits, replan, recovery, checkout and generation completion by assessment revision."
-    },
-    {
-      "file": "lib/retail-product-checkout.ts",
-      "owner": "lockCurrentWebCheckoutRecommendations",
-      "key": "e1cb3403a13d513a61ecd5b4867d0281b2040704aa2ec219c758776a3dacc5d5",
-      "statement": "` select revision from public.catalogue_runtime_revision where singleton = true for share`",
-      "mechanisms": [
-        6
-      ],
-      "justification": "Selection and creation of new checkout validate current commercial facts atomically. Matching publication retains its immutable snapshot and ordinary reads take no epoch lock."
     },
     {
       "file": "lib/stripe-payments.ts",
@@ -2290,6 +2228,16 @@
       "mechanisms": [
         12
       ]
+    },
+    {
+      "file": "lib/funnel-idempotency.ts",
+      "owner": "claimFunnelRequest",
+      "key": "0f6b3413b5d702eb951358d46818cc6ed603ca86510618f6699c045c593ea39d",
+      "statement": "`select resource_id, input_hash, response from public.funnel_requests where scope = ${scope} and request_key = ${key} for update`",
+      "mechanisms": [
+        16
+      ],
+      "justification": "Only conflicting incomplete receipt claims serialize. Completed replay is read-only; a fresh INSERT already owns its row."
     }
   ]
 }

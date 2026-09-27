@@ -7,7 +7,8 @@ import { closeSqlPool, getSql } from "../lib/db.ts";
 import { ensureRetailProviderSession, recordRetailProviderSession, retailPaymentConfirmed, type RetailSessionPayment, type RetailSessionProvider } from "../lib/retail-checkout-provider-session.ts";
 
 const databaseUrl = process.env.TEST_DB_URL;
-describe("retail provider session replay on PostgreSQL", { skip: !databaseUrl }, () => {
+assert.ok(databaseUrl, "This integration test requires isolated PostgreSQL");
+describe("retail provider session replay on PostgreSQL", () => {
   const planId = randomUUID();
   before(async () => {
     fixtureDatabaseUrl();

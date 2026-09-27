@@ -33,8 +33,8 @@ async function adviceReady(sql: Db, planId: string, revision: number, locale: Lo
 /** Called inside capture/completion/request transactions; never sends email here. */
 export async function enqueueReadyHealthScoreDeliveries(sql: Db, planId: string, revision: number, locale: Locale) {
   if (!await adviceReady(sql, planId, revision, locale)) return;
-  const rows = await sql<DeliveryRow[]>`select * from public.healthscore_delivery_requests
-    where plan_id = ${planId}::uuid and revision = ${revision} and locale = ${locale} and status = 'waiting' for update`;
+  const rows = await sql<DeliveryRow[]>`update public.healthscore_delivery_requests set status='queued', updated_at=now()
+    where plan_id = ${planId}::uuid and revision = ${revision} and locale = ${locale} and status = 'waiting' returning *`;
   for (const row of rows) {
     const { task } = await createTask({ actorType: "deterministic", title: "Deliver completed HealthScore", taskType: HEALTHSCORE_DELIVERY_TASK,
       planId, payload: { deliveryRequestId: row.id }, requiredCapabilities: requiredCapabilitiesForWorkTaskType(HEALTHSCORE_DELIVERY_TASK),
@@ -80,6 +80,7 @@ export async function deliverHealthScore(requestId: string, send: SendEmail = se
   const sql = getSql(); if (!sql) throw new Error("Database is not configured");
   const [initial] = await sql<DeliveryRow[]>`select * from public.healthscore_delivery_requests where id = ${requestId}::uuid`;
   if (!initial) throw new Error("Delivery request not found");
+  if (["sent", "unknown", "superseded"].includes(initial.status)) return receipt(initial);
   const prepared = await withDatabaseTransaction(sql, async tx => {
     const [assessment] = await tx`select input_revision from public.assessments where plan_id = ${initial.plan_id}::uuid for no key update`;
     const [row] = await tx<DeliveryRow[]>`select * from public.healthscore_delivery_requests where id = ${requestId}::uuid for update`;

@@ -47,8 +47,10 @@ test("EFF-READ-PG-01 ordinary status reads complete behind held updates while mu
   try {
     const status = await readPlanState(app, handle);
     assert.ok("projection" in status);
-    await assert.rejects(store.transaction(tx => tx.getActiveOrderForPlanRevisionForUpdate(id, 1)), (error: { code?: string }) => error.code === "55P03");
-    await assert.rejects(store.transaction(tx => tx.isCatalogueRevisionCurrent!(1)), (error: { code?: string }) => error.code === "55P03");
+    await assert.rejects(store.transaction(tx => tx.getOrderForUpdate(orderId)), (error: { code?: string }) => error.code === "55P03");
+    assert.equal((await store.getActiveOrderForPlanRevision(id, 1))?.id, orderId);
+    const [epoch] = await sql`select revision from catalogue_runtime_revision where singleton`;
+    assert.equal(await store.transaction(tx => tx.isCatalogueRevisionCurrent!(Number(epoch.revision))), true);
   } finally { release(); await writer; }
 });
 

@@ -6,7 +6,8 @@ import Stripe from "stripe";
 import { getSql, closeSqlPool, withDatabaseTransaction } from "../lib/db.ts";
 import { handleStripeWebhookPayload } from "../lib/stripe-payments.ts";
 const databaseUrl = process.env.TEST_DB_URL;
-describe("signed webhook interruption and replay", { skip: !databaseUrl }, () => {
+assert.ok(databaseUrl, "This integration test requires isolated PostgreSQL");
+describe("signed webhook interruption and replay", () => {
   const paymentId = randomUUID(), eventId = `evt_fixture_${randomUUID()}`, sessionId = `mock_cs_${paymentId}`;
   const secret = "whsec_local_fixture";
   before(async () => {

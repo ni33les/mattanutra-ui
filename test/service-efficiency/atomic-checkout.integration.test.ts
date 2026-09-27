@@ -79,20 +79,34 @@ test("LOCK-REDUNDANT-02 existing checkout reuse reads its immutable receipt whil
     const first = await executeTool(call); assert.equal(first.ok, true, JSON.stringify(first));
     const [planId] = await app.store.listPlanIdsByPrincipal(app.scope.principalScope!);
     const [order] = await sql`select id from agentic_orders where plan_id=${planId}`; assert.ok(order);
-    const replay = await whileWriterHeld(sql, tx => tx`select id from agentic_orders where id=${order.id} for update`,
-      () => executeTool({...call,idempotencyKey:"locking-reuse-new-key"}));
+    const frozen = await app.store.getOrder(order.id);
+    assert.ok(frozen);
+    const items = await app.store.getOrderItems(order.id);
+    assert.ok(items.length);
+    const replay = await whileWriterHeld(sql, tx => tx`update agentic_orders set order_status='cancelled',cancelled_at=now(),checkout_reuse_eligible=false where id=${order.id}`,
+      () => executeTool({...call,idempotencyKey:"locking-reuse-new-key"}), true);
     assert.deepEqual(JSON.parse(JSON.stringify(replay)), JSON.parse(JSON.stringify(first)));
+    const current = await app.store.getOrder(order.id);
+    assert.equal(current?.orderStatus,"cancelled","The next ordinary read observes the concurrent cancellation");
+    assert.deepEqual(current?.frozenPlan,frozen.frozenPlan,"Receipt reuse cannot change the frozen plan");
+    assert.deepEqual(await app.store.getOrderItems(order.id),items,"Receipt reuse cannot change purchased items or prices");
+    assert.equal(current?.totalPriceMinor,frozen.totalPriceMinor);
+    assert.equal((await sql`select count(*)::int as n from agentic_orders where plan_id=${planId}`)[0].n,1);
   } finally { await app.store.deletePrincipalScope(app.scope.principalScope!); }
 });
 
 test("LOCK-REDUNDANT-07 checkout observes a committed catalogue snapshot without waiting for its writer", {timeout:15000}, async () => {
   const app = await fixture();
+  const [epoch] = await sql`select revision from catalogue_runtime_revision where singleton`;
   try {
     const plan = await rpcWithTaskExecutor(app, "plan", { idempotencyKey:"locking-snapshot-read", ...publicRequest({...request, requirements:{productDoses:[{productId:"prd_b1111111111111111111111111111111",servingsPerDay:1}]}}) });
     assert.equal(plan.status, "ready", JSON.stringify(plan));
     const call = { ...app, now:app.now!, planHandle:String(plan.planHandle), expectedRevision:Number(plan.revision), idempotencyKey:"locking-snapshot-checkout" };
-    const first = await whileWriterHeld(sql, tx => tx`update catalogue_runtime_revision set revision=revision+1 where singleton`, () => executeTool(call));
+    const first = await whileWriterHeld(sql, tx => tx`update catalogue_runtime_revision set revision=revision+1 where singleton`, () => executeTool(call), true);
     assert.equal(first.ok, true, JSON.stringify(first));
     assert.deepEqual(JSON.parse(JSON.stringify(await executeTool({...call,idempotencyKey:"locking-snapshot-replay"}))), JSON.parse(JSON.stringify(first)));
-  } finally { await app.store.deletePrincipalScope(app.scope.principalScope!); }
+  } finally {
+    await app.store.deletePrincipalScope(app.scope.principalScope!);
+    await sql`update catalogue_runtime_revision set revision=${epoch.revision} where singleton`;
+  }
 });

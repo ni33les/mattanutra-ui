@@ -70,7 +70,7 @@
     },
     {
       "file": "test/assessment-capture.integration.test.ts",
-      "expectedCases": 5,
+      "expectedCases": 11,
       "reason": "Shared classic/chat admission, revision, reservation and contact correctness",
       "database": true
     }

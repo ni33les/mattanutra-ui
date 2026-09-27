@@ -376,8 +376,8 @@ export async function currentWebCheckoutRecommendations(sql: RetailCheckoutDb, i
 export async function lockWebCheckoutAssessment(sql: RetailCheckoutDb, planId: string) {
   await sql`select plan_id from public.assessments where plan_id = ${planId}::uuid for no key update`;
 }
-/** Existing new-checkout publication fence: retain current commercial facts until the intent commits. */
-export async function lockCurrentWebCheckoutRecommendations(sql: RetailCheckoutDb, input: WebCheckoutSelectionInput,
+/** Validate the latest committed snapshot; a later catalogue update does not rewrite the accepted quote. */
+export async function validateCurrentWebCheckoutRecommendations(sql: RetailCheckoutDb, input: WebCheckoutSelectionInput,
   prepared: Awaited<ReturnType<typeof currentWebCheckoutSelection>>) {
   const proof = prepared.proof;
   if (proof.planId !== input.planId || proof.locale !== input.locale ||
@@ -386,9 +386,9 @@ export async function lockCurrentWebCheckoutRecommendations(sql: RetailCheckoutD
     throw new FunnelError("Prepared checkout does not match the selected products.", 409, "invalid_product_selection");
   }
   const [catalogue] = await sql<Array<{ revision: number | string }>>`
-    select revision from public.catalogue_runtime_revision where singleton = true for share`;
+    select revision from public.catalogue_runtime_revision where singleton = true`;
   // Runs are append-only. Revalidate the latest run and mutable heads, without
-  // fetching their advice, options or products again while writers are fenced.
+  // fetching their advice, options or products again or fencing catalogue writers.
   const [current] = await sql`select r.id::text from public.product_recommendation_runs r
     join public.assessments a on a.plan_id = r.plan_id
     left join public.assessment_product_preferences p on p.plan_id = a.plan_id
@@ -1002,7 +1002,7 @@ export async function createRetailCheckoutSession(input: RetailCheckoutQuoteInpu
       if (checkoutMode === "web") {
         // Only new intents require the current revision and catalogue. Exact
         // retries retain their existing payment and frozen commercial facts.
-        await lockCurrentWebCheckoutRecommendations(tx, { ...input, recommendationRunId: runId, selectedItemIds: selectedProductIds }, preparedSelection!);
+        await validateCurrentWebCheckoutRecommendations(tx, { ...input, recommendationRunId: runId, selectedItemIds: selectedProductIds }, preparedSelection!);
       }
       const rows = await tx<CheckoutPaymentRow[]>`
         insert into public.retail_checkout_payments (

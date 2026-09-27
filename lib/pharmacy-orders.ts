@@ -8,7 +8,7 @@ import { inStorePharmacyFromAnswers, resolvePharmacyOrganisation } from "@/lib/p
 import { pharmacyOrganisationSlug } from "@/lib/pharmacy-journey";
 import { preparePharmacyOrder, type PharmacyOrderProduct } from "@/lib/pharmacy-order-input";
 import { claimFunnelRequest, completeFunnelRequest } from "@/lib/funnel-idempotency";
-import { currentWebCheckoutSelection, lockCurrentWebCheckoutRecommendations, lockWebCheckoutAssessment } from "@/lib/retail-product-checkout";
+import { currentWebCheckoutSelection, validateCurrentWebCheckoutRecommendations, lockWebCheckoutAssessment } from "@/lib/retail-product-checkout";
 import { queueAdminOrganisationCommunication } from "@/lib/communications";
 import { FunnelError } from "@/lib/funnel-errors";
 import { isLocale, type Locale } from "@/lib/i18n";
@@ -109,7 +109,7 @@ export async function createPharmacyOrder(value: unknown, key: string): Promise<
     const claim = await claimFunnelRequest(tx, "pharmacy-order", key, input, orderId);
     if (claim.response) return claim.response as PharmacyOrderReceipt;
     await lockWebCheckoutAssessment(tx, planId);
-    await lockCurrentWebCheckoutRecommendations(tx, quote.selection, quote.preparedSelection!);
+    await validateCurrentWebCheckoutRecommendations(tx, quote.selection, quote.preparedSelection!);
     const receipt = preparedReceipt;
     await tx`insert into public.retail_customer_orders (id, organisation_id, order_number, source, customer_name, status, currency, placed_at, metadata)
       values (${receipt.id}::uuid, ${quote.pharmacy.id}::uuid, ${receipt.reference}, 'pharmacy', ${receipt.customerName}, 'placed', ${receipt.currency}, now(),

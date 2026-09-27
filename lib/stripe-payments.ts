@@ -296,83 +296,88 @@ async function fulfillMockCheckoutSession(
 
 /** Serializes payment state and its append-only audit under the payment row lock. */
 export async function updatePaymentState(sql: Db, input: PaymentStatePatch) {
-  return withDatabaseTransaction(sql, async sql => {
-    const [current] = await sql<PaymentRow[]>`
+  return withDatabaseTransaction(sql, async tx => {
+    const [current] = await tx<PaymentRow[]>`
       select * from public.payments where id = ${input.paymentId}::uuid for update
     `;
-    if (!current) return null;
-    if (input.expectedStatuses?.length && !input.expectedStatuses.includes(current.status)) return null;
-    if (input.planId && current.plan_id && input.planId !== current.plan_id) return null;
-    const confirmed = current.status === "paid" || current.status === "bound" || Boolean(current.paid_at);
-    if (confirmed && input.status && input.status !== "paid" && input.status !== "bound") return null;
-    if (current.status === "bound" && input.status === "paid") return current;
-    const metadata = input.metadata ?? {};
-    const rows = await sql<PaymentRow[]>`
-      with updated_payment as (
-        update public.payments
-        set
-          plan_id = coalesce(${input.planId ?? null}::uuid, plan_id),
-          status = coalesce(${input.status ?? null}, status),
-          stripe_checkout_session_id = coalesce(${input.stripeCheckoutSessionId ?? null}, stripe_checkout_session_id),
-          stripe_payment_intent_id = coalesce(${input.stripePaymentIntentId ?? null}, stripe_payment_intent_id),
-          stripe_customer_id = coalesce(${input.stripeCustomerId ?? null}, stripe_customer_id),
-          stripe_price_id = coalesce(${input.stripePriceId ?? null}, stripe_price_id),
-          customer_email = coalesce(${input.customerEmail ?? null}, customer_email),
-          metadata = metadata || ${sql.json(toJsonValue(metadata))}::jsonb,
-          paid_at = case
-            when ${input.status ?? null} = 'paid' then coalesce(paid_at, now())
-            else paid_at
-          end,
-          bound_at = case
-            when ${input.status ?? null} = 'bound' then coalesce(bound_at, now())
-            else bound_at
-          end,
-          updated_at = now()
-        where id = ${input.paymentId}::uuid
-          and (
-            ${input.expectedStatuses ? input.expectedStatuses.length : 0}::int = 0
-            or status = any(${textArray(sql, input.expectedStatuses ?? [])}::text[])
-          )
-        returning *
-      ),
-      appended_version as (
-        insert into public.payment_versions (
-          payment_id,
-          version,
-          action,
-          actor,
-          reason,
-          source,
-          plan_id,
-          snapshot,
-          metadata,
-          created_at
-        )
-        select
-          updated_payment.id,
-          coalesce((
-            select max(payment_versions.version)
-            from public.payment_versions
-            where payment_versions.payment_id = updated_payment.id
-          ), 0) + 1,
-          ${input.action},
-          ${input.actor ?? "system"},
-          ${input.reason},
-          'stripe_payments',
-          updated_payment.plan_id,
-          to_jsonb(updated_payment.*),
-          ${sql.json(toJsonValue(metadata))}::jsonb,
-          now()
-        from updated_payment
-        returning payment_id
-      )
-      select updated_payment.*
-      from updated_payment
-      join appended_version on appended_version.payment_id = updated_payment.id
-    `;
-
-    return rows[0] ?? null;
+    return applyOwnedPaymentState(tx, input, current);
   });
+}
+
+/** Internal: caller owns this payment in the current transaction. */
+async function applyOwnedPaymentState(sql: Db, input: PaymentStatePatch, current: PaymentRow | undefined) {
+  if (!current) return null;
+  if (input.expectedStatuses?.length && !input.expectedStatuses.includes(current.status)) return null;
+  if (input.planId && current.plan_id && input.planId !== current.plan_id) return null;
+  const confirmed = current.status === "paid" || current.status === "bound" || Boolean(current.paid_at);
+  if (confirmed && input.status && input.status !== "paid" && input.status !== "bound") return null;
+  if (current.status === "bound" && input.status === "paid") return current;
+  const metadata = input.metadata ?? {};
+  const rows = await sql<PaymentRow[]>`
+    with updated_payment as (
+      update public.payments
+      set
+        plan_id = coalesce(${input.planId ?? null}::uuid, plan_id),
+        status = coalesce(${input.status ?? null}, status),
+        stripe_checkout_session_id = coalesce(${input.stripeCheckoutSessionId ?? null}, stripe_checkout_session_id),
+        stripe_payment_intent_id = coalesce(${input.stripePaymentIntentId ?? null}, stripe_payment_intent_id),
+        stripe_customer_id = coalesce(${input.stripeCustomerId ?? null}, stripe_customer_id),
+        stripe_price_id = coalesce(${input.stripePriceId ?? null}, stripe_price_id),
+        customer_email = coalesce(${input.customerEmail ?? null}, customer_email),
+        metadata = metadata || ${sql.json(toJsonValue(metadata))}::jsonb,
+        paid_at = case
+          when ${input.status ?? null} = 'paid' then coalesce(paid_at, now())
+          else paid_at
+        end,
+        bound_at = case
+          when ${input.status ?? null} = 'bound' then coalesce(bound_at, now())
+          else bound_at
+        end,
+        updated_at = now()
+      where id = ${input.paymentId}::uuid
+        and (
+          ${input.expectedStatuses ? input.expectedStatuses.length : 0}::int = 0
+          or status = any(${textArray(sql, input.expectedStatuses ?? [])}::text[])
+        )
+      returning *
+    ),
+    appended_version as (
+      insert into public.payment_versions (
+        payment_id,
+        version,
+        action,
+        actor,
+        reason,
+        source,
+        plan_id,
+        snapshot,
+        metadata,
+        created_at
+      )
+      select
+        updated_payment.id,
+        coalesce((
+          select max(payment_versions.version)
+          from public.payment_versions
+          where payment_versions.payment_id = updated_payment.id
+        ), 0) + 1,
+        ${input.action},
+        ${input.actor ?? "system"},
+        ${input.reason},
+        'stripe_payments',
+        updated_payment.plan_id,
+        to_jsonb(updated_payment.*),
+        ${sql.json(toJsonValue(metadata))}::jsonb,
+        now()
+      from updated_payment
+      returning payment_id
+    )
+    select updated_payment.*
+    from updated_payment
+    join appended_version on appended_version.payment_id = updated_payment.id
+  `;
+
+  return rows[0] ?? null;
 }
 
 /** Claims a reservation without performing external I/O; joins a caller transaction. */
@@ -386,11 +391,11 @@ export async function claimPaidReservation(sql: Db, paymentId: string, planId: s
       return { payment, replayed: true };
     }
     if (payment.plan_id || payment.status !== "paid") return null;
-    const bound = await updatePaymentState(tx, {
+    const bound = await applyOwnedPaymentState(tx, {
       paymentId, planId, status: "bound", expectedStatuses: ["paid"],
       action: "payment_reservation_bound", actor: "system", reason: "paid_reservation_bound_to_assessment",
       metadata: { source: "assessment_capture" }
-    });
+    }, payment);
     return bound ? { payment: bound, replayed: false } : null;
   });
 }
@@ -1463,10 +1468,10 @@ export async function completeMockPayment(input: Readonly<{ paymentId: string; r
   const payment = await withDatabaseTransaction(sql, async tx => {
     const [current] = await tx<PaymentRow[]>`select * from public.payments where id = ${input.paymentId}::uuid for update`;
     if (!current || current.stripe_mode !== "mock") return null;
-    const paid = current.status === "paid" || current.status === "bound" ? current : await updatePaymentState(tx, {
+    const paid = current.status === "paid" || current.status === "bound" ? current : await applyOwnedPaymentState(tx, {
       paymentId: current.id, action: "mock_payment_paid", actor: "system", reason: "local_mock_payment_confirmed", status: "paid",
       stripeCustomerId: "mock_customer", stripePaymentIntentId: `mock_pi_${current.id}`, metadata: { mock: true }
-    });
+    }, current);
     if (!paid) return null;
     await enqueueWebPaymentFulfillment(tx, paid, current.status === "paid" || current.status === "bound" ? prepared : newlyConfirmedFulfillment(paid));
     return (await getPaymentRowById(tx, paid.id))!;
@@ -1920,20 +1925,20 @@ export async function fulfillCheckoutSession(
     const confirmed = row.status === "paid" || row.status === "bound" || Boolean(row.paid_at);
     if (session.payment_status === "paid") {
       if (row.status !== "paid" && row.status !== "bound") {
-        row = await updatePaymentState(tx, {
+        row = await applyOwnedPaymentState(tx, {
           paymentId: row.id, action: "payment_paid", actor: "stripe", reason: "stripe_payment_confirmed", status: "paid",
           customerEmail: sessionCustomerEmail(session) || null, stripeCustomerId: stringId(session.customer),
           stripePaymentIntentId: stringId(session.payment_intent), metadata: { source: input.source }
-        }) ?? row;
+        }, row) ?? row;
       }
       await enqueueWebPaymentFulfillment(tx, row, confirmed ? prepared : newlyConfirmedFulfillment(row));
     } else if (!confirmed) {
       const status = session.status === "expired" ? "expired" : "processing";
-      if (row.status !== status) row = await updatePaymentState(tx, {
+      if (row.status !== status) row = await applyOwnedPaymentState(tx, {
         paymentId: row.id, action: status === "expired" ? "checkout_expired" : "payment_processing",
         actor: "stripe", reason: "stripe_checkout_status", status,
         expectedStatuses: ["created", "checkout_session_created", "checkout_opened", "processing"]
-      }) ?? row;
+      }, row) ?? row;
     }
     return (await getPaymentRowById(tx, row.id))!;
   });

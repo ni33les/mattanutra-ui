@@ -32,16 +32,16 @@ test('PRACTICAL-CHECKOUT-02 read selection returns the chosen option advice befo
   assert.deepEqual(selected.advice, [advice]); assert.equal(selected.recommendations[0].price_amount, 123);
 });
 
-test('PRACTICAL-CHECKOUT-03 only new checkout publication takes its existing commercial snapshot fence', async () => {
-  assert.equal(typeof checkout.lockCurrentWebCheckoutRecommendations, 'function');
+test('PRACTICAL-CHECKOUT-03 new checkout validates commercial provenance without locking the catalogue', async () => {
+  assert.equal(typeof checkout.validateCurrentWebCheckoutRecommendations, 'function');
   const {sql, queries} = database();
   const prepared = await checkout.currentWebCheckoutSelection(sql, input);
   const before = queries.length;
-  const rows = await checkout.lockCurrentWebCheckoutRecommendations(sql, input, prepared);
+  const rows = await checkout.validateCurrentWebCheckoutRecommendations(sql, input, prepared);
   assert.deepEqual(rows, prepared.recommendations);
   const publication = queries.slice(before);
-  assert.equal(publication.filter(q => /for share/i.test(q)).length, 1);
-  assert.equal(publication.length, 2, 'Only epoch fencing and a narrow revision check belong under checkout locks');
+  assert.equal(publication.filter(q => /for\s+(?:share|update)/i.test(q)).length, 0);
+  assert.equal(publication.length, 2, 'Only committed catalogue and narrow revision reads belong to checkout validation');
   assert.ok(publication.every(q => !q.includes('r.diagnostics,') && !q.includes('product_recommendation_items')),
     'Product/advice decoding and rendering are completed before the checkout transaction');
 });

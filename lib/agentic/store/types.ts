@@ -271,15 +271,13 @@ export type AgenticStore = {
     planId: string,
     planRevision: number
   ): Promise<OrderRecord | null>;
-  /** Mutation-only lookup; protects checkout reuse and payment transitions until commit. */
-  getActiveOrderForPlanRevisionForUpdate(planId: string, planRevision: number): Promise<OrderRecord | null>;
   getExecuteResponseForOrder(orderId: string): Promise<unknown | null>;
   getOrderItems(orderId: string): Promise<readonly OrderItemRecord[]>;
   getOutboxPending(): Promise<readonly OutboxEventRecord[]>;
   claimOutboxBatch(limit: number): Promise<readonly OutboxEventRecord[]>;
   getPlan(id: string): Promise<PlanRecord | null>;
   getPlanForUpdate(id: string): Promise<PlanRecord | null>;
-  /** Verifies and holds the live catalogue epoch through the enclosing transaction. */
+  /** Checks the latest committed catalogue epoch; the accepted quote remains frozen. */
   isCatalogueRevisionCurrent?(expectedRevision: number): Promise<boolean>;
   getPlanRevision(
     planId: string,

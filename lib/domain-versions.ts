@@ -16,6 +16,8 @@ export async function appendAssessmentVersion(
     eventPayload?: unknown;
     eventType: string;
     planId: string;
+    /** Immutable pre-update snapshot, accepted only after the caller's conditional write succeeds. */
+    projectionBefore?: unknown;
     requestId?: string | null;
     source?: string | null;
     taskId?: string | null;
@@ -60,7 +62,7 @@ export async function appendAssessmentVersion(
       ${input.taskId ?? null}::uuid,
       ${input.requestId ?? null},
       jsonb_build_object(
-        'projectionBefore', coalesce((
+        'projectionBefore', coalesce(${input.projectionBefore === undefined ? null : db.json(jsonPayload(input.projectionBefore))}::jsonb, (
           select to_jsonb(assessments.*)
           from public.assessments
           where assessments.plan_id = bumped.plan_id

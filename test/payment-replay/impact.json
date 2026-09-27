@@ -76,7 +76,7 @@
     },
     {
       "file": "test/web-payment-transitions.integration.test.ts",
-      "expectedCases": 4,
+      "expectedCases": 5,
       "database": true,
       "slice": "consumers",
       "reason": "Cancellation versus confirmation and atomic reservation binding"

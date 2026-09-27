@@ -95,7 +95,7 @@
       "file": "test/task-transactions.integration.test.ts",
       "slice": "task-transactions",
       "database": true,
-      "expectedCases": 14,
+      "expectedCases": 17,
       "reason": "Task admission/rollback, reservation fencing, deferred matching ownership and exact replay through the existing worker completion boundary"
     },
     {
@@ -122,14 +122,14 @@
       "file": "test/assessment-capture.integration.test.ts",
       "slice": "capture",
       "database": true,
-      "expectedCases": 5,
+      "expectedCases": 11,
       "reason": "Capture idempotency, revision fencing, contact-only preservation and transactional generation scheduling"
     },
     {
       "file": "test/web-payment-transitions.integration.test.ts",
       "slice": "payments",
       "database": true,
-      "expectedCases": 4,
+      "expectedCases": 5,
       "reason": "Atomic binding and conditional payment transitions preserve revenue, ownership and paid state"
     },
     {
@@ -143,7 +143,7 @@
       "file": "test/healthscore-delivery.integration.test.ts",
       "slice": "email",
       "database": true,
-      "expectedCases": 4,
+      "expectedCases": 6,
       "reason": "Persisted advice readiness must preserve durable delivery, rejection, ambiguous acceptance and provider acknowledgement"
     },
     {
@@ -307,7 +307,7 @@
       "file": "test/web-advisory.integration.test.ts",
       "slice": "web-publication",
       "database": true,
-      "expectedCases": 8,
+      "expectedCases": 9,
       "reason": "Web catalogue snapshot publication, preserved immutable reference identities, preferences/revision concurrency and explicit recovery without read maintenance"
     },
     {
@@ -422,7 +422,7 @@
     {
       "file": "test/service-efficiency/atomic-checkout.integration.test.ts",
       "slice": "atomic-checkout",
-      "expectedCases": 2,
+      "expectedCases": 4,
       "database": true,
       "reason": "Actual concurrent PostgreSQL admission and checkout preserve one durable resource and immutable frozen recovery without process queues"
     },

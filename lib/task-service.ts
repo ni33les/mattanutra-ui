@@ -817,7 +817,8 @@ export async function createTask(input: CreateTaskInput, sqlOverride?: Db) {
   const create = async (tx: Db) => {
     if (input.planId && ASSESSMENT_GENERATION_TASKS.has(input.taskType) && !generationInput(input.payload)) {
       const generation = await loadGenerationInput(tx, input.planId, payloadRecord(input.payload).locale);
-      if (generation) return createTaskRecord(tx, { ...input,
+      if (!generation) throw new Error("Assessment changed during task preparation; retry recovery");
+      return createTaskRecord(tx, { ...input,
         id: input.id ? generationTaskId(input.id, generation) : undefined,
         payload: { ...payloadRecord(input.payload), generation },
         idempotencyKey: input.idempotencyKey ? `${input.idempotencyKey}:${generation.revision}:${generation.locale}:${generation.generatorVersion}` : undefined
@@ -2552,118 +2553,47 @@ export async function completeTask(input: CompleteTaskInput) {
 }
 
 export async function renewTaskLease(input: RenewTaskLeaseInput) {
-  const sql = getRequiredSql();
-  const taskId = uuidOrNull(input.taskId);
-  const reservationId = uuidOrNull(input.reservationId);
-  const agentId = scopeAgentId(input);
-  const membershipId = scopeMembershipId(input);
-  const workerSessionId = uuidOrNull(input.workerSessionId);
-
-  if (!taskId || (!reservationId && !agentId && !workerSessionId)) {
-    throw new Error("Task lease renewal requires a valid taskId and reservationId, agentId, or workerSessionId");
-  }
-
-  const leaseSeconds = normalizeLeaseSeconds(input.leaseSeconds);
-  const rows = await withTaskRowLock(sql, taskId, tx => tx<TaskReservationResultRow[]>`
-    with active_reservation as (
-      select id, agent_id, membership_id, worker_session_id
-      from public.task_reservations
-      where task_id = ${taskId}::uuid
-        and status = 'active'
-        and (${reservationId}::uuid is null or id = ${reservationId}::uuid)
-        and (${agentId}::uuid is null or agent_id = ${agentId}::uuid)
-        and (${membershipId}::uuid is null or membership_id = ${membershipId}::uuid)
-        and (${workerSessionId}::uuid is null or worker_session_id = ${workerSessionId}::uuid)
-      order by reserved_at desc
-      limit 1
-    ),
-    updated_task as (
-      update public.tasks set
-        lease_until = now() + make_interval(secs => ${leaseSeconds}),
-        updated_at = now()
-      from active_reservation
-      where public.tasks.id = ${taskId}::uuid
-        and public.tasks.reserved_by_agent_id = active_reservation.agent_id
-        and public.tasks.status in ('reserved', 'running')
-      returning
-        public.tasks.*,
-        active_reservation.id::text as reservation_id,
-        active_reservation.agent_id::text as reservation_agent_id,
-        active_reservation.membership_id::text as reservation_membership_id,
-        active_reservation.worker_session_id::text as reservation_worker_session_id
-    ),
-    updated_reservation as (
-      update public.task_reservations set
-        lease_until = updated_task.lease_until,
-        heartbeat_at = now()
-      from updated_task
-      where task_reservations.id = updated_task.reservation_id::uuid
-      returning task_reservations.id
-    ),
-    updated_session as (
-      update public.worker_sessions set
-        status = 'working',
-        current_task_id = ${taskId}::uuid,
-        last_seen_at = now(),
-        updated_at = now()
-      from updated_task
-      where worker_sessions.id = updated_task.reservation_worker_session_id::uuid
-        and (
-          updated_task.reservation_membership_id::uuid is null
-          or worker_sessions.membership_id = updated_task.reservation_membership_id::uuid
-        )
-      returning worker_sessions.id
-    )
-    select *
-    from updated_task
-  `);
-  const row = rows[0];
-
-  if (!row) {
-    throw new Error(`Task ${taskId} is not currently renewable`);
-  }
-
-  return {
-    reservationId: row.reservation_id ?? "",
-    task: mapTask(row)
-  };
+  return updateTaskActivity(input);
 }
 
 export async function reportTaskProgress(input: ProgressTaskInput) {
+  return updateTaskActivity(input, payloadRecord(input.resultPayload ?? {}));
+}
+
+/** The observed tuple version fences reservation replacement, including same-agent reclaim.
+ * Normal activity is one atomic statement. Only a raced write needs the existing task fence. */
+async function updateTaskActivity(input: RenewTaskLeaseInput, resultPayload?: Record<string, unknown>) {
   const sql = getRequiredSql();
-  const taskId = uuidOrNull(input.taskId);
-  const reservationId = uuidOrNull(input.reservationId);
-  const agentId = scopeAgentId(input);
-  const membershipId = scopeMembershipId(input);
+  const taskId = uuidOrNull(input.taskId), reservationId = uuidOrNull(input.reservationId);
+  const agentId = scopeAgentId(input), membershipId = scopeMembershipId(input);
   const workerSessionId = uuidOrNull(input.workerSessionId);
-
+  const operation = resultPayload === undefined ? "lease renewal" : "progress";
   if (!taskId || (!reservationId && !agentId && !workerSessionId)) {
-    throw new Error("Task progress requires a valid taskId and reservationId, agentId, or workerSessionId");
+    throw new Error(`Task ${operation} requires a valid taskId and reservationId, agentId, or workerSessionId`);
   }
-
   const leaseSeconds = normalizeLeaseSeconds(input.leaseSeconds);
-  const resultPayload = payloadRecord(input.resultPayload ?? {});
-  const rows = await withTaskRowLock(sql, taskId, tx => tx<TaskReservationResultRow[]>`
-    with active_reservation as (
-      select id, agent_id, membership_id, worker_session_id
-      from public.task_reservations
-      where task_id = ${taskId}::uuid
-        and status = 'active'
-        and (${reservationId}::uuid is null or id = ${reservationId}::uuid)
-        and (${agentId}::uuid is null or agent_id = ${agentId}::uuid)
-        and (${membershipId}::uuid is null or membership_id = ${membershipId}::uuid)
-        and (${workerSessionId}::uuid is null or worker_session_id = ${workerSessionId}::uuid)
+  const update = (tx: postgres.Sql) => tx<TaskReservationResultRow[]>`
+    with active_reservation as materialized (
+      select r.id, r.agent_id, r.membership_id, r.worker_session_id, t.xmin as task_xmin
+      from public.task_reservations r join public.tasks t on t.id=r.task_id
+      where r.task_id = ${taskId}::uuid
+        and r.status = 'active'
+        and (${reservationId}::uuid is null or r.id = ${reservationId}::uuid)
+        and (${agentId}::uuid is null or r.agent_id = ${agentId}::uuid)
+        and (${membershipId}::uuid is null or r.membership_id = ${membershipId}::uuid)
+        and (${workerSessionId}::uuid is null or r.worker_session_id = ${workerSessionId}::uuid)
       order by reserved_at desc
       limit 1
     ),
     updated_task as (
       update public.tasks set
-        result_payload = coalesce(result_payload, '{}'::jsonb) ||
-          ${sql.json(toJsonValue(resultPayload))}::jsonb,
+        result_payload = case when ${resultPayload !== undefined} then coalesce(result_payload, '{}'::jsonb) ||
+          ${sql.json(toJsonValue(resultPayload ?? {}))}::jsonb else result_payload end,
         lease_until = now() + make_interval(secs => ${leaseSeconds}),
         updated_at = now()
       from active_reservation
       where public.tasks.id = ${taskId}::uuid
+        and public.tasks.xmin = active_reservation.task_xmin
         and public.tasks.reserved_by_agent_id = active_reservation.agent_id
         and public.tasks.status in ('reserved', 'running')
       returning
@@ -2697,17 +2627,10 @@ export async function reportTaskProgress(input: ProgressTaskInput) {
     )
     select *
     from updated_task
-  `);
-  const row = rows[0];
-
-  if (!row) {
-    throw new Error(`Task ${taskId} is not currently progress-reportable`);
-  }
-
-  return {
-    reservationId: row.reservation_id ?? "",
-    task: mapTask(row)
-  };
+  `;
+  const row = (await update(sql))[0] ?? (await withTaskRowLock(sql, taskId, update))[0];
+  if (!row) throw new Error(`Task ${taskId} is not currently ${resultPayload === undefined ? "renewable" : "progress-reportable"}`);
+  return { reservationId: row.reservation_id ?? "", task: mapTask(row) };
 }
 
 async function claimTaskFailureApplication(

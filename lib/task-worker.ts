@@ -2,7 +2,7 @@ import { FORMULATION_AVAILABILITY_POLICY } from '@/lib/formulation-availability'
 import { loadAdminSafetyReferenceSnapshot } from "@/lib/agentic/catalogue/load-safety-ceilings";
 import { getAssessmentProductPreferences } from "@/lib/assessment-product-preferences";
 import { assessmentInputHash as canonicalAssessmentInputHash, generationLocale, ASSESSMENT_GENERATION_TASKS, loadGenerationInput, FUNNEL_GENERATOR_VERSION } from "@/lib/assessment-revisions";
-import { deferUntilDatabaseCommit } from "@/lib/db";
+import { deferUntilDatabaseCommit, withDatabaseTransaction } from "@/lib/db";
 import type postgres from "postgres";
 import {
   DEFAULT_ASSESSMENT_PLAN,
@@ -356,17 +356,18 @@ export async function enqueueHealthScoreAnalysisTask({
   });
 }
 
-type AssessmentTaskIdentity = Readonly<{ revision: number; inputHash: string }>;
+type AssessmentTaskIdentity = Readonly<{ revision: number; inputHash: string; rowVersion: string; projectionBefore?: unknown }>;
 
-async function assessmentTaskIdentity(sql: postgres.Sql, planId: string): Promise<AssessmentTaskIdentity | null> {
+async function assessmentTaskIdentity(sql: postgres.Sql, planId: string, includeProjection = false): Promise<AssessmentTaskIdentity | null> {
   const [row] = await sql`
-    select input_revision, input_hash,
+    select input_revision, input_hash, xmin::text as row_version,
+      case when ${includeProjection} then to_jsonb(assessments.*) end as projection_before,
       case when input_hash is null then answers end as legacy_answers
     from public.assessments where plan_id = ${planId}::uuid
   `;
   if (!row) return null;
   return {
-    revision: Number(row.input_revision),
+    revision: Number(row.input_revision), rowVersion: row.row_version, projectionBefore: row.projection_before,
     inputHash: row.input_hash ?? canonicalAssessmentInputHash(row.legacy_answers)
   };
 }
@@ -564,13 +565,15 @@ export async function enqueueNutritionPlanTasks({
   locale,
   paymentId,
   plan,
-  planId
+  planId,
+  recovery
 }: Readonly<{
   answers?: unknown;
   locale?: unknown;
   paymentId?: string | null;
   plan: AssessmentPlan;
   planId: string;
+  recovery?: Pick<AssessmentTaskIdentity, "revision" | "inputHash">;
 }>) {
   const sql = getSql();
 
@@ -578,8 +581,26 @@ export async function enqueueNutritionPlanTasks({
     return null;
   }
 
-  const identity = await assessmentTaskIdentity(sql, planId);
+  const identity = await assessmentTaskIdentity(sql, planId, true);
   if (!identity) return null;
+  if (recovery && (identity.revision !== recovery.revision || identity.inputHash !== recovery.inputHash ||
+    (identity.projectionBefore as { selected_plan?: string }).selected_plan !== plan)) {
+    throw new Error("Assessment changed during task preparation; retry recovery");
+  }
+
+  // All readiness/task preparation precedes this short optimistic publication.
+  // xmin also rejects a newer completion/contact/plan change at the same input revision.
+  const publish = (status: "failed" | "ready" | "queued", error: string | null,
+    version: Parameters<typeof appendAssessmentVersion>[1]) => withDatabaseTransaction(sql, async tx => {
+    const [updated] = await tx`update public.assessments set selected_plan=${plan}, status=${status}::public.assessment_status,
+      queue_position=case when ${status === "queued"} then coalesce(queue_position,1) else 0 end,
+      error_message=${error}, plan_selected_at=coalesce(plan_selected_at,now()),
+      completed_at=case when ${status === "ready"} then coalesce(completed_at,now()) else completed_at end, updated_at=now()
+      where plan_id=${planId}::uuid and input_revision=${identity.revision} and xmin=${identity.rowVersion}::xid
+      returning plan_id`;
+    if (!updated) throw new Error("Assessment changed during task preparation; retry recovery");
+    await appendAssessmentVersion(tx, { ...version, projectionBefore: identity.projectionBefore });
+  });
 
   const inputHash = stableHash({ answers, locale });
   const checkoutInputHash = paymentId
@@ -650,7 +671,7 @@ export async function enqueueNutritionPlanTasks({
       const errorMessage =
         "Completed nutrition task was found, but the generated output is missing.";
 
-      await appendAssessmentVersion(sql, {
+      await publish("failed", errorMessage, {
         afterPayload: {
           errorMessage,
           planSelectedAt: "coalesce_current_or_now",
@@ -669,16 +690,7 @@ export async function enqueueNutritionPlanTasks({
         source: "task_worker"
       });
 
-      await sql`
-        update public.assessments set
-          selected_plan = ${plan},
-          status = 'failed'::public.assessment_status,
-          queue_position = 0,
-          error_message = ${errorMessage},
-          plan_selected_at = coalesce(plan_selected_at, now()),
-          updated_at = now()
-        where plan_id = ${planId}::uuid
-      `;
+
 
       return {
         foodGuidanceTaskId,
@@ -712,7 +724,7 @@ export async function enqueueNutritionPlanTasks({
   const nutritionReady = readiness.formulationReady;
   const status = nutritionReady ? "ready" : "queued";
 
-  await appendAssessmentVersion(sql, {
+  await publish(status, null, {
     afterPayload: {
       completedAt: nutritionReady ? "coalesce_current_or_now" : "unchanged",
       errorMessage: null,
@@ -738,23 +750,7 @@ export async function enqueueNutritionPlanTasks({
     source: "task_worker"
   });
 
-  await sql`
-    update public.assessments set
-      selected_plan = ${plan},
-      status = ${status}::public.assessment_status,
-      queue_position = case
-        when ${nutritionReady} then 0
-        else coalesce(queue_position, 1)
-      end,
-      error_message = null,
-      plan_selected_at = coalesce(plan_selected_at, now()),
-      completed_at = case
-        when ${nutritionReady} then coalesce(completed_at, now())
-        else completed_at
-      end,
-      updated_at = now()
-    where plan_id = ${planId}::uuid
-  `;
+
 
   return {
     foodGuidanceTaskId,

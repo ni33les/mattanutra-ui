@@ -13,7 +13,7 @@ import { normalizeAssessmentContactEmail } from "@/lib/assessment-contact";
 import { firstNameFromAssessmentAnswers } from "@/lib/assessment-first-name";
 import { getAssessmentResumeDraft, finalizeAssessmentResumeDraft } from "@/lib/assessment-resume-store";
 import { appendAssessmentVersion } from "@/lib/domain-versions";
-import { claimFunnelRequest, completeFunnelRequest } from "@/lib/funnel-idempotency";
+import { claimFunnelRequest, completeFunnelRequest, completedFunnelRequest } from "@/lib/funnel-idempotency";
 import { FunnelError } from "@/lib/funnel-errors";
 import { getSql, withDatabaseTransaction } from "@/lib/db";
 import { computeHealthScore } from "@/lib/health-score";
@@ -89,12 +89,13 @@ export async function captureAssessment(bodyValue: unknown, options: { planId?: 
   if (!sql) throw new Error("Database is not configured");
   const sessionId = typeof body.sessionId === "string" ? body.sessionId : null;
   if (sessionId && !isUuid(sessionId)) throw new FunnelError("Invalid questionnaire session", 400, "invalid_session");
+  const requestInput = { planId: requestedPlanId, sessionId, answers, locale, contactEmail, paymentId, expectedRevision: body.expectedRevision ?? null };
+  const previous = await completedFunnelRequest(sql, "assessment-capture", options.idempotencyKey, requestInput);
+  if (previous) return previous as CaptureReceipt;
   let replayed = false;
   const result = await withDatabaseTransaction(sql, async tx => {
     const session = sessionId ? await claimFunnelRequest(tx, "assessment-session", sessionId, {}, requestedPlanId ?? undefined) : null;
-    const claimed = await claimFunnelRequest(tx, "assessment-capture", options.idempotencyKey, {
-      planId: requestedPlanId, sessionId, answers, locale, contactEmail, paymentId, expectedRevision: body.expectedRevision ?? null
-    });
+    const claimed = await claimFunnelRequest(tx, "assessment-capture", options.idempotencyKey, requestInput);
     if (claimed.response) { replayed = true; return claimed.response as CaptureReceipt; }
     const planId = requestedPlanId ?? session?.resourceId ?? claimed.resourceId;
     await tx`update public.funnel_requests set resource_id = ${planId}::uuid where scope = 'assessment-capture' and request_key = ${options.idempotencyKey}`;
@@ -166,12 +167,8 @@ export async function retryAssessmentHealthScore(planId: string, locale: unknown
   if (!isUuid(planId) || !isLocale(locale)) throw new FunnelError("Invalid assessment request", 400, "invalid_request");
   const sql = getSql();
   if (!sql) throw new Error("Database is not configured");
-  return withDatabaseTransaction(sql, async tx => {
-    const [row] = await tx`select input_revision from public.assessments where plan_id = ${planId}::uuid for no key update`;
-    if (!row) throw new FunnelError("Assessment not found", 404, "assessment_not_found");
-    const generation = await loadGenerationInput(tx, planId, locale);
-    if (!generation) throw new FunnelError("Assessment changed. Reload before retrying.", 409, "assessment_changed");
-    const tasks = await withGenerationInput(planId, generation, () => enqueueAssessmentPregenerationTasks({ planId, locale, answers: generation.answers }));
-    return { planId, revision: Number(row.input_revision), taskId: tasks?.healthScoreTaskId ?? null, generationStatus: "pending" };
-  });
+  const generation = await loadGenerationInput(sql, planId, locale);
+  if (!generation) throw new FunnelError("Assessment not found", 404, "assessment_not_found");
+  const tasks = await withGenerationInput(planId, generation, () => enqueueAssessmentPregenerationTasks({ planId, locale, answers: generation.answers }));
+  return { planId, revision: generation.revision, taskId: tasks?.healthScoreTaskId ?? null, generationStatus: "pending" };
 }

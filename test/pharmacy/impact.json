@@ -48,7 +48,7 @@
     },
     {
       "file": "test/assessment-capture.integration.test.ts",
-      "expectedCases": 5,
+      "expectedCases": 11,
       "reason": "Shared capture recovery, validation, revision and context preservation",
       "slice": "capture",
       "database": true

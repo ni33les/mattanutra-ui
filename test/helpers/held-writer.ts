@@ -2,12 +2,12 @@ import assert from "node:assert/strict";
 import type postgres from "postgres";
 
 /** Prove a reader finishes before releasing a real, independent writer. */
-export async function whileWriterHeld<T>(sql: postgres.Sql, lock: (tx: postgres.TransactionSql) => Promise<unknown>, read: () => Promise<T>) {
+export async function whileWriterHeld<T>(sql: postgres.Sql, lock: (tx: postgres.TransactionSql) => Promise<unknown>, read: () => Promise<T>, commit = false) {
   let release!: () => void, entered!: () => void;
   const ready = new Promise<void>(resolve => { entered = resolve; });
   const gate = new Promise<void>(resolve => { release = resolve; });
   const rollback = new Error("rollback contention fixture");
-  const writer = sql.begin(async tx => { await lock(tx); entered(); await gate; throw rollback; })
+  const writer = sql.begin(async tx => { await lock(tx); entered(); await gate; if (!commit) throw rollback; })
     .catch(error => { if (error !== rollback) throw error; });
   let operation: Promise<T> | undefined, timer: ReturnType<typeof setTimeout> | undefined;
   try {

@@ -166,9 +166,9 @@ export function createPostgresStore(inputSql: Sql, inTransaction = false, notifi
       return rows.length === 1;
     },
     async isCatalogueRevisionCurrent(expectedRevision) {
-      if (!inTransaction) throw new Error("Catalogue publication fences require a transaction");
+      if (!inTransaction) throw new Error("Catalogue publication checks require a transaction");
       const [row] = await sql<{ revision: number | string }>`
-        select revision from public.catalogue_runtime_revision where singleton = true for share`;
+        select revision from public.catalogue_runtime_revision where singleton = true`;
       return row != null && String(row.revision) === String(expectedRevision);
     },
     async getCatalogueSnapshot(id) {
@@ -404,22 +404,6 @@ export function createPostgresStore(inputSql: Sql, inTransaction = false, notifi
           and expired_at is null
         order by created_at asc
         limit 1
-      `;
-      return row ? mapOrder(row) : null;
-    },
-    async getActiveOrderForPlanRevisionForUpdate(planId, planRevision) {
-      if (!inTransaction) throw new Error("Order mutation lookup requires a transaction");
-      const [row] = await sql<DatabaseRow<OrderRecord>>`
-        select * from public.agentic_orders
-        where plan_id = ${planId}::uuid
-          and plan_revision = ${planRevision}
-          and order_status not in ('expired', 'cancelled')
-          and checkout_reuse_eligible
-          and cancelled_at is null
-          and expired_at is null
-        order by created_at asc
-        limit 1
-        for update
       `;
       return row ? mapOrder(row) : null;
     },

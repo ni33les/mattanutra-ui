@@ -275,9 +275,6 @@ export function createMemoryStore(): AgenticStore {
 
       return matches[0] ? clone(matches[0]) : null;
     },
-    async getActiveOrderForPlanRevisionForUpdate(planId, planRevision) {
-      return store.getActiveOrderForPlanRevision(planId, planRevision);
-    },
     async getExecuteResponseForOrder(orderId) {
       const matches = [...idempotency.values()]
         .filter(

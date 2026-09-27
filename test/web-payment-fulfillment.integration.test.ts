@@ -10,7 +10,8 @@ import { enqueueWebPaymentFulfillment, fulfillWebPayment } from "../lib/web-paym
 import { bindPaidReservationToAssessment, completeMockPayment, createStripeCheckoutSession, type PaymentRow, updatePaymentState } from "../lib/stripe-payments.ts";
 
 const databaseUrl = process.env.TEST_DB_URL;
-describe("durable web payment fulfillment on PostgreSQL", { skip: !databaseUrl }, () => {
+assert.ok(databaseUrl, "This integration test requires isolated PostgreSQL");
+describe("durable web payment fulfillment on PostgreSQL", () => {
   const ids: string[] = [], plans: string[] = [], keys: string[] = [];
   const dependencies = {
     session: async () => null,
