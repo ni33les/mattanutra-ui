@@ -1,4 +1,5 @@
 import { ASSESSMENT_GENERATION_TASKS, generationInput, generationTaskId, loadGenerationInput } from "@/lib/assessment-revisions";
+import { FunnelError } from "@/lib/funnel-errors";
 import { randomUUID } from "node:crypto";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { canonicalHash } from "@/lib/agentic/value/canonical";
@@ -817,7 +818,7 @@ export async function createTask(input: CreateTaskInput, sqlOverride?: Db) {
   const create = async (tx: Db) => {
     if (input.planId && ASSESSMENT_GENERATION_TASKS.has(input.taskType) && !generationInput(input.payload)) {
       const generation = await loadGenerationInput(tx, input.planId, payloadRecord(input.payload).locale);
-      if (!generation) throw new Error("Assessment changed during task preparation; retry recovery");
+      if (!generation) throw new FunnelError("Assessment changed during task preparation; retry recovery", 409, "assessment_changed");
       return createTaskRecord(tx, { ...input,
         id: input.id ? generationTaskId(input.id, generation) : undefined,
         payload: { ...payloadRecord(input.payload), generation },

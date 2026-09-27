@@ -1,4 +1,5 @@
 import { FORMULATION_AVAILABILITY_POLICY } from '@/lib/formulation-availability';
+import { FunnelError } from "@/lib/funnel-errors";
 import { loadAdminSafetyReferenceSnapshot } from "@/lib/agentic/catalogue/load-safety-ceilings";
 import { getAssessmentProductPreferences } from "@/lib/assessment-product-preferences";
 import { assessmentInputHash as canonicalAssessmentInputHash, generationLocale, ASSESSMENT_GENERATION_TASKS, loadGenerationInput, FUNNEL_GENERATOR_VERSION } from "@/lib/assessment-revisions";
@@ -585,7 +586,7 @@ export async function enqueueNutritionPlanTasks({
   if (!identity) return null;
   if (recovery && (identity.revision !== recovery.revision || identity.inputHash !== recovery.inputHash ||
     (identity.projectionBefore as { selected_plan?: string }).selected_plan !== plan)) {
-    throw new Error("Assessment changed during task preparation; retry recovery");
+    throw new FunnelError("Assessment changed during task preparation; retry recovery", 409, "assessment_changed");
   }
 
   // All readiness/task preparation precedes this short optimistic publication.
@@ -598,7 +599,7 @@ export async function enqueueNutritionPlanTasks({
       completed_at=case when ${status === "ready"} then coalesce(completed_at,now()) else completed_at end, updated_at=now()
       where plan_id=${planId}::uuid and input_revision=${identity.revision} and xmin=${identity.rowVersion}::xid
       returning plan_id`;
-    if (!updated) throw new Error("Assessment changed during task preparation; retry recovery");
+    if (!updated) throw new FunnelError("Assessment changed during task preparation; retry recovery", 409, "assessment_changed");
     await appendAssessmentVersion(tx, { ...version, projectionBefore: identity.projectionBefore });
   });
 
