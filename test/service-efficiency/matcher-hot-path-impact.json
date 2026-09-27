@@ -207,6 +207,11 @@
       "file": "test/service-efficiency/search-strategy.test.ts",
       "expectedCases": 6,
       "reason": "SEARCH-WORK-01–06: conservative additive pruning, explicit-purchase/unknown-intake exceptions and residual-first exploration with one-attempt checkpoint equivalence"
+    },
+    {
+      "file": "test/web-journey-fix/search.test.ts",
+      "expectedCases": 1,
+      "reason": "WEB-JOURNEY-05: shared cursor repair still consolidates a nine-product routine, preserving one-attempt checkpoint traversal"
     }
   ],
   "exclusions": "No full application/MCP, live database, payment or unrelated browser suites; no contract or scoring-policy changes."
