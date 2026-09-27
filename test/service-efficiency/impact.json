@@ -650,6 +650,12 @@
       "expectedCases": 2,
       "reason": "PERF-CPU-65–66: avoid duplicate resident archive storage, preserve historical checkpoint encoding, restart and expanded traversal",
       "slice": "numeric"
+    },
+    {
+      "file": "test/service-efficiency/score-storage.test.ts",
+      "expectedCases": 2,
+      "reason": "PERF-CPU-67–68: exact scoring cache avoids singleton array allocation while isolating all routine measurements and profiles",
+      "slice": "numeric"
     }
   ],
   "inputs": [
