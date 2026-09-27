@@ -136,7 +136,7 @@ test('PERF-PACK-03 each benchmark process receives its own source identity witho
   const { mkdtempSync, writeFileSync, rmSync } = await import('node:fs');
   const { tmpdir } = await import('node:os'); const { join } = await import('node:path');
   const { execFileSync } = await import('node:child_process');
-  const module = await import('../../scripts/service-efficiency/benchmark.mjs');
+  const benchmark = await import('../../scripts/service-efficiency/benchmark.mjs');
   const root = mkdtempSync(join(tmpdir(), 'benchmark-identity-'));
   const git = (...args: string[]) => execFileSync('git', ['-C', root, ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
   const fields = ['AGENTIC_BUILD_ID', 'AGENTIC_WORKER_VERSION', 'WORKER_VERSION', 'COMMIT_SHA', 'COMMIT_HASH'];
@@ -145,12 +145,12 @@ test('PERF-PACK-03 each benchmark process receives its own source identity witho
     git('init'); writeFileSync(join(root, 'source.txt'), 'control'); git('add', 'source.txt');
     git('-c', 'user.name=Fixture', '-c', 'user.email=fixture@localhost', 'commit', '-m', 'control');
     const control = git('rev-parse', 'HEAD');
-    const before = module.benchmarkEnvironment?.(inherited, root) ?? inherited;
+    const before = benchmark.benchmarkEnvironment?.(inherited, root) ?? inherited;
     for (const field of fields) assert.equal(before[field], control, `${field} must identify the process source, not the previous test run`);
     writeFileSync(join(root, 'source.txt'), 'candidate'); git('add', 'source.txt');
     git('-c', 'user.name=Fixture', '-c', 'user.email=fixture@localhost', 'commit', '-m', 'candidate');
     const candidate = git('rev-parse', 'HEAD'); assert.notEqual(candidate, control);
-    const after = module.benchmarkEnvironment(inherited, root);
+    const after = benchmark.benchmarkEnvironment(inherited, root);
     for (const field of fields) assert.equal(after[field], candidate);
     assert.equal(after.FIXTURE_SCOPE, 'isolated'); assert.equal(inherited.AGENTIC_BUILD_ID, 'a'.repeat(40));
   } finally { rmSync(root, { recursive: true, force: true }); }
