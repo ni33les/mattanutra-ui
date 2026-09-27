@@ -653,8 +653,8 @@
     },
     {
       "file": "test/service-efficiency/score-storage.test.ts",
-      "expectedCases": 2,
-      "reason": "PERF-CPU-67–68: exact scoring cache avoids singleton array allocation while isolating all routine measurements and profiles",
+      "expectedCases": 1,
+      "reason": "PERF-CPU-68: shared exposure must preserve distinct routine measurements; PERF-CPU-67 withdrawn with the slower singleton-cache experiment; evidence retained outside checkout",
       "slice": "numeric"
     }
   ],
