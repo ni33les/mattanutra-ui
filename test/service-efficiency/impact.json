@@ -7,7 +7,7 @@
       "file": "test/service-efficiency/checkpoint-flag.test.ts",
       "slice": "checkpoint-flag",
       "expectedCases": 7,
-      "reason": "CKPT-FLAG-01–04: default-off durable cursors, zero checkpoint encoding, identical standard/expanded search, explicit interruption/replay failure and opt-in persistence"
+      "reason": "CKPT-FLAG-01\u201304: default-off durable cursors, zero checkpoint encoding, identical standard/expanded search, explicit interruption/replay failure and opt-in persistence"
     },
     {
       "file": "test/service-efficiency/measurements.test.ts",
@@ -256,7 +256,7 @@
       "file": "test/service-efficiency/permit-removal.test.ts",
       "slice": "permits",
       "expectedCases": 4,
-      "reason": "Audits 22–25: remove artificial admission/worker/connection/database gates while preserving cancellation and deadlines"
+      "reason": "Audits 22\u201325: remove artificial admission/worker/connection/database gates while preserving cancellation and deadlines"
     },
     {
       "file": "test/agentic-catalogue-publish-v5.test.ts",
@@ -491,7 +491,7 @@
     {
       "file": "test/service-efficiency/numeric-scoring.test.ts",
       "expectedCases": 48,
-      "reason": "Exact ranking must avoid allocating human display conversions while preserving complete serialized score facts and weighted penalties; resident sessions own catalogue facts once and preserve checkpoint invalidation after caller mutation; PERF-CPU-01 exact interior-probe comparison and historical checkpoint recovery without response materialization; PERF-CPU-02 repeated label identities share reference resolution without sharing quantities or confidence; PERF-CPU-03 physical variant reuse with changed-offer repricing; PERF-CPU-04 independent exact linear coefficients; PERF-CPU-05 safety and retained scores share verified quantities without trusting stale preparation; PERF-CPU-06 selected product metadata is shared across final scoring counts; PERF-CPU-13 endpoint allocation; PERF-CPU-15 exact score facts share one lifetime record; PERF-CPU-16 and 18–24: indexed retained quantities, immutable deviation/concern/basis reuse, compiled intake endpoints, exact serving lower bounds, sorted variant facts and deferred public score materialization; PERF-CPU-26–28 and 30: one quantity-group lookup, normalized endpoint components, exact identity/common-denominator comparison and canonical unit parsing; PERF-CPU-59: exact monotonic profile bounds avoid redundant scoring while allowing decreasing weights to reverse ordering; PERF-CPU-63: skip quantities that cannot make an unrelated listing selectable while retaining explicit/unknown requests; PERF-CPU-64: reference breakpoints reuse the already verified minimum-quantity label exposure",
+      "reason": "Exact ranking must avoid allocating human display conversions while preserving complete serialized score facts and weighted penalties; resident sessions own catalogue facts once and preserve checkpoint invalidation after caller mutation; PERF-CPU-01 exact interior-probe comparison and historical checkpoint recovery without response materialization; PERF-CPU-02 repeated label identities share reference resolution without sharing quantities or confidence; PERF-CPU-03 physical variant reuse with changed-offer repricing; PERF-CPU-04 independent exact linear coefficients; PERF-CPU-05 safety and retained scores share verified quantities without trusting stale preparation; PERF-CPU-06 selected product metadata is shared across final scoring counts; PERF-CPU-13 endpoint allocation; PERF-CPU-15 exact score facts share one lifetime record; PERF-CPU-16 and 18\u201324: indexed retained quantities, immutable deviation/concern/basis reuse, compiled intake endpoints, exact serving lower bounds, sorted variant facts and deferred public score materialization; PERF-CPU-26\u201328 and 30: one quantity-group lookup, normalized endpoint components, exact identity/common-denominator comparison and canonical unit parsing; PERF-CPU-59: exact monotonic profile bounds avoid redundant scoring while allowing decreasing weights to reverse ordering; PERF-CPU-63: skip quantities that cannot make an unrelated listing selectable while retaining explicit/unknown requests; PERF-CPU-64: reference breakpoints reuse the already verified minimum-quantity label exposure",
       "slice": "numeric"
     },
     {
@@ -648,7 +648,7 @@
     {
       "file": "test/service-efficiency/resident-archive.test.ts",
       "expectedCases": 2,
-      "reason": "PERF-CPU-65–66: avoid duplicate resident archive storage, preserve historical checkpoint encoding, restart and expanded traversal",
+      "reason": "PERF-CPU-65\u201366: avoid duplicate resident archive storage, preserve historical checkpoint encoding, restart and expanded traversal",
       "slice": "numeric"
     },
     {
@@ -660,8 +660,14 @@
     {
       "file": "test/service-efficiency/checkpoint-progress.test.ts",
       "expectedCases": 3,
-      "reason": "PERF-CKPT-05–06: combine checkpoint-off progress with the next reservation, preserving commit-before-dispatch, interruption accounting and opt-in acknowledgements",
+      "reason": "PERF-CKPT-05\u201306: combine checkpoint-off progress with the next reservation, preserving commit-before-dispatch, interruption accounting and opt-in acknowledgements",
       "slice": "sessions"
+    },
+    {
+      "file": "test/service-efficiency/matcher-heap.test.ts",
+      "slice": "worker-heap",
+      "expectedCases": 1,
+      "reason": "PERF-CPU-69: real prepared worker resource limits, unchanged two-slot capacity and complete shutdown; bounded GC tuning with no matching changes"
     }
   ],
   "inputs": [
