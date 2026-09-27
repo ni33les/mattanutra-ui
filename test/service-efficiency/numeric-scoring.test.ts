@@ -26,37 +26,23 @@ mock.module('../../lib/matcher/safety.ts', { namedExports: { ...safetyModule, la
 const { request } = await import('../matcher/flexible-v5-fixtures.ts');
 const { doseFitScore, numericalDoseFitScore, exactDoseFit, compareDoseFit, weightedDoseFitScore, numericalWeightedDoseFitScore } = await import('../../lib/matcher/dose-fit.ts');
 
-test('PERF-CPU-67 repeated quantities reuse the current parent identity across continuations', async () => {
-  const { createSearchCursor, advanceSearchCursor, searchCursorResult } = await import('../../lib/matcher/search-cursor.ts');
-  const { compileGroups } = await import('../../lib/matcher/candidates.ts');
-  const { DEFAULT_MATCHER_CONFIG } = await import('../../lib/matcher/config.ts');
-  const { product, catalog } = await import('../matcher/flexible-v5-fixtures.ts');
-  const input = request(), groups = compileGroups(input, catalog([
-    product('first', { a: 7 }), product('second', { a: 13 }), product('third', { a: 17 })
-  ]));
-  const cursor = createSearchCursor(groups, input, { ...DEFAULT_MATCHER_CONFIG, exactGroupLimit: 0, expansionBudget: 1000 });
-  let parentIds: readonly string[] | undefined, mappings = 0, attemptsAtParent = 0;
-  try {
-    for (let step = 0; step < 1000 && !cursor.done; step++) {
-      const parent = cursor.phase === 'beam' ? cursor.beam[cursor.parent] : undefined;
-      if (!parentIds && parent?.selectedVariantIds.length) {
-        parentIds = parent.selectedVariantIds; attemptsAtParent = cursor.expansionAttempts;
-        const original = parentIds.map;
-        Object.defineProperty(parentIds, 'map', { configurable: true, value: function<T>(this: string[], ...args: Parameters<typeof original<T>>) {
-          mappings++; return original.apply(this, args);
-        } });
-      }
-      if (parentIds && parent && parent.selectedVariantIds !== parentIds) break;
-      advanceSearchCursor(cursor, input, 1);
-    }
-  } finally { if (parentIds) Reflect.deleteProperty(parentIds, 'map'); }
-  assert.ok(parentIds, 'The fixture must reach a nonempty parent with multiple physical quantities');
-  assert.ok(cursor.expansionAttempts - attemptsAtParent >= 8, 'Several real additions must reuse the parent');
-  const restored = structuredClone(cursor);
-  while (!cursor.done) advanceSearchCursor(cursor, input, 17);
-  while (!restored.done) advanceSearchCursor(restored, input, 31);
-  assert.deepEqual(searchCursorResult(restored, input), searchCursorResult(cursor, input), 'Transient identity reuse must not change restored traversal or scores');
-  assert.equal(mappings, 1, 'One current parent identity is sufficient; do not rebuild its ordinal vector per quantity');
+test('PERF-CPU-68 exact sums avoid temporary iterators and preserve wide signed comparisons', () => {
+  const values = [fractions.rational(7n, 13n), fractions.rational(3n, 10n), fractions.rational(-2n, 7n), fractions.ZERO];
+  let iterators = 0;
+  Object.defineProperty(values, Symbol.iterator, { value() { iterators++; return Array.prototype[Symbol.iterator].call(this); } });
+  assert.deepEqual(fractions.sum(values), { num: 503n, den: 910n });
+  assert.deepEqual(fractions.sum([]), fractions.ZERO);
+  assert.deepEqual(fractions.sum([fractions.rational(2n, 3n), fractions.rational(-2n, 3n)]), fractions.ZERO);
+  const wide = 2n ** 200n;
+  for (const denominator of [1n, 3n, wide - 1n]) {
+    const lower = fractions.rational(wide, denominator), higher = fractions.rational(wide + 1n, denominator);
+    assert.equal(fractions.compare(lower, higher), -1);
+    assert.equal(fractions.compare(higher, lower), 1);
+    assert.equal(fractions.compare(lower, fractions.rational(wide * 2n, denominator * 2n)), 0);
+    assert.equal(fractions.compare(fractions.rational(-wide - 1n, denominator), fractions.rational(-wide, denominator)), -1);
+  }
+  assert.equal(fractions.compare(fractions.rational(wide, wide - 1n), fractions.rational(wide + 1n, wide)), 1);
+  assert.equal(iterators, 0, 'Exact accumulation must not allocate an iterator for each candidate component list');
 });
 
 test('PERF-CPU-64 physical breakpoint preparation reuses its verified minimum-quantity exposure', async () => {

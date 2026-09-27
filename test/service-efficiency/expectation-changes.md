@@ -346,3 +346,9 @@ work still takes the tested conditional retirement path.
 - Audit suggestion for a web frozen-payment fast path was already implemented by `findReusableWebCheckoutPayment`; no second fast path or duplicate query was added.
 - Final execution discovered nine maintained web-advisory cases, rather than the older inventory's eight; all nine executed and passed. The first affected run's only failing check was the changed receipt SQL fingerprint in the lock register. Preserve that failure, the corrected register review and replacement execution; no test assertion was relaxed.
 - Recovery races use the existing `assessment_changed` / HTTP 409 response. `LOCK-REDUNDANT-05D–E` first failed against generic internal errors, then passed with the shared `FunnelError`; no new response field or error vocabulary was introduced.
+
+### 2026-09-27 — bounded exact-arithmetic CPU trial
+
+- `PERF-CPU-67`'s current-parent identity cache was withdrawn: the frozen results and corrected regression passed, but the nine-trial CPU comparison increased combined CPU and did not improve expanded search. The initial assertion required one mapping even when a preceding probe had already prepared the key; corrected RED/GREEN, patch and timings are retained in `/root/.codex/deploy/matcher-cpu-20260927`. Only that unshipped optimisation's exclusive assertion is retired.
+- `PERF-CPU-68` checks iterator-free exact summation and independently calculated signed/wide fraction ordering. No scoring coefficient, rounding, search order, quantity or budget changes are approved.
+- The simple-plan refinement inventory still listed 28 numerical cases; it now records the actual 48 maintained cases. No prior arithmetic assertion is removed or skipped.
