@@ -36,8 +36,6 @@ export class MatchWorkerPool {
     this.capacity = capacity;
     // Keep the path explicit so Next.js can trace the worker entry point.
     this.pool = new ThreadPool<MatchCommand, MatchCompletion>(() => new Worker(resolve(process.cwd(), "workers/mcp-matcher.ts"), {
-      // Search creates short-lived exact-number objects; avoid frequent minor collections.
-      resourceLimits: { maxYoungGenerationSizeMb: 64 },
       execArgv: ["--experimental-strip-types", "--import", resolve(process.cwd(), "scripts/register-ts-path-loader.mjs")]
     }), capacity, queueLimit);
   }
