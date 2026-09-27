@@ -107,6 +107,45 @@ describe("task lifecycle transactions on PostgreSQL", () => {
     await assert.rejects(reportTaskProgress({ ...input, resultPayload: { stale: true } }), /progress-reportable/);
     assert.equal((await renewTaskLease({ ...input, reservationId: next.reservationId })).reservationId, next.reservationId);
   });
+  it("LOCK-REDUNDANT-06C a waiting activity write rechecks same-agent ownership after a tuple changes", async () => {
+    const sql = getSql()!;
+    for (const replace of [false, true]) {
+      const input = await reserved(), replacement = randomUUID();
+      let release!: () => void, entered!: () => void, writerPid = 0;
+      const ready = new Promise<void>(resolve => { entered=resolve; }), gate = new Promise<void>(resolve => { release=resolve; });
+      const writer = sql.begin(async tx => {
+        writerPid = (await tx`select pg_backend_pid() as pid`)[0].pid;
+        await tx`update tasks set updated_at=clock_timestamp() where id=${input.taskId}`;
+        if (replace) {
+          // Deferred work may be reclaimed with the same agent AND attempt count.
+          await tx`update task_reservations set status='released',released_at=now() where id=${input.reservationId}`;
+          await tx`insert into task_reservations(id,task_id,agent_id,membership_id,worker_session_id,status,reserved_at,lease_until)
+            values(${replacement},${input.taskId},${agentId},${membershipId},${sessionId},'active',now(),now()+interval '3 minutes')`;
+        }
+        entered(); await gate;
+      });
+      await ready;
+      const pending = reportTaskProgress({...input,resultPayload:{observed:replace ? "stale" : "current"}})
+        .then(value => ({value,error:null}), error => ({value:null,error}));
+      try {
+        let blocked = false;
+        for (let i=0;i<100;i++) {
+          const [row] = await sql`select exists(select 1 from pg_stat_activity where datname=current_database()
+            and ${writerPid} = any(pg_blocking_pids(pid))) as blocked`;
+          if (row.blocked) { blocked=true; break; }
+          await new Promise(resolve => setTimeout(resolve,5));
+        }
+        assert.equal(blocked,true,"The activity UPDATE must have started before the ownership change commits");
+        release(); await writer;
+        const result = await pending;
+        if (replace) {
+          assert.match(result.error?.message ?? "", /progress-reportable/);
+          assert.equal((await sql`select result_payload->>'observed' as observed from tasks where id=${input.taskId}`)[0].observed,null);
+          assert.equal((await renewTaskLease({...input,reservationId:replacement})).reservationId,replacement);
+        } else { assert.equal(result.error,null); assert.equal((result.value!.task.resultPayload as {observed:string}).observed,"current"); }
+      } finally { release(); await writer; await pending; }
+    }
+  });
 
   it("LOCK-TASK-01 result preparation occurs before the task lock and the prepared payload is used once", async () => {
     const input = await reserved();

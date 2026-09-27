@@ -87,6 +87,56 @@ describe("shared assessment capture on PostgreSQL", () => {
     assert.equal(result.revision, first.revision); assert.ok(result.taskId);
     assert.equal((await retryAssessmentHealthScore(first.planId, "en")).taskId, result.taskId);
   });
+  it("LOCK-REDUNDANT-05B recovery cannot overwrite a newer assessment after preparing tasks", async () => {
+    const { enqueueNutritionPlanTasks } = await import("../lib/task-worker.ts");
+    const first = await captureAssessment(body, request()); plans.push(first.planId);
+    const sql = getSql()!;
+    await sql`update tasks set status='failed' where plan_id=${first.planId}`;
+    await sql.unsafe(`create function public.lock_fixture_newer_assessment() returns trigger language plpgsql as $$ begin
+      if new.plan_id='${first.planId}'::uuid and new.task_type='generate_food_gap_guidance' then
+        update public.assessments set input_revision=input_revision+1,input_hash='newer-recovery-input',status='ready' where plan_id=new.plan_id;
+      end if; return new; end $$`);
+    await sql`create trigger lock_fixture_newer_assessment after insert on tasks for each row execute function public.lock_fixture_newer_assessment()`;
+    try {
+      await assert.rejects(enqueueNutritionPlanTasks({planId:first.planId,plan:"precision",answers:body.answers,locale:"en"}), /Assessment changed during task preparation/);
+      const [current] = await sql`select input_revision,status from assessments where plan_id=${first.planId}`;
+      assert.equal(Number(current.input_revision),first.revision+1); assert.equal(current.status,"ready");
+      assert.equal((await sql`select count(*)::int as n from assessment_versions where plan_id=${first.planId} and reason='plan_selected_tasks_queued'`)[0].n,0);
+    } finally { await sql`drop trigger lock_fixture_newer_assessment on tasks`; await sql`drop function public.lock_fixture_newer_assessment()`; }
+  });
+  it("LOCK-REDUNDANT-05C recovery audit retains the pre-publication snapshot", async () => {
+    const { enqueueNutritionPlanTasks } = await import("../lib/task-worker.ts");
+    const first = await captureAssessment(body, request()); plans.push(first.planId);
+    await enqueueNutritionPlanTasks({planId:first.planId,plan:"precision",answers:body.answers,locale:"en"});
+    const [version] = await getSql()!`select snapshot from assessment_versions where plan_id=${first.planId} and reason='plan_selected_tasks_queued' order by version desc limit 1`;
+    assert.ok(version); assert.equal(version.snapshot.projectionBefore.status,"captured");
+    assert.equal(version.snapshot.projectionPatch.status,"queued");
+  });
+  it("LOCK-REDUNDANT-05D recovery preserves a plan selected after its input was read", async () => {
+    const { enqueueNutritionPlanTasks } = await import("../lib/task-worker.ts");
+    const { loadGenerationInput } = await import("../lib/assessment-revisions.ts");
+    const first = await captureAssessment(body, request()); plans.push(first.planId);
+    const sql = getSql()!, recovery = await loadGenerationInput(sql, first.planId, "en");
+    assert.ok(recovery);
+    await sql`update assessments set selected_plan='pro' where plan_id=${first.planId}`;
+    const before = await sql`select id from tasks where plan_id=${first.planId} order by id`;
+    await assert.rejects(enqueueNutritionPlanTasks({planId:first.planId,plan:"precision",answers:body.answers,locale:"en",recovery}), /Assessment changed/);
+    assert.equal((await sql`select selected_plan from assessments where plan_id=${first.planId}`)[0].selected_plan,"pro");
+    assert.deepEqual(await sql`select id from tasks where plan_id=${first.planId} order by id`,before);
+  });
+  it("LOCK-REDUNDANT-05E a changed generation cannot be admitted as an unversioned task", async () => {
+    const { loadGenerationInput, withGenerationInput } = await import("../lib/assessment-revisions.ts");
+    const { createTask } = await import("../lib/task-service.ts");
+    const first = await captureAssessment(body, request()); plans.push(first.planId);
+    const sql = getSql()!, generation = await loadGenerationInput(sql, first.planId, "en");
+    assert.ok(generation);
+    await sql`update assessments set input_revision=input_revision+1,input_hash='new-input' where plan_id=${first.planId}`;
+    const before = await sql`select id from tasks where plan_id=${first.planId} order by id`;
+    await assert.rejects(withGenerationInput(first.planId,generation,() => createTask({
+      planId:first.planId,taskType:"generate_supplement_guidance",title:"Stale recovery",payload:{locale:"en"}
+    })), /Assessment changed/);
+    assert.deepEqual(await sql`select id from tasks where plan_id=${first.planId} order by id`,before);
+  });
   it("creates only the ID reserved by a valid resume token and preserves payment context", async () => {
     const paymentId = randomUUID(); payments.push(paymentId);
     await getSql()!`insert into public.payments (id, selected_plan, status, amount, paid_at) values (${paymentId}::uuid, 'precision', 'paid', 690000000, now())`;
