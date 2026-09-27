@@ -13,7 +13,12 @@ import { matchPlan } from "../../lib/agentic/plan/matching.ts";
 import { normalizePlanRequest } from "../../lib/agentic/plan/normalize.ts";
 import type { AgenticStore } from "../../lib/agentic/store/types.ts";
 
-afterEach(uninstallRealCatalogue);
+const checkpointFlag = process.env.MATCHER_DURABLE_CHECKPOINTS_ENABLED;
+afterEach(() => {
+  uninstallRealCatalogue();
+  if (checkpointFlag === undefined) delete process.env.MATCHER_DURABLE_CHECKPOINTS_ENABLED;
+  else process.env.MATCHER_DURABLE_CHECKPOINTS_ENABLED = checkpointFlag;
+});
 
 test("LOCK-SNAPSHOT-02 concurrent reference scopes keep their immutable facts after a refresh", async () => {
   assert.equal(typeof runWithMatcherSafetySnapshot, "function");
@@ -35,6 +40,7 @@ test("LOCK-SNAPSHOT-02 concurrent reference scopes keep their immutable facts af
 });
 
 test("LOCK-SNAPSHOT-03 interrupted durable matching restores its catalogue and references after both change", { timeout: 30_000 }, async () => {
+  process.env.MATCHER_DURABLE_CHECKPOINTS_ENABLED = "true";
   const frozen = await installCatalogue(), app = runtime("immutable-restart");
   const previous = process.env.AX_REFINEMENT_REAL_WORKERS; process.env.AX_REFINEMENT_REAL_WORKERS = "1";
   const normalized = await normalizePlanRequest({ config: app.config, snapshot: frozen.snapshot, request: prepareSimpleRequest(publicRequest(goldens.d3), frozen.snapshot) as typeof goldens.d3 });

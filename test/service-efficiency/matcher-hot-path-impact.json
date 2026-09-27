@@ -11,7 +11,7 @@
     {
       "file": "test/service-efficiency/immutable-references.test.ts",
       "expectedCases": 2,
-      "reason": "Reference isolation across concurrent and restarted resident calculations"
+      "reason": "Reference isolation across concurrent and restarted resident calculations; restart fixture explicitly enables opt-in durable checkpoint persistence"
     },
     {
       "file": "test/matcher/dose.test.ts",
@@ -46,7 +46,7 @@
     {
       "file": "test/service-efficiency/checkpoint-hot-path.test.ts",
       "expectedCases": 5,
-      "reason": "Terminal checkpoint, old cursor recovery and expanded accounting"
+      "reason": "Terminal checkpoint, old cursor recovery and expanded accounting; compare complete durable cursor states across live/archive representation changes"
     },
     {
       "file": "test/service-efficiency/frontier-hot-path.test.ts",

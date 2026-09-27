@@ -391,7 +391,7 @@
       "file": "test/service-efficiency/immutable-references.test.ts",
       "slice": "immutable-references",
       "expectedCases": 2,
-      "reason": "Audits 6/30/33: concurrent immutable reference scopes and real checkpoint restart after catalogue/reference changes, with explicit stale presentation"
+      "reason": "Audits 6/30/33: concurrent immutable reference scopes and real checkpoint restart after catalogue/reference changes, with explicit stale presentation; restart fixture explicitly enables opt-in durable checkpoint persistence"
     },
     {
       "file": "test/transaction-boundary.test.ts",
@@ -480,7 +480,7 @@
       "file": "test/service-efficiency/checkpoint-hot-path.test.ts",
       "slice": "matcher-hot-path",
       "expectedCases": 5,
-      "reason": "Completion without redundant checkpoint continuation, historical cursor recovery and standard-to-expanded attempt accounting"
+      "reason": "Completion without redundant checkpoint continuation, historical cursor recovery and standard-to-expanded attempt accounting; compare complete durable cursor states across live/archive representation changes"
     },
     {
       "file": "test/service-efficiency/frontier-hot-path.test.ts",

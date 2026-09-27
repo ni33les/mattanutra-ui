@@ -1,11 +1,14 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { request, product, catalog } from '../matcher/flexible-v5-fixtures.ts';
-import { createMatchCursor, advanceMatchCursor, expandMatchCursor, matchCursorAttempts } from '../../lib/matcher/match-cursor.ts';
+import { createMatchCursor, advanceMatchCursor, expandMatchCursor, matchCursorAttempts, type MatchCursor } from '../../lib/matcher/match-cursor.ts';
 import { DEFAULT_MATCHER_CONFIG, match } from '../../lib/matcher/index.ts';
 import { encodeMatchCursorBytes, decodeMatchCursor } from '../../lib/matcher/cursor-codec-server.ts';
 
 const fixture = () => ({ input: request(), products: catalog([product('one', { a: 75 }), product('two', { a: 50 })]), config: { ...DEFAULT_MATCHER_CONFIG, expansionBudget: 8 } });
+// Live archives retain states; the unchanged durable format retains packed rows.
+// Compare complete persisted state, including all frontiers and work counters.
+const durable = (cursor: MatchCursor) => decodeMatchCursor(encodeMatchCursorBytes(cursor), cursor.identity);
 
 test('EFF-HOT-05 the final productive chunk marks completion without a zero-work continuation', () => {
   const { input, products, config } = fixture();
@@ -37,7 +40,7 @@ test('EFF-HOT-07 terminal standard checkpoints remain expandable and resume iden
   for (const current of [cursor, restored]) advanceMatchCursor(current, input, 16);
   assert.equal(matchCursorAttempts(cursor), matchCursorAttempts(restored));
   assert.ok(matchCursorAttempts(cursor) > 8);
-  assert.deepEqual(restored, cursor);
+  assert.deepEqual(durable(restored), durable(cursor));
 });
 
 
@@ -57,7 +60,7 @@ test('PERF-CKPT-01 completed bounded search releases obsolete frontiers while re
   const historical=structuredClone(restored);
   Object.assign(historical.sellers[0]!.cursor,{singles:active.singles,beam:active.beam,expanded:active.expanded});
   for(const current of [cursor,restored,historical]){expandMatchCursor(current);advanceMatchCursor(current,input,400);}
-  assert.deepEqual(restored,cursor);assert.deepEqual(historical,cursor);
+  assert.deepEqual(durable(restored),durable(cursor));assert.deepEqual(durable(historical),durable(cursor));
   assert.equal(matchCursorAttempts(cursor),700,'Cleanup must not alter or consume search attempts');
 });
 
@@ -81,7 +84,7 @@ test('PERF-CKPT-02 checkpoints retain only the frontiers needed by the active ph
     const restored=decodeMatchCursor(encodeMatchCursorBytes(cursor),cursor.identity);
     advanceMatchCursor(restored,input,2400);
     const uninterrupted=structuredClone(cursor);advanceMatchCursor(uninterrupted,input,2400);
-    assert.deepEqual(restored,uninterrupted,'Phase cleanup preserves exact checkpoint recovery');
+    assert.deepEqual(durable(restored),durable(uninterrupted),'Phase cleanup preserves exact checkpoint recovery');
   }
   assert.deepEqual([...observed],['repair','second'],'Both active phases must actually be exercised');
   assert.equal(matchCursorAttempts(cursor),2400);
