@@ -6,7 +6,7 @@
     {
       "file": "test/service-efficiency/numeric-scoring.test.ts",
       "expectedCases": 47,
-      "reason": "Exact internal records, serving lower bounds, immutable quantity/intake/exposure reuse and complete public materialization without search changes; PERF-CPU-26\u201328 and 30: one quantity-group lookup, normalized endpoint components, exact identity/common-denominator comparison and canonical unit parsing; PERF-CPU-31/33 preserve stable remaining-gap leaders and reuse preference denominators; PERF-CPU-59: exact monotonic profile bounds avoid redundant scoring while allowing decreasing weights to reverse ordering; PERF-CPU-63: skip quantities that cannot make an unrelated listing selectable while retaining explicit/unknown requests; PERF-CPU-64: reference breakpoints reuse the already verified minimum-quantity label exposure"
+      "reason": "Exact internal records, serving lower bounds, immutable quantity/intake/exposure reuse and complete public materialization without search changes; PERF-CPU-26–28 and 30: one quantity-group lookup, normalized endpoint components, exact identity/common-denominator comparison and canonical unit parsing; PERF-CPU-31/33 preserve stable remaining-gap leaders and reuse preference denominators; PERF-CPU-59: exact monotonic profile bounds avoid redundant scoring while allowing decreasing weights to reverse ordering; PERF-CPU-63: skip quantities that cannot make an unrelated listing selectable while retaining explicit/unknown requests; PERF-CPU-64: reference breakpoints reuse the already verified minimum-quantity label exposure"
     },
     {
       "file": "test/service-efficiency/immutable-references.test.ts",
@@ -192,6 +192,11 @@
       "file": "test/service-efficiency/harness.test.ts",
       "expectedCases": 9,
       "reason": "PERF-PACK-03 binds each benchmark child to its own source/build identity, preserving runtime guards and isolated fixture settings"
+    },
+    {
+      "file": "test/service-efficiency/resident-archive.test.ts",
+      "expectedCases": 2,
+      "reason": "PERF-CPU-65–66: avoid duplicate resident archive storage, preserve historical checkpoint encoding, restart and expanded traversal"
     }
   ],
   "exclusions": "No full application/MCP, live database, payment or unrelated browser suites; no contract or scoring-policy changes."
