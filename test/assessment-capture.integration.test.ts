@@ -120,7 +120,7 @@ describe("shared assessment capture on PostgreSQL", () => {
     assert.ok(recovery);
     await sql`update assessments set selected_plan='pro' where plan_id=${first.planId}`;
     const before = await sql`select id from tasks where plan_id=${first.planId} order by id`;
-    await assert.rejects(enqueueNutritionPlanTasks({planId:first.planId,plan:"precision",answers:body.answers,locale:"en",recovery}), /Assessment changed/);
+    await assert.rejects(enqueueNutritionPlanTasks({planId:first.planId,plan:"precision",answers:body.answers,locale:"en",recovery}), { name:"FunnelError",status:409,code:"assessment_changed" });
     assert.equal((await sql`select selected_plan from assessments where plan_id=${first.planId}`)[0].selected_plan,"pro");
     assert.deepEqual(await sql`select id from tasks where plan_id=${first.planId} order by id`,before);
   });
@@ -134,7 +134,7 @@ describe("shared assessment capture on PostgreSQL", () => {
     const before = await sql`select id from tasks where plan_id=${first.planId} order by id`;
     await assert.rejects(withGenerationInput(first.planId,generation,() => createTask({
       planId:first.planId,taskType:"generate_supplement_guidance",title:"Stale recovery",payload:{locale:"en"}
-    })), /Assessment changed/);
+    })), { name:"FunnelError",status:409,code:"assessment_changed" });
     assert.deepEqual(await sql`select id from tasks where plan_id=${first.planId} order by id`,before);
   });
   it("creates only the ID reserved by a valid resume token and preserves payment context", async () => {
