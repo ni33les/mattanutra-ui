@@ -7981,7 +7981,8 @@
                         "unavailable",
                         "not_on_list",
                         "not_allowed",
-                        "unknown"
+                        "unknown",
+                        "adjusted_to_configured_limit"
                       ]
                     },
                     "message": {
