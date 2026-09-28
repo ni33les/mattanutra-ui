@@ -1,5 +1,7 @@
 import { boundedDecisionCopy, requestFitCopy, refinementCopy } from "@/lib/agentic/presentation/decision-copy";
 import { availabilityMessage } from '@/lib/agentic/plan/availability';
+import { appliedTargetAmount } from '@/lib/agentic/plan/configured-target-limits';
+import { targetLimitIssues } from '@/lib/agentic/presentation/target-limit-notes';
 import { isUuid, publicSupplementId } from "@/lib/agentic/contract/ids";
 import { sha256Hex } from "@/lib/sha256";
 import { convertAmount } from "@/lib/matcher/dose";
@@ -117,8 +119,9 @@ function choiceIngredients(result: PlanResult, option: StackOption): Ingredient[
       : row.supplied === null ? 'unknown' : amount > 0 ? 'supplied' : prepared ?? 'unknown';
     if (row.supplied === null && amount > 0) row.suppliedAtLeast = amount;
     if (row.requested !== null && typeof row.existing === "number" && row.supplied !== null) {
-      row.gap = Math.max(0, row.requested - row.existing - row.supplied);
-      row.excess = Math.max(0, row.existing + row.supplied - row.requested);
+      const target = appliedTargetAmount(state, row.ingredientId, row.requested);
+      row.gap = Math.max(0, target - row.existing - row.supplied);
+      row.excess = Math.max(0, row.existing + row.supplied - target);
     }
   }
   // A source finding belongs to the choice once. Link its other affected
@@ -175,7 +178,8 @@ export function presentDecision(result: PlanResult, planHandle: string, revision
       const coverage = requested.length ? 100 * requested.reduce((n, row) => {
         const quantified = (typeof row.existing === "number" ? row.existing : row.existing?.minimum ?? 0) + (row.supplied ?? row.suppliedAtLeast ?? 0);
         // Zero goals contribute a binary known-zero result; unknown never becomes verified zero.
-        const contribution = row.requested === 0 ? Number(typeof row.existing === "number" && row.supplied !== null && quantified === 0) : Math.min(1, quantified / row.requested!);
+        const target = appliedTargetAmount(state, row.ingredientId, row.requested!);
+        const contribution = target === 0 ? Number(typeof row.existing === "number" && row.supplied !== null && quantified === 0) : Math.min(1, quantified / target);
         return n + contribution;
       }, 0) / requested.length : 0;
       const pills = option.basket.map(row => { const count = administrationDailyPills(row.administration); return count === null ? null : count * row.servingsPerDay; });
@@ -186,16 +190,19 @@ export function presentDecision(result: PlanResult, planHandle: string, revision
           goodsPrice: complete ? option.basket.reduce((n, row) => n + row.lineTotalMinor, 0) / 100 : null,
           coveragePercent: coverageComplete ? coverage : null, ...(!coverageComplete ? { coverageAtLeastPercent: coverage } : {}), ingredientDataComplete: ingredients.every(row => row.supplied !== null) }, ingredients, products: option.basket.map(productDecision) };
     }) };
-  const requestIssues = [...(state.availability?.issues ?? [])];
+  const adjustmentIssues = targetLimitIssues(state);
+  const requestIssues: NonNullable<Ready['requestIssues']> = [...(state.availability?.issues ?? []), ...adjustmentIssues];
   for (const [index, target] of (state.originalRequest?.targets ?? []).entries()) {
     const row = decision.choices[0]?.ingredients.find(item => item.ingredientId === target.ingredientId || item.ingredientId === target.supplementId);
-    if (row?.availability === 'not_selected' && row.supplied === 0 && !requestIssues.some(issue => issue.itemId === row.ingredientId)) {
+    if (row?.availability === 'not_selected' && row.supplied === 0 && !requestIssues.some(issue => issue.itemId === row.ingredientId && issue.code !== 'adjusted_to_configured_limit')) {
       requestIssues.push({ fieldPath: `targets[${index}]`, itemId: row.ingredientId, code: 'not_selected', message: availabilityMessage('not_selected', state.locale) });
     }
   }
   if (requestIssues.length) decision.requestIssues = requestIssues;
-  return status === "ready" && decision.choices[0] ? { ...decision,
-    summary: boundedDecisionCopy([summary, ...requestFitCopy(state, decision.choices[0])]) } : decision;
+  return { ...decision, summary: boundedDecisionCopy([
+    ...adjustmentIssues.map(issue => issue.message), summary,
+    ...(status === "ready" && decision.choices[0] ? requestFitCopy(state, decision.choices[0]) : [])
+  ]) };
 }
 
 /** Prepare once before publication; terminal reads never fetch the previous revision. */

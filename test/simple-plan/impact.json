@@ -459,6 +459,19 @@
       "expectedCases": 4,
       "reason": "Hard fresh native timing gate rejects cache hits, incomplete trials, changed semantics and stale evidence",
       "slice": "consumers"
+    },
+    {
+      "file": "test/simple-plan/configured-target-limits.test.ts",
+      "expectedCases": 12,
+      "reason": "Configured target normalization, response arithmetic, original intent, refinement, replay and preserved advice",
+      "slice": "responses"
+    },
+    {
+      "file": "test/simple-plan/configured-target-limits.integration.test.ts",
+      "expectedCases": 1,
+      "reason": "Configured-limit provenance survives interrupted worker execution and PostgreSQL replay",
+      "slice": "postgres",
+      "database": true
     }
   ],
   "inputs": [

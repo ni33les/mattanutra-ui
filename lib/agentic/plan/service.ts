@@ -33,6 +33,7 @@ import {
 } from "@/lib/agentic/idempotency";
 import { resolveMarket } from "@/lib/agentic/catalogue/market";
 import { refreshAdminSafetyCeilings } from "@/lib/agentic/catalogue/load-safety-ceilings";
+import { applyConfiguredTargetLimits } from "@/lib/agentic/plan/configured-target-limits";
 import { matcherSafetyCeilings, captureMatcherSafetySnapshot, type MatcherSafetySnapshot } from "@/lib/matcher/safety-ceilings";
 import { runWithMatcherSafetySnapshot } from "@/lib/matcher/safety-ceilings-server";
 import { AGENTIC_CONTRACT_VERSION, GUIDANCE_RULES_VERSION } from "@/lib/agentic/config";
@@ -1824,6 +1825,8 @@ async function completePreparedPlan(
     });
   }
 
+  state = applyConfiguredTargetLimits(state);
+  if (previous && planRematchFingerprint(previous.requestSnapshot) !== planRematchFingerprint(state)) pinPrevious = false;
   if (state.scoring) state = { ...state, pinnedCandidateKey: null };
 
   if (state.targets.length === 1) {

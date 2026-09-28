@@ -11,6 +11,7 @@ import { DEFAULT_TARGET_BASIS } from "@/lib/agentic/contract/schemas";
 import { resolvePracticalProfile } from "@/lib/matcher/practical-scoring";
 import { resolvedNutrientFormName } from "@/lib/nutrient-identity";
 import { preparePlanAvailability } from '@/lib/agentic/plan/availability';
+import { applyConfiguredTargetLimits } from '@/lib/agentic/plan/configured-target-limits';
 import type {
   AcceptedGap,
   CanonicalPlanState,
@@ -415,6 +416,8 @@ export function applyPlanAnswers(
 
 export function planRematchFingerprint(state: CanonicalPlanState) {
   return JSON.stringify({
+    configuredLimitPolicy: state.configuredLimitPolicy,
+    targetLimitAdjustments: state.targetLimitAdjustments,
     scoringProfileHash: resolvePracticalProfile({ optimization: state.optimization, preferenceImportance: state.requirements.preferenceImportance, scoring: state.scoring }).hash,
     ageYears: state.profile.ageYears,
     conditionCodes: state.conditionCodes,
@@ -674,6 +677,7 @@ export async function normalizePlanRequest(input: Readonly<{
   };
 
   state = applyPlanAnswers(state, request);
+  state = applyConfiguredTargetLimits(state);
   const available = preparePlanAvailability(state, input.snapshot);
   if (isAgenticErrorResult(available)) return available;
   state = available;
