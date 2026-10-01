@@ -324,8 +324,11 @@ export function rawDoseLeaders(states: readonly SearchState[], request: Canonica
 export function completionReferences(ranked: readonly SearchState[], request: CanonicalRequest) {
   const additiveBases = ranked.flatMap(state => {
     const score = numericalDoseFitScore(request,state.exposure), targets = doseFitTargetDeviations(score);
-    return targets.every(row=>row.over===0) && targets.some(row=>row.under>0)
-      ? [{ state, score, losses: new Map(targets.map(row => [row.subjectId, row.under + row.over])) }] : [];
+    if (!targets.every(row=>row.over===0) || !targets.some(row=>row.under>0)) return [];
+    const losses = new Map<string, number>();
+    // Preserve find()'s first match even for repeated subject references.
+    for (const row of targets) if (!losses.has(row.subjectId)) losses.set(row.subjectId, row.under + row.over);
+    return [{ state, score, losses }];
   });
   return request.targets.filter(target => !isDeferredConditional(target)).map(target =>
     smallest(additiveBases, 1, (a,b) => (a.losses.get(target.subjectId) ?? Infinity) - (b.losses.get(target.subjectId) ?? Infinity)
