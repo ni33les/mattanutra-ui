@@ -7,7 +7,7 @@ import { rejectedCandidatesFor } from "@/lib/matcher/explainer";
 import { amountFromScaled } from "@/lib/matcher/dose";
 import { knownTargetExposure } from "@/lib/matcher/target-basis";
 import { equivalentSellerOffers } from "@/lib/matcher/seller-offers";
-import { seedState } from "@/lib/matcher/search";
+import { indexVariants, seedState } from "@/lib/matcher/search";
 import { searchCursorResult, archivedSearchStates } from "@/lib/matcher/search-cursor";
 import { createMatchCursor, advanceMatchCursor, matchCursorAttempts, type MatchCursor } from "@/lib/matcher/match-cursor";
 import { compareBaskets, hasFewerConcerns, scoreState, selectOptions } from "@/lib/matcher/selector";
@@ -117,8 +117,9 @@ export function match(request: CanonicalRequest, catalog: CatalogSnapshot,
     trimmed ||= run.trimmed;
     if (run.mode === "bounded") searchStatus.mode = "bounded";
     if (observeCandidate) for (const state of archivedSearchStates(seller.cursor)) observeCandidate(seller.sellerId, state, run.groups);
+    const variantsById = indexVariants(run.groups);
     for (const state of run.complete) {
-      const basket = scoreState({ groups: run.groups, request, sellerId: seller.sellerId, state });
+      const basket = scoreState({ groups: run.groups, request, sellerId: seller.sellerId, state, variantsById });
       if (basket && basket.productCount > 0) {
         scored.push(basket);
         sourceStates.set(basket.variantIds.join("|"), { state, groups: run.groups });
@@ -127,6 +128,7 @@ export function match(request: CanonicalRequest, catalog: CatalogSnapshot,
   }
   const exploredGroups = [...perSellerGroups.values()].flat();
   const preliminary = selectOptions({ baskets: scored, request, config });
+  const preliminaryCount = scored.length;
   // Recover commercial ties only for retained role candidates. This bounded
   // projection compares quotes for existing baskets, with no extra dose search.
   for (const basket of [preliminary.selected, ...preliminary.alternatives]) {
@@ -138,14 +140,8 @@ export function match(request: CanonicalRequest, catalog: CatalogSnapshot,
       if (priced) scored.push(priced);
     }
   }
-  const winner = selectOptions({ baskets: scored, request, config });
-  const targetFrontiers = request.targets.filter((target) => !isDeferredConditional(target)).map((target) => ({
-    subjectId: target.subjectId, name: target.name,
-    productIds: [...new Set(scored.filter((row) => (row.coverageBySubject.get(target.subjectId) ?? 0) > 0)
-      .sort((a, b) => compareBaskets(a, b, request, config)).flatMap((row) => row.productIds.filter((id) =>
-        exploredGroups.some((group) => group.sellerId === row.sellerId && group.productId === id && group.variants.some((variant) =>
-          row.variantIds.includes(variant.variantId) && (variant.contributions.get(target.subjectId)?.units ?? BigInt(0)) > BigInt(0))))))].slice(0, 3)
-  }));
+  const winner = scored.length === preliminaryCount ? preliminary : selectOptions({ baskets: scored, request, config });
+  const targetFrontiers = targetFrontiersFor(scored, exploredGroups, request, config);
   const found = winner.alternatives.some((row) => winner.selected && hasFewerConcerns(row, winner.selected, request));
   const hasConcerns = Boolean(winner.selected && (winner.selected.safety.findings.length || winner.selected.doseFit?.over || winner.selected.doseFit?.limit));
   const alternativeSearch: NonNullable<MatchResult["alternativeSearch"]> = found
@@ -159,6 +155,24 @@ export function match(request: CanonicalRequest, catalog: CatalogSnapshot,
   return { ...winner, alternativeSearch, searchSummary, matchingDiagnostics, leftovers: leftoversFor(request, winner.selected),
     lossCertificates: lossCertificatesFor(request, catalog, exploredGroups, winner.selected, trimmed),
     rejected, searchMode: searchStatus.mode, targetFrontiers, trimmed };
+}
+
+export function targetFrontiersFor(scored: readonly ScoredBasket[], groups: readonly ProductGroup[], request: CanonicalRequest, config: MatcherConfig) {
+  const ranked = [...scored].sort((a, b) => compareBaskets(a, b, request, config));
+  return request.targets.filter(target => !isDeferredConditional(target)).map(target => {
+    const productIds = new Set<string>();
+    for (const row of ranked) {
+      if ((row.coverageBySubject.get(target.subjectId) ?? 0) <= 0) continue;
+      for (const id of row.productIds) {
+        if (productIds.has(id)) continue;
+        if (groups.some(group => group.sellerId === row.sellerId && group.productId === id && group.variants.some(variant =>
+          row.variantIds.includes(variant.variantId) && (variant.contributions.get(target.subjectId)?.units ?? BigInt(0)) > BigInt(0)))) productIds.add(id);
+        if (productIds.size === 3) break;
+      }
+      if (productIds.size === 3) break;
+    }
+    return { subjectId: target.subjectId, name: target.name, productIds: [...productIds] };
+  });
 }
 
 export { DEFAULT_MATCHER_CONFIG, MATCHER_VERSION } from "@/lib/matcher/config";

@@ -385,16 +385,19 @@ export function residualPattern(state: SearchState, request: CanonicalRequest) {
   }).join("|");
 }
 
+/** Build after quantity exploration, then share across final basket validation.
+ * Last duplicate wins, both within a group and across groups. */
+export function indexVariants(groups: readonly ProductGroup[]) {
+  const byId = new Map<string, DoseVariant>();
+  for (const group of groups) for (const variant of group.variants) byId.set(variant.variantId, variant);
+  return byId;
+}
+
 export function reconstructVariants(
   groups: readonly ProductGroup[],
-  variantIds: readonly string[]
+  variantIds: readonly string[],
+  byId: ReadonlyMap<string, DoseVariant> = indexVariants(groups)
 ) {
-  const byId = new Map<string, DoseVariant>();
-  for (const group of groups) for (const id of variantIds) {
-    const variant = quantityById(group.variants, id, true);
-    if (variant) byId.set(id, variant);
-  }
-
   return variantIds
     .map((id) => byId.get(id))
     .filter((item): item is DoseVariant => Boolean(item));
@@ -403,9 +406,10 @@ export function reconstructVariants(
 export function revalidateState(
   state: SearchState,
   groups: readonly ProductGroup[],
-  request: CanonicalRequest
+  request: CanonicalRequest,
+  variantsById?: ReadonlyMap<string, DoseVariant>
 ) {
-  const variants = reconstructVariants(groups, state.selectedVariantIds);
+  const variants = reconstructVariants(groups, state.selectedVariantIds, variantsById);
   const exposure = aggregateDailyExposure({
     current: request.currentSupplements,
     variants
