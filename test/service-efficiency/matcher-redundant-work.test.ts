@@ -100,6 +100,7 @@ test('EFF-SIX-05 target frontiers preserve exhaustive results, sort once and sto
   try {
     Array.prototype.sort = function (...args) { if (this[0]?.coverageBySubject) sorts++; return Reflect.apply(sort, this, args); };
     assert.deepEqual(targetFrontiersFor(baskets, counted, input, DEFAULT_MATCHER_CONFIG), expected);
+    assert.deepEqual(targetFrontiersFor(baskets, counted, { ...input, targets: [] }, DEFAULT_MATCHER_CONFIG), []);
   } finally { Array.prototype.sort = sort; }
   assert.equal(sorts, 1);
   assert.equal(scans, 3 * input.targets.length);

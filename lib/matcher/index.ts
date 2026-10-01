@@ -158,8 +158,10 @@ export function match(request: CanonicalRequest, catalog: CatalogSnapshot,
 }
 
 export function targetFrontiersFor(scored: readonly ScoredBasket[], groups: readonly ProductGroup[], request: CanonicalRequest, config: MatcherConfig) {
+  const targets = request.targets.filter(target => !isDeferredConditional(target));
+  if (!targets.length) return [];
   const ranked = [...scored].sort((a, b) => compareBaskets(a, b, request, config));
-  return request.targets.filter(target => !isDeferredConditional(target)).map(target => {
+  return targets.map(target => {
     const productIds = new Set<string>();
     for (const row of ranked) {
       if ((row.coverageBySubject.get(target.subjectId) ?? 0) <= 0) continue;
