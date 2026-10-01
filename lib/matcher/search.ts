@@ -396,10 +396,21 @@ export function indexVariants(groups: readonly ProductGroup[]) {
 export function reconstructVariants(
   groups: readonly ProductGroup[],
   variantIds: readonly string[],
-  byId: ReadonlyMap<string, DoseVariant> = indexVariants(groups)
+  byId?: ReadonlyMap<string, DoseVariant>
 ) {
+  if (!byId) {
+    // Standalone callers already have append-aware quantity indices. Only the
+    // batch finalizer needs a full cross-group index; reuse cached lookups here.
+    const selected = new Map<string, DoseVariant>();
+    for (const group of groups) for (const id of variantIds) {
+      const variant = quantityById(group.variants, id, true);
+      if (variant) selected.set(id, variant);
+    }
+    byId = selected;
+  }
+  const resolved = byId;
   return variantIds
-    .map((id) => byId.get(id))
+    .map((id) => resolved.get(id))
     .filter((item): item is DoseVariant => Boolean(item));
 }
 
