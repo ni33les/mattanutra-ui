@@ -150,8 +150,12 @@ export function dominatesAtLayer(
 }
 
 export function fingerprintState(state: SearchState) {
+  return fingerprintAtGroup(state, state.nextGroupIndex);
+}
+
+export function fingerprintAtGroup(state: SearchState, nextGroupIndex: number) {
   return [
-    state.nextGroupIndex,
+    nextGroupIndex,
     ...state.selectedVariantIds,
     state.price,
     state.pills,
