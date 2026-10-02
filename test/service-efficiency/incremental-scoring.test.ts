@@ -35,7 +35,7 @@ test('EFF-INC-02 residual signatures reuse immutable delivered amounts while iso
   assert.equal(residualPattern(state, { ...input, targets: [] }), '');
 });
 
-test('EFF-INC-03 repeated review retains the same frontier without rereading target deviations', () => {
+test('EFF-INC-03 repeated review retains the same frontier and reuses surviving comparison facts', () => {
   const input = request();
   input.targets = [{ ...input.targets[0]!, importance: 'required' }, { ...input.targets[0]!, subjectId: 'b', name: 'B', importance: 'optional' }];
   const states = Array.from({ length: 260 }, (_, i) => {
@@ -50,9 +50,9 @@ test('EFF-INC-03 repeated review retains the same frontier without rereading tar
   }
   assert.deepEqual(reviewFrontier(states, input, []).map(fingerprintState), expected);
   assert.ok(reads > 0);
-  reads = 0;
+  const firstReads = reads; reads = 0;
   assert.deepEqual(reviewFrontier(states, input, []).map(fingerprintState), expected);
-  assert.equal(reads, 0, 'A second review uses the facts already computed for these candidates');
+  assert.ok(reads < firstReads, 'A second review reuses the facts of surviving candidates');
   const revised = { ...input, targets: input.targets.map(row => ({ ...row, importance: 'optional' as const })) };
   assert.deepEqual(reviewFrontier(states, revised, []).map(fingerprintState), reviewFrontier(structuredClone(states), structuredClone(revised), []).map(fingerprintState));
 });
@@ -163,18 +163,20 @@ test('EFF-INC-12 sparse updates do not rebuild an evicted old endpoint just to s
   assert.equal(endpointReads, 1, 'Only the new endpoint is evaluated after eviction');
 });
 
-test('EFF-INC-13 diversity caches retain recent reuse and evict stale work without changing signatures', () => {
-  const input = request(), seed = seedState(input), delivered = new Map([['a', 50_000_000n]]);
-  let reads = 0; const get = delivered.get.bind(delivered);
-  delivered.get = id => { reads++; return get(id); };
-  const active = { ...seed, delivered };
-  assert.equal(residualPattern(active, input), '5');
-  for (let i = 0; i < 5000; i++) {
-    residualPattern({ ...seed, delivered: new Map([['a', BigInt(i)]]) }, input);
-    assert.equal(residualPattern(active, input), '5');
-  }
-  assert.equal(reads, 1, 'An actively reused signature survives a large search');
-  for (let i = 0; i < 5000; i++) residualPattern({ ...seed, delivered: new Map([['a', BigInt(i)]]) }, input);
-  assert.equal(residualPattern(active, input), '5');
-  assert.equal(reads, 2, 'A stale entry is evicted instead of following the entire archive');
+test('EFF-INC-13 frontier survivors reuse signatures while archived losers release their cached facts', () => {
+  const input = request(), seed = seedState(input), reads = new Map<number, number>();
+  const states = Array.from({ length: 260 }, (_, i) => {
+    const exposure = new Map([['a', BigInt(i) * 1_000_000n]]), delivered = new Map(exposure), get = delivered.get.bind(delivered);
+    delivered.get = id => { reads.set(i, (reads.get(i) ?? 0) + 1); return get(id); };
+    return { ...seed, exposure, delivered, count: 1, price: i, selectedVariantIds: [String(i)], selectedProductIds: [String(i)] };
+  });
+  const retained = reviewFrontier(states, input, []);
+  const survivor = retained[0]!, loser = states.find(state => !retained.includes(state))!;
+  assert.ok(survivor); assert.ok(loser);
+  const first = Number(survivor.selectedVariantIds[0]), second = Number(loser.selectedVariantIds[0]);
+  const keptReads = reads.get(first), discardedReads = reads.get(second)!;
+  assert.equal(residualPattern(survivor, input), String(BigInt(first) / 10n));
+  assert.equal(reads.get(first), keptReads, 'Retained frontier facts are reused');
+  assert.equal(residualPattern(loser, input), String(BigInt(second) / 10n));
+  assert.equal(reads.get(second), discardedReads + 1, 'An archived loser no longer retains its cached signature');
 });

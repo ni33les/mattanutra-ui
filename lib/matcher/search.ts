@@ -1,4 +1,3 @@
-import { BoundedLru } from "@/lib/bounded-lru";
 import { add, fromDecimal, multiply, positive, subtract, ZERO } from "@/lib/matcher/rational";
 import { targetDoseTicks } from "@/lib/matcher/target-basis";
 import { servingIncrement } from "@/lib/matcher/serving-grid";
@@ -35,7 +34,7 @@ export type SearchRun = Readonly<{
   trimmed: boolean;
 }>;
 
-const variantMeasurements = new WeakMap<DoseVariant, { product: ProductGroup["product"]; burden: ReturnType<typeof multiply>; monthly: number | null; uncertain: number; contributionOnly: boolean; exposureSubjects: readonly string[] }>();
+const variantMeasurements = new WeakMap<DoseVariant, { product: ProductGroup["product"]; burden: ReturnType<typeof multiply>; monthly: number | null; uncertain: number; contributionOnly: boolean; exposureSubjects?: readonly string[] }>();
 
 // Quantity arrays are immutable apart from append-only, physically compiled
 // probes. A resumed/replaced array gets a fresh index; traversal order is unchanged.
@@ -114,8 +113,7 @@ export function tryAddVariant(
     const excess = positive(subtract(variant.dailyUnitsRatio ?? fromDecimal(variant.dailyUnits), fromDecimal(1)));
     measured = { product: group.product, burden: multiply(excess, excess),
       monthly: monthlyGoodsPrice(group.product, variant.dailyUnits, variant.dailyUnitsRatio), uncertain: Number(!administrationBasisKnown(group.product)),
-      contributionOnly: safetyExposure.size === variant.contributions.size && [...safetyExposure].every(([id, amount]) => variant.contributions.get(id)?.units === amount.units),
-      exposureSubjects: [...new Set([...safetyExposure.keys(), ...variant.contributions.keys()])] };
+      contributionOnly: safetyExposure.size === variant.contributions.size && [...safetyExposure].every(([id, amount]) => variant.contributions.get(id)?.units === amount.units), exposureSubjects: undefined };
     variantMeasurements.set(variant, measured);
   }
   const monthly = measured.monthly;
@@ -128,8 +126,13 @@ export function tryAddVariant(
   if (delivered !== exposure) for (const [id, amount] of variant.contributions) {
     delivered.set(id, (delivered.get(id) ?? BigInt(0)) + amount.units);
   }
-  // Broad changes use the full evaluator; do not retain parent maps for them.
-  if (measured.exposureSubjects.length * 3 <= request.targets.length) registerDoseFitChange(exposure, state.exposure, measured.exposureSubjects);
+  // Broad changes use the full evaluator. Build a subject list only for variants
+  // that can use the incremental path, and reuse an identical contribution list.
+  if (Math.max(safetyExposure.size, variant.contributions.size) * 3 <= request.targets.length) {
+    measured.exposureSubjects ??= measured.contributionOnly ? [...variant.contributions.keys()]
+      : [...new Set([...safetyExposure.keys(), ...variant.contributions.keys()])];
+    if (measured.exposureSubjects.length * 3 <= request.targets.length) registerDoseFitChange(exposure, state.exposure, measured.exposureSubjects);
+  }
   return {
     routineServings: [...(state.routineServings ?? []), variant.dailyUnits],
     servingBurden: add(state.servingBurden ?? ZERO, measured.burden),
@@ -379,11 +382,10 @@ function* removalSets(ids: readonly string[]): Generator<readonly string[]> {
   }
 }
 
-// Retain recent comparison work, not one cache entry for every archived basket.
-const residualPatterns = new WeakMap<CanonicalRequest, BoundedLru<SearchState["delivered"], string>>();
+const residualPatterns = new WeakMap<CanonicalRequest, WeakMap<SearchState["delivered"], string>>();
 export function residualPattern(state: SearchState, request: CanonicalRequest) {
   let cache = residualPatterns.get(request);
-  if (!cache) { cache = new BoundedLru(2048); residualPatterns.set(request, cache); }
+  if (!cache) { cache = new WeakMap(); residualPatterns.set(request, cache); }
   let pattern = cache.get(state.delivered);
   if (pattern !== undefined) return pattern;
   pattern = request.targets.map(target => {
@@ -459,10 +461,10 @@ export function revalidateState(
  * not thousands of losing search states. This changes computational effort,
  * never the permitted number of products or quantities in a basket. */
 type FrontierFacts = { deviations: ReturnType<typeof doseFitTargetDeviations>; losses?: Map<string, number>; protectedLoss?: number };
-const frontierFacts = new WeakMap<CanonicalRequest, BoundedLru<SearchState["exposure"], FrontierFacts>>();
+const frontierFacts = new WeakMap<CanonicalRequest, WeakMap<SearchState["exposure"], FrontierFacts>>();
 function frontierFactsFor(state: SearchState, request: CanonicalRequest) {
   let cache = frontierFacts.get(request);
-  if (!cache) { cache = new BoundedLru(2048); frontierFacts.set(request, cache); }
+  if (!cache) { cache = new WeakMap(); frontierFacts.set(request, cache); }
   let facts = cache.get(state.exposure);
   if (!facts) {
     facts = { deviations: doseFitTargetDeviations(numericalDoseFitScore(request, state.exposure)) };
@@ -528,5 +530,15 @@ export function reviewFrontier(states: readonly SearchState[], request: Canonica
   // The first member of each bin in a stable full sort is its stable minimum.
   // Order only those representatives, retaining the original cross-bin tie order.
   for (const row of smallest([...patterns.values()], 48, (a, b) => order(a.state, b.state) || a.index - b.index)) chosen.add(row.state);
+  // Only frontier survivors are compared again in the next review. The cursor
+  // archives losing states for recovery; their comparison metadata need not live
+  // as long as that archive. Weak keys also avoid retaining standalone inputs.
+  const previousPatterns = residualPatterns.get(request), previousFacts = frontierFacts.get(request);
+  const keptPatterns = new WeakMap<SearchState["delivered"], string>(), keptFacts = new WeakMap<SearchState["exposure"], FrontierFacts>();
+  for (const state of chosen) {
+    const pattern = previousPatterns?.get(state.delivered); if (pattern !== undefined) keptPatterns.set(state.delivered, pattern);
+    const facts = previousFacts?.get(state.exposure); if (facts) keptFacts.set(state.exposure, facts);
+  }
+  residualPatterns.set(request, keptPatterns); frontierFacts.set(request, keptFacts);
   return [...chosen];
 }
