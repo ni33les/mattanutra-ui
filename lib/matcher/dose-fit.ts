@@ -200,7 +200,7 @@ function appendDifference(terms: Fraction[], next: Fraction, previous: Fraction)
 }
 
 function incrementalDoseFit(request: CanonicalRequest, exposure: ReadonlyMap<string, bigint>, parent: NumericalDoseFitScore,
-  change: { parent: ReadonlyMap<string, bigint>; subjects: readonly string[] }, applyWeights: boolean): NumericalDoseFitScore {
+  change: { parent: ReadonlyMap<string, bigint>; subjects: readonly string[] }, applyWeights: boolean): NumericalDoseFitScore | null {
   const fittingTerms = [parent.fitting], safetyTerms = [parent.safety], intentTerms = [parent.exact];
   const settings = applyWeights && request.scoring ? effectiveWeights(request.scoring) : null;
   const weights = settings ? exactWeights(settings) : null;
@@ -211,7 +211,11 @@ function incrementalDoseFit(request: CanonicalRequest, exposure: ReadonlyMap<str
     const compiled = subjectInputs(request, subjectId);
     if (!compiled.target && compiled.reference === BigInt(0) && compiled.bounds.length === 0) continue;
     const weight = weights ? weights.subjects.get(subjectId) ?? weights.defaultWeight : ONE;
-    const before = cachedSubjectLoss(compiled, previousKnown, weight), after = cachedSubjectLoss(compiled, known, weight);
+    // A cached parent score can outlive its individual endpoint terms. Rebuilding
+    // an old endpoint solely to subtract it adds work; use the full evaluator.
+    const before = compiled.losses.get(weight)?.get(previousKnown);
+    if (!before) return null;
+    const after = cachedSubjectLoss(compiled, known, weight);
     appendDifference(fittingTerms, after.worst.fitting, before.worst.fitting);
     appendDifference(safetyTerms, after.worst.safety, before.worst.safety);
     if (settings) appendDifference(intentTerms, after.worst.total, before.worst.total);
@@ -252,7 +256,7 @@ function calculateDoseFit(request: CanonicalRequest, exposure: ReadonlyMap<strin
     // active subjects, so incidental limits cannot make this estimate optimistic.
     if (change && parent && change.subjects.length * 3 <= parent.deviations.length) {
       const score = incrementalDoseFit(request, exposure, parent, change, applyWeights);
-      cache.set(exposure, score); return score;
+      if (score) { cache.set(exposure, score); return score; }
     }
   }
   const fittingTerms: Fraction[] = [], safetyTerms: Fraction[] = [], intentTerms: Fraction[] = [];

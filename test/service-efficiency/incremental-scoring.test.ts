@@ -146,3 +146,35 @@ test('EFF-INC-08 equal penalties retain distinct display exposures and zero-valu
   assert.equal(after.perLimit?.length, 1);
   assert.deepEqual(after, dose.doseFitScore(structuredClone(input), new Map(child)));
 });
+
+
+test('EFF-INC-12 sparse updates do not rebuild an evicted old endpoint just to subtract it', () => {
+  const input = request({ targets: manyTargets() });
+  const parent = new Map([['a', 50_000_000n], ['b', 30_000_000n], ['c', 0n]]);
+  dose.numericalDoseFitScore(input, parent);
+  for (let i = 100; i < 400; i++) dose.numericalDoseFitScore(input, new Map([['a', BigInt(i) * 1_000_000n]]));
+  const child = new Map(parent); child.set('a', 51_000_000n);
+  const expected = dose.numericalDoseFitScore(structuredClone(input), new Map(child));
+  let endpointReads = 0;
+  const units = input.targets[0]!.requested.units;
+  Object.defineProperty(input.targets[0]!.requested, 'units', { get() { endpointReads++; return units; } });
+  dose.registerDoseFitChange(child, parent, ['a']);
+  assert.deepEqual(dose.numericalDoseFitScore(input, child), expected);
+  assert.equal(endpointReads, 1, 'Only the new endpoint is evaluated after eviction');
+});
+
+test('EFF-INC-13 diversity caches retain recent reuse and evict stale work without changing signatures', () => {
+  const input = request(), seed = seedState(input), delivered = new Map([['a', 50_000_000n]]);
+  let reads = 0; const get = delivered.get.bind(delivered);
+  delivered.get = id => { reads++; return get(id); };
+  const active = { ...seed, delivered };
+  assert.equal(residualPattern(active, input), '5');
+  for (let i = 0; i < 5000; i++) {
+    residualPattern({ ...seed, delivered: new Map([['a', BigInt(i)]]) }, input);
+    assert.equal(residualPattern(active, input), '5');
+  }
+  assert.equal(reads, 1, 'An actively reused signature survives a large search');
+  for (let i = 0; i < 5000; i++) residualPattern({ ...seed, delivered: new Map([['a', BigInt(i)]]) }, input);
+  assert.equal(residualPattern(active, input), '5');
+  assert.equal(reads, 2, 'A stale entry is evicted instead of following the entire archive');
+});
