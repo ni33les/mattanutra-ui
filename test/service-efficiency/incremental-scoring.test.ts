@@ -113,4 +113,36 @@ test('EFF-INC-06 immutable candidate additions reuse unchanged unknown-product l
   assert.strictEqual(second.unknownProductIds, first.unknownProductIds);
   assert.notStrictEqual(second.exposure, first.exposure);
   assert.deepEqual(second.unknownProductIds, []);
+  const uncertain = tryAddVariant(first, { ...groups[1]!.variants[0]!, unknownSafetyAmount: true }, groups[1]!, input)!;
+  assert.deepEqual(uncertain.unknownProductIds, [groups[1]!.productId]);
+  assert.deepEqual(first.unknownProductIds, []);
+});
+
+test('EFF-INC-07 zero targets, deferred targets and unavailable limit profiles retain exact full-score behavior', () => {
+  const targets = canonicalizeTargets({ targets: [{ subjectId: 'vitamin-d3', name: 'Vitamin D3', amount: 0, unit: 'mcg' }] }).targets;
+  targets.push({ ...manyTargets()[0]!, importance: 'conditional', prerequisite: { status: 'unknown' } });
+  for (const profileKnown of [undefined, { ageYears: false, lifeStage: false }]) {
+    const input = request({ targets, profileKnown, scoring: { profile: 'best_coverage', weights: {} },
+      safetyCeilings: [{ subjectId: 'vitamin-d3', name: 'Vitamin D3', maxAmount: 100, maxUnit: 'mcg', sourceScope: 'supplemental' }] });
+    const parent = new Map<string, bigint>();
+    for (const score of [dose.numericalDoseFitScore, dose.numericalWeightedDoseFitScore]) score(input, parent);
+    const child = new Map([['vitamin-d3', 125_000n], ['a', 40_000_000n], ['irrelevant', 1n]]);
+    dose.registerDoseFitChange(child, parent, [...child.keys()]);
+    for (const score of [dose.numericalDoseFitScore, dose.numericalWeightedDoseFitScore]) assert.deepEqual(score(input, child), score(structuredClone(input), new Map(child)));
+    assert.deepEqual(dose.doseFitScore(input, child), dose.doseFitScore(structuredClone(input), new Map(child)));
+  }
+});
+
+test('EFF-INC-08 equal penalties retain distinct display exposures and zero-valued incidental limit rows', () => {
+  const input = request({ safetyCeilings: [{ subjectId: 'x', name: 'X', maxAmount: 100, maxUnit: 'mg', sourceScope: 'supplemental' }] });
+  const parent = new Map([['a', 100_000_000n]]);
+  const before = dose.doseFitScore(input, parent);
+  const child = new Map(parent); child.set('x', 0n);
+  dose.registerDoseFitChange(child, parent, ['x']);
+  const after = dose.doseFitScore(input, child);
+  assert.equal(after.total, before.total);
+  assert.notStrictEqual(after, before);
+  assert.equal(before.perLimit?.length, 0);
+  assert.equal(after.perLimit?.length, 1);
+  assert.deepEqual(after, dose.doseFitScore(structuredClone(input), new Map(child)));
 });
