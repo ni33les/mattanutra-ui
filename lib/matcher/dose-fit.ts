@@ -245,6 +245,10 @@ function calculateDoseFit(request: CanonicalRequest, exposure: ReadonlyMap<strin
   if (previous && !materialize) return previous;
   if (!materialize) {
     const change = exposureChanges.get(exposure), parent = change && cache.get(change.parent);
+    // Once the raw score exists, uniform profiles reuse it and later weighted
+    // endpoints can use the full evaluator. No child needs to retain its parent's
+    // exposure map for the remaining lifetime of a large search archive.
+    if (!applyWeights) exposureChanges.delete(exposure);
     // Replacing terms reads both the old and new loss. A broad update is cheaper
     // with the full evaluator. Target count is a conservative lower bound for
     // active subjects, so incidental limits cannot make this estimate optimistic.

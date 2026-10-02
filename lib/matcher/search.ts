@@ -127,7 +127,8 @@ export function tryAddVariant(
   if (delivered !== exposure) for (const [id, amount] of variant.contributions) {
     delivered.set(id, (delivered.get(id) ?? BigInt(0)) + amount.units);
   }
-  registerDoseFitChange(exposure, state.exposure, measured.exposureSubjects);
+  // Broad changes use the full evaluator; do not retain parent maps for them.
+  if (measured.exposureSubjects.length * 3 <= request.targets.length) registerDoseFitChange(exposure, state.exposure, measured.exposureSubjects);
   return {
     routineServings: [...(state.routineServings ?? []), variant.dailyUnits],
     servingBurden: add(state.servingBurden ?? ZERO, measured.burden),
