@@ -455,7 +455,7 @@ export function revalidateState(
 /** Full safety and conversational rendering runs on diverse bounded extrema,
  * not thousands of losing search states. This changes computational effort,
  * never the permitted number of products or quantities in a basket. */
-type FrontierFacts = { deviations: ReturnType<typeof doseFitTargetDeviations>; additive?: boolean; losses?: Map<string, number>; protectedLoss?: number };
+type FrontierFacts = { deviations: ReturnType<typeof doseFitTargetDeviations>; losses?: Map<string, number>; protectedLoss?: number };
 const frontierFacts = new WeakMap<CanonicalRequest, WeakMap<SearchState["exposure"], FrontierFacts>>();
 function frontierFactsFor(state: SearchState, request: CanonicalRequest) {
   let cache = frontierFacts.get(request);
@@ -475,10 +475,9 @@ export function reviewFrontier(states: readonly SearchState[], request: Canonica
   // complementary addition, despite losing every aggregate/profile ranking.
   const protectedIds = new Set(request.targets.filter(row => row.importance === "core" || row.importance === "required").map(row => row.subjectId));
   const facts = (state: SearchState) => frontierFactsFor(state, request);
-  const additiveBases = states.filter(state => {
-    const value = facts(state);
-    return value.additive ??= value.deviations.every(row => row.over === 0);
-  });
+  // Most rejected candidates fail this short-circuit scan immediately. Cache
+  // comparison facts only when the target or protected-fit rankings use them.
+  const additiveBases = states.filter(state => doseFitTargetDeviations(numericalDoseFitScore(request, state.exposure)).every(row => row.over === 0));
   for (const target of request.targets.filter(row => !isDeferredConditional(row)).slice(0, 32)) {
     const deviation = (state: SearchState) => {
       const value = facts(state), losses = value.losses ??= new Map();
