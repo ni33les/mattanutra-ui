@@ -123,9 +123,16 @@ export class ThreadPool<Input, Result> {
     try {
       // A real thread is assigned already. Database preparation must not occupy
       // productive CPU capacity shared with independent matching pools.
-      releaseUnstarted = await job.options.beforeStart?.();
+      recordServiceMetric("worker.thread_wait_ms", performance.now() - job.queuedAt);
+      if (job.options.beforeStart) {
+        const preparedAt = performance.now();
+        try { releaseUnstarted = await job.options.beforeStart(); }
+        finally { recordServiceMetric("worker.preparation_ms", performance.now() - preparedAt); }
+      }
       if (job.settled || slot.job !== job) return;
+      const cpuQueuedAt = performance.now();
       const release = await matcherCpuAdmission.acquire(job.controller.signal);
+      recordServiceMetric("worker.cpu_wait_ms", performance.now() - cpuQueuedAt);
       if (job.settled || slot.job !== job) { release(); return; }
       slot.releaseCpu = release;
       recordServiceMetric("worker.queue_ms", performance.now() - job.queuedAt);
