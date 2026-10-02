@@ -1,3 +1,4 @@
+import { BoundedLru } from "@/lib/bounded-lru";
 import { add, fromDecimal, multiply, positive, subtract, ZERO } from "@/lib/matcher/rational";
 import { targetDoseTicks } from "@/lib/matcher/target-basis";
 import { servingIncrement } from "@/lib/matcher/serving-grid";
@@ -378,10 +379,11 @@ function* removalSets(ids: readonly string[]): Generator<readonly string[]> {
   }
 }
 
-const residualPatterns = new WeakMap<CanonicalRequest, WeakMap<SearchState["delivered"], string>>();
+// Retain recent comparison work, not one cache entry for every archived basket.
+const residualPatterns = new WeakMap<CanonicalRequest, BoundedLru<SearchState["delivered"], string>>();
 export function residualPattern(state: SearchState, request: CanonicalRequest) {
   let cache = residualPatterns.get(request);
-  if (!cache) { cache = new WeakMap(); residualPatterns.set(request, cache); }
+  if (!cache) { cache = new BoundedLru(2048); residualPatterns.set(request, cache); }
   let pattern = cache.get(state.delivered);
   if (pattern !== undefined) return pattern;
   pattern = request.targets.map(target => {
@@ -457,10 +459,10 @@ export function revalidateState(
  * not thousands of losing search states. This changes computational effort,
  * never the permitted number of products or quantities in a basket. */
 type FrontierFacts = { deviations: ReturnType<typeof doseFitTargetDeviations>; losses?: Map<string, number>; protectedLoss?: number };
-const frontierFacts = new WeakMap<CanonicalRequest, WeakMap<SearchState["exposure"], FrontierFacts>>();
+const frontierFacts = new WeakMap<CanonicalRequest, BoundedLru<SearchState["exposure"], FrontierFacts>>();
 function frontierFactsFor(state: SearchState, request: CanonicalRequest) {
   let cache = frontierFacts.get(request);
-  if (!cache) { cache = new WeakMap(); frontierFacts.set(request, cache); }
+  if (!cache) { cache = new BoundedLru(2048); frontierFacts.set(request, cache); }
   let facts = cache.get(state.exposure);
   if (!facts) {
     facts = { deviations: doseFitTargetDeviations(numericalDoseFitScore(request, state.exposure)) };
