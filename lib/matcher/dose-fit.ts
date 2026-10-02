@@ -99,8 +99,6 @@ function rangeOffsets(rows: CanonicalRequest["currentSupplements"], subjectId: s
   return { minimum, maximum, base };
 }
 
-const fixedSubjects = new WeakMap<CanonicalRequest, readonly string[] | null>();
-const requestedSubjects = new WeakMap<CanonicalRequest, Set<string>>();
 const subjectCache = new WeakMap<CanonicalRequest, Map<string, ReturnType<typeof compileSubject>>>();
 function compileSubject(request: CanonicalRequest, subjectId: string) {
   const requested = request.targets.find(row => row.subjectId === subjectId);
@@ -118,6 +116,34 @@ function subjectInputs(request: CanonicalRequest, subjectId: string) {
   request = sharedInputs.get(request) ?? request;
   let compiled = subjectCache.get(request); if (!compiled) { compiled = new Map(); subjectCache.set(request, compiled); }
   let value = compiled.get(subjectId); if (!value) { value = compileSubject(request, subjectId); compiled.set(subjectId, value); } return value;
+}
+
+// The requested subjects and their numeric ordering belong to the immutable
+// request. Exposure-only subjects still resolve their own incidental safety limits.
+const subjectLayouts = new WeakMap<CanonicalRequest, {
+  ids: Set<string>; rows: { id: string; input: ReturnType<typeof compileSubject> }[]; fixed: boolean;
+}>();
+function subjectLayout(request: CanonicalRequest) {
+  request = sharedInputs.get(request) ?? request;
+  let layout = subjectLayouts.get(request);
+  if (!layout) {
+    const ids = new Set([...(request.dietaryIntake ?? []).map(row => row.subjectId), ...request.targets.map(row => row.subjectId)]);
+    layout = { ids, rows: [...ids].sort().map(id => ({ id, input: subjectInputs(request, id) })),
+      fixed: request.currentSupplements.length === 0 && (!knownLimitProfile(request) || !request.safetyCeilings?.length) };
+    subjectLayouts.set(request, layout);
+  }
+  return layout;
+}
+function* scoringSubjects(request: CanonicalRequest, exposure: ReadonlyMap<string, bigint>, materialize: boolean) {
+  const layout = subjectLayout(request);
+  if (materialize && !layout.fixed) {
+    for (const id of [...new Set([...exposure.keys(), ...layout.ids])].sort()) yield { id, input: subjectInputs(request, id) };
+    return;
+  }
+  yield* layout.rows;
+  if (!layout.fixed) for (const id of exposure.keys()) {
+    if (!layout.ids.has(id)) yield { id, input: subjectInputs(request, id) };
+  }
 }
 
 /** Request-local exact endpoint terms. Different baskets commonly supply the
@@ -268,20 +294,7 @@ function calculateDoseFit(request: CanonicalRequest, exposure: ReadonlyMap<strin
   const perContinuedDose: NonNullable<DoseFitScore["perContinuedDose"]>[number][] | null = materialize ? [] : null;
   const perLimit: DoseFitScore["perLimit"][number][] | null = materialize ? [] : null;
   const deviations: TargetDeviation[] = [], estimatedTargets: string[] = [];
-  let fixed = fixedSubjects.get(request);
-  if (fixed === undefined) {
-    fixed = request.currentSupplements.length === 0 && (!knownLimitProfile(request) || !request.safetyCeilings?.length)
-      ? [...new Set([...(request.dietaryIntake ?? []).map(row => row.subjectId), ...request.targets.map(row => row.subjectId)])].sort() : null;
-    fixedSubjects.set(request, fixed);
-  }
-  // Display rows retain their historical ordering. Exact numeric sums are
-  // order-independent; avoid allocating and sorting a set for every basket.
-  let requested = requestedSubjects.get(request);
-  if (!requested) { requested = new Set([...(request.dietaryIntake ?? []).map(row => row.subjectId), ...request.targets.map(row => row.subjectId)]); requestedSubjects.set(request, requested); }
-  const subjects = fixed ?? (materialize ? [...new Set([...exposure.keys(), ...requested])].sort()
-    : [...requested, ...exposure.keys()].filter((id, index) => index < requested.size || !requested.has(id)));
-  for (const subjectId of subjects) {
-    const compiled = subjectInputs(request, subjectId);
+  for (const { id: subjectId, input: compiled } of scoringSubjects(request, exposure, materialize)) {
     const { target, dietary, referenceRows, reference, bounds } = compiled;
     if (!target && reference === BigInt(0) && bounds.length === 0) continue;
     const known = exposure.get(subjectId) ?? BigInt(0);
@@ -336,7 +349,8 @@ function calculateDoseFit(request: CanonicalRequest, exposure: ReadonlyMap<strin
   const exact = settings ? (intentTerms.length === 1 ? intentTerms[0]! : sum(intentTerms)) : add(fitting, weighted);
   const facts = { exact, fitting, safety: weighted, deviations };
   if (!materialize) {
-    deviations.sort((a, b) => a.subjectId < b.subjectId ? -1 : a.subjectId > b.subjectId ? 1 : 0);
+    // Requested targets were compiled in stable subject order; incidental
+    // exposure-only subjects cannot introduce another target deviation.
     cache.set(exposure, facts); return facts;
   }
   const [under, over, limit] = displayTerms!.map(sum);
