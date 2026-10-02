@@ -1,6 +1,6 @@
 import { measureService, recordServiceMetric } from "@/lib/service-metrics";
 import { refinementDecisionSummary } from "@/lib/agentic/presentation/decision";
-import { withServiceMeasurements } from "@/lib/service-metrics";
+import { withServiceMeasurements, serviceMeasurements } from "@/lib/service-metrics";
 import { planStatusProjection, visiblePlanRevision, type PlanOperationRead } from "@/lib/agentic/presentation/status-projection";
 import {preparePlanRevisionRecord} from "@/lib/agentic/store/prepared-revision";
 import { readPlanPresentation } from "@/lib/agentic/presentation/plan-read";
@@ -986,19 +986,22 @@ export async function runAdmittedPlanOperation(input: Readonly<{
   }
   const work = withRequestLifetime({ signal, correlationId: attempt.correlationId }, () => withServiceMeasurements(() => planAttempts.run(attempt, async () => {
     if (claim.command.scope.principalScope?.startsWith("qa-v3:")) setQueryNamespace(claim.command.scope.principalScope);
+    const endOperation = measureService("match.operation_ms");
+    let outcome = "failed";
     try {
       const result = await completePreparedPlan(prepared, {
         config: input.config, now: claim.createdAt, payload: claim.command.payload as PlanToolInput,
         scope: claim.command.scope, store: input.store
       }, !(claim.command.payload as PlanToolInput).planHandle, Date.now());
       if (isAgenticErrorResult(result)) {
+        outcome = result.error.reasonCode;
         if (operationDeadlineRemaining(claim) === 0) {
           await withOperationCleanup(() => expirePlanOperation(input.store, claim.id, new Date().toISOString()));
           return planOperationDeadlineError();
         }
         const status = result.error.retryable ? "retryable" : "failed";
         await withOperationCleanup(() => updateClaimedOperation(input.store, claim, { status, error: result }, new Date().toISOString()));
-      }
+      } else outcome = result.status;
       return result;
     } catch (error) {
       if (operationDeadlineRemaining(claim) === 0) {
@@ -1010,6 +1013,13 @@ export async function runAdmittedPlanOperation(input: Readonly<{
       await withOperationCleanup(() => failPlanOperation(input.store, claim, result, new Date().toISOString()));
       console.error("[agentic-plan-operation]", { operationId: claim.id, origin: error instanceof Error ? error.name : "unknown", message: error instanceof Error ? error.message : "operation_failed" });
       return result;
+    } finally {
+      endOperation();
+      // Numeric, operation-scoped measurements stay in internal logs. The age
+      // includes time before this claim (including any earlier retry); nested
+      // stage timers overlap and must not be summed into request latency.
+      console.info("[matcher-performance]", JSON.stringify({ operationId: claim.id, buildId: input.config.buildId,
+        outcome, operationAgeMs: Math.max(0, Date.now() - Date.parse(claim.createdAt)), metrics: serviceMeasurements() }));
     }
   }))).finally(() => { clearTimeout(deadline); inflightDurableOperations.delete(claim.id); });
   inflightDurableOperations.set(claim.id, work);
