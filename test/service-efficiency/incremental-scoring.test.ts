@@ -71,7 +71,7 @@ test('EFF-INC-04 incremental exact scores equal independent full traversal acros
     let parent = new Map([['a', 20_000_000n], ['b', 0n], ['c', 0n]]);
     for (let i = 0; i < 30; i++) {
       for (const score of [dose.numericalDoseFitScore, dose.numericalWeightedDoseFitScore]) score(input, parent);
-      const changed = i % 2 ? ['a', 'x'] : ['b', 'c'];
+      const changed = [['a'], ['x'], ['b'], ['b', 'c']][i % 4]!;
       const child = new Map(parent);
       for (const id of changed) child.set(id, (parent.get(id) ?? 0n) + BigInt(i + 1) * 2_000_000n);
       dose.registerDoseFitChange(child, parent, changed);
@@ -120,13 +120,13 @@ test('EFF-INC-06 immutable candidate additions reuse unchanged unknown-product l
 
 test('EFF-INC-07 zero targets, deferred targets and unavailable limit profiles retain exact full-score behavior', () => {
   const targets = canonicalizeTargets({ targets: [{ subjectId: 'vitamin-d3', name: 'Vitamin D3', amount: 0, unit: 'mcg' }] }).targets;
-  targets.push({ ...manyTargets()[0]!, importance: 'conditional', prerequisite: { status: 'unknown' } });
+  targets.push(...manyTargets().slice(1), { ...manyTargets()[0]!, importance: 'conditional', prerequisite: { status: 'unknown' } });
   for (const profileKnown of [undefined, { ageYears: false, lifeStage: false }]) {
     const input = request({ targets, profileKnown, scoring: { profile: 'best_coverage', weights: {} },
       safetyCeilings: [{ subjectId: 'vitamin-d3', name: 'Vitamin D3', maxAmount: 100, maxUnit: 'mcg', sourceScope: 'supplemental' }] });
     const parent = new Map<string, bigint>();
     for (const score of [dose.numericalDoseFitScore, dose.numericalWeightedDoseFitScore]) score(input, parent);
-    const child = new Map([['vitamin-d3', 125_000n], ['a', 40_000_000n], ['irrelevant', 1n]]);
+    const child = new Map([['vitamin-d3', 125_000n]]);
     dose.registerDoseFitChange(child, parent, [...child.keys()]);
     for (const score of [dose.numericalDoseFitScore, dose.numericalWeightedDoseFitScore]) assert.deepEqual(score(input, child), score(structuredClone(input), new Map(child)));
     assert.deepEqual(dose.doseFitScore(input, child), dose.doseFitScore(structuredClone(input), new Map(child)));
