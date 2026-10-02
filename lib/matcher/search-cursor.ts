@@ -67,6 +67,19 @@ function indexFor(values: string[], indices: Map<string, number>, id: string) {
   const found = indices.get(id); if (found != null) return found;
   const next = values.length; values.push(id); indices.set(id, next); return next;
 }
+// Variant numbers belong to one cursor and survive its checkpoints. A restored
+// index gets its own cache; immutable selections can share keys across layers.
+const selectionKeys = new WeakMap<SearchCursor["variantIndex"], WeakMap<readonly string[], string>>();
+export function searchSelectionKey(cursor: Pick<SearchCursor, "variantIds" | "variantIndex">, ids: readonly string[]) {
+  let cache = selectionKeys.get(cursor.variantIndex);
+  if (!cache) { cache = new WeakMap(); selectionKeys.set(cursor.variantIndex, cache); }
+  let key = cache.get(ids);
+  if (key === undefined) {
+    key = ids.map(id => indexFor(cursor.variantIds, cursor.variantIndex, id)).sort((a, b) => a - b).join(",");
+    cache.set(ids, key);
+  }
+  return key;
+}
 function packedExposure(cursor: SearchCursor, values: ReadonlyMap<string, bigint>): ExactVector {
   const packed: ExactVector = [];
   for (const [id, value] of values) packed.push(indexFor(cursor.subjects, cursor.subjectIndex, id), value);
@@ -98,8 +111,7 @@ export function* archivedSearchStates(cursor: SearchCursor) {
   for (const packed of cursor.archive.values()) yield restoreState(cursor, packed);
 }
 function remember(cursor: SearchCursor, state: SearchState) {
-  const ids = state.selectedVariantIds.map(id => indexFor(cursor.variantIds, cursor.variantIndex, id));
-  const key = [...ids].sort((a, b) => a - b).join(",");
+  const key = searchSelectionKey(cursor, state.selectedVariantIds);
   if (!cursor.archive.has(key)) {
     cursor.archive.set(key, state.count > 0 ? state : { ...state, unknownProductIds: state.unknownProductIds ?? [] });
     cursor.unreviewed.push(state);
@@ -297,8 +309,7 @@ function completedAttempt(cursor: SearchCursor, request: CanonicalRequest) {
   if (cursor.expansionAttempts % 1000 === 0) reduceReview(cursor, request);
 }
 function add(cursor: SearchCursor, state: SearchState, groupIndex: number, id: string, request: CanonicalRequest) {
-  const ids = state.selectedVariantIds.map(selected => indexFor(cursor.variantIds, cursor.variantIndex, selected)).sort((a, b) => a - b);
-  const edge = ids.join(",") + ">" + indexFor(cursor.variantIds, cursor.variantIndex, id);
+  const edge = searchSelectionKey(cursor, state.selectedVariantIds) + ">" + indexFor(cursor.variantIds, cursor.variantIndex, id);
   if (cursor.edges.has(edge)) { const key = cursor.edges.get(edge); return key != null ? restoreState(cursor, cursor.archive.get(key)!) : null; }
   cursor.expansionAttempts++;
   const row = variant(cursor, groupIndex, id);
