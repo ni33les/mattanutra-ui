@@ -134,7 +134,7 @@ test('EFF-INC-07 zero targets, deferred targets and unavailable limit profiles r
 });
 
 test('EFF-INC-08 equal penalties retain distinct display exposures and zero-valued incidental limit rows', () => {
-  const input = request({ safetyCeilings: [{ subjectId: 'x', name: 'X', maxAmount: 100, maxUnit: 'mg', sourceScope: 'supplemental' }] });
+  const input = request({ targets: manyTargets(), safetyCeilings: [{ subjectId: 'x', name: 'X', maxAmount: 100, maxUnit: 'mg', sourceScope: 'supplemental' }] });
   const parent = new Map([['a', 100_000_000n]]);
   const before = dose.doseFitScore(input, parent);
   const child = new Map(parent); child.set('x', 0n);
