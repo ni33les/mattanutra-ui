@@ -245,7 +245,10 @@ function calculateDoseFit(request: CanonicalRequest, exposure: ReadonlyMap<strin
   if (previous && !materialize) return previous;
   if (!materialize) {
     const change = exposureChanges.get(exposure), parent = change && cache.get(change.parent);
-    if (change && parent) {
+    // Replacing terms reads both the old and new loss. A broad update is cheaper
+    // with the full evaluator. Target count is a conservative lower bound for
+    // active subjects, so incidental limits cannot make this estimate optimistic.
+    if (change && parent && change.subjects.length * 3 <= parent.deviations.length) {
       const score = incrementalDoseFit(request, exposure, parent, change, applyWeights);
       cache.set(exposure, score); return score;
     }

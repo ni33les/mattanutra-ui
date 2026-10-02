@@ -111,7 +111,7 @@ export function* archivedSearchStates(cursor: SearchCursor) {
   for (const packed of cursor.archive.values()) yield restoreState(cursor, packed);
 }
 function remember(cursor: SearchCursor, state: SearchState) {
-  const key = searchSelectionKey(cursor, state.selectedVariantIds);
+  const key = state.selectedVariantIds.map(id => indexFor(cursor.variantIds, cursor.variantIndex, id)).sort((a, b) => a - b).join(",");
   if (!cursor.archive.has(key)) {
     cursor.archive.set(key, state.count > 0 ? state : { ...state, unknownProductIds: state.unknownProductIds ?? [] });
     cursor.unreviewed.push(state);
