@@ -134,18 +134,6 @@ function subjectLayout(request: CanonicalRequest) {
   }
   return layout;
 }
-function* scoringSubjects(request: CanonicalRequest, exposure: ReadonlyMap<string, bigint>, materialize: boolean) {
-  const layout = subjectLayout(request);
-  if (materialize && !layout.fixed) {
-    for (const id of [...new Set([...exposure.keys(), ...layout.ids])].sort()) yield { id, input: subjectInputs(request, id) };
-    return;
-  }
-  yield* layout.rows;
-  if (!layout.fixed) for (const id of exposure.keys()) {
-    if (!layout.ids.has(id)) yield { id, input: subjectInputs(request, id) };
-  }
-}
-
 /** Request-local exact endpoint terms. Different baskets commonly supply the
  * same amount of one nutrient; profile weights and uncertain endpoints stay isolated. */
 function subjectLoss(input: { target: CanonicalRequest["targets"][number] | undefined; ranges: ReturnType<typeof rangeOffsets>; dietary: ReturnType<typeof rangeOffsets>; reference: bigint; scale: bigint | undefined; bounds: readonly Limit[] }, known: bigint, weight: Fraction) {
@@ -197,17 +185,19 @@ export function numericalDoseFitScore(request: CanonicalRequest, exposure: Reado
 }
 export function numericalWeightedDoseFitScore(request: CanonicalRequest, exposure: ReadonlyMap<string, bigint>): NumericalDoseFitScore {
   const settings = request.scoring ? effectiveWeights(request.scoring) : null;
-  if (!settings || (settings.defaultNutrient === 1 && Object.values(settings.nutrients).every(weight => weight === 1))) return numericalDoseFitScore(request, exposure);
+  if (!settings) return numericalDoseFitScore(request, exposure);
   // With one physical endpoint and uniform fitting weights >=1 there is no
   // endpoint choice. Reuse the exact fit/safety components.
   // Estimated ranges must always evaluate the complete weighted endpoints.
   let uniform = fixedWeights.get(request);
   if (uniform === undefined) {
+    const equalWeights = Object.values(settings.nutrients).every(weight => weight === settings.defaultNutrient);
     const varying = [...request.currentSupplements, ...(request.dietaryIntake ?? [])].some(row =>
       (row.minimumDailyAmount ?? row.dailyAmount) !== (row.maximumDailyAmount ?? row.dailyAmount));
-    uniform = !varying && Object.values(settings.nutrients).every(weight => weight === settings.defaultNutrient) ? settings.defaultNutrient : null;
+    uniform = equalWeights && (settings.defaultNutrient === 1 || !varying) ? settings.defaultNutrient : null;
     fixedWeights.set(request, uniform);
   }
+  if (uniform === 1) return numericalDoseFitScore(request, exposure);
   if (uniform !== null) {
     let cache = weightedCache.get(request); if (!cache) { cache = new WeakMap(); weightedCache.set(request, cache); }
     const found = cache.get(exposure); if (found) return found;
@@ -294,7 +284,21 @@ function calculateDoseFit(request: CanonicalRequest, exposure: ReadonlyMap<strin
   const perContinuedDose: NonNullable<DoseFitScore["perContinuedDose"]>[number][] | null = materialize ? [] : null;
   const perLimit: DoseFitScore["perLimit"][number][] | null = materialize ? [] : null;
   const deviations: TargetDeviation[] = [], estimatedTargets: string[] = [];
-  for (const { id: subjectId, input: compiled } of scoringSubjects(request, exposure, materialize)) {
+  const layout = subjectLayout(request);
+  const rows = materialize && !layout.fixed
+    ? [...new Set([...exposure.keys(), ...layout.ids])].sort().map(id => ({ id, input: subjectInputs(request, id) }))
+    : layout.rows;
+  const extra = !materialize && !layout.fixed ? exposure.keys() : undefined;
+  let position = 0;
+  for (;;) {
+    let row = rows[position++];
+    if (!row) {
+      const next = extra?.next();
+      if (!next || next.done) break;
+      if (layout.ids.has(next.value)) continue;
+      row = { id: next.value, input: subjectInputs(request, next.value) };
+    }
+    const { id: subjectId, input: compiled } = row;
     const { target, dietary, referenceRows, reference, bounds } = compiled;
     if (!target && reference === BigInt(0) && bounds.length === 0) continue;
     const known = exposure.get(subjectId) ?? BigInt(0);
