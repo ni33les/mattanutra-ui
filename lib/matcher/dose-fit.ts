@@ -192,16 +192,17 @@ export function numericalWeightedDoseFitScore(request: CanonicalRequest, exposur
   return calculateDoseFit(request, exposure, true);
 }
 
-function appendDifference(terms: Fraction[], next: Fraction, previous: Fraction) {
-  if (next === previous) return;
+function appendDifference(terms: Fraction[] | undefined, base: Fraction, next: Fraction, previous: Fraction) {
+  if (next === previous) return terms;
   const sameDenominator = next.den === previous.den;
   const num = sameDenominator ? next.num - previous.num : next.num * previous.den - previous.num * next.den;
-  if (num !== BigInt(0)) terms.push({ num, den: sameDenominator ? next.den : next.den * previous.den });
+  if (num !== BigInt(0)) (terms ??= [base]).push({ num, den: sameDenominator ? next.den : next.den * previous.den });
+  return terms;
 }
 
 function incrementalDoseFit(request: CanonicalRequest, exposure: ReadonlyMap<string, bigint>, parent: NumericalDoseFitScore,
   change: { parent: ReadonlyMap<string, bigint>; subjects: readonly string[] }, applyWeights: boolean): NumericalDoseFitScore | null {
-  const fittingTerms = [parent.fitting], safetyTerms = [parent.safety], intentTerms = [parent.exact];
+  let fittingTerms: Fraction[] | undefined, safetyTerms: Fraction[] | undefined, intentTerms: Fraction[] | undefined;
   const settings = applyWeights && request.scoring ? effectiveWeights(request.scoring) : null;
   const weights = settings ? exactWeights(settings) : null;
   let deviations = parent.deviations;
@@ -216,9 +217,9 @@ function incrementalDoseFit(request: CanonicalRequest, exposure: ReadonlyMap<str
     const before = compiled.losses.get(weight)?.get(previousKnown);
     if (!before) return null;
     const after = cachedSubjectLoss(compiled, known, weight);
-    appendDifference(fittingTerms, after.worst.fitting, before.worst.fitting);
-    appendDifference(safetyTerms, after.worst.safety, before.worst.safety);
-    if (settings) appendDifference(intentTerms, after.worst.total, before.worst.total);
+    fittingTerms = appendDifference(fittingTerms, parent.fitting, after.worst.fitting, before.worst.fitting);
+    safetyTerms = appendDifference(safetyTerms, parent.safety, after.worst.safety, before.worst.safety);
+    if (settings) intentTerms = appendDifference(intentTerms, parent.exact, after.worst.total, before.worst.total);
     if (after.deviation) {
       // Targets are present even at zero exposure. Preserve the existing stable
       // subject order and share untouched immutable deviation rows.
@@ -229,9 +230,9 @@ function incrementalDoseFit(request: CanonicalRequest, exposure: ReadonlyMap<str
       (deviations as TargetDeviation[])[index] = after.deviation;
     }
   }
-  const fitting = fittingTerms.length === 1 ? parent.fitting : sum(fittingTerms);
-  const safety = safetyTerms.length === 1 ? parent.safety : sum(safetyTerms);
-  const exact = settings ? (intentTerms.length === 1 ? parent.exact : sum(intentTerms)) : add(fitting, safety);
+  const fitting = fittingTerms ? sum(fittingTerms) : parent.fitting;
+  const safety = safetyTerms ? sum(safetyTerms) : parent.safety;
+  const exact = settings ? (intentTerms ? sum(intentTerms) : parent.exact) : fittingTerms || safetyTerms ? add(fitting, safety) : parent.exact;
   // Keep a distinct numerical identity: equal penalties can still have different
   // display exposures or newly encountered incidental nutrient rows.
   return { exact, fitting, safety, deviations };
