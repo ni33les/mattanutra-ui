@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { SharedMatchWork } from '../../lib/match-work-cache.ts';
-import { withServiceMeasurements, serviceMeasurements } from '../../lib/service-metrics.ts';
+import { withServiceMeasurements, serviceMeasurements, mergeWorkerMeasurements, recordServiceMetric } from '../../lib/service-metrics.ts';
 import { installCatalogue, goldens } from '../mcp-7-2-3/helpers.ts';
 import { runtime, rpc, uninstallRealCatalogue } from '../ax-refinement/helpers.ts';
 import { runAdmittedPlanOperation } from '../../lib/agentic/plan/service.ts';
@@ -56,4 +56,17 @@ test('EFF-INC-10 completed durable operations emit internal phase measurements w
     if (previous === undefined) delete process.env.AX_REFINEMENT_REAL_WORKERS; else process.env.AX_REFINEMENT_REAL_WORKERS = previous;
     uninstallRealCatalogue();
   }
+});
+
+
+test('EFF-INC-11 worker phase measurements reject invalid numbers and remain scoped to the operation', () => {
+  withServiceMeasurements(() => {
+    mergeWorkerMeasurements(undefined);
+    mergeWorkerMeasurements({ 'match.finalization_ms': { count: 1, total: 2, max: 2 } });
+    mergeWorkerMeasurements({ 'match.search_ms': { count: 0, total: -1, max: Number.NaN } });
+    recordServiceMetric('match.search_ms', -1);
+    recordServiceMetric('match.search_ms', Number.NaN);
+    assert.deepEqual(serviceMeasurements(), { 'match.finalization_ms': { count: 1, total: 2, max: 2 } });
+  });
+  assert.deepEqual(serviceMeasurements(), {});
 });

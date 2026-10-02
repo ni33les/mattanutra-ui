@@ -219,12 +219,10 @@ function incrementalDoseFit(request: CanonicalRequest, exposure: ReadonlyMap<str
       // Targets are present even at zero exposure. Preserve the existing stable
       // subject order and share untouched immutable deviation rows.
       if (deviations === parent.deviations) deviations = [...deviations];
+      // The parent already includes every active target, even at zero exposure.
+      // Adding exposure cannot introduce a new target into this immutable request.
       const index = deviations.findIndex(row => row.subjectId === subjectId);
-      if (index >= 0) (deviations as TargetDeviation[])[index] = after.deviation;
-      else {
-        (deviations as TargetDeviation[]).push(after.deviation);
-        (deviations as TargetDeviation[]).sort((a, b) => a.subjectId < b.subjectId ? -1 : a.subjectId > b.subjectId ? 1 : 0);
-      }
+      (deviations as TargetDeviation[])[index] = after.deviation;
     }
   }
   const fitting = fittingTerms.length === 1 ? parent.fitting : sum(fittingTerms);
@@ -248,7 +246,7 @@ function calculateDoseFit(request: CanonicalRequest, exposure: ReadonlyMap<strin
     // Once the raw score exists, uniform profiles reuse it and later weighted
     // endpoints can use the full evaluator. No child needs to retain its parent's
     // exposure map for the remaining lifetime of a large search archive.
-    if (!applyWeights) exposureChanges.delete(exposure);
+    if (!applyWeights && change) exposureChanges.delete(exposure);
     // Replacing terms reads both the old and new loss. A broad update is cheaper
     // with the full evaluator. Target count is a conservative lower bound for
     // active subjects, so incidental limits cannot make this estimate optimistic.
