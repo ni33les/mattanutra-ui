@@ -455,22 +455,15 @@ export function revalidateState(
 /** Full safety and conversational rendering runs on diverse bounded extrema,
  * not thousands of losing search states. This changes computational effort,
  * never the permitted number of products or quantities in a basket. */
-const frontierFacts = new WeakMap<CanonicalRequest, WeakMap<SearchState["exposure"], { additive: boolean; losses: Map<string, number>; protectedLoss: number }>>();
-function frontierFactsFor(state: SearchState, request: CanonicalRequest, protectedIds: ReadonlySet<string>) {
+type FrontierFacts = { deviations: ReturnType<typeof doseFitTargetDeviations>; additive?: boolean; losses?: Map<string, number>; protectedLoss?: number };
+const frontierFacts = new WeakMap<CanonicalRequest, WeakMap<SearchState["exposure"], FrontierFacts>>();
+function frontierFactsFor(state: SearchState, request: CanonicalRequest) {
   let cache = frontierFacts.get(request);
   if (!cache) { cache = new WeakMap(); frontierFacts.set(request, cache); }
   let facts = cache.get(state.exposure);
   if (!facts) {
-    let additive = true, protectedLoss = 0;
-    const losses = new Map<string, number>();
-    for (const row of doseFitTargetDeviations(numericalDoseFitScore(request, state.exposure))) {
-      additive &&= row.over === 0;
-      const loss = row.under + row.over;
-      // The former find() used the first occurrence of a subject.
-      if (!losses.has(row.subjectId)) losses.set(row.subjectId, loss);
-      if (protectedIds.has(row.subjectId)) protectedLoss = protectedLoss + row.under + row.over;
-    }
-    facts = { additive, losses, protectedLoss }; cache.set(state.exposure, facts);
+    facts = { deviations: doseFitTargetDeviations(numericalDoseFitScore(request, state.exposure)) };
+    cache.set(state.exposure, facts);
   }
   return facts;
 }
@@ -481,10 +474,21 @@ export function reviewFrontier(states: readonly SearchState[], request: Canonica
   // A close fit on one target can become the best complete basket after a
   // complementary addition, despite losing every aggregate/profile ranking.
   const protectedIds = new Set(request.targets.filter(row => row.importance === "core" || row.importance === "required").map(row => row.subjectId));
-  const facts = (state: SearchState) => frontierFactsFor(state, request, protectedIds);
-  const additiveBases = states.filter(state => facts(state).additive);
+  const facts = (state: SearchState) => frontierFactsFor(state, request);
+  const additiveBases = states.filter(state => {
+    const value = facts(state);
+    return value.additive ??= value.deviations.every(row => row.over === 0);
+  });
   for (const target of request.targets.filter(row => !isDeferredConditional(row)).slice(0, 32)) {
-    const deviation = (state: SearchState) => facts(state).losses.get(target.subjectId) ?? Infinity;
+    const deviation = (state: SearchState) => {
+      const value = facts(state), losses = value.losses ??= new Map();
+      let loss = losses.get(target.subjectId);
+      if (loss === undefined) {
+        const row = value.deviations.find(row => row.subjectId === target.subjectId);
+        loss = row ? row.under + row.over : Infinity; losses.set(target.subjectId, loss);
+      }
+      return loss;
+    };
     const reference = smallest(additiveBases, 1, (a,b)=>deviation(a)-deviation(b) || doseOrder(a,b))[0];
     if (reference) chosen.add(reference);
   }
@@ -506,7 +510,10 @@ export function reviewFrontier(states: readonly SearchState[], request: Canonica
     (a: SearchState, b: SearchState) => comparePillCounts(a.pills, a.pillCountKnown, b.pills, b.pillCountKnown) || order(a, b)
   ]) for (const state of smallest(nonempty, 24, compare)) chosen.add(state);
   if (protectedIds.size && request.targets.some(row => row.importance === "optional")) {
-    const protectedFit = (state: SearchState) => facts(state).protectedLoss;
+    const protectedFit = (state: SearchState) => {
+      const value = facts(state);
+      return value.protectedLoss ??= value.deviations.filter(row => protectedIds.has(row.subjectId)).reduce((sum, row) => sum + row.under + row.over, 0);
+    };
     for (const state of smallest(states, 48, (a, b) => protectedFit(a) - protectedFit(b) || order(a, b))) chosen.add(state);
   }
   const patterns = new Map<string, { state: SearchState; index: number }>();
