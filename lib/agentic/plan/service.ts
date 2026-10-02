@@ -454,14 +454,17 @@ type DurableSearchCheckpoint = {
   search?: import("@/lib/agentic/plan/matching").ResidentChunkOptions["checkpoint"];
   reservedAttempts?: number;
 };
+// A successful conditional normalization write owns these exact immutable facts.
+// Reuse them in the same attempt; dispatch and publication still verify the lease.
+const normalizedCheckpoints = new WeakMap<PlanOperationRecord, DurableSearchCheckpoint>();
 type MatchCheckpointEvent = { checkpoint: DurableSearchCheckpoint; reserve: boolean; restoreReservedAttempts?: number };
 const durableMatchingWork = new SharedMatchWork<ReturnType<typeof matchPlan>, MatchCheckpointEvent>(16 * 1024 * 1024);
 async function durableMatch(input: { snapshot: CatalogueSnapshot; state: CanonicalPlanState }) {
   const attempt = planAttempts.getStore();
   if (!attempt?.operation || !attempt.operationStore) return matchPlanInWorker(input);
   const store = attempt.operationStore, claim = attempt.operation;
-  const current = await store.getPlanOperation(claim.id);
-  const initial = current?.checkpoint as DurableSearchCheckpoint | null;
+  const initial = normalizedCheckpoints.get(claim)
+    ?? (await store.getPlanOperation(claim.id))?.checkpoint as DurableSearchCheckpoint | null;
   if (!initial) throw new Error("Missing normalized operation checkpoint");
   const persistCheckpoint = initial.persistSearchCheckpoints === true;
   if (!persistCheckpoint && (initial.search || initial.reservedAttempts)) {
@@ -1887,11 +1890,14 @@ async function completePreparedPlan(
       activeOperation.referenceIdentity && activeOperation.referenceIdentity !== matcherSafetyReferenceIdentity()?.fingerprint)) {
       return businessError({ reasonCode: "stale_revision", message: "Catalogue or reference inputs changed during matching. Reload the plan." });
     }
+    const normalized: DurableSearchCheckpoint = { ...(checkpoint ?? { stage: "normalized", state, catalogueId: snapshotIdentity }),
+      persistSearchCheckpoints, references: undefined, referencesJson: JSON.stringify(references) };
     const saved = await updateClaimedOperation(input.store, activeOperation, {
       catalogueIdentity: snapshotIdentity, referenceIdentity: matcherSafetyReferenceIdentity()?.fingerprint ?? null,
-      checkpoint: { ...(activeOperation.checkpoint ? withoutOperationCursor(activeOperation).checkpoint as DurableSearchCheckpoint : checkpoint ?? { stage: "normalized", state, catalogueId: snapshotIdentity }), persistSearchCheckpoints, references: undefined, referencesJson: JSON.stringify(references) }
+      checkpoint: activeOperation.checkpoint ? withoutOperationCursor({ ...activeOperation, checkpoint: normalized }).checkpoint : normalized
     }, new Date().toISOString());
     if (!saved) return businessError({ reasonCode: "stale_revision", message: "This matching operation was cancelled or superseded. Reload the plan." });
+    normalizedCheckpoints.set(activeOperation, normalized);
   }
 
   if (state.requirements.productDoses?.length) {
