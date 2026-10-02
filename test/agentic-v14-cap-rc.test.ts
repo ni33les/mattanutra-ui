@@ -200,7 +200,7 @@ describe("v1.4 capacity cancellation and bounded completion", () => {
     assert.deepEqual(activeRequestCountForTests(), baseline);
   });
 
-  it("CAP-RC-RED-05 a waiting ordinary request does not prevent independent admission", async () => {
+  it("CAP-RC-RED-05 a waiting ordinary request does not prevent independent admission", { timeout: 2000 }, async (context) => {
     const cluster = createHandlerCluster();
 
     const latch = deferred();
@@ -214,13 +214,12 @@ describe("v1.4 capacity cancellation and bounded completion", () => {
     const first = cluster.asHandler("A", (runtime) => qaCall(runtime, "beginRun", { runId: "pool-1" }));
     await entered.promise;
     const second = cluster.asHandler("B", (runtime) => qaCall(runtime, "beginRun", { runId: "pool-2" }));
-    let timer: ReturnType<typeof setTimeout> | undefined;
+    const release = () => latch.resolve();
+    context.signal.addEventListener("abort", release, { once: true });
     try {
-      await Promise.race([bothEntered.promise, new Promise((_, reject) => {
-        timer = setTimeout(() => reject(new Error("Independent admission did not reach its barrier")), 2000);
-      })]);
+      await bothEntered.promise;
       assert.equal(admitted, 2, 'The second request enters before the first request releases its latch');
-    } finally { clearTimeout(timer); latch.resolve(); }
+    } finally { context.signal.removeEventListener("abort", release); latch.resolve(); }
     const [a, b] = await Promise.all([first, second]);
     assert.equal(a.ok, true);
     assert.equal(b.ok, true);
