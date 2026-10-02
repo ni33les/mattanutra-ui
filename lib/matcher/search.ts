@@ -78,12 +78,10 @@ export function seedState(request: CanonicalRequest): SearchState {
   };
 }
 
-export function tryAddVariant(
-  state: SearchState,
-  variant: DoseVariant,
-  group: ProductGroup,
-  request: CanonicalRequest
-): SearchState | null {
+// Eligibility depends on the immutable request, product and variant, never on
+// the parent basket. Probe each variant once even when many parents reach it.
+const eligibleVariants = new WeakMap<CanonicalRequest, WeakMap<DoseVariant, { product: ProductGroup["product"]; eligible: boolean }>>();
+function variantIsEligible(variant: DoseVariant, group: ProductGroup, request: CanonicalRequest) {
   const helpsPurchasableTarget = request.targets.some((target) => {
     if (isDeferredConditional(target)) {
       return false;
@@ -96,8 +94,26 @@ export function tryAddVariant(
   if (!helpsPurchasableTarget && !request.retainProductIds.includes(group.productId) &&
     !request.productDoses?.some(row => row.productId === group.productId) &&
     !request.retainSubjectIds.some((id) => (variant.safetyExposure?.get(id)?.units ?? BigInt(0)) > BigInt(0))) {
-    return null;
+    return false;
   }
+
+  return true;
+}
+
+export function tryAddVariant(
+  state: SearchState,
+  variant: DoseVariant,
+  group: ProductGroup,
+  request: CanonicalRequest
+): SearchState | null {
+  let eligibility = eligibleVariants.get(request);
+  if (!eligibility) { eligibility = new WeakMap(); eligibleVariants.set(request, eligibility); }
+  let measuredEligibility = eligibility.get(variant);
+  if (!measuredEligibility || measuredEligibility.product !== group.product) {
+    measuredEligibility = { product: group.product, eligible: variantIsEligible(variant, group, request) };
+    eligibility.set(variant, measuredEligibility);
+  }
+  if (!measuredEligibility.eligible) return null;
 
   const quantities = quantityIndex(group.variants).ids;
   if (state.selectedVariantIds.some((id) => quantities.has(id))) return null;
@@ -472,18 +488,33 @@ function frontierFactsFor(state: SearchState, request: CanonicalRequest) {
   }
   return facts;
 }
+const frontierInputs = new WeakMap<CanonicalRequest, {
+  protectedIds: Set<string>; targets: CanonicalRequest["targets"]; optional: boolean;
+  targetIds: Set<string>; focusedByGroups: WeakMap<readonly ProductGroup[], Set<string>>;
+}>();
+function frontierInputsFor(request: CanonicalRequest) {
+  let inputs = frontierInputs.get(request);
+  if (!inputs) {
+    inputs = { protectedIds: new Set(request.targets.filter(row => row.importance === "core" || row.importance === "required").map(row => row.subjectId)),
+      targets: request.targets.filter(row => !isDeferredConditional(row)).slice(0, 32), optional: request.targets.some(row => row.importance === "optional"),
+      targetIds: new Set(request.targets.map(row => row.subjectId)), focusedByGroups: new WeakMap() };
+    frontierInputs.set(request, inputs);
+  }
+  return inputs;
+}
+
 export function reviewFrontier(states: readonly SearchState[], request: CanonicalRequest, incumbents: readonly SearchState[], order = (a: SearchState, b: SearchState) => compareSearchStates(a, b, request), groups: readonly ProductGroup[] = []) {
   if (states.length <= 192) return [...states];
   const doseOrder = (a: SearchState, b: SearchState) => compareDoseFit(numericalDoseFitScore(request, a.exposure), numericalDoseFitScore(request, b.exposure)) || order(a, b);
   const chosen = new Set<SearchState>([...incumbents, ...smallest(states, 16, doseOrder)]);
   // A close fit on one target can become the best complete basket after a
   // complementary addition, despite losing every aggregate/profile ranking.
-  const protectedIds = new Set(request.targets.filter(row => row.importance === "core" || row.importance === "required").map(row => row.subjectId));
+  const inputs = frontierInputsFor(request), { protectedIds } = inputs;
   const facts = (state: SearchState) => frontierFactsFor(state, request);
   // Most rejected candidates fail this short-circuit scan immediately. Cache
   // comparison facts only when the target or protected-fit rankings use them.
   const additiveBases = states.filter(state => doseFitTargetDeviations(numericalDoseFitScore(request, state.exposure)).every(row => row.over === 0));
-  for (const target of request.targets.filter(row => !isDeferredConditional(row)).slice(0, 32)) {
+  for (const target of inputs.targets) {
     const deviation = (state: SearchState) => {
       const value = facts(state), losses = value.losses ??= new Map();
       let loss = losses.get(target.subjectId);
@@ -501,19 +532,22 @@ export function reviewFrontier(states: readonly SearchState[], request: Canonica
     for (const state of smallest(states, 12, (a, b) => compareSearchStates(a, b, profile))) chosen.add(state);
   }
   const nonempty = states.filter(row => row.count > 0);
-  const targetIds = new Set(request.targets.map(row => row.subjectId));
-  const focusedIds = new Set(groups.filter(group => {
-    const facts = group.product.labelledContributions.filter(row => row.amount != null && row.amount > 0);
-    return facts.length > 0 && facts.every(row => row.subjectId !== null && targetIds.has(row.subjectId));
-  }).map(group => group.productId));
-  const focused = smallest(nonempty.filter(row => row.count === 1 && row.selectedProductIds?.some(id => focusedIds.has(id))), 1, order)[0];
+  let focusedIds = inputs.focusedByGroups.get(groups);
+  if (!focusedIds) {
+    focusedIds = new Set(groups.filter(group => {
+      const facts = group.product.labelledContributions.filter(row => row.amount != null && row.amount > 0);
+      return facts.length > 0 && facts.every(row => row.subjectId !== null && inputs.targetIds.has(row.subjectId));
+    }).map(group => group.productId));
+    inputs.focusedByGroups.set(groups, focusedIds);
+  }
+  const focused = smallest(nonempty.filter(row => row.count === 1 && row.selectedProductIds?.some(id => focusedIds!.has(id))), 1, order)[0];
   if (focused) chosen.add(focused);
   for (const compare of [
     (a: SearchState, b: SearchState) => a.price - b.price || order(a, b),
     (a: SearchState, b: SearchState) => a.count - b.count || comparePillCounts(a.pills, a.pillCountKnown, b.pills, b.pillCountKnown) || order(a, b),
     (a: SearchState, b: SearchState) => comparePillCounts(a.pills, a.pillCountKnown, b.pills, b.pillCountKnown) || order(a, b)
   ]) for (const state of smallest(nonempty, 24, compare)) chosen.add(state);
-  if (protectedIds.size && request.targets.some(row => row.importance === "optional")) {
+  if (protectedIds.size && inputs.optional) {
     const protectedFit = (state: SearchState) => {
       const value = facts(state);
       return value.protectedLoss ??= value.deviations.filter(row => protectedIds.has(row.subjectId)).reduce((sum, row) => sum + row.under + row.over, 0);
