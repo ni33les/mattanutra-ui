@@ -307,7 +307,12 @@ describe("life-stage stack UL on every live matching flow", () => {
 
     // Exploration uses the shared numerical scorer; retained results alone
     // materialize display fields from that same evaluator.
-    assert.match(search, /import \{ compareDoseFit, numericalDoseFitScore, doseFitTargetDeviations \} from "@\/lib\/matcher\/dose-fit"/);
+    const scorerImport = search.match(/import \{([^}]+)\} from "@\/lib\/matcher\/dose-fit"/);
+    assert.ok(scorerImport);
+    const importedScorers = new Set(scorerImport[1]!.split(",").map((name) => name.trim()));
+    for (const name of ["compareDoseFit", "numericalDoseFitScore", "doseFitTargetDeviations"]) {
+      assert.ok(importedScorers.has(name), `Search must import the shared ${name} scorer`);
+    }
     assert.match(search, /compareDoseFit\(numericalDoseFitScore\(request, a\.exposure\), numericalDoseFitScore\(request, b\.exposure\)\)/);
     assert.doesNotMatch(search, /stackUnitsViolateCeiling/);
     assert.match(search, /labelledSafetyExposure/);
