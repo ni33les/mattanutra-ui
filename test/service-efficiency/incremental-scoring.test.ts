@@ -75,9 +75,9 @@ test('EFF-INC-04 incremental exact scores equal independent full traversal acros
       const child = new Map(parent);
       for (const id of changed) child.set(id, (parent.get(id) ?? 0n) + BigInt(i + 1) * 2_000_000n);
       dose.registerDoseFitChange(child, parent, changed);
-      for (const score of [dose.numericalDoseFitScore, dose.numericalWeightedDoseFitScore]) {
-        assert.deepEqual(score(input, child), score(structuredClone(input), new Map(child)));
-      }
+      const scorers = [dose.numericalDoseFitScore, dose.numericalWeightedDoseFitScore];
+      if (i % 2) scorers.reverse();
+      for (const score of scorers) assert.deepEqual(score(input, child), score(structuredClone(input), new Map(child)));
       assert.deepEqual(dose.weightedDoseFitScore(input, child), dose.weightedDoseFitScore(structuredClone(input), new Map(child)));
       parent = child;
     }
