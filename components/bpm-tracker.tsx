@@ -51,7 +51,7 @@ export function BpmTracker({ locale }: Readonly<{ locale: Locale }>) {
   const isAdminPath = new RegExp(`^/(${localePattern})/admin(/|$)`).test(pathname);
 
   useEffect(() => {
-    if (isAdminPath) {
+    if (isAdminPath || /\/connect(?:\/|$)/.test(pathname)) {
       return;
     }
 
@@ -80,7 +80,7 @@ export function BpmTracker({ locale }: Readonly<{ locale: Locale }>) {
   }, [isAdminPath, locale, pathname, search]);
 
   useEffect(() => {
-    if (isAdminPath) {
+    if (isAdminPath || /\/connect(?:\/|$)/.test(pathname)) {
       return;
     }
 
@@ -113,7 +113,7 @@ export function BpmTracker({ locale }: Readonly<{ locale: Locale }>) {
     return () => {
       document.removeEventListener("click", onTrackedClick, { capture: true });
     };
-  }, [isAdminPath, locale]);
+  }, [isAdminPath, locale, pathname]);
 
   return null;
 }

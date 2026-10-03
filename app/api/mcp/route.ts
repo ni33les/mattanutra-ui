@@ -1,5 +1,5 @@
 import { withRequestLifetime } from "@/lib/request-lifetime";
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { createLogger } from "@/lib/logger";
 import { requestCorrelationId } from "@/lib/request-correlation";
 import { AGENTIC_CONTRACT_VERSION, loadAgenticConfig } from "@/lib/agentic/config";
@@ -37,6 +37,23 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const log = createLogger("api.mcp");
+
+function scheduleConnectionConfirmation(request: Request, body: unknown, reply: unknown) {
+  // No imports, token parsing or database work for ordinary MCP requests.
+  if (process.env.CONNECT_VERIFICATION_ENABLED === "false" || !request.url.includes("connect_token=")) return;
+  try {
+    after(() => withRequestLifetime({ signal: AbortSignal.timeout(15000) }, async () => {
+      try {
+        const { successfulConnectInfo } = await import("@/lib/connect-token");
+        if (!successfulConnectInfo(body, reply)) return;
+        const token = new URL(request.url).searchParams.get("connect_token");
+        if (!token) return;
+        const { verifyConnectToken } = await import("@/lib/connect-verification");
+        await verifyConnectToken(token);
+      } catch { console.warn("[connect] Confirmation unavailable; MCP response unaffected"); }
+    }));
+  } catch { console.warn("[connect] Confirmation scheduling unavailable"); }
+}
 
 function mcpReply(
   request: Request,
@@ -165,6 +182,7 @@ async function handlePost(request: Request) {
           durationMs,
           tool: timed ?? "other"
         });
+        scheduleConnectionConfirmation(request, body, light);
         return mcpReply(request, light, 200, { "x-mcp-handler-ms": String(durationMs) });
       }
     }
@@ -210,6 +228,7 @@ async function handlePost(request: Request) {
       }));
       if (stream) return stream;
     }
+    scheduleConnectionConfirmation(request, body, result);
     return mcpReply(request, result, 200, { "x-mcp-handler-ms": String(durationMs) });
   } catch (error) {
     if (error instanceof QaRunInvalidError) {

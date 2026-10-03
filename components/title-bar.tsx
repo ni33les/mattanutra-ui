@@ -6,9 +6,12 @@ import { LanguageSwitcher } from "@/components/language-switcher";
 import type { Locale, LocaleCode } from "@/lib/i18n";
 import { getNamespace } from "@/lib/i18n-messages";
 import { nutritionQuizPath } from "@/lib/nutrition-paths";
+import { ConnectCampaignLink } from "@/components/connect-campaign-link";
+import { connectCopy } from "@/lib/connect-copy";
 
 type TitleBarProps = Readonly<{
   assessmentHref?: string;
+  actionLabel?: string;
   currentLocale: Locale;
   currentPath?: string;
   localizedPaths?: Partial<Record<LocaleCode, string>>;
@@ -64,6 +67,7 @@ function isAssessmentStartedPath(currentPath: string, locale: Locale) {
 
 export function TitleBar({
   assessmentHref,
+  actionLabel,
   currentLocale,
   currentPath = `/${currentLocale}`,
   localizedPaths,
@@ -175,13 +179,14 @@ export function TitleBar({
                 {label}
               </Link>
             ))}
+            <ConnectCampaignLink href={`/${currentLocale}/connect`} className="mn-titlebar-link">{connectCopy[currentLocale].nav}</ConnectCampaignLink>
           </nav>
         ) : null}
         <div className="mn-titlebar-actions">
           {!isQuiz && showAssessmentCta ? (
-            <Link className="mn-titlebar-cta" href={titleCtaHref}>
-              {copy.assessment}
-            </Link>
+            <ConnectCampaignLink className="mn-titlebar-cta" href={titleCtaHref}>
+              {actionLabel || copy.assessment}
+            </ConnectCampaignLink>
           ) : null}
           {/* Site-wide: language switcher always visible (including collapsed iPhone). */}
           <div className="mn-titlebar-lang-always">
@@ -206,11 +211,12 @@ export function TitleBar({
                     {label}
                   </Link>
                 ))}
+                <ConnectCampaignLink href={`/${currentLocale}/connect`} className="mn-titlebar-mobile-link">{connectCopy[currentLocale].nav}</ConnectCampaignLink>
                 <div className="mn-titlebar-mobile-actions">
                   {showAssessmentCta ? (
-                    <Link className="mn-titlebar-mobile-cta" href={titleCtaHref}>
-                      {copy.assessment}
-                    </Link>
+                    <ConnectCampaignLink className="mn-titlebar-mobile-cta" href={titleCtaHref}>
+                      {actionLabel || copy.assessment}
+                    </ConnectCampaignLink>
                   ) : null}
                 </div>
               </div>
