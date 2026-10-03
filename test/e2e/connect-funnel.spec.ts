@@ -1,6 +1,7 @@
 import { test, expect, type Page, type BrowserContext } from "@playwright/test";
 import { connectCopy } from "../../lib/connect-copy";
 import { connectProviders } from "../../lib/connect";
+import { createConnectToken } from "../../lib/connect-token";
 const locales = ["en", "th", "zh-CN"] as const;
 
 async function marketing(page: Page, context: BrowserContext, baseURL: string, optedOut = false) {
@@ -87,4 +88,39 @@ test("verification failure keeps the ordinary URL usable and saved advertising o
   await expect(page.locator("#connect-url")).toHaveValue(/\/api\/mcp$/);
   await expect(page.getByRole("button", { name: connectCopy.th.newLink, exact: true })).toBeVisible();
   expect(fixture.events).toHaveLength(0); expect(fixture.pixelLoads()).toBe(0);
+});
+
+test("real HTTP: discovery does not verify; info confirms the matching browser and expired tokens preserve ordinary access", async ({ page, context, baseURL, browser }) => {
+  await marketing(page, context, baseURL!, true);
+  await page.addInitScript(() => Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText: async () => undefined } }));
+  await page.goto("/en/connect/claude");
+  const created = page.waitForResponse(response => response.url().endsWith("/api/connect/attempts") && response.request().method() === "POST");
+  await page.getByRole("button", { name: "Copy connection URL", exact: true }).click();
+  const response = await created;
+  expect(response.status()).toBe(201);
+  const attempt = await response.json();
+  const statusUrl = `${baseURL}/api/connect/attempts/${attempt.id}`;
+  const outsider = await browser.newContext();
+  try { expect((await outsider.request.get(statusUrl)).status()).toBe(404); }
+  finally { await outsider.close(); }
+  async function rpc(method: string, params: object, url = attempt.connectionUrl) {
+    const response = await page.request.post(url, { headers: { "content-type": "application/json", accept: "application/json" }, data: { jsonrpc: "2.0", id: 7, method, params } });
+    expect(response.status()).toBe(200); return response.json();
+  }
+  await rpc("initialize", { protocolVersion: "2025-03-26", clientInfo: { name: "connection-http-test", version: "1" }, capabilities: {} });
+  const listed = await rpc("tools/list", {});
+  expect(listed.result.tools.map((tool: { name: string }) => tool.name)).toEqual(["info", "plan", "execute", "order", "support", "feedback"]);
+  expect((await (await page.request.get(statusUrl)).json()).status).toBe("pending");
+  const expired = createConnectToken(attempt.id, "dev", new Date(Date.now() - 1000), "isolated-browser-fixture");
+  const infoParams = { name: "info", arguments: { locale: "en", view: "overview" } };
+  expect((await rpc("tools/call", infoParams, `${baseURL}/api/mcp?connect_token=${expired}`)).result.isError).toBe(false);
+  expect((await (await page.request.get(statusUrl)).json()).status).toBe("pending");
+  expect((await rpc("tools/call", infoParams)).result.structuredContent.ok).toBe(true);
+  await page.locator("#connection-test").scrollIntoViewIfNeeded();
+  await expect(page.getByText(connectCopy.en.verified, { exact: true })).toBeVisible({ timeout: 15000 });
+  const status = await page.request.get(statusUrl);
+  expect(status.headers()["cache-control"]).toContain("no-store");
+  expect((await status.json()).status).toBe("verified");
+  const ordinary = await rpc("tools/call", infoParams, `${baseURL}/api/mcp`);
+  expect(ordinary.result.structuredContent.ok).toBe(true);
 });
