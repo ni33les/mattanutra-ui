@@ -54,7 +54,7 @@ export function MarketingPreference({ locale }: { locale: Locale }) {
     window.fbq?.("consent", "grant");
     const navigationKey = `${pathname}?${search}:${choice}`;
     if (navigation.current.key !== navigationKey) navigation.current = { key: navigationKey, id: crypto.randomUUID() };
-    void trackMetaEvent("PageView", { locale, stage: pathname.includes("checkout") ? "checkout" : pathname.includes("quiz") ? "assessment" : pathname.includes("healthscore") || pathname.includes("reveal") ? "results" : "landing" }, `navigation:${navigation.current.id}`);
+    void trackMetaEvent("PageView", { locale, provider: /\/connect\/(claude|perplexity|chatgpt|grok)/.exec(pathname)?.[1], stage: pathname.includes("/connect") ? pathname.split("/").length > 3 ? "connect_guide" : "connect" : pathname.includes("checkout") ? "checkout" : pathname.includes("quiz") ? "assessment" : pathname.includes("healthscore") || pathname.includes("reveal") ? "results" : "landing" }, `navigation:${navigation.current.id}`);
     // Next's client navigation retains third-party scripts. Cross the boundary with a fresh document.
     const onClick = (event: MouseEvent) => {
       const link = event.target instanceof Element ? event.target.closest("a[href]") as HTMLAnchorElement | null : null;

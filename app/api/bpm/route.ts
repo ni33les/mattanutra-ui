@@ -47,6 +47,10 @@ export async function POST(request: Request) {
 
   const eventName = text(body.eventName);
 
+  if (eventName === "McpConnectionVerified" || eventName === "mcp_connection_verified") {
+    return NextResponse.json({ error: "Server-only milestone" }, { status: 400, headers: { "Cache-Control": "no-store" } });
+  }
+
   if (!eventName) {
     return NextResponse.json(
       { message: "eventName is required" },

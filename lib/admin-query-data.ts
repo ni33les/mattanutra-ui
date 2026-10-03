@@ -81,6 +81,7 @@ export type AdminCampaignSummary = Readonly<{
 }>;
 
 export type AdminCampaignsData = Readonly<{
+  connections?: import("@/lib/connect-report").ConnectReport;
   meta?: MetaDiagnostics;
   databaseAvailable: boolean;
   pagination?: AdminQueryPagination;
@@ -472,6 +473,7 @@ async function getCampaigns(params: QueryParams): Promise<AdminCampaignsData> {
     rows: pageRows,
     summary: campaignSummary(mappedRows),
     meta: await metaDiagnostics(start),
+    connections: await (await import("@/lib/connect-report")).connectReport(start),
     pagination
   };
 }
