@@ -155,7 +155,8 @@ describe("server-confirmed MCP connections", () => {
     const response = await attemptPost(request("", { provider: "grok", locale: "th" }));
     assert.equal(response.status, 201); const body = await response.json(); ids.push(body.id);
     assert.match(response.headers.get("set-cookie")!, /HttpOnly/i); assert.match(response.headers.get("cache-control")!, /no-store/);
-    const proxied = await attemptPost(new Request("http://0.0.0.0:8080/api/connect/attempts", { method: "POST", headers: { origin: "https://dev.mattanutra.com" }, body: '{"provider":"grok","locale":"th"}' }));
-    assert.equal(proxied.status, 201); ids.push((await proxied.json()).id); assert.match(proxied.headers.get("set-cookie")!, /Secure/);
+    const proxied = await attemptPost(new Request("http://localhost:3000/api/connect/attempts", { method: "POST", headers: { origin: "https://dev.mattanutra.com" }, body: '{"provider":"grok","locale":"th"}' }));
+    assert.equal(proxied.status, 201); const proxyBody = await proxied.json(); ids.push(proxyBody.id);
+    assert.match(proxied.headers.get("set-cookie")!, /Secure/); assert.equal(new URL(proxyBody.connectionUrl).origin, "https://dev.mattanutra.com");
   });
 });
