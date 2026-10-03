@@ -1,9 +1,32 @@
 "use client";
-import { META_CONSENT_COOKIE, browserPixelPageSafe, metaCustomData, metaEventForBpm, metaEventName, type MetaEventName, type MetaPublicConfig, uuidPattern } from "@/lib/meta-event-policy";
+import { META_CONSENT_COOKIE, browserPixelPageSafe, metaCustomData, metaEventForBpm, metaEventName, type MetaEventName, type MetaPreferenceSource, type MetaPublicConfig, uuidPattern } from "@/lib/meta-event-policy";
 let config: MetaPublicConfig | null = null;
 const sent = new Set<string>();
 const pending = new Map<string, Promise<void>>();
 export const marketingGranted = () => typeof document !== "undefined" && document.cookie.split(";").some(c => c.trim() === `${META_CONSENT_COOKIE}=granted`);
+export const marketingPreferenceSaved = () => typeof document !== "undefined" && document.cookie.split(";").some(c => /^mn_marketing=(granted|denied)$/.test(c.trim()));
+export const META_PREFERENCE_CHANGED = "mn:marketing-preference-changed";
+
+export async function saveMarketingPreference(granted: boolean, source: MetaPreferenceSource = "explicit") {
+  const controller = new AbortController(), timer = setTimeout(() => controller.abort(), 8000);
+  try {
+    const response = await fetch("/api/marketing/consent", { method: "POST", credentials: "same-origin", signal: controller.signal,
+      headers: { "content-type": "application/json" }, body: JSON.stringify({ granted, source, sourceUrl: location.href }) });
+    if (!response.ok) throw new Error("Could not save advertising preference");
+    const saved = await response.json();
+    if (typeof saved.granted !== "boolean") throw new Error("Invalid advertising preference response");
+    if (saved.granted && !marketingGranted()) throw new Error("Advertising preference cookie was not saved");
+    if (saved.granted && !document.cookie.split(";").some(c => c.trim().startsWith("_fbp="))) {
+      document.cookie = `_fbp=fb.1.${Date.now()}.${crypto.getRandomValues(new Uint32Array(1))[0]}; Max-Age=${90 * 86400}; Path=/; SameSite=Lax; Secure`;
+    }
+    if (!saved.granted) {
+      window.fbq?.("consent", "revoke");
+      for (const name of ["_fbp", "_fbc"]) document.cookie = `${name}=; Max-Age=0; Path=/; SameSite=Lax`;
+    }
+    window.dispatchEvent(new Event(META_PREFERENCE_CHANGED));
+    return saved.granted as boolean;
+  } finally { clearTimeout(timer); }
+}
 const waiting: Array<() => void> = [];
 export function configureMetaClient(value: MetaPublicConfig) { config = value; for (const send of waiting.splice(0)) send(); }
 function sessionId() {
@@ -15,7 +38,7 @@ function sessionId() {
 let fallbackSession: string | undefined;
 
 export function trackMetaEvent(name: MetaEventName, input: Record<string, unknown> = {}, occurrence?: string) {
-  if (!config && typeof window !== "undefined" && marketingGranted() && waiting.length < 20) {
+  if (!config && typeof window !== "undefined" && (!marketingPreferenceSaved() || marketingGranted()) && waiting.length < 20) {
     return new Promise<void>(resolve => { waiting.push(() => { void trackMetaEvent(name, input, occurrence).then(resolve); }); });
   }
   if (!config?.enabled || !marketingGranted() || typeof window === "undefined" || /\/(admin|api)(\/|$)/.test(location.pathname)) return Promise.resolve();

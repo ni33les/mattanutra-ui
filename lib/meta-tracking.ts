@@ -6,7 +6,7 @@ import { createTask } from "@/lib/task-service";
 import { AGENT_CAPABILITIES } from "@/lib/system-agents";
 import { metaConfig } from "@/lib/meta-config";
 import { hashEmailForFacebook, hashPhoneForFacebook } from "@/lib/facebook-capi";
-import { META_CONSENT_COOKIE, META_CONTEXT_COOKIE, META_CONSENT_VERSION, metaCustomData, sanitiseMetaUrl, uuidPattern, type MetaEventName } from "@/lib/meta-event-policy";
+import { META_CONSENT_COOKIE, META_CONTEXT_COOKIE, META_CONSENT_VERSION, metaCustomData, sanitiseMetaUrl, uuidPattern, type MetaEventName, type MetaPreferenceSource } from "@/lib/meta-event-policy";
 
 type Db = postgres.Sql | postgres.TransactionSql;
 type Resource = "plan" | "payment" | "retail" | "agentic";
@@ -42,21 +42,35 @@ export function metaMatchingFromRequest(request: Request, sourceUrl?: unknown) {
 }
 
 export async function setMetaConsent(request: Request, granted: boolean, sourceUrl?: unknown) {
+  return (await setMetaPreference(request, granted, sourceUrl, "explicit")).id;
+}
+
+/** Automatic activation is recorded as a site default, never an explicit consent action. */
+export async function setMetaPreference(request: Request, granted: boolean, sourceUrl: unknown, source: MetaPreferenceSource) {
   const sql = getSql(); if (!sql) throw new Error("Database is not configured");
   const config = metaConfig();
   const cookieId = marketingCookie(request, META_CONTEXT_COOKIE);
   const id = cookieId && uuidPattern.test(cookieId) ? cookieId : randomUUID();
   return withDatabaseTransaction(sql, async tx => {
     const matching = granted ? metaMatchingFromRequest(request, sourceUrl) : {};
-    await tx`insert into public.meta_tracking_contexts (id,environment,consent_version,consent_granted,matching)
-      values (${id}::uuid,${config.environment},${META_CONSENT_VERSION},${granted},${tx.json(matching)})
+    const [saved] = await tx<{ id: string; consent_granted: boolean }[]>`insert into public.meta_tracking_contexts (id,environment,consent_version,consent_granted,preference_source,matching)
+      values (${id}::uuid,${config.environment},${META_CONSENT_VERSION},${granted},${source},${tx.json(matching)})
       on conflict(id) do update set consent_granted=excluded.consent_granted,consent_version=excluded.consent_version,
+        preference_source=case when ${source}='site_default' then meta_tracking_contexts.preference_source else excluded.preference_source end,
         matching=case when excluded.consent_granted then meta_tracking_contexts.matching || excluded.matching else '{}'::jsonb end,
         expires_at=now()+interval '90 days',updated_at=now()
-      where meta_tracking_contexts.environment=excluded.environment`;
+      where meta_tracking_contexts.environment=excluded.environment
+        and (${source}='explicit' or meta_tracking_contexts.consent_granted)
+      returning id,consent_granted`;
+    if (!saved) {
+      const [existing] = await tx<{ id: string; consent_granted: boolean }[]>`select id,consent_granted from public.meta_tracking_contexts
+        where id=${id}::uuid and environment=${config.environment}`;
+      if (!existing) throw new Error("Marketing context belongs to another environment");
+      return { id: existing.id, granted: existing.consent_granted };
+    }
     if (!granted) await tx`update public.meta_conversion_events set status='suppressed',response_message='consent_withdrawn',updated_at=now()
       where context_id=${id}::uuid and status in ('queued','retrying','sending')`;
-    return id;
+    return { id: saved.id, granted: saved.consent_granted };
   });
 }
 

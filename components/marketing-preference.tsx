@@ -3,31 +3,35 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import type { Locale } from "@/lib/i18n";
 import { browserPixelPageSafe, type MetaPublicConfig } from "@/lib/meta-event-policy";
-import { configureMetaClient, marketingGranted, trackMetaEvent } from "@/lib/meta-client";
+import { configureMetaClient, marketingGranted, marketingPreferenceSaved, META_PREFERENCE_CHANGED, saveMarketingPreference, trackMetaEvent } from "@/lib/meta-client";
 
-const copy = {
-  en: { title: "Advertising measurement", body: "Allow Meta to measure visits and purchases using browser identifiers, plan IDs and hashed contact details? We do not share health answers, results or supplement details. Your choice does not affect your assessment.", accept: "Allow", decline: "Decline", settings: "Privacy choices", error: "Could not save your choice. Please try again." },
-  th: { title: "การวัดผลโฆษณา", body: "อนุญาตให้ Meta วัดผลการเข้าชมและการซื้อโดยใช้รหัสเบราว์เซอร์ รหัสแผน และข้อมูลติดต่อที่แฮชแล้วหรือไม่ เราไม่ส่งคำตอบ ผลสุขภาพ หรือรายละเอียดอาหารเสริม การเลือกนี้ไม่มีผลต่อแบบประเมิน", accept: "อนุญาต", decline: "ไม่อนุญาต", settings: "ตัวเลือกความเป็นส่วนตัว", error: "บันทึกตัวเลือกไม่สำเร็จ โปรดลองอีกครั้ง" },
-  "zh-CN": { title: "广告衡量", body: "是否允许 Meta 使用浏览器标识、方案编号和经过哈希处理的联系方式衡量访问和购买？我们不会分享健康答案、结果或补充剂详情。此选择不会影响评估。", accept: "允许", decline: "拒绝", settings: "隐私选择", error: "无法保存，请重试。" }
-};
+let initialPreference: Promise<boolean> | undefined;
 
 export function MarketingPreference({ locale }: { locale: Locale }) {
   const [config, setConfig] = useState<MetaPublicConfig>({ enabled: false, pixelId: "", environment: "dev" });
   const navigation = useRef({ key: "", id: "" });
   const pathname = usePathname(), search = useSearchParams().toString();
-  const [open, setOpen] = useState(false), [choice, setChoice] = useState(0), [saving, setSaving] = useState(false), [error, setError] = useState(false);
+  const [choice, setChoice] = useState(0);
   const excluded = /\/(admin|api)(\/|$)/.test(pathname);
   useEffect(() => {
     if (excluded) return;
     let active = true;
-    void fetch("/api/marketing/consent", { cache: "no-store" }).then(response => response.ok ? response.json() : null).then(value => {
+    void fetch("/api/marketing/consent", { cache: "no-store" }).then(response => response.ok ? response.json() : null).then(async value => {
       if (active && value && ["dev", "uat", "prd"].includes(value.environment)) {
-        configureMetaClient(value); setConfig(value);
-        setOpen(!document.cookie.split(";").some(c => /^mn_marketing=(granted|denied)$/.test(c.trim())));
+        if (value.enabled && !marketingPreferenceSaved()) {
+          initialPreference ??= saveMarketingPreference(true, "site_default");
+          try { await initialPreference; } catch { initialPreference = undefined; }
+        }
+        if (active) { configureMetaClient(value); setConfig(value); }
       }
     }).catch(() => undefined);
     return () => { active = false; };
   }, [excluded]);
+  useEffect(() => {
+    const changed = () => setChoice(value => value + 1);
+    window.addEventListener(META_PREFERENCE_CHANGED, changed);
+    return () => window.removeEventListener(META_PREFERENCE_CHANGED, changed);
+  }, []);
   useLayoutEffect(() => {
     if (config.enabled && window.fbq && !browserPixelPageSafe(location.href, document.referrer, config.environment)) {
       window.fbq("consent", "revoke");
@@ -66,24 +70,5 @@ export function MarketingPreference({ locale }: { locale: Locale }) {
     return () => document.removeEventListener("click", onClick, true);
   }, [config, excluded, pathname, search, locale, choice]);
 
-  async function save(granted: boolean) {
-    const wasGranted = marketingGranted();
-    setSaving(true); setError(false);
-    try {
-      const response = await fetch("/api/marketing/consent", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ granted, sourceUrl: location.href }) });
-      if (!response.ok) throw new Error();
-      if (granted && !document.cookie.split(";").some(c => c.trim().startsWith("_fbp="))) {
-        const random = crypto.getRandomValues(new Uint32Array(1))[0];
-        document.cookie = `_fbp=fb.1.${Date.now()}.${random}; Max-Age=${90 * 86400}; Path=/; SameSite=Lax; Secure`;
-      }
-      if (!granted) { window.fbq?.("consent", "revoke"); for (const name of ["_fbp", "_fbc"]) document.cookie = `${name}=; Max-Age=0; Path=/; SameSite=Lax`; }
-      setOpen(false); if (wasGranted !== granted) setChoice(v => v + 1);
-    } catch { setError(true); } finally { setSaving(false); }
-  }
-  if (!config.enabled || excluded) return null;
-  const labels = copy[locale];
-  return <aside className="fixed bottom-3 left-3 z-[90] max-w-sm rounded-xl border border-stone-200 bg-white p-3 text-sm text-stone-900 shadow-lg" aria-label={labels.title}>
-    {open ? <><strong>{labels.title}</strong><p className="my-2">{labels.body}</p><div className="flex gap-3"><button type="button" disabled={saving} onClick={() => void save(true)} className="rounded bg-teal-900 px-4 py-2 text-white">{labels.accept}</button><button type="button" disabled={saving} onClick={() => void save(false)} className="rounded border border-stone-400 px-4 py-2">{labels.decline}</button></div>{error && <p role="alert">{labels.error}</p>}</>
-      : <button type="button" onClick={() => setOpen(true)}>{labels.settings}</button>}
-  </aside>;
+  return null;
 }

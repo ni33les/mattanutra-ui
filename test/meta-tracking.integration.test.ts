@@ -5,16 +5,17 @@ import { before, after, describe, it } from "node:test";
 import type Stripe from "stripe";
 import { fixtureDatabaseUrl, cleanupFixtureRelationships } from "./helpers/fixture-teardown.ts";
 import { closeSqlPool, databaseTransactionActive, getSql, withDatabaseTransaction } from "../lib/db.ts";
-import { bindMetaContext, enqueueMetaEvent, recordMetaPurchase, requestMetaContext, setMetaConsent } from "../lib/meta-tracking.ts";
+import { bindMetaContext, enqueueMetaEvent, recordMetaPurchase, requestMetaContext, setMetaConsent, setMetaPreference } from "../lib/meta-tracking.ts";
 import { sendMetaEvent } from "../lib/meta-dispatch.ts";
 import { createStripeCheckoutSession, completeMockPayment } from "../lib/stripe-payments.ts";
 import { recordRetailProviderSession, type RetailSessionPayment } from "../lib/retail-checkout-provider-session.ts";
 import { register } from "node:module";
 register("../scripts/matcher-http-loader.mjs", import.meta.url);
 const { POST: browserEvent } = await import("../app/api/marketing/events/route.ts");
+const { POST: savePreference } = await import("../app/api/marketing/consent/route.ts");
 
 assert.ok(process.env.TEST_DB_URL, "This integration test requires isolated PostgreSQL");
-describe("consented, durable and isolated Meta delivery", () => {
+describe("preference-controlled, durable and isolated Meta delivery", () => {
   const contexts: string[] = [], payments: string[] = [], retail: string[] = [], requestKeys: string[] = [];
   const planId = randomUUID();
   before(async () => {
@@ -49,8 +50,8 @@ describe("consented, durable and isolated Meta delivery", () => {
     return new Request("https://dev.mattanutra.com/api/assessment", { headers: { origin: "https://dev.mattanutra.com", "user-agent": "Fixture browser", "x-forwarded-for": "192.0.2.15",
       ...(contextId ? { cookie: `mn_marketing=${granted ? "granted" : "denied"}; mn_marketing_context=${contextId}; _fbp=fb.1.1770000000000.12345` } : {}) } });
   }
-  async function consent() {
-    const id = await setMetaConsent(request(), true, "https://dev.mattanutra.com/en?fbclid=fixtureClick"); contexts.push(id);
+  async function consent(source: "explicit" | "site_default" = "explicit") {
+    const id = (await setMetaPreference(request(), true, "https://dev.mattanutra.com/en?fbclid=fixtureClick", source)).id; contexts.push(id);
     return { id, request: request(id), context: (await requestMetaContext(request(id)))! };
   }
   async function queued() {
@@ -58,7 +59,7 @@ describe("consented, durable and isolated Meta delivery", () => {
     const id = await withDatabaseTransaction(getSql()!, tx => enqueueMetaEvent(tx, { context: c.context, name: "PageView", sourceKey: randomUUID(), sourceUrl: "/en" }));
     assert.ok(id); return { ...c, eventId: id };
   }
-  it("requires explicit consent and refuses browser-authored purchases", async () => {
+  it("requires an enabled tracking context and refuses browser-authored purchases", async () => {
     assert.equal(await requestMetaContext(request()), null);
     const c = await consent();
     assert.equal(await requestMetaContext(request(c.id, false)), null);
@@ -66,8 +67,46 @@ describe("consented, durable and isolated Meta delivery", () => {
       method: "POST", headers: request(c.id).headers, body: JSON.stringify({ name: "Purchase", eventId: randomUUID(), sessionId: randomUUID(), sourceUrl: "/en", data: { value: 690, currency: "THB" } }) }));
     assert.equal(response.status, 400);
   });
-  it("queues a 690 THB plan purchase only after confirmation and only once on replay", async () => {
-    const c = await consent(), key = randomUUID(); requestKeys.push(key);
+  it("records automatic activation separately and keeps a saved opt-out on automatic retries", async () => {
+    const saved = await setMetaPreference(request(), true, "/en", "site_default"); contexts.push(saved.id);
+    assert.equal(saved.granted, true);
+    assert.ok(await requestMetaContext(request(saved.id)));
+    assert.equal((await getSql()!`select preference_source from public.meta_tracking_contexts where id=${saved.id}::uuid`)[0].preference_source, "site_default");
+    await setMetaConsent(request(saved.id), false);
+    // A stale browser tab still thinks the old cookie is granted.
+    const retried = await setMetaPreference(request(saved.id), true, "/en", "site_default");
+    assert.deepEqual(retried, { id: saved.id, granted: false });
+    const [row] = await getSql()!`select consent_granted,preference_source,matching from public.meta_tracking_contexts where id=${saved.id}::uuid`;
+    assert.equal(row.consent_granted, false); assert.equal(row.preference_source, "explicit"); assert.deepEqual(row.matching, {});
+    assert.equal(await requestMetaContext(request(saved.id)), null);
+  });
+  it("does not initialise tracking when the browser has already opted out", async () => {
+    const response = await savePreference(new Request("https://dev.mattanutra.com/api/marketing/consent", { method: "POST",
+      headers: { origin: "https://dev.mattanutra.com", cookie: "mn_marketing=denied", "content-type": "application/json" },
+      body: JSON.stringify({ granted: true, source: "site_default" }) }));
+    assert.equal(response.status, 200); assert.equal((await response.json()).granted, false); assert.equal(response.headers.get("set-cookie"), null);
+  });
+  it("saves preferences and enqueues events on the www production alias behind the hosting proxy", async () => {
+    const keys = ["MATTANUTRA_ENV", "FACEBOOK_CAPI_ACCESS_TOKEN_PRD"] as const;
+    const old = keys.map(key => process.env[key]);
+    try {
+      process.env.MATTANUTRA_ENV = "prd"; process.env.FACEBOOK_CAPI_ACCESS_TOKEN_PRD = "fixture-not-a-real-token";
+      const headers = { origin: "https://www.mattanutra.com", "content-type": "application/json" };
+      const response = await savePreference(new Request("http://0.0.0.0:8080/api/marketing/consent", { method: "POST", headers,
+        body: JSON.stringify({ granted: true, source: "site_default", sourceUrl: "https://www.mattanutra.com/en" }) }));
+      assert.equal(response.status, 200); assert.equal((await response.json()).granted, true);
+      const cookie = response.headers.get("set-cookie")!;
+      const id = cookie.match(/mn_marketing_context=([a-f0-9-]{36})/)?.[1]; assert.ok(id); contexts.push(id);
+      assert.match(cookie, /Secure/);
+      const event = await browserEvent(new Request("http://0.0.0.0:8080/api/marketing/events", { method: "POST", headers: { ...headers, cookie: `mn_marketing=granted; mn_marketing_context=${id}` },
+        body: JSON.stringify({ name: "PageView", eventId: randomUUID(), sessionId: randomUUID(), sourceUrl: "https://www.mattanutra.com/en" }) }));
+      assert.equal(event.status, 200); assert.equal((await event.json()).accepted, true);
+      const [row] = await getSql()!`select custom_data,source_url from public.meta_conversion_events where context_id=${id}::uuid`;
+      assert.equal(row.custom_data.mn_env, "prd"); assert.equal(row.source_url, "https://mattanutra.com/en");
+    } finally { keys.forEach((key,i) => { if (old[i] === undefined) delete process.env[key]; else process.env[key] = old[i]; }); }
+  });
+  it("queues an automatically enabled 690 THB purchase only after confirmation and once on replay", async () => {
+    const c = await consent("site_default"), key = randomUUID(); requestKeys.push(key);
     const session = await createStripeCheckoutSession({ locale: "en", selectedPlan: "precision", sourceSurface: "landing", idempotencyKey: key, request: c.request });
     payments.push(session.paymentId);
     assert.equal((await getSql()!`select count(*)::int as n from public.meta_conversion_events where context_id=${c.id}::uuid`)[0].n,0);
