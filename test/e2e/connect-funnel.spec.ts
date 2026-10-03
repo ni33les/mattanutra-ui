@@ -113,6 +113,29 @@ test("polling stops in a hidden tab and after two minutes, and resumes when the 
   await expect.poll(() => polls).toBeGreaterThan(pausedAt);
 });
 
+test("expired links stop polling and a replacement link can verify", async ({ page, context, baseURL }) => {
+  await marketing(page, context, baseURL!, true);
+  const ids = ["a31e81c6-96a4-4b65-a9a5-096cf407d17b", "f5b6c97e-c9ae-4c8f-a08c-b9a91804ea81"];
+  let created = 0, expiredPolls = 0;
+  await page.route("**/api/connect/attempts", route => {
+    const id = ids[created++];
+    return route.fulfill({ status: 201, json: { id, status: "pending", expiresAt: new Date(Date.now() + 86400000).toISOString(), connectionUrl: `${baseURL}/api/mcp?connect_token=fixture-${id}` } });
+  });
+  await page.route(`**/api/connect/attempts/${ids[0]}`, route => { expiredPolls++; return route.fulfill({ json: { id: ids[0], status: "expired" } }); });
+  await page.route(`**/api/connect/attempts/${ids[1]}`, route => route.fulfill({ json: { id: ids[1], status: "verified" } }));
+  await page.addInitScript(() => Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText: async () => undefined } }));
+  await page.goto("/en/connect/perplexity");
+  await page.getByRole("button", { name: "Copy connection URL", exact: true }).click();
+  await expect(page.locator(".mn-connect-status")).toContainText(connectCopy.en.expired);
+  const stoppedAt = expiredPolls;
+  await page.waitForTimeout(3500);
+  expect(expiredPolls).toBe(stoppedAt);
+  await page.getByRole("button", { name: connectCopy.en.newLink, exact: true }).click();
+  await expect(page.locator(".mn-connect-status")).toContainText(connectCopy.en.verified);
+  expect(created).toBe(2);
+  await expect(page.locator("#connect-url")).toHaveValue(new RegExp(ids[1]));
+});
+
 test("real HTTP: discovery does not verify; info confirms the matching browser and expired tokens preserve ordinary access", async ({ page, context, baseURL, browser }) => {
   await marketing(page, context, baseURL!, true);
   await page.addInitScript(() => Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText: async () => undefined } }));
