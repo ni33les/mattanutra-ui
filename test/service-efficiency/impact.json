@@ -668,6 +668,12 @@
       "expectedCases": 6,
       "reason": "SEARCH-WORK-01–06: conservative additive pruning, explicit-purchase/unknown-intake exceptions and residual-first exploration with one-attempt checkpoint equivalence",
       "slice": "matcher-hot-path"
+    },
+    {
+      "file": "test/meta-tracking.integration.test.ts",
+      "expectedCases": 8,
+      "reason": "Meta outbox claim ownership, transactional payment capture, concurrent dispatch, lease fencing and consent withdrawal; provider HTTP must execute after commit.",
+      "slice": "sessions"
     }
   ],
   "inputs": [
