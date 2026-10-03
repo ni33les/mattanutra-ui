@@ -328,6 +328,7 @@ export type WorkTaskRegistryEntry = Readonly<{
 }>;
 
 export const WORK_TASK_REGISTRY = {
+  send_meta_event: { agentKey: "scheduler", requiredCapabilities: [AGENT_CAPABILITIES.communicationDispatch] },
   match_agentic_plan: { agentKey: "productMatcher", requiredCapabilities: [AGENT_CAPABILITIES.agenticPlanMatching] },
   fulfill_web_payment: { agentKey: "scheduler", requiredCapabilities: [AGENT_CAPABILITIES.webPaymentFulfillment] },
   admin_catalogue_optimization_job: {

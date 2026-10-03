@@ -1,3 +1,4 @@
+import { bindMetaContext, recordMetaPlanMilestone } from "@/lib/meta-tracking";
 import { effectiveQuestionnaireAnswers, questionnaireChannel } from "@/lib/web-purchase-preferences";
 import type { QuestionnaireChannel } from "@/lib/questionnaire/types";
 import { createHash } from "node:crypto";
@@ -58,7 +59,7 @@ export function validateCaptureAnswers(value: unknown, channel: QuestionnaireCha
 }
 
 /** Shared HTTP and server-coordinator capture. The receipt, revision, binding and jobs commit together. */
-export async function captureAssessment(bodyValue: unknown, options: { planId?: string | null; idempotencyKey: string }): Promise<CaptureReceipt> {
+export async function captureAssessment(bodyValue: unknown, options: { planId?: string | null; idempotencyKey: string; request?: Request }): Promise<CaptureReceipt> {
   const body = record(bodyValue);
   if (body.intent === "process") throw new FunnelError("Payment is required before plan processing", 402, "payment_required");
   if (!isLocale(body.locale)) throw new FunnelError("Invalid assessment locale", 400, "invalid_locale");
@@ -129,6 +130,9 @@ export async function captureAssessment(bodyValue: unknown, options: { planId?: 
     if (paymentId && !await bindPaidReservationToAssessment({ locale, paymentId: String(paymentId), planId })) {
       throw new FunnelError("Paid reservation could not be applied", 409, "reservation_conflict");
     }
+    await bindMetaContext(tx, "plan", planId, options.request, { email: contactEmail });
+    await recordMetaPlanMilestone(tx, planId, "QuizSubmitted", locale);
+    if (contactEmail) await recordMetaPlanMilestone(tx, planId, "EmailCapture", locale);
     const taskIds = await enqueueAssessmentPregenerationTasks({ answers, locale, planId });
     if (selectedPlan) await enqueueNutritionPlanTasks({ answers, locale, planId, plan: selectedPlan });
     if (resume) await finalizeAssessmentResumeDraft({ planId, token });
@@ -147,7 +151,7 @@ export async function captureAssessment(bodyValue: unknown, options: { planId?: 
   return result;
 }
 
-export async function updateAssessmentContact(planId: string, emailValue: unknown) {
+export async function updateAssessmentContact(planId: string, emailValue: unknown, request?: Request) {
   if (!isUuid(planId)) throw new FunnelError("Assessment not found", 404, "assessment_not_found");
   const email = normalizeAssessmentContactEmail(emailValue);
   if (!email) throw new FunnelError("Enter a valid email address", 400, "invalid_email");
@@ -155,10 +159,12 @@ export async function updateAssessmentContact(planId: string, emailValue: unknow
   if (!sql) throw new Error("Database is not configured");
   return withDatabaseTransaction(sql, async tx => {
     const [row] = await tx`update public.assessments set contact_email = ${email}, contact_email_captured_at = coalesce(contact_email_captured_at, now()),
-      updated_at = now() where plan_id = ${planId}::uuid returning input_revision`;
+      updated_at = now() where plan_id = ${planId}::uuid returning input_revision,locale`;
     if (!row) throw new FunnelError("Assessment not found", 404, "assessment_not_found");
     await appendAssessmentVersion(tx, { planId, actor: "assessment_api", source: "assessment_contact", changeReason: "contact_updated",
       eventType: "assessment_contact_updated", afterPayload: { contactEmail: email }, eventPayload: {} });
+    await bindMetaContext(tx, "plan", planId, request, { email });
+    await recordMetaPlanMilestone(tx, planId, "EmailCapture", row.locale ?? "en");
     return { planId, contactEmail: email, revision: Number(row.input_revision) };
   });
 }

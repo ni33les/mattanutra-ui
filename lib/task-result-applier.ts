@@ -1,3 +1,4 @@
+import { recordMetaPlanMilestone } from "@/lib/meta-tracking";
 import { randomUUID } from "node:crypto";
 import { publishedFormulation } from '@/lib/formulation-availability';
 import { healthScoreReadProjection } from "@/lib/healthscore-readiness";
@@ -398,6 +399,7 @@ async function applyHealthScoreResult(
     await sql`update public.assessments set health_score = ${prepared.json}::text::jsonb, updated_at = now()
       where plan_id = ${task.planId}::uuid and input_revision = ${generation.revision} and locale = ${generation.locale}`;
     await enqueueReadyHealthScoreDeliveries(sql, task.planId, generation.revision, generation.locale);
+    await recordMetaPlanMilestone(sql, task.planId, "Lead", generation.locale);
   }
   await eventually(afterCommit, async () => {
     await recordTaskXaiUsageCost({

@@ -9,7 +9,7 @@ export async function POST(request: Request) {
   if (limited) return limited;
   try {
     const body = await request.json();
-    const receipt = await captureAssessment(body, { idempotencyKey: request.headers.get("Idempotency-Key") ?? "" });
+    const receipt = await captureAssessment(body, { idempotencyKey: request.headers.get("Idempotency-Key") ?? "", request });
     return NextResponse.json(receipt, { headers: { "Cache-Control": "no-store" } });
   } catch (error) { return funnelErrorResponse(error); }
 }

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { describe, it, beforeEach, afterEach } from "node:test";
+import { describe, it } from "node:test";
 import {
   DEFAULT_FACEBOOK_PIXEL_ID,
   facebookEventForInternal,
@@ -150,73 +150,14 @@ describe("facebook pixel mapping", () => {
     );
   });
 
-  it("is wired into the locale layout with noscript fallback", () => {
-    const layout = readFileSync(
-      new URL("../app/[locale]/layout.tsx", import.meta.url),
-      "utf8"
-    );
-    assert.match(layout, /FacebookPixel/);
-    assert.match(layout, /FacebookPixelNoscript/);
-    assert.match(layout, /from "@\/components\/facebook-pixel"/);
-
-    const pixel = readFileSync(
-      new URL("../components/facebook-pixel.tsx", import.meta.url),
-      "utf8"
-    );
-    assert.match(pixel, /fbq\('init'/);
-    assert.match(pixel, /fbq\('track', 'PageView'\)/);
-    assert.match(pixel, /connect\.facebook\.net\/en_US\/fbevents\.js/);
-    assert.match(pixel, /www\.facebook\.com\/tr\?id=/);
-    assert.match(pixel, /getPrimaryFacebookPixelId|getFacebookPixelIds/);
-    const helper = readFileSync(
-      new URL("../lib/facebook-pixel.ts", import.meta.url),
-      "utf8"
-    );
-    assert.match(helper, /27629903823308584/);
-    assert.match(helper, /resolveMattanutraRuntimeEnv/);
-    assert.match(helper, /FACEBOOK_ALLOW_SHARED_PIXEL|ALLOW_SHARED/);
-    // Conversions must not fire from path alone.
-    assert.doesNotMatch(pixel, /trackFacebookEvent\("Lead"/);
-    assert.doesNotMatch(pixel, /trackFacebookEvent\("CompleteRegistration"/);
-    assert.doesNotMatch(pixel, /trackFacebookEvent\("InitiateCheckout"/);
-  });
-
-  it("bpm client mirrors mapped events with shared event_id for CAPI dedupe", () => {
-    const bpm = readFileSync(
-      new URL("../lib/bpm-client.ts", import.meta.url),
-      "utf8"
-    );
-    assert.match(bpm, /facebook-pixel/);
-    assert.match(bpm, /facebookEventForInternal/);
-    assert.match(bpm, /facebookEventId/);
-    assert.match(bpm, /eventID: facebookEventId/);
-    assert.match(bpm, /claimFacebookLeadOnce/);
-    assert.match(bpm, /mn_env/);
-  });
-
-  it("supports eventID on the browser pixel helper", () => {
-    const helper = readFileSync(
-      new URL("../lib/facebook-pixel.ts", import.meta.url),
-      "utf8"
-    );
-    assert.match(helper, /eventID/);
-    assert.match(helper, /trackCustom[\s\S]*eventID|eventID[\s\S]*trackCustom/);
-  });
-
-  it("wires server CAPI from the BPM route with env isolation helpers", () => {
-    const route = readFileSync(
-      new URL("../app/api/bpm/route.ts", import.meta.url),
-      "utf8"
-    );
-    assert.match(route, /mirrorBpmEventToFacebookCapi/);
-    assert.match(route, /facebookEventId/);
-    const capi = readFileSync(
-      new URL("../lib/facebook-capi.ts", import.meta.url),
-      "utf8"
-    );
-    assert.match(capi, /mn_env/);
-    assert.match(capi, /FACEBOOK_CAPI_ACCESS_TOKEN_UAT|ACCESS_TOKEN_UAT/);
-    assert.match(capi, /resolveMattanutraRuntimeEnv/);
+  it("uses the consent-gated export boundary instead of forwarding arbitrary BPM payloads", () => {
+    const bpm = readFileSync(new URL("../lib/bpm-client.ts", import.meta.url), "utf8");
+    const route = readFileSync(new URL("../app/api/bpm/route.ts", import.meta.url), "utf8");
+    const layout = readFileSync(new URL("../app/[locale]/layout.tsx", import.meta.url), "utf8");
+    assert.match(bpm, /trackMetaBpm/);
+    assert.doesNotMatch(route, /mirrorBpmEventToFacebookCapi/);
+    assert.match(layout, /MarketingPreference/);
+    assert.doesNotMatch(layout, /FacebookPixelNoscript/);
   });
 
   it("fires line_connected after LINE connect success", () => {

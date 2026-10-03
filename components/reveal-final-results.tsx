@@ -1,4 +1,5 @@
 "use client";
+import { trackMetaEvent } from "@/lib/meta-client";
 
 import type { ReactNode } from "react";
 import { pharmacyCopy } from "@/lib/pharmacy-copy";
@@ -1767,6 +1768,7 @@ function RevealProductsFinalSection({
                     {!pharmacy && <button
                       className="product-remove-btn mt-6 w-fit rounded-full border border-[var(--mn-line)] bg-transparent px-3.5 py-1.5 mn-reveal-font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--mn-ink-soft)] transition hover:border-[var(--mn-reveal-caution-edge)] hover:bg-[var(--mn-reveal-caution-bg)] hover:text-[var(--mn-reveal-caution-ink)]"
                       onClick={() => {
+                        if (!selected) void trackMetaEvent("AddToCart", { planId, locale, stage: "basket" }, `basket-add:${crypto.randomUUID()}`);
                         updateSelectedBasketIds((current) => {
                           const next = new Set(current);
                           if (selected) {
@@ -1858,7 +1860,7 @@ function RevealProductsFinalSection({
             </p>
           </div>
           {selectedBasketIdList.length > 0 ? (
-            <Link aria-disabled={!basketCheckoutHref} className="mn-reveal-final-button" href={basketCheckoutHref || "#"} onClick={event => { if (!basketCheckoutHref) event.preventDefault(); }}>
+            <Link aria-disabled={!basketCheckoutHref} className="mn-reveal-final-button" href={basketCheckoutHref || "#"} onClick={event => { if (!basketCheckoutHref) event.preventDefault(); else void trackMetaEvent("AddToCart", { planId, locale, stage: "basket" }, `basket-confirm:${crypto.randomUUID()}`); }}>
               {finalCopy.checkout}
             </Link>
           ) : (

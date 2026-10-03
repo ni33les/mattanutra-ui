@@ -10,10 +10,7 @@ import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
 import { Suspense } from "react";
 import { BpmTracker } from "@/components/bpm-tracker";
-import {
-  FacebookPixel,
-  FacebookPixelNoscript
-} from "@/components/facebook-pixel";
+import { MarketingPreference } from "@/components/marketing-preference";
 import "../globals.css";
 import "../library-article-body.css";
 import "../customer.css";
@@ -114,9 +111,8 @@ export default async function LocaleLayout({
       >
         <Suspense fallback={null}><BpmTracker locale={locale} /></Suspense>
         <Suspense fallback={null}>
-          <FacebookPixel locale={locale} />
+          <MarketingPreference locale={locale} />
         </Suspense>
-        <FacebookPixelNoscript />
         {children}
       </body>
     </html>

@@ -1,3 +1,5 @@
+import { withDatabaseTransaction } from "@/lib/db";
+import { recordMetaPurchase } from "@/lib/meta-tracking";
 import type Stripe from "stripe";
 import type postgres from "postgres";
 import { FunnelError } from "@/lib/funnel-errors";
@@ -39,7 +41,8 @@ export async function recordRetailProviderSession<T extends RetailSessionPayment
   )) {
     throw new FunnelError("Checkout payment amount does not match the saved quote", 409, "payment_amount_mismatch");
   }
-  const [updated] = await sql<T[]>`update public.retail_checkout_payments
+  return withDatabaseTransaction(sql as postgres.Sql, async tx => {
+  const [updated] = await tx<T[]>`update public.retail_checkout_payments
     set status = case
         when paid_at is not null or fulfilled_at is not null or status in ('paid', 'fulfilled') then status
         when ${session.payment_status} = 'paid' then 'paid'
@@ -57,7 +60,14 @@ export async function recordRetailProviderSession<T extends RetailSessionPayment
     where id = ${payment.id}::uuid and (stripe_checkout_session_id is null or stripe_checkout_session_id = ${session.id})
     returning *`;
   if (!updated) throw new FunnelError("Checkout session changed. Resume the current payment.", 409, "payment_session_mismatch");
+  if (session.payment_status === "paid") {
+    const row = updated as T & { plan_id?: string; locale?: string; customer_email?: string };
+    await recordMetaPurchase(tx, { type: "retail", id: row.id, sessionId: session.id, planId: row.plan_id ?? null,
+      amount: Number(row.amount) / AMOUNT_MICROS_PER_UNIT, currency: row.currency, locale: row.locale,
+      mode: session.livemode ? "live" : "test", paidAt: row.paid_at, email: row.customer_email });
+  }
   return updated;
+  });
 }
 
 /** Provider I/O is outside transactions. The provider key and parameters survive interruption/replay. */
