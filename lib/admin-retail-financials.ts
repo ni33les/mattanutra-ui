@@ -247,15 +247,6 @@ export async function resolveRetailerPayableUnitAmount(
   return majorCurrencyAmount(stockRows[0]?.wholesale_price_amount);
 }
 
-function formatMicrosAmount(amountMicros: number | string | null | undefined, currency: string) {
-  const amount = microsToAmount(amountMicros);
-
-  return `${amount.toLocaleString("en-US", {
-    maximumFractionDigits: 2,
-    minimumFractionDigits: 0
-  })} ${currency}`;
-}
-
 function dateIso(value: Date | string | null | undefined) {
   return value ? new Date(value).toISOString() : null;
 }
@@ -295,21 +286,7 @@ async function queuePlatformSettlementNotification(input: Readonly<{
   settlementId: string;
 }>) {
   try {
-    const amount =
-      input.amountMicros === undefined
-        ? null
-        : formatMicrosAmount(input.amountMicros, input.currency ?? "");
-    const orderNumber = cleanText(input.orderNumber) || "the order";
-    const organisationName = cleanText(input.organisationName) || "the retailer";
-    const subject = input.eventKey === "platform_retailer_payout_due"
-      ? `Retailer payout due: ${orderNumber}`
-      : `Retailer settlement review: ${orderNumber}`;
-    const body = input.eventKey === "platform_retailer_payout_due"
-      ? `${organisationName} has a retailer payout due for ${orderNumber}${amount ? ` (${amount})` : ""}. Review Platform Financials and mark it paid when the transfer is made.`
-      : `${organisationName} has a settlement needing review for ${orderNumber}. ${cleanText(input.reason) || "Review the order, refund, and payout state before reconciling."}`;
-
     await queuePlatformAdminCommunication({
-      body,
       eventKey: input.eventKey,
       metadata: {
         amountMicros: input.amountMicros ?? null,
@@ -322,8 +299,7 @@ async function queuePlatformSettlementNotification(input: Readonly<{
         ...input.metadata
       },
       resourceId: input.settlementId,
-      resourceType: "retail_order_settlement",
-      subject
+      resourceType: "retail_order_settlement"
     });
   } catch (error) {
     console.warn("Unable to queue platform settlement notification", error);
@@ -341,20 +317,7 @@ async function queueRetailSettlementNotification(input: Readonly<{
   settlementId: string;
 }>) {
   try {
-    const amount =
-      input.amountMicros === undefined
-        ? null
-        : formatMicrosAmount(input.amountMicros, input.currency ?? "");
-    const orderNumber = cleanText(input.orderNumber) || "the order";
-    const subject = input.eventKey === "retail_settlement_payout_paid"
-      ? `Retail payout sent: ${orderNumber}`
-      : `Settlement needs review: ${orderNumber}`;
-    const body = input.eventKey === "retail_settlement_payout_paid"
-      ? `MattaNutra has marked the retailer payout paid for ${orderNumber}${amount ? ` (${amount})` : ""}. Please confirm receipt in Retail Financials when the funds arrive.`
-      : `The settlement for ${orderNumber} needs review. ${cleanText(input.reason) || "Check Retail Financials before confirming any payout or adjustment."}`;
-
     await queueAdminOrganisationCommunication({
-      body,
       eventKey: input.eventKey,
       metadata: {
         amountMicros: input.amountMicros ?? null,
@@ -367,8 +330,7 @@ async function queueRetailSettlementNotification(input: Readonly<{
       },
       organisationId: input.organisationId,
       resourceId: input.settlementId,
-      resourceType: "retail_order_settlement",
-      subject
+      resourceType: "retail_order_settlement"
     });
   } catch (error) {
     console.warn("Unable to queue retail settlement notification", error);
