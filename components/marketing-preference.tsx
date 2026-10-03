@@ -40,6 +40,7 @@ export function MarketingPreference({ locale }: { locale: Locale }) {
       const queue: unknown[][] = [];
       const fbq = Object.assign((...args: unknown[]) => { if (fbq.callMethod) fbq.callMethod(...args); else queue.push(args); },
         { queue, loaded: true, version: "2.0", callMethod: undefined as ((...args: unknown[]) => void) | undefined });
+      Object.assign(fbq, { push: fbq });
       window.fbq = window._fbq = fbq;
       fbq("set", "autoConfig", false, config.pixelId);
       fbq("init", config.pixelId);
@@ -66,6 +67,7 @@ export function MarketingPreference({ locale }: { locale: Locale }) {
   }, [config, excluded, pathname, search, locale, choice]);
 
   async function save(granted: boolean) {
+    const wasGranted = marketingGranted();
     setSaving(true); setError(false);
     try {
       const response = await fetch("/api/marketing/consent", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ granted, sourceUrl: location.href }) });
@@ -75,7 +77,7 @@ export function MarketingPreference({ locale }: { locale: Locale }) {
         document.cookie = `_fbp=fb.1.${Date.now()}.${random}; Max-Age=${90 * 86400}; Path=/; SameSite=Lax; Secure`;
       }
       if (!granted) { window.fbq?.("consent", "revoke"); for (const name of ["_fbp", "_fbc"]) document.cookie = `${name}=; Max-Age=0; Path=/; SameSite=Lax`; }
-      setOpen(false); setChoice(v => v + 1);
+      setOpen(false); if (wasGranted !== granted) setChoice(v => v + 1);
     } catch { setError(true); } finally { setSaving(false); }
   }
   if (!config.enabled || excluded) return null;
