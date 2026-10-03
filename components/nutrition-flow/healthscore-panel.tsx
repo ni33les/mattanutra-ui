@@ -1,4 +1,5 @@
 "use client";
+import { trackMetaEvent } from "@/lib/meta-client";
 
 import Image from "next/image";
 import {
@@ -1344,6 +1345,7 @@ function PricingSection({
       return;
     }
 
+    void trackMetaEvent("SelectOffer", { planId, locale, offer: plan, stage: "offer" });
     setPendingPlan(plan);
     window.location.href = paymentCheckoutPath(locale, {
       plan,
@@ -1397,6 +1399,7 @@ function HealthScoreExperience({
   result: HealthScoreResult;
   showPricing: boolean;
 }>) {
+  useEffect(() => { void trackMetaEvent("ViewContent", { planId, locale, stage: "results" }); }, [planId, locale]);
   const rootRef = useRef<HTMLElement | null>(null);
   const model = buildHealthScoreViewModel({ firstName, locale, result });
 

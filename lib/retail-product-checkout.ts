@@ -1,3 +1,4 @@
+import { bindMetaContext, recordMetaPurchase } from "@/lib/meta-tracking";
 import { readStoredMatching, frozenCheckoutIdentityJson } from "@/lib/recommendation-storage";
 import { MATCHER_VERSION } from "@/lib/matcher/config";
 import { requireCurrentProductSelection } from "@/lib/assessment-product-preferences";
@@ -1101,6 +1102,10 @@ async function continueRetailCheckoutPayment(sql: RetailCheckoutDb, payment: Che
       returnUrl: recovered?.destination ?? retailCheckoutReturnUrl(input.locale, payment!.id) };
   }
   if (retailPaymentConfirmed(payment)) return resumeExistingPayment();
+  await withDatabaseTransaction(sql as Db, async tx => {
+    await bindMetaContext(tx, "retail", payment.id, input.request, { email: payment.customer_email, phone: payment.customer_phone, country: String(objectValue(payment.shipping_address).country ?? "") });
+    if (typeof metadata.agenticOrderId === "string") await bindMetaContext(tx, "agentic", metadata.agenticOrderId, input.request);
+  });
 
   void writeBpmEvent({
     actorType: "visitor",
@@ -1799,7 +1804,8 @@ export async function completeMockRetailCheckout(input: Readonly<{
     };
   }
 
-  const rows = await sql<CheckoutPaymentRow[]>`
+  const payment = await withDatabaseTransaction(sql, async tx => {
+  const rows = await tx<CheckoutPaymentRow[]>`
     update public.retail_checkout_payments
     set status = 'paid',
       stripe_customer_id = 'mock_customer',
@@ -1811,11 +1817,13 @@ export async function completeMockRetailCheckout(input: Readonly<{
       and status in ('created', 'checkout_session_created', 'checkout_opened', 'processing', 'paid', 'fulfilled')
     returning *
   `;
-  const payment = rows[0] ?? null;
-
-  if (!payment) {
-    return null;
-  }
+  const paid = rows[0] ?? null;
+  if (paid) await recordMetaPurchase(tx, { type: "retail", id: paid.id, sessionId: paid.stripe_checkout_session_id,
+    planId: paid.plan_id, amount: Number(paid.amount) / AMOUNT_MICROS_PER_UNIT, currency: paid.currency,
+    locale: paid.locale, mode: paid.stripe_mode, paidAt: paid.paid_at, email: paid.customer_email });
+  return paid;
+  });
+  if (!payment) return null;
 
   await recordVersion(sql, payment.id, "mock_payment_paid", "system", "mock_product_payment");
 
@@ -1877,6 +1885,7 @@ export async function fulfillRetailCheckoutSession(input: Readonly<{
     const rows = await sql<CheckoutPaymentRow[]>`
       select * from public.retail_checkout_payments
       where stripe_checkout_session_id = ${input.sessionId}
+        or (stripe_checkout_session_id is null and id::text = ${session.metadata?.paymentId ?? ""} and ${session.metadata?.kind === "retail_product_checkout"})
     `;
     payment = rows[0] ? await recordRetailProviderSession(sql, rows[0], session) : null;
   } else if (input.paymentId && isUuid(input.paymentId)) {

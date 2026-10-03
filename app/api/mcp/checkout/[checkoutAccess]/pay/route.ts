@@ -1,3 +1,5 @@
+import { bindMetaContext } from "@/lib/meta-tracking";
+import { getSql, withDatabaseTransaction } from "@/lib/db";
 import { NextResponse } from "next/server";
 import { getLiveAgenticRuntime } from "@/lib/agentic/live-runtime";
 import { nowIso } from "@/lib/agentic/runtime";
@@ -166,6 +168,9 @@ export async function POST(request: Request, { params }: RouteProps) {
     scenario: requestedScenario
   });
 
+  const sql = getSql();
+  if (sql && order.paymentStatus === "unpaid") await withDatabaseTransaction(sql, tx =>
+    bindMetaContext(tx, "agentic", order.id, request, { email: parsed.address.customerEmail, phone: parsed.address.phone, country: parsed.address.country }));
   await applyVerifiedPaymentEvent({
     event,
     now,

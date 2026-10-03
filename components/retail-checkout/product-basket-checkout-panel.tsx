@@ -1,4 +1,5 @@
 "use client";
+import { trackMetaEvent } from "@/lib/meta-client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { EmbeddedCheckout, EmbeddedCheckoutProvider } from "@stripe/react-stripe-js";
@@ -745,6 +746,7 @@ export function ProductBasketCheckoutPanel({
         throw new Error((body as { message?: string }).message || labels.error);
       }
 
+      void trackMetaEvent("InitiateCheckout", { planId, locale, stage: "checkout", channel: checkoutMode === "agentic" ? "mcp_web" : "web", attemptId: body.paymentId }, `checkout:${body.paymentId}`);
       setPaymentId(body.paymentId);
 
       if (body.mock) {

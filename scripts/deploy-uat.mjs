@@ -130,6 +130,7 @@ async function applyRuntimeSchema(env) {
   await run(npmCommand, ["run", "payments:schema:apply"], {
     env
   });
+  await run(npmCommand, ["run", "marketing:schema:apply"], { env });
   await run(npmCommand, ["run", "web-funnel:schema:apply"], {
     env
   });

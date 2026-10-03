@@ -254,6 +254,10 @@ export async function executeTaskWorkItem(
     return { operationId: workItem.operationId, revision: result.revision, status: result.status,
       ...(result.status === "processing" ? { deferredOperationId: workItem.operationId } : {}) };
   }
+  if (workItem.taskType === "send_meta_event") {
+    const { sendMetaEvent } = await import("@/lib/meta-dispatch");
+    return sendMetaEvent(workItem.eventId);
+  }
   if (workItem.taskType === "send_healthscore_email") {
     const { deliverHealthScore } = await import("@/lib/healthscore-delivery");
     return deliverHealthScore(workItem.deliveryRequestId);

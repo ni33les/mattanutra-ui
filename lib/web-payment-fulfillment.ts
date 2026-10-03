@@ -1,3 +1,4 @@
+import { recordMetaPurchase } from "@/lib/meta-tracking";
 import { paymentFulfillmentEvidence, paymentFulfillmentIdentity, type PreparedPaymentFulfillment } from "@/lib/payment-fulfillment-evidence";
 import type Stripe from "stripe";
 import { getSql, withDatabaseTransaction } from "@/lib/db";
@@ -34,6 +35,9 @@ export async function enqueueWebPaymentFulfillment(sql: Db, payment: PaymentRow,
     if (current && paymentFulfillmentIdentity(current) === paymentFulfillmentIdentity(payment) && current.fulfillment_status === "complete") return null;
     throw new Error("Payment changed; retry fulfillment preparation");
   }
+  await recordMetaPurchase(sql, { type: "payment", id: payment.id, sessionId: payment.stripe_checkout_session_id,
+    planId: payment.plan_id, amount: Number(payment.amount) / 1_000_000, currency: payment.currency,
+    locale: payment.locale, mode: payment.stripe_mode, paidAt: payment.paid_at, email: payment.customer_email });
   const { task } = await createTask({
     actorType: "deterministic", title: "Fulfill confirmed web payment", taskType: WEB_PAYMENT_FULFILLMENT_TASK,
     planId: payment.plan_id, payload: { paymentId: payment.id },
@@ -61,7 +65,8 @@ export async function fulfillWebPayment(paymentId: string, dependencies: Fulfill
   if (evidence.status === "complete") return { paymentId, fulfillmentStatus: "complete" };
 
   void writePaymentBpmEvent({ eventName: "payment_fulfillment_started", eventStatus: "pending", paymentId,
-    planId: payment.plan_id, locale: payment.locale }).catch(() => undefined);
+    planId: payment.plan_id, locale: payment.locale, selectedPlan: payment.selected_plan,
+    valueAmount: Number(payment.amount) / 1_000_000, valueCurrency: payment.currency }).catch(() => undefined);
   try {
     const session = await (dependencies.session ?? retrievePaidPaymentSession)(payment);
     const fx = await stripePaymentAccountingNeedsFx(sql, payment, session)
@@ -83,7 +88,8 @@ export async function fulfillWebPayment(paymentId: string, dependencies: Fulfill
     });
     if (fulfilled) {
       void writePaymentBpmEvent({ eventName: "payment_fulfillment_succeeded", eventStatus: "paid", paymentId,
-        planId: payment.plan_id, locale: payment.locale }).catch(() => undefined);
+        planId: payment.plan_id, locale: payment.locale, selectedPlan: payment.selected_plan,
+    valueAmount: Number(payment.amount) / 1_000_000, valueCurrency: payment.currency }).catch(() => undefined);
       void notifyWebPaymentFulfilled(payment).catch(() => undefined);
     }
     return { paymentId, fulfillmentStatus: "complete" };
@@ -96,7 +102,8 @@ export async function fulfillWebPayment(paymentId: string, dependencies: Fulfill
         and date_trunc('milliseconds',bound_at) is not distinct from ${payment.bound_at}::timestamptz
         and status in ('paid','bound') and fulfillment_status <> 'complete'`;
     void writePaymentBpmEvent({ eventName: "payment_fulfillment_failed", eventStatus: "failed", paymentId,
-      planId: payment.plan_id, locale: payment.locale, errorCode: "fulfillment_failed",
+      planId: payment.plan_id, locale: payment.locale, selectedPlan: payment.selected_plan,
+    valueAmount: Number(payment.amount) / 1_000_000, valueCurrency: payment.currency, errorCode: "fulfillment_failed",
       errorMessage: error instanceof Error ? error.message : "Fulfillment failed" }).catch(() => undefined);
     throw error;
   }

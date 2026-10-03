@@ -1,3 +1,5 @@
+import { recordMetaPurchase } from "@/lib/meta-tracking";
+import { loadAgenticConfig } from "@/lib/agentic/config";
 import { operationCursor, operationCursorBytes, withoutOperationCursor, withOperationCursor } from "@/lib/agentic/store/operation-checkpoint";
 import { operationCommands } from "@/lib/agentic/store/operation-commands";
 import { notifyPlanOperationChanged } from "@/lib/agentic/plan/completion-notify";
@@ -781,7 +783,8 @@ export function createPostgresStore(inputSql: Sql, inTransaction = false, notifi
       `;
     },
     async updateOrder(record) {
-      await sql`
+      return withDatabaseTransaction(inputSql, async tx => {
+      await tx`
         update public.agentic_orders set
           checkout_url = ${record.checkoutUrl},
           checkout_expires_at = ${record.checkoutExpiresAt}::timestamptz,
@@ -798,6 +801,13 @@ export function createPostgresStore(inputSql: Sql, inTransaction = false, notifi
           expired_at = ${record.expiredAt}::timestamptz
         where id = ${record.id}::uuid
       `;
+      if (record.paymentStatus === "paid") {
+        const mode = loadAgenticConfig().paymentProvider;
+        await recordMetaPurchase(tx, { type: "agentic", id: record.id, sessionId: record.providerSessionId,
+          planId: record.planId, amount: record.totalPriceMinor / 100, currency: record.currency,
+          mode: mode === "stripe_live" ? "live" : mode === "stripe_test" ? "test" : "mock", paidAt: record.updatedAt });
+      }
+      });
     },
     async updatePlan(record) {
       await sql`

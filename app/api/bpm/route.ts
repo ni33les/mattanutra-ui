@@ -4,7 +4,6 @@ import {
   type BpmEventType,
   type BpmSeverity
 } from "@/lib/bpm";
-import { mirrorBpmEventToFacebookCapi } from "@/lib/facebook-capi";
 import { isLocale } from "@/lib/i18n";
 import {
   enforceRateLimit,
@@ -88,34 +87,6 @@ export async function POST(request: Request) {
     severity: text(body.severity) as BpmSeverity | undefined,
     valueAmount,
     valueCurrency
-  });
-
-  // Server-side Meta CAPI mirror (deduped with browser via facebookEventId).
-  // Never block the BPM response on Meta.
-  const facebookEventId =
-    text(properties.facebookEventId) || text(body.facebookEventId);
-  const eventSourceUrl =
-    text(properties.sourceUrl) ||
-    text(attribution.sourceUrl) ||
-    request.headers.get("referer");
-
-  // Prefer client mn_env when present; CAPI also resolves server env for isolation.
-  void mirrorBpmEventToFacebookCapi({
-    email,
-    eventName,
-    eventSourceUrl,
-    facebookEventId,
-    planId,
-    phone: text(properties.phone) || text(body.phone),
-    properties: {
-      ...properties,
-      mn_env: text(properties.mn_env) || text(body.mn_env)
-    },
-    request,
-    valueAmount,
-    valueCurrency
-  }).catch(() => {
-    // CAPI must never affect tracking or UX.
   });
 
   return NextResponse.json(

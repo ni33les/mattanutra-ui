@@ -37,6 +37,7 @@ type TriggerRow = Readonly<{
 }>;
 
 const requiredTables = [
+  "meta_tracking_contexts", "meta_tracking_bindings", "meta_conversion_events",
   "agentic_matcher_events",
   "organisations", "product_brands", "product_facts", "supplements", "supplement_aliases", "supplement_safety_limits", "retail_sellable_products",
   "catalogue_runtime_revision", "catalogue_correction_audit", "supplement_safety_reference_corrections",

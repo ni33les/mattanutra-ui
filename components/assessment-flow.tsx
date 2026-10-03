@@ -1,4 +1,5 @@
 "use client";
+import { trackMetaEvent } from "@/lib/meta-client";
 
 import { effectiveQuestionnaireAnswers } from "@/lib/web-purchase-preferences";
 
@@ -232,6 +233,13 @@ export function AssessmentFlow({
   }, [answers, assessmentRevision, capturedStatus, classicDraftKey, contactEmail, draftReady, effectiveReturningPlanId, processingStatus, sectionIndex]);
 
 
+  useEffect(() => {
+    if (!draftReady || precision.essentialDone <= 0) return;
+    for (const progress of [25, 50, 75]) if (precision.progress >= progress) {
+      void trackMetaEvent("QuizProgress", { locale, progress, planId: returningPlanId, assessmentAttemptId: browserSession, stage: "assessment" });
+    }
+  }, [draftReady, precision.essentialDone, precision.progress, locale, returningPlanId, browserSession]);
+
   function clearProcessingStatus() {
     setProcessingStatus(null);
   }
@@ -244,11 +252,12 @@ export function AssessmentFlow({
       eventType: "funnel",
       locale,
       properties: {
+        sessionId: browserSession,
         completedRequired: precision.essentialDone,
         returningPlanId: returningPlanId || undefined
       }
     });
-  }, [locale, precision.essentialDone, returningPlanId]);
+  }, [locale, precision.essentialDone, returningPlanId, browserSession]);
 
   useEffect(() => {
     if (!showHealthScore || healthScoreViewedTracked.current) return;
