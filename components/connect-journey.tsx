@@ -1,11 +1,12 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { ArrowUpRight, Check, Copy, LoaderCircle } from "lucide-react";
 import { connectBrowserEvents, connectHref, connectProviders, providerNames, type ConnectAttempt, type ConnectBrowserEvent, type ConnectProvider } from "@/lib/connect";
 import { connectCopy, providerSetup } from "@/lib/connect-copy";
 import { trackMetaEvent } from "@/lib/meta-client";
 import { uuidPattern, type MetaEventName } from "@/lib/meta-event-policy";
 import type { Locale } from "@/lib/i18n";
+import { useConnectSearch } from "@/components/connect-campaign-link";
 
 let fallbackVisitor: string | undefined;
 function visitorId() {
@@ -36,8 +37,7 @@ export function ConnectVisit({ locale, provider }: { locale: Locale; provider?: 
 }
 
 export function ConnectProviderCards({ locale }: { locale: Locale }) {
-  const [search, setSearch] = useState("");
-  useEffect(() => setSearch(location.search), []);
+  const search = useConnectSearch();
   const copy = connectCopy[locale];
   return <div className="mn-connect-providers">{connectProviders.map((provider, index) => <a key={provider}
     href={connectHref(locale, provider, search)} className="mn-connect-provider" onClick={() => track("provider_selected", locale, provider)}>
@@ -47,31 +47,31 @@ export function ConnectProviderCards({ locale }: { locale: Locale }) {
   </a>)}</div>;
 }
 
+function subscribeStorage(callback: () => void) { window.addEventListener("storage", callback); return () => window.removeEventListener("storage", callback); }
 export function ConnectActions({ locale, provider, serverUrl }: { locale: Locale; provider: ConnectProvider; serverUrl: string }) {
   const copy = connectCopy[locale], storageKey = `mn:connect:attempt:${provider}`;
-  const [attempt, setAttempt] = useState<ConnectAttempt | null>(null);
+  const [currentAttempt, setAttempt] = useState<ConnectAttempt | null>(null);
+  const saved = useSyncExternalStore(subscribeStorage, () => { try { return sessionStorage.getItem(storageKey); } catch { return null; } }, () => null);
+  const restored = useMemo(() => {
+    try {
+      const value = JSON.parse(saved || "null") as ConnectAttempt | null;
+      if (value && uuidPattern.test(value.id) && new URL(value.connectionUrl).origin === new URL(serverUrl).origin && new URL(value.connectionUrl).pathname === "/api/mcp")
+        return { ...value, status: "pending" as const };
+    } catch { /* Invalid recovery data cannot establish success. */ }
+    return null;
+  }, [saved, serverUrl]);
+  const attempt = currentAttempt || restored;
   const [status, setStatus] = useState<"idle" | "preparing" | "pending" | "verified" | "expired" | "unavailable" | "paused">("idle");
   const [feedback, setFeedback] = useState("");
   const [manual, setManual] = useState("");
   const [retry, setRetry] = useState(0);
   const panel = useRef<HTMLDivElement>(null);
   const inFlight = useRef<Promise<ConnectAttempt | null> | null>(null);
-  const activeAttempt = useRef<ConnectAttempt | null>(null);
   const manualInput = useRef<HTMLTextAreaElement>(null);
   const remember = (value: ConnectAttempt) => {
-    activeAttempt.current = value; setAttempt(value); setStatus(value.status);
+    setAttempt(value); setStatus(value.status);
     try { sessionStorage.setItem(storageKey, JSON.stringify(value)); } catch { /* Cookie still owns this attempt for the open page. */ }
   };
-
-  useEffect(() => {
-    try {
-      const value = JSON.parse(sessionStorage.getItem(storageKey) || "null") as ConnectAttempt | null;
-      if (value && uuidPattern.test(value.id) && new URL(value.connectionUrl).origin === new URL(serverUrl).origin && new URL(value.connectionUrl).pathname === "/api/mcp") {
-        const restored = { ...value, status: value.status === "verified" ? "pending" as const : Date.parse(value.expiresAt) <= Date.now() ? "expired" as const : "pending" as const };
-        activeAttempt.current = restored; setAttempt(restored); setStatus(restored.status);
-      }
-    } catch { /* Storage may be disabled or cleared. */ }
-  }, [storageKey, serverUrl]);
 
   useEffect(() => { if (manual) { manualInput.current?.focus(); manualInput.current?.select(); } }, [manual]);
 
@@ -93,7 +93,7 @@ export function ConnectActions({ locale, provider, serverUrl }: { locale: Locale
         if (result.status !== "pending") {
           clearInterval(timer); stopped = true;
           const next = { ...attempt, status: result.status } as ConnectAttempt;
-          activeAttempt.current = next; setAttempt(next);
+          setAttempt(next);
           try { sessionStorage.setItem(storageKey, JSON.stringify(next)); } catch { /* Optional recovery cache. */ }
         }
       } catch { if (!controller.signal.aborted) setStatus("unavailable"); }
@@ -109,10 +109,10 @@ export function ConnectActions({ locale, provider, serverUrl }: { locale: Locale
     document.addEventListener("visibilitychange", resume);
     window.addEventListener("focus", resume);
     return () => { stopped = true; clearInterval(timer); controller.abort(); observer.disconnect(); document.removeEventListener("visibilitychange", resume); window.removeEventListener("focus", resume); };
-  }, [attempt?.id, attempt?.status, retry, storageKey]);
+  }, [attempt, retry, storageKey]);
 
   async function prepare(fresh = false): Promise<ConnectAttempt | null> {
-    const current = activeAttempt.current;
+    const current = attempt;
     if (!fresh && current && Date.parse(current.expiresAt) > Date.now()) return current;
     if (inFlight.current) return inFlight.current;
     setStatus("preparing");
