@@ -68,7 +68,7 @@ export async function verifyConnectToken(token: string) {
       where id=${decoded.id}::uuid and environment=${environment} and expires_at>now() and verified_at is null
       returning *
     ) insert into public.connect_funnel_events(id,environment,event_name,provider,locale,visitor_id,attempt_id,campaign,occurred_at)
-      select id,environment,'verified',provider,locale,visitor_id,id,campaign,verified_at from confirmed
+      select ${randomUUID()}::uuid,environment,'verified',provider,locale,visitor_id,id,campaign,verified_at from confirmed
       on conflict do nothing`;
   });
   await flushConnectMeta(decoded.id);
@@ -90,7 +90,7 @@ export async function flushConnectMeta(id?: string) {
         from public.meta_tracking_contexts where id=${row.meta_context_id}::uuid and environment=${metaConfig().environment}
           and consent_granted and expires_at>now()` : [];
       if (context) await enqueueMetaEvent(tx, { context, name: "McpConnectionVerified", sourceKey: `connect:${row.id}`,
-        occurredAt: row.verified_at, eventId: row.id, sourceUrl: `/${row.locale}/connect/${row.provider}`,
+        occurredAt: row.verified_at, sourceUrl: `/${row.locale}/connect/${row.provider}`,
         data: { ...row.campaign, provider: row.provider, locale: row.locale, stage: "connect_verified" } });
       await tx`update public.connect_attempts set meta_recorded_at=now() where id=${row.id}::uuid`;
     }
