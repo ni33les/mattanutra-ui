@@ -90,6 +90,29 @@ test("verification failure keeps the ordinary URL usable and saved advertising o
   expect(fixture.events).toHaveLength(0); expect(fixture.pixelLoads()).toBe(0);
 });
 
+test("polling stops in a hidden tab and after two minutes, and resumes when the visitor returns", async ({ page, context, baseURL }) => {
+  await marketing(page, context, baseURL!, true);
+  const id = "fedfab37-ecbb-4e66-9ab3-524986bd11ed"; let polls = 0;
+  await page.clock.install();
+  await page.route("**/api/connect/attempts", route => route.fulfill({ status: 201, json: { id, status: "pending", expiresAt: new Date(Date.now() + 86400000).toISOString(), connectionUrl: `${baseURL}/api/mcp?connect_token=private-test` } }));
+  await page.route(`**/api/connect/attempts/${id}`, route => { polls++; return route.fulfill({ json: { id, status: "pending" } }); });
+  await page.addInitScript(() => Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText: async () => undefined } }));
+  await page.goto("/en/connect/grok");
+  await page.getByRole("button", { name: "Copy connection URL", exact: true }).click();
+  await expect.poll(() => polls).toBeGreaterThan(0);
+  await expect(page.locator(".mn-connect-status")).toContainText(connectCopy.en.waiting);
+  await page.evaluate(() => { Object.defineProperty(document, "hidden", { configurable: true, value: true }); document.dispatchEvent(new Event("visibilitychange")); });
+  const hiddenAt = polls; await page.clock.fastForward(15000); expect(polls).toBe(hiddenAt);
+  await page.evaluate(() => { Object.defineProperty(document, "hidden", { configurable: true, value: false }); document.dispatchEvent(new Event("visibilitychange")); });
+  await expect.poll(() => polls).toBeGreaterThan(hiddenAt);
+  await expect(page.locator(".mn-connect-status")).toContainText(connectCopy.en.waiting);
+  await page.clock.fastForward(121000);
+  await expect(page.locator(".mn-connect-status")).toContainText(connectCopy.en.paused);
+  const pausedAt = polls; await page.clock.fastForward(15000); expect(polls).toBe(pausedAt);
+  await page.getByRole("button", { name: "Check again", exact: true }).click();
+  await expect.poll(() => polls).toBeGreaterThan(pausedAt);
+});
+
 test("real HTTP: discovery does not verify; info confirms the matching browser and expired tokens preserve ordinary access", async ({ page, context, baseURL, browser }) => {
   await marketing(page, context, baseURL!, true);
   await page.addInitScript(() => Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText: async () => undefined } }));

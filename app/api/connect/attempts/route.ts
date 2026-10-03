@@ -22,7 +22,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Invalid connection attempt" }, { status: 400, headers });
     const { owner, attempt } = await createConnectAttempt(request, { ...body, visitorId: body.visitorId || randomUUID() });
     const response = NextResponse.json(attempt, { status: 201, headers });
-    response.cookies.set(connectCookieName(environment), owner, { httpOnly: true, secure: environment !== "dev" || new URL(request.url).protocol === "https:", sameSite: "lax", path: "/", maxAge: 2 * 86400 });
+    const localDev = environment === "dev" && ["localhost", "127.0.0.1"].includes(new URL(request.url).hostname);
+    response.cookies.set(connectCookieName(environment), owner, { httpOnly: true, secure: !localDev, sameSite: "lax", path: "/", maxAge: 2 * 86400 });
     return response;
   } catch { return NextResponse.json({ error: "Confirmation unavailable", connectionUrl: connectServerUrl(request) }, { status: 503, headers }); }
 }
