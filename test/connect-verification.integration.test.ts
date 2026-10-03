@@ -138,6 +138,14 @@ describe("server-confirmed MCP connections", () => {
     assert.equal(funnel.status, 400);
     assert.equal((await bpmPost(request("", { eventName: "mcp_connection_verified" }))).status, 400);
   });
+  it("records a landing-page URL copy without inventing a provider", async () => {
+    const id = randomUUID();
+    const response = await funnelEvent(request("", { id, visitorId: visitor, name: "url_copied", locale: "en", sourceUrl: "/en/connect" }));
+    assert.equal(response.status, 200);
+    const [row] = await getSql()!`select provider,event_name from public.connect_funnel_events where id=${id}::uuid`;
+    assert.equal(row.provider, null); assert.equal(row.event_name, "url_copied");
+    assert.equal((await funnelEvent(request("", { id: randomUUID(), visitorId: visitor, name: "provider_opened", locale: "en" }))).status, 400);
+  });
   it("browser-chosen event IDs cannot reserve or suppress a server confirmation", async () => {
     const a = await attempt();
     assert.equal((await funnelEvent(request("", { id: a.attempt.id, visitorId: visitor, name: "url_copied", provider: "claude", locale: "en" }))).status, 200);
