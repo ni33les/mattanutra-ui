@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type postgres from "postgres";
-import { getSql } from "@/lib/db";
+import { getSql, withDatabaseTransaction } from "@/lib/db";
 import type {
   SupplementConfidence,
   SupplementListStatus
@@ -583,7 +583,9 @@ export async function getAdminReviewQueueData(): Promise<AdminReviewQueueData> {
 
   try {
     await expireOverdueGenericHumanReviewTasks(sql);
-    const rows = await loadReviewTaskRows(sql);
+    // Compose the UNION on the transaction handle so its SELECT fragment stays
+    // lazy instead of being admitted as a separate database phase.
+    const rows = await withDatabaseTransaction(sql, loadReviewTaskRows);
     const mappedRows = rows.map(rowFromDb);
 
     return {
