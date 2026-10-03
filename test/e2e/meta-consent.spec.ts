@@ -18,7 +18,8 @@ test("marketing consent gates browser measurement and sensitive pages use only t
     pixelLoads += 1;
     await route.fulfill({ contentType: "application/javascript", body: "window.__pixelCalls=window.fbq.queue.slice();window.fbq.callMethod=(...args)=>window.__pixelCalls.push(args);" });
   });
-  await page.goto("/en");
+  const landing = await page.goto("/en");
+  expect(landing?.headers()["content-security-policy"]).toContain("https://connect.facebook.net");
   await expect(page.getByRole("button", { name: "Allow", exact: true })).toBeVisible();
   expect(events).toHaveLength(0); expect(pixelLoads).toBe(0);
   await page.getByRole("button", { name: "Allow", exact: true }).click();
@@ -32,7 +33,8 @@ test("marketing consent gates browser measurement and sensitive pages use only t
   await expect(page.getByRole("button", { name: "Privacy choices", exact: true })).toBeVisible();
   expect(events).toHaveLength(beforeConfirm);
   const before = pixelLoads;
-  await page.goto("/en/nutrition/quiz");
+  const privatePage = await page.goto("/en/nutrition/quiz");
+  expect(privatePage?.headers()["content-security-policy"]).not.toContain("facebook");
   await expect(page.getByRole("button", { name: "Privacy choices", exact: true })).toBeVisible();
   expect(pixelLoads).toBe(before);
   expect(await page.evaluate(() => typeof window.fbq)).toBe("undefined");
