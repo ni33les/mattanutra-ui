@@ -4,9 +4,17 @@ import type Stripe from "stripe";
 import { assertSessionMatchesPayment, type PaymentRow } from "../lib/stripe-payments.ts";
 import type { StripePaymentConfig } from "../lib/stripe-payment-config.ts";
 import { metaConfig } from "../lib/meta-config.ts";
-import { metaCustomData, metaEventName, metaEventForBpm, sanitiseMetaUrl, browserPixelPageSafe } from "../lib/meta-event-policy.ts";
+import { metaCustomData, metaEventName, metaEventForBpm, sanitiseMetaUrl, browserPixelPageSafe, metaRequestOriginAllowed } from "../lib/meta-event-policy.ts";
 const planId = "843893a8-4c1b-44d9-86f4-092e16270d1a";
 describe("campaign export boundary", () => {
+  it("accepts both production hostnames behind a proxy while rejecting foreign and cross-environment origins", () => {
+    const request = (origin?: string) => new Request("http://0.0.0.0:8080/api/marketing/consent", { headers: origin ? { origin } : {} });
+    for (const origin of ["https://mattanutra.com", "https://www.mattanutra.com"]) assert.equal(metaRequestOriginAllowed(request(origin), "prd"), true);
+    for (const origin of [undefined, "null", "https://evil.example", "https://www.mattanutra.com.evil.example", "http://www.mattanutra.com", "https://uat.mattanutra.com"]) assert.equal(metaRequestOriginAllowed(request(origin), "prd"), false);
+    assert.equal(metaRequestOriginAllowed(request("https://www.mattanutra.com"), "uat"), false);
+    assert.equal(metaRequestOriginAllowed(request("https://uat.mattanutra.com"), "uat"), true);
+    assert.equal(metaRequestOriginAllowed(request("https://dev.mattanutra.com"), "dev"), true);
+  });
   it("requires the actual paid provider total to match the saved purchase before publishing a conversion", () => {
     const payment = { selected_plan: "precision", amount: 690000000, currency: "THB", stripe_price_id: null } as PaymentRow;
     const config = { env: "dev", mode: "test", priceIds: { precision: "", pro: "" } } as StripePaymentConfig;

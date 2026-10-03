@@ -211,7 +211,7 @@ const enPrivacy: LegalContent = {
     {
       title: "11. Cookies and analytics",
       paragraphs: [
-        "We may use cookies, local storage, logs, and similar technologies to operate the site, remember preferences, understand usage, and improve performance. You can control some cookies through your browser settings. Advertising measurement is optional. If you allow it in Privacy choices, we send Meta funnel milestones and confirmed purchase amounts and currency, plan IDs, cleaned page URLs, browser/ad-click identifiers, IP address, browser details and SHA-256 email/phone hashes for campaign measurement and matching. We exclude raw contact details, health answers/results and supplement details. You can withdraw permission in Privacy choices; this stops future and pending delivery but cannot recall events already sent. Browser attribution and matching data expire after 90 days. Meta processes information under its own privacy policy."
+        "We may use cookies, local storage, logs, and similar technologies to operate the site, remember preferences, understand usage, and improve performance. You can control some cookies through your browser settings. Advertising measurement is enabled by default. You can turn it off in Advertising preferences on this Privacy page. We send Meta funnel milestones and confirmed purchase amounts and currency, plan IDs, cleaned page URLs, browser/ad-click identifiers, IP address, browser details and SHA-256 email/phone hashes for campaign measurement and matching. We exclude raw contact details, health answers/results and supplement details. Turning advertising measurement off stops future and pending delivery but cannot recall events already sent. Existing opt-outs are respected. Automatic activation is recorded as a site default, not as your explicit consent. Browser attribution and matching data expire after 90 days. Meta processes information under its own privacy policy."
       ]
     },
     {
@@ -426,7 +426,7 @@ const thPrivacy: LegalContent = {
     {
       title: "11. คุกกี้และการวิเคราะห์",
       paragraphs: [
-        "เราอาจใช้คุกกี้ พื้นที่จัดเก็บในเครื่อง บันทึกระบบ และเทคโนโลยีที่คล้ายกันเพื่อให้เว็บไซต์ทำงาน จดจำการตั้งค่า เข้าใจการใช้งาน และปรับปรุงประสิทธิภาพ คุณสามารถควบคุมคุกกี้บางส่วนผ่านการตั้งค่าเบราว์เซอร์ การวัดผลโฆษณาเป็นทางเลือก หากอนุญาตผ่านตัวเลือกความเป็นส่วนตัว เราจะส่งขั้นตอนการใช้งาน ยอดซื้อและสกุลเงิน รหัสแผน URL ที่กรองแล้ว รหัสเบราว์เซอร์และคลิกโฆษณา IP ข้อมูลเบราว์เซอร์ และแฮช SHA-256 ของอีเมลหรือโทรศัพท์ให้ Meta เพื่อวัดผลและจับคู่โฆษณา เราไม่ส่งข้อมูลติดต่อดิบ คำตอบหรือผลสุขภาพ หรือรายละเอียดอาหารเสริม ถอนความยินยอมได้เพื่อหยุดการส่งในอนาคตและที่รอส่ง แต่เรียกคืนข้อมูลที่ส่งแล้วไม่ได้ ข้อมูลการระบุแหล่งที่มาและการจับคู่หมดอายุหลัง 90 วัน Meta ประมวลผลตามนโยบายความเป็นส่วนตัวของตน"
+        "เราอาจใช้คุกกี้ พื้นที่จัดเก็บในเครื่อง บันทึกระบบ และเทคโนโลยีที่คล้ายกันเพื่อให้เว็บไซต์ทำงาน จดจำการตั้งค่า เข้าใจการใช้งาน และปรับปรุงประสิทธิภาพ คุณสามารถควบคุมคุกกี้บางส่วนผ่านการตั้งค่าเบราว์เซอร์ การวัดผลโฆษณาเปิดใช้งานโดยค่าเริ่มต้น คุณปิดได้ในการตั้งค่าโฆษณาบนหน้านโยบายความเป็นส่วนตัวนี้ เราจะส่งขั้นตอนการใช้งาน ยอดซื้อและสกุลเงิน รหัสแผน URL ที่กรองแล้ว รหัสเบราว์เซอร์และคลิกโฆษณา IP ข้อมูลเบราว์เซอร์ และแฮช SHA-256 ของอีเมลหรือโทรศัพท์ให้ Meta เพื่อวัดผลและจับคู่โฆษณา เราไม่ส่งข้อมูลติดต่อดิบ คำตอบหรือผลสุขภาพ หรือรายละเอียดอาหารเสริม การปิดการวัดผลจะหยุดการส่งในอนาคตและที่รอส่ง แต่เรียกคืนข้อมูลที่ส่งแล้วไม่ได้ เราเคารพตัวเลือกปิดที่บันทึกไว้ และบันทึกการเปิดอัตโนมัติเป็นค่าเริ่มต้นของเว็บไซต์ ไม่ใช่ความยินยอมโดยชัดแจ้งของคุณ ข้อมูลการระบุแหล่งที่มาและการจับคู่หมดอายุหลัง 90 วัน Meta ประมวลผลตามนโยบายความเป็นส่วนตัวของตน"
       ]
     },
     {
@@ -640,7 +640,7 @@ const zhCnPrivacy: LegalContent = {
       {
         "title": "11. Cookie 和分析",
         "paragraphs": [
-          "我们可能会使用 Cookie、本地存储、日志和类似技术来运营网站、记住偏好、了解使用情况和改进性能。您可以通过浏览器设置控制某些 Cookie。广告衡量是可选的。若在“隐私选择”中允许，我们会向 Meta 发送流程事件、确认购买的金额及货币、方案编号、清理后的页面 URL、浏览器及广告点击标识、IP 地址、浏览器信息及电子邮件或电话的 SHA-256 哈希，用于广告衡量和匹配。不会发送原始联系方式、健康答案或结果、补充剂详情。撤回许可会停止后续及待发送事件，但无法撤回已发送的信息。归因和匹配信息在 90 天后过期。Meta 依其隐私政策处理信息。"
+          "我们可能会使用 Cookie、本地存储、日志和类似技术来运营网站、记住偏好、了解使用情况和改进性能。您可以通过浏览器设置控制某些 Cookie。广告衡量默认开启。您可在此隐私页面的“广告偏好设置”中关闭。我们会向 Meta 发送流程事件、确认购买的金额及货币、方案编号、清理后的页面 URL、浏览器及广告点击标识、IP 地址、浏览器信息及电子邮件或电话的 SHA-256 哈希，用于广告衡量和匹配。不会发送原始联系方式、健康答案或结果、补充剂详情。关闭广告衡量将停止后续及待发送事件，但无法撤回已发送的信息。我们尊重已保存的关闭选择。自动开启会记录为网站默认设置，而非您的明确同意。归因和匹配信息在 90 天后过期。Meta 依其隐私政策处理信息。"
         ]
       },
       {
