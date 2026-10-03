@@ -456,8 +456,15 @@ describe("database transaction boundaries", () => {
 
   it("keeps payment state and version writes statement-atomic", async () => {
     const source = await readFile("lib/stripe-payments.ts", "utf8");
-    const updateHelper = functionBody(source, "updatePaymentState");
+    const updateEntry = functionBody(source, "updatePaymentState");
+    const updateHelper = functionBody(source, "applyOwnedPaymentState");
     const insertHelper = functionBody(source, "insertPayment");
+
+    assert.match(
+      updateEntry,
+      /return applyOwnedPaymentState\(tx, input, current\)/,
+      "the payment entry point must delegate its locked row to the atomic state writer"
+    );
 
     assert.equal(
       /pg_advisory(?:_xact)?_lock\s*\(/i.test(source),
