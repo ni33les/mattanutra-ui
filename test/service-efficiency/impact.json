@@ -662,6 +662,12 @@
       "expectedCases": 3,
       "reason": "PERF-CKPT-05–06: combine checkpoint-off progress with the next reservation, preserving commit-before-dispatch, interruption accounting and opt-in acknowledgements",
       "slice": "sessions"
+    },
+    {
+      "file": "test/meta-tracking.integration.test.ts",
+      "expectedCases": 8,
+      "reason": "Meta outbox claim ownership, transactional payment capture, concurrent dispatch, lease fencing and consent withdrawal; provider HTTP must execute after commit.",
+      "slice": "sessions"
     }
   ],
   "inputs": [

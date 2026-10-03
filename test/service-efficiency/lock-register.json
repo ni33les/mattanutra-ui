@@ -921,19 +921,21 @@
     },
     {
       "number": 19,
-      "resource": "OMS outbox row \u2014 FOR UPDATE SKIP LOCKED",
+      "resource": "Outbox ownership \u2014 OMS FOR UPDATE SKIP LOCKED and Meta event FOR UPDATE",
       "disposition": "narrow",
-      "invariant": "Claims a fulfilment event before applying it to its order.",
+      "invariant": "Only one owner may apply an OMS fulfilment event or dispatch a Meta conversion; retries retain the event identity.",
       "acquisition": "Explicit mutation transaction or conditional write; ordinary reads never acquire this lock.",
       "permittedWork": "Revalidate ownership, revision and affected row identities; apply necessary writes only. Prepare, calculate, serialize, render and perform external effects outside the protected phase.",
-      "release": "One event transaction, which can then take its order lock; at most 25 such transactions per mock-OMS pass.",
+      "release": "OMS releases after its bounded event/order transaction. Meta releases after validating consent and recording its 30-second lease; all provider HTTP occurs after commit and receipts are fenced by that lease.",
       "callers": [
         "lib/agentic/retail/mock-thailand.ts",
         "lib/agentic/store/postgres.ts",
-        "lib/agentic/store/postgres.ts:claimOutboxBatch"
+        "lib/agentic/store/postgres.ts:claimOutboxBatch",
+        "lib/meta-dispatch.ts:sendMetaEvent"
       ],
       "tests": [
-        "test/service-efficiency/retained-claims.integration.test.ts"
+        "test/service-efficiency/retained-claims.integration.test.ts",
+        "test/meta-tracking.integration.test.ts"
       ],
       "verification": "Required named cases reconciled with successful execution by lock-register-verification.json in the unchanged-source scoped gate; historical RED evidence remains separate.",
       "cases": [
@@ -944,6 +946,14 @@
         {
           "file": "test/service-efficiency/retained-claims.integration.test.ts",
           "name": "LOCK-RETAIN-19B fulfilment uses its already locked order once and replay does not duplicate its event"
+        },
+        {
+          "file": "test/meta-tracking.integration.test.ts",
+          "name": "retries outside database transactions with original event ID/time and only allowed fields"
+        },
+        {
+          "file": "test/meta-tracking.integration.test.ts",
+          "name": "serializes concurrent dispatch without keeping a transaction open during HTTP"
         }
       ],
       "historicalCallers": [
@@ -2238,6 +2248,16 @@
         16
       ],
       "justification": "Only conflicting incomplete receipt claims serialize. Completed replay is read-only; a fresh INSERT already owns its row."
+    },
+    {
+      "file": "lib/meta-dispatch.ts",
+      "owner": "sendMetaEvent",
+      "key": "853c1e08f7521a3faa7ce384e5e045bd61a68c7f235af6ad7cdd53df33d76725",
+      "statement": "`select e.*,c.consent_granted,c.expires_at,c.matching from public.meta_conversion_events e join public.meta_tracking_contexts c on c.id=e.context_id where e.id=${eventId}::uuid for update of e`",
+      "mechanisms": [
+        19
+      ],
+      "justification": "Claim one conversion by ID, recheck consent/destination and write a bounded lease in a short transaction. No provider I/O holds the row lock; a conditional lease receipt prevents a stale sender from overriding withdrawal or a newer owner."
     }
   ]
 }
