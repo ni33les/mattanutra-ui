@@ -184,6 +184,7 @@ async function queuePlatformRetailRevenueNotification(
       metadata: {
         amountMicros: Number(payment.amount) || 0,
         checkoutPaymentId: payment.id,
+        channel: orderCheckoutChannelFromPayment(payment.metadata),
         currency: payment.currency,
         paymentStatus: payment.status,
         planId: payment.plan_id,

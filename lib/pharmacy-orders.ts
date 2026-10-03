@@ -119,7 +119,7 @@ export async function createPharmacyOrder(value: unknown, key: string): Promise<
     // Durable notification admission participates in the existing task transaction;
     // the worker performs delivery after commit.
     await queueAdminOrganisationCommunication({ organisationId: quote.pharmacy.id, eventKey: "retail_order_created",
-      resourceId: receipt.id, resourceType: "retail_customer_order", subject: `Pay at till: ${receipt.reference}`,
+      resourceId: receipt.id, resourceType: "retail_customer_order",
       metadata: { source: "pharmacy", paymentStatus: "unpaid" } });
     return receipt;
   });

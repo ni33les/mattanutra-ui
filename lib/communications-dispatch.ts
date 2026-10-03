@@ -12,6 +12,7 @@ import {
   selectBestCommunicationChannel
 } from "@/lib/communication-channel-utils";
 import { formatOutboundLineMessage } from "@/lib/line-message-format";
+import { adminNotificationLineMessage } from "@/lib/admin-notification";
 import {
   sendTransactionalEmail,
   type TransactionalEmailAttachment
@@ -26,6 +27,7 @@ import {
   mapChannel,
   mapMessage,
   MESSAGE_STATUSES,
+  normalizeAdminCommunicationEventKey,
   objectValue,
   optionalText,
   safetyFollowupItems,
@@ -530,6 +532,8 @@ async function attachmentsForPreparedEmailMessage(
   attachments: TransactionalEmailAttachment[];
   warning: string | null;
 }> {
+  // Organisation alerts link to the order; documents remain available there.
+  if (normalizeAdminCommunicationEventKey(message.messageType)) return { attachments: [], warning: null };
   const metadata = objectValue(message.metadata);
   const orderId = cleanText(metadata.planInsertOrderId);
 
@@ -831,7 +835,7 @@ async function deliverLineMessage(row: DeliveryTargetRow) {
     ...(row.message_type === "pharmacy_plan_welcome" ? { signal: AbortSignal.timeout(10_000) } : {}),
     body: JSON.stringify({
       messages: [
-        {
+        (normalizeAdminCommunicationEventKey(row.message_type) ? adminNotificationLineMessage(row.body, row.metadata) : null) ?? {
           text: formatOutboundLineMessage(row.body).slice(0, 4900),
           type: "text"
         }

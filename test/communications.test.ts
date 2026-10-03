@@ -106,7 +106,7 @@ describe("communications channel selection", () => {
     }
   });
 
-  it("adds environment and useful details to admin notification copy", () => {
+  it("keeps admin notifications concise with a link and a compact environment marker", () => {
     const originalEnvironment = process.env.MATTANUTRA_ENV;
 
     try {
@@ -126,13 +126,10 @@ describe("communications channel selection", () => {
         subject: "Platform revenue received"
       });
 
-      assert.equal(copy.subject, "[UAT] Platform revenue received");
-      assert.match(copy.body, /Environment: UAT/);
-      assert.match(copy.body, /Amount: 1,234 THB/);
-      assert.match(copy.body, /Order: MN-1001/);
-      assert.match(copy.body, /Status: paid/);
-      assert.match(copy.body, /Source: retail_product_checkout/);
-      assert.doesNotMatch(copy.body, /Reference:/);
+      assert.equal(copy.subject, "[UAT] 1,234 THB received");
+      assert.equal(copy.body, "[UAT] 1,234 THB received.");
+      assert.match(copy.html, /<a href="https:\/\/uat\.mattanutra\.com\/en\/admin\/dashboard/);
+      assert.doesNotMatch(copy.body, /Status:|Source:|Reference:|Environment:/);
     } finally {
       if (originalEnvironment === undefined) {
         delete process.env.MATTANUTRA_ENV;
@@ -158,10 +155,9 @@ describe("communications channel selection", () => {
         subject: "Platform revenue received"
       });
 
-      assert.equal(copy.subject, "Platform revenue received");
-      assert.doesNotMatch(copy.body, /Environment:/);
-      assert.match(copy.body, /Amount: 1,234 THB/);
-      assert.match(copy.body, /Status: paid/);
+      assert.equal(copy.subject, "1,234 THB received");
+      assert.equal(copy.body, "1,234 THB received.");
+      assert.match(copy.html, /https:\/\/mattanutra\.com\/en\/admin\/dashboard/);
     } finally {
       if (originalEnvironment === undefined) {
         delete process.env.MATTANUTRA_ENV;
