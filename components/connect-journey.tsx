@@ -76,7 +76,7 @@ export function ConnectActions({ locale, provider, serverUrl }: { locale: Locale
   useEffect(() => { if (manual) { manualInput.current?.focus(); manualInput.current?.select(); } }, [manual]);
 
   useEffect(() => {
-    if (!attempt || attempt.status === "verified" || !panel.current) return;
+    if (!attempt || attempt.status !== "pending" || !panel.current) return;
     let visible = false, stopped = false, polling = false, started = 0;
     let timer: ReturnType<typeof setInterval> | undefined;
     const controller = new AbortController();
