@@ -18,10 +18,18 @@ export function connectOwner(request: Request) {
   const owner = marketingCookie(request, connectCookieName(metaConfig().environment));
   return owner && /^[A-Za-z0-9_-]{43}$/.test(owner) ? owner : null;
 }
+export function connectIsLocalRequest(request: Request) {
+  if (metaConfig().environment !== "dev") return false;
+  try {
+    const origin = new URL(request.headers.get("origin") || ""), internal = new URL(request.url);
+    return ["http:", "https:"].includes(origin.protocol) && ["localhost", "127.0.0.1"].includes(origin.hostname)
+      && ["localhost", "127.0.0.1", "0.0.0.0"].includes(internal.hostname) && origin.port === internal.port;
+  } catch { return false; }
+}
 export function connectServerUrl(request?: Request) {
   const environment = metaConfig().environment;
-  const local = request && new URL(request.url);
-  const origin = environment === "dev" && local && ["localhost", "127.0.0.1"].includes(local.hostname) ? local.origin : metaOrigin(environment);
+  // Next may expose localhost internally even for a public reverse-proxied request.
+  const origin = request && connectIsLocalRequest(request) ? new URL(request.headers.get("origin")!).origin : metaOrigin(environment);
   return `${origin}/api/mcp`;
 }
 

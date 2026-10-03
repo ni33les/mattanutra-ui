@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { randomUUID } from "node:crypto";
 import { isLocale } from "@/lib/i18n";
 import { isConnectProvider } from "@/lib/connect";
-import { connectCookieName, connectServerUrl, createConnectAttempt } from "@/lib/connect-verification";
+import { connectCookieName, connectIsLocalRequest, connectServerUrl, createConnectAttempt } from "@/lib/connect-verification";
 import { metaConfig } from "@/lib/meta-config";
 import { metaRequestOriginAllowed, uuidPattern } from "@/lib/meta-event-policy";
 import { enforceRateLimit } from "@/lib/rate-limit";
@@ -22,7 +22,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Invalid connection attempt" }, { status: 400, headers });
     const { owner, attempt } = await createConnectAttempt(request, { ...body, visitorId: body.visitorId || randomUUID() });
     const response = NextResponse.json(attempt, { status: 201, headers });
-    const localDev = environment === "dev" && ["localhost", "127.0.0.1"].includes(new URL(request.url).hostname);
+    const localDev = connectIsLocalRequest(request);
     response.cookies.set(connectCookieName(environment), owner, { httpOnly: true, secure: !localDev, sameSite: "lax", path: "/", maxAge: 2 * 86400 });
     return response;
   } catch { return NextResponse.json({ error: "Confirmation unavailable", connectionUrl: connectServerUrl(request) }, { status: 503, headers }); }
