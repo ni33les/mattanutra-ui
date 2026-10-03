@@ -3,9 +3,9 @@ import {
   DM_Sans,
   Fraunces,
   JetBrains_Mono,
-  Noto_Sans_Thai,
-  Noto_Serif_Thai
+  Noto_Sans_Thai
 } from "next/font/google";
+import localFont from "next/font/local";
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
 import { Suspense } from "react";
@@ -64,9 +64,12 @@ const thaiFont = Noto_Sans_Thai({
   display: "swap"
 });
 
-const thaiSerifFont = Noto_Serif_Thai({
-  subsets: ["thai"],
-  weight: ["400", "500", "600"],
+// Reuse the site's bundled variable font; Google can return extensionless URLs
+// that Next's Google font loader cannot parse during a cloud build.
+const thaiSerifFont = localFont({
+  src: "../../public/assets/pharmacy/fonts/noto-serif-thai.ttf",
+  weight: "100 900",
+  adjustFontFallback: "Times New Roman",
   variable: "--mn-font-thai-serif",
   display: "swap"
 });
