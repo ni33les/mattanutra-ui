@@ -13,7 +13,10 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   try {
     const attempt = await getConnectAttempt(request, id);
     if (!attempt) return NextResponse.json({ error: "Not found" }, { status: 404, headers });
-    if (attempt.status === "verified") after(async () => { try { await flushConnectMeta(id); } catch { console.warn("[connect] Event delivery pending"); } });
+    if (attempt.status === "verified") {
+      try { after(async () => { try { await flushConnectMeta(id); } catch { console.warn("[connect] Event delivery pending"); } }); }
+      catch { console.warn("[connect] Event delivery scheduling unavailable"); }
+    }
     return NextResponse.json(attempt, { headers });
   } catch { return NextResponse.json({ error: "Confirmation unavailable" }, { status: 503, headers }); }
 }

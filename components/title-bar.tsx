@@ -184,9 +184,8 @@ export function TitleBar({
         ) : null}
         <div className="mn-titlebar-actions">
           {!isQuiz && showAssessmentCta ? (
-            <ConnectCampaignLink className="mn-titlebar-cta" href={titleCtaHref}>
-              {actionLabel || copy.assessment}
-            </ConnectCampaignLink>
+            actionLabel ? <ConnectCampaignLink className="mn-titlebar-cta" href={titleCtaHref}>{actionLabel}</ConnectCampaignLink>
+              : <Link className="mn-titlebar-cta" href={titleCtaHref}>{copy.assessment}</Link>
           ) : null}
           {/* Site-wide: language switcher always visible (including collapsed iPhone). */}
           <div className="mn-titlebar-lang-always">
@@ -214,9 +213,8 @@ export function TitleBar({
                 <ConnectCampaignLink href={`/${currentLocale}/connect`} className="mn-titlebar-mobile-link">{connectCopy[currentLocale].nav}</ConnectCampaignLink>
                 <div className="mn-titlebar-mobile-actions">
                   {showAssessmentCta ? (
-                    <ConnectCampaignLink className="mn-titlebar-mobile-cta" href={titleCtaHref}>
-                      {actionLabel || copy.assessment}
-                    </ConnectCampaignLink>
+                    actionLabel ? <ConnectCampaignLink className="mn-titlebar-mobile-cta" href={titleCtaHref}>{actionLabel}</ConnectCampaignLink>
+                      : <Link className="mn-titlebar-mobile-cta" href={titleCtaHref}>{copy.assessment}</Link>
                   ) : null}
                 </div>
               </div>
