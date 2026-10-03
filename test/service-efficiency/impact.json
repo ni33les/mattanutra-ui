@@ -674,6 +674,12 @@
       "expectedCases": 8,
       "reason": "Meta outbox claim ownership, transactional payment capture, concurrent dispatch, lease fencing and consent withdrawal; provider HTTP must execute after commit.",
       "slice": "sessions"
+    },
+    {
+      "file": "test/connect-verification.integration.test.ts",
+      "expectedCases": 11,
+      "reason": "Connection outbox row ownership under concurrent confirmation, disabled advertising, rollback and retry; confirmed milestones remain durable and Meta enqueue remains deduplicated.",
+      "slice": "sessions"
     }
   ],
   "inputs": [
