@@ -32,8 +32,9 @@ export async function POST(request: Request) {
     } } catch { /* URL already validated for export. */ }
     const attemptId = typeof body.attemptId === "string" && uuidPattern.test(body.attemptId) ? body.attemptId : null;
     if (name === "InitiateCheckout" && !attemptId) return NextResponse.json({ error: "Checkout attempt required" }, { status: 400 });
+    const dimension = String(data.funnel_stage).startsWith("connect") ? `${data.provider || ""}:${data.locale || ""}:` : "";
     const key = name === "InitiateCheckout" ? `checkout:${attemptId}` : name === "PageView" || name === "AddToCart" ? body.eventId
-      : `${body.sessionId}:${data.plan_id || "visit"}:${name}:${data.provider || ""}:${data.locale || ""}:${data.progress ?? data.offer ?? data.funnel_stage ?? ""}`;
+      : `${body.sessionId}:${data.plan_id || "visit"}:${name}:${dimension}${data.progress ?? data.offer ?? data.funnel_stage ?? ""}`;
     const eventId = await withDatabaseTransaction(sql, async tx => {
       await tx`update public.meta_tracking_contexts set matching=matching || ${tx.json(matching)},attribution=attribution || ${tx.json(campaign)},updated_at=now()
         where id=${context.id}::uuid and consent_granted`;

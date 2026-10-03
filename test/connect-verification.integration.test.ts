@@ -83,6 +83,22 @@ describe("server-confirmed MCP connections", () => {
     await flushConnectMeta(a.attempt.id); await flushConnectMeta(a.attempt.id);
     assert.equal((await getSql()!`select count(*)::int as n from public.meta_conversion_events where source_key=${`connect:${a.attempt.id}`}`)[0].n, 1);
   });
+  it("keeps the verified record if the advertising outbox write fails and retries without duplicates", async () => {
+    const a = await attempt(), sql = getSql()!;
+    const functionName = `connect_test_${a.attempt.id.replaceAll("-", "")}`;
+    try {
+      await sql.unsafe(`create function public.${functionName}() returns trigger language plpgsql as $$ begin
+        if NEW.source_key='connect:${a.attempt.id}' then raise exception 'isolated advertising failure'; end if; return NEW; end $$`);
+      await sql.unsafe(`create trigger ${functionName} before insert on public.meta_conversion_events for each row execute function public.${functionName}()`);
+      await assert.rejects(verifyConnectToken(a.token), /isolated advertising failure/);
+      assert.equal((await getConnectAttempt(a.request, a.attempt.id))?.status, "verified");
+    } finally {
+      await sql.unsafe(`drop trigger if exists ${functionName} on public.meta_conversion_events`);
+      await sql.unsafe(`drop function if exists public.${functionName}()`);
+    }
+    await flushConnectMeta(a.attempt.id); await flushConnectMeta(a.attempt.id);
+    assert.equal((await sql`select count(*)::int as n from public.meta_conversion_events where source_key=${`connect:${a.attempt.id}`}`)[0].n, 1);
+  });
   it("does not send opted-out connections to Meta", async () => {
     const a = await attempt(false); await verifyConnectToken(a.token);
     assert.equal((await getConnectAttempt(a.request, a.attempt.id))?.status, "verified");
@@ -107,6 +123,14 @@ describe("server-confirmed MCP connections", () => {
       assert.equal((await response.json()).connectionUrl, "https://dev.mattanutra.com/api/mcp");
     } finally { process.env.CONNECT_VERIFICATION_ENABLED = "true"; }
   });
+  it("returns a usable fallback when the database is unavailable", async () => {
+    const previous = process.env.DB_URL; delete process.env.DB_URL;
+    try {
+      const response = await attemptPost(request("", { provider: "claude", locale: "en" }));
+      assert.equal(response.status, 503);
+      assert.equal((await response.json()).connectionUrl, "https://dev.mattanutra.com/api/mcp");
+    } finally { process.env.DB_URL = previous; }
+  });
   it("refuses browser-forged verified milestones on every browser event endpoint", async () => {
     const response = await browserEvent(request("", { name: "McpConnectionVerified", eventId: randomUUID(), sessionId: visitor, sourceUrl: "/en/connect/claude" }));
     assert.equal(response.status, 400);
@@ -120,5 +144,7 @@ describe("server-confirmed MCP connections", () => {
     const response = await attemptPost(request("", { provider: "grok", locale: "th" }));
     assert.equal(response.status, 201); const body = await response.json(); ids.push(body.id);
     assert.match(response.headers.get("set-cookie")!, /HttpOnly/i); assert.match(response.headers.get("cache-control")!, /no-store/);
+    const proxied = await attemptPost(new Request("http://0.0.0.0:8080/api/connect/attempts", { method: "POST", headers: { origin: "https://dev.mattanutra.com" }, body: '{"provider":"grok","locale":"th"}' }));
+    assert.equal(proxied.status, 201); ids.push((await proxied.json()).id); assert.match(proxied.headers.get("set-cookie")!, /Secure/);
   });
 });
