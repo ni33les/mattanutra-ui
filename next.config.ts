@@ -126,6 +126,16 @@ const securityHeaders = [
       ])
 ];
 
+// Native Pixel is allowed only on public home/legal documents. Personalised
+// documents retain the restrictive policy and export solely through our server.
+const publicMarketingHeaders = securityHeaders.filter(header => header.key === "Content-Security-Policy").map(header => ({
+  ...header,
+  value: header.value
+    .replace("script-src 'self'", "script-src 'self' https://connect.facebook.net")
+    .replace("connect-src 'self'", "connect-src 'self' https://connect.facebook.net https://www.facebook.com")
+    .replace("img-src 'self'", "img-src 'self' https://www.facebook.com")
+}));
+
 const nextConfig: NextConfig = {
   ...(process.env.NEXT_BUILD_CPUS === "1" ? { experimental: { cpus: 1, webpackMemoryOptimizations: true } } : {}),
   allowedDevOrigins: ["localhost", "127.0.0.1", "dev.mattanutra.com"],
@@ -151,6 +161,8 @@ const nextConfig: NextConfig = {
         headers: securityHeaders,
         source: "/(.*)"
       },
+      { source: `/:locale(${publicLocaleRoutePattern})`, headers: publicMarketingHeaders },
+      { source: `/:locale(${publicLocaleRoutePattern})/:document(privacy|terms)`, headers: publicMarketingHeaders },
       {
         headers: [
           {
