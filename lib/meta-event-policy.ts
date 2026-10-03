@@ -6,8 +6,16 @@ export type MetaPublicConfig = { environment: MetaEnvironment; pixelId: string; 
 export const META_CONSENT_COOKIE = "mn_marketing";
 export const META_CONTEXT_COOKIE = "mn_marketing_context";
 export const META_CONSENT_VERSION = 1;
+export type MetaPreferenceSource = "explicit" | "site_default";
 export const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 export const metaOrigin = (env: MetaEnvironment) => env === "prd" ? "https://mattanutra.com" : `https://${env}.mattanutra.com`;
+
+/** Public aliases are explicit; proxy-internal request URLs need not match the browser origin. */
+export function metaRequestOriginAllowed(request: Request, env: MetaEnvironment) {
+  const origin = request.headers.get("origin");
+  return !!origin && (origin === new URL(request.url).origin || origin === metaOrigin(env)
+    || env === "prd" && origin === "https://www.mattanutra.com");
+}
 
 export function metaEventName(name: MetaEventName, env: MetaEnvironment) {
   // Tags alone do not stop UAT purchases entering production conversion optimisation.

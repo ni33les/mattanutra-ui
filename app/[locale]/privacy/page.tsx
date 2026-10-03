@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { LegalDocument } from "@/components/legal-document";
+import { MarketingPrivacySettings } from "@/components/marketing-privacy-settings";
 import { SiteFooter } from "@/components/site-footer";
 import { TitleBar } from "@/components/title-bar";
 import { getDictionary, isLocale, locales, type Locale } from "@/lib/i18n";
@@ -51,6 +52,7 @@ export default async function PrivacyPage({ params }: PrivacyPageProps) {
         title={dictionary.hero.eyebrow}
       />
       <LegalDocument content={content} />
+      <MarketingPrivacySettings locale={locale} />
       <SiteFooter content={dictionary.footer} locale={locale} />
     </main>
   );

@@ -3,12 +3,15 @@ create table if not exists public.meta_tracking_contexts (
   environment text not null check (environment in ('dev','uat','prd')),
   consent_version integer not null default 1,
   consent_granted boolean not null,
+  preference_source text not null default 'explicit' check (preference_source in ('explicit','site_default')),
   attribution jsonb not null default '{}'::jsonb,
   matching jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   expires_at timestamptz not null default now() + interval '90 days'
 );
+alter table public.meta_tracking_contexts add column if not exists preference_source text not null default 'explicit'
+  check (preference_source in ('explicit','site_default'));
 create table if not exists public.meta_tracking_bindings (
   resource_type text not null check (resource_type in ('plan','payment','retail','agentic')),
   resource_id text not null,

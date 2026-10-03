@@ -2,13 +2,13 @@ import { NextResponse } from "next/server";
 import { getSql, withDatabaseTransaction } from "@/lib/db";
 import { enforceRateLimit, publicRateLimits } from "@/lib/rate-limit";
 import { metaConfig } from "@/lib/meta-config";
-import { META_EVENTS, metaCustomData, metaOrigin, sanitiseMetaUrl, uuidPattern, type MetaEventName } from "@/lib/meta-event-policy";
+import { META_EVENTS, metaCustomData, metaRequestOriginAllowed, sanitiseMetaUrl, uuidPattern, type MetaEventName } from "@/lib/meta-event-policy";
 import { enqueueMetaEvent, metaMatchingFromRequest, requestMetaContext } from "@/lib/meta-tracking";
 export const runtime = "nodejs";
 export async function POST(request: Request) {
   const limited = enforceRateLimit(request, publicRateLimits.bpmPost); if (limited) return limited;
-  const config = metaConfig(), origin = request.headers.get("origin");
-  if (!origin || ![new URL(request.url).origin, metaOrigin(config.environment)].includes(origin)) return NextResponse.json({ error: "Invalid origin" }, { status: 403 });
+  const config = metaConfig();
+  if (!metaRequestOriginAllowed(request, config.environment)) return NextResponse.json({ error: "Invalid origin" }, { status: 403 });
   if (!config.enabled) return NextResponse.json({ accepted: false, reason: "disabled" });
   if (Number(request.headers.get("content-length")) > 8192) return NextResponse.json({ error: "Event too large" }, { status: 413 });
   try {
