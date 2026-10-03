@@ -1,4 +1,5 @@
 import { ArrowDown, ArrowLeft, ArrowUpRight, Check } from "lucide-react";
+import Image from "next/image";
 import { TitleBar } from "@/components/title-bar";
 import { SiteFooter } from "@/components/site-footer";
 import { ConnectActions, ConnectProviderCards, ConnectVisit } from "@/components/connect-journey";
@@ -33,8 +34,8 @@ export function ConnectPage({ locale, provider }: { locale: Locale; provider?: C
           <section className="mn-connect-instructions"><span className="mn-v15-eyebrow">01 — 02</span><h2>{copy.steps}</h2>
             <ol>{guide.steps.map((step, index) => <li key={step}><span aria-hidden>{index + 1}</span><p>{step}</p></li>)}</ol>
             <details><summary>{copy.admin}</summary><p>{guide.admin}</p></details>
-            {evidence.screenshots.map(shot => <figure key={shot.src}>{/* Real provider captures only; never generated UI. */}
-              {/* eslint-disable-next-line @next/next/no-img-element */}<img src={shot.src} alt={shot.alt[locale]} loading="lazy" width="1200" height="800" /><figcaption>{shot.captions[locale]}</figcaption></figure>)}
+            {evidence.screenshots.map(shot => <figure key={shot.src}>
+              <Image src={shot.src} alt={shot.alt[locale]} loading="lazy" width={1200} height={800} /><figcaption>{shot.captions[locale]}</figcaption></figure>)}
             <div className="mn-connect-guide-evidence"><p>{copy.reviewed}: <time dateTime={evidence.instructionsReviewedAt}>{evidence.instructionsReviewedAt}</time></p>
               {evidence.connectionVerifiedAt ? <p>{copy.verifiedOn}: <time dateTime={evidence.connectionVerifiedAt}>{evidence.connectionVerifiedAt}</time></p> : <p>{copy.pendingReview}</p>}
               <a href={providerSetup[provider].help} target="_blank" rel="noopener noreferrer">{copy.officialHelp}<ArrowUpRight aria-hidden size={15} /></a>
