@@ -138,6 +138,17 @@ describe("server-confirmed MCP connections", () => {
     assert.equal(funnel.status, 400);
     assert.equal((await bpmPost(request("", { eventName: "mcp_connection_verified" }))).status, 400);
   });
+  it("browser-chosen event IDs cannot reserve or suppress a server confirmation", async () => {
+    const a = await attempt();
+    assert.equal((await funnelEvent(request("", { id: a.attempt.id, visitorId: visitor, name: "url_copied", provider: "claude", locale: "en" }))).status, 200);
+    const forgedId = await browserEvent(request(a.request.headers.get("cookie")!, { name: "PageView", eventId: a.attempt.id, sessionId: visitor, sourceUrl: "/en/connect/claude", data: { locale: "en", stage: "connect_guide" } }));
+    assert.equal(forgedId.status, 200);
+    await verifyConnectToken(a.token);
+    assert.equal((await getConnectAttempt(a.request, a.attempt.id))?.status, "verified");
+    const rows = await getSql()!`select id from public.meta_conversion_events where source_key=${`connect:${a.attempt.id}`}`;
+    assert.equal(rows.length, 1); assert.notEqual(rows[0].id, a.attempt.id);
+    assert.equal((await getSql()!`select count(*)::int as n from public.connect_funnel_events where attempt_id=${a.attempt.id}::uuid and event_name='verified'`)[0].n, 1);
+  });
   it("rejects invalid provider and foreign origins; accepts the specified provider/locale-only shape", async () => {
     assert.equal((await attemptPost(request("", { provider: "unknown", locale: "en" }))).status, 400);
     assert.equal((await attemptPost(new Request("https://dev.mattanutra.com/api/connect/attempts", { method: "POST", headers: { origin: "https://example.com" }, body: '{"provider":"claude","locale":"en"}' }))).status, 403);
