@@ -69,10 +69,10 @@ test("a failed preference save is visible, restores the button and supports retr
   await page.goto("/en/privacy");
   fixture.failNext();
   await page.getByRole("button", { name: "Turn on", exact: true }).click();
-  await expect(page.getByRole("alert")).toHaveText("Could not save your choice. Please try again.");
+  await expect(page.locator("#advertising-preferences").getByRole("alert")).toHaveText("Could not save your choice. Please try again.");
   await expect(page.getByRole("button", { name: "Turn on", exact: true })).toBeEnabled();
   expect(fixture.events).toHaveLength(0);
   await page.getByRole("button", { name: "Turn on", exact: true }).click();
   await expect(page.getByRole("button", { name: "Turn off", exact: true })).toBeVisible();
-  await expect(page.getByRole("alert")).toHaveCount(0);
+  await expect(page.locator("#advertising-preferences").getByRole("alert")).toHaveCount(0);
 });
