@@ -15,6 +15,7 @@ const forwardSchemaScripts = [
   "communications:schema:apply",
   "panya:schema:apply",
   "payments:schema:apply",
+  "marketing:schema:apply",
   "retail-checkout:schema:apply",
   "agentic:schema:apply",
   "retail-financials:schema:apply",

@@ -381,53 +381,5 @@ export function trackBpmEvent(eventName: string, input: TrackBpmEventInput = {})
     // Tracking must never affect the user journey.
   });
 
-  // Mirror key funnel events to Meta Pixel when configured (client-only).
-  void import("@/lib/facebook-pixel")
-    .then(
-      ({
-        claimFacebookLeadOnce,
-        facebookEventForInternal,
-        resolveMattanutraRuntimeEnv,
-        trackFacebookEvent
-      }) => {
-        const mapped = facebookEventForInternal(eventName);
-
-        if (!mapped) {
-          return;
-        }
-
-        // PageView is handled by FacebookPixel on route changes — skip duplicates.
-        if (mapped.event === "PageView") {
-          return;
-        }
-
-        // Lead once per plan per session (results ready).
-        if (mapped.event === "Lead" && !claimFacebookLeadOnce(planId)) {
-          return;
-        }
-
-        const mnEnv = resolveMattanutraRuntimeEnv();
-        const params: Record<string, unknown> = {
-          content_name: eventName,
-          locale: input.locale,
-          plan_id: planId ?? undefined,
-          value: input.valueAmount,
-          currency: input.valueCurrency,
-          mn_env: mnEnv,
-          ...(input.properties || {})
-        };
-
-        if (mapped.event === "ViewContent" && eventName === "healthscore_viewed") {
-          params.content_category = "healthscore";
-        }
-
-        return trackFacebookEvent(mapped.event, params, {
-          custom: mapped.custom,
-          eventID: facebookEventId
-        });
-      }
-    )
-    .catch(() => {
-      // Pixel must never break BPM or UX.
-    });
+  void import("@/lib/meta-client").then(({ trackMetaBpm }) => trackMetaBpm(eventName, input)).catch(() => undefined);
 }

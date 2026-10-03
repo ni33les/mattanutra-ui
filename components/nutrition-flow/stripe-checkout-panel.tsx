@@ -1,4 +1,5 @@
 "use client";
+import { trackMetaEvent } from "@/lib/meta-client";
 
 import { fetchWithBodyDeadline } from "@/lib/funnel-polling";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -145,6 +146,7 @@ export function StripeCheckoutPanel({
       throw new Error(labels.unable);
     }
 
+    void trackMetaEvent("InitiateCheckout", { planId, locale, offer: plan, stage: "checkout", attemptId: body.paymentId }, `checkout:${body.paymentId}`);
     setPaymentId(body.paymentId);
 
     if (body.mock) {

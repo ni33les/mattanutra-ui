@@ -42,7 +42,7 @@ export async function PATCH(request: Request, { params }: AssessmentStatusRouteP
   if (limited) return limited;
   try {
     const { planId } = await params;
-    const receipt = await captureAssessment(await request.json(), { planId, idempotencyKey: request.headers.get("Idempotency-Key") ?? "" });
+    const receipt = await captureAssessment(await request.json(), { planId, idempotencyKey: request.headers.get("Idempotency-Key") ?? "", request });
     return NextResponse.json(receipt, { headers: { "Cache-Control": "no-store" } });
   } catch (error) { return funnelErrorResponse(error); }
 }

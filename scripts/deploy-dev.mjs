@@ -10,6 +10,7 @@ import {validateRolloutBinding} from "./service-efficiency/rollout-proof.mjs";
 
 const serviceName = "mattanutra-ui-dev.service";
 const schemaScripts = [
+  "marketing:schema:apply",
   "supplements:country-availability:schema:apply",
   // Updated reference readers/seeders require these additive provenance columns.
   "supplements:safety-reference-integrity:schema:apply",

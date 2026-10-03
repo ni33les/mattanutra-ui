@@ -1,3 +1,4 @@
+import { bindMetaContext } from "@/lib/meta-tracking";
 import { existingPaymentAccounting, recordPaymentAccountingOnce } from "@/lib/payment-accounting";
 import { effectivePayment, preparePaymentFulfillment, newlyConfirmedFulfillment } from "@/lib/payment-fulfillment-evidence";
 import { claimFunnelRequest } from "@/lib/funnel-idempotency";
@@ -962,7 +963,7 @@ async function startPaymentCheckoutPregeneration(input: Readonly<{
   };
 }
 
-function assertSessionMatchesPayment(
+export function assertSessionMatchesPayment(
   session: Stripe.Checkout.Session,
   payment: PaymentRow,
   config: StripePaymentConfig
@@ -990,7 +991,7 @@ function assertSessionMatchesPayment(
     throw new Error("Stripe session price does not match configured plan price");
   }
 
-  if (amountMicros && amountMicros !== plan.amountMicros) {
+  if ((session.payment_status === "paid" || amountMicros !== null) && (amountMicros !== plan.amountMicros || amountMicros !== Number(payment.amount))) {
     throw new Error("Stripe session amount does not match configured plan amount");
   }
 }
@@ -1077,6 +1078,7 @@ export async function createStripeCheckoutSession(input: CheckoutSessionInput) {
     if (existing) return existing;
     return insertPayment(tx, { config, locale: input.locale, paymentId, planId: input.planId, selectedPlan: input.selectedPlan, sourceSurface: input.sourceSurface });
   });
+  if (!payment.paid_at) await withDatabaseTransaction(sql, tx => bindMetaContext(tx, "payment", payment.id, input.request));
   if (payment.status === "fulfillment_failed" && payment.paid_at && payment.stripe_checkout_session_id) {
     await fulfillCheckoutSession(payment.stripe_checkout_session_id, { source: "return_page", request: input.request });
     return { paymentId, clientSecret: null, mock: config.mode === "mock", publishableKey: config.publishableKey,
@@ -1945,6 +1947,7 @@ export async function fulfillCheckoutSession(
   const paid = current.status === "paid" || current.status === "bound";
   void writePaymentBpmEvent({ eventName: paid ? "payment_succeeded" : current.status === "expired" ? "payment_expired" : "payment_processing",
     eventStatus: current.status, paymentId: current.id, planId: current.plan_id, locale: current.locale,
+    selectedPlan: current.selected_plan, valueAmount: Number(current.amount) / AMOUNT_MICROS_PER_UNIT, valueCurrency: current.currency,
     stripeSessionId: session.id, stripeEventId: input.stripeEventId }).catch(() => undefined);
   return { payment: await mapPayment(current), status: paid
     ? current.plan_id ? "paid_with_plan" as const : "paid_reservation" as const
@@ -2150,6 +2153,21 @@ export async function handleStripeWebhookPayload(input: Readonly<{
     payloadShape: input.payloadShape,
     sessionId: session?.id ?? null
   });
+
+  // Retail checkout uses the same signed endpoint. Confirmation must survive a closed browser.
+  if (session?.metadata?.kind === "retail_product_checkout" &&
+      ["checkout.session.completed", "checkout.session.async_payment_succeeded"].includes(event.type)) {
+    try {
+      const { fulfillRetailCheckoutSession } = await import("@/lib/retail-product-checkout");
+      const result = await fulfillRetailCheckoutSession({ sessionId: session.id, request: input.request });
+      if (!result) throw new Error("Retail checkout payment not found");
+      await markWebhookEventStatus(sql, { sessionId: session.id, status: "processed", stripeEventId: event.id });
+      return { duplicate: !isFresh, ok: true };
+    } catch (error) {
+      await markWebhookEventStatus(sql, { sessionId: session.id, status: "failed", stripeEventId: event.id });
+      throw error;
+    }
+  }
 
   if (!isFresh) {
     // A processed event may predate durable fulfillment, or a later repair may be unfinished.

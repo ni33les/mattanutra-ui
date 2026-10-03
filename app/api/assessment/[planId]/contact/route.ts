@@ -9,6 +9,6 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ pl
   try {
     const { planId } = await params;
     const body = await request.json();
-    return NextResponse.json(await updateAssessmentContact(planId, body.contactEmail), { headers: { "Cache-Control": "no-store" } });
+    return NextResponse.json(await updateAssessmentContact(planId, body.contactEmail, request), { headers: { "Cache-Control": "no-store" } });
   } catch (error) { return funnelErrorResponse(error); }
 }

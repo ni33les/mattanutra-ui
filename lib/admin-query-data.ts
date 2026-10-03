@@ -1,3 +1,4 @@
+import { metaDiagnostics, type MetaDiagnostics } from "@/lib/meta-diagnostics";
 import {
   adminDashboardRangeStart,
   type AdminDashboardRange
@@ -80,6 +81,7 @@ export type AdminCampaignSummary = Readonly<{
 }>;
 
 export type AdminCampaignsData = Readonly<{
+  meta?: MetaDiagnostics;
   databaseAvailable: boolean;
   pagination?: AdminQueryPagination;
   rows: AdminCampaignRow[];
@@ -469,6 +471,7 @@ async function getCampaigns(params: QueryParams): Promise<AdminCampaignsData> {
     databaseAvailable: true,
     rows: pageRows,
     summary: campaignSummary(mappedRows),
+    meta: await metaDiagnostics(start),
     pagination
   };
 }

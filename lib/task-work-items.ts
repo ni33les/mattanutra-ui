@@ -430,6 +430,7 @@ export type RetailOperationsReviewWorkItem = Readonly<{
 }>;
 
 export type TaskWorkItem =
+  | Readonly<{ taskId: string; taskType: "send_meta_event"; eventId: string }>
   | Readonly<{ taskId: string; taskType: "match_agentic_plan"; operationId: string }>
   | Readonly<{ taskId: string; taskType: "send_healthscore_email"; deliveryRequestId: string }>
   | Readonly<{ taskId: string; taskType: "fulfill_web_payment"; paymentId: string }>
@@ -2265,6 +2266,7 @@ function buildWebPaymentFulfillmentWorkItem(task: TaskRecord) {
 }
 
 const taskWorkItemHandlers: Readonly<Record<string, TaskWorkItemBuilder>> = {
+  send_meta_event: task => ({ taskId: task.id, taskType: "send_meta_event", eventId: payloadText(task.payload, "eventId") }),
   match_agentic_plan: task => ({ taskId: task.id, taskType: "match_agentic_plan", operationId: payloadText(task.payload, "operationId") }),
   [ADMIN_CATALOGUE_OPTIMIZATION_TASK_TYPE]: buildAdminCatalogueOptimizationWorkItem,
   analyze_healthscore: buildHealthScoreWorkItem,

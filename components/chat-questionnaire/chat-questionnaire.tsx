@@ -1,4 +1,5 @@
 "use client";
+import { trackMetaEvent } from "@/lib/meta-client";
 
 import { combinedCopy } from "@/components/pharmacy/combined-copy";
 import { pharmacyCopy } from "@/lib/pharmacy-copy";
@@ -253,6 +254,13 @@ export function ChatQuestionnaire({
       detail: `${encourage}${remainBit}`
     };
   }, [state, definition, currentTurn, chrome]);
+
+  useEffect(() => {
+    if (uiScreen !== "chat") return;
+    for (const progress of [25, 50, 75]) if (progressMeta.barPct >= progress) {
+      void trackMetaEvent("QuizProgress", { locale, progress, assessmentAttemptId: state?.sessionId, stage: "assessment" });
+    }
+  }, [uiScreen, progressMeta.barPct, locale, state?.sessionId]);
 
   const track = useCallback(
     async (events: readonly QuestionnaireEvent[]) => {
