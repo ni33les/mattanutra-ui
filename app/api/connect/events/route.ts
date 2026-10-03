@@ -17,7 +17,7 @@ export async function POST(request: Request) {
     if (raw.length > 4096) return NextResponse.json({ error: "Too large" }, { status: 413, headers });
     const body = JSON.parse(raw);
     if (!connectBrowserEvents.includes(body.name) || !isLocale(body.locale) || !uuidPattern.test(body.id || "") || !uuidPattern.test(body.visitorId || "")
-      || (body.provider != null && !isConnectProvider(body.provider)) || (body.name !== "page_viewed" && !body.provider))
+      || (body.provider != null && !isConnectProvider(body.provider)) || (!["page_viewed", "url_copied"].includes(body.name) && !body.provider))
       return NextResponse.json({ error: "Invalid browser milestone" }, { status: 400, headers });
     const sql = getSql(); if (!sql) throw new Error("Database unavailable");
     await sql`insert into public.connect_funnel_events(id,environment,event_name,provider,locale,visitor_id,campaign)
