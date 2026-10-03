@@ -7,7 +7,9 @@ import { EmbeddedCheckout, EmbeddedCheckoutProvider } from "@stripe/react-stripe
 import { loadStripe } from "@stripe/stripe-js";
 import type { AssessmentPlan } from "@/lib/assessment-snapshot";
 import type { Locale } from "@/lib/i18n";
-import type { PaymentSourceSurface } from "@/lib/payment-paths";
+import { paymentCheckoutPath, type PaymentSourceSurface } from "@/lib/payment-paths";
+import { nutritionHealthScorePath } from "@/lib/nutrition-paths";
+import { usePaymentRecovery } from "@/components/nutrition-flow/use-payment-recovery";
 
 const CHECKOUT_SESSION_TIMEOUT_MS = 15_000;
 const STRIPE_LOAD_TIMEOUT_MS = 15_000;
@@ -24,6 +26,21 @@ type StripeCheckoutPanelProps = Readonly<{
 const copy = {
   en: {
     cancel: "Cancel",
+    cancelling: "Checking payment…",
+    cancelPending: "Payment may still be processing. Check its status before trying again.",
+    cancelFailed: "We could not cancel this checkout. Check your payment status before trying again.",
+    checkPayment: "Check payment status",
+    copyRecovery: "Copy recovery link",
+    recoveryCopied: "Recovery link copied. Keep it private.",
+    recoveryCopyFailed: "Copy this link manually to return to the same checkout.",
+    recoveryHint: "If you switch to a banking app, return here after paying. Save this link to reopen the same checkout in Safari or Chrome.",
+    recovery: {
+      waiting: "Waiting for payment confirmation. Your plan will open when payment is confirmed.",
+      unavailable: "We could not check your payment yet. Check again before making another payment.",
+      paused: "Automatic checks have paused. If you have paid, check your payment status.",
+      ended: "This checkout has ended. You can check its final payment status below.",
+      confirmed: "Payment confirmed. Opening your plan…"
+    },
     configError:
       "Checkout is not configured at this time. Please contact support.",
     creatingSession: "Creating your payment session...",
@@ -38,6 +55,21 @@ const copy = {
   },
   th: {
     cancel: "ยกเลิก",
+    cancelling: "กำลังตรวจสอบการชำระเงิน…",
+    cancelPending: "การชำระเงินอาจยังอยู่ระหว่างดำเนินการ โปรดตรวจสอบสถานะก่อนลองอีกครั้ง",
+    cancelFailed: "ไม่สามารถยกเลิกการชำระเงินนี้ได้ โปรดตรวจสอบสถานะการชำระเงินก่อนลองอีกครั้ง",
+    checkPayment: "ตรวจสอบสถานะการชำระเงิน",
+    copyRecovery: "คัดลอกลิงก์กลับมาชำระเงิน",
+    recoveryCopied: "คัดลอกลิงก์แล้ว โปรดเก็บลิงก์นี้ไว้เป็นส่วนตัว",
+    recoveryCopyFailed: "คัดลอกลิงก์นี้ด้วยตนเองเพื่อกลับมายังการชำระเงินเดิม",
+    recoveryHint: "หากสลับไปใช้แอปธนาคาร ให้กลับมาที่หน้านี้หลังชำระเงิน บันทึกลิงก์นี้เพื่อเปิดการชำระเงินเดิมใน Safari หรือ Chrome",
+    recovery: {
+      waiting: "กำลังรอการยืนยันการชำระเงิน แผนของคุณจะเปิดเมื่อยืนยันแล้ว",
+      unavailable: "ยังไม่สามารถตรวจสอบการชำระเงินได้ โปรดตรวจสอบอีกครั้งก่อนชำระเงินซ้ำ",
+      paused: "หยุดตรวจสอบอัตโนมัติชั่วคราว หากชำระเงินแล้ว โปรดตรวจสอบสถานะการชำระเงิน",
+      ended: "การชำระเงินครั้งนี้สิ้นสุดแล้ว คุณสามารถตรวจสอบสถานะสุดท้ายได้ด้านล่าง",
+      confirmed: "ยืนยันการชำระเงินแล้ว กำลังเปิดแผนของคุณ…"
+    },
     configError:
       "ยังไม่ได้ตั้งค่าการชำระเงินในขณะนี้ โปรดติดต่อทีมงาน",
     creatingSession: "กำลังสร้างเซสชันการชำระเงิน...",
@@ -52,6 +84,21 @@ const copy = {
   },
   "zh-CN": {
     cancel: "取消",
+    cancelling: "正在检查付款…",
+    cancelPending: "付款可能仍在处理中。请先检查付款状态，再重试。",
+    cancelFailed: "无法取消此次结账。请先检查付款状态，再重试。",
+    checkPayment: "检查付款状态",
+    copyRecovery: "复制恢复链接",
+    recoveryCopied: "恢复链接已复制。请妥善保管，不要分享给他人。",
+    recoveryCopyFailed: "请手动复制此链接，以返回同一次结账。",
+    recoveryHint: "如果切换到银行应用，请在付款后返回此页面。保存此链接，即可在 Safari 或 Chrome 中重新打开同一次结账。",
+    recovery: {
+      waiting: "正在等待付款确认。确认后将打开你的计划。",
+      unavailable: "暂时无法检查付款。请再次检查，避免重复付款。",
+      paused: "自动检查已暂停。如果已付款，请检查付款状态。",
+      ended: "此次结账已结束。你可以在下方检查最终付款状态。",
+      confirmed: "付款已确认。正在打开你的计划…"
+    },
     configError: "目前尚未配置结账。请联系支持。",
     creatingSession: "正在创建支付会话...",
     loading: "正在加载安全结账...",
@@ -80,6 +127,15 @@ export function StripeCheckoutPanel({
   const [isLoadingSession, setIsLoadingSession] = useState(false);
   const [isMockCheckout, setIsMockCheckout] = useState(false);
   const [stripeReady, setStripeReady] = useState(false);
+  const [isCancelling, setIsCancelling] = useState(false);
+  const [recoveryCopyMessage, setRecoveryCopyMessage] = useState("");
+  const [manualRecoveryUrl, setManualRecoveryUrl] = useState("");
+  const recovery = usePaymentRecovery(isMockCheckout ? null : paymentId, locale);
+  const checkPayment = recovery.check;
+  const handleCheckoutComplete = useCallback(() => {
+    setError("");
+    checkPayment();
+  }, [checkPayment]);
   const trimmedPublishableKey = publishableKey.trim();
   const hasStripePublishableKey = trimmedPublishableKey.length > 0;
   const hasValidStripePublishableKey = /^pk_(test|live)_/.test(
@@ -213,6 +269,42 @@ export function StripeCheckoutPanel({
     setCheckoutAttempt((attempt) => attempt + 1);
 
   }, [attemptEnded]);
+
+  async function cancelCheckout() {
+    if (!paymentId || isCancelling) return;
+    setIsCancelling(true);
+    setError("");
+    try {
+      const response = await fetchWithBodyDeadline(`/api/payments/${encodeURIComponent(paymentId)}`, {
+        cache: "no-store", method: "DELETE"
+      }, CHECKOUT_SESSION_TIMEOUT_MS);
+      const payment = await response.json();
+      if (!response.ok) throw new Error(labels.cancelFailed);
+      if (recovery.handlePaid(payment)) return;
+      if (payment.id === paymentId && ["cancelled", "expired", "failed"].includes(payment.status)) {
+        window.location.replace(sourceSurface === "healthscore" && planId
+          ? nutritionHealthScorePath(locale, planId) : `/${locale}`);
+        return;
+      }
+      setError(labels.cancelPending);
+      recovery.check();
+    } catch {
+      setError(labels.cancelFailed);
+      recovery.check();
+    } finally { setIsCancelling(false); }
+  }
+
+  async function copyRecoveryLink() {
+    const url = new URL(paymentCheckoutPath(locale, { attemptId, plan, planId, sourceSurface }), window.location.origin).href;
+    setManualRecoveryUrl("");
+    try {
+      await navigator.clipboard.writeText(url);
+      setRecoveryCopyMessage(labels.recoveryCopied);
+    } catch {
+      setRecoveryCopyMessage(labels.recoveryCopyFailed);
+      setManualRecoveryUrl(url);
+    }
+  }
 
   useEffect(() => {
     if (!hasValidStripePublishableKey) {
@@ -361,19 +453,25 @@ export function StripeCheckoutPanel({
           <button
             className="text-xs font-semibold text-[var(--mn-ash)] underline decoration-[var(--mn-line)] underline-offset-4 hover:text-[var(--mn-teal-deep)]"
             type="button"
-            onClick={() => {
-              void fetch(`/api/payments/${encodeURIComponent(paymentId)}`, {
-                cache: "no-store",
-                method: "DELETE"
-              }).finally(() => {
-                window.history.back();
-              });
-            }}
+            disabled={isCancelling}
+            onClick={() => void cancelCheckout()}
           >
-            {labels.cancel}
+            {isCancelling ? labels.cancelling : labels.cancel}
           </button>
         ) : null}
       </div>
+      {paymentId && !isMockCheckout ? (
+        <div className="mb-5 rounded-lg border border-[var(--mn-line)] p-4 text-sm" data-testid="payment-recovery">
+          <p role="status" aria-live="polite">{labels.recovery[recovery.state]}</p>
+          <p className="mt-2 text-[var(--mn-ink-soft)]">{labels.recoveryHint}</p>
+          <div className="mt-3 flex flex-wrap gap-4">
+            <button className="font-semibold underline" type="button" disabled={recovery.checking} onClick={recovery.check}>{labels.checkPayment}</button>
+            <button className="font-semibold underline" type="button" onClick={() => void copyRecoveryLink()}>{labels.copyRecovery}</button>
+          </div>
+          <p className="mt-2" role="status" aria-live="polite">{recoveryCopyMessage}</p>
+          {manualRecoveryUrl ? <textarea className="mt-2 w-full rounded border p-2" aria-label={labels.copyRecovery} readOnly rows={4} value={manualRecoveryUrl} onFocus={event => event.target.select()} /> : null}
+        </div>
+      ) : null}
       {error ? (
         <div className="mb-4 rounded-lg bg-[var(--mn-error-soft)] p-3">
           <p className="text-sm font-semibold text-[var(--mn-error)]">{error}</p>
@@ -404,9 +502,7 @@ export function StripeCheckoutPanel({
           key={clientSecret}
           options={{
             clientSecret,
-            onComplete: () => {
-              setError("");
-            }
+            onComplete: handleCheckoutComplete
           }}
           stripe={stripePromise}
         >

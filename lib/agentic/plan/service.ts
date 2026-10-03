@@ -1,6 +1,6 @@
 import { measureService, recordServiceMetric } from "@/lib/service-metrics";
 import { refinementDecisionSummary } from "@/lib/agentic/presentation/decision";
-import { withServiceMeasurements } from "@/lib/service-metrics";
+import { withServiceMeasurements, serviceMeasurements } from "@/lib/service-metrics";
 import { planStatusProjection, visiblePlanRevision, type PlanOperationRead } from "@/lib/agentic/presentation/status-projection";
 import {preparePlanRevisionRecord} from "@/lib/agentic/store/prepared-revision";
 import { readPlanPresentation } from "@/lib/agentic/presentation/plan-read";
@@ -33,6 +33,7 @@ import {
 } from "@/lib/agentic/idempotency";
 import { resolveMarket } from "@/lib/agentic/catalogue/market";
 import { refreshAdminSafetyCeilings } from "@/lib/agentic/catalogue/load-safety-ceilings";
+import { applyConfiguredTargetLimits } from "@/lib/agentic/plan/configured-target-limits";
 import { matcherSafetyCeilings, captureMatcherSafetySnapshot, type MatcherSafetySnapshot } from "@/lib/matcher/safety-ceilings";
 import { runWithMatcherSafetySnapshot } from "@/lib/matcher/safety-ceilings-server";
 import { AGENTIC_CONTRACT_VERSION, GUIDANCE_RULES_VERSION } from "@/lib/agentic/config";
@@ -453,14 +454,17 @@ type DurableSearchCheckpoint = {
   search?: import("@/lib/agentic/plan/matching").ResidentChunkOptions["checkpoint"];
   reservedAttempts?: number;
 };
+// A successful conditional normalization write owns these exact immutable facts.
+// Reuse them in the same attempt; dispatch and publication still verify the lease.
+const normalizedCheckpoints = new WeakMap<PlanOperationRecord, DurableSearchCheckpoint>();
 type MatchCheckpointEvent = { checkpoint: DurableSearchCheckpoint; reserve: boolean; restoreReservedAttempts?: number };
 const durableMatchingWork = new SharedMatchWork<ReturnType<typeof matchPlan>, MatchCheckpointEvent>(16 * 1024 * 1024);
 async function durableMatch(input: { snapshot: CatalogueSnapshot; state: CanonicalPlanState }) {
   const attempt = planAttempts.getStore();
   if (!attempt?.operation || !attempt.operationStore) return matchPlanInWorker(input);
   const store = attempt.operationStore, claim = attempt.operation;
-  const current = await store.getPlanOperation(claim.id);
-  const initial = current?.checkpoint as DurableSearchCheckpoint | null;
+  const initial = normalizedCheckpoints.get(claim)
+    ?? (await store.getPlanOperation(claim.id))?.checkpoint as DurableSearchCheckpoint | null;
   if (!initial) throw new Error("Missing normalized operation checkpoint");
   const persistCheckpoint = initial.persistSearchCheckpoints === true;
   if (!persistCheckpoint && (initial.search || initial.reservedAttempts)) {
@@ -985,19 +989,22 @@ export async function runAdmittedPlanOperation(input: Readonly<{
   }
   const work = withRequestLifetime({ signal, correlationId: attempt.correlationId }, () => withServiceMeasurements(() => planAttempts.run(attempt, async () => {
     if (claim.command.scope.principalScope?.startsWith("qa-v3:")) setQueryNamespace(claim.command.scope.principalScope);
+    const endOperation = measureService("match.operation_ms");
+    let outcome = "failed";
     try {
       const result = await completePreparedPlan(prepared, {
         config: input.config, now: claim.createdAt, payload: claim.command.payload as PlanToolInput,
         scope: claim.command.scope, store: input.store
       }, !(claim.command.payload as PlanToolInput).planHandle, Date.now());
       if (isAgenticErrorResult(result)) {
+        outcome = result.error.reasonCode;
         if (operationDeadlineRemaining(claim) === 0) {
           await withOperationCleanup(() => expirePlanOperation(input.store, claim.id, new Date().toISOString()));
           return planOperationDeadlineError();
         }
         const status = result.error.retryable ? "retryable" : "failed";
         await withOperationCleanup(() => updateClaimedOperation(input.store, claim, { status, error: result }, new Date().toISOString()));
-      }
+      } else outcome = result.status;
       return result;
     } catch (error) {
       if (operationDeadlineRemaining(claim) === 0) {
@@ -1009,6 +1016,13 @@ export async function runAdmittedPlanOperation(input: Readonly<{
       await withOperationCleanup(() => failPlanOperation(input.store, claim, result, new Date().toISOString()));
       console.error("[agentic-plan-operation]", { operationId: claim.id, origin: error instanceof Error ? error.name : "unknown", message: error instanceof Error ? error.message : "operation_failed" });
       return result;
+    } finally {
+      endOperation();
+      // Numeric, operation-scoped measurements stay in internal logs. The age
+      // includes time before this claim (including any earlier retry); nested
+      // stage timers overlap and must not be summed into request latency.
+      console.info("[matcher-performance]", JSON.stringify({ operationId: claim.id, buildId: input.config.buildId,
+        outcome, operationAgeMs: Math.max(0, Date.now() - Date.parse(claim.createdAt)), metrics: serviceMeasurements() }));
     }
   }))).finally(() => { clearTimeout(deadline); inflightDurableOperations.delete(claim.id); });
   inflightDurableOperations.set(claim.id, work);
@@ -1824,6 +1838,8 @@ async function completePreparedPlan(
     });
   }
 
+  state = applyConfiguredTargetLimits(state);
+  if (previous && planRematchFingerprint(previous.requestSnapshot) !== planRematchFingerprint(state)) pinPrevious = false;
   if (state.scoring) state = { ...state, pinnedCandidateKey: null };
 
   if (state.targets.length === 1) {
@@ -1874,11 +1890,14 @@ async function completePreparedPlan(
       activeOperation.referenceIdentity && activeOperation.referenceIdentity !== matcherSafetyReferenceIdentity()?.fingerprint)) {
       return businessError({ reasonCode: "stale_revision", message: "Catalogue or reference inputs changed during matching. Reload the plan." });
     }
+    const normalized: DurableSearchCheckpoint = { ...(checkpoint ?? { stage: "normalized", state, catalogueId: snapshotIdentity }),
+      persistSearchCheckpoints, references: undefined, referencesJson: JSON.stringify(references) };
     const saved = await updateClaimedOperation(input.store, activeOperation, {
       catalogueIdentity: snapshotIdentity, referenceIdentity: matcherSafetyReferenceIdentity()?.fingerprint ?? null,
-      checkpoint: { ...(activeOperation.checkpoint ? withoutOperationCursor(activeOperation).checkpoint as DurableSearchCheckpoint : checkpoint ?? { stage: "normalized", state, catalogueId: snapshotIdentity }), persistSearchCheckpoints, references: undefined, referencesJson: JSON.stringify(references) }
+      checkpoint: activeOperation.checkpoint ? withoutOperationCursor({ ...activeOperation, checkpoint: normalized }).checkpoint : normalized
     }, new Date().toISOString());
     if (!saved) return businessError({ reasonCode: "stale_revision", message: "This matching operation was cancelled or superseded. Reload the plan." });
+    normalizedCheckpoints.set(activeOperation, normalized);
   }
 
   if (state.requirements.productDoses?.length) {

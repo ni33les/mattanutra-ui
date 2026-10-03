@@ -7,7 +7,7 @@ import { servingIncrement } from "@/lib/matcher/serving-grid";
 import { intakeIsKnown, knownTargetExposure, targetBasis, targetDoseTicks } from "@/lib/matcher/target-basis";
 import { compareOverallScores, resolvePracticalProfile, numericalSearchStateScore, type ComparableOverallScore } from "@/lib/matcher/practical-scoring";
 import { divide, fromDecimal, multiply, rational, toNumber } from "@/lib/matcher/rational";
-import { fingerprintState } from "@/lib/matcher/dominance";
+import { fingerprintAtGroup, fingerprintState } from "@/lib/matcher/dominance";
 import { compareDoseFit, numericalDoseFitScore, doseFitTargetDeviations } from "@/lib/matcher/dose-fit";
 import { quantityById, compareSearchStates, profileLeaders, residualPattern, reviewFrontier, seedState, tryAddVariant, type SearchRun } from "@/lib/matcher/search";
 import type { CanonicalRequest, DoseVariant, MatcherConfig, ProductGroup, SearchState } from "@/lib/matcher/types";
@@ -38,9 +38,47 @@ export type SearchCursor = {
   quantitySearch?: QuantitySearch;
 };
 
+// Preserve the historical Map's first position / last value semantics without
+// storing duplicate probes or cloning the same skipped parent repeatedly.
+// The array stays checkpoint-compatible; old duplicate arrays normalize once.
+const expandedIndices = new WeakMap<SearchState[], Map<string, { position: number; source: SearchState }>>();
+function expandedIndex(rows: SearchState[]) {
+  let index = expandedIndices.get(rows);
+  if (!index) {
+    index = new Map();
+    for (const row of rows) {
+      const key = fingerprintState(row), position = index.get(key)?.position ?? index.size;
+      rows[position] = row; index.set(key, { position, source: row });
+    }
+    rows.length = index.size;
+    expandedIndices.set(rows, index);
+  }
+  return index;
+}
+function retainBeamState(cursor: SearchCursor, state: SearchState, nextGroupIndex: number) {
+  const index = expandedIndex(cursor.expanded), key = fingerprintAtGroup(state, nextGroupIndex), previous = index.get(key);
+  if (previous?.source === state) return;
+  const position = previous?.position ?? cursor.expanded.length;
+  cursor.expanded[position] = { ...state, nextGroupIndex };
+  index.set(key, { position, source: state });
+}
+
 function indexFor(values: string[], indices: Map<string, number>, id: string) {
   const found = indices.get(id); if (found != null) return found;
   const next = values.length; values.push(id); indices.set(id, next); return next;
+}
+// Variant numbers belong to one cursor and survive its checkpoints. A restored
+// index gets its own cache; immutable selections can share keys across layers.
+const selectionKeys = new WeakMap<SearchCursor["variantIndex"], WeakMap<readonly string[], string>>();
+export function searchSelectionKey(cursor: Pick<SearchCursor, "variantIds" | "variantIndex">, ids: readonly string[]) {
+  let cache = selectionKeys.get(cursor.variantIndex);
+  if (!cache) { cache = new WeakMap(); selectionKeys.set(cursor.variantIndex, cache); }
+  let key = cache.get(ids);
+  if (key === undefined) {
+    key = ids.map(id => indexFor(cursor.variantIds, cursor.variantIndex, id)).sort((a, b) => a - b).join(",");
+    cache.set(ids, key);
+  }
+  return key;
 }
 function packedExposure(cursor: SearchCursor, values: ReadonlyMap<string, bigint>): ExactVector {
   const packed: ExactVector = [];
@@ -73,8 +111,7 @@ export function* archivedSearchStates(cursor: SearchCursor) {
   for (const packed of cursor.archive.values()) yield restoreState(cursor, packed);
 }
 function remember(cursor: SearchCursor, state: SearchState) {
-  const ids = state.selectedVariantIds.map(id => indexFor(cursor.variantIds, cursor.variantIndex, id));
-  const key = [...ids].sort((a, b) => a - b).join(",");
+  const key = state.selectedVariantIds.map(id => indexFor(cursor.variantIds, cursor.variantIndex, id)).sort((a, b) => a - b).join(",");
   if (!cursor.archive.has(key)) {
     cursor.archive.set(key, state.count > 0 ? state : { ...state, unknownProductIds: state.unknownProductIds ?? [] });
     cursor.unreviewed.push(state);
@@ -240,7 +277,7 @@ function variantsFor(cursor: SearchCursor, index: number, state: SearchState, re
 }
 
 function retainProbe(cursor: SearchCursor, candidate: SearchState | null, index: number) {
-  if (candidate && cursor.phase === "beam") cursor.expanded.push({ ...candidate, nextGroupIndex: index + 1 });
+  if (candidate && cursor.phase === "beam") retainBeamState(cursor, candidate, index + 1);
   if (candidate && cursor.phase === "repair") cursor.repaired.push(candidate);
 }
 
@@ -272,8 +309,7 @@ function completedAttempt(cursor: SearchCursor, request: CanonicalRequest) {
   if (cursor.expansionAttempts % 1000 === 0) reduceReview(cursor, request);
 }
 function add(cursor: SearchCursor, state: SearchState, groupIndex: number, id: string, request: CanonicalRequest) {
-  const ids = state.selectedVariantIds.map(selected => indexFor(cursor.variantIds, cursor.variantIndex, selected)).sort((a, b) => a - b);
-  const edge = ids.join(",") + ">" + indexFor(cursor.variantIds, cursor.variantIndex, id);
+  const edge = searchSelectionKey(cursor, state.selectedVariantIds) + ">" + indexFor(cursor.variantIds, cursor.variantIndex, id);
   if (cursor.edges.has(edge)) { const key = cursor.edges.get(edge); return key != null ? restoreState(cursor, cursor.archive.get(key)!) : null; }
   cursor.expansionAttempts++;
   const row = variant(cursor, groupIndex, id);
@@ -335,13 +371,29 @@ export function rawDoseLeaders(states: readonly SearchState[], request: Canonica
   for (const state of ranked) { if (chosen.length >= limit) break; if (!chosen.includes(state)) chosen.push(state); }
   return chosen;
 }
+export function completionReferences(ranked: readonly SearchState[], request: CanonicalRequest) {
+  const additiveBases = ranked.flatMap(state => {
+    const score = numericalDoseFitScore(request,state.exposure), targets = doseFitTargetDeviations(score);
+    if (!targets.every(row=>row.over===0) || !targets.some(row=>row.under>0)) return [];
+    const losses = new Map<string, number>();
+    // Preserve find()'s first match even for repeated subject references.
+    for (const row of targets) if (!losses.has(row.subjectId)) losses.set(row.subjectId, row.under + row.over);
+    return [{ state, score, losses }];
+  });
+  return request.targets.filter(target => !isDeferredConditional(target)).map(target =>
+    smallest(additiveBases, 1, (a,b) => (a.losses.get(target.subjectId) ?? Infinity) - (b.losses.get(target.subjectId) ?? Infinity)
+      || compareDoseFit(a.score,b.score) || compareSearchStates(a.state,b.state,request))[0]?.state
+  ).filter((row): row is SearchState => Boolean(row));
+}
+
 function finishBeamLayer(cursor: SearchCursor, request: CanonicalRequest) {
   // Skipping an optional group costs no expansion. Keep unvisited parents when
   // the bounded quantity probes exhaust the layer before every parent runs.
   if (!mustSelect(cursor.groups[cursor.group]!, request)) {
-    cursor.expanded.push(...cursor.beam.map(state => ({ ...state, nextGroupIndex: cursor.group + 1 })));
+    for (const state of cursor.beam) retainBeamState(cursor, state, cursor.group + 1);
   }
-  const ranked = [...new Map(cursor.expanded.map(row => [fingerprintState(row), row])).values()].sort((a,b) => compareSearchStates(a,b,request));
+  expandedIndex(cursor.expanded);
+  const ranked = cursor.expanded.sort((a,b) => compareSearchStates(a,b,request));
   const size = width(cursor), chosen = profileLeaders(ranked, request, size);
   // Keep a small raw-dose lane as well as each practical profile's incumbent.
   // A single incumbent can contain collateral nutrients that require replacing
@@ -445,11 +497,11 @@ export function advanceSearchCursor(cursor: SearchCursor, request: CanonicalRequ
       if (!cursor.variants) {
         cursor.variants=variantsFor(cursor,cursor.group,base,request,Math.min(stop,cursor.groupLimit)); cursor.variant=0;
         if (!cursor.variants) continue;
-        if (!mustSelect(group,request)) cursor.expanded.push({...base,nextGroupIndex:cursor.group+1});
+        if (!mustSelect(group,request)) retainBeamState(cursor,base,cursor.group+1);
       }
       if (cursor.variant >= cursor.variants.length) { cursor.parent++; cursor.variants=null; continue; }
       const next=add(cursor,base,cursor.group,cursor.variants[cursor.variant++]!,request);
-      if (next) cursor.expanded.push({...next,nextGroupIndex:cursor.group+1});
+      if (next) retainBeamState(cursor,next,cursor.group+1);
     } else if (cursor.phase === "pairs") {
       // Diagonal traversal gives late complementary listings an opportunity
       // before all quantities paired with the very first listing are exhausted.
@@ -465,11 +517,7 @@ export function advanceSearchCursor(cursor: SearchCursor, request: CanonicalRequ
         // Explored complementary bases remain useful even when they did not win
         // a repair role. Give each target's closest base a completion opportunity.
         const ranked = [...new Map([...cursor.repaired, ...cursor.review, ...cursor.unreviewed].map(row => [fingerprintState(row),row])).values()].sort((a,b)=>compareSearchStates(a,b,request));
-        const additiveBases = ranked.filter(state => { const targets=doseFitTargetDeviations(numericalDoseFitScore(request,state.exposure)); return targets.every(row=>row.over===0) && targets.some(row=>row.under>0); });
-        const references = request.targets.filter(target => !isDeferredConditional(target)).map(target => {
-          const loss = (state: SearchState) => { const row = doseFitTargetDeviations(numericalDoseFitScore(request,state.exposure)).find(row=>row.subjectId===target.subjectId); return row ? row.under + row.over : Infinity; };
-          return [...additiveBases].sort((a,b)=>loss(a)-loss(b) || compareDoseFit(numericalDoseFitScore(request,a.exposure),numericalDoseFitScore(request,b.exposure)) || compareSearchStates(a,b,request))[0];
-        }).filter((row): row is SearchState => Boolean(row));
+        const references = completionReferences(ranked, request);
         // Complete the practical incumbent before the raw-dose lane can spend
         // the remaining allowance on an already excessive routine.
         const complementary = references.slice(0,Math.ceil(width(cursor)/4));

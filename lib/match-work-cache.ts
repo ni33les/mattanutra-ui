@@ -55,11 +55,13 @@ export class SharedMatchWork<T, C> {
   constructor(limit: number) { this.completed = new ByteBoundedCache<T>(limit); }
   run(key: string, owner: Owner<C>, compute: (context: SharedWorkContext<C>) => Promise<T>): Promise<T> {
     if (owner.signal?.aborted) return Promise.reject(owner.signal.reason);
-    const cached = this.completed.get(key); if (cached !== undefined) return Promise.resolve(cached);
+    const cached = this.completed.get(key);
+    if (cached !== undefined) { recordServiceMetric("match.result_reused"); return Promise.resolve(cached); }
     let flight = this.pending.get(key);
     if (!flight && this.pending.size >= 16) return Promise.reject(new Error("Matcher capacity exhausted"));
     if (flight && flight.owners.size >= 16) return Promise.reject(new Error("Matcher subscriber capacity exhausted"));
     const created = !flight;
+    recordServiceMetric(created ? "match.work_started" : "match.work_joined");
     if (!flight) { flight = { controller: new AbortController(), owners: new Set() }; this.pending.set(key, flight); }
     const active = flight;
     const detach = (subscriber: Subscriber<T, C>, error: unknown) => {

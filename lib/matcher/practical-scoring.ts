@@ -135,7 +135,7 @@ function coefficients(profile: Profile) {
 
 type PracticalRequest = Pick<CanonicalRequest, "currency" | "maxDailyPills" | "maxProductCount" | "maxPriceMinor"> & ProfileRequest;
 type PreferenceBases = readonly ({ target: Rational; scale: Rational } | null)[];
-const measuredActuals = new WeakMap<PracticalRequest, { values: WeakMap<PracticalActuals, ReturnType<typeof compileMeasurements>>; bases: PreferenceBases }>();
+const measuredActuals = new WeakMap<PracticalRequest, { values: WeakMap<PracticalActuals, ReturnType<typeof compileLinearTerms>>; displays: WeakMap<PracticalActuals, ReturnType<typeof compileMeasurements>>; bases: PreferenceBases }>();
 function compileMeasurements(request: PracticalRequest, actual: PracticalActuals, profile: Profile, bases: PreferenceBases) {
   const pills = measurement(actual.pillLowerBound, "pillLowerBound"), products = measurement(actual.productCount, "productCount", true);
   if (actual.dailyPills !== null) {
@@ -160,31 +160,39 @@ function compileMeasurements(request: PracticalRequest, actual: PracticalActuals
       request.maxPriceMinor == null || (profile.version === WEB_PRACTICAL_SCORING_VERSION && preferencePrice === null) ? normalizedPrice : ZERO,
       servings, weightedUncertainty ? ZERO : uncertainty, weightedUncertainty ? uncertainty : ZERO, ...overruns]) };
 }
-function measurementsFor(request: PracticalRequest, actual: PracticalActuals, profile: Profile) {
+function measurementsFor(request: PracticalRequest, actual: PracticalActuals, profile: Profile, display: true): ReturnType<typeof compileMeasurements>;
+function measurementsFor(request: PracticalRequest, actual: PracticalActuals, profile: Profile, display?: false): ReturnType<typeof compileLinearTerms>;
+function measurementsFor(request: PracticalRequest, actual: PracticalActuals, profile: Profile, display = false) {
   const source = doseRequest.get(request as CanonicalRequest) ?? request;
   let cache = measuredActuals.get(source);
   if (!cache) {
     const bases = FIELDS.map(field => source[field] == null ? null : {
       target: measurement(source[field], field, field !== "maxDailyPills"),
       scale: fromDecimal(source[field] > 0 ? source[field] : field === "maxPriceMinor" ? 10000 : 1) });
-    cache = { values: new WeakMap(), bases }; measuredActuals.set(source, cache);
+    cache = { values: new WeakMap(), displays: new WeakMap(), bases }; measuredActuals.set(source, cache);
   }
-  let result = cache.values.get(actual);
-  if (!result) { result = compileMeasurements(request, actual, profile, cache.bases); cache.values.set(actual, result); }
-  return result;
+  const found = display ? cache.displays.get(actual) : cache.values.get(actual);
+  if (found) return found;
+  const measured = compileMeasurements(request, actual, profile, cache.bases);
+  cache.values.set(actual, measured.linear);
+  // Every explored state needs its exact linear axes. The component breakdown
+  // is needed only for a retained public result, so it need not fill the archive.
+  if (display) cache.displays.set(actual, measured);
+  return display ? measured : measured.linear;
 }
 /** Exact ranking estimate, with incomplete observations explicitly distinct from known zero. */
 function numericalPracticalPenalties(request: PracticalRequest, actual: PracticalActuals) {
   if (actual.currency !== request.currency || actual.currency !== "THB") throw new Error("currency must match the THB profile normalization currency");
   const profile = resolvePracticalProfile(request), coefficient = coefficients(profile);
   const measured = measurementsFor(request, actual, profile);
-  return linearSum(measured.linear, coefficient.linear);
+  return linearSum(measured, coefficient.linear);
 }
 export type NumericalOverallScore = Readonly<{ profile: Profile; request: CanonicalRequest; actual: PracticalActuals;
   doseExact: Rational; exactTotal: Rational }>;
 function displayPenalties(request: PracticalRequest, actual: PracticalActuals): PracticalPenaltyScore {
-  const total = numericalPracticalPenalties(request, actual), profile = resolvePracticalProfile(request);
-  const measured = measurementsFor(request, actual, profile), coefficient = coefficients(profile), m = profile.multipliers;
+  if (actual.currency !== request.currency || actual.currency !== "THB") throw new Error("currency must match the THB profile normalization currency");
+  const profile = resolvePracticalProfile(request), coefficient = coefficients(profile), m = profile.multipliers;
+  const measured = measurementsFor(request, actual, profile, true), total = linearSum(measured.linear, coefficient.linear);
   const missing = new Set<string>();
   if (actual.uncertainProductCount > 0) missing.add("administrationBasis");
   if (actual.dailyPills === null) missing.add("dailyPills");

@@ -78,7 +78,7 @@ describe("v1.4 deployment-path decision gate", () => {
     assert.notEqual(second.namespace, first.namespace);
   });
 
-  it("EDGE-RC-RED-04 independent admission completes while an earlier request is waiting", async () => {
+  it("EDGE-RC-RED-04 independent admission completes while an earlier request is waiting", { timeout: 2000 }, async (context) => {
     const cluster = createHandlerCluster();
 
     const latch = deferred();
@@ -92,13 +92,12 @@ describe("v1.4 deployment-path decision gate", () => {
     const first = cluster.asHandler("A", (runtime) => qaCall(runtime, "beginRun", { runId: "sat-1" }));
     await entered.promise;
     const extra = cluster.asHandler("B", (runtime) => qaCall(runtime, "beginRun", { runId: "sat-2" }));
-    let timer: ReturnType<typeof setTimeout> | undefined;
+    const release = () => latch.resolve();
+    context.signal.addEventListener("abort", release, { once: true });
     try {
-      await Promise.race([bothEntered.promise, new Promise((_, reject) => {
-        timer = setTimeout(() => reject(new Error("Independent admission did not reach its barrier")), 2000);
-      })]);
+      await bothEntered.promise;
       assert.equal(admitted, 2);
-    } finally { clearTimeout(timer); latch.resolve(); }
+    } finally { context.signal.removeEventListener("abort", release); latch.resolve(); }
     const [a, b] = await Promise.all([first, extra]);
     assert.equal(a.ok, true);
     assert.equal(b.ok, true, canonicalJson(b));

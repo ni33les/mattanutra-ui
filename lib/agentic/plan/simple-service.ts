@@ -7,6 +7,8 @@ import { processingDecision, failedDecision, presentDecision } from "@/lib/agent
 import { catalogueSnapshotId } from "@/lib/agentic/catalogue/freeze";
 import { ensureCatalogueSnapshot } from "@/lib/agentic/catalogue/snapshot";
 import { prepareSimpleRequest } from "@/lib/agentic/plan/simple-input";
+import { CONFIGURED_TARGET_LIMIT_POLICY_VERSION } from "@/lib/agentic/plan/configured-target-limits";
+import { matcherSafetyReferenceIdentity } from "@/lib/matcher/safety-ceilings";
 import { canonicalRequestHash } from "@/lib/agentic/idempotency";
 import { planTool, commitPlanNoop, operationFailureResponse, type PlanToolInput } from "@/lib/agentic/plan/service";
 import type { PlanResult } from "@/lib/agentic/plan/types";
@@ -79,7 +81,10 @@ async function runSimplePlanTool(runtime: AgenticRuntime, params: Record<string,
     if (isAgenticErrorResult(request)) return request;
     Object.assign(payload, { request, searchEffort: params.searchEffort ?? prior?.result.requestSnapshot.searchEffort ?? "standard" });
     const original = prior?.result.originalRequest ?? prior?.result.requestSnapshot.originalRequest;
-    if (prior && !prior.refreshRequired && (prior.result.selected?.snapshotId ?? prior.result.matcherTelemetry.snapshotId) === catalogueSnapshotId(snapshot) && (!state?.operation || state.operation.status === "complete") && original && canonicalRequestHash(request) === canonicalRequestHash(original) && payload.searchEffort === prior.result.requestSnapshot.searchEffort) {
+    const policy = prior?.result.requestSnapshot.configuredLimitPolicy;
+    const currentPolicy = policy?.version === CONFIGURED_TARGET_LIMIT_POLICY_VERSION &&
+      policy.referenceFingerprint === (matcherSafetyReferenceIdentity()?.fingerprint ?? null);
+    if (prior && currentPolicy && !prior.refreshRequired && (prior.result.selected?.snapshotId ?? prior.result.matcherTelemetry.snapshotId) === catalogueSnapshotId(snapshot) && (!state?.operation || state.operation.status === "complete") && original && canonicalRequestHash(request) === canonicalRequestHash(original) && payload.searchEffort === prior.result.requestSnapshot.searchEffort) {
       const committed = await commitPlanNoop({ ...runtime, now, payload }, prior.result, prior.plan.id, handle!, prior.revision.revision);
       return isAgenticErrorResult(committed) ? committed : presentDecision(prior.result, handle!, prior.revision.revision);
     }

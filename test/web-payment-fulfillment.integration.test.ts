@@ -7,7 +7,7 @@ import { persistAssessmentSubmission } from "../lib/assessment-store.ts";
 import { createAssessmentSnapshot } from "../lib/assessment-snapshot.ts";
 import { computeHealthScore } from "../lib/health-score.ts";
 import { enqueueWebPaymentFulfillment, fulfillWebPayment } from "../lib/web-payment-fulfillment.ts";
-import { bindPaidReservationToAssessment, completeMockPayment, createStripeCheckoutSession, type PaymentRow, updatePaymentState } from "../lib/stripe-payments.ts";
+import { bindPaidReservationToAssessment, completeMockPayment, createStripeCheckoutSession, fulfillCheckoutSession, type PaymentRow, updatePaymentState } from "../lib/stripe-payments.ts";
 
 const databaseUrl = process.env.TEST_DB_URL;
 assert.ok(databaseUrl, "This integration test requires isolated PostgreSQL");
@@ -67,6 +67,24 @@ describe("durable web payment fulfillment on PostgreSQL", () => {
     return row;
   }
   function newKey() { const key = randomUUID(); keys.push(key); return key; }
+
+  it("records actual return calls after fulfillment without repeating accounting or calling Stripe", async () => {
+    const planId = await seedPlan(), payment = await seedPayment(planId), sql = getSql()!;
+    const sessionId = `cs_test_return_${payment.id}`;
+    await sql`update public.payments set stripe_checkout_session_id=${sessionId} where id=${payment.id}::uuid`;
+    await fulfillWebPayment(payment.id, dependencies);
+    for (let i = 0; i < 2; i++) {
+      assert.equal((await fulfillCheckoutSession(sessionId, { source: "return_page" })).status, "paid_with_plan");
+    }
+    let returns = 0;
+    for (let i = 0; i < 50; i++) {
+      returns = (await sql`select count(*)::int as n from public.bpm where event_name='payment_checkout_returned' and properties->>'paymentId'=${payment.id}`)[0].n;
+      if (returns === 2) break;
+      await new Promise(resolve => setTimeout(resolve, 20));
+    }
+    assert.equal(returns, 2);
+    assert.equal((await sql`select count(*)::int as n from public.finance_transactions where source_ref=${`stripe:payment:${payment.id}:nominal-revenue`}`)[0].n, 1);
+  });
 
   it("rolls confirmation and required task creation back together", async () => {
     const p = await seedPayment();

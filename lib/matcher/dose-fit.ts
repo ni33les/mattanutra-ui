@@ -18,6 +18,13 @@ const fixedWeights = new WeakMap<CanonicalRequest, number | null>();
 const scoreCache = new WeakMap<CanonicalRequest, WeakMap<object, NumericalDoseFitScore>>();
 const weightedCache = new WeakMap<CanonicalRequest, WeakMap<object, NumericalDoseFitScore>>();
 const sharedInputs = new WeakMap<CanonicalRequest, CanonicalRequest>();
+// Live additions retain only their parent exposure and the variant's immutable
+// subject list. Checkpoints carry ordinary maps and use the full evaluator until
+// another live addition establishes a parent; no recovery format changes.
+const exposureChanges = new WeakMap<object, { parent: ReadonlyMap<string, bigint>; subjects: readonly string[] }>();
+export function registerDoseFitChange(exposure: ReadonlyMap<string, bigint>, parent: ReadonlyMap<string, bigint>, subjects: readonly string[]) {
+  exposureChanges.set(exposure, { parent, subjects });
+}
 /** Only the internal profile copier calls this: all intake, target and reference
  * objects are shared immutable inputs, while weighted endpoint caches stay separate. */
 export function shareDoseFitInputs(profile: CanonicalRequest, source: CanonicalRequest) {
@@ -92,8 +99,6 @@ function rangeOffsets(rows: CanonicalRequest["currentSupplements"], subjectId: s
   return { minimum, maximum, base };
 }
 
-const fixedSubjects = new WeakMap<CanonicalRequest, readonly string[] | null>();
-const requestedSubjects = new WeakMap<CanonicalRequest, Set<string>>();
 const subjectCache = new WeakMap<CanonicalRequest, Map<string, ReturnType<typeof compileSubject>>>();
 function compileSubject(request: CanonicalRequest, subjectId: string) {
   const requested = request.targets.find(row => row.subjectId === subjectId);
@@ -113,6 +118,22 @@ function subjectInputs(request: CanonicalRequest, subjectId: string) {
   let value = compiled.get(subjectId); if (!value) { value = compileSubject(request, subjectId); compiled.set(subjectId, value); } return value;
 }
 
+// The requested subjects and their numeric ordering belong to the immutable
+// request. Exposure-only subjects still resolve their own incidental safety limits.
+const subjectLayouts = new WeakMap<CanonicalRequest, {
+  ids: Set<string>; rows: { id: string; input: ReturnType<typeof compileSubject> }[]; fixed: boolean;
+}>();
+function subjectLayout(request: CanonicalRequest) {
+  request = sharedInputs.get(request) ?? request;
+  let layout = subjectLayouts.get(request);
+  if (!layout) {
+    const ids = new Set([...(request.dietaryIntake ?? []).map(row => row.subjectId), ...request.targets.map(row => row.subjectId)]);
+    layout = { ids, rows: [...ids].sort().map(id => ({ id, input: subjectInputs(request, id) })),
+      fixed: request.currentSupplements.length === 0 && (!knownLimitProfile(request) || !request.safetyCeilings?.length) };
+    subjectLayouts.set(request, layout);
+  }
+  return layout;
+}
 /** Request-local exact endpoint terms. Different baskets commonly supply the
  * same amount of one nutrient; profile weights and uncertain endpoints stay isolated. */
 function subjectLoss(input: { target: CanonicalRequest["targets"][number] | undefined; ranges: ReturnType<typeof rangeOffsets>; dietary: ReturnType<typeof rangeOffsets>; reference: bigint; scale: bigint | undefined; bounds: readonly Limit[] }, known: bigint, weight: Fraction) {
@@ -164,17 +185,19 @@ export function numericalDoseFitScore(request: CanonicalRequest, exposure: Reado
 }
 export function numericalWeightedDoseFitScore(request: CanonicalRequest, exposure: ReadonlyMap<string, bigint>): NumericalDoseFitScore {
   const settings = request.scoring ? effectiveWeights(request.scoring) : null;
-  if (!settings || (settings.defaultNutrient === 1 && Object.values(settings.nutrients).every(weight => weight === 1))) return numericalDoseFitScore(request, exposure);
+  if (!settings) return numericalDoseFitScore(request, exposure);
   // With one physical endpoint and uniform fitting weights >=1 there is no
   // endpoint choice. Reuse the exact fit/safety components.
   // Estimated ranges must always evaluate the complete weighted endpoints.
   let uniform = fixedWeights.get(request);
   if (uniform === undefined) {
+    const equalWeights = Object.values(settings.nutrients).every(weight => weight === settings.defaultNutrient);
     const varying = [...request.currentSupplements, ...(request.dietaryIntake ?? [])].some(row =>
       (row.minimumDailyAmount ?? row.dailyAmount) !== (row.maximumDailyAmount ?? row.dailyAmount));
-    uniform = !varying && Object.values(settings.nutrients).every(weight => weight === settings.defaultNutrient) ? settings.defaultNutrient : null;
+    uniform = equalWeights && (settings.defaultNutrient === 1 || !varying) ? settings.defaultNutrient : null;
     fixedWeights.set(request, uniform);
   }
+  if (uniform === 1) return numericalDoseFitScore(request, exposure);
   if (uniform !== null) {
     let cache = weightedCache.get(request); if (!cache) { cache = new WeakMap(); weightedCache.set(request, cache); }
     const found = cache.get(exposure); if (found) return found;
@@ -184,6 +207,53 @@ export function numericalWeightedDoseFitScore(request: CanonicalRequest, exposur
   }
   return calculateDoseFit(request, exposure, true);
 }
+
+function appendDifference(terms: Fraction[] | undefined, base: Fraction, next: Fraction, previous: Fraction) {
+  if (next === previous) return terms;
+  const sameDenominator = next.den === previous.den;
+  const num = sameDenominator ? next.num - previous.num : next.num * previous.den - previous.num * next.den;
+  if (num !== BigInt(0)) (terms ??= [base]).push({ num, den: sameDenominator ? next.den : next.den * previous.den });
+  return terms;
+}
+
+function incrementalDoseFit(request: CanonicalRequest, exposure: ReadonlyMap<string, bigint>, parent: NumericalDoseFitScore,
+  change: { parent: ReadonlyMap<string, bigint>; subjects: readonly string[] }, applyWeights: boolean): NumericalDoseFitScore | null {
+  let fittingTerms: Fraction[] | undefined, safetyTerms: Fraction[] | undefined, intentTerms: Fraction[] | undefined;
+  const settings = applyWeights && request.scoring ? effectiveWeights(request.scoring) : null;
+  const weights = settings ? exactWeights(settings) : null;
+  let deviations = parent.deviations;
+  for (const subjectId of change.subjects) {
+    const known = exposure.get(subjectId) ?? BigInt(0), previousKnown = change.parent.get(subjectId) ?? BigInt(0);
+    if (known === previousKnown) continue;
+    const compiled = subjectInputs(request, subjectId);
+    if (!compiled.target && compiled.reference === BigInt(0) && compiled.bounds.length === 0) continue;
+    const weight = weights ? weights.subjects.get(subjectId) ?? weights.defaultWeight : ONE;
+    // A cached parent score can outlive its individual endpoint terms. Rebuilding
+    // an old endpoint solely to subtract it adds work; use the full evaluator.
+    const before = compiled.losses.get(weight)?.get(previousKnown);
+    if (!before) return null;
+    const after = cachedSubjectLoss(compiled, known, weight);
+    fittingTerms = appendDifference(fittingTerms, parent.fitting, after.worst.fitting, before.worst.fitting);
+    safetyTerms = appendDifference(safetyTerms, parent.safety, after.worst.safety, before.worst.safety);
+    if (settings) intentTerms = appendDifference(intentTerms, parent.exact, after.worst.total, before.worst.total);
+    if (after.deviation) {
+      // Targets are present even at zero exposure. Preserve the existing stable
+      // subject order and share untouched immutable deviation rows.
+      if (deviations === parent.deviations) deviations = [...deviations];
+      // The parent already includes every active target, even at zero exposure.
+      // Adding exposure cannot introduce a new target into this immutable request.
+      const index = deviations.findIndex(row => row.subjectId === subjectId);
+      (deviations as TargetDeviation[])[index] = after.deviation;
+    }
+  }
+  const fitting = fittingTerms ? sum(fittingTerms) : parent.fitting;
+  const safety = safetyTerms ? sum(safetyTerms) : parent.safety;
+  const exact = settings ? (intentTerms ? sum(intentTerms) : parent.exact) : fittingTerms || safetyTerms ? add(fitting, safety) : parent.exact;
+  // Keep a distinct numerical identity: equal penalties can still have different
+  // display exposures or newly encountered incidental nutrient rows.
+  return { exact, fitting, safety, deviations };
+}
+
 function calculateDoseFit(request: CanonicalRequest, exposure: ReadonlyMap<string, bigint>, applyWeights: boolean, materialize: true): DoseFitScore;
 function calculateDoseFit(request: CanonicalRequest, exposure: ReadonlyMap<string, bigint>, applyWeights: boolean, materialize?: false): NumericalDoseFitScore;
 function calculateDoseFit(request: CanonicalRequest, exposure: ReadonlyMap<string, bigint>, applyWeights: boolean, materialize = false): NumericalDoseFitScore | DoseFitScore {
@@ -192,6 +262,20 @@ function calculateDoseFit(request: CanonicalRequest, exposure: ReadonlyMap<strin
   if (!cache) { cache = new WeakMap(); memo.set(request, cache); }
   const previous = cache.get(exposure);
   if (previous && !materialize) return previous;
+  if (!materialize) {
+    const change = exposureChanges.get(exposure), parent = change && cache.get(change.parent);
+    // Once the raw score exists, uniform profiles reuse it and later weighted
+    // endpoints can use the full evaluator. No child needs to retain its parent's
+    // exposure map for the remaining lifetime of a large search archive.
+    if (!applyWeights && change) exposureChanges.delete(exposure);
+    // Replacing terms reads both the old and new loss. A broad update is cheaper
+    // with the full evaluator. Target count is a conservative lower bound for
+    // active subjects, so incidental limits cannot make this estimate optimistic.
+    if (change && parent && change.subjects.length * 3 <= parent.deviations.length) {
+      const score = incrementalDoseFit(request, exposure, parent, change, applyWeights);
+      if (score) { cache.set(exposure, score); return score; }
+    }
+  }
   const fittingTerms: Fraction[] = [], safetyTerms: Fraction[] = [], intentTerms: Fraction[] = [];
   const displayTerms: Fraction[][] | null = materialize ? [[], [], []] : null;
   const settings = applyWeights && request.scoring ? effectiveWeights(request.scoring) : null;
@@ -200,20 +284,21 @@ function calculateDoseFit(request: CanonicalRequest, exposure: ReadonlyMap<strin
   const perContinuedDose: NonNullable<DoseFitScore["perContinuedDose"]>[number][] | null = materialize ? [] : null;
   const perLimit: DoseFitScore["perLimit"][number][] | null = materialize ? [] : null;
   const deviations: TargetDeviation[] = [], estimatedTargets: string[] = [];
-  let fixed = fixedSubjects.get(request);
-  if (fixed === undefined) {
-    fixed = request.currentSupplements.length === 0 && (!knownLimitProfile(request) || !request.safetyCeilings?.length)
-      ? [...new Set([...(request.dietaryIntake ?? []).map(row => row.subjectId), ...request.targets.map(row => row.subjectId)])].sort() : null;
-    fixedSubjects.set(request, fixed);
-  }
-  // Display rows retain their historical ordering. Exact numeric sums are
-  // order-independent; avoid allocating and sorting a set for every basket.
-  let requested = requestedSubjects.get(request);
-  if (!requested) { requested = new Set([...(request.dietaryIntake ?? []).map(row => row.subjectId), ...request.targets.map(row => row.subjectId)]); requestedSubjects.set(request, requested); }
-  const subjects = fixed ?? (materialize ? [...new Set([...exposure.keys(), ...requested])].sort()
-    : [...requested, ...exposure.keys()].filter((id, index) => index < requested.size || !requested.has(id)));
-  for (const subjectId of subjects) {
-    const compiled = subjectInputs(request, subjectId);
+  const layout = subjectLayout(request);
+  const rows = materialize && !layout.fixed
+    ? [...new Set([...exposure.keys(), ...layout.ids])].sort().map(id => ({ id, input: subjectInputs(request, id) }))
+    : layout.rows;
+  const extra = !materialize && !layout.fixed ? exposure.keys() : undefined;
+  let position = 0;
+  for (;;) {
+    let row = rows[position++];
+    if (!row) {
+      const next = extra?.next();
+      if (!next || next.done) break;
+      if (layout.ids.has(next.value)) continue;
+      row = { id: next.value, input: subjectInputs(request, next.value) };
+    }
+    const { id: subjectId, input: compiled } = row;
     const { target, dietary, referenceRows, reference, bounds } = compiled;
     if (!target && reference === BigInt(0) && bounds.length === 0) continue;
     const known = exposure.get(subjectId) ?? BigInt(0);
@@ -268,7 +353,8 @@ function calculateDoseFit(request: CanonicalRequest, exposure: ReadonlyMap<strin
   const exact = settings ? (intentTerms.length === 1 ? intentTerms[0]! : sum(intentTerms)) : add(fitting, weighted);
   const facts = { exact, fitting, safety: weighted, deviations };
   if (!materialize) {
-    deviations.sort((a, b) => a.subjectId < b.subjectId ? -1 : a.subjectId > b.subjectId ? 1 : 0);
+    // Requested targets were compiled in stable subject order; incidental
+    // exposure-only subjects cannot introduce another target deviation.
     cache.set(exposure, facts); return facts;
   }
   const [under, over, limit] = displayTerms!.map(sum);

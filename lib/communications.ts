@@ -39,7 +39,6 @@ import {
   normalizeAdminCommunicationChannelType,
   normalizeAdminCommunicationEventKey,
   objectValue,
-  optionalText,
   organisationCommunicationScope,
   platformAdminCommunicationEventKeys,
   platformOrganisationId,
@@ -125,129 +124,6 @@ export {
 } from "@/lib/communications-organisation";
 export type { PendingOrganisationLineConnection } from "@/lib/communications-organisation";
 
-function orderEventCopy(input: Readonly<{
-  customerName: string | null;
-  eventKey: AdminCommunicationEventKey;
-  lineCount: number;
-  orderNumber: string | null;
-  status: string | null;
-}>) {
-  const orderNumber = input.orderNumber ?? "customer order";
-  const customer = input.customerName ? ` for ${input.customerName}` : "";
-  const itemSummary = input.lineCount === 1 ? "1 item" : `${input.lineCount} items`;
-  const testMessageCopy = {
-    body: "This is a MattaNutra admin communication test message.",
-    subject: "MattaNutra admin communication test"
-  };
-  const copies: Partial<Record<AdminCommunicationEventKey, { body: string; subject: string }>> = {
-    admin_test_message: testMessageCopy,
-    retail_order_awaiting_stock: {
-      body: `${orderNumber}${customer} is awaiting stock. Review reorder advice or the active shopping lists. Basket: ${itemSummary}.`,
-      subject: `${orderNumber} is awaiting stock`
-    },
-    retail_order_cancelled: {
-      body: `${orderNumber}${customer} has been cancelled. No further fulfilment action is required unless stock or refund handling is pending.`,
-      subject: `${orderNumber} was cancelled`
-    },
-    retail_order_created: {
-      body: `${orderNumber}${customer} has been paid and created. Allocate stock or review shortages. Basket: ${itemSummary}.`,
-      subject: `New paid order ${orderNumber}`
-    },
-    retail_order_delivered: {
-      body: `${orderNumber}${customer} has been marked delivered.`,
-      subject: `${orderNumber} delivered`
-    },
-    retail_order_pickup_booked: {
-      body: `${orderNumber}${customer} has a courier pickup booked. Review the pickup window and keep the parcel ready for handover. Basket: ${itemSummary}.`,
-      subject: `${orderNumber} pickup booked`
-    },
-    retail_order_ready_to_pack: {
-      body: `${orderNumber}${customer} has stock available and is ready to pack. Basket: ${itemSummary}.`,
-      subject: `${orderNumber} is ready to pack`
-    },
-    retail_order_ready_to_ship: {
-      body: `${orderNumber}${customer} is allocated and ready to ship. Pack it, add tracking if available, then mark it shipped.`,
-      subject: `${orderNumber} is ready to ship`
-    },
-    retail_order_returned: {
-      body: `${orderNumber}${customer} has been marked returned. Review stock and settlement handling if needed.`,
-      subject: `${orderNumber} was returned`
-    },
-    retail_order_shipment_exception: {
-      body: `${orderNumber}${customer} has a shipment exception. Review the carrier timeline and decide the next action.`,
-      subject: `${orderNumber} shipment exception`
-    },
-    retail_order_shipped: {
-      body: `${orderNumber}${customer} has been marked shipped.`,
-      subject: `${orderNumber} shipped`
-    },
-    retail_settlement_needs_review: {
-      body: "A retailer settlement needs review because the related order was cancelled, returned, or adjusted after shipment. Review the Retail Financials page before reconciling.",
-      subject: "Retail settlement needs review"
-    },
-    retail_settlement_payout_paid: {
-      body: "A retailer payout has been marked paid by MattaNutra. Review Retail Financials and confirm receipt when the funds arrive.",
-      subject: "Retail payout sent"
-    }
-  };
-
-  return copies[input.eventKey] ?? testMessageCopy;
-}
-
-function platformEventCopy(eventKey: AdminCommunicationEventKey) {
-  const copies: Partial<Record<AdminCommunicationEventKey, { body: string; subject: string }>> = {
-    platform_checkout_failed: {
-      body: "A customer checkout failed before payment could be completed. Review the checkout logs and payment configuration.",
-      subject: "Platform checkout failure"
-    },
-    platform_carrier_integration_failed: {
-      body: "A carrier integration failed while creating a shipment, generating a label, booking pickup, or processing a provider event. Review carrier tasks and shipment events.",
-      subject: "Carrier integration failure"
-    },
-    platform_communication_failed: {
-      body: "A platform communication failed or had no usable channel. Review the Communications log and dispatch tasks.",
-      subject: "Platform communication failure"
-    },
-    platform_payment_failed: {
-      body: "A customer payment failed or expired. Review Stripe/mock payment records and the customer checkout state.",
-      subject: "Platform payment failure"
-    },
-    platform_payout_failed: {
-      body: "A Stripe payout failed or was cancelled. Review payout reconciliation and finance ledger state.",
-      subject: "Platform payout failure"
-    },
-    platform_revenue_received: {
-      body: "A customer payment was received. Review the finance ledger for the recorded revenue and payment details.",
-      subject: "Platform revenue received"
-    },
-    platform_retailer_payout_due: {
-      body: "A retailer settlement is now due because an order has shipped. Review platform Financials and pay the retailer when ready.",
-      subject: "Retailer payout due"
-    },
-    platform_retailer_settlement_needs_review: {
-      body: "A retailer settlement needs platform review because the related order was cancelled, returned, or adjusted after shipment.",
-      subject: "Retailer settlement needs review"
-    },
-    platform_task_stuck: {
-      body: "A platform task appears stuck or overdue. Review task health and worker availability.",
-      subject: "Platform task needs attention"
-    },
-    platform_technical_alert: {
-      body: "A platform technical alert was raised. Review admin alerts and recent runtime errors.",
-      subject: "Platform technical alert"
-    },
-    platform_worker_unavailable: {
-      body: "A worker or required agent capability is unavailable. Review worker registration and capability health.",
-      subject: "Platform worker unavailable"
-    }
-  };
-
-  return copies[eventKey] ?? {
-    body: "A MattaNutra platform notification was raised.",
-    subject: "MattaNutra platform notification"
-  };
-}
-
 async function adminCommunicationCopy(input: Readonly<{
   body?: string | null;
   eventKey: AdminCommunicationEventKey;
@@ -257,94 +133,41 @@ async function adminCommunicationCopy(input: Readonly<{
   subject?: string | null;
   sql: Db;
 }>) {
-  const subject = optionalText(input.subject);
-  const body = optionalText(input.body);
-
-  if (subject && body) {
-    return applyAdminNotificationContext({
-      body,
-      eventKey: input.eventKey,
-      metadata: input.metadata,
-      resourceId: input.resourceId,
-      resourceType: input.resourceType,
-      subject
+  const metadata = { ...(input.metadata ?? {}) };
+  const resourceId = input.resourceId ?? "";
+  const sql = input.sql;
+  if (isUuid(resourceId) && input.resourceType === "retail_customer_order") {
+    const [order] = await sql<Array<{
+      order_number: string; status: string; source: string; metadata: unknown;
+    }>>`select order_number,status,source,metadata from public.retail_customer_orders
+      where id=${resourceId}::uuid limit 1`;
+    if (order) {
+      const orderMetadata = objectValue(order.metadata);
+      const paymentId = cleanText(orderMetadata.checkoutPaymentId);
+      const [payment] = isUuid(paymentId)
+        ? await sql<Array<{ status: string }>>`select status from public.retail_checkout_payments where id=${paymentId}::uuid limit 1`
+        : [];
+      Object.assign(metadata, {
+        orderId: resourceId,
+        orderNumber: order.order_number,
+        orderStatus: order.status,
+        orderSource: order.source === "pharmacy" ? "pharmacy" : orderMetadata.channel || (["manual", "checkout"].includes(order.source) ? "web" : order.source),
+        // Order creation and fulfilment are not evidence of payment.
+        paymentStatus: payment?.status ?? orderMetadata.paymentStatus ?? "unknown"
+      });
+    }
+  }
+  if (isUuid(resourceId) && input.resourceType === "retail_order_settlement") {
+    const [order] = await sql`select o.id::text,o.order_number,o.source,o.metadata
+      from public.retail_order_settlements s join public.retail_customer_orders o on o.id=s.retail_customer_order_id
+      where s.id=${resourceId}::uuid limit 1`;
+    if (order) Object.assign(metadata, {
+      orderId: order.id, orderNumber: order.order_number,
+      orderSource: order.source === "pharmacy" ? "pharmacy" : objectValue(order.metadata).channel || "web"
     });
   }
-
-  const resourceId = input.resourceId ?? null;
-
-  if (
-    input.resourceType === "retail_customer_order" &&
-    resourceId &&
-    isUuid(resourceId)
-  ) {
-    const sql = input.sql;
-    const rows = await sql<Array<{
-      customer_name: string | null;
-      line_count: number | string;
-      order_number: string | null;
-      status: string | null;
-    }>>`
-      select
-        retail_customer_orders.order_number,
-        retail_customer_orders.customer_name,
-        retail_customer_orders.status,
-        count(retail_customer_order_lines.id)::int as line_count
-      from public.retail_customer_orders
-      left join public.retail_customer_order_lines
-        on retail_customer_order_lines.customer_order_id = retail_customer_orders.id
-      where retail_customer_orders.id = ${resourceId}::uuid
-      group by retail_customer_orders.id
-      limit 1
-    `;
-    const row = rows[0];
-    const copy = orderEventCopy({
-      customerName: row?.customer_name ?? null,
-      eventKey: input.eventKey,
-      lineCount: Number(row?.line_count) || 0,
-      orderNumber: row?.order_number ?? null,
-      status: row?.status ?? null
-    });
-
-    return applyAdminNotificationContext({
-      body: body ?? copy.body,
-      eventKey: input.eventKey,
-      metadata: input.metadata,
-      resourceId: input.resourceId,
-      resourceType: input.resourceType,
-      subject: subject ?? copy.subject
-    });
-  }
-
-  if (input.eventKey.startsWith("platform_")) {
-    const copy = platformEventCopy(input.eventKey);
-
-    return applyAdminNotificationContext({
-      body: body ?? copy.body,
-      eventKey: input.eventKey,
-      metadata: input.metadata,
-      resourceId: input.resourceId,
-      resourceType: input.resourceType,
-      subject: subject ?? copy.subject
-    });
-  }
-
-  const copy = orderEventCopy({
-    customerName: null,
-    eventKey: input.eventKey,
-    lineCount: 0,
-    orderNumber: null,
-    status: null
-  });
-
-  return applyAdminNotificationContext({
-    body: body ?? copy.body,
-    eventKey: input.eventKey,
-    metadata: input.metadata,
-    resourceId: input.resourceId,
-    resourceType: input.resourceType,
-    subject: subject ?? copy.subject
-  });
+  if (metadata.source) metadata.triggerSource = metadata.source;
+  return applyAdminNotificationContext({ ...input, metadata });
 }
 
 export async function routeAdminCommunication(input: Readonly<{
@@ -451,6 +274,7 @@ export async function routeAdminCommunication(input: Readonly<{
         status,
         subject,
         body,
+        html,
         provider,
         error_message,
         metadata,
@@ -467,10 +291,11 @@ export async function routeAdminCommunication(input: Readonly<{
         'no_channel',
         ${copy.subject},
         ${copy.body},
+        ${copy.html},
         ${forcedChannelType},
         'No active organisation communication channel is configured',
         ${sql.json(toJsonValue({
-          ...(input.metadata ?? {}),
+          ...copy.metadata,
           eventKey: input.eventKey,
           organisationId: input.organisationId,
           resourceId: input.resourceId ?? null,
@@ -522,6 +347,7 @@ export async function routeAdminCommunication(input: Readonly<{
         status,
         subject,
         body,
+        html,
         provider,
         metadata,
         created_at,
@@ -537,9 +363,10 @@ export async function routeAdminCommunication(input: Readonly<{
         'queued',
         ${copy.subject},
         ${copy.body},
+        ${copy.html},
         ${channel.channelType},
         ${sql.json(toJsonValue({
-          ...(input.metadata ?? {}),
+          ...copy.metadata,
           channelType: channel.channelType,
           eventKey: input.eventKey,
           organisationId: input.organisationId,

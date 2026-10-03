@@ -1,4 +1,5 @@
 import { coverageSummary } from "@/lib/matcher/coverage";
+import { smallest } from "@/lib/matcher/top-k";
 import { compareDoseFit, doseFitScore, withProductUncertainty } from "@/lib/matcher/dose-fit";
 import { COVERED_THRESHOLD, DEFAULT_MATCHER_CONFIG } from "@/lib/matcher/config";
 import { contributionFor } from "@/lib/matcher/candidates";
@@ -14,6 +15,7 @@ import { compareOverallScores, overallMatchingScore, searchStateScore } from "@/
 import type {
   CanonicalRequest,
   ConversationalOptionRole,
+  DoseVariant,
   MatcherConfig,
   MatcherProduct,
   ProductGroup,
@@ -63,11 +65,13 @@ export function scoreState(input: Readonly<{
   request: CanonicalRequest;
   sellerId: string;
   state: SearchState;
+  variantsById?: ReadonlyMap<string, DoseVariant>;
 }>): ScoredBasket | null {
   const validated = revalidateState(
     input.state,
     input.groups,
-    input.request
+    input.request,
+    input.variantsById
   );
 
   if (!validated) {
@@ -286,10 +290,11 @@ export function selectOptions(input: Readonly<{ baskets: readonly ScoredBasket[]
   }
   const compare = (a: ScoredBasket, b: ScoredBasket) => compareBaskets(a, b, input.request, input.config);
   const ranked = [...unique.values()].sort(compare);
-  const best = protectedReferenceCandidates(ranked, input.request)[0];
+  const protectedCandidates = protectedReferenceCandidates(ranked, input.request);
+  const best = protectedCandidates[0];
   if (!best) return { alternatives: [] as ScoredBasket[], selected: null };
   const nonempty = ranked.filter(row => row.productCount > 0);
-  const closest = protectedReferenceCandidates([...ranked].sort((a, b) => compareClosestDose(a, b, input.request)), input.request)[0];
+  const closest = smallest(protectedCandidates, 1, (a, b) => compareClosestDose(a, b, input.request))[0];
   // These sorted extremal choices are Pareto-valid without quadratic pruning:
   // any strict dominator sorts before them on that objective then full fit.
   const lowerCost = [...nonempty].sort((a, b) => a.priceMinor - b.priceMinor || compare(a, b)).find(row => !nonempty.some(other => other !== row && optionDominates(other, row, input.request)));

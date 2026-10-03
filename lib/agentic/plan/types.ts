@@ -160,7 +160,22 @@ export type PlanLeftover = Readonly<{
   unit?: CatalogueUnit;
 }>;
 
+export type TargetLimitAdjustment = Readonly<{
+  requestIndex: number;
+  ingredientId: string;
+  supplementId: string;
+  name: string;
+  requestedAmount: number;
+  appliedAmount: number;
+  unit: CatalogueUnit;
+  sourceScope: "supplemental" | "total";
+  bandId: string | null;
+  bandVersion: number | null;
+}>;
+
 export type CanonicalPlanState = Readonly<{
+  configuredLimitPolicy?: Readonly<{ version: number; referenceFingerprint: string | null }>;
+  targetLimitAdjustments?: readonly TargetLimitAdjustment[];
   availability?: import('@/lib/agentic/plan/availability').PlanAvailability;
   scoring?: import("@/lib/matcher/scoring-policy").ScoringSettings;
   searchEffort?: "standard" | "expanded";

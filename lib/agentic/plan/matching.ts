@@ -1302,7 +1302,7 @@ export function matchPlanChunk(input: Parameters<typeof matchPlan>[0], options: 
   const session = createResidentPlanSession(input, options.checkpoint);
   const step = advanceResidentSearch(session, options);
   const checkpoint = { ...sessionCheckpoint(session), cursor: encodeMatchCursor(session.cursor) };
-  return { ...step, checkpoint, ...(step.done ? { result: computeMatchPlan({ ...session.input, completedCursor: session.cursor, prepared: { request: session.request, groups: session.compiledGroups } }) } : {}) };
+  return { ...step, checkpoint, ...(step.done ? { result: finalizeResidentPlanSession(session) } : {}) };
 }
 
 export function createResidentPlanSession(input: Parameters<typeof matchPlan>[0], checkpoint?: PlanSearchCheckpoint | BinaryPlanSearchCheckpoint) {
@@ -1330,6 +1330,11 @@ export function createResidentPlanSession(input: Parameters<typeof matchPlan>[0]
   } finally { endCompilation(); }
 }
 type ResidentSession = ReturnType<typeof createResidentPlanSession>;
+function finalizeResidentPlanSession(session: ResidentSession) {
+  const end = measureService("match.finalization_ms");
+  try { return computeMatchPlan({ ...session.input, completedCursor: session.cursor, prepared: { request: session.request, groups: session.compiledGroups } }); }
+  finally { end(); }
+}
 function sessionCheckpoint(session: ResidentSession) {
   return { version: "plan-search-1" as const, inputIdentity: session.inputIdentity,
     expansionAttempts: matchCursorAttempts(session.cursor), expansionBudget: session.cursor.expansionBudget };
@@ -1354,7 +1359,7 @@ function advanceResidentSearch(session: ResidentSession, options: { chunkBudget:
 export function advanceResidentPlanSession(session: ResidentSession, options: { chunkBudget: number; lostAttempts?: number; persistCheckpoint?: boolean }): ResidentPlanMatchChunk {
   const step = advanceResidentSearch(session, options);
   const checkpoint = { ...sessionCheckpoint(session), ...(options.persistCheckpoint === false ? {} : { cursor: Uint8Array.from(encodeMatchCursorBytes(session.cursor)) }) };
-  return { ...step, checkpoint, ...(step.done ? { result: computeMatchPlan({ ...session.input, completedCursor: session.cursor, prepared: { request: session.request, groups: session.compiledGroups } }) } : {}) };
+  return { ...step, checkpoint, ...(step.done ? { result: finalizeResidentPlanSession(session) } : {}) };
 }
 
 export function planCheckpointInputIdentity(input: Parameters<typeof matchPlan>[0]) {

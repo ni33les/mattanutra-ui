@@ -3,7 +3,7 @@ import { targetDoseTicks } from "@/lib/matcher/target-basis";
 import { servingIncrement } from "@/lib/matcher/serving-grid";
 import { comparePillCounts } from "@/lib/matcher/pill-burden";
 import { compileVariant, isDeferredConditional } from "@/lib/matcher/candidates";
-import { compareDoseFit, numericalDoseFitScore, doseFitTargetDeviations } from "@/lib/matcher/dose-fit";
+import { compareDoseFit, numericalDoseFitScore, doseFitTargetDeviations, registerDoseFitChange } from "@/lib/matcher/dose-fit";
 import { administrationBasisKnown, compareSearchStateScores, monthlyGoodsPrice, PRACTICAL_OBJECTIVES, requestForProfile } from "@/lib/matcher/practical-scoring";
 import { DEFAULT_MATCHER_CONFIG } from "@/lib/matcher/config";
 import { fingerprintState } from "@/lib/matcher/dominance";
@@ -34,7 +34,7 @@ export type SearchRun = Readonly<{
   trimmed: boolean;
 }>;
 
-const variantMeasurements = new WeakMap<DoseVariant, { product: ProductGroup["product"]; burden: ReturnType<typeof multiply>; monthly: number | null; uncertain: number; contributionOnly: boolean }>();
+const variantMeasurements = new WeakMap<DoseVariant, { product: ProductGroup["product"]; burden: ReturnType<typeof multiply>; monthly: number | null; uncertain: number; contributionOnly: boolean; exposureSubjects?: readonly string[] }>();
 
 // Quantity arrays are immutable apart from append-only, physically compiled
 // probes. A resumed/replaced array gets a fresh index; traversal order is unchanged.
@@ -78,12 +78,10 @@ export function seedState(request: CanonicalRequest): SearchState {
   };
 }
 
-export function tryAddVariant(
-  state: SearchState,
-  variant: DoseVariant,
-  group: ProductGroup,
-  request: CanonicalRequest
-): SearchState | null {
+// Eligibility depends on the immutable request, product and variant, never on
+// the parent basket. Probe each variant once even when many parents reach it.
+const eligibleVariants = new WeakMap<CanonicalRequest, WeakMap<DoseVariant, { product: ProductGroup["product"]; eligible: boolean }>>();
+function variantIsEligible(variant: DoseVariant, group: ProductGroup, request: CanonicalRequest) {
   const helpsPurchasableTarget = request.targets.some((target) => {
     if (isDeferredConditional(target)) {
       return false;
@@ -96,8 +94,26 @@ export function tryAddVariant(
   if (!helpsPurchasableTarget && !request.retainProductIds.includes(group.productId) &&
     !request.productDoses?.some(row => row.productId === group.productId) &&
     !request.retainSubjectIds.some((id) => (variant.safetyExposure?.get(id)?.units ?? BigInt(0)) > BigInt(0))) {
-    return null;
+    return false;
   }
+
+  return true;
+}
+
+export function tryAddVariant(
+  state: SearchState,
+  variant: DoseVariant,
+  group: ProductGroup,
+  request: CanonicalRequest
+): SearchState | null {
+  let eligibility = eligibleVariants.get(request);
+  if (!eligibility) { eligibility = new WeakMap(); eligibleVariants.set(request, eligibility); }
+  let measuredEligibility = eligibility.get(variant);
+  if (!measuredEligibility || measuredEligibility.product !== group.product) {
+    measuredEligibility = { product: group.product, eligible: variantIsEligible(variant, group, request) };
+    eligibility.set(variant, measuredEligibility);
+  }
+  if (!measuredEligibility.eligible) return null;
 
   const quantities = quantityIndex(group.variants).ids;
   if (state.selectedVariantIds.some((id) => quantities.has(id))) return null;
@@ -113,7 +129,7 @@ export function tryAddVariant(
     const excess = positive(subtract(variant.dailyUnitsRatio ?? fromDecimal(variant.dailyUnits), fromDecimal(1)));
     measured = { product: group.product, burden: multiply(excess, excess),
       monthly: monthlyGoodsPrice(group.product, variant.dailyUnits, variant.dailyUnitsRatio), uncertain: Number(!administrationBasisKnown(group.product)),
-      contributionOnly: safetyExposure.size === variant.contributions.size && [...safetyExposure].every(([id, amount]) => variant.contributions.get(id)?.units === amount.units) };
+      contributionOnly: safetyExposure.size === variant.contributions.size && [...safetyExposure].every(([id, amount]) => variant.contributions.get(id)?.units === amount.units), exposureSubjects: undefined };
     variantMeasurements.set(variant, measured);
   }
   const monthly = measured.monthly;
@@ -125,6 +141,13 @@ export function tryAddVariant(
   const delivered = measured.contributionOnly && state.delivered === state.exposure ? exposure : new Map(state.delivered);
   if (delivered !== exposure) for (const [id, amount] of variant.contributions) {
     delivered.set(id, (delivered.get(id) ?? BigInt(0)) + amount.units);
+  }
+  // Broad changes use the full evaluator. Build a subject list only for variants
+  // that can use the incremental path, and reuse an identical contribution list.
+  if (Math.max(safetyExposure.size, variant.contributions.size) * 3 <= request.targets.length) {
+    measured.exposureSubjects ??= measured.contributionOnly ? [...variant.contributions.keys()]
+      : [...new Set([...safetyExposure.keys(), ...variant.contributions.keys()])];
+    if (measured.exposureSubjects.length * 3 <= request.targets.length) registerDoseFitChange(exposure, state.exposure, measured.exposureSubjects);
   }
   return {
     routineServings: [...(state.routineServings ?? []), variant.dailyUnits],
@@ -141,7 +164,7 @@ export function tryAddVariant(
     price,
     selectedVariantIds: [...state.selectedVariantIds, variant.variantId],
     selectedProductIds: [...(state.selectedProductIds ?? []), group.productId],
-    unknownProductIds: [...(state.unknownProductIds ?? []), ...(variant.unknownSafetyAmount ? [variant.productId] : [])]
+    unknownProductIds: variant.unknownSafetyAmount ? [...(state.unknownProductIds ?? []), variant.productId] : state.unknownProductIds ?? []
   };
 }
 
@@ -375,37 +398,59 @@ function* removalSets(ids: readonly string[]): Generator<readonly string[]> {
   }
 }
 
+const residualPatterns = new WeakMap<CanonicalRequest, WeakMap<SearchState["delivered"], string>>();
 export function residualPattern(state: SearchState, request: CanonicalRequest) {
-  return request.targets.map(target => {
+  let cache = residualPatterns.get(request);
+  if (!cache) { cache = new WeakMap(); residualPatterns.set(request, cache); }
+  let pattern = cache.get(state.delivered);
+  if (pattern !== undefined) return pattern;
+  pattern = request.targets.map(target => {
     const delivered = state.delivered.get(target.subjectId) ?? BigInt(0);
     if (target.requested.units <= 0) return "0";
     // Distinguish absent, partial, exact and excess contributions with ten
     // proportional bins. This is frontier diversity, never clinical scoring.
     return String(delivered * BigInt(10) / target.requested.units);
   }).join("|");
+  cache.set(state.delivered, pattern);
+  return pattern;
+}
+
+/** Build after quantity exploration, then share across final basket validation.
+ * Last duplicate wins, both within a group and across groups. */
+export function indexVariants(groups: readonly ProductGroup[]) {
+  const byId = new Map<string, DoseVariant>();
+  for (const group of groups) for (const variant of group.variants) byId.set(variant.variantId, variant);
+  return byId;
 }
 
 export function reconstructVariants(
   groups: readonly ProductGroup[],
-  variantIds: readonly string[]
+  variantIds: readonly string[],
+  byId?: ReadonlyMap<string, DoseVariant>
 ) {
-  const byId = new Map<string, DoseVariant>();
-  for (const group of groups) for (const id of variantIds) {
-    const variant = quantityById(group.variants, id, true);
-    if (variant) byId.set(id, variant);
+  if (!byId) {
+    // Standalone callers already have append-aware quantity indices. Only the
+    // batch finalizer needs a full cross-group index; reuse cached lookups here.
+    const selected = new Map<string, DoseVariant>();
+    for (const group of groups) for (const id of variantIds) {
+      const variant = quantityById(group.variants, id, true);
+      if (variant) selected.set(id, variant);
+    }
+    byId = selected;
   }
-
+  const resolved = byId;
   return variantIds
-    .map((id) => byId.get(id))
+    .map((id) => resolved.get(id))
     .filter((item): item is DoseVariant => Boolean(item));
 }
 
 export function revalidateState(
   state: SearchState,
   groups: readonly ProductGroup[],
-  request: CanonicalRequest
+  request: CanonicalRequest,
+  variantsById?: ReadonlyMap<string, DoseVariant>
 ) {
-  const variants = reconstructVariants(groups, state.selectedVariantIds);
+  const variants = reconstructVariants(groups, state.selectedVariantIds, variantsById);
   const exposure = aggregateDailyExposure({
     current: request.currentSupplements,
     variants
@@ -431,15 +476,54 @@ export function revalidateState(
 /** Full safety and conversational rendering runs on diverse bounded extrema,
  * not thousands of losing search states. This changes computational effort,
  * never the permitted number of products or quantities in a basket. */
+type FrontierFacts = { deviations: ReturnType<typeof doseFitTargetDeviations>; losses?: Map<string, number>; protectedLoss?: number };
+const frontierFacts = new WeakMap<CanonicalRequest, WeakMap<SearchState["exposure"], FrontierFacts>>();
+function frontierFactsFor(state: SearchState, request: CanonicalRequest) {
+  let cache = frontierFacts.get(request);
+  if (!cache) { cache = new WeakMap(); frontierFacts.set(request, cache); }
+  let facts = cache.get(state.exposure);
+  if (!facts) {
+    facts = { deviations: doseFitTargetDeviations(numericalDoseFitScore(request, state.exposure)) };
+    cache.set(state.exposure, facts);
+  }
+  return facts;
+}
+const frontierInputs = new WeakMap<CanonicalRequest, {
+  protectedIds: Set<string>; targets: CanonicalRequest["targets"]; optional: boolean;
+  targetIds: Set<string>; focusedByGroups: WeakMap<readonly ProductGroup[], Set<string>>;
+}>();
+function frontierInputsFor(request: CanonicalRequest) {
+  let inputs = frontierInputs.get(request);
+  if (!inputs) {
+    inputs = { protectedIds: new Set(request.targets.filter(row => row.importance === "core" || row.importance === "required").map(row => row.subjectId)),
+      targets: request.targets.filter(row => !isDeferredConditional(row)).slice(0, 32), optional: request.targets.some(row => row.importance === "optional"),
+      targetIds: new Set(request.targets.map(row => row.subjectId)), focusedByGroups: new WeakMap() };
+    frontierInputs.set(request, inputs);
+  }
+  return inputs;
+}
+
 export function reviewFrontier(states: readonly SearchState[], request: CanonicalRequest, incumbents: readonly SearchState[], order = (a: SearchState, b: SearchState) => compareSearchStates(a, b, request), groups: readonly ProductGroup[] = []) {
   if (states.length <= 192) return [...states];
   const doseOrder = (a: SearchState, b: SearchState) => compareDoseFit(numericalDoseFitScore(request, a.exposure), numericalDoseFitScore(request, b.exposure)) || order(a, b);
   const chosen = new Set<SearchState>([...incumbents, ...smallest(states, 16, doseOrder)]);
   // A close fit on one target can become the best complete basket after a
   // complementary addition, despite losing every aggregate/profile ranking.
-  const additiveBases = states.filter(state => doseFitTargetDeviations(numericalDoseFitScore(request,state.exposure)).every(row=>row.over===0));
-  for (const target of request.targets.filter(row => !isDeferredConditional(row)).slice(0, 32)) {
-    const deviation = (state: SearchState) => { const row = doseFitTargetDeviations(numericalDoseFitScore(request,state.exposure)).find(row=>row.subjectId===target.subjectId); return row ? row.under + row.over : Infinity; };
+  const inputs = frontierInputsFor(request), { protectedIds } = inputs;
+  const facts = (state: SearchState) => frontierFactsFor(state, request);
+  // Most rejected candidates fail this short-circuit scan immediately. Cache
+  // comparison facts only when the target or protected-fit rankings use them.
+  const additiveBases = states.filter(state => doseFitTargetDeviations(numericalDoseFitScore(request, state.exposure)).every(row => row.over === 0));
+  for (const target of inputs.targets) {
+    const deviation = (state: SearchState) => {
+      const value = facts(state), losses = value.losses ??= new Map();
+      let loss = losses.get(target.subjectId);
+      if (loss === undefined) {
+        const row = value.deviations.find(row => row.subjectId === target.subjectId);
+        loss = row ? row.under + row.over : Infinity; losses.set(target.subjectId, loss);
+      }
+      return loss;
+    };
     const reference = smallest(additiveBases, 1, (a,b)=>deviation(a)-deviation(b) || doseOrder(a,b))[0];
     if (reference) chosen.add(reference);
   }
@@ -448,21 +532,26 @@ export function reviewFrontier(states: readonly SearchState[], request: Canonica
     for (const state of smallest(states, 12, (a, b) => compareSearchStates(a, b, profile))) chosen.add(state);
   }
   const nonempty = states.filter(row => row.count > 0);
-  const targetIds = new Set(request.targets.map(row => row.subjectId));
-  const focusedIds = new Set(groups.filter(group => {
-    const facts = group.product.labelledContributions.filter(row => row.amount != null && row.amount > 0);
-    return facts.length > 0 && facts.every(row => row.subjectId !== null && targetIds.has(row.subjectId));
-  }).map(group => group.productId));
-  const focused = smallest(nonempty.filter(row => row.count === 1 && row.selectedProductIds?.some(id => focusedIds.has(id))), 1, order)[0];
+  let focusedIds = inputs.focusedByGroups.get(groups);
+  if (!focusedIds) {
+    focusedIds = new Set(groups.filter(group => {
+      const facts = group.product.labelledContributions.filter(row => row.amount != null && row.amount > 0);
+      return facts.length > 0 && facts.every(row => row.subjectId !== null && inputs.targetIds.has(row.subjectId));
+    }).map(group => group.productId));
+    inputs.focusedByGroups.set(groups, focusedIds);
+  }
+  const focused = smallest(nonempty.filter(row => row.count === 1 && row.selectedProductIds?.some(id => focusedIds!.has(id))), 1, order)[0];
   if (focused) chosen.add(focused);
   for (const compare of [
     (a: SearchState, b: SearchState) => a.price - b.price || order(a, b),
     (a: SearchState, b: SearchState) => a.count - b.count || comparePillCounts(a.pills, a.pillCountKnown, b.pills, b.pillCountKnown) || order(a, b),
     (a: SearchState, b: SearchState) => comparePillCounts(a.pills, a.pillCountKnown, b.pills, b.pillCountKnown) || order(a, b)
   ]) for (const state of smallest(nonempty, 24, compare)) chosen.add(state);
-  const protectedIds = new Set(request.targets.filter(row => row.importance === "core" || row.importance === "required").map(row => row.subjectId));
-  if (protectedIds.size && request.targets.some(row => row.importance === "optional")) {
-    const protectedFit = (state: SearchState) => doseFitTargetDeviations(numericalDoseFitScore(request, state.exposure)).filter(row => protectedIds.has(row.subjectId)).reduce((sum, row) => sum + row.under + row.over, 0);
+  if (protectedIds.size && inputs.optional) {
+    const protectedFit = (state: SearchState) => {
+      const value = facts(state);
+      return value.protectedLoss ??= value.deviations.filter(row => protectedIds.has(row.subjectId)).reduce((sum, row) => sum + row.under + row.over, 0);
+    };
     for (const state of smallest(states, 48, (a, b) => protectedFit(a) - protectedFit(b) || order(a, b))) chosen.add(state);
   }
   const patterns = new Map<string, { state: SearchState; index: number }>();
@@ -475,5 +564,15 @@ export function reviewFrontier(states: readonly SearchState[], request: Canonica
   // The first member of each bin in a stable full sort is its stable minimum.
   // Order only those representatives, retaining the original cross-bin tie order.
   for (const row of smallest([...patterns.values()], 48, (a, b) => order(a.state, b.state) || a.index - b.index)) chosen.add(row.state);
+  // Only frontier survivors are compared again in the next review. The cursor
+  // archives losing states for recovery; their comparison metadata need not live
+  // as long as that archive. Weak keys also avoid retaining standalone inputs.
+  const previousPatterns = residualPatterns.get(request), previousFacts = frontierFacts.get(request);
+  const keptPatterns = new WeakMap<SearchState["delivered"], string>(), keptFacts = new WeakMap<SearchState["exposure"], FrontierFacts>();
+  for (const state of chosen) {
+    const pattern = previousPatterns?.get(state.delivered); if (pattern !== undefined) keptPatterns.set(state.delivered, pattern);
+    const facts = previousFacts?.get(state.exposure); if (facts) keptFacts.set(state.exposure, facts);
+  }
+  residualPatterns.set(request, keptPatterns); frontierFacts.set(request, keptFacts);
   return [...chosen];
 }
