@@ -26,6 +26,11 @@ test("marketing consent gates browser measurement and sensitive pages use only t
   await expect.poll(() => pixelLoads).toBe(1);
   expect(events.every(e => e.data.mn_env === "dev")).toBe(true);
   await expect.poll(() => page.evaluate(() => (window as unknown as { __pixelCalls: unknown[][] }).__pixelCalls.some(call => call[0] === "trackSingleCustom" && call[2] === "DEV_PageView"))).toBe(true);
+  const beforeConfirm = events.length;
+  await page.getByRole("button", { name: "Privacy choices", exact: true }).click();
+  await page.getByRole("button", { name: "Allow", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Privacy choices", exact: true })).toBeVisible();
+  expect(events).toHaveLength(beforeConfirm);
   const before = pixelLoads;
   await page.goto("/en/nutrition/quiz");
   await expect(page.getByRole("button", { name: "Privacy choices", exact: true })).toBeVisible();
