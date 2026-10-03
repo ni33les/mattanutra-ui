@@ -44,7 +44,7 @@ export function trackMetaEvent(name: MetaEventName, input: Record<string, unknow
   if (!config?.enabled || !marketingGranted() || typeof window === "undefined" || /\/(admin|api)(\/|$)/.test(location.pathname)) return Promise.resolve();
   const env = config.environment, id = typeof input.assessmentAttemptId === "string" && uuidPattern.test(input.assessmentAttemptId) ? input.assessmentAttemptId : sessionId();
   const data = metaCustomData(name, input, env);
-  const key = occurrence || `${id}:${name}:${data.plan_id || "visit"}:${data.progress ?? data.offer ?? data.funnel_stage ?? ""}`;
+  const key = occurrence || `${id}:${name}:${data.plan_id || "visit"}:${data.provider || ""}:${data.locale || ""}:${data.progress ?? data.offer ?? data.funnel_stage ?? ""}`;
   if (sent.has(key)) return Promise.resolve();
   if (pending.has(key)) return pending.get(key)!;
   const eventId = crypto.randomUUID();

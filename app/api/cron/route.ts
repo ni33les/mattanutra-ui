@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { requireOpenClawAccess } from "@/lib/openclaw-api";
 import {
   enqueueDigitalOceanBillingSyncTask,
@@ -16,6 +16,10 @@ async function runDueWork(request: Request) {
   }
 
   try {
+    after(async () => {
+      try { await (await import("@/lib/connect-verification")).flushConnectMeta(); }
+      catch { console.warn("[connect] Event reconciliation pending"); }
+    });
     const [result, digitalOcean, humanReviewTasks] = await Promise.all([
       enqueueDueScheduledActions(),
       enqueueDigitalOceanBillingSyncTask(),

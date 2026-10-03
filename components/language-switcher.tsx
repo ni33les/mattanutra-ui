@@ -7,6 +7,7 @@ import {
 } from "@/lib/i18n";
 import { t } from "@/lib/i18n-messages";
 import { cn } from "@/lib/utils";
+import { ConnectCampaignLink } from "@/components/connect-campaign-link";
 
 type LanguageSwitcherProps = Readonly<{
   currentLocale: Locale;
@@ -48,7 +49,7 @@ export function LanguageSwitcher({
           isCjkLocale(locale) || locale === "th" || !isLatinLocaleLabel(label);
 
         return (
-          <a
+          <ConnectCampaignLink
             key={locale}
             href={next}
             aria-current={isActive ? "page" : undefined}
@@ -61,7 +62,7 @@ export function LanguageSwitcher({
             )}
           >
             {label}
-          </a>
+          </ConnectCampaignLink>
         );
       })}
     </nav>

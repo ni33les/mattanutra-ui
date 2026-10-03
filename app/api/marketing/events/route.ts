@@ -15,7 +15,7 @@ export async function POST(request: Request) {
     const raw = await request.text();
     if (raw.length > 8192) return NextResponse.json({ error: "Event too large" }, { status: 413 });
     const body = JSON.parse(raw);
-    if (!META_EVENTS.includes(body.name) || ["Purchase", "Lead", "QuizSubmitted", "EmailCapture"].includes(body.name) || !uuidPattern.test(body.eventId || "") || !uuidPattern.test(body.sessionId || "")) {
+    if (!META_EVENTS.includes(body.name) || ["Purchase", "Lead", "QuizSubmitted", "EmailCapture", "McpConnectionVerified"].includes(body.name) || !uuidPattern.test(body.eventId || "") || !uuidPattern.test(body.sessionId || "")) {
       return NextResponse.json({ error: "Invalid browser milestone" }, { status: 400 });
     }
     const sourceUrl = sanitiseMetaUrl(body.sourceUrl, config.environment);
@@ -33,7 +33,7 @@ export async function POST(request: Request) {
     const attemptId = typeof body.attemptId === "string" && uuidPattern.test(body.attemptId) ? body.attemptId : null;
     if (name === "InitiateCheckout" && !attemptId) return NextResponse.json({ error: "Checkout attempt required" }, { status: 400 });
     const key = name === "InitiateCheckout" ? `checkout:${attemptId}` : name === "PageView" || name === "AddToCart" ? body.eventId
-      : `${body.sessionId}:${data.plan_id || "visit"}:${name}:${data.progress ?? data.offer ?? data.funnel_stage ?? ""}`;
+      : `${body.sessionId}:${data.plan_id || "visit"}:${name}:${data.provider || ""}:${data.locale || ""}:${data.progress ?? data.offer ?? data.funnel_stage ?? ""}`;
     const eventId = await withDatabaseTransaction(sql, async tx => {
       await tx`update public.meta_tracking_contexts set matching=matching || ${tx.json(matching)},attribution=attribution || ${tx.json(campaign)},updated_at=now()
         where id=${context.id}::uuid and consent_granted`;

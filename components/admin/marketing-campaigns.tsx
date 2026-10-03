@@ -2,6 +2,7 @@
 
 import type { AdminCampaignRow, AdminCampaignsData } from "@/lib/admin-query-data";
 import type { Locale } from "@/lib/i18n";
+import { connectCopy } from "@/lib/connect-copy";
 import type { AdminContent } from "@/components/admin/dashboard-content";
 import {
   BusinessStatsGrid,
@@ -63,6 +64,16 @@ export function AdminCampaignsView({
   return (
     <section className="mt-8">
       <BusinessStatsGrid metrics={campaignMetrics} />
+      {data.connections && <div className="mt-6 rounded-2xl bg-white p-5 ring-1 ring-gray-200">
+        <h2 className="font-semibold">{connectCopy[locale].summaryTitle} · {data.connections.environment.toUpperCase()}</h2>
+        <p className="mt-2 text-sm">{connectCopy[locale].summaryNote}</p>
+        {!data.connections.available ? <p>{connectCopy[locale].summaryUnavailable}</p> : <div className="overflow-x-auto"><table className="mt-3 w-full text-left text-sm">
+          <thead><tr>{connectCopy[locale].summaryColumns.map(label => <th scope="col" className="p-2" key={label}>{label}</th>)}</tr></thead>
+          <tbody>{data.connections.rows.map(row => <tr key={`${row.provider}:${row.locale}`}>
+            {[row.provider, row.locale, row.visits, row.selected, row.copied, row.opened, row.prompted, row.verified, row.accepted].map((value, index) => <td key={index} className="p-2">{value}</td>)}
+          </tr>)}</tbody>
+        </table></div>}
+      </div>}
       {data.meta && <div className="mt-6 rounded-2xl bg-white p-5 ring-1 ring-gray-200">
         <h2 className="font-semibold">Meta · {data.meta.environment.toUpperCase()} · {data.meta.enabled ? "Enabled" : "Disabled"}</h2>
         <p className="mt-2 text-sm">Pixel {data.meta.pixelId || "unconfigured"}. All campaigns in this date range. Accepted means Meta acknowledged delivery; it does not establish ad attribution.</p>
@@ -194,4 +205,3 @@ function CampaignRow({
     </tr>
   );
 }
-

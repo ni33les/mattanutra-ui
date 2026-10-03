@@ -1,6 +1,6 @@
 /** The complete export boundary. Internal BPM payloads must never be spread into Meta events. */
 export type MetaEnvironment = "dev" | "uat" | "prd";
-export const META_EVENTS = ["PageView", "ViewContent", "QuizStart", "QuizProgress", "QuizSubmitted", "Lead", "EmailCapture", "Contact", "SelectOffer", "AddToCart", "InitiateCheckout", "Purchase"] as const;
+export const META_EVENTS = ["PageView", "ViewContent", "QuizStart", "QuizProgress", "QuizSubmitted", "Lead", "EmailCapture", "Contact", "SelectOffer", "AddToCart", "InitiateCheckout", "Purchase", "McpProviderSelected", "McpUrlCopied", "McpProviderOpened", "McpPromptCopied", "McpConnectionVerified"] as const;
 export type MetaEventName = typeof META_EVENTS[number];
 export type MetaPublicConfig = { environment: MetaEnvironment; pixelId: string; enabled: boolean };
 export const META_CONSENT_COOKIE = "mn_marketing";
@@ -34,7 +34,8 @@ export function sanitiseMetaUrl(value: unknown, env: MetaEnvironment): string | 
     if (!match) return null;
     const [, locale, tail = ""] = match;
     const exact = ["", "privacy", "terms", "assessment", "assessment/results", "nutrition/refine", "nutrition/quiz", "nutrition/healthscore", "nutrition/progress", "nutrition/reveal", "nutrition/payment/checkout", "nutrition/payment/return", "basket/checkout", "basket/return", "order/track", "library"];
-    const path = exact.includes(tail.replace(/\/$/, "")) ? tail.replace(/\/$/, "")
+    const path = /^connect(?:\/(?:claude|perplexity|chatgpt|grok))?\/?$/.test(tail) ? tail.replace(/\/$/, "")
+      : exact.includes(tail.replace(/\/$/, "")) ? tail.replace(/\/$/, "")
       : tail.startsWith("library/") || tail.startsWith("blog/") ? "library"
       : tail.startsWith("mcp/checkout/") ? "basket/checkout"
       : tail.startsWith("order/track/") ? "order/track"
@@ -44,7 +45,7 @@ export function sanitiseMetaUrl(value: unknown, env: MetaEnvironment): string | 
     if (path === null) return null;
     const safe = new URL(`/${locale}${path ? `/${path}` : ""}`, metaOrigin(env));
     const plan = url.searchParams.get("planId");
-    if (plan && uuidPattern.test(plan)) safe.searchParams.set("planId", plan);
+    if (!path.startsWith("connect") && plan && uuidPattern.test(plan)) safe.searchParams.set("planId", plan);
     return safe.href;
   } catch { return null; }
 }
@@ -67,11 +68,13 @@ export function browserPixelPageSafe(value: string, referrer: string, env: MetaE
 export function metaCustomData(name: MetaEventName, value: unknown, environment: MetaEnvironment) {
   const input = value && typeof value === "object" ? value as Record<string, unknown> : {};
   const data: Record<string, string | number> = { mn_env: environment, event_schema: "1" };
-  if (typeof input.planId === "string" && uuidPattern.test(input.planId)) data.plan_id = input.planId;
+  const connection = name.startsWith("Mcp") || String(input.stage).startsWith("connect");
+  if (!connection && typeof input.planId === "string" && uuidPattern.test(input.planId)) data.plan_id = input.planId;
   if (["en", "th", "zh-CN"].includes(String(input.locale))) data.locale = String(input.locale);
   if (["web", "pharmacy", "mcp_web"].includes(String(input.channel))) data.channel = String(input.channel);
-  if (["landing", "assessment", "results", "offer", "basket", "checkout", "confirmation", "content"].includes(String(input.stage))) data.funnel_stage = String(input.stage);
-  if (["precision", "pro"].includes(String(input.offer))) data.offer = String(input.offer);
+  if (["landing", "assessment", "results", "offer", "basket", "checkout", "confirmation", "content", "connect", "connect_guide", "connect_verified"].includes(String(input.stage))) data.funnel_stage = String(input.stage);
+  if (connection && ["claude", "perplexity", "chatgpt", "grok"].includes(String(input.provider))) data.provider = String(input.provider);
+  if (!connection && ["precision", "pro"].includes(String(input.offer))) data.offer = String(input.offer);
   if (name === "QuizProgress" && [25, 50, 75].includes(Number(input.progress))) data.progress = Number(input.progress);
   if (["Purchase", "InitiateCheckout", "SelectOffer", "AddToCart"].includes(name)) {
     if (typeof input.value === "number" && Number.isFinite(input.value) && input.value >= 0 && input.value <= 1e9) data.value = Math.round(input.value * 100) / 100;

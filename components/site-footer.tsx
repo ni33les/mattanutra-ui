@@ -4,6 +4,8 @@ import { HealthspanLogo } from "@/components/healthspan-logo";
 import { lineOfficialAccountUrl } from "@/lib/chat-links";
 import { localeLabels, publicLocales, type Locale } from "@/lib/i18n";
 import { getNamespace } from "@/lib/i18n-messages";
+import { ConnectCampaignLink } from "@/components/connect-campaign-link";
+import { connectCopy } from "@/lib/connect-copy";
 
 const socialLinks = [
   {
@@ -89,8 +91,8 @@ function localizedHref(locale: Locale, href: string) {
 }
 
 export function SiteFooter({
-  locale
-}: Readonly<{ content: FooterContent; locale: Locale }>) {
+  locale, currentPath
+}: Readonly<{ content: FooterContent; locale: Locale; currentPath?: string }>) {
   const copy = getNamespace<FooterCopy>(locale, "customer.footer");
 
   return (
@@ -99,6 +101,7 @@ export function SiteFooter({
         <div className="mn-site-footer-brand">
           <HealthspanLogo locale={locale} variant="v14" />
           <p>{copy.body}</p>
+          <ConnectCampaignLink href={`/${locale}/connect`}>{connectCopy[locale].nav}</ConnectCampaignLink>
           <div className="mn-site-footer-social">
             {socialLinks.map((item) => (
               <a
@@ -130,12 +133,12 @@ export function SiteFooter({
           <span>{copy.copyright}</span>
           <span className="mn-site-footer-languages">
             {publicLocales.map((language) => (
-              <Link
-                href={`/${language}`}
+              <ConnectCampaignLink
+                href={currentPath ? currentPath.replace(/^\/(en|th|zh-CN)/, `/${language}`) : `/${language}`}
                 key={language}
               >
                 {localeLabels[language]}
-              </Link>
+              </ConnectCampaignLink>
             ))}
           </span>
         </div>
