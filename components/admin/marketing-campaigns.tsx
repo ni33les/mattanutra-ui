@@ -70,7 +70,7 @@ export function AdminCampaignsView({
         {!data.connections.available ? <p>{connectCopy[locale].summaryUnavailable}</p> : <div className="overflow-x-auto"><table className="mt-3 w-full text-left text-sm">
           <thead><tr>{connectCopy[locale].summaryColumns.map(label => <th scope="col" className="p-2" key={label}>{label}</th>)}</tr></thead>
           <tbody>{data.connections.rows.map(row => <tr key={`${row.provider}:${row.locale}`}>
-            {[row.provider, row.locale, row.visits, row.selected, row.copied, row.opened, row.prompted, row.verified, row.accepted].map((value, index) => <td key={index} className="p-2">{value}</td>)}
+            {[row.provider, row.locale, row.visits, row.selected, row.copied, row.opened].map((value, index) => <td key={index} className="p-2">{value}</td>)}
           </tr>)}</tbody>
         </table></div>}
       </div>}
