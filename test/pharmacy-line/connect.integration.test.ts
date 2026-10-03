@@ -1,14 +1,16 @@
 import assert from "node:assert/strict";
 import { createHmac, randomUUID } from "node:crypto";
 import { after, it } from "node:test";
+import { register } from "node:module";
 import QRCode from "qrcode";
-import { POST as connectRoute } from "../../app/api/assessment/[planId]/line-connect/route.ts";
-import { POST as webhook } from "../../app/api/line/webhook/route.ts";
 import { getSql, closeSqlPool } from "../../lib/db.ts";
 import { createPharmacyOrder } from "../../lib/pharmacy-orders.ts";
 import { dispatchCommunicationMessage, executeCommunicationDispatchTask } from "../../lib/communications.ts";
 import { seedPharmacyFixture } from "../helpers/pharmacy-fixture.ts";
 import { fixtureDatabaseUrl } from "../helpers/fixture-teardown.ts";
+register("../../scripts/matcher-http-loader.mjs", import.meta.url);
+const { POST: connectRoute } = await import("../../app/api/assessment/[planId]/line-connect/route.ts");
+const { POST: webhook } = await import("../../app/api/line/webhook/route.ts");
 fixtureDatabaseUrl();
 const sql=getSql()!;
 after(closeSqlPool);

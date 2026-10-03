@@ -75,6 +75,19 @@ test('STREAM-HTTP-notify actual isolated adapter observes external completion an
     if (child && !exited) { kill('SIGTERM'); await Promise.race([exit, new Promise(resolve => setTimeout(resolve, 5000))]); }
     if (child && !exited) { kill('SIGKILL'); await exit; }
     await sql.end();
-    try { if (created) await admin.unsafe(`drop database ${name}`); } finally { await admin.end(); }
+    try {
+      if (created) {
+        // The process exit and PostgreSQL's socket cleanup are asynchronous.
+        // Preserve the LISTEN assertion above and wait for our remaining sockets;
+        // never terminate other clients to make fixture deletion pass.
+        const deadline = Date.now() + 5000;
+        while (Date.now() < deadline) {
+          const [remaining] = await admin`select count(*)::int as count from pg_stat_activity where datname=${name}::name`;
+          if (remaining.count === 0) break;
+          await new Promise(resolve => setTimeout(resolve, 25));
+        }
+        await admin.unsafe(`drop database ${name}`);
+      }
+    } finally { await admin.end(); }
   }
 });
