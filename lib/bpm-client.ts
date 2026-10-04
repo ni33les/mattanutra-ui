@@ -1,4 +1,5 @@
 import { pharmacyBpmAttribution, pharmacySource } from "@/lib/pharmacy-acquisition";
+import { journeyChannelForPath } from "@/lib/journey-channel";
 import type { Locale } from "@/lib/i18n";
 
 type BpmAttribution = Readonly<{
@@ -298,7 +299,7 @@ function currentAttribution(): BpmAttribution {
   };
 }
 
-export function getBpmAttribution() {
+export function getBpmAttribution(): BpmAttribution {
   if (!browserReady()) {
     return {};
   }
@@ -353,8 +354,11 @@ export function trackBpmEvent(eventName: string, input: TrackBpmEventInput = {})
   // Shared browser/CAPI dedupe key (Meta event_id / eventID).
   const facebookEventId = randomRay();
   const planId = input.planId ?? currentPlanId();
+  const attribution = getBpmAttribution();
+  const journeyChannel = attribution.trafficSource === "pharmacy" ? "retail" : journeyChannelForPath(window.location.pathname);
   const properties: Record<string, unknown> = {
     ...(input.properties || {}),
+    journeyChannel,
     facebookEventId,
     sourceUrl:
       typeof window !== "undefined" ? window.location.href : undefined
@@ -362,7 +366,7 @@ export function trackBpmEvent(eventName: string, input: TrackBpmEventInput = {})
 
   const payload = {
     ...input,
-    attribution: getBpmAttribution(),
+    attribution,
     eventName,
     planId,
     properties,
@@ -381,5 +385,5 @@ export function trackBpmEvent(eventName: string, input: TrackBpmEventInput = {})
     // Tracking must never affect the user journey.
   });
 
-  void import("@/lib/meta-client").then(({ trackMetaBpm }) => trackMetaBpm(eventName, input)).catch(() => undefined);
+  void import("@/lib/meta-client").then(({ trackMetaBpm }) => trackMetaBpm(eventName, { ...input, planId, properties })).catch(() => undefined);
 }

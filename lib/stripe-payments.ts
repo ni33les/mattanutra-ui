@@ -1212,6 +1212,7 @@ export async function createStripeCheckoutSession(input: CheckoutSessionInput) {
       }
     },
     return_url: `${siteBaseUrl()}${paymentReturnPath(input.locale)}?session_id={CHECKOUT_SESSION_ID}`,
+    redirect_on_completion: "if_required",
     ui_mode: "embedded_page"
   }, { idempotencyKey: `web-checkout:${config.env}:${paymentId}` });
 
@@ -1906,6 +1907,10 @@ export async function fulfillCheckoutSession(
   await assertPaymentSchema(sql);
   const previous = await getPaymentRowBySessionId(sql, sessionId);
   if (previous && (await effectivePayment(sql, previous)).fulfillment_status === "complete") {
+    if (input.source === "return_page") {
+      void writePaymentBpmEvent({ eventName: "payment_checkout_returned", eventStatus: "received", paymentId: previous.id,
+        planId: previous.plan_id, locale: previous.locale, stripeSessionId: sessionId, request: input.request }).catch(() => undefined);
+    }
     return { payment: await mapPayment(previous), status: previous.plan_id ? "paid_with_plan" as const : "paid_reservation" as const };
   }
   const config = stripePaymentConfig(input.request);

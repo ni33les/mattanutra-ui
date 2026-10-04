@@ -1,3 +1,4 @@
+import { funnelBpmSource } from "@/lib/admin-funnel-events";
 import { getSql } from "@/lib/db";
 import {
   adminDashboardFilterSql,
@@ -472,18 +473,18 @@ export async function getAdminDashboardData(
           select
             id::text,
             ray::text,
-            event_name,
+            case when funnel_event_name='healthscore_page_viewed' then 'healthscore_viewed' else funnel_event_name end as event_name,
             event_status,
             event_type,
             selected_plan::text,
             plan_id::text,
             example_request_id::text,
             occurred_at
-          from public.bpm
-          where occurred_at >= ${start}
+          from ${funnelBpmSource(sql)}
+          where journey_channel='web' and occurred_at >= ${start}
             and ${adminDashboardFilterSql(sql, filters)}
             and (
-              event_name in ('free_email_requested', 'healthscore_viewed')
+              funnel_event_name in ('free_email_requested', 'healthscore_viewed', 'healthscore_page_viewed')
               or (
                 (
                   event_name in (
@@ -515,17 +516,17 @@ export async function getAdminDashboardData(
           select
             id::text,
             ray::text,
-            event_name,
+            case when funnel_event_name='healthscore_page_viewed' then 'healthscore_viewed' else funnel_event_name end as event_name,
             event_status,
             event_type,
             selected_plan::text,
             plan_id::text,
             example_request_id::text,
             occurred_at
-          from public.bpm
-          where ${adminDashboardFilterSql(sql, filters)}
+          from ${funnelBpmSource(sql)}
+          where journey_channel='web' and ${adminDashboardFilterSql(sql, filters)}
             and (
-              event_name in ('free_email_requested', 'healthscore_viewed')
+              funnel_event_name in ('free_email_requested', 'healthscore_viewed', 'healthscore_page_viewed')
             or (
               (
                 event_name in (

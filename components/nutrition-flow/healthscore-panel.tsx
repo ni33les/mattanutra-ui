@@ -1,5 +1,6 @@
 "use client";
 import { trackMetaEvent } from "@/lib/meta-client";
+import { trackBpmEvent } from "@/lib/bpm-client";
 
 import Image from "next/image";
 import {
@@ -1399,7 +1400,18 @@ function HealthScoreExperience({
   result: HealthScoreResult;
   showPricing: boolean;
 }>) {
-  useEffect(() => { void trackMetaEvent("ViewContent", { planId, locale, stage: "results" }); }, [planId, locale]);
+  const trackedDisplay = useRef("");
+  useEffect(() => {
+    const key = `${planId}:${locale}`;
+    const recordDisplay = () => {
+      if (!planId || document.visibilityState !== "visible" || trackedDisplay.current === key) return;
+      trackedDisplay.current = key;
+      trackBpmEvent("healthscore_viewed", { planId, locale, eventType: "funnel" });
+    };
+    recordDisplay();
+    document.addEventListener("visibilitychange", recordDisplay);
+    return () => document.removeEventListener("visibilitychange", recordDisplay);
+  }, [planId, locale]);
   const rootRef = useRef<HTMLElement | null>(null);
   const model = buildHealthScoreViewModel({ firstName, locale, result });
 

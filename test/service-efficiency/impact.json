@@ -664,9 +664,21 @@
       "slice": "sessions"
     },
     {
+      "file": "test/service-efficiency/search-strategy.test.ts",
+      "expectedCases": 6,
+      "reason": "SEARCH-WORK-01–06: conservative additive pruning, explicit-purchase/unknown-intake exceptions and residual-first exploration with one-attempt checkpoint equivalence",
+      "slice": "matcher-hot-path"
+    },
+    {
       "file": "test/meta-tracking.integration.test.ts",
       "expectedCases": 8,
       "reason": "Meta outbox claim ownership, transactional payment capture, concurrent dispatch, lease fencing and consent withdrawal; provider HTTP must execute after commit.",
+      "slice": "sessions"
+    },
+    {
+      "file": "test/connect-verification.integration.test.ts",
+      "expectedCases": 11,
+      "reason": "Connection outbox row ownership under concurrent confirmation, disabled advertising, rollback and retry; confirmed milestones remain durable and Meta enqueue remains deduplicated.",
       "slice": "sessions"
     }
   ],

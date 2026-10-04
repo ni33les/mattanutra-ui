@@ -63,8 +63,8 @@ function assertOrder(source: string, labels: readonly string[]) {
 }
 
 describe("final reveal UX", () => {
-  it("leaves the reveal content blank while loading its saved result", () => {
-    assert.match(wrapper, /if \(loadState === "loading"\) \{\s*return null;\s*\}/);
+  it("shows progress while loading its saved result", () => {
+    assert.match(wrapper, /if \(loadState === "loading"\) \{\s*return <FunnelLoading locale=\{locale\} stage="opening" \/>;\s*\}/);
     assert.doesNotMatch(wrapper, /NutritionGuidancePreparingPanel/);
     assert.match(wrapper, /data-testid="formulation-retry"/);
   });
@@ -342,7 +342,7 @@ describe("final reveal UX", () => {
     assert.match(reveal, /nutrient-dose/);
     assert.match(reveal, /nutrient-coverage/);
     assert.match(reveal, /md:grid-cols-\[36px_minmax\(160px,1\.25fr\)_minmax\(260px,2\.2fr\)_minmax\(96px,auto\)_minmax\(72px,auto\)_36px\]/);
-    assert.match(reveal, /<span aria-hidden=\{true\} className="expand-icon" \/>/);
+    assert.match(reveal, /<span aria-hidden=\{true\} className="expand-icon(?: [^"]*)?" \/>/);
     assert.doesNotMatch(reveal, /expand-icon absolute/);
     assert.match(css, /\.mn-reveal-final \.mn-reveal-nutrient-header \.expand-icon::before/);
     assert.match(css, /\.mn-reveal-final \.mn-reveal-nutrient-header \.expand-icon::after/);

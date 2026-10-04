@@ -355,3 +355,21 @@ work still takes the tested conditional retirement path.
 - The simple-plan refinement inventory still listed 28 numerical cases; it now records the actual 48 maintained cases. No prior arithmetic assertion is removed or skipped.
 
 - `PERF-CPU-69` worker heap tuning was withdrawn after DEV testing. Although two capped kernel comparisons improved, the two live expanded pairs were 5.948/6.507 seconds without versus 7.229/5.730 with the setting, and both cold D3 runs slowed. The additional memory did not produce a dependable live benefit. Retire only the unshipped setting assertion; preserve its real-worker RED/GREEN, full matching equality, patch and both live rounds externally. All prior production optimisations and checkpoint feature flags remain unchanged.
+
+### 2026-09-27 — measured search, safe additions and residual-first exploration
+
+`SEARCH-WORK-01–06` preserve the RED control at `af732062` and external evidence
+in `/root/.codex/deploy/search-strategy-20260927`. The new pruning removes only
+unrequested additions whose affected targets are already known covered; it is
+not an eligibility rule. Unknown facts, monthly-cost uncertainty, fixed/retained
+products and the nonempty purchase fallback retain the conservative path. Each
+pruned attempt still consumes the ordinary expansion budget.
+
+Beam and repair phases try physically supported residual completions and labelled
+quantities before distant interior probes, preserving the remaining domain and
+serializable probe position. This intentionally changes bounded exploration;
+internal matcher identity advances to `importance-matching-6`, while scoring,
+public MCP 11.1.0, checkpoint readers and the 8,000/64,000 ceilings remain.
+No heuristic early stopping is introduced. Historical fixtures/prices/assertions
+are unchanged. Candidate diagnostics/frontiers may differ as the explored pool
+changes; selected and alternative baskets are compared independently.

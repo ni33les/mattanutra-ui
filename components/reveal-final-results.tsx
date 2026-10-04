@@ -1043,7 +1043,7 @@ function RevealFormulaFinalSection({
                       type="checkbox"
                     />
                     <label
-                      className="nutrient-header mn-reveal-nutrient-header relative grid cursor-pointer select-none grid-cols-[32px_minmax(0,1fr)_36px] items-center gap-3.5 rounded py-5 transition-colors hover:bg-[var(--mn-cream)] md:grid-cols-[36px_minmax(160px,1.25fr)_minmax(260px,2.2fr)_minmax(96px,auto)_minmax(72px,auto)_36px] md:gap-5 md:pr-2"
+                      className="nutrient-header mn-reveal-nutrient-header relative grid cursor-pointer select-none grid-cols-[32px_minmax(0,1fr)_36px] items-center gap-x-3.5 gap-y-2 rounded py-5 transition-colors hover:bg-[var(--mn-cream)] md:grid-cols-[36px_minmax(160px,1.25fr)_minmax(260px,2.2fr)_minmax(96px,auto)_minmax(72px,auto)_36px] md:gap-5 md:pr-2"
                       htmlFor={toggleId}
                     >
                       <span className="mn-reveal-font-display text-2xl italic text-[var(--mn-gold)]">
@@ -1065,13 +1065,13 @@ function RevealFormulaFinalSection({
                           </span>
                         ) : null}
                       </span>
-                      <span className="nutrient-dose hidden whitespace-nowrap text-right mn-reveal-font-mono text-sm font-semibold text-[var(--mn-ink)] md:block">
+                      <span className="nutrient-dose col-start-2 row-start-2 min-w-0 break-words text-left mn-reveal-font-mono text-sm font-semibold text-[var(--mn-ink)] md:col-start-auto md:row-start-auto md:whitespace-nowrap md:text-right">
                         {dailyDose}
                       </span>
                       <span className="nutrient-coverage hidden whitespace-nowrap text-right mn-reveal-font-mono text-sm font-semibold text-[var(--mn-teal-deep)] md:block">
                         {coverageLabel}
                       </span>
-                      <span aria-hidden={true} className="expand-icon" />
+                      <span aria-hidden={true} className="expand-icon col-start-3 row-start-1 md:col-start-auto md:row-start-auto" />
                     </label>
                     <div className="nutrient-body">
                       <div className="mn-reveal-nutrient-drawer grid gap-6 pb-7 pl-[46px] pr-2 pt-4 md:grid-cols-2 md:gap-10 md:pl-[56px]">

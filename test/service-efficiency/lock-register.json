@@ -921,21 +921,23 @@
     },
     {
       "number": 19,
-      "resource": "Outbox ownership \u2014 OMS FOR UPDATE SKIP LOCKED and Meta event FOR UPDATE",
+      "resource": "Outbox ownership \u2014 OMS and connection FOR UPDATE SKIP LOCKED; Meta event FOR UPDATE",
       "disposition": "narrow",
-      "invariant": "Only one owner may apply an OMS fulfilment event or dispatch a Meta conversion; retries retain the event identity.",
-      "acquisition": "Explicit mutation transaction or conditional write; ordinary reads never acquire this lock.",
-      "permittedWork": "Revalidate ownership, revision and affected row identities; apply necessary writes only. Prepare, calculate, serialize, render and perform external effects outside the protected phase.",
-      "release": "OMS releases after its bounded event/order transaction. Meta releases after validating consent and recording its 30-second lease; all provider HTTP occurs after commit and receipts are fenced by that lease.",
+      "invariant": "Only one owner may apply an OMS fulfilment event, transfer a verified connection into the Meta outbox, or dispatch a Meta conversion; retries retain event identity and a failed outbox write preserves server confirmation.",
+      "acquisition": "Explicit event publication or dispatch transaction. Connection recovery runs after the MCP response or from maintenance; ordinary MCP requests do not acquire it.",
+      "permittedWork": "Revalidate ownership, consent and affected row identities; apply bounded event/task writes only. Connection recovery handles at most 25 rows and serializes only allowlisted event metadata. Matching and external provider effects remain outside the protected phase.",
+      "release": "OMS releases after its bounded event/order transaction. Connection recovery commits the deduplicated enqueue and recorded marker together. Meta dispatch commits its 30-second lease before provider HTTP; receipts remain fenced by that lease.",
       "callers": [
         "lib/agentic/retail/mock-thailand.ts",
         "lib/agentic/store/postgres.ts",
         "lib/agentic/store/postgres.ts:claimOutboxBatch",
-        "lib/meta-dispatch.ts:sendMetaEvent"
+        "lib/meta-dispatch.ts:sendMetaEvent",
+        "lib/connect-verification.ts:flushConnectMeta"
       ],
       "tests": [
         "test/service-efficiency/retained-claims.integration.test.ts",
-        "test/meta-tracking.integration.test.ts"
+        "test/meta-tracking.integration.test.ts",
+        "test/connect-verification.integration.test.ts"
       ],
       "verification": "Required named cases reconciled with successful execution by lock-register-verification.json in the unchanged-source scoped gate; historical RED evidence remains separate.",
       "cases": [
@@ -954,6 +956,18 @@
         {
           "file": "test/meta-tracking.integration.test.ts",
           "name": "serializes concurrent dispatch without keeping a transaction open during HTTP"
+        },
+        {
+          "file": "test/connect-verification.integration.test.ts",
+          "name": "restricts status to the owner, then records one confirmation under concurrent calls"
+        },
+        {
+          "file": "test/connect-verification.integration.test.ts",
+          "name": "preserves confirmation when Meta is disabled and recovers the same event later"
+        },
+        {
+          "file": "test/connect-verification.integration.test.ts",
+          "name": "keeps the verified record if the advertising outbox write fails and retries without duplicates"
         }
       ],
       "historicalCallers": [
@@ -2258,6 +2272,16 @@
         19
       ],
       "justification": "Claim one conversion by ID, recheck consent/destination and write a bounded lease in a short transaction. No provider I/O holds the row lock; a conditional lease receipt prevents a stale sender from overriding withdrawal or a newer owner."
+    },
+    {
+      "file": "lib/connect-verification.ts",
+      "owner": "flushConnectMeta",
+      "key": "e07f2b4f9c49ff87fd33f2316c9e1df3c806cb7b2bb5e0df58af361b253fc27f",
+      "statement": "` select id,provider,locale,campaign,verified_at,meta_context_id from public.connect_attempts where environment=${metaConfig().environment} and verified_at is not null and meta_recorded_at is null ${id ? tx`and id=${id}::uuid` : tx``} order by verified_at limit 25 for update skip locked`",
+      "mechanisms": [
+        19
+      ],
+      "justification": "Claim at most 25 verified connections before atomically inserting their deduplicated Meta event/task and marking the connection recorded. SKIP LOCKED lets concurrent recovery callers take distinct batches; rollback leaves confirmation intact and retryable. Provider HTTP runs later in the Meta dispatcher after commit."
     }
   ]
 }

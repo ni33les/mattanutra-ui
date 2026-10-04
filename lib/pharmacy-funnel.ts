@@ -2,24 +2,37 @@ import { getSql } from "@/lib/db";
 import { adminDashboardFilterSql, type AdminDashboardFilters } from "@/lib/admin-dashboard-filters";
 import { pharmacySources, pharmacySource, type PharmacySource } from "@/lib/pharmacy-acquisition";
 export type PharmacyFunnelStage = "landing" | "started" | "captured" | "revealed" | "orders";
-export type PharmacyFunnelEvent = Readonly<{ id: string; ray: string | null; planId: string | null; pharmacy: string; source: PharmacySource; stage: PharmacyFunnelStage; orderId?: string }>;
-export type PharmacySourceFunnel = { pharmacy: string; source: PharmacySource; landing: number; started: number; captured: number; revealed: number; orders: number; orderedJourneys: number };
+export type PharmacyFunnelEvent = Readonly<{ id: string; ray: string | null; planId: string | null; pharmacy: string; source: PharmacySource; stage: PharmacyFunnelStage; orderId?: string; occurredAt?: Date | string }>;
+export type PharmacySourceFunnel = { pharmacy: string; source: PharmacySource; landing: number; started: number; captured: number; revealed: number; orders: number; orderedJourneys: number; transitions?: Partial<Record<PharmacyFunnelStage, { numerator: number; denominator: number }>> };
 /** A capture connects anonymous entry events to the durable assessment; repeated events never add conversions. */
 export function summarizePharmacySources(events: readonly PharmacyFunnelEvent[]): PharmacySourceFunnel[] {
   const byRay = new Map(events.filter(event => event.ray && event.planId).map(event => [`${event.pharmacy}:${event.ray}`, event.planId!]));
-  const groups = new Map<string, {row: PharmacySourceFunnel; sets: Map<string, Set<string>>}>();
+  const groups = new Map<string, {row: PharmacySourceFunnel; sets: Map<string, Set<string>>; times: Map<PharmacyFunnelStage, Map<string, number>> }>();
   for (const pharmacy of [...new Set(events.map(event => event.pharmacy))].sort()) for (const source of pharmacySources) {
-    groups.set(`${pharmacy}:${source}`, { row: { pharmacy, source, landing: 0, started: 0, captured: 0, revealed: 0, orders: 0, orderedJourneys: 0 }, sets: new Map() });
+    groups.set(`${pharmacy}:${source}`, { row: { pharmacy, source, landing: 0, started: 0, captured: 0, revealed: 0, orders: 0, orderedJourneys: 0 }, sets: new Map(), times: new Map() });
   }
   for (const event of events) {
     const group = groups.get(`${event.pharmacy}:${event.source}`)!;
     const subject = event.planId || (event.ray && byRay.get(`${event.pharmacy}:${event.ray}`)) || event.ray || event.id;
+    const at = event.occurredAt ? new Date(event.occurredAt).getTime() : NaN;
+    const times = group.times.get(event.stage) ?? new Map<string, number>();
+    if (Number.isFinite(at)) times.set(subject, Math.min(times.get(subject) ?? Infinity, at));
+    group.times.set(event.stage, times);
     const set = group.sets.get(event.stage) ?? new Set<string>();
     set.add(event.stage === "orders" ? event.orderId! : subject); group.sets.set(event.stage, set);
     group.row[event.stage] = set.size;
     if (event.stage === "orders") { const purchased = group.sets.get("orderedJourneys") ?? new Set<string>(); purchased.add(subject); group.sets.set("orderedJourneys", purchased); group.row.orderedJourneys = purchased.size; }
   }
-  return [...groups.values()].map(group => group.row);
+  return [...groups.values()].map(group => {
+    const stages: PharmacyFunnelStage[] = ["landing", "started", "captured", "revealed", "orders"];
+    group.row.transitions = {};
+    for (let i=1; i<stages.length; i++) {
+      const from = group.times.get(stages[i-1]), to = group.times.get(stages[i]);
+      group.row.transitions[stages[i]] = { denominator: from?.size ?? 0,
+        numerator: from ? [...from].filter(([subject, at]) => (to?.get(subject) ?? -Infinity) >= at).length : 0 };
+    }
+    return group.row;
+  });
 }
 export async function getPharmacySourceFunnel(start: Date | null, filters: AdminDashboardFilters): Promise<PharmacySourceFunnel[]> {
   const sql = getSql(); if (!sql) return [];
@@ -36,7 +49,7 @@ export async function getPharmacySourceFunnel(start: Date | null, filters: Admin
   // Project durable orders into existing filter columns. BPM delivery is not evidence of payment or a prerequisite for an order count.
   const orders = await sql`
     select * from (
-      select o.id::text, o.metadata->>'planId' as plan_id, o.metadata->>'planId' as "planId",
+      select o.id::text, o.placed_at as occurred_at, o.metadata->>'planId' as plan_id, o.metadata->>'planId' as "planId",
         coalesce(o.metadata #>> '{acquisition,ray}', a.answers #>> '{inStorePharmacy,acquisition,ray}') as ray,
         coalesce(o.metadata->>'pharmacySlug', a.answers->'inStorePharmacy'->>'slug', org.slug) as pharmacy,
         coalesce(o.metadata #>> '{acquisition,source}', a.answers #>> '{inStorePharmacy,acquisition,source}', 'unknown') as source_detail,
@@ -51,7 +64,7 @@ export async function getPharmacySourceFunnel(start: Date | null, filters: Admin
     ) orders where ${adminDashboardFilterSql(sql, filters)}`;
   const stages: Record<string, PharmacyFunnelStage> = {pharmacy_landing_viewed:"landing",assessment_started:"started",chat_start:"started",assessment_submitted:"captured",assessment_captured:"captured",assessment_recaptured:"captured",formulation_page_viewed:"revealed"};
   return summarizePharmacySources([
-    ...events.map(row => ({ id: row.id, ray: row.ray, planId: row.plan_id, pharmacy: row.pharmacy, source: pharmacySource(row.source,"unknown"), stage: stages[row.event_name] })),
-    ...orders.map(row => ({ id: row.id, orderId: row.id, ray: row.ray, planId: row.plan_id, pharmacy: row.pharmacy, source: pharmacySource(row.source_detail,"unknown"), stage: "orders" as const }))
+    ...events.map(row => ({ id: row.id, ray: row.ray, planId: row.plan_id, pharmacy: row.pharmacy, source: pharmacySource(row.source,"unknown"), stage: stages[row.event_name], occurredAt: row.occurred_at })),
+    ...orders.map(row => ({ id: row.id, orderId: row.id, ray: row.ray, planId: row.plan_id, pharmacy: row.pharmacy, source: pharmacySource(row.source_detail,"unknown"), stage: "orders" as const, occurredAt: row.occurred_at }))
   ]);
 }

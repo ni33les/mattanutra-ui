@@ -1,3 +1,5 @@
+import { funnelBpmSource, webJourneyEventNames } from "@/lib/admin-funnel-events";
+import { getAdminMcpFunnel, type McpFunnelReport } from "@/lib/admin-mcp-funnel";
 import { getPharmacySourceFunnel, type PharmacySourceFunnel } from "@/lib/pharmacy-funnel";
 import { getSql } from "@/lib/db";
 import {
@@ -28,6 +30,7 @@ export type AdminFlowNodeId =
   | "dropoffAfterSubmission"
   | "deliveryDetailsConfirmed"
   | "formulationReady"
+  | "healthscoreDisplayed"
   | "healthscoreViewed"
   | "landingViewed"
   | "marketplaceClicked"
@@ -60,6 +63,9 @@ export type AdminFlowEdge = Readonly<{
 }>;
 
 export type AdminFlowData = Readonly<{
+  journeyChannel?: "web";
+  mcp?: McpFunnelReport;
+  transitions?: Partial<Record<AdminConversionTargetId, { numerator: number; denominator: number }>>;
   pharmacySources?: PharmacySourceFunnel[];
   databaseAvailable: boolean;
   edges: AdminFlowEdge[];
@@ -68,6 +74,7 @@ export type AdminFlowData = Readonly<{
   range: AdminDashboardRange;
   series: {
     bucketLabels: string[];
+    conversionRate?: number[];
     nodes: Partial<Record<AdminFlowNodeId, number[]>>;
   };
   summary: {
@@ -110,7 +117,7 @@ export const defaultAdminConversionTargets = {
   proConversions: 1
 } satisfies AdminConversionTargets;
 
-type FlowRow = Readonly<{
+export type FlowRow = Readonly<{
   event_name: string;
   event_status: string | null;
   event_type: string | null;
@@ -127,6 +134,7 @@ const coreNodeIds: AdminFlowNodeId[] = [
   "assessmentStarted",
   "assessmentSubmitted",
   "healthscoreViewed",
+  "healthscoreDisplayed",
   "planSelected",
   "precisionPaid",
   "proPaid",
@@ -355,7 +363,7 @@ function bucketDateFormatter(range: AdminDashboardRange) {
   });
 }
 
-function buildFlowBuckets(range: AdminDashboardRange, rows: FlowRow[]) {
+function buildFlowBuckets(range: AdminDashboardRange, rows: readonly FlowRow[]) {
   const now = new Date();
   const buckets: Array<{ end: Date; label: string; start: Date }> = [];
   const formatter = bucketDateFormatter(range);
@@ -493,7 +501,7 @@ function nodesForRow(row: FlowRow): AdminFlowNodeId[] {
   }
 
   if (row.event_name === "assessment_viewed") {
-    return ["assessmentViewed"];
+    return ["landingViewed", "assessmentViewed"];
   }
 
   if (row.event_name === "assessment_started") {
@@ -509,8 +517,14 @@ function nodesForRow(row: FlowRow): AdminFlowNodeId[] {
   }
 
   if (row.event_name === "healthscore_viewed") {
-    return ["healthscoreViewed"];
+    return ["landingViewed", "healthscoreViewed", "healthscoreDisplayed"];
   }
+
+  if (row.event_name === "healthscore_page_viewed") {
+    return ["landingViewed", "healthscoreViewed"];
+  }
+
+  if (row.event_name === "web_page_viewed") return ["landingViewed"];
 
   if (row.event_name === "plan_selected") {
     return ["planSelected"];
@@ -529,7 +543,7 @@ function nodesForRow(row: FlowRow): AdminFlowNodeId[] {
   }
 
   if (row.event_name === "formulation_page_viewed") {
-    return ["resultsViewed"];
+    return ["landingViewed", "resultsViewed"];
   }
 
   if (row.event_name === "chat_channel_clicked") {
@@ -541,7 +555,7 @@ function nodesForRow(row: FlowRow): AdminFlowNodeId[] {
   }
 
   if (row.event_name === "retail_product_checkout_viewed") {
-    return ["productCheckoutViewed"];
+    return ["landingViewed", "productCheckoutViewed"];
   }
 
   if (row.event_name === "retail_delivery_details_confirmed") {
@@ -588,7 +602,7 @@ function nodesForRow(row: FlowRow): AdminFlowNodeId[] {
   }
 
   if (row.event_name === "order_tracking_viewed") {
-    return ["orderTrackingViewed"];
+    return ["landingViewed", "orderTrackingViewed"];
   }
 
   return [];
@@ -750,141 +764,8 @@ export async function updateAdminConversionTargets(input: Readonly<{
   return getAdminConversionTargets();
 }
 
-export async function getAdminFlowData(
-  range: AdminDashboardRange,
-  filters: AdminDashboardFilters
-): Promise<AdminFlowData> {
-  const sql = getSql();
-
-  if (!sql) {
-    return emptyFlow(range);
-  }
-
-  try {
-    const targets = await getAdminConversionTargets();
-    const start = queryStartForRange(range);
-    const rows = start
-      ? await sql<FlowRow[]>`
-          select
-            id::text,
-            ray::text,
-            plan_id::text,
-            event_name,
-            event_type,
-            event_status,
-            selected_plan::text,
-            occurred_at
-          from public.bpm
-          where coalesce(traffic_source,'') <> 'pharmacy'
-            and not exists (select 1 from public.assessments a where a.plan_id=bpm.plan_id and a.answers ? 'inStorePharmacy')
-            and occurred_at >= ${start}
-            and ${adminDashboardFilterSql(sql, filters)}
-            and (
-              event_name in (
-                'assessment_captured',
-                'assessment_recaptured',
-                'assessment_started',
-                'assessment_submitted',
-                'assessment_viewed',
-                'blog_article_viewed',
-                'chat_channel_clicked',
-                'formulation_page_viewed',
-                'formulation_ready',
-                'free_email_requested',
-                'free_email_sent',
-                'healthscore_viewed',
-                'home_viewed',
-                'library_article_viewed',
-                'product_clicked',
-                'plan_selected',
-                'order_tracking_viewed',
-                'retail_customer_order_created',
-                'retail_delivery_details_confirmed',
-                'retail_order_awaiting_stock',
-                'retail_order_cancelled',
-                'retail_order_created',
-                'retail_order_delivered',
-                'retail_order_returned',
-                'retail_order_shipped',
-                'retail_product_checkout_opened',
-                'retail_product_checkout_requested',
-                'retail_product_checkout_session_created',
-                'retail_product_checkout_viewed',
-                'retail_product_payment_succeeded'
-              )
-              or event_name in (
-                'checkout_completed',
-                'checkout_paid',
-                'payment_completed',
-                'payment_confirmed',
-                'payment_succeeded',
-                'plan_paid'
-              )
-              or event_type = 'payment'
-            )
-          order by occurred_at asc
-          limit 100000
-        `
-      : await sql<FlowRow[]>`
-          select
-            id::text,
-            ray::text,
-            plan_id::text,
-            event_name,
-            event_type,
-            event_status,
-            selected_plan::text,
-            occurred_at
-          from public.bpm
-          where coalesce(traffic_source,'') <> 'pharmacy'
-            and not exists (select 1 from public.assessments a where a.plan_id=bpm.plan_id and a.answers ? 'inStorePharmacy')
-            and ${adminDashboardFilterSql(sql, filters)}
-            and (
-              event_name in (
-              'assessment_captured',
-              'assessment_recaptured',
-              'assessment_started',
-              'assessment_submitted',
-              'assessment_viewed',
-              'blog_article_viewed',
-              'chat_channel_clicked',
-              'formulation_page_viewed',
-              'formulation_ready',
-              'free_email_requested',
-              'free_email_sent',
-              'healthscore_viewed',
-              'home_viewed',
-              'library_article_viewed',
-              'product_clicked',
-              'plan_selected',
-              'order_tracking_viewed',
-              'retail_customer_order_created',
-              'retail_delivery_details_confirmed',
-              'retail_order_awaiting_stock',
-              'retail_order_cancelled',
-              'retail_order_created',
-              'retail_order_delivered',
-              'retail_order_returned',
-              'retail_order_shipped',
-              'retail_product_checkout_opened',
-              'retail_product_checkout_requested',
-              'retail_product_checkout_session_created',
-              'retail_product_checkout_viewed',
-              'retail_product_payment_succeeded'
-            )
-            or event_name in (
-              'checkout_completed',
-              'checkout_paid',
-              'payment_completed',
-              'payment_confirmed',
-              'payment_succeeded',
-              'plan_paid'
-            )
-            or event_type = 'payment'
-            )
-          order by occurred_at asc
-          limit 100000
-        `;
+/** Pure aggregation shared by the report and regression tests. Counts never imply missing steps. */
+export function buildAdminFlowData(range: AdminDashboardRange, rows: readonly FlowRow[], targets: AdminConversionTargets = defaultAdminConversionTargets): AdminFlowData {
     const planEventsByRay = new Map<
       string,
       Array<{ planId: string; time: Date }>
@@ -1080,23 +961,55 @@ export async function getAdminFlowData(
           !steps.has("retailOrderCancelled") &&
           !steps.has("retailOrderReturned"))
     ).length;
+    const convertedAfterHealthScore = [...subjects.values()].filter(steps => {
+      const reached = steps.get("healthscoreViewed");
+      return reached && (["precisionPaid", "proPaid", "retailOrderCreated"] as const).some(stage => {
+        const converted = steps.get(stage);
+        return converted && converted >= reached && (stage !== "retailOrderCreated" || !steps.has("retailOrderCancelled") && !steps.has("retailOrderReturned"));
+      });
+    });
+    const conversionRateSeries = buckets.map((bucket, index) => {
+      const denominator = seriesByNode.healthscoreViewed?.[index] ?? 0;
+      const numerator = convertedAfterHealthScore.filter(steps => {
+        const reached = steps.get("healthscoreViewed")!;
+        return reached >= bucket.start && reached < bucket.end;
+      }).length;
+      return denominator ? 100 * numerator / denominator : 0;
+    });
     const reachedHealthScore = countByNode.get("healthscoreViewed") ?? 0;
 
+    const stagePairs: Array<[AdminConversionTargetId, AdminFlowNodeId, AdminFlowNodeId]> = [
+      ["assessmentStarts", "landingViewed", "assessmentStarted"],
+      ["assessmentCompletions", "assessmentStarted", "assessmentSubmitted"],
+      ["healthScoreViews", "assessmentSubmitted", "healthscoreViewed"],
+      ["precisionConversions", "healthscoreViewed", "precisionPaid"],
+      ["proConversions", "healthscoreViewed", "proPaid"],
+      ["productOrders", "healthscoreViewed", "retailOrderCreated"]
+    ];
+    const transitions = Object.fromEntries(stagePairs.map(([id, from, to]) => [id, {
+      denominator: countByNode.get(from) ?? 0,
+      numerator: [...subjects.values()].filter(steps => {
+        const entered = steps.get(from), advanced = steps.get(to);
+        return entered && advanced && advanced >= entered;
+      }).length
+    }]));
     return {
       databaseAvailable: true,
-      pharmacySources: await getPharmacySourceFunnel(start, filters),
+      journeyChannel: "web",
+      transitions,
       edges,
       generatedAt: new Date().toISOString(),
       nodes: [...nodes, ...dropoffNodes],
       range,
       series: {
         bucketLabels: buckets.map((bucket) => bucket.label),
+        conversionRate: conversionRateSeries,
         nodes: seriesByNode
       },
       summary: {
         conversionRate:
           reachedHealthScore > 0
-            ? Number(((convertedSubjects / reachedHealthScore) * 100).toFixed(1))
+            ? Number(((convertedAfterHealthScore.length / reachedHealthScore) * 100).toFixed(1))
             : 0,
         converted: convertedSubjects,
         entered: countByNode.get("landingViewed") ?? 0,
@@ -1104,6 +1017,28 @@ export async function getAdminFlowData(
       },
       targets
     };
+
+}
+
+export async function getAdminFlowData(range: AdminDashboardRange, filters: AdminDashboardFilters): Promise<AdminFlowData> {
+  const sql = getSql();
+  if (!sql) return emptyFlow(range);
+  try {
+    const start = queryStartForRange(range);
+    const names = [...webJourneyEventNames, ...paidEventNames];
+    const [targets, rows, pharmacySources, mcp] = await Promise.all([
+      getAdminConversionTargets(),
+      sql<FlowRow[]>`
+        select id::text,ray::text,plan_id::text,funnel_event_name as event_name,event_type,event_status,selected_plan::text,occurred_at
+        from ${funnelBpmSource(sql)}
+        where journey_channel='web' and (${start}::timestamptz is null or occurred_at>=${start})
+          and ${adminDashboardFilterSql(sql, filters)}
+          and (funnel_event_name=any(${names}::text[]) or event_type='payment')
+        order by occurred_at,id limit 100000`,
+      getPharmacySourceFunnel(start, filters),
+      getAdminMcpFunnel(start)
+    ]);
+    return { ...buildAdminFlowData(range, rows, targets), pharmacySources, mcp };
   } catch (error) {
     console.error("Unable to load admin flow data", error);
     return emptyFlow(range);

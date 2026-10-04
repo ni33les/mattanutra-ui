@@ -71,7 +71,9 @@ export function metaCustomData(name: MetaEventName, value: unknown, environment:
   const connection = name.startsWith("Mcp") || String(input.stage).startsWith("connect");
   if (!connection && typeof input.planId === "string" && uuidPattern.test(input.planId)) data.plan_id = input.planId;
   if (["en", "th", "zh-CN"].includes(String(input.locale))) data.locale = String(input.locale);
-  if (["web", "pharmacy", "mcp_web"].includes(String(input.channel))) data.channel = String(input.channel);
+  if (["web", "retail", "mcp", "pharmacy", "mcp_web"].includes(String(input.channel))) {
+    data.channel = input.channel === "pharmacy" ? "retail" : input.channel === "mcp_web" ? "mcp" : String(input.channel);
+  }
   if (["landing", "assessment", "results", "offer", "basket", "checkout", "confirmation", "content", "connect", "connect_guide", "connect_verified"].includes(String(input.stage))) data.funnel_stage = String(input.stage);
   if (connection && ["claude", "perplexity", "chatgpt", "grok"].includes(String(input.provider))) data.provider = String(input.provider);
   if (!connection && ["precision", "pro"].includes(String(input.offer))) data.offer = String(input.offer);

@@ -27,6 +27,12 @@ function pageEventForPath(pathname: string) {
   }
 
   if (
+    new RegExp(`^/(${localePattern})/nutrition/healthscore$`).test(pathname)
+  ) {
+    return { eventName: "healthscore_page_viewed", eventType: "funnel" };
+  }
+
+  if (
     new RegExp(`^/(${localePattern})/assessment/results`).test(pathname) ||
     new RegExp(`^/(${localePattern})/${revealPathPattern}`).test(pathname)
   ) {
