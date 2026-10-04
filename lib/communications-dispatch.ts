@@ -12,7 +12,7 @@ import {
   selectBestCommunicationChannel
 } from "@/lib/communication-channel-utils";
 import { formatOutboundLineMessage } from "@/lib/line-message-format";
-import { adminNotificationLineMessage } from "@/lib/admin-notification";
+import { adminNotificationLineMessage, isPaymentExpiryNotification } from "@/lib/admin-notification";
 import {
   sendTransactionalEmail,
   type TransactionalEmailAttachment
@@ -801,6 +801,17 @@ function lineRecipient(row: DeliveryTargetRow) {
 }
 
 async function deliverLineMessage(row: DeliveryTargetRow) {
+  // Also suppress alerts queued before the routing policy changed, including retries.
+  if (isPaymentExpiryNotification(row.message_type, row.metadata)) {
+    const reason = "Payment expiry is retained in reporting without LINE alerts";
+    const message = await updateCommunicationMessageStatus({
+      errorMessage: reason,
+      messageId: row.id,
+      status: "skipped"
+    });
+    return { attempted: false, configured: true, message, provider: "line", reason } satisfies CommunicationDispatchResult;
+  }
+
   const accessToken = configuredLineAccessToken();
 
   if (!accessToken) {

@@ -23,7 +23,10 @@ const sql = Object.assign(async (strings: TemplateStringsArray, ...values: unkno
   const query = strings.reduce((result, part, index) => result + (index ? `$${index}` : "") + part, "");
   if (/from public.retail_customer_orders/i.test(query)) return [{ ...orderRow }];
   if (/from public.retail_checkout_payments/i.test(query)) return [{ status: paymentStatus }];
-  if (/from public.communication_channels/i.test(query)) return channels;
+  if (/from public.communication_channels/i.test(query)) {
+    const enabledTypes = values.find(Array.isArray) as string[] | undefined;
+    return enabledTypes ? channels.filter(channel => enabledTypes.includes(channel.channel_type)) : channels;
+  }
   if (/insert into public.communication_messages/i.test(query)) {
     const match = query.match(/communication_messages\s*\(([^)]+)\)\s*values\s*\(([\s\S]+)\)\s*returning/i)!;
     const fields = match[1].split(",").map(field => field.trim());
@@ -150,6 +153,64 @@ test("platform messages route to the platform account and keep technical context
     assert.doesNotMatch(message.html!, /Private raw error|communication_dispatch/);
   }
   await assert.rejects(routeAdminCommunication({ organisationId: pharmacyId, eventKey: "platform_payment_failed" }), /does not belong/);
+});
+
+test("payment expiry retains email delivery but creates no LINE message or dispatch task", async () => {
+  for (const environment of ["dev", "uat", "prd"]) {
+    process.env.MATTANUTRA_ENV = environment;
+    const result = await routeAdminCommunication({
+      organisationId: platformId, eventKey: "platform_payment_failed", resourceType: "payment", resourceId: paymentId,
+      metadata: { paymentStatus: "expired", sourceSurface: "web" }
+    });
+    assert.deepEqual(result.messages.map(message => message.provider), ["email"]);
+    assert.equal(result.dispatchTasks.length, 1);
+    assert.equal((await dispatchCommunicationMessage(result.messages[0].id)).message.status, "sent");
+  }
+  assert.equal(emails.length, 3);
+  assert.equal(pushes.length, 0);
+});
+
+test("explicit LINE routing cannot override payment expiry suppression", async () => {
+  const result = await routeAdminCommunication({
+    organisationId: platformId, eventKey: "platform_payment_failed", channelType: "line",
+    metadata: { paymentStatus: "expired" }
+  });
+  assert.equal(result.messages.length, 0);
+  assert.equal(result.dispatchTasks.length, 0);
+  assert.equal(emails.length, 0);
+  assert.equal(pushes.length, 0);
+});
+
+test("genuine payment failures still send LINE alerts", async () => {
+  const result = await routeAdminCommunication({
+    organisationId: platformId, eventKey: "platform_payment_failed", channelType: "line",
+    metadata: { paymentStatus: "failed" }
+  });
+  assert.equal(result.messages.length, 1);
+  assert.equal((await dispatchCommunicationMessage(result.messages[0].id)).message.status, "sent");
+  assert.equal(pushes.length, 1);
+  assert.equal(result.messages[0].body, "[UAT] Payment failed.");
+});
+
+test("previously queued payment expiry alerts and retries are skipped without contacting LINE", async () => {
+  channels = channels.filter(channel => channel.channel_type === "line");
+  const result = await routeAdminCommunication({
+    organisationId: platformId, eventKey: "platform_payment_failed", channelType: "line",
+    metadata: { paymentStatus: "failed" }
+  });
+  // Reproduce an expiry alert stored before the new routing policy.
+  const row = messages.get(result.messages[0].id)!;
+  row.metadata = { ...(row.metadata as Record<string, unknown>), paymentStatus: "expired" };
+  row.body = "[UAT] Payment expired.";
+  const delivery = await dispatchCommunicationMessage(row.id);
+  assert.equal(delivery.attempted, false);
+  assert.equal(delivery.message.status, "skipped");
+  assert.equal(delivery.message.sentAt, null);
+  const retry = await retryCommunicationMessage(row.id);
+  assert.equal(retry.attempted, false);
+  assert.equal(retry.message.status, "skipped");
+  assert.equal(pushes.length, 0);
+  assert.equal(routedTasks.length, 0);
 });
 
 test("a failed LINE delivery can retry with the same linked status", async () => {
