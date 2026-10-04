@@ -63,8 +63,8 @@ function assertOrder(source: string, labels: readonly string[]) {
 }
 
 describe("final reveal UX", () => {
-  it("leaves the reveal content blank while loading its saved result", () => {
-    assert.match(wrapper, /if \(loadState === "loading"\) \{\s*return null;\s*\}/);
+  it("shows progress while loading its saved result", () => {
+    assert.match(wrapper, /if \(loadState === "loading"\) \{\s*return <FunnelLoading locale=\{locale\} stage="opening" \/>;\s*\}/);
     assert.doesNotMatch(wrapper, /NutritionGuidancePreparingPanel/);
     assert.match(wrapper, /data-testid="formulation-retry"/);
   });

@@ -225,6 +225,14 @@ test("final reveal renders the handoff fonts and hero eyebrow rules", async ({
       height: viewport.height,
       width: viewport.width,
     });
+    // Doses must remain readable without expanding a nutrient on phones.
+    for (const dose of await page.locator(".mn-reveal-formula .nutrient-dose").all()) {
+      await expect(dose).toBeVisible();
+      await expect(dose).not.toHaveText("");
+      const bounds = await dose.boundingBox();
+      expect(bounds!.x).toBeGreaterThanOrEqual(0);
+      expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(viewport.width);
+    }
 
     for (const [sectionName, locator] of viewport.sections) {
       await locator.scrollIntoViewIfNeeded();

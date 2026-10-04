@@ -3,8 +3,9 @@ import { trackMetaEvent } from "@/lib/meta-client";
 
 import { fetchWithBodyDeadline } from "@/lib/funnel-polling";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { EmbeddedCheckout, EmbeddedCheckoutProvider } from "@stripe/react-stripe-js";
 import { loadStripe } from "@stripe/stripe-js";
+import { EmbeddedPaymentCheckout } from "@/components/nutrition-flow/embedded-payment-checkout";
+import { FunnelLoading } from "@/components/nutrition-flow/funnel-loading";
 import type { AssessmentPlan } from "@/lib/assessment-snapshot";
 import type { Locale } from "@/lib/i18n";
 import { paymentCheckoutPath, type PaymentSourceSurface } from "@/lib/payment-paths";
@@ -12,7 +13,6 @@ import { nutritionHealthScorePath } from "@/lib/nutrition-paths";
 import { usePaymentRecovery } from "@/components/nutrition-flow/use-payment-recovery";
 
 const CHECKOUT_SESSION_TIMEOUT_MS = 15_000;
-const STRIPE_LOAD_TIMEOUT_MS = 15_000;
 
 type StripeCheckoutPanelProps = Readonly<{
   attemptId: string;
@@ -25,6 +25,9 @@ type StripeCheckoutPanelProps = Readonly<{
 
 const copy = {
   en: {
+    secureCheckout: "Secure checkout",
+    paymentHelp: "Already paid or need help?",
+    browserHelp: "If checkout will not open inside Facebook, copy this link and open it in Safari or Chrome.",
     cancel: "Cancel",
     cancelling: "Checking payment…",
     cancelPending: "Payment may still be processing. Check its status before trying again.",
@@ -50,10 +53,13 @@ const copy = {
       "Local development is using mock payment mode. No Stripe keys or card details are needed.",
     retry: "Try again",
     stripeLoadTimeout:
-      "Stripe did not finish loading. Please check browser blockers.",
+      "The secure payment form could not load. Please try again, or open this checkout in Safari or Chrome.",
     unable: "We could not open checkout at this time."
   },
   th: {
+    secureCheckout: "ชำระเงินอย่างปลอดภัย",
+    paymentHelp: "ชำระเงินแล้วหรือต้องการความช่วยเหลือ?",
+    browserHelp: "หากเปิดหน้าชำระเงินใน Facebook ไม่ได้ ให้คัดลอกลิงก์นี้แล้วเปิดใน Safari หรือ Chrome",
     cancel: "ยกเลิก",
     cancelling: "กำลังตรวจสอบการชำระเงิน…",
     cancelPending: "การชำระเงินอาจยังอยู่ระหว่างดำเนินการ โปรดตรวจสอบสถานะก่อนลองอีกครั้ง",
@@ -79,10 +85,13 @@ const copy = {
       "โหมดพัฒนาบนเครื่องนี้ใช้การชำระเงินจำลอง จึงไม่ต้องใช้คีย์ Stripe หรือข้อมูลบัตร",
     retry: "ลองอีกครั้ง",
     stripeLoadTimeout:
-      "Stripe โหลดไม่เสร็จ โปรดตรวจสอบตัวบล็อกในเบราว์เซอร์",
+      "ไม่สามารถโหลดแบบฟอร์มชำระเงินได้ โปรดลองอีกครั้ง หรือเปิดลิงก์ชำระเงินนี้ใน Safari หรือ Chrome",
     unable: "ไม่สามารถเปิดหน้าชำระเงินได้ในขณะนี้"
   },
   "zh-CN": {
+    secureCheckout: "安全结账",
+    paymentHelp: "已付款或需要帮助？",
+    browserHelp: "如果无法在 Facebook 内打开结账，请复制此链接并在 Safari 或 Chrome 中打开。",
     cancel: "取消",
     cancelling: "正在检查付款…",
     cancelPending: "付款可能仍在处理中。请先检查付款状态，再重试。",
@@ -105,7 +114,7 @@ const copy = {
     mockCta: "模拟支付成功",
     mockIntro: "本地开发正在使用模拟支付模式，不需要 Stripe 密钥或银行卡信息。",
     retry: "重试",
-    stripeLoadTimeout: "Stripe 未完成加载。请检查浏览器拦截器。",
+    stripeLoadTimeout: "无法加载安全付款表单。请重试，或在 Safari 或 Chrome 中打开此次结账。",
     unable: "目前无法打开结账。"
   }
 };
@@ -123,10 +132,10 @@ export function StripeCheckoutPanel({
   const [error, setError] = useState("");
   const [attemptEnded, setAttemptEnded] = useState(false);
   const [clientSecret, setClientSecret] = useState<string | null>(null);
-  const [checkoutAttempt, setCheckoutAttempt] = useState(0);
   const [isLoadingSession, setIsLoadingSession] = useState(false);
   const [isMockCheckout, setIsMockCheckout] = useState(false);
-  const [stripeReady, setStripeReady] = useState(false);
+  const [checkoutReady, setCheckoutReady] = useState(false);
+  const [paymentSubmitted, setPaymentSubmitted] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
   const [recoveryCopyMessage, setRecoveryCopyMessage] = useState("");
   const [manualRecoveryUrl, setManualRecoveryUrl] = useState("");
@@ -134,8 +143,11 @@ export function StripeCheckoutPanel({
   const checkPayment = recovery.check;
   const handleCheckoutComplete = useCallback(() => {
     setError("");
+    setPaymentSubmitted(true);
     checkPayment();
   }, [checkPayment]);
+  const handleCheckoutReady = useCallback(() => setCheckoutReady(true), []);
+  const handleCheckoutError = useCallback(() => setError(labels.stripeLoadTimeout), [labels.stripeLoadTimeout]);
   const trimmedPublishableKey = publishableKey.trim();
   const hasStripePublishableKey = trimmedPublishableKey.length > 0;
   const hasValidStripePublishableKey = /^pk_(test|live)_/.test(
@@ -148,6 +160,9 @@ export function StripeCheckoutPanel({
         : Promise.resolve(null),
     [hasValidStripePublishableKey, trimmedPublishableKey]
   );
+  // Initialization handles rejection once a session is ready. Avoid an
+  // unhandled rejection if the script fails before the session request returns.
+  useEffect(() => { void stripePromise.catch(() => undefined); }, [stripePromise]);
   const requestCheckoutSession = useCallback(async (signal?: AbortSignal) => {
     setError("");
 
@@ -261,13 +276,9 @@ export function StripeCheckoutPanel({
       return;
     }
 
-    setError("");
-    setClientSecret(null);
-    setPaymentId(null);
-    setIsMockCheckout(false);
-    setStripeReady(false);
-    setCheckoutAttempt((attempt) => attempt + 1);
-
+    // A fresh document retries failed Stripe scripts and pending provider
+    // initialization while retaining the same idempotent payment attempt.
+    window.location.reload();
   }, [attemptEnded]);
 
   async function cancelCheckout() {
@@ -305,51 +316,6 @@ export function StripeCheckoutPanel({
       setManualRecoveryUrl(url);
     }
   }
-
-  useEffect(() => {
-    if (!hasValidStripePublishableKey) {
-      return;
-    }
-
-    let cancelled = false;
-    const timeout = window.setTimeout(() => {
-      if (!cancelled) {
-        setError(labels.stripeLoadTimeout);
-      }
-    }, STRIPE_LOAD_TIMEOUT_MS);
-
-    stripePromise
-      .then((stripe) => {
-        if (cancelled) {
-          return;
-        }
-
-        window.clearTimeout(timeout);
-
-        if (!stripe) {
-          setError(labels.stripeLoadTimeout);
-          return;
-        }
-
-        setStripeReady(true);
-      })
-      .catch(() => {
-        if (!cancelled) {
-          window.clearTimeout(timeout);
-          setError(labels.stripeLoadTimeout);
-        }
-      });
-
-    return () => {
-      cancelled = true;
-      window.clearTimeout(timeout);
-    };
-  }, [
-    checkoutAttempt,
-    hasValidStripePublishableKey,
-    labels.stripeLoadTimeout,
-    stripePromise
-  ]);
 
   useEffect(() => {
     if (!hasValidStripePublishableKey || clientSecret || isMockCheckout) {
@@ -400,7 +366,6 @@ export function StripeCheckoutPanel({
       window.clearTimeout(sessionTimer);
     };
   }, [
-    checkoutAttempt,
     clientSecret,
     hasValidStripePublishableKey,
     isMockCheckout,
@@ -447,7 +412,7 @@ export function StripeCheckoutPanel({
     <div className="mn-commerce-card">
       <div className="mb-5 flex items-center justify-between gap-4">
         <p className="mn-mono-label text-xs font-bold uppercase tracking-[0.16em] text-[var(--mn-teal-deep)]">
-          {labels.loading}
+          {labels.secureCheckout}
         </p>
         {paymentId ? (
           <button
@@ -460,18 +425,6 @@ export function StripeCheckoutPanel({
           </button>
         ) : null}
       </div>
-      {paymentId && !isMockCheckout ? (
-        <div className="mb-5 rounded-lg border border-[var(--mn-line)] p-4 text-sm" data-testid="payment-recovery">
-          <p role="status" aria-live="polite">{labels.recovery[recovery.state]}</p>
-          <p className="mt-2 text-[var(--mn-ink-soft)]">{labels.recoveryHint}</p>
-          <div className="mt-3 flex flex-wrap gap-4">
-            <button className="font-semibold underline" type="button" disabled={recovery.checking} onClick={recovery.check}>{labels.checkPayment}</button>
-            <button className="font-semibold underline" type="button" onClick={() => void copyRecoveryLink()}>{labels.copyRecovery}</button>
-          </div>
-          <p className="mt-2" role="status" aria-live="polite">{recoveryCopyMessage}</p>
-          {manualRecoveryUrl ? <textarea className="mt-2 w-full rounded border p-2" aria-label={labels.copyRecovery} readOnly rows={4} value={manualRecoveryUrl} onFocus={event => event.target.select()} /> : null}
-        </div>
-      ) : null}
       {error ? (
         <div className="mb-4 rounded-lg bg-[var(--mn-error-soft)] p-3">
           <p className="text-sm font-semibold text-[var(--mn-error)]">{error}</p>
@@ -484,8 +437,9 @@ export function StripeCheckoutPanel({
           </button>
         </div>
       ) : null}
-      {!clientSecret || !stripeReady ? (
-        <div className="flex min-h-[24rem] items-center justify-center rounded-[var(--mn-radius-lg)] border border-[var(--mn-line)] bg-[var(--mn-paper-soft)] p-8 text-center">
+      {paymentSubmitted ? <FunnelLoading locale={locale} stage={recovery.state === "confirmed" ? "formula" : "payment"} /> : null}
+      {!checkoutReady && !error && !paymentSubmitted ? (
+        <div role="status" className="flex min-h-[12rem] items-center justify-center rounded-[var(--mn-radius-lg)] border border-[var(--mn-line)] bg-[var(--mn-paper-soft)] p-8 text-center">
           <div>
             <p className="mn-mono-label text-xs font-bold uppercase tracking-[0.16em] text-[var(--mn-teal-deep)]">
               {labels.loading}
@@ -497,18 +451,29 @@ export function StripeCheckoutPanel({
             ) : null}
           </div>
         </div>
-      ) : (
-        <EmbeddedCheckoutProvider
-          key={clientSecret}
-          options={{
-            clientSecret,
-            onComplete: handleCheckoutComplete
-          }}
+      ) : null}
+      {clientSecret && !paymentSubmitted ? (
+        <EmbeddedPaymentCheckout
+          clientSecret={clientSecret}
+          onComplete={handleCheckoutComplete}
+          onReady={handleCheckoutReady}
+          onError={handleCheckoutError}
           stripe={stripePromise}
-        >
-          <EmbeddedCheckout className="min-h-[32rem]" />
-        </EmbeddedCheckoutProvider>
-      )}
+        />
+      ) : null}
+      {!isMockCheckout && (paymentId || error) ? (
+        <details className="mt-5 rounded-lg border border-[var(--mn-line)] p-4 text-sm" data-testid="payment-recovery" open={paymentSubmitted || Boolean(error) || undefined}>
+          <summary className="cursor-pointer font-semibold text-[var(--mn-teal-deep)]">{labels.paymentHelp}</summary>
+          {paymentId && (paymentSubmitted || recovery.state !== "waiting") ? <p className="mt-3" role="status" aria-live="polite">{labels.recovery[recovery.state]}</p> : null}
+          <p className="mt-3 text-[var(--mn-ink-soft)]">{error ? labels.browserHelp : labels.recoveryHint}</p>
+          <div className="mt-3 flex flex-wrap gap-4">
+            {paymentId ? <button className="font-semibold underline" type="button" disabled={recovery.checking} onClick={recovery.check}>{labels.checkPayment}</button> : null}
+            <button className="font-semibold underline" type="button" onClick={() => void copyRecoveryLink()}>{labels.copyRecovery}</button>
+          </div>
+          <p className="mt-2" role="status" aria-live="polite">{recoveryCopyMessage}</p>
+          {manualRecoveryUrl ? <textarea className="mt-2 w-full rounded border p-2" aria-label={labels.copyRecovery} readOnly rows={4} value={manualRecoveryUrl} onFocus={event => event.target.select()} /> : null}
+        </details>
+      ) : null}
     </div>
   );
 }

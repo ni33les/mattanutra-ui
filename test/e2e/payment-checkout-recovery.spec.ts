@@ -50,6 +50,7 @@ async function checkout(page: Page, locale = "en") {
   await page.goto(path);
   await expect(page.getByTestId("provider-fixture")).toBeVisible();
   const panel = page.getByTestId("payment-recovery");
+  await panel.locator("summary").click();
   await expect(panel.getByRole("button").first()).toBeEnabled();
   await expect.poll(() => state.reads).toBeGreaterThan(0);
   await page.clock.pauseAt(await page.evaluate(() => Date.now() + 1000));
@@ -60,6 +61,7 @@ for (const locale of ["en", "th", "zh-CN"]) {
   test(`${locale}: completion without provider redirect opens only a server-confirmed payment`, async ({ page }) => {
     const fixture = await checkout(page, locale), before = fixture.state.reads;
     await page.evaluate(() => (window as unknown as FixtureWindow).completeCheckout());
+    await expect(page.getByTestId("funnel-loading")).toBeVisible();
     await expect.poll(() => fixture.state.reads).toBeGreaterThan(before);
     await expect(fixture.panel.getByRole("button").first()).toBeEnabled();
     expect(new URL(page.url()).pathname).toContain("/checkout");

@@ -9,6 +9,7 @@ import {
 import { ExclamationTriangleIcon } from "@heroicons/react/20/solid";
 import { getWelcomeCopy } from "@/components/chat-questionnaire/questionnaire-welcome";
 import { useFormulationPolling } from "@/components/nutrition-flow/use-formulation-polling";
+import { FunnelLoading } from "@/components/nutrition-flow/funnel-loading";
 import { formulationResultsCopy } from "@/components/formulation-results-copy";
 import {
   defaultProductStackPreferenceForResult,
@@ -86,7 +87,7 @@ export function FormulationResults({
   }, [productPollingPreference, result]);
 
   if (loadState === "loading") {
-    return null;
+    return <FunnelLoading locale={locale} stage="opening" />;
   }
 
   if (loadState === "error" || !result) {

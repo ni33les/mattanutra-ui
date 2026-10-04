@@ -52,6 +52,10 @@ export function JourneyProgress({ initial, locale, planId }: JourneyProgressProp
   }, [initial.readyForReveal, locale, planId, retryCount, router]);
 
   return (
+    <section>
+    {current.hasPaidPlan ? <p className="pt-6 text-center text-sm font-semibold text-[var(--mn-teal-deep)]" data-testid="payment-confirmed">
+      {locale === "th" ? "ยืนยันการชำระเงินแล้ว" : locale === "zh-CN" ? "付款已确认" : "Payment confirmed"}
+    </p> : null}
     <CalculatingWait copy={{ body: labels.body, disclaimer: support.calcDisclaimer,
       kicker: labels.kicker, line: support.calcLine, note: failed ? null : labels.note,
       status: failed ? labels.error : labels.building, title: labels.title }}
@@ -59,5 +63,6 @@ export function JourneyProgress({ initial, locale, planId }: JourneyProgressProp
       {failed ? <button type="button" className="mn-quiz-calc__ready-btn" data-testid="journey-progress-retry"
         onClick={() => { setFailed(false); setRetryCount(value => value + 1); }}>{labels.retry}</button> : null}
     </CalculatingWait>
+    </section>
   );
 }
