@@ -3,6 +3,7 @@ import { createHash, randomUUID } from "node:crypto";
 import type postgres from "postgres";
 import { getSql, withDatabaseTransaction } from "@/lib/db";
 import { createTask } from "@/lib/task-service";
+import type { JourneyChannel } from "@/lib/journey-channel";
 import { AGENT_CAPABILITIES } from "@/lib/system-agents";
 import { metaConfig } from "@/lib/meta-config";
 import { hashEmailForFacebook, hashPhoneForFacebook } from "@/lib/facebook-capi";
@@ -137,17 +138,34 @@ export async function recordMetaPurchase(sql: Db, input: {
   if (!config.enabled || !input.paidAt || (config.environment === "prd" && input.mode !== "live")) return null;
   const context = await boundMetaContext(sql, input.type, input.id);
   if (!context) return null;
+  const channel = await metaResourceChannel(sql, input.planId, input.type, input.id);
   const hash = hashEmailForFacebook(input.email);
   if (hash) await sql`update public.meta_tracking_contexts set matching=matching || ${sql.json({ em: [hash] })} where id=${context.id}::uuid and consent_granted`;
   return enqueueMetaEvent(sql, { context, name: "Purchase", sourceKey: `purchase:${input.sessionId || `${input.type}:${input.id}`}`,
-    occurredAt: input.paidAt, data: { planId: input.planId, value: input.amount, currency: input.currency.toUpperCase(), locale: input.locale || "en", stage: "confirmation" },
+    occurredAt: input.paidAt, data: { channel, planId: input.planId, value: input.amount, currency: input.currency.toUpperCase(), locale: input.locale || "en", stage: "confirmation" },
     sourceUrl: `/${input.locale || "en"}/${input.type === "payment" ? "nutrition/payment/return" : "basket/return"}` });
 }
 
 export async function recordMetaPlanMilestone(sql: Db, planId: string, name: "Lead" | "QuizSubmitted" | "EmailCapture", locale: string, sourceSuffix = "") {
   const context = await boundMetaContext(sql, "plan", planId);
   if (!context) return null;
-  return enqueueMetaEvent(sql, { context, name, sourceKey: `${name}:${planId}:${sourceSuffix}`, data: { planId, locale, stage: name === "Lead" ? "results" : "assessment" } });
+  const channel = await metaResourceChannel(sql, planId, "plan", planId);
+  return enqueueMetaEvent(sql, { context, name, sourceKey: `${name}:${planId}:${sourceSuffix}`, data: { channel, planId, locale, stage: name === "Lead" ? "results" : "assessment" } });
+}
+
+/** Derive server milestones from the business resource, never the last browser tab. */
+export async function metaResourceChannel(sql: Db, planId: string | null, type: Resource, id: string): Promise<JourneyChannel> {
+  if (type === "agentic") return "mcp";
+  if (!planId && type !== "retail") return "web";
+  const assessmentId = planId && uuidPattern.test(planId) ? planId : null;
+  const paymentId = type === "retail" && uuidPattern.test(id) ? id : null;
+  const [row] = await sql<{ channel: JourneyChannel }[]>`select case
+    when exists(select 1 from public.assessments where plan_id=${assessmentId}::uuid and answers ? 'inStorePharmacy') then 'retail'
+    when exists(select 1 from public.assessments where plan_id=${assessmentId}::uuid and (answers->>'channel'='mcp' or answers->>'source'='mcp')) then 'mcp'
+    when ${type}='retail' and exists(select 1 from public.retail_checkout_payments where id=${paymentId}::uuid
+      and (nullif(metadata->>'agenticOrderId','') is not null or metadata->>'channel' in ('mcp','agentic'))) then 'mcp'
+    else 'web' end as channel`;
+  return row.channel;
 }
 
 export const metaExternalId = (id: string) => createHash("sha256").update(id).digest("hex");

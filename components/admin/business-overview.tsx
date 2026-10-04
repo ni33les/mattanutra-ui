@@ -1,6 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import { FunnelStageTable, type FunnelTableRow } from "./funnel-stage-table";
+import { funnelReportCopy } from "@/lib/funnel-report-copy";
+import { PharmacySourceFunnelTable } from "./pharmacy-source-funnel";
+import { McpFunnelTable } from "./mcp-funnel-table";
 import type { AdminDashboardData } from "@/lib/admin-dashboard-data";
 import type { AdminDashboardFilters } from "@/lib/admin-dashboard-filters";
 import type { AdminCommunicationsData } from "@/lib/admin-communications";
@@ -18,9 +22,7 @@ import {
   classNames,
   flowNodeCount,
   flowNodeSeries,
-  formatLocale,
   formatNumber,
-  formatPercent,
   type BusinessMetric
 } from "@/components/admin/dashboard-shared";
 
@@ -97,64 +99,6 @@ function businessFunnelStages(
   ];
 }
 
-function stageActualConversion(stage: BusinessFunnelStage) {
-  if (stage.isEntry) {
-    return stage.count > 0 ? 100 : null;
-  }
-
-  return stage.denominator && stage.denominator > 0
-    ? (stage.count / stage.denominator) * 100
-    : null;
-}
-
-function conversionTargetClass(
-  actualConversion: number | null,
-  targetConversion: number
-) {
-  if (actualConversion === null) {
-    return "bg-white";
-  }
-
-  const targetAchievement =
-    targetConversion > 0 ? actualConversion / targetConversion : 1;
-
-  if (targetAchievement >= 1) {
-    return "bg-[#ECFDF5]";
-  }
-
-  if (targetAchievement >= 0.75) {
-    return "bg-amber-50";
-  }
-
-  return "bg-red-50";
-}
-
-function conversionDeltaClass(delta: number | null) {
-  if (delta === null) {
-    return "text-gray-500";
-  }
-
-  if (delta >= 0) {
-    return "text-[#126B4F]";
-  }
-
-  if (delta >= -10) {
-    return "text-amber-800";
-  }
-
-  return "text-red-700";
-}
-
-function formatConversionDelta(delta: number, locale: Locale) {
-  const formatted = new Intl.NumberFormat(formatLocale(locale), {
-    maximumFractionDigits: 1,
-    minimumFractionDigits: Number.isInteger(delta) ? 0 : 1,
-    signDisplay: "always"
-  }).format(delta);
-
-  return `${formatted} pp`;
-}
-
 export function BusinessFunnelTable({
   accessToken,
   flowData,
@@ -224,7 +168,7 @@ export function BusinessFunnelTable({
     <section className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-gray-200">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h2 className="text-base font-semibold text-gray-900">
-          {labels.atAGlance.conversionSnapshot}
+          {funnelReportCopy[locale].web}
         </h2>
         {showTargets ? (
           <div className="flex items-center gap-2">
@@ -272,146 +216,29 @@ export function BusinessFunnelTable({
           {targetSaveError}
         </p>
       ) : null}
-      <div className="mt-6 flow-root">
-        <div className="-mx-5 -my-2 overflow-x-auto">
-          <div className="inline-block min-w-full py-2 align-middle px-5">
-            <div className="overflow-hidden shadow-sm outline-1 outline-black/5 sm:rounded-lg">
-              <table className="relative min-w-full divide-y divide-gray-300">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th
-                      className="py-3.5 pr-3 pl-4 text-left text-sm font-semibold text-gray-900 sm:pl-6"
-                      scope="col"
-                    >
-                      {labels.atAGlance.stage}
-                    </th>
-                    <th
-                      className="px-3 py-3.5 text-right text-sm font-semibold text-gray-900"
-                      scope="col"
-                    >
-                      {labels.atAGlance.count}
-                    </th>
-                    <th
-                      className="px-3 py-3.5 text-right text-sm font-semibold text-gray-900"
-                      scope="col"
-                    >
-                      {labels.atAGlance.dropoff}
-                    </th>
-                    <th
-                      className="px-3 py-3.5 text-right text-sm font-semibold text-gray-900"
-                      scope="col"
-                    >
-                      {labels.atAGlance.conversion}
-                    </th>
-                    {showTargets ? (
-                      <>
-                        <th
-                          className="px-3 py-3.5 text-right text-sm font-semibold text-gray-900"
-                          scope="col"
-                        >
-                          {labels.atAGlance.target}
-                        </th>
-                        <th
-                          className="py-3.5 pr-4 pl-3 text-right text-sm font-semibold text-gray-900 sm:pr-6"
-                          scope="col"
-                        >
-                          {labels.atAGlance.deviation}
-                        </th>
-                      </>
-                    ) : null}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200 bg-white">
-                  {businessFunnelStages(
-                    flowData,
-                    labels,
-                    activeTargets
-                  ).map((stage) => {
-                    const dropoff =
-                      stage.denominator === null || stage.isEntry
-                        ? null
-                        : Math.max(0, stage.denominator - stage.count);
-                    const conversion = stageActualConversion(stage);
-                    const delta =
-                      conversion === null
-                        ? null
-                        : conversion - stage.targetConversion;
-
-                    return (
-                      <tr
-                        className={
-                          showTargets
-                            ? conversionTargetClass(
-                                conversion,
-                                stage.targetConversion
-                              )
-                            : undefined
-                        }
-                        key={stage.id}
-                      >
-                        <td className="py-4 pr-3 pl-4 text-sm font-medium whitespace-nowrap text-gray-900 sm:pl-6">
-                          {stage.label}
-                        </td>
-                        <td className="px-3 py-4 text-right text-sm whitespace-nowrap text-gray-500">
-                          {formatNumber(stage.count, locale)}
-                        </td>
-                        <td className="px-3 py-4 text-right text-sm whitespace-nowrap text-gray-500">
-                          {dropoff === null ? "" : formatNumber(dropoff, locale)}
-                        </td>
-                        <td className="px-3 py-4 text-right text-sm whitespace-nowrap text-gray-500">
-                          {conversion === null
-                            ? ""
-                            : formatPercent(conversion, locale)}
-                        </td>
-                        {showTargets ? (
-                          <>
-                            <td className="px-3 py-4 text-right text-sm whitespace-nowrap text-gray-500">
-                              {editingTargets ? (
-                                <input
-                                  aria-label={`${labels.atAGlance.target}: ${stage.label}`}
-                                  className="ml-auto block w-24 rounded-md bg-white px-2 py-1 text-right text-sm text-gray-900 outline-1 -outline-offset-1 outline-gray-300 focus:outline-2 focus:-outline-offset-2 focus:outline-[#1FA77A]"
-                                  max={100}
-                                  min={0}
-                                  onChange={(event) => {
-                                    const parsed = Number(event.target.value);
-                                    const nextValue = Number.isFinite(parsed)
-                                      ? Math.max(0, Math.min(100, parsed))
-                                      : 0;
-
-                                    setDraftTargets((current) => ({
-                                      ...current,
-                                      [stage.id]: nextValue
-                                    }));
-                                  }}
-                                  step={0.1}
-                                  type="number"
-                                  value={draftTargets[stage.id]}
-                                />
-                              ) : (
-                                formatPercent(stage.targetConversion, locale)
-                              )}
-                            </td>
-                            <td
-                              className={classNames(
-                                conversionDeltaClass(delta),
-                                "py-4 pr-4 pl-3 text-right text-sm font-semibold whitespace-nowrap sm:pr-6"
-                              )}
-                            >
-                              {delta === null
-                                ? ""
-                                : formatConversionDelta(delta, locale)}
-                            </td>
-                          </>
-                        ) : null}
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      </div>
+      <p className="mt-2 text-sm text-gray-600">{funnelReportCopy[locale].webNote}</p>
+      <FunnelStageTable locale={locale} caption={funnelReportCopy[locale].web} targets={showTargets}
+        rows={businessFunnelStages(flowData, labels, activeTargets).map((stage, index): FunnelTableRow => ({
+          id: stage.id,
+          label: stage.id === "landingVisitors" ? funnelReportCopy[locale].visits : stage.id === "healthScoreViews" ? funnelReportCopy[locale].reached : stage.label,
+          count: stage.count,
+          color: (["entry", "start", "complete", "result", "conversion", "conversion", "order"] as const)[index],
+          entry: stage.isEntry,
+          denominator: flowData.transitions?.[stage.id]?.denominator,
+          numerator: flowData.transitions?.[stage.id]?.numerator,
+          target: stage.targetConversion,
+          targetControl: editingTargets ? <input
+            aria-label={`${labels.atAGlance.target}: ${stage.label}`}
+            className="ml-auto block w-20 rounded border border-gray-300 bg-white px-2 py-1 text-right"
+            max={100} min={0} step={0.1} type="number" value={draftTargets[stage.id]}
+            onChange={event => {
+              const parsed = Number(event.target.value);
+              setDraftTargets(current => ({ ...current, [stage.id]: Number.isFinite(parsed) ? Math.max(0, Math.min(100, parsed)) : 0 }));
+            }} /> : undefined
+        }))} />
+      <p className="mt-3 text-xs text-gray-600">{funnelReportCopy[locale].evidence
+        .replace("{displayed}", formatNumber(flowNodeCount(flowData, "healthscoreDisplayed"), locale))
+        .replace("{arrivals}", formatNumber(flowNodeCount(flowData, "healthscoreViewed") - flowNodeCount(flowData, "healthscoreDisplayed"), locale))}</p>
     </section>
   );
 }
@@ -542,6 +369,8 @@ export function AdminAtAGlanceView({
 
       <div className="mt-8 grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)]">
         <BusinessFunnelTable flowData={flowData} labels={labels} locale={locale} />
+        <PharmacySourceFunnelTable rows={flowData.pharmacySources ?? []} locale={locale} />
+        <McpFunnelTable data={flowData.mcp} locale={locale} />
 
         <section className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-gray-200">
           <h2

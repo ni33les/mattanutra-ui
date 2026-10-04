@@ -1,5 +1,9 @@
 "use client";
 
+import { PharmacySourceFunnelTable } from "./pharmacy-source-funnel";
+import { McpFunnelTable } from "./mcp-funnel-table";
+import { funnelReportCopy } from "@/lib/funnel-report-copy";
+import { funnelStageColors } from "./funnel-stage-table";
 import type { AdminCampaignRow, AdminCampaignsData } from "@/lib/admin-query-data";
 import type { Locale } from "@/lib/i18n";
 import { connectCopy } from "@/lib/connect-copy";
@@ -11,14 +15,10 @@ import {
   classNames,
   formatGeneratedAt,
   formatNumber,
-  formatPercent,
   optionalLabel,
   type BusinessMetric
 } from "@/components/admin/dashboard-shared";
 
-function marketingConversion(numerator: number, denominator: number, locale: Locale) {
-  return denominator > 0 ? formatPercent((numerator / denominator) * 100, locale) : "";
-}
 
 export function AdminCampaignsView({
   data,
@@ -41,7 +41,7 @@ export function AdminCampaignsView({
     {
       color: businessMetricColors.healthScoreViews,
       id: "healthScoreViews",
-      label: labels.marketingPages.healthScoreViews,
+      label: funnelReportCopy[locale].reached,
       series: [],
       value: formatNumber(summary.healthScoreViews, locale)
     },
@@ -63,7 +63,12 @@ export function AdminCampaignsView({
 
   return (
     <section className="mt-8">
+      <h2 className="mb-3 text-lg font-semibold">Web</h2>
+      <p className="mb-3 text-sm text-gray-600">{funnelReportCopy[locale].webNote}</p>
       <BusinessStatsGrid metrics={campaignMetrics} />
+      <p className="mt-3 text-xs text-gray-600">{funnelReportCopy[locale].evidence
+        .replace("{displayed}", formatNumber(data.healthScoreDisplayed ?? 0, locale))
+        .replace("{arrivals}", formatNumber(data.summary.healthScoreViews - (data.healthScoreDisplayed ?? 0), locale))}</p>
       {data.connections && <div className="mt-6 rounded-2xl bg-white p-5 ring-1 ring-gray-200">
         <h2 className="font-semibold">{connectCopy[locale].summaryTitle} · {data.connections.environment.toUpperCase()}</h2>
         <p className="mt-2 text-sm">{connectCopy[locale].summaryNote}</p>
@@ -78,8 +83,8 @@ export function AdminCampaignsView({
         <h2 className="font-semibold">Meta · {data.meta.environment.toUpperCase()} · {data.meta.enabled ? "Enabled" : "Disabled"}</h2>
         <p className="mt-2 text-sm">Pixel {data.meta.pixelId || "unconfigured"}. All campaigns in this date range. Accepted means Meta acknowledged delivery; it does not establish ad attribution.</p>
         <p className="mt-2 text-sm">Confirmed purchases with a consent binding: {data.meta.purchases.confirmed}. Recorded: {data.meta.purchases.recorded}. Missing records: {data.meta.purchases.missing}.</p>
-        <table className="mt-3 w-full text-left text-sm"><thead><tr><th scope="col">Event</th><th scope="col">Delivery status</th><th scope="col">Count</th><th scope="col">Last update</th></tr></thead>
-          <tbody>{data.meta.rows.map(row => <tr key={`${row.name}:${row.status}`}><td className="py-1">{row.name}</td><td>{row.status}</td><td>{row.count}</td><td>{new Date(row.lastAt).toLocaleString(locale)}</td></tr>)}</tbody>
+        <table className="mt-3 w-full text-left text-sm"><thead><tr><th scope="col">Event</th><th scope="col">Flow</th><th scope="col">Delivery status</th><th scope="col">Count</th><th scope="col">Last update</th></tr></thead>
+          <tbody>{data.meta.rows.map(row => <tr key={`${row.name}:${row.channel}:${row.status}`}><td className="py-1">{row.name}</td><td>{row.channel === "web" ? "Web" : row.channel === "retail" ? "Retail" : row.channel === "mcp" ? "MCP" : funnelReportCopy[locale].unknown}</td><td>{row.status}</td><td>{row.count}</td><td>{new Date(row.lastAt).toLocaleString(locale)}</td></tr>)}</tbody>
         </table>
       </div>}
 
@@ -96,17 +101,18 @@ export function AdminCampaignsView({
                   labels.marketingPages.landed,
                   labels.marketingPages.assessmentStarts,
                   labels.marketingPages.assessmentCompletions,
-                  labels.marketingPages.healthScoreViews,
+                  funnelReportCopy[locale].reached,
                   labels.marketingPages.freeRequests,
                   labels.marketingPages.precisionConversions,
                   labels.marketingPages.proConversions,
                   labels.marketingPages.lastSeen
-                ].map((heading) => (
+                ].map((heading, index) => (
                   <th
                     className={classNames(
                       "px-4 py-3 text-left text-xs font-semibold text-gray-500",
                       locale === "en" ? "uppercase tracking-[0.14em]" : adminLocaleTextClass(locale, "label")
                     )}
+                    style={index >= 4 && index <= 10 ? { borderTop: `3px solid ${funnelStageColors[(["entry", "start", "complete", "result", "result", "conversion", "conversion"] as const)[index - 4]]}` } : undefined}
                     key={heading}
                     scope="col"
                   >
@@ -145,6 +151,8 @@ export function AdminCampaignsView({
           </table>
         </div>
       </div>
+      <PharmacySourceFunnelTable rows={data.pharmacySources ?? []} locale={locale} />
+      <McpFunnelTable data={data.mcp} locale={locale} />
     </section>
   );
 }
@@ -156,7 +164,6 @@ function CampaignRow({
   locale: Locale;
   row: AdminCampaignRow;
 }>) {
-  const paidConversions = row.precisionConversions + row.proConversions;
 
   return (
     <tr className="hover:bg-gray-50">
@@ -175,29 +182,17 @@ function CampaignRow({
       </td>
       <td className="px-4 py-4 text-sm text-gray-600">
         {formatNumber(row.assessmentStarts, locale)}
-        <span className="ml-2 text-xs text-gray-400">
-          {marketingConversion(row.assessmentStarts, row.landed, locale)}
-        </span>
       </td>
       <td className="px-4 py-4 text-sm text-gray-600">
         {formatNumber(row.assessmentCompletions, locale)}
-        <span className="ml-2 text-xs text-gray-400">
-          {marketingConversion(row.assessmentCompletions, row.assessmentStarts, locale)}
-        </span>
       </td>
       <td className="px-4 py-4 text-sm text-gray-600">
         {formatNumber(row.healthScoreViews, locale)}
-        <span className="ml-2 text-xs text-gray-400">
-          {marketingConversion(row.healthScoreViews, row.assessmentCompletions, locale)}
-        </span>
       </td>
       <td className="px-4 py-4 text-sm text-gray-600">{formatNumber(row.freeRequests, locale)}</td>
       <td className="px-4 py-4 text-sm text-gray-600">{formatNumber(row.precisionConversions, locale)}</td>
       <td className="px-4 py-4 text-sm text-gray-600">
         {formatNumber(row.proConversions, locale)}
-        <span className="ml-2 text-xs text-gray-400">
-          {marketingConversion(paidConversions, row.healthScoreViews, locale)}
-        </span>
       </td>
       <td className="px-4 py-4 text-sm text-gray-500">
         {formatGeneratedAt(row.lastSeenAt, locale)}

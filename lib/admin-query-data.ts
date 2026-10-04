@@ -1,3 +1,6 @@
+import { funnelBpmSource, webEntryEventNames } from "@/lib/admin-funnel-events";
+import { getPharmacySourceFunnel, type PharmacySourceFunnel } from "@/lib/pharmacy-funnel";
+import { getAdminMcpFunnel, type McpFunnelReport } from "@/lib/admin-mcp-funnel";
 import { metaDiagnostics, type MetaDiagnostics } from "@/lib/meta-diagnostics";
 import {
   adminDashboardRangeStart,
@@ -53,6 +56,7 @@ type QueryParams = AdminQueryParams;
 export type { AdminQueryPagination } from "@/lib/admin-query-helpers";
 
 export type AdminCampaignRow = Readonly<{
+  journeyChannel?: "web";
   affiliate: string | null;
   assessmentCompletions: number;
   assessmentStarts: number;
@@ -81,6 +85,10 @@ export type AdminCampaignSummary = Readonly<{
 }>;
 
 export type AdminCampaignsData = Readonly<{
+  journeyChannel?: "web";
+  pharmacySources?: PharmacySourceFunnel[];
+  mcp?: McpFunnelReport;
+  healthScoreDisplayed?: number;
   connections?: import("@/lib/connect-report").ConnectReport;
   meta?: MetaDiagnostics;
   databaseAvailable: boolean;
@@ -280,6 +288,7 @@ const leadEventNames = new Set([
   "assessment_resume_opened",
   "assessment_resume_finalized",
   "healthscore_viewed",
+  "healthscore_page_viewed",
   "free_email_requested",
   "free_email_sent",
   "formulation_page_viewed",
@@ -379,6 +388,8 @@ async function getCampaigns(params: QueryParams): Promise<AdminCampaignsData> {
   const start = adminDashboardRangeStart(params.range);
   const rows = await sql<
     Array<{
+      total: number;
+      healthscore_displayed: number;
       affiliate: string | null;
       assessment_completions: number | string;
       assessment_starts: number | string;
@@ -396,7 +407,11 @@ async function getCampaigns(params: QueryParams): Promise<AdminCampaignsData> {
       source: string | null;
     }>
   >`
-    with campaign_events as (
+    with matched_events as (
+      select * from ${funnelBpmSource(sql)}
+      where journey_channel='web' and ${start ? sql`occurred_at >= ${start} and` : sql``}
+        ${adminDashboardFilterSql(sql, params.filters)}
+    ), campaign_events as (
       select
         coalesce(nullif(utm_source, ''), nullif(traffic_source, ''), nullif(source_channel, ''), 'direct') as source,
         nullif(utm_medium, '') as medium,
@@ -404,17 +419,20 @@ async function getCampaigns(params: QueryParams): Promise<AdminCampaignsData> {
         nullif(campaign_id, '') as campaign_id,
         coalesce(nullif(affiliate_id, ''), nullif(affiliate_ref, '')) as affiliate,
         nullif(promo_code, '') as promo_code,
-        coalesce(plan_id::text, ray::text, id::text) as subject,
-        event_name,
+        coalesce(plan_id::text, (select p.plan_id::text from matched_events p
+          where p.plan_id is not null and p.ray=e.ray and p.occurred_at>=e.occurred_at
+            and p.occurred_at<=e.occurred_at + interval '30 minutes'
+          order by p.occurred_at,p.id limit 1), ray::text, id::text) as subject,
+        funnel_event_name as event_name,
         event_type,
         event_status,
         selected_plan::text,
         occurred_at
-      from public.bpm
-      where ${start ? sql`occurred_at >= ${start} and` : sql``}
-        ${adminDashboardFilterSql(sql, params.filters)}
+      from matched_events e
     )
     select
+      grouping(source)::int as total,
+      count(distinct subject) filter (where event_name='healthscore_viewed')::int as healthscore_displayed,
       source,
       medium,
       campaign,
@@ -424,11 +442,11 @@ async function getCampaigns(params: QueryParams): Promise<AdminCampaignsData> {
       min(occurred_at) as first_seen_at,
       max(occurred_at) as last_seen_at,
       count(distinct subject) filter (
-        where event_name in ('home_viewed', 'blog_article_viewed', 'library_article_viewed')
+        where event_name = any(${[...webEntryEventNames]}::text[])
       )::int as landed,
       count(distinct subject) filter (where event_name = 'assessment_started')::int as assessment_starts,
       count(distinct subject) filter (where event_name in ('assessment_submitted', 'assessment_captured', 'assessment_recaptured'))::int as assessment_completions,
-      count(distinct subject) filter (where event_name = 'healthscore_viewed')::int as healthscore_views,
+      count(distinct subject) filter (where event_name in ('healthscore_viewed','healthscore_page_viewed'))::int as healthscore_views,
       count(distinct subject) filter (where event_name = 'free_email_requested')::int as free_requests,
       count(distinct subject) filter (
         where selected_plan = 'precision'
@@ -445,11 +463,12 @@ async function getCampaigns(params: QueryParams): Promise<AdminCampaignsData> {
           )
       )::int as pro_conversions
     from campaign_events
-    group by source, medium, campaign, campaign_id, affiliate, promo_code
-    order by landed desc, healthscore_views desc, last_seen_at desc
+    group by grouping sets ((source, medium, campaign, campaign_id, affiliate, promo_code), ())
+    order by total desc, landed desc, healthscore_views desc, last_seen_at desc
     limit 1000
   `;
-  const mappedRows: AdminCampaignRow[] = rows.map((row) => ({
+  const mapRow = (row: (typeof rows)[number]): AdminCampaignRow => ({
+    journeyChannel: "web",
     affiliate: row.affiliate,
     assessmentCompletions: Number(row.assessment_completions) || 0,
     assessmentStarts: Number(row.assessment_starts) || 0,
@@ -465,13 +484,19 @@ async function getCampaigns(params: QueryParams): Promise<AdminCampaignsData> {
     proConversions: Number(row.pro_conversions) || 0,
     promoCode: row.promo_code,
     source: row.source
-  }));
+  });
+  const total = rows.find(row => row.total === 1);
+  const mappedRows = rows.filter(row => row.total === 0).map(mapRow);
   const { pageRows, pagination } = paginateAdminRows(mappedRows, params);
 
   return {
     databaseAvailable: true,
+    journeyChannel: "web",
+    pharmacySources: await getPharmacySourceFunnel(start, params.filters),
+    mcp: await getAdminMcpFunnel(start),
+    healthScoreDisplayed: Number(total?.healthscore_displayed) || 0,
     rows: pageRows,
-    summary: campaignSummary(mappedRows),
+    summary: campaignSummary(total ? [mapRow(total)] : []),
     meta: await metaDiagnostics(start),
     connections: await (await import("@/lib/connect-report")).connectReport(start),
     pagination
@@ -527,12 +552,12 @@ async function getLeads(params: QueryParams): Promise<AdminLeadsData> {
         selected_plan::text,
         coalesce(nullif(utm_source, ''), nullif(traffic_source, ''), nullif(source_channel, '')) as source,
         coalesce(nullif(utm_campaign, ''), nullif(campaign_name, '')) as campaign,
-        event_name,
+        funnel_event_name as event_name,
         event_type,
         event_status,
         occurred_at
-      from public.bpm
-      where ${start ? sql`occurred_at >= ${start} and` : sql``}
+      from ${funnelBpmSource(sql)}
+      where journey_channel='web' and ${start ? sql`occurred_at >= ${start} and` : sql``}
         ${adminDashboardFilterSql(sql, params.filters)}
     ),
     lead_rows as (
@@ -551,12 +576,12 @@ async function getLeads(params: QueryParams): Promise<AdminLeadsData> {
         bool_or(event_name in (
           'home_viewed',
           'blog_article_viewed',
-          'library_article_viewed'
+          'library_article_viewed', 'assessment_viewed', 'web_page_viewed', 'healthscore_page_viewed', 'healthscore_viewed'
         )) as landed,
         bool_or(event_name = 'assessment_started') as started,
         bool_or(event_name in ('assessment_submitted', 'assessment_captured', 'assessment_recaptured')) as submitted,
         bool_or(event_name in ('assessment_resume_requested', 'assessment_resume_email_sent', 'assessment_resume_opened')) as assessment_resume_requested,
-        bool_or(event_name = 'healthscore_viewed') as healthscore_viewed,
+        bool_or(event_name in ('healthscore_viewed','healthscore_page_viewed')) as healthscore_viewed,
         bool_or(event_name = 'free_email_requested') as free_email_requested,
         bool_or(event_name = 'free_email_sent') as free_email_sent,
         bool_or(

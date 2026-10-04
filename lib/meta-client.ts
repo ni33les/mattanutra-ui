@@ -1,4 +1,5 @@
 "use client";
+import { journeyChannelForPath } from "@/lib/journey-channel";
 import { META_CONSENT_COOKIE, browserPixelPageSafe, metaCustomData, metaEventForBpm, metaEventName, type MetaEventName, type MetaPreferenceSource, type MetaPublicConfig, uuidPattern } from "@/lib/meta-event-policy";
 let config: MetaPublicConfig | null = null;
 const sent = new Set<string>();
@@ -43,7 +44,7 @@ export function trackMetaEvent(name: MetaEventName, input: Record<string, unknow
   }
   if (!config?.enabled || !marketingGranted() || typeof window === "undefined" || /\/(admin|api)(\/|$)/.test(location.pathname)) return Promise.resolve();
   const env = config.environment, id = typeof input.assessmentAttemptId === "string" && uuidPattern.test(input.assessmentAttemptId) ? input.assessmentAttemptId : sessionId();
-  const data = metaCustomData(name, input, env);
+  const data = metaCustomData(name, { channel: journeyChannelForPath(location.pathname), ...input }, env);
   const dimension = String(data.funnel_stage).startsWith("connect") ? `${data.provider || ""}:${data.locale || ""}:` : "";
   const key = occurrence || `${id}:${name}:${data.plan_id || "visit"}:${dimension}${data.progress ?? data.offer ?? data.funnel_stage ?? ""}`;
   if (sent.has(key)) return Promise.resolve();
@@ -72,5 +73,6 @@ export function trackMetaBpm(name: string, input: { locale?: string; planId?: st
   const event = metaEventForBpm(name); if (!event) return;
   const p = input.properties ?? {};
   void trackMetaEvent(event, { locale: input.locale, planId: input.planId, value: input.valueAmount, currency: input.valueCurrency,
-    progress: p.progress, offer: p.offer, attemptId: p.attemptId, assessmentAttemptId: p.sessionId, stage: name.includes("checkout") ? "checkout" : name.includes("viewed") ? "results" : "assessment", channel: p.channel });
+    progress: p.progress, offer: p.offer, attemptId: p.attemptId, assessmentAttemptId: p.sessionId, stage: name.includes("checkout") ? "checkout" : name.includes("viewed") ? "results" : "assessment",
+    channel: p.journeyChannel ?? p.channel ?? journeyChannelForPath(location.pathname) });
 }

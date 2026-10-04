@@ -1,5 +1,6 @@
 "use client";
 
+import { McpFunnelTable } from "./mcp-funnel-table";
 import { PharmacySourceFunnelTable } from "./pharmacy-source-funnel";
 import { useState } from "react";
 import type { AdminFlowData } from "@/lib/admin-flow-data";
@@ -40,7 +41,7 @@ export function AdminFlowView({
     productOrderSeries
   );
   const healthScoreSeries = flowNodeSeries(flowData, "healthscoreViewed");
-  const conversionRateSeries = percentageMetricSeries(
+  const conversionRateSeries = flowData.series.conversionRate ?? percentageMetricSeries(
     convertedSeries,
     healthScoreSeries
   );
@@ -104,6 +105,7 @@ export function AdminFlowView({
         />
       </div>
       <PharmacySourceFunnelTable rows={flowData.pharmacySources ?? []} locale={locale} />
+      <McpFunnelTable data={flowData.mcp} locale={locale} />
     </>
   );
 }
