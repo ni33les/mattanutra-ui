@@ -39,3 +39,10 @@ export const webEntryEventNames = [
   "assessment_viewed", "healthscore_page_viewed", "healthscore_viewed",
   "formulation_page_viewed", "retail_product_checkout_viewed", "order_tracking_viewed"
 ] as const;
+
+export const webJourneyEventNames = [...webEntryEventNames,
+      "assessment_started", "assessment_submitted", "assessment_captured", "assessment_recaptured",
+      "chat_channel_clicked", "formulation_ready", "free_email_requested", "free_email_sent", "product_clicked", "plan_selected",
+      "retail_customer_order_created", "retail_delivery_details_confirmed", "retail_order_awaiting_stock", "retail_order_cancelled",
+      "retail_order_created", "retail_order_delivered", "retail_order_returned", "retail_order_shipped", "retail_product_checkout_opened",
+      "retail_product_checkout_requested", "retail_product_checkout_session_created", "retail_product_payment_succeeded"] as const;

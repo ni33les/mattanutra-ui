@@ -1,4 +1,4 @@
-import { funnelBpmSource, webEntryEventNames } from "@/lib/admin-funnel-events";
+import { funnelBpmSource, webJourneyEventNames } from "@/lib/admin-funnel-events";
 import { getAdminMcpFunnel, type McpFunnelReport } from "@/lib/admin-mcp-funnel";
 import { getPharmacySourceFunnel, type PharmacySourceFunnel } from "@/lib/pharmacy-funnel";
 import { getSql } from "@/lib/db";
@@ -1025,12 +1025,7 @@ export async function getAdminFlowData(range: AdminDashboardRange, filters: Admi
   if (!sql) return emptyFlow(range);
   try {
     const start = queryStartForRange(range);
-    const names = [...webEntryEventNames, ...paidEventNames,
-      "assessment_started", "assessment_submitted", "assessment_captured", "assessment_recaptured",
-      "chat_channel_clicked", "formulation_ready", "free_email_requested", "free_email_sent", "product_clicked", "plan_selected",
-      "retail_customer_order_created", "retail_delivery_details_confirmed", "retail_order_awaiting_stock", "retail_order_cancelled",
-      "retail_order_created", "retail_order_delivered", "retail_order_returned", "retail_order_shipped", "retail_product_checkout_opened",
-      "retail_product_checkout_requested", "retail_product_checkout_session_created", "retail_product_payment_succeeded"];
+    const names = [...webJourneyEventNames, ...paidEventNames];
     const [targets, rows, pharmacySources, mcp] = await Promise.all([
       getAdminConversionTargets(),
       sql<FlowRow[]>`

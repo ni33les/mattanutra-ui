@@ -1,4 +1,4 @@
-import { funnelBpmSource, webEntryEventNames } from "@/lib/admin-funnel-events";
+import { funnelBpmSource, webEntryEventNames, webJourneyEventNames } from "@/lib/admin-funnel-events";
 import { getPharmacySourceFunnel, type PharmacySourceFunnel } from "@/lib/pharmacy-funnel";
 import { getAdminMcpFunnel, type McpFunnelReport } from "@/lib/admin-mcp-funnel";
 import { metaDiagnostics, type MetaDiagnostics } from "@/lib/meta-diagnostics";
@@ -407,10 +407,14 @@ async function getCampaigns(params: QueryParams): Promise<AdminCampaignsData> {
       source: string | null;
     }>
   >`
-    with matched_events as (
+    with matched_events as materialized (
       select * from ${funnelBpmSource(sql)}
       where journey_channel='web' and ${start ? sql`occurred_at >= ${start} and` : sql``}
         ${adminDashboardFilterSql(sql, params.filters)}
+        and (funnel_event_name=any(${[...webJourneyEventNames, ...paidEventNames]}::text[])
+          or event_type='payment')
+    ), plan_links as materialized (
+      select id,ray,plan_id,occurred_at from matched_events where plan_id is not null
     ), campaign_events as (
       select
         coalesce(nullif(utm_source, ''), nullif(traffic_source, ''), nullif(source_channel, ''), 'direct') as source,
@@ -419,8 +423,8 @@ async function getCampaigns(params: QueryParams): Promise<AdminCampaignsData> {
         nullif(campaign_id, '') as campaign_id,
         coalesce(nullif(affiliate_id, ''), nullif(affiliate_ref, '')) as affiliate,
         nullif(promo_code, '') as promo_code,
-        coalesce(plan_id::text, (select p.plan_id::text from matched_events p
-          where p.plan_id is not null and p.ray=e.ray and p.occurred_at>=e.occurred_at
+        coalesce(plan_id::text, (select p.plan_id::text from plan_links p
+          where p.ray=e.ray and p.occurred_at>=e.occurred_at
             and p.occurred_at<=e.occurred_at + interval '30 minutes'
           order by p.occurred_at,p.id limit 1), ray::text, id::text) as subject,
         funnel_event_name as event_name,

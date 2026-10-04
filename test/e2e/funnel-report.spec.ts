@@ -46,6 +46,7 @@ for(const locale of ["en","th","zh-CN"]){
         expect(colours.every(colour=>colour!=="rgba(0, 0, 0, 0)")).toBe(true);
         expect(await page.locator("body").innerText()).not.toMatch(/NaN|Infinity/);
         await expect(page.getByTestId("pharmacy-source-funnel").getByRole("combobox").first()).toBeEnabled();
+        if(locale === "en") await page.screenshot({path:`${process.env.FUNNEL_SCREENSHOT_DIR ?? "test-results"}/funnel-${width}.png`,fullPage:true});
       }
     }finally{
       await runApp(`import {getSql,closeSqlPool} from './lib/db.ts';try{await getSql()\`update public.admin_sessions set revoked_at=now() where id=\${'${session.sessionId}'}::uuid\`;console.log('REPORT_FIXTURE:{}');}finally{await closeSqlPool();}`);
@@ -58,6 +59,11 @@ for(const locale of ["en","th","zh-CN"]){
     const seen:Array<{eventName:string;planId?:string;properties?:{journeyChannel?:string}}>=[];
     page.on("request",request=>{if(new URL(request.url()).pathname==="/api/bpm")seen.push(request.postDataJSON());});
     await page.goto(`/${locale}/nutrition/healthscore?plan=${planId}`);
+    // A page arrival while the formula is still pending must not claim a displayed score.
+    await expect.poll(()=>seen.some(event=>event.eventName==="healthscore_page_viewed")).toBe(true);
+    expect(seen.filter(event=>event.eventName==="healthscore_viewed")).toHaveLength(0);
+    await fixture({action:"formula",locale,planId});
+    await page.reload();
     await expect(page.locator(".mn-healthscore-v7")).toBeVisible();
     await expect.poll(()=>seen.filter(event=>event.eventName==="healthscore_viewed").length).toBe(1);
     const display=seen.find(event=>event.eventName==="healthscore_viewed")!;
