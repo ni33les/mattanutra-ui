@@ -106,7 +106,7 @@ describe("communications channel selection", () => {
     }
   });
 
-  it("keeps admin notifications concise with a link and a compact environment marker", () => {
+  it("includes the order and an explicit admin link with a compact environment marker", () => {
     const originalEnvironment = process.env.MATTANUTRA_ENV;
 
     try {
@@ -127,7 +127,7 @@ describe("communications channel selection", () => {
       });
 
       assert.equal(copy.subject, "[UAT] 1,234 THB received");
-      assert.equal(copy.body, "[UAT] 1,234 THB received.");
+      assert.equal(copy.body, "[UAT] 1,234 THB received.\nOrder: MN-1001\nOpen in admin: https://uat.mattanutra.com/en/admin/dashboard?view=financials&range=all");
       assert.match(copy.html, /<a href="https:\/\/uat\.mattanutra\.com\/en\/admin\/dashboard/);
       assert.doesNotMatch(copy.body, /Status:|Source:|Reference:|Environment:/);
     } finally {
@@ -156,7 +156,7 @@ describe("communications channel selection", () => {
       });
 
       assert.equal(copy.subject, "1,234 THB received");
-      assert.equal(copy.body, "1,234 THB received.");
+      assert.equal(copy.body, "1,234 THB received.\nOpen in admin: https://mattanutra.com/en/admin/dashboard?view=financials&range=all");
       assert.match(copy.html, /https:\/\/mattanutra\.com\/en\/admin\/dashboard/);
     } finally {
       if (originalEnvironment === undefined) {

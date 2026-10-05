@@ -139,20 +139,33 @@ async function adminCommunicationCopy(input: Readonly<{
   const sql = input.sql;
   if (isUuid(resourceId) && input.resourceType === "retail_customer_order") {
     const [order] = await sql<Array<{
-      order_number: string; status: string; source: string; metadata: unknown;
-    }>>`select order_number,status,source,metadata from public.retail_customer_orders
-      where id=${resourceId}::uuid limit 1`;
+      order_number: string; status: string; source: string; currency: string; metadata: unknown; line_total_amount: string | null;
+    }>>`select order_number,status,source,currency,metadata,
+      case when coalesce(metadata #>> '{pricingSnapshot,totalAmount}',metadata #>> '{receipt,total}',metadata->>'checkoutPaymentId') is null
+        then (select case when count(*)>0 and count(retail_price_amount)=count(*) then sum(quantity_ordered*retail_price_amount)::text end
+          from public.retail_customer_order_lines where customer_order_id=o.id) end as line_total_amount
+      from public.retail_customer_orders o where id=${resourceId}::uuid limit 1`;
     if (order) {
       const orderMetadata = objectValue(order.metadata);
       const paymentId = cleanText(orderMetadata.checkoutPaymentId);
       const [payment] = isUuid(paymentId)
-        ? await sql<Array<{ status: string }>>`select status from public.retail_checkout_payments where id=${paymentId}::uuid limit 1`
+        ? await sql<Array<{ status: string; amount: string; currency: string; locale: string }>>`select status,amount,currency,locale from public.retail_checkout_payments where id=${paymentId}::uuid limit 1`
         : [];
+      // Checkout amounts are stored in micros; order pricing and till receipts are major currency units.
+      const savedTotal = objectValue(orderMetadata.pricingSnapshot).totalAmount ?? objectValue(orderMetadata.receipt).total;
+      const total = savedTotal ?? order.line_total_amount;
+      const totalIsNumber = (typeof total === "number" || typeof total === "string" && total.trim() !== "") && Number.isFinite(Number(total)) && Number(total) >= 0;
       Object.assign(metadata, {
         orderId: resourceId,
         orderNumber: order.order_number,
         orderStatus: order.status,
-        orderSource: order.source === "pharmacy" ? "pharmacy" : orderMetadata.channel || (["manual", "checkout"].includes(order.source) ? "web" : order.source),
+        orderSource: ["pharmacy", "manual"].includes(order.source) ? "retail" : orderMetadata.channel || (orderMetadata.agenticOrderId ? "mcp" : order.source === "checkout" ? "web" : order.source),
+        amountMicros: payment?.amount ?? (totalIsNumber ? Math.round(Number(total) * 1_000_000) : null),
+        amountIsSubtotal: !payment && savedTotal == null && totalIsNumber,
+        currency: payment?.currency ?? order.currency,
+        checkoutPaymentId: paymentId || null,
+        locale: payment?.locale ?? orderMetadata.locale ?? metadata.locale,
+        paymentMethod: orderMetadata.paymentMethod,
         // Order creation and fulfilment are not evidence of payment.
         paymentStatus: payment?.status ?? orderMetadata.paymentStatus ?? "unknown"
       });
@@ -164,8 +177,16 @@ async function adminCommunicationCopy(input: Readonly<{
       where s.id=${resourceId}::uuid limit 1`;
     if (order) Object.assign(metadata, {
       orderId: order.id, orderNumber: order.order_number,
-      orderSource: order.source === "pharmacy" ? "pharmacy" : objectValue(order.metadata).channel || "web"
+      orderSource: ["pharmacy", "manual"].includes(order.source) ? "retail" : objectValue(order.metadata).channel || (objectValue(order.metadata).agenticOrderId ? "mcp" : order.source === "checkout" ? "web" : order.source)
     });
+  }
+  if (isUuid(resourceId) && input.resourceType === "payment") {
+    const [payment] = await sql`select p.amount,p.currency,p.selected_plan,p.locale,
+      case when a.answers ? 'inStorePharmacy' then 'retail'
+        when a.answers->>'channel'='mcp' or a.answers->>'source'='mcp' then 'mcp' else 'web' end as journey_channel
+      from public.payments p left join public.assessments a on a.plan_id=p.plan_id where p.id=${resourceId}::uuid limit 1`;
+    if (payment) Object.assign(metadata, { paymentId: resourceId, amountMicros: payment.amount, currency: payment.currency,
+      selectedPlan: payment.selected_plan, locale: payment.locale, orderSource: payment.journey_channel });
   }
   if (metadata.source) metadata.triggerSource = metadata.source;
   return applyAdminNotificationContext({ ...input, metadata });

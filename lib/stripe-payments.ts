@@ -2377,6 +2377,8 @@ export async function handleStripeWebhookPayload(input: Readonly<{
         await queuePlatformAdminCommunication({
           eventKey: "platform_payout_failed",
           metadata: {
+            amountMicros: payout.amount * AMOUNT_MICROS_PER_UNIT / STRIPE_MINOR_UNITS_PER_MAJOR,
+            currency: payout.currency.toUpperCase(),
             eventType: event.type,
             mattanutraEnv: config.env,
             stripeEventId: event.id,

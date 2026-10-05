@@ -11,7 +11,7 @@ import * as tasks from "../lib/task-service.ts";
 // transports. No database, SMTP server or LINE recipient is contacted.
 const pharmacyId = randomUUID(), platformId = randomUUID(), orderId = randomUUID(), paymentId = randomUUID();
 const messages = new Map<string, shared.MessageRow>();
-let orderRow: { order_number: string; status: string; source: string; metadata: Record<string, unknown> };
+let orderRow: { order_number: string; status: string; source: string; metadata: Record<string, unknown>; currency?: string; line_total_amount?: string | null };
 let paymentStatus: string, channels: shared.ChannelRow[], lineStatus: number;
 const emails: Parameters<typeof smtp.sendTransactionalEmail>[0][] = [];
 const pushes: { messages: Record<string, unknown>[] }[] = [];
@@ -22,7 +22,8 @@ const fetchBefore = globalThis.fetch;
 const sql = Object.assign(async (strings: TemplateStringsArray, ...values: unknown[]) => {
   const query = strings.reduce((result, part, index) => result + (index ? `$${index}` : "") + part, "");
   if (/from public.retail_customer_orders/i.test(query)) return [{ ...orderRow }];
-  if (/from public.retail_checkout_payments/i.test(query)) return [{ status: paymentStatus }];
+  if (/from public.retail_checkout_payments/i.test(query)) return [{ status: paymentStatus, amount: "1450000000", currency: "THB", locale: "en" }];
+  if (/from public.payments p/i.test(query)) return [{ amount: "690000000", currency: "THB", selected_plan: "precision", locale: "th", journey_channel: "mcp" }];
   if (/from public.communication_channels/i.test(query)) {
     const enabledTypes = values.find(Array.isArray) as string[] | undefined;
     return enabledTypes ? channels.filter(channel => enabledTypes.includes(channel.channel_type)) : channels;
@@ -84,7 +85,7 @@ const { dispatchCommunicationMessage, retryCommunicationMessage } = await import
 beforeEach(() => {
   process.env.MATTANUTRA_ENV = "uat";
   messages.clear(); emails.length = 0; pushes.length = 0; routedTasks.length = 0; documentRenders = 0; lineStatus = 200;
-  orderRow = { order_number: "PH-B52BA237", status: "placed", source: "pharmacy", metadata: { paymentStatus: "unpaid" } };
+  orderRow = { order_number: "PH-B52BA237", status: "placed", source: "pharmacy", currency: "THB", line_total_amount: null, metadata: { paymentStatus: "unpaid", paymentMethod: "pay_at_till", receipt: { total: 1234.5 } } };
   paymentStatus = "paid";
   channels = (["email", "line"] as const).map((channel_type, index) => ({
     id: randomUUID(), identity_id: pharmacyId, channel_type, actor_type: "human", status: "active",
@@ -107,16 +108,22 @@ test("unpaid pharmacy orders retain accurate copy and the exact order link throu
     metadata: { source: "pharmacy", paymentStatus: "paid", planInsertOrderId: orderId }, subject: "New paid order" });
   assert.equal(result.messages.length, 2);
   for (const message of result.messages) {
-    assert.equal(message.body, "[UAT] PH-B52BA237 created.");
+    assert.equal(message.body.split("\n")[0], "[UAT] PH-B52BA237 created.");
+    assert.match(message.body, /Order total: 1,234\.5 THB/);
+    assert.match(message.body, /Flow: Retail/);
+    assert.match(message.body, /Payment: Unpaid — pay at till/);
     assert.ok(message.html?.includes(`order=${orderId}`));
     assert.equal((await dispatchCommunicationMessage(message.id)).message.status, "sent");
   }
   assert.equal(emails.length, 1); assert.equal(pushes.length, 1);
-  assert.match(emails[0].html, />PH-B52BA237<\/a> created\./);
+  assert.match(emails[0].html, /PH-B52BA237 created\./);
+  assert.match(emails[0].html, />Open in admin<\/a>/);
   assert.deepEqual(emails[0].attachments, []); assert.equal(documentRenders, 0);
   assert.equal(pushes[0].messages[0].type, "flex");
   assert.ok(JSON.stringify(pushes[0]).includes(`order=${orderId}`));
-  assert.doesNotMatch(JSON.stringify(pushes[0]), /Status:|Reference:|Basket:|paid and created/);
+  assert.ok(JSON.stringify(pushes[0]).includes("Order total: 1,234.5 THB"));
+  assert.ok(JSON.stringify(pushes[0]).includes("Open in admin"));
+  assert.doesNotMatch(JSON.stringify(pushes[0]), /Basket:|paid and created/);
   assert.equal((await dispatchCommunicationMessage(result.messages[0].id)).attempted, false);
 });
 
@@ -126,7 +133,10 @@ test("MCP and web payments are distinguished using the recorded channel and paym
     paymentStatus = "fulfilled";
     const result = await routeAdminCommunication({ organisationId: pharmacyId, eventKey: "retail_order_created", resourceType: "retail_customer_order", resourceId: orderId, metadata: { source: "retail_product_checkout" } });
     for (const message of result.messages) {
-      assert.equal(message.body, "[UAT] PH-B52BA237 paid — on backorder.");
+      assert.equal(message.body.split("\n")[0], "[UAT] PH-B52BA237 paid — on backorder.");
+      assert.match(message.body, /Order total: 1,450 THB/);
+      assert.ok(message.body.includes(`Flow: ${channel === "mcp" ? "MCP" : "Web"}`));
+      assert.ok(message.body.includes(`Payment reference: ${paymentId}`));
       assert.equal((message.metadata as { source: string }).source, channel);
     }
   }
@@ -138,7 +148,38 @@ test("no-channel notifications preserve the link for later email recovery", asyn
   assert.equal(result.messages[0].status, "no_channel");
   channels = available;
   assert.equal((await retryCommunicationMessage(result.messages[0].id)).message.status, "sent");
-  assert.match(emails[0].html, />PH-B52BA237<\/a> created\./);
+  assert.match(emails[0].html, /PH-B52BA237 created\./);
+  assert.match(emails[0].html, />Open in admin<\/a>/);
+});
+
+test("payment notifications use stored amounts, locale and MCP provenance", async () => {
+  const result = await routeAdminCommunication({ organisationId: platformId, eventKey: "platform_revenue_received", resourceType: "payment", resourceId: paymentId,
+    metadata: { paymentStatus: "paid", amountMicros: 1, currency: "USD", sourceSurface: "healthscore", selectedPlan: "pro" } });
+  for (const message of result.messages) {
+    assert.equal(message.body.split("\n")[0], "[UAT] 690 THB received.");
+    assert.match(message.body, /Flow: MCP · Precision/);
+    assert.ok(message.body.includes(`Payment reference: ${paymentId}`));
+    assert.match(message.body, /uat\.mattanutra\.com\/th\/admin\/dashboard/);
+    assert.doesNotMatch(message.body, /USD|Pro/);
+    assert.equal((await dispatchCommunicationMessage(message.id)).message.status, "sent");
+  }
+});
+
+test("manual order totals include the frozen shipping total without claiming payment", async () => {
+  orderRow = { ...orderRow, source: "manual", metadata: { paymentStatus: "unpaid", pricingSnapshot: { totalAmount: 1450 } } };
+  const result = await routeAdminCommunication({ organisationId: pharmacyId, eventKey: "retail_order_created", resourceType: "retail_customer_order", resourceId: orderId });
+  assert.match(result.messages[0].body, /Order total: 1,450 THB/);
+  assert.match(result.messages[0].body, /Flow: Retail\nPayment: Unpaid/);
+});
+
+test("older order prices are labeled as a subtotal and used only when all line prices are known", async () => {
+  orderRow = { ...orderRow, source: "manual", metadata: {}, line_total_amount: "690.25" };
+  let result = await routeAdminCommunication({ organisationId: pharmacyId, eventKey: "retail_order_created", resourceType: "retail_customer_order", resourceId: orderId });
+  assert.match(result.messages[0].body, /Products subtotal: 690\.25 THB/);
+  assert.doesNotMatch(result.messages[0].body, /Order total:/);
+  orderRow.line_total_amount = null;
+  result = await routeAdminCommunication({ organisationId: pharmacyId, eventKey: "retail_order_created", resourceType: "retail_customer_order", resourceId: orderId });
+  assert.doesNotMatch(result.messages[0].body, /Order total:|Products subtotal:|NaN/);
 });
 
 test("platform messages route to the platform account and keep technical context out of the delivered body", async () => {
@@ -148,7 +189,9 @@ test("platform messages route to the platform account and keep technical context
   assert.equal(payload.organisationId, platformId);
   const result = await routeAdminCommunication(payload);
   for (const message of result.messages) {
-    assert.equal(message.body, "[UAT] Notification delivery failed.");
+    assert.equal(message.body.split("\n")[0], "[UAT] Notification delivery failed.");
+    assert.match(message.body, /Reference:/);
+    assert.match(message.body, /Open in admin:/);
     assert.equal((await dispatchCommunicationMessage(message.id)).message.status, "sent");
     assert.doesNotMatch(message.html!, /Private raw error|communication_dispatch/);
   }
@@ -189,7 +232,7 @@ test("genuine payment failures still send LINE alerts", async () => {
   assert.equal(result.messages.length, 1);
   assert.equal((await dispatchCommunicationMessage(result.messages[0].id)).message.status, "sent");
   assert.equal(pushes.length, 1);
-  assert.equal(result.messages[0].body, "[UAT] Payment failed.");
+  assert.equal(result.messages[0].body.split("\n")[0], "[UAT] Payment failed.");
 });
 
 test("previously queued payment expiry alerts and retries are skipped without contacting LINE", async () => {
