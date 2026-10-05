@@ -85,6 +85,8 @@ export async function bindMetaContext(sql: Db, resourceType: Resource, resourceI
   const context = await requestMetaContext(request, sql);
   if (!context) return null;
   const matching: Record<string, string | string[]> = request ? metaMatchingFromRequest(request, undefined, context.matching) : {};
+  // Page capture owns the click. A checkout waiting on another tab must not restore an older fbc.
+  delete matching.fbc;
   const email = hashEmailForFacebook(contact?.email);
   const rawPhone = contact?.phone?.trim() ?? "";
   // A national number is ambiguous without its country. Do not guess a Thai number for other markets.

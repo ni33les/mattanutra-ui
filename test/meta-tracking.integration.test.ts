@@ -166,6 +166,36 @@ describe("preference-controlled, durable and isolated Meta delivery", () => {
       assert.equal(row.custom_data.mn_env, "prd"); assert.equal(row.source_url, "https://mattanutra.com/en");
     } finally { keys.forEach((key,i) => { if (old[i] === undefined) delete process.env[key]; else process.env[key] = old[i]; }); }
   });
+  it("does not let a waiting checkout overwrite a newer ad click", async () => {
+    const c = await consent();
+    const locker = postgres(process.env.TEST_DB_URL!, { max: 1, onnotice() {} });
+    const observer = postgres(process.env.TEST_DB_URL!, { max: 1, onnotice() {} });
+    let release!:()=>void, entered!:()=>void;
+    const hold=new Promise<void>(resolve=>{release=resolve;}), locked=new Promise<void>(resolve=>{entered=resolve;});
+    try {
+      const writer=withDatabaseTransaction(locker,async tx=>{
+        await tx`select id from public.meta_tracking_contexts where id=${c.id}::uuid for update`;
+        entered();await hold;
+        await tx`update public.meta_tracking_contexts set attribution='{"campaign_id":"999"}',matching='{"fbc":"fb.1.1780000000000.newerClick"}' where id=${c.id}::uuid`;
+      });
+      await locked;
+      const binding=withDatabaseTransaction(getSql()!,tx=>bindMetaContext(tx,"payment",randomUUID(),c.request));
+      try {
+        let blocked=false;
+        for(let attempt=0;attempt<100;attempt++) {
+          const [state]=await observer`select exists(select 1 from pg_stat_activity where datname=current_database() and wait_event_type='Lock'
+            and query like '%insert into public.meta_tracking_bindings%') as blocked`;
+          if(state.blocked){blocked=true;break;}
+          await new Promise(resolve=>setTimeout(resolve,10));
+        }
+        assert.ok(blocked,"The resource binding must wait behind the competing page capture");
+      } finally {release();await writer;}
+      await binding;
+      const current=(await requestMetaContext(c.request,observer))!;
+      assert.equal(current.matching.fbc,"fb.1.1780000000000.newerClick");
+      assert.deepEqual(current.attribution,{campaign_id:"999"});
+    } finally {await Promise.all([locker.end(),observer.end()]);}
+  });
   it("queues an automatically enabled 690 THB purchase only after confirmation and once on replay", async () => {
     const c = await consent("site_default"), key = randomUUID(); requestKeys.push(key);
     const session = await createStripeCheckoutSession({ locale: "en", selectedPlan: "precision", sourceSurface: "landing", idempotencyKey: key, request: c.request });
