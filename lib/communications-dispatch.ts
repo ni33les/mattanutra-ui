@@ -739,6 +739,9 @@ export async function retryCommunicationMessage(messageId: string) {
     } satisfies CommunicationDispatchResult;
   }
 
+  // Manual retries cannot revive an expiry alert on email or LINE.
+  if (isPaymentExpiryNotification(initial.message_type, initial.metadata)) return skipPaymentExpiryMessage(mapMessage(initial));
+
   const planId = isUuid(initial.plan_id ?? "") ? initial.plan_id : null;
   const identityId = isUuid(initial.identity_id ?? "")
     ? initial.identity_id
@@ -800,18 +803,13 @@ function lineRecipient(row: DeliveryTargetRow) {
   );
 }
 
-async function deliverLineMessage(row: DeliveryTargetRow) {
-  // Also suppress alerts queued before the routing policy changed, including retries.
-  if (isPaymentExpiryNotification(row.message_type, row.metadata)) {
-    const reason = "Payment expiry is retained in reporting without LINE alerts";
-    const message = await updateCommunicationMessageStatus({
-      errorMessage: reason,
-      messageId: row.id,
-      status: "skipped"
-    });
-    return { attempted: false, configured: true, message, provider: "line", reason } satisfies CommunicationDispatchResult;
-  }
+async function skipPaymentExpiryMessage(previous: CommunicationMessage) {
+  const reason = "Payment expiry alerts are disabled";
+  const message = await updateCommunicationMessageStatus({ errorMessage: reason, messageId: previous.id, status: "skipped" });
+  return { attempted: false, configured: true, message, provider: previous.provider, reason } satisfies CommunicationDispatchResult;
+}
 
+async function deliverLineMessage(row: DeliveryTargetRow) {
   const accessToken = configuredLineAccessToken();
 
   if (!accessToken) {
@@ -930,6 +928,9 @@ export async function dispatchCommunicationMessage(messageId: string) {
       reason: "Message is not queued"
     } satisfies CommunicationDispatchResult;
   }
+
+  // Suppress old queued alerts before selecting any outbound transport.
+  if (isPaymentExpiryNotification(row.message_type, row.metadata)) return skipPaymentExpiryMessage(mapMessage(row));
 
   if (!row.delivery_channel_type) {
     const message = await updateCommunicationMessageStatus({

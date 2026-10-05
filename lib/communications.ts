@@ -244,16 +244,16 @@ export async function routeAdminCommunication(input: Readonly<{
       .sort((left, right) => left.preferenceRank - right.preferenceRank)
       .map((preference) => preference.channelType)
   );
-  // Expiry remains in payment reporting, but does not need a LINE alert.
+  // Expiry remains in payment reporting without sending an admin alert.
   const paymentExpiry = isPaymentExpiryNotification(input.eventKey, copy.metadata);
-  if (paymentExpiry) enabledTypes.delete("line");
+  if (paymentExpiry) enabledTypes.clear();
 
   if (enabledTypes.size === 0) {
     await writeBpmEvent({
       actorType: "system",
       emittedBy: "admin_communications",
       eventName: "admin_communication_suppressed",
-      eventStatus: paymentExpiry ? "payment_expiry_line_suppressed" : "preference_disabled",
+      eventStatus: paymentExpiry ? "payment_expiry_suppressed" : "preference_disabled",
       eventType: "system",
       properties: {
         eventKey: input.eventKey,

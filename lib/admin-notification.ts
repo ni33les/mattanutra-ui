@@ -20,7 +20,7 @@ function object(value: unknown): Metadata {
   return value && typeof value === "object" && !Array.isArray(value) ? value as Metadata : {};
 }
 export function isPaymentExpiryNotification(eventKey: string, metadata: unknown) {
-  return eventKey === "platform_payment_failed" && object(metadata).paymentStatus === "expired";
+  return eventKey === "payment_expired" || (eventKey === "platform_payment_failed" && object(metadata).paymentStatus === "expired");
 }
 function uuid(value: unknown) {
   return typeof value === "string" && /^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/i.test(value) ? value : null;

@@ -198,60 +198,67 @@ test("platform messages route to the platform account and keep technical context
   await assert.rejects(routeAdminCommunication({ organisationId: pharmacyId, eventKey: "platform_payment_failed" }), /does not belong/);
 });
 
-test("payment expiry retains email delivery but creates no LINE message or dispatch task", async () => {
+test("payment expiry creates no email, LINE message or dispatch task in any environment", async () => {
   for (const environment of ["dev", "uat", "prd"]) {
     process.env.MATTANUTRA_ENV = environment;
     const result = await routeAdminCommunication({
       organisationId: platformId, eventKey: "platform_payment_failed", resourceType: "payment", resourceId: paymentId,
       metadata: { paymentStatus: "expired", sourceSurface: "web" }
     });
-    assert.deepEqual(result.messages.map(message => message.provider), ["email"]);
-    assert.equal(result.dispatchTasks.length, 1);
-    assert.equal((await dispatchCommunicationMessage(result.messages[0].id)).message.status, "sent");
+    assert.equal(result.messages.length, 0);
+    assert.equal(result.dispatchTasks.length, 0);
   }
-  assert.equal(emails.length, 3);
-  assert.equal(pushes.length, 0);
-});
-
-test("explicit LINE routing cannot override payment expiry suppression", async () => {
-  const result = await routeAdminCommunication({
-    organisationId: platformId, eventKey: "platform_payment_failed", channelType: "line",
-    metadata: { paymentStatus: "expired" }
-  });
-  assert.equal(result.messages.length, 0);
-  assert.equal(result.dispatchTasks.length, 0);
   assert.equal(emails.length, 0);
   assert.equal(pushes.length, 0);
 });
 
-test("genuine payment failures still send LINE alerts", async () => {
+test("explicit email and LINE routing cannot override payment expiry suppression", async () => {
+  for (const channelType of ["email", "line"] as const) {
+    const result = await routeAdminCommunication({
+      organisationId: platformId, eventKey: "platform_payment_failed", channelType,
+      metadata: { paymentStatus: "expired" }
+    });
+    assert.equal(result.messages.length, 0);
+    assert.equal(result.dispatchTasks.length, 0);
+  }
+  assert.equal(emails.length, 0);
+  assert.equal(pushes.length, 0);
+});
+
+test("genuine payment failures still send email and LINE alerts", async () => {
   const result = await routeAdminCommunication({
-    organisationId: platformId, eventKey: "platform_payment_failed", channelType: "line",
+    organisationId: platformId, eventKey: "platform_payment_failed",
     metadata: { paymentStatus: "failed" }
   });
-  assert.equal(result.messages.length, 1);
-  assert.equal((await dispatchCommunicationMessage(result.messages[0].id)).message.status, "sent");
+  assert.equal(result.messages.length, 2);
+  for (const message of result.messages) assert.equal((await dispatchCommunicationMessage(message.id)).message.status, "sent");
+  assert.equal(emails.length, 1);
   assert.equal(pushes.length, 1);
   assert.equal(result.messages[0].body.split("\n")[0], "[UAT] Payment failed.");
 });
 
-test("previously queued payment expiry alerts and retries are skipped without contacting LINE", async () => {
-  channels = channels.filter(channel => channel.channel_type === "line");
-  const result = await routeAdminCommunication({
-    organisationId: platformId, eventKey: "platform_payment_failed", channelType: "line",
-    metadata: { paymentStatus: "failed" }
-  });
-  // Reproduce an expiry alert stored before the new routing policy.
-  const row = messages.get(result.messages[0].id)!;
-  row.metadata = { ...(row.metadata as Record<string, unknown>), paymentStatus: "expired" };
-  row.body = "[UAT] Payment expired.";
-  const delivery = await dispatchCommunicationMessage(row.id);
-  assert.equal(delivery.attempted, false);
-  assert.equal(delivery.message.status, "skipped");
-  assert.equal(delivery.message.sentAt, null);
-  const retry = await retryCommunicationMessage(row.id);
-  assert.equal(retry.attempted, false);
-  assert.equal(retry.message.status, "skipped");
+test("old expiry alerts and direct retries are skipped on both transports, including legacy event names", async () => {
+  for (const channelType of ["email", "line"] as const) {
+    for (const legacy of [false, true]) {
+      for (const directRetry of [false, true]) {
+        const result = await routeAdminCommunication({ organisationId: platformId, eventKey: "platform_payment_failed", channelType, metadata: { paymentStatus: "failed" } });
+        // Reproduce an expiry alert stored before the new routing policy.
+        const row = messages.get(result.messages[0].id)!;
+        if (legacy) row.message_type = "payment_expired";
+        else row.metadata = { ...(row.metadata as Record<string, unknown>), paymentStatus: "expired" };
+        row.body = "[UAT] Payment expired.";
+        if (directRetry) row.status = "failed";
+        const delivery = await (directRetry ? retryCommunicationMessage(row.id) : dispatchCommunicationMessage(row.id));
+        assert.equal(delivery.attempted, false);
+        assert.equal(delivery.message.status, "skipped");
+        assert.equal(delivery.message.sentAt, null);
+        const retry = await retryCommunicationMessage(row.id);
+        assert.equal(retry.attempted, false);
+        assert.equal(retry.message.status, "skipped");
+      }
+    }
+  }
+  assert.equal(emails.length, 0);
   assert.equal(pushes.length, 0);
   assert.equal(routedTasks.length, 0);
 });

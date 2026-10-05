@@ -567,6 +567,7 @@ async function queuePlatformPaymentNotification(input: Readonly<{
   metadata?: Record<string, unknown>;
   payment: PaymentRow;
 }>) {
+  if (input.eventKey === "platform_payment_failed" && input.payment.status === "expired") return;
   try {
     await queuePlatformAdminCommunication({
       eventKey: input.eventKey,

@@ -2,8 +2,9 @@ import { cleanupFixtureRelationships } from "./helpers/fixture-teardown.ts";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { after, before, describe, it } from "node:test";
+import type Stripe from "stripe";
 import { closeSqlPool, getSql, withDatabaseTransaction } from "../lib/db.ts";
-import { claimPaidReservation, markPaymentCancelled, updatePaymentState } from "../lib/stripe-payments.ts";
+import { claimPaidReservation, markPaymentCancelled, markStripePaymentFailure, updatePaymentState } from "../lib/stripe-payments.ts";
 
 const databaseUrl = process.env.TEST_DB_URL;
 assert.ok(databaseUrl, "Payment transition tests require isolated PostgreSQL");
@@ -23,6 +24,7 @@ describe("web payment integrity on PostgreSQL", () => {
       await sql`set local session_replication_role = replica`;
       await cleanupFixtureRelationships(sql, { planIds: plans });
       for (const id of ids) {
+        await sql`delete from public.bpm where properties->>'paymentId' = ${id}`;
         await sql`delete from public.finance_transactions where source_ref = ${`stripe:payment:${id}:nominal-revenue`}`;
         await sql`delete from public.payment_versions where payment_id = ${id}::uuid`;
         await sql`delete from public.payments where id = ${id}::uuid`;
@@ -57,6 +59,16 @@ describe("web payment integrity on PostgreSQL", () => {
       assert.equal((await sql`select count(*)::int as n from public.finance_transactions where source_ref = ${`stripe:payment:${id}:nominal-revenue`}`)[0].n, 1);
       assert.equal((await sql`select count(*)::int as n from public.payment_versions where payment_id = ${id}::uuid`)[0].n, 0);
     }
+  });
+
+  it("records checkout expiry without queueing any admin notification", async () => {
+    const id = await seed("checkout_session_created"), sql = getSql()!;
+    const session = { id: `mock_cs_${id}`, metadata: { paymentId: id } } as Stripe.Checkout.Session;
+    const result = await markStripePaymentFailure({ eventName: "payment_expired", eventStatus: "expired", reason: "Fixture checkout expired", session });
+    assert.equal(result?.status, "expired");
+    assert.equal((await sql`select status from public.payments where id=${id}::uuid`)[0].status, "expired");
+    assert.equal((await sql`select count(*)::int n from public.bpm where event_name='payment_expired' and properties->>'paymentId'=${id}`)[0].n, 1);
+    assert.equal((await sql`select count(*)::int n from public.tasks where task_type='route_admin_communication' and payload->>'resourceId'=${id}`)[0].n, 0);
   });
 
   it("serializes cancellation against confirmation without downgrading paid", async () => {
