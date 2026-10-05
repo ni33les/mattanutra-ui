@@ -16,7 +16,8 @@ export async function metaDiagnostics(since: Date | string | null): Promise<Meta
   const result: MetaDiagnostics = { environment: config.environment, pixelId: config.pixelId, enabled: config.enabled,
     rows: [], purchases: { confirmed: 0, recorded: 0, missing: 0 }, campaigns: emptyMetaCampaignReport() };
   if (!sql || !config.enabled) return result;
-  const start = since ?? new Date(Date.now() - 30 * 86400000);
+  // The dashboard passes null for its explicit All range.
+  const start = since ?? new Date(0);
   const [rows, purchases, campaigns] = await Promise.all([
     sql`select event_name,status,
       case when custom_data->>'channel'='pharmacy' then 'retail' when custom_data->>'channel'='mcp_web' then 'mcp'

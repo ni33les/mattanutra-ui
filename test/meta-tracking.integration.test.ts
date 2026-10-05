@@ -9,6 +9,7 @@ import { closeSqlPool, databaseTransactionActive, getSql, withDatabaseTransactio
 import { bindMetaContext, enqueueMetaEvent, recordMetaPurchase, requestMetaContext, setMetaConsent, setMetaPreference } from "../lib/meta-tracking.ts";
 import { sendMetaEvent } from "../lib/meta-dispatch.ts";
 import { metaCampaignReport } from "../lib/meta-campaign-report.ts";
+import { metaDiagnostics } from "../lib/meta-diagnostics.ts";
 import { createStripeCheckoutSession, completeMockPayment } from "../lib/stripe-payments.ts";
 import { recordRetailProviderSession, type RetailSessionPayment } from "../lib/retail-checkout-provider-session.ts";
 import { register } from "node:module";
@@ -286,6 +287,15 @@ describe("preference-controlled, durable and isolated Meta delivery", () => {
     assert.equal(report.sales.reduce((sum,row)=>sum+row.purchases,0),6);
     assert.equal(report.adsReportingConnected,false); assert.equal(report.limited,false);
     assert.doesNotMatch(JSON.stringify(report),/fb\.1|Fixture|client_ip|client_user|email|phone/);
+  });
+  it("honours the dashboard All range without silently restricting it to thirty days", async () => {
+    const c = await consent(), id = randomUUID();
+    await getSql()!`insert into public.meta_conversion_events(id,environment,pixel_id,event_name,source_key,context_id,custom_data,status,occurred_at)
+      values (${id}::uuid,'dev','123456789012345','Purchase',${id},${c.id}::uuid,
+        '{"campaign_id":"777777","purchase_type":"plan","offer":"precision","value":690,"currency":"THB","channel":"web","locale":"en"}','accepted','2020-01-01')`;
+    const all = await metaDiagnostics(null), recent = await metaDiagnostics(new Date(Date.now()-30*86400000));
+    assert.equal(all.campaigns.sales.find(row=>row.campaignId==="777777")?.purchases,1);
+    assert.equal(recent.campaigns.sales.find(row=>row.campaignId==="777777"),undefined);
   });
   it("does not call a rejected Meta response accepted and bounds transient retries", async () => {
     const c=await queued();
