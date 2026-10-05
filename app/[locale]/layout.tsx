@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import {
   DM_Sans,
   Fraunces,
-  JetBrains_Mono,
   Noto_Sans_Thai
 } from "next/font/google";
 import localFont from "next/font/local";
@@ -50,11 +49,13 @@ const displayFont = Fraunces({
   axes: ["opsz"]
 });
 
-const monoFont = JetBrains_Mono({
-  subsets: ["latin"],
+// Google intermittently returns extensionless URLs that next/font cannot parse.
+const monoFont = localFont({
+  src: "../../public/assets/pharmacy/fonts/jetbrains-mono.woff2",
   variable: "--mn-font-mono",
   display: "swap",
-  weight: ["400", "500", "600"]
+  weight: "100 800",
+  fallback: ["monospace"]
 });
 
 const thaiFont = Noto_Sans_Thai({
