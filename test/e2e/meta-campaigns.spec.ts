@@ -6,6 +6,7 @@ import { metaAdUrlParameters } from "../../lib/meta-attribution";
 import type { AdminBrowserSession } from "../helpers/admin-browser-fixture";
 
 const execute = promisify(execFile);
+test.use({ actionTimeout: 10_000 });
 async function runApp<T>(script: string, fixture?: unknown): Promise<T> {
   const { stdout } = await execute(process.execPath, ["--experimental-strip-types", "--import", "./scripts/register-ts-path-loader.mjs", "--import", "./test/helpers/offline-network.mjs", "--input-type=module", "-e", script],
     { env: { ...process.env, META_CAMPAIGN_FIXTURE: JSON.stringify(fixture) }, maxBuffer: 1024 * 1024 });
@@ -54,13 +55,13 @@ test("campaign tables separate sales from delivery, filter all flows, and work i
         expect(await panel.evaluate(element=>element.scrollWidth<=element.clientWidth+1)).toBe(true);
         expect(await panel.innerText()).not.toMatch(/NaN|Infinity/);
       }
-      await panel.getByLabel(t.flow, { exact: true }).selectOption("mcp");
+      await panel.getByRole("combobox", { name: t.flow, exact: true }).selectOption("mcp");
       await expect(sales.locator("tbody tr")).toHaveCount(1);
       await expect(sales.locator("tbody")).toContainText("MCP");
-      await panel.getByLabel(t.language, { exact: true }).selectOption("en");
+      await panel.getByRole("combobox", { name: t.language, exact: true }).selectOption("en");
       await expect(sales.locator("tbody")).toHaveText(t.empty);
-      await panel.getByLabel(t.language, { exact: true }).selectOption("");
-      await panel.getByLabel(t.flow, { exact: true }).selectOption("");
+      await panel.getByRole("combobox", { name: t.language, exact: true }).selectOption("");
+      await panel.getByRole("combobox", { name: t.flow, exact: true }).selectOption("");
       await panel.locator("summary").filter({hasText:t.setup}).click();
       await expect(panel.getByLabel(t.parameters)).toHaveValue(metaAdUrlParameters);
       await page.evaluate(()=>Object.defineProperty(navigator,"clipboard",{configurable:true,value:{writeText:()=>Promise.reject(new Error("blocked"))}}));
