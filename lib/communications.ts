@@ -1,6 +1,7 @@
 import type postgres from "postgres";
 import { isUuid, toJsonValue } from "@/lib/assessment-store";
 import { writeBpmEvent } from "@/lib/bpm";
+import { isPaymentExpiryNotification } from "@/lib/admin-notification";
 import {
   normalizeCommunicationChannelType,
   normalizeLineUserId,
@@ -222,13 +223,16 @@ export async function routeAdminCommunication(input: Readonly<{
       .sort((left, right) => left.preferenceRank - right.preferenceRank)
       .map((preference) => preference.channelType)
   );
+  // Expiry remains in payment reporting, but does not need a LINE alert.
+  const paymentExpiry = isPaymentExpiryNotification(input.eventKey, copy.metadata);
+  if (paymentExpiry) enabledTypes.delete("line");
 
   if (enabledTypes.size === 0) {
     await writeBpmEvent({
       actorType: "system",
       emittedBy: "admin_communications",
       eventName: "admin_communication_suppressed",
-      eventStatus: "preference_disabled",
+      eventStatus: paymentExpiry ? "payment_expiry_line_suppressed" : "preference_disabled",
       eventType: "system",
       properties: {
         eventKey: input.eventKey,
