@@ -151,7 +151,7 @@ async function adminCommunicationCopy(input: Readonly<{
       const [payment] = isUuid(paymentId)
         ? await sql<Array<{ status: string; amount: string; currency: string; locale: string }>>`select status,amount,currency,locale from public.retail_checkout_payments where id=${paymentId}::uuid limit 1`
         : [];
-      // Checkout amounts are stored in micros; order pricing and till receipts are major currency units.
+      // Checkout amounts are stored in micros; order pricing and checkout receipts are major currency units.
       const savedTotal = objectValue(orderMetadata.pricingSnapshot).totalAmount ?? objectValue(orderMetadata.receipt).total;
       const total = savedTotal ?? order.line_total_amount;
       const totalIsNumber = (typeof total === "number" || typeof total === "string" && total.trim() !== "") && Number.isFinite(Number(total)) && Number(total) >= 0;

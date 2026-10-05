@@ -9,7 +9,7 @@ const en = {
   title: "Your personalised supplement plan", introResults: "Review your recommendation, then choose what to order at this pharmacy.",
   products: "Your products", ingredients: "Your nutrients", removeHint: "Untick anything you already have or don’t wish to order.",
   name: "Name or nickname", nameHint: "The pharmacist will use this name at the counter.", pay: "Pay at the pharmacy counter", paymentHint: "No online payment. The pharmacist will discuss any unavailable items and arrange collection with you.",
-  confirm: "Confirm my order", sending: "Saving your order…", confirmed: "Your order has been sent to the pharmacy", reference: "Order reference", unpaid: "Unpaid · Pay at till",
+  confirm: "Confirm my order", sending: "Saving your order…", confirmed: "Your order has been sent to the pharmacy", reference: "Order reference", unpaid: "Unpaid · Pay at checkout",
   details: "Your plan, in full", copyLink: "Copy private plan link", copied: "Link copied", line: "Share my plan to LINE", lineHint: "Choose your LINE chat and tap Send to save the link.",
   orderSummary: "Order summary", subtotal: "Subtotal", total: "Total", quantity: "Packs", unitPrice: "Price per pack", tax: "Tax", included: "Included", shipping: "Delivery", removed: "Excluded from this order",
   unknown: "Unknown", noProducts: "No products are recommended for purchase now. You can still read your plan.", error: "We could not complete this step. Please try again.", refresh: "Products or prices have changed. Refresh the recommendation before ordering.",

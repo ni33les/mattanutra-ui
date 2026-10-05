@@ -115,7 +115,7 @@ export function buildAdminNotification(input: AdminNotificationInput) {
   if (source) details.push(`Flow: ${{ web: "Web", retail: "Retail", mcp: "MCP" }[source]}${["precision", "pro"].includes(offer) ? ` · ${offer === "pro" ? "Pro" : "Precision"}` : ""}`);
   if (copy.view === "retail-customer-orders") {
     const paymentLabels: Record<string, string> = { paid: "Paid", bound: "Paid", fulfilled: "Paid", unpaid: "Unpaid", processing: "Processing", failed: "Failed", expired: "Expired", refunded: "Refunded", partially_refunded: "Partially refunded", cancelled: "Cancelled", canceled: "Cancelled" };
-    if (paymentLabels[paymentState]) details.push(`Payment: ${paymentLabels[paymentState]}${paymentState === "unpaid" && metadata.paymentMethod === "pay_at_till" ? " — pay at till" : ""}`);
+    if (paymentLabels[paymentState]) details.push(`Payment: ${paymentLabels[paymentState]}${paymentState === "unpaid" && metadata.paymentMethod === "pay_at_till" ? " — pay at checkout" : ""}`);
   }
   const paymentId = uuid(metadata.paymentId) || uuid(metadata.checkoutPaymentId)
     || (["payment", "retail_checkout_payment"].includes(input.resourceType ?? "") ? uuid(input.resourceId) : null);

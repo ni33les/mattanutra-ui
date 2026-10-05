@@ -7,9 +7,9 @@ The existing questionnaire capture binds the pharmacy server-side. Formula and H
 
 `POST /api/retail/orders` accepts `planId`, `pharmacy`, `locale`, `expectedRevision`, `productIds` and `customerName`, with `Idempotency-Key`. Server data supplies prices and first-order packs. `GET` retrieves an owned receipt or current quote; `view=analysis` reads the explanation for that order's frozen revision. Possession of the existing opaque assessment identifier follows the existing web access model; a human order reference alone grants no access.
 
-Orders use source `pharmacy`, status `placed`, and explicit unpaid/pay-at-till metadata. No online payment, financial booking, stock allocation, shipment or settlement is initiated. The shared order-creation revision/catalogue fences protect only final validation and necessary writes. Reused task infrastructure commits the notification request with the order and dispatches after commit. Delivery failure cannot invalidate a saved order. Counter payment/collection/POS integration is outside this version.
+Orders use source `pharmacy`, status `placed`, and explicit unpaid/pay-at-checkout metadata. No online payment, financial booking, stock allocation, shipment or settlement is initiated. The shared order-creation revision/catalogue fences protect only final validation and necessary writes. Reused task infrastructure commits the notification request with the order and dispatches after commit. Delivery failure cannot invalidate a saved order. Counter payment/collection/POS integration is outside this version.
 
-The order UI reuses existing basket/order-summary styles. It removes address, billing, shipping and Stripe controls; it adds product inclusion, name/nickname and pay-at-till copy. Attached examples provide structure and text, not customer facts, prices, clearance claims or fixed counts. Deep-dive results distinguish the original formulation from the ordered product subset.
+The order UI reuses existing basket/order-summary styles. It removes address, billing, shipping and Stripe controls; it adds product inclusion, name/nickname and pay-at-checkout copy. Attached examples provide structure and text, not customer facts, prices, clearance claims or fixed counts. Deep-dive results distinguish the original formulation from the ordered product subset.
 
 ## Save the plan in LINE
 
@@ -42,7 +42,7 @@ Only `db-rollout/pharmacy-orders.sql` is applied: it adds `pharmacy` to the sour
 - Poster: `/retail/delight?source=in_store`
 - Business card: `/retail/delight?source=business_card`
 
-Use any existing pharmacy slug in place of `delight`. Both links use the same pharmacy flow and pay at the till. New untagged entries default to in-store; malformed explicit sources and historical entries without evidence are unknown. The initial redirect preserves query parameters and assigns a session for source correlation. Saved assessment/resume attribution wins over later URL or browser state.
+Use any existing pharmacy slug in place of `delight`. Both links use the same pharmacy flow and pay at checkout. New untagged entries default to in-store; malformed explicit sources and historical entries without evidence are unknown. The initial redirect preserves query parameters and assigns a session for source correlation. Saved assessment/resume attribution wins over later URL or browser state.
 
 BPM uses `trafficSource=pharmacy`, the canonical pharmacy slug in `sourceChannel`, and `in_store|business_card|unknown` in `sourceDetail`. Acquisition is stored in `answers.inStorePharmacy.acquisition` and new order metadata; it is excluded from generation identity and worker inputs. No historical backfill or pricing change is performed.
 

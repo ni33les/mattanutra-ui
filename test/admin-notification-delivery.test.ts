@@ -111,7 +111,7 @@ test("unpaid pharmacy orders retain accurate copy and the exact order link throu
     assert.equal(message.body.split("\n")[0], "[UAT] PH-B52BA237 created.");
     assert.match(message.body, /Order total: 1,234\.5 THB/);
     assert.match(message.body, /Flow: Retail/);
-    assert.match(message.body, /Payment: Unpaid — pay at till/);
+    assert.match(message.body, /Payment: Unpaid — pay at checkout/);
     assert.ok(message.html?.includes(`order=${orderId}`));
     assert.equal((await dispatchCommunicationMessage(message.id)).message.status, "sent");
   }

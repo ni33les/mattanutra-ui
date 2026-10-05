@@ -17,10 +17,10 @@ function order(paymentStatus: string, orderStatus = "placed") {
 }
 
 describe("informative admin notifications", () => {
-  it("shows order value, Retail flow, unpaid till status and an explicit admin link", () => {
+  it("shows order value, Retail flow, unpaid checkout status and an explicit admin link", () => {
     const copy = order("unpaid");
     assert.equal(headline(copy), "PH-B52BA237 created.");
-    assert.match(copy.body, /Order total: 1,250\.5 THB\nFlow: Retail\nPayment: Unpaid — pay at till/);
+    assert.match(copy.body, /Order total: 1,250\.5 THB\nFlow: Retail\nPayment: Unpaid — pay at checkout/);
     assert.ok(copy.body.includes(`Open in admin: ${copy.metadata.notification.href}`));
     assert.equal(new URL(copy.metadata.notification.href).searchParams.get("order"), orderId);
     assert.match(copy.html, />Open in admin<\/a>/);assert.match(copy.html, /Order total: 1,250\.5 THB/);
