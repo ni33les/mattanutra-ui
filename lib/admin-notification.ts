@@ -86,6 +86,8 @@ export function buildAdminNotification(input: AdminNotificationInput) {
     platform_payment_failed: { label: "Payment", state: paymentState === "expired" ? "expired" : cancelled ? "cancelled" : "failed", view: "financials" },
     platform_payout_failed: { label: "Payout", state: payoutCancelled ? "cancelled" : "failed", view: "financials" },
     platform_revenue_received: { label: paid && money ? money : "Payment", state: paid ? "received" : "needs review", view: "financials" },
+    // Platform accounts cannot open tenant-scoped retail order screens.
+    platform_retail_order_created: { ...orderCopy(`${paid ? "paid" : "created"}${backorder ? " — on backorder" : ""}`), view: "communications" },
     platform_retailer_payout_due: settlementCopy(`payout due${money ? ` (${money})` : ""}`, true),
     platform_retailer_settlement_needs_review: settlementCopy("payout needs review", true),
     platform_carrier_integration_failed: { label: "Carrier update", state: "failed", view: "alerts" },
@@ -95,6 +97,7 @@ export function buildAdminNotification(input: AdminNotificationInput) {
     platform_worker_unavailable: { label: text(metadata.workerName) || "Worker", state: "unavailable", view: "agents" }
   };
   const copy = copies[input.eventKey];
+  const isOrderNotification = copy.view === "retail-customer-orders" || input.eventKey === "platform_retail_order_created";
   const locale = ["en", "th", "zh-CN"].includes(text(metadata.locale)) ? text(metadata.locale) : "en";
   const origin = environment === "prd" ? "https://mattanutra.com" : `https://${environment}.mattanutra.com`;
   const url = new URL(`/${locale}/admin/dashboard`, origin);
@@ -109,11 +112,12 @@ export function buildAdminNotification(input: AdminNotificationInput) {
   const title = `${prefix}${copy.label}${ending}`;
   const source = notificationSource(metadata);
   const details: string[] = [];
+  if (input.eventKey === "platform_retail_order_created" && text(metadata.retailerName)) details.push(`Retailer: ${text(metadata.retailerName)}`);
   if (text(metadata.orderNumber) && copy.label !== text(metadata.orderNumber)) details.push(`Order: ${text(metadata.orderNumber)}`);
-  if (money && !title.includes(money)) details.push(`${copy.view === "retail-customer-orders" ? metadata.amountIsSubtotal === true ? "Products subtotal" : "Order total" : "Amount"}: ${money}`);
+  if (money && !title.includes(money)) details.push(`${isOrderNotification ? metadata.amountIsSubtotal === true ? "Products subtotal" : "Order total" : "Amount"}: ${money}`);
   const offer = text(metadata.selectedPlan);
   if (source) details.push(`Flow: ${{ web: "Web", retail: "Retail", mcp: "MCP" }[source]}${["precision", "pro"].includes(offer) ? ` · ${offer === "pro" ? "Pro" : "Precision"}` : ""}`);
-  if (copy.view === "retail-customer-orders") {
+  if (isOrderNotification) {
     const paymentLabels: Record<string, string> = { paid: "Paid", bound: "Paid", fulfilled: "Paid", unpaid: "Unpaid", processing: "Processing", failed: "Failed", expired: "Expired", refunded: "Refunded", partially_refunded: "Partially refunded", cancelled: "Cancelled", canceled: "Cancelled" };
     if (paymentLabels[paymentState]) details.push(`Payment: ${paymentLabels[paymentState]}${paymentState === "unpaid" && metadata.paymentMethod === "pay_at_till" ? " — pay at till" : ""}`);
   }

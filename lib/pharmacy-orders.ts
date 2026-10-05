@@ -9,7 +9,7 @@ import { pharmacyOrganisationSlug } from "@/lib/pharmacy-journey";
 import { preparePharmacyOrder, type PharmacyOrderProduct } from "@/lib/pharmacy-order-input";
 import { claimFunnelRequest, completeFunnelRequest } from "@/lib/funnel-idempotency";
 import { currentWebCheckoutSelection, validateCurrentWebCheckoutRecommendations, lockWebCheckoutAssessment } from "@/lib/retail-product-checkout";
-import { queueAdminOrganisationCommunication } from "@/lib/communications";
+import { queueAdminOrganisationCommunication, queuePlatformAdminCommunication } from "@/lib/communications";
 import { FunnelError } from "@/lib/funnel-errors";
 import { isLocale, type Locale } from "@/lib/i18n";
 import type { FormulationResult } from "@/lib/formulation-types";
@@ -121,6 +121,9 @@ export async function createPharmacyOrder(value: unknown, key: string): Promise<
     await queueAdminOrganisationCommunication({ organisationId: quote.pharmacy.id, eventKey: "retail_order_created",
       resourceId: receipt.id, resourceType: "retail_customer_order",
       metadata: { source: "pharmacy", paymentStatus: "unpaid" } });
+    await queuePlatformAdminCommunication({ eventKey: "platform_retail_order_created",
+      resourceId: receipt.id, resourceType: "retail_customer_order",
+      metadata: { source: "pharmacy", paymentStatus: "unpaid", retailerName: quote.pharmacy.name, locale: quote.assessment.locale } });
     return receipt;
   });
   void writeBpmEvent({ eventName: "retail_order_created", eventType: "fulfillment", eventStatus: "placed",

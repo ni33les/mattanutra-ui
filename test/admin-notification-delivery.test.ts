@@ -13,6 +13,7 @@ const pharmacyId = randomUUID(), platformId = randomUUID(), orderId = randomUUID
 const messages = new Map<string, shared.MessageRow>();
 let orderRow: { order_number: string; status: string; source: string; metadata: Record<string, unknown>; currency?: string; line_total_amount?: string | null };
 let paymentStatus: string, channels: shared.ChannelRow[], lineStatus: number;
+let platformCheckoutAlertEnabled: boolean;
 const emails: Parameters<typeof smtp.sendTransactionalEmail>[0][] = [];
 const pushes: { messages: Record<string, unknown>[] }[] = [];
 const routedTasks: Parameters<typeof tasks.createTask>[0][] = [];
@@ -66,7 +67,9 @@ mock.module("../lib/communications-shared.ts", { namedExports: { ...shared, sqlO
 } });
 mock.module("../lib/communications-organisation.ts", { namedExports: { ...organisation,
   ensureOrganisationCommunicationIdentity: async ({ organisationId }: { organisationId: string }) => organisationId,
-  listOrganisationNotificationPreferences: async () => shared.adminCommunicationEventKeys.flatMap(eventKey => ["email", "line"].map(channelType => ({ eventKey, channelType, enabled: true, preferenceRank: 1 }))),
+  listOrganisationNotificationPreferences: async () => shared.adminCommunicationEventKeys.flatMap(eventKey => (["email", "line"] as const).map(channelType => ({ eventKey, channelType,
+    enabled: eventKey === "platform_retail_order_created" ? platformCheckoutAlertEnabled && shared.adminCommunicationPreferenceDefault(eventKey, channelType) : true,
+    preferenceRank: 1 }))),
   queueCommunicationMessageDispatchTask: async () => ({ created: true, task: { id: randomUUID(), taskType: "dispatch_email_communication" } })
 } });
 mock.module("../lib/smtp-email.ts", { namedExports: { ...smtp,
@@ -85,6 +88,7 @@ const { dispatchCommunicationMessage, retryCommunicationMessage } = await import
 beforeEach(() => {
   process.env.MATTANUTRA_ENV = "uat";
   messages.clear(); emails.length = 0; pushes.length = 0; routedTasks.length = 0; documentRenders = 0; lineStatus = 200;
+  platformCheckoutAlertEnabled = true;
   orderRow = { order_number: "PH-B52BA237", status: "placed", source: "pharmacy", currency: "THB", line_total_amount: null, metadata: { paymentStatus: "unpaid", paymentMethod: "pay_at_till", receipt: { total: 1234.5 } } };
   paymentStatus = "paid";
   channels = (["email", "line"] as const).map((channel_type, index) => ({
@@ -125,6 +129,39 @@ test("unpaid pharmacy orders retain accurate copy and the exact order link throu
   assert.ok(JSON.stringify(pushes[0]).includes("Open in admin"));
   assert.doesNotMatch(JSON.stringify(pushes[0]), /Basket:|paid and created/);
   assert.equal((await dispatchCommunicationMessage(result.messages[0].id)).attempted, false);
+});
+
+test("pharmacy checkout reaches platform LINE with the retailer, saved unpaid amount and accessible admin link", async () => {
+  const queued = await queuePlatformAdminCommunication({ eventKey: "platform_retail_order_created", resourceType: "retail_customer_order", resourceId: orderId,
+    metadata: { source: "pharmacy", paymentStatus: "unpaid", retailerName: "Fixture Pharmacy", customerName: "Private customer" } });
+  assert.equal(queued.created, true);
+  const payload = routedTasks[0].payload as Parameters<typeof routeAdminCommunication>[0];
+  assert.equal(payload.organisationId, platformId);
+  const result = await routeAdminCommunication(payload);
+  assert.equal(result.messages.length, 1);
+  const message = result.messages[0];
+  assert.equal(message.provider, "line");
+  assert.equal(message.channelId, channels.find(channel => channel.channel_type === "line")?.id);
+  assert.equal(message.body.split("\n")[0], "[UAT] PH-B52BA237 created.");
+  assert.match(message.body, /Retailer: Fixture Pharmacy/);
+  assert.match(message.body, /Order total: 1,234\.5 THB/);
+  assert.match(message.body, /Flow: Retail\nPayment: Unpaid — pay at till/);
+  assert.match(message.body, /Open in admin: https:\/\/uat\.mattanutra\.com\/en\/admin\/dashboard\?view=communications&range=all/);
+  assert.doesNotMatch(message.body, /Private customer|received\./);
+  assert.equal((await dispatchCommunicationMessage(message.id)).message.status, "sent");
+  assert.equal(emails.length, 0); assert.equal(pushes.length, 1); assert.equal(documentRenders, 0);
+  assert.ok(JSON.stringify(pushes[0]).includes("Retailer: Fixture Pharmacy"));
+  assert.ok(JSON.stringify(pushes[0]).includes("PH-B52BA237"));
+  assert.ok(JSON.stringify(pushes[0]).includes("view=communications"));
+  await assert.rejects(routeAdminCommunication({ ...payload, organisationId: pharmacyId }), /does not belong/);
+});
+
+test("pharmacy checkout honours disabled platform notification preferences", async () => {
+  platformCheckoutAlertEnabled = false;
+  const result = await routeAdminCommunication({ organisationId: platformId, eventKey: "platform_retail_order_created", resourceType: "retail_customer_order", resourceId: orderId });
+  assert.equal(result.messages.length, 0);
+  assert.equal(result.dispatchTasks.length, 0);
+  assert.equal(emails.length, 0); assert.equal(pushes.length, 0);
 });
 
 test("MCP and web payments are distinguished using the recorded channel and payment state", async () => {

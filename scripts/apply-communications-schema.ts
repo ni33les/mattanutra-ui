@@ -50,6 +50,7 @@ try {
       constraint organisation_notification_preferences_event_check check (
         event_key in (
           'platform_revenue_received',
+          'platform_retail_order_created',
           'platform_checkout_failed',
           'platform_carrier_integration_failed',
           'platform_payment_failed',
@@ -90,6 +91,7 @@ try {
       add constraint organisation_notification_preferences_event_check check (
         event_key in (
           'platform_revenue_received',
+          'platform_retail_order_created',
           'platform_checkout_failed',
           'platform_carrier_integration_failed',
           'platform_payment_failed',

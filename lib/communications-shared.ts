@@ -44,6 +44,7 @@ export type AdminCommunicationEventKey =
   | "platform_payment_failed"
   | "platform_payout_failed"
   | "platform_revenue_received"
+  | "platform_retail_order_created"
   | "platform_retailer_payout_due"
   | "platform_retailer_settlement_needs_review"
   | "platform_task_stuck"
@@ -203,6 +204,7 @@ const RETAIL_ADMIN_COMMUNICATION_EVENT_DEFAULTS = {
 } satisfies Record<Extract<AdminCommunicationEventKey, `retail_${string}`>, boolean>;
 const PLATFORM_ADMIN_COMMUNICATION_EVENT_KEYS = [
   "platform_revenue_received",
+  "platform_retail_order_created",
   "platform_checkout_failed",
   "platform_carrier_integration_failed",
   "platform_payment_failed",
@@ -223,6 +225,7 @@ const ADMIN_COMMUNICATION_EVENT_DEFAULTS = {
   platform_payment_failed: true,
   platform_payout_failed: true,
   platform_revenue_received: true,
+  platform_retail_order_created: true,
   platform_retailer_payout_due: true,
   platform_retailer_settlement_needs_review: true,
   platform_task_stuck: true,
@@ -838,6 +841,8 @@ export function adminCommunicationPreferenceDefault(
   if (eventKey === "admin_test_message") {
     return false;
   }
+
+  if (eventKey === "platform_retail_order_created") return channelType === "line";
 
   if (eventKey.startsWith("platform_")) {
     if (channelType === "email") {
