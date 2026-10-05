@@ -59,6 +59,7 @@ const retailPreferenceEvents = [
 
 const platformPreferenceEvents = [
   "platform_revenue_received",
+  "platform_retail_order_created",
   "platform_checkout_failed",
   "platform_payment_failed",
   "platform_payout_failed",
@@ -670,7 +671,7 @@ async function seedNotificationPreferences(
           ${input.platformOrganisationId}::uuid,
           ${eventKey},
           ${channelType},
-          ${channelType === "email" || lineEnabled},
+          ${eventKey === "platform_retail_order_created" ? channelType === "line" : channelType === "email" || lineEnabled},
           ${channelType === "line" ? 50 : 100},
           ${target.json(toJsonValue({ source: "seed-uat-minimal-runtime" }))}::jsonb,
           now(),
