@@ -53,7 +53,7 @@ it("PHARM-PG-01 explanation work is durable but never gates reveal or orders", a
   assert.equal(Number(stored.unit_price_amount),17);
   assert.ok(stored.retail_sellable_product_id,"The captured seller offer survives completion");
 });
-it("PHARM-PG-02 concurrent replay saves one unpaid order, notification and no accounting", async () => {
+it("PHARM-PG-02 concurrent replay saves one unpaid order, one notification per recipient and no accounting", async () => {
   const fixture = await seedPharmacyFixture();
   const before = await counters(), key = randomUUID();
   const input = { planId: fixture.planId, pharmacy: fixture.slug, locale: "en", expectedRevision: fixture.revision, productIds: fixture.productIds, customerName: "Counter Visitor" };
@@ -62,10 +62,21 @@ it("PHARM-PG-02 concurrent replay saves one unpaid order, notification and no ac
   assert.deepEqual(await counters(),before);
   assert.deepEqual((await readPharmacyOrder(fixture.planId,fixture.slug,a.id))?.receipt,a);
   assert.equal((await sql`select count(*)::int as n from public.retail_customer_orders where metadata->>'planId'=${fixture.planId}`)[0].n,1);
-  assert.equal((await sql`select count(*)::int as n from public.tasks where task_type='route_admin_communication' and payload->>'resourceId'=${a.id}`)[0].n,1);
+  const alerts = await sql`select payload from public.tasks where task_type='route_admin_communication' and payload->>'resourceId'=${a.id}`;
+  assert.equal(alerts.length,2);
+  const retailer = alerts.find(t => t.payload.eventKey === "retail_order_created");
+  const platform = alerts.find(t => t.payload.eventKey === "platform_retail_order_created");
+  assert.ok(retailer); assert.ok(platform);
+  assert.equal(retailer.payload.organisationId, fixture.pharmacyId);
+  const [platformOrganisation] = await sql`select id::text from public.organisations where slug='mattanutra' and organisation_type='platform' and status='active'`;
+  assert.equal(platform.payload.organisationId, platformOrganisation.id);
+  assert.equal(platform.payload.metadata.paymentStatus, "unpaid");
+  assert.equal(platform.payload.metadata.source, "pharmacy");
+  assert.ok(platform.payload.metadata.retailerName);
   await assert.rejects(createPharmacyOrder({...input,customerName:"Another"},key), {code:"idempotency_conflict"});
   await sql`update public.assessments set input_revision=input_revision+1 where plan_id=${fixture.planId}::uuid`;
   assert.deepEqual(await createPharmacyOrder(input,key),a,"replay survives a later revision");
+  assert.equal((await sql`select count(*)::int n from public.tasks where task_type='route_admin_communication' and payload->>'resourceId'=${a.id}`)[0].n,2);
   const analysis = await readPharmacyAnalysis(fixture.planId,fixture.slug,a.id);
   assert.equal(analysis.revision,fixture.revision);
   assert.equal(analysis.retryAllowed,false,"A frozen order cannot regenerate the later assessment");

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { after, before, describe, it } from "node:test";
 import { adminNotificationLineMessage, buildAdminNotification, notificationSource } from "../lib/admin-notification.ts";
-import { adminCommunicationEventKeys } from "../lib/communications-shared.ts";
+import { adminCommunicationEventKeys, adminCommunicationEventScope, adminCommunicationPreferenceDefault } from "../lib/communications-shared.ts";
 import { adminViewAllowed, permissionsForRole } from "../lib/admin-rbac.ts";
 import type { AdminDashboardView } from "../components/admin/dashboard-content.tsx";
 
@@ -17,6 +17,11 @@ function order(paymentStatus: string, orderStatus = "placed") {
 }
 
 describe("informative admin notifications", () => {
+  it("defaults pharmacy checkout alerts to platform LINE only", () => {
+    assert.equal(adminCommunicationEventScope("platform_retail_order_created"), "platform");
+    assert.equal(adminCommunicationPreferenceDefault("platform_retail_order_created", "line"), true);
+    assert.equal(adminCommunicationPreferenceDefault("platform_retail_order_created", "email"), false);
+  });
   it("shows order value, Retail flow, unpaid checkout status and an explicit admin link", () => {
     const copy = order("unpaid");
     assert.equal(headline(copy), "PH-B52BA237 created.");
@@ -42,7 +47,7 @@ describe("informative admin notifications", () => {
     assert.match(copy.subject, /Web$/);assert.equal(new URL(copy.metadata.notification.href).searchParams.get("view"), "financials");
   });
   it("covers every event with concise facts and an allowed admin destination", () => {
-    assert.equal(adminCommunicationEventKeys.length, 24);
+    assert.equal(adminCommunicationEventKeys.length, 25);
     for (const eventKey of adminCommunicationEventKeys) {
       const copy = buildAdminNotification({ eventKey, resourceId: orderId, resourceType: "retail_customer_order", metadata: {
         orderNumber: "PH-B52BA237", paymentStatus: "paid", amountMicros: 690_000_000, currency: "THB", orderSource: "mcp",
