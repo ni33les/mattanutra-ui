@@ -6,6 +6,7 @@ import { createTask } from "@/lib/task-service";
 import type { JourneyChannel } from "@/lib/journey-channel";
 import { AGENT_CAPABILITIES } from "@/lib/system-agents";
 import { metaConfig } from "@/lib/meta-config";
+import { metaCampaignAttribution, metaClickId, metaFbc } from "@/lib/meta-attribution";
 import { hashEmailForFacebook, hashPhoneForFacebook } from "@/lib/facebook-capi";
 import { META_CONSENT_COOKIE, META_CONTEXT_COOKIE, META_CONSENT_VERSION, metaCustomData, sanitiseMetaUrl, uuidPattern, type MetaEventName, type MetaPreferenceSource } from "@/lib/meta-event-policy";
 
@@ -26,15 +27,12 @@ export async function requestMetaContext(request?: Request | null, sql: Db | nul
   return context ?? null;
 }
 
-export function metaMatchingFromRequest(request: Request, sourceUrl?: unknown) {
+export function metaMatchingFromRequest(request: Request, sourceUrl?: unknown, previous: Record<string, unknown> = {}) {
   const matching: Record<string, string> = {};
   const fbp = marketingCookie(request, "_fbp"), fbc = marketingCookie(request, "_fbc");
   if (fbp && /^fb\.\d\.\d{10,13}\.[\w-]{1,250}$/.test(fbp)) matching.fbp = fbp;
-  if (fbc && /^fb\.\d\.\d{10,13}\.[\w-]{1,500}$/.test(fbc)) matching.fbc = fbc;
-  try {
-    const click = typeof sourceUrl === "string" ? new URL(sourceUrl).searchParams.get("fbclid") : null;
-    if (click && /^[\w-]{1,500}$/.test(click)) matching.fbc = `fb.1.${Date.now()}.${click}`;
-  } catch { /* Invalid URLs are never exported. */ }
+  const click = metaFbc(metaClickId(sourceUrl, metaConfig().environment), fbc, previous.fbc);
+  if (click) matching.fbc = click;
   const ua = request.headers.get("user-agent");
   if (ua && ua.length <= 1024) matching.client_user_agent = ua;
   const ip = (request.headers.get("x-forwarded-for")?.split(",")[0] || request.headers.get("x-real-ip"))?.trim();
@@ -53,12 +51,17 @@ export async function setMetaPreference(request: Request, granted: boolean, sour
   const cookieId = marketingCookie(request, META_CONTEXT_COOKIE);
   const id = cookieId && uuidPattern.test(cookieId) ? cookieId : randomUUID();
   return withDatabaseTransaction(sql, async tx => {
-    const matching = granted ? metaMatchingFromRequest(request, sourceUrl) : {};
-    const [saved] = await tx<{ id: string; consent_granted: boolean }[]>`insert into public.meta_tracking_contexts (id,environment,consent_version,consent_granted,preference_source,matching)
-      values (${id}::uuid,${config.environment},${META_CONSENT_VERSION},${granted},${source},${tx.json(matching)})
+    const [previous] = await tx`select matching,attribution from public.meta_tracking_contexts
+      where id=${id}::uuid and environment=${config.environment} for update`;
+    const matching = granted ? metaMatchingFromRequest(request, sourceUrl, previous?.matching) : {};
+    const attribution = metaCampaignAttribution(sourceUrl, config.environment, previous?.attribution,
+      !!matching.fbc && matching.fbc !== previous?.matching?.fbc);
+    const [saved] = await tx<{ id: string; consent_granted: boolean }[]>`insert into public.meta_tracking_contexts (id,environment,consent_version,consent_granted,preference_source,matching,attribution)
+      values (${id}::uuid,${config.environment},${META_CONSENT_VERSION},${granted},${source},${tx.json(matching)},${tx.json(attribution)})
       on conflict(id) do update set consent_granted=excluded.consent_granted,consent_version=excluded.consent_version,
         preference_source=case when ${source}='site_default' then meta_tracking_contexts.preference_source else excluded.preference_source end,
         matching=case when excluded.consent_granted then meta_tracking_contexts.matching || excluded.matching else '{}'::jsonb end,
+        attribution=case when excluded.consent_granted then excluded.attribution else meta_tracking_contexts.attribution end,
         expires_at=now()+interval '90 days',updated_at=now()
       where meta_tracking_contexts.environment=excluded.environment
         and (${source}='explicit' or meta_tracking_contexts.consent_granted)
@@ -69,8 +72,10 @@ export async function setMetaPreference(request: Request, granted: boolean, sour
       if (!existing) throw new Error("Marketing context belongs to another environment");
       return { id: existing.id, granted: existing.consent_granted };
     }
-    if (!granted) await tx`update public.meta_conversion_events set status='suppressed',response_message='consent_withdrawn',updated_at=now()
-      where context_id=${id}::uuid and status in ('queued','retrying','sending')`;
+    if (!granted) await tx`update public.meta_conversion_events set matching='{}'::jsonb,
+      status=case when status in ('queued','retrying','sending') then 'suppressed' else status end,
+      response_message=case when status in ('queued','retrying','sending') then 'consent_withdrawn' else response_message end,updated_at=now()
+      where context_id=${id}::uuid`;
     return { id: saved.id, granted: saved.consent_granted };
   });
 }
@@ -79,7 +84,7 @@ export async function setMetaPreference(request: Request, granted: boolean, sour
 export async function bindMetaContext(sql: Db, resourceType: Resource, resourceId: string, request?: Request, contact?: { email?: string | null; phone?: string | null; country?: string | null }) {
   const context = await requestMetaContext(request, sql);
   if (!context) return null;
-  const matching: Record<string, string | string[]> = request ? metaMatchingFromRequest(request) : {};
+  const matching: Record<string, string | string[]> = request ? metaMatchingFromRequest(request, undefined, context.matching) : {};
   const email = hashEmailForFacebook(contact?.email);
   const rawPhone = contact?.phone?.trim() ?? "";
   // A national number is ambiguous without its country. Do not guess a Thai number for other markets.
@@ -116,9 +121,9 @@ export async function enqueueMetaEvent(sql: Db, input: {
   if (input.name === "Purchase" && (typeof data.value !== "number" || typeof data.currency !== "string")) throw new Error("Verified purchase amount and currency are required");
   const sourceUrl = sanitiseMetaUrl(input.sourceUrl, config.environment) || sanitiseMetaUrl(`/${data.locale || "en"}/${input.name === "Purchase" ? "nutrition/payment/return" : "nutrition/healthscore"}`, config.environment);
   const [inserted] = await sql<{ id: string }[]>`insert into public.meta_conversion_events
-    (id,environment,pixel_id,event_name,source_key,context_id,source_url,custom_data,occurred_at)
+    (id,environment,pixel_id,event_name,source_key,context_id,source_url,custom_data,matching,occurred_at)
     values (${id}::uuid,${config.environment},${config.pixelId},${input.name},${input.sourceKey},${input.context.id}::uuid,
-      ${sourceUrl},${sql.json(data)},${input.occurredAt ?? new Date()})
+      ${sourceUrl},${sql.json(data)},${sql.json(input.context.matching)},${input.occurredAt ?? new Date()})
     on conflict(environment,pixel_id,event_name,source_key) do nothing returning id`;
   if (!inserted) return null;
   const { task } = await createTask({ actorType: "deterministic", taskType: "send_meta_event", title: `Send ${config.environment.toUpperCase()} campaign event`,
@@ -133,6 +138,7 @@ export async function enqueueMetaEvent(sql: Db, input: {
 export async function recordMetaPurchase(sql: Db, input: {
   type: "payment" | "retail" | "agentic"; id: string; sessionId: string | null; planId: string | null;
   amount: number; currency: string; locale?: string; mode: string; paidAt?: Date | string | null; email?: string | null;
+  selectedPlan?: string | null;
 }) {
   const config = metaConfig();
   if (!config.enabled || !input.paidAt || (config.environment === "prd" && input.mode !== "live")) return null;
@@ -140,9 +146,14 @@ export async function recordMetaPurchase(sql: Db, input: {
   if (!context) return null;
   const channel = await metaResourceChannel(sql, input.planId, input.type, input.id);
   const hash = hashEmailForFacebook(input.email);
-  if (hash) await sql`update public.meta_tracking_contexts set matching=matching || ${sql.json({ em: [hash] })} where id=${context.id}::uuid and consent_granted`;
+  if (hash) {
+    await sql`update public.meta_tracking_contexts set matching=matching || ${sql.json({ em: [hash] })} where id=${context.id}::uuid and consent_granted`;
+    context.matching = { ...context.matching, em: [hash] };
+  }
   return enqueueMetaEvent(sql, { context, name: "Purchase", sourceKey: `purchase:${input.sessionId || `${input.type}:${input.id}`}`,
-    occurredAt: input.paidAt, data: { channel, planId: input.planId, value: input.amount, currency: input.currency.toUpperCase(), locale: input.locale || "en", stage: "confirmation" },
+    occurredAt: input.paidAt, data: { channel, planId: input.planId, value: input.amount, currency: input.currency.toUpperCase(),
+      purchase_type: input.type === "payment" ? "plan" : "products", offer: input.type === "payment" ? input.selectedPlan : undefined,
+      locale: input.locale || "en", stage: "confirmation" },
     sourceUrl: `/${input.locale || "en"}/${input.type === "payment" ? "nutrition/payment/return" : "basket/return"}` });
 }
 

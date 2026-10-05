@@ -3,10 +3,12 @@ import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { before, after, describe, it } from "node:test";
 import type Stripe from "stripe";
+import postgres from "postgres";
 import { fixtureDatabaseUrl, cleanupFixtureRelationships } from "./helpers/fixture-teardown.ts";
 import { closeSqlPool, databaseTransactionActive, getSql, withDatabaseTransaction } from "../lib/db.ts";
 import { bindMetaContext, enqueueMetaEvent, recordMetaPurchase, requestMetaContext, setMetaConsent, setMetaPreference } from "../lib/meta-tracking.ts";
 import { sendMetaEvent } from "../lib/meta-dispatch.ts";
+import { metaCampaignReport } from "../lib/meta-campaign-report.ts";
 import { createStripeCheckoutSession, completeMockPayment } from "../lib/stripe-payments.ts";
 import { recordRetailProviderSession, type RetailSessionPayment } from "../lib/retail-checkout-provider-session.ts";
 import { register } from "node:module";
@@ -50,8 +52,8 @@ describe("preference-controlled, durable and isolated Meta delivery", () => {
     return new Request("https://dev.mattanutra.com/api/assessment", { headers: { origin: "https://dev.mattanutra.com", "user-agent": "Fixture browser", "x-forwarded-for": "192.0.2.15",
       ...(contextId ? { cookie: `mn_marketing=${granted ? "granted" : "denied"}; mn_marketing_context=${contextId}; _fbp=fb.1.1770000000000.12345` } : {}) } });
   }
-  async function consent(source: "explicit" | "site_default" = "explicit") {
-    const id = (await setMetaPreference(request(), true, "https://dev.mattanutra.com/en?fbclid=fixtureClick", source)).id; contexts.push(id);
+  async function consent(source: "explicit" | "site_default" = "explicit", url = "https://dev.mattanutra.com/en?fbclid=fixtureClick&campaign_id=111&adset_id=222&ad_id=333") {
+    const id = (await setMetaPreference(request(), true, url, source)).id; contexts.push(id);
     return { id, request: request(id), context: (await requestMetaContext(request(id)))! };
   }
   async function queued() {
@@ -86,6 +88,64 @@ describe("preference-controlled, durable and isolated Meta delivery", () => {
       body: JSON.stringify({ granted: true, source: "site_default" }) }));
     assert.equal(response.status, 200); assert.equal((await response.json()).granted, false); assert.equal(response.headers.get("set-cookie"), null);
   });
+  it("captures the first ad before PageView and preserves it through untagged recovery and repeated events", async () => {
+    const c = await consent("site_default");
+    assert.deepEqual(c.context.attribution, { campaign_id: "111", adset_id: "222", ad_id: "333" });
+    const headers = new Headers(c.request.headers);
+    headers.set("cookie", `${headers.get("cookie")}; _fbc=fb.1.1760000000000.staleClick`);
+    const returning = new Request(c.request.url, { headers });
+    await setMetaPreference(returning, true, "/en/nutrition/payment/return", "site_default");
+    assert.equal((await requestMetaContext(returning))!.matching.fbc, c.context.matching.fbc);
+    const eventId = randomUUID();
+    const body = { name: "PageView", eventId, sessionId: randomUUID(), sourceUrl: "/en?fbclid=fixtureClick&campaign_id=111&adset_id=222&ad_id=333", data: { channel: "web", locale: "en", stage: "landing" } };
+    for (let i=0;i<2;i++) {
+      const response = await browserEvent(new Request("https://dev.mattanutra.com/api/marketing/events", { method: "POST", headers, body: JSON.stringify(body) }));
+      assert.equal(response.status,200);
+    }
+    const [event] = await getSql()!`select custom_data,matching from public.meta_conversion_events where id=${eventId}::uuid`;
+    assert.equal(event.matching.fbc,c.context.matching.fbc); assert.equal(event.custom_data.ad_id,"333");
+    assert.equal((await getSql()!`select count(*)::int as n from public.meta_conversion_events where context_id=${c.id}::uuid`)[0].n,1);
+    await setMetaPreference(returning,true,"/th?campaign_id=444&fbclid=newClick","site_default");
+    assert.deepEqual((await requestMetaContext(returning))!.attribution,{ campaign_id: "444" });
+    await setMetaPreference(returning,true,"/en?fbclid=anotherClick","site_default");
+    assert.deepEqual((await requestMetaContext(returning))!.attribution,{});
+  });
+  it("serializes competing attribution updates and rechecks withdrawal before enqueue", async () => {
+    const locker = postgres(process.env.TEST_DB_URL!, { max: 1, onnotice() {} });
+    const observer = postgres(process.env.TEST_DB_URL!, { max: 1, onnotice() {} });
+    try {
+      for (const withdraw of [false, true]) {
+        const c = await consent();
+        let release!:()=>void, entered!:()=>void;
+        const hold = new Promise<void>(resolve=>{release=resolve;}), locked = new Promise<void>(resolve=>{entered=resolve;});
+        const writer = withDatabaseTransaction(locker,async tx=>{
+          await tx`select id from public.meta_tracking_contexts where id=${c.id}::uuid for update`;
+          entered(); await hold;
+          await tx`update public.meta_tracking_contexts set attribution='{"campaign_id":"999"}',matching='{"fbc":"fb.1.1780000000000.newClick"}',consent_granted=${!withdraw} where id=${c.id}::uuid`;
+        });
+        await locked;
+        const eventId = randomUUID();
+        const saving = browserEvent(new Request("https://dev.mattanutra.com/api/marketing/events", { method: "POST", headers: c.request.headers,
+          body: JSON.stringify({ name: "PageView", eventId, sessionId: randomUUID(), sourceUrl: "/en", data: { channel: "web", locale: "en" } }) }));
+        try {
+          let blocked = false;
+          for (let attempt=0;attempt<100;attempt++) {
+            const [state] = await observer`select exists(select 1 from pg_stat_activity where datname=current_database()
+              and wait_event_type='Lock' and query like '%select matching,attribution,consent_granted,expires_at%') as blocked`;
+            if (state.blocked) { blocked=true; break; }
+            await new Promise(resolve=>setTimeout(resolve,10));
+          }
+          assert.ok(blocked,"A competing capture must wait for its own context writer");
+          assert.ok(await requestMetaContext(c.request,observer),"Ordinary reads remain nonblocking before the writer commits");
+        } finally { release(); await writer; }
+        const response = await saving; assert.equal(response.status,200);
+        assert.equal((await response.json()).accepted,!withdraw);
+        const rows = await observer`select custom_data,matching from public.meta_conversion_events where id=${eventId}::uuid`;
+        assert.equal(rows.length,withdraw?0:1);
+        if (!withdraw) { assert.equal(rows[0].custom_data.campaign_id,"999"); assert.equal(rows[0].matching.fbc,"fb.1.1780000000000.newClick"); }
+      }
+    } finally { await Promise.all([locker.end(),observer.end()]); }
+  });
   it("saves preferences and enqueues events on the www production alias behind the hosting proxy", async () => {
     const keys = ["MATTANUTRA_ENV", "FACEBOOK_CAPI_ACCESS_TOKEN_PRD"] as const;
     const old = keys.map(key => process.env[key]);
@@ -115,6 +175,14 @@ describe("preference-controlled, durable and isolated Meta delivery", () => {
     const events = await getSql()!`select * from public.meta_conversion_events where context_id=${c.id}::uuid and event_name='Purchase'`;
     assert.equal(events.length,1); assert.equal(events[0].custom_data.value,690); assert.equal(events[0].custom_data.currency,"THB");
     assert.equal(events[0].custom_data.mn_env,"dev"); assert.ok(events[0].task_id);
+    assert.equal(events[0].custom_data.purchase_type,"plan"); assert.equal(events[0].custom_data.offer,"precision");
+    assert.equal(events[0].custom_data.channel,"web"); assert.equal(events[0].custom_data.locale,"en");
+    assert.equal(events[0].custom_data.campaign_id,"111"); assert.equal(events[0].custom_data.adset_id,"222"); assert.equal(events[0].custom_data.ad_id,"333");
+    assert.equal(events[0].matching.fbc,c.context.matching.fbc);
+    const outbound: Record<string, unknown>[] = [];
+    await sendMetaEvent(events[0].id, async (_url, init) => { outbound.push(JSON.parse(String(init?.body)).data[0]); return new Response('{"events_received":1}'); });
+    assert.equal(outbound[0].event_name,"DEV_Purchase"); assert.equal(outbound[0].action_source,"website");
+    assert.deepEqual(outbound[0].custom_data,events[0].custom_data);
   });
   it("commits retail confirmation and outbox together and deduplicates the corresponding MCP purchase", async () => {
     const c = await consent();
@@ -134,6 +202,19 @@ describe("preference-controlled, durable and isolated Meta delivery", () => {
       await recordMetaPurchase(tx,{type:"agentic",id:orderId,sessionId:session.id,planId,amount:250,currency:"THB",mode:"test",paidAt:new Date()});
     });
     assert.equal((await getSql()!`select count(*)::int as n from public.meta_conversion_events where source_key=${`purchase:${session.id}`}`)[0].n,1);
+    const [event] = await getSql()!`select custom_data,matching from public.meta_conversion_events where source_key=${`purchase:${session.id}`}`;
+    assert.equal(event.custom_data.purchase_type,"products"); assert.equal(event.custom_data.offer,undefined);
+    assert.match(event.matching.em[0],/^[a-f0-9]{64}$/); assert.match(event.matching.ph[0],/^[a-f0-9]{64}$/);
+  });
+  it("records Pro separately from Precision with the actual payment locale and amount", async () => {
+    const c = await consent(), key = randomUUID(); requestKeys.push(key);
+    const session = await createStripeCheckoutSession({ locale: "zh-CN", selectedPlan: "pro", sourceSurface: "landing", idempotencyKey: key, request: c.request });
+    payments.push(session.paymentId);
+    await completeMockPayment({ paymentId: session.paymentId });
+    const [event] = await getSql()!`select custom_data from public.meta_conversion_events where context_id=${c.id}::uuid and event_name='Purchase'`;
+    const [payment] = await getSql()!`select amount from public.payments where id=${session.paymentId}::uuid`;
+    assert.equal(event.custom_data.offer,"pro"); assert.equal(event.custom_data.purchase_type,"plan");
+    assert.equal(event.custom_data.locale,"zh-CN"); assert.equal(event.custom_data.value,Number(payment.amount)/1_000_000);
   });
   it("retries outside database transactions with original event ID/time and only allowed fields", async () => {
     const c = await queued();
@@ -145,6 +226,8 @@ describe("preference-controlled, durable and isolated Meta delivery", () => {
       return new Response(JSON.stringify(bodies.length === 1 ? {error:{code:1,is_transient:true}} : {events_received:1}), {status:bodies.length === 1 ? 503 : 200});
     };
     await assert.rejects(sendMetaEvent(c.eventId,fake),/temporarily unavailable/);
+    // A later ad visit must not rewrite an event that is waiting to retry.
+    await setMetaPreference(c.request,true,"/en?fbclid=laterClick&campaign_id=999","site_default");
     assert.equal((await sendMetaEvent(c.eventId,fake)).status,"accepted");
     assert.deepEqual(bodies[0],bodies[1]);
     assert.equal(bodies[0].data[0].event_name,"DEV_PageView");
@@ -165,6 +248,44 @@ describe("preference-controlled, durable and isolated Meta delivery", () => {
     const c=await queued(); await setMetaConsent(c.request,false);
     assert.equal((await sendMetaEvent(c.eventId,async()=>{throw new Error("no network after withdrawal");})).status,"suppressed");
     assert.deepEqual((await getSql()!`select matching from public.meta_tracking_contexts where id=${c.id}::uuid`)[0].matching,{});
+    assert.deepEqual((await getSql()!`select matching from public.meta_conversion_events where id=${c.eventId}::uuid`)[0].matching,{});
+  });
+  it("clears accepted matching snapshots on withdrawal without altering delivery evidence", async () => {
+    const c = await queued();
+    await sendMetaEvent(c.eventId,async()=>new Response('{"events_received":1}'));
+    await setMetaConsent(c.request,false);
+    const [event] = await getSql()!`select status,response_message,matching from public.meta_conversion_events where id=${c.eventId}::uuid`;
+    assert.equal(event.status,"accepted"); assert.equal(event.response_message,"events_received:1"); assert.deepEqual(event.matching,{});
+  });
+  it("reports unique visitors, currencies, offers and delivery separately without inventing attribution", async () => {
+    const sql = getSql()!, c = await consent(), other = await consent();
+    const config = { environment: "dev" as const, enabled: true, pixelId: "987654321012345" };
+    const dimensions = { campaign_id: "100", adset_id: "200", ad_id: "300", channel: "web", locale: "th" };
+    const add = async (name: string, data: Record<string,unknown> = {}, status = "accepted", context = c.id, environment = "dev", time = "2026-10-05T00:00:00Z") => {
+      const id = randomUUID();
+      await sql`insert into public.meta_conversion_events (id,environment,pixel_id,event_name,source_key,context_id,custom_data,status,occurred_at)
+        values (${id}::uuid,${environment},${config.pixelId},${name},${id},${context}::uuid,${sql.json(data)},${status},${time})`;
+    };
+    await add("PageView",dimensions); await add("PageView",dimensions); await add("PageView",dimensions,"accepted",other.id);
+    await add("QuizSubmitted",dimensions); await add("InitiateCheckout",dimensions);
+    const sale = { ...dimensions, purchase_type: "plan", offer: "precision", value: 690, currency: "THB" };
+    await add("Purchase",sale); await add("Purchase",sale,"retrying"); await add("Purchase",{...sale,offer:"pro",value:100,currency:"USD"},"rejected");
+    await add("Purchase",{...sale,campaign_id:"101",channel:"pharmacy",locale:"en",purchase_type:"products",offer:undefined,value:250},"accepted",other.id);
+    await add("Purchase",{...sale,channel:"mcp_web",locale:"zh-CN",purchase_type:"products",offer:undefined},"suppressed");
+    await add("Purchase",{value:690,currency:"THB"});
+    await add("Purchase",sale,"accepted",c.id,"uat");
+    await add("Purchase",sale,"accepted",c.id,"dev","2026-09-01T00:00:00Z");
+    const report = await metaCampaignReport(sql,config,"2026-10-01T00:00:00Z");
+    assert.deepEqual(report.activity,[{campaignId:"100",adsetId:"200",adId:"300",channel:"web",locale:"th",visitors:2,starts:0,completions:1,checkouts:1,purchasingVisitors:1,purchaseRate:50}]);
+    const plan = report.sales.find(row=>row.channel==="web" && row.currency==="THB")!;
+    assert.equal(plan.purchases,2); assert.equal(plan.revenue,1380); assert.equal(plan.accepted,1); assert.equal(plan.pending,1); assert.equal(plan.failed,0);
+    assert.equal(report.sales.find(row=>row.currency==="USD")!.revenue,100);
+    assert.equal(report.sales.find(row=>row.channel==="retail")!.purchaseType,"products");
+    assert.equal(report.sales.find(row=>row.channel==="mcp")!.failed,1);
+    assert.equal(report.sales.find(row=>row.channel==="unknown")!.offer,"unknown");
+    assert.equal(report.sales.reduce((sum,row)=>sum+row.purchases,0),6);
+    assert.equal(report.adsReportingConnected,false); assert.equal(report.limited,false);
+    assert.doesNotMatch(JSON.stringify(report),/fb\.1|Fixture|client_ip|client_user|email|phone/);
   });
   it("does not call a rejected Meta response accepted and bounds transient retries", async () => {
     const c=await queued();

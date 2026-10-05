@@ -217,7 +217,7 @@ export function StripeCheckoutPanel({
       throw new Error(labels.unable);
     }
 
-    void trackMetaEvent("InitiateCheckout", { planId, locale, offer: plan, stage: "checkout", attemptId: body.paymentId }, `checkout:${body.paymentId}`);
+    void trackMetaEvent("InitiateCheckout", { planId, locale, offer: plan, purchase_type: "plan", stage: "checkout", attemptId: body.paymentId }, `checkout:${body.paymentId}`);
     setPaymentId(body.paymentId);
 
     if (body.mock) {

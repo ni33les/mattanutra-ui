@@ -746,7 +746,7 @@ export function ProductBasketCheckoutPanel({
         throw new Error((body as { message?: string }).message || labels.error);
       }
 
-      void trackMetaEvent("InitiateCheckout", { planId, locale, stage: "checkout", channel: checkoutMode === "agentic" ? "mcp_web" : "web", attemptId: body.paymentId }, `checkout:${body.paymentId}`);
+      void trackMetaEvent("InitiateCheckout", { planId, locale, purchase_type: "products", stage: "checkout", channel: checkoutMode === "agentic" ? "mcp" : "web", attemptId: body.paymentId }, `checkout:${body.paymentId}`);
       setPaymentId(body.paymentId);
 
       if (body.mock) {

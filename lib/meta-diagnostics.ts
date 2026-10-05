@@ -1,21 +1,23 @@
 import { getSql } from "@/lib/db";
 import { metaConfig } from "@/lib/meta-config";
 import { metaEventName, type MetaEventName } from "@/lib/meta-event-policy";
+import { emptyMetaCampaignReport, metaCampaignReport, type MetaCampaignReport } from "@/lib/meta-campaign-report";
 
 export type MetaDiagnostics = {
   environment: string; pixelId: string; enabled: boolean;
   rows: { name: string; channel: string; status: string; count: number; lastAt: string }[];
   purchases: { confirmed: number; recorded: number; missing: number };
+  campaigns: MetaCampaignReport;
 };
 
 /** Operational receipts, never contact hashes, browser identifiers or raw Meta errors. */
 export async function metaDiagnostics(since: Date | string | null): Promise<MetaDiagnostics> {
   const config = metaConfig(), sql = getSql();
   const result: MetaDiagnostics = { environment: config.environment, pixelId: config.pixelId, enabled: config.enabled,
-    rows: [], purchases: { confirmed: 0, recorded: 0, missing: 0 } };
+    rows: [], purchases: { confirmed: 0, recorded: 0, missing: 0 }, campaigns: emptyMetaCampaignReport() };
   if (!sql || !config.enabled) return result;
   const start = since ?? new Date(Date.now() - 30 * 86400000);
-  const [rows, purchases] = await Promise.all([
+  const [rows, purchases, campaigns] = await Promise.all([
     sql`select event_name,status,
       case when custom_data->>'channel'='pharmacy' then 'retail' when custom_data->>'channel'='mcp_web' then 'mcp'
         when custom_data->>'channel' in ('web','retail','mcp') then custom_data->>'channel' else 'unknown' end as channel,
@@ -37,10 +39,12 @@ export async function metaDiagnostics(since: Date | string | null): Promise<Meta
       where c.environment=${config.environment} and b.created_at<=p.paid_at
     ) select count(*)::int as confirmed,count(e.id)::int as recorded,count(*) filter(where e.id is null)::int as missing
       from eligible p left join public.meta_conversion_events e on e.source_key=p.source_key and e.event_name='Purchase'
-        and e.environment=${config.environment} and e.pixel_id=${config.pixelId}`
+        and e.environment=${config.environment} and e.pixel_id=${config.pixelId}`,
+    metaCampaignReport(sql, config, start)
   ]);
   result.rows = rows.map(row => ({ name: metaEventName(row.event_name as MetaEventName, config.environment),
     channel: row.channel, status: row.status, count: Number(row.count), lastAt: new Date(row.last_at).toISOString() }));
   result.purchases = { confirmed: Number(purchases[0].confirmed), recorded: Number(purchases[0].recorded), missing: Number(purchases[0].missing) };
+  result.campaigns = campaigns;
   return result;
 }

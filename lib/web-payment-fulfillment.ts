@@ -37,7 +37,7 @@ export async function enqueueWebPaymentFulfillment(sql: Db, payment: PaymentRow,
   }
   await recordMetaPurchase(sql, { type: "payment", id: payment.id, sessionId: payment.stripe_checkout_session_id,
     planId: payment.plan_id, amount: Number(payment.amount) / 1_000_000, currency: payment.currency,
-    locale: payment.locale, mode: payment.stripe_mode, paidAt: payment.paid_at, email: payment.customer_email });
+    locale: payment.locale, selectedPlan: payment.selected_plan, mode: payment.stripe_mode, paidAt: payment.paid_at, email: payment.customer_email });
   const { task } = await createTask({
     actorType: "deterministic", title: "Fulfill confirmed web payment", taskType: WEB_PAYMENT_FULFILLMENT_TASK,
     planId: payment.plan_id, payload: { paymentId: payment.id },

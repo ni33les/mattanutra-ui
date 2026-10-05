@@ -37,6 +37,13 @@ describe("campaign export boundary", () => {
     try { process.env.MATTANUTRA_ENV = "uat"; process.env.NEXT_PUBLIC_MATTANUTRA_ENV = "prd"; assert.equal(metaConfig().environment, "uat"); }
     finally { if(old===undefined)delete process.env.MATTANUTRA_ENV; else process.env.MATTANUTRA_ENV=old; if(oldPublic===undefined)delete process.env.NEXT_PUBLIC_MATTANUTRA_ENV; else process.env.NEXT_PUBLIC_MATTANUTRA_ENV=oldPublic; }
   });
+  it("permits coarse purchase categories and offers without supplement identities", () => {
+    assert.deepEqual(metaCustomData("Purchase", { purchase_type: "plan", offer: "precision", channel: "pharmacy", locale: "th", value: 690, currency: "THB", campaign_id: "123", content_ids: ["private"], content_name: "private" }, "prd"),
+      { mn_env: "prd", event_schema: "1", locale: "th", channel: "retail", offer: "precision", purchase_type: "plan", value: 690, currency: "THB", campaign_id: "123" });
+    assert.equal(metaCustomData("Purchase", { purchase_type: "products", channel: "mcp_web" }, "uat").purchase_type, "products");
+    assert.equal(metaCustomData("Purchase", { purchase_type: "private-supplement", offer: "private-condition" }, "prd").purchase_type, undefined);
+    assert.equal(metaCustomData("PageView", { purchase_type: "products" }, "prd").purchase_type, undefined);
+  });
   it("retains permitted page/plan URLs and strips contacts, products, capabilities and arbitrary search text", () => {
     assert.equal(sanitiseMetaUrl(`https://uat.mattanutra.com/en/nutrition/healthscore?planId=${planId}&email=private&condition=private#secret`, "uat"), `https://uat.mattanutra.com/en/nutrition/healthscore?planId=${planId}`);
     assert.equal(sanitiseMetaUrl("https://uat.mattanutra.com/en/mcp/checkout/secret-token?order=private", "uat"), "https://uat.mattanutra.com/en/basket/checkout");

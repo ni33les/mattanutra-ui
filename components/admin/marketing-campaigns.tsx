@@ -4,6 +4,7 @@ import { PharmacySourceFunnelTable } from "./pharmacy-source-funnel";
 import { McpFunnelTable } from "./mcp-funnel-table";
 import { funnelReportCopy } from "@/lib/funnel-report-copy";
 import { funnelStageColors } from "./funnel-stage-table";
+import { MetaCampaignPanel } from "./meta-campaign-panel";
 import type { AdminCampaignRow, AdminCampaignsData } from "@/lib/admin-query-data";
 import type { Locale } from "@/lib/i18n";
 import { connectCopy } from "@/lib/connect-copy";
@@ -79,14 +80,7 @@ export function AdminCampaignsView({
           </tr>)}</tbody>
         </table></div>}
       </div>}
-      {data.meta && <div className="mt-6 rounded-2xl bg-white p-5 ring-1 ring-gray-200">
-        <h2 className="font-semibold">Meta · {data.meta.environment.toUpperCase()} · {data.meta.enabled ? "Enabled" : "Disabled"}</h2>
-        <p className="mt-2 text-sm">Pixel {data.meta.pixelId || "unconfigured"}. All campaigns in this date range. Accepted means Meta acknowledged delivery; it does not establish ad attribution.</p>
-        <p className="mt-2 text-sm">Confirmed purchases with a consent binding: {data.meta.purchases.confirmed}. Recorded: {data.meta.purchases.recorded}. Missing records: {data.meta.purchases.missing}.</p>
-        <table className="mt-3 w-full text-left text-sm"><thead><tr><th scope="col">Event</th><th scope="col">Flow</th><th scope="col">Delivery status</th><th scope="col">Count</th><th scope="col">Last update</th></tr></thead>
-          <tbody>{data.meta.rows.map(row => <tr key={`${row.name}:${row.channel}:${row.status}`}><td className="py-1">{row.name}</td><td>{row.channel === "web" ? "Web" : row.channel === "retail" ? "Retail" : row.channel === "mcp" ? "MCP" : funnelReportCopy[locale].unknown}</td><td>{row.status}</td><td>{row.count}</td><td>{new Date(row.lastAt).toLocaleString(locale)}</td></tr>)}</tbody>
-        </table>
-      </div>}
+      {data.meta && <MetaCampaignPanel data={data.meta} locale={locale} />}
 
       <div className="mt-8 overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-200">
         <div className="overflow-x-auto">

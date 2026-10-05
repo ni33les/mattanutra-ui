@@ -3,6 +3,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import type { Locale } from "@/lib/i18n";
 import { browserPixelPageSafe, type MetaPublicConfig } from "@/lib/meta-event-policy";
+import { metaCampaignAttribution, metaClickId } from "@/lib/meta-attribution";
 import { configureMetaClient, marketingGranted, marketingPreferenceSaved, META_PREFERENCE_CHANGED, saveMarketingPreference, trackMetaEvent } from "@/lib/meta-client";
 
 let initialPreference: Promise<boolean> | undefined;
@@ -18,7 +19,8 @@ export function MarketingPreference({ locale }: { locale: Locale }) {
     let active = true;
     void fetch("/api/marketing/consent", { cache: "no-store" }).then(response => response.ok ? response.json() : null).then(async value => {
       if (active && value && ["dev", "uat", "prd"].includes(value.environment)) {
-        if (value.enabled && !marketingPreferenceSaved()) {
+        const adArrival = metaClickId(location.href, value.environment) || Object.keys(metaCampaignAttribution(location.href, value.environment)).length > 0;
+        if (value.enabled && (!marketingPreferenceSaved() || marketingGranted() && adArrival)) {
           initialPreference ??= saveMarketingPreference(true, "site_default");
           try { await initialPreference; } catch { initialPreference = undefined; }
         }
@@ -61,7 +63,7 @@ export function MarketingPreference({ locale }: { locale: Locale }) {
       if (!link || link.origin !== location.origin || event.ctrlKey || event.metaKey || event.shiftKey || link.target === "_blank") return;
       const target = new URL(link.href);
       if (target.pathname.endsWith("/nutrition/payment/checkout")) void trackMetaEvent("SelectOffer", {
-        locale, planId: target.searchParams.get("planId"), offer: target.searchParams.get("plan"), stage: "offer"
+        locale, planId: target.searchParams.get("planId"), offer: target.searchParams.get("plan"), purchase_type: "plan", stage: "offer"
       });
       if (!window.fbq) return;
       if (!browserPixelPageSafe(link.href, location.href, config.environment)) { event.preventDefault(); event.stopPropagation(); location.assign(link.href); }

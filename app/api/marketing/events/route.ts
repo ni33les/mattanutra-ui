@@ -4,6 +4,7 @@ import { enforceRateLimit, publicRateLimits } from "@/lib/rate-limit";
 import { metaConfig } from "@/lib/meta-config";
 import { META_EVENTS, metaCustomData, metaRequestOriginAllowed, sanitiseMetaUrl, uuidPattern, type MetaEventName } from "@/lib/meta-event-policy";
 import { enqueueMetaEvent, metaMatchingFromRequest, requestMetaContext } from "@/lib/meta-tracking";
+import { metaCampaignAttribution } from "@/lib/meta-attribution";
 export const runtime = "nodejs";
 export async function POST(request: Request) {
   const limited = enforceRateLimit(request, publicRateLimits.bpmPost); if (limited) return limited;
@@ -25,20 +26,21 @@ export async function POST(request: Request) {
     if (!context) return NextResponse.json({ accepted: false, reason: "consent_required" });
     const name = body.name as MetaEventName;
     const data = metaCustomData(name, body.data, config.environment);
-    const matching = metaMatchingFromRequest(request, body.sourceUrl);
-    const campaign: Record<string, string> = {};
-    try { const url = new URL(body.sourceUrl); for (const key of ["campaign_id", "adset_id", "ad_id", "creative_id"]) {
-      const value = url.searchParams.get(key); if (value && /^\d{1,25}$/.test(value)) campaign[key] = value;
-    } } catch { /* URL already validated for export. */ }
     const attemptId = typeof body.attemptId === "string" && uuidPattern.test(body.attemptId) ? body.attemptId : null;
     if (name === "InitiateCheckout" && !attemptId) return NextResponse.json({ error: "Checkout attempt required" }, { status: 400 });
     const dimension = String(data.funnel_stage).startsWith("connect") ? `${data.provider || ""}:${data.locale || ""}:` : "";
     const key = name === "InitiateCheckout" ? `checkout:${attemptId}` : name === "PageView" || name === "AddToCart" ? body.eventId
       : `${body.sessionId}:${data.plan_id || "visit"}:${name}:${dimension}${data.progress ?? data.offer ?? data.funnel_stage ?? ""}`;
     const eventId = await withDatabaseTransaction(sql, async tx => {
-      await tx`update public.meta_tracking_contexts set matching=matching || ${tx.json(matching)},attribution=attribution || ${tx.json(campaign)},updated_at=now()
+      // Serialize capture against other tabs before taking the event's attribution snapshot.
+      const [current] = await tx`select matching,attribution,consent_granted,expires_at from public.meta_tracking_contexts where id=${context.id}::uuid for update`;
+      if (!current?.consent_granted || new Date(current.expires_at).getTime() <= Date.now()) return null;
+      const matching = metaMatchingFromRequest(request, body.sourceUrl, current?.matching);
+      const campaign = metaCampaignAttribution(body.sourceUrl, config.environment, current?.attribution,
+        !!matching.fbc && matching.fbc !== current?.matching?.fbc);
+      await tx`update public.meta_tracking_contexts set matching=matching || ${tx.json(matching)},attribution=${tx.json(campaign)},updated_at=now()
         where id=${context.id}::uuid and consent_granted`;
-      return enqueueMetaEvent(tx, { context: { ...context, attribution: { ...context.attribution, ...campaign } }, name,
+      return enqueueMetaEvent(tx, { context: { ...context, attribution: campaign, matching: { ...current.matching, ...matching } }, name,
         sourceKey: `browser:${key}`, eventId: body.eventId, sourceUrl, data: { ...data, planId: data.plan_id, stage: data.funnel_stage } });
     });
     return NextResponse.json({ accepted: !!eventId, eventId }, { headers: { "Cache-Control": "no-store" } });

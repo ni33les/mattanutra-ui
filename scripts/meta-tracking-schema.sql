@@ -28,6 +28,7 @@ create table if not exists public.meta_conversion_events (
   context_id uuid not null references public.meta_tracking_contexts(id) on delete cascade,
   source_url text,
   custom_data jsonb not null,
+  matching jsonb,
   occurred_at timestamptz not null default now(),
   status text not null default 'queued' check (status in ('queued','sending','accepted','retrying','rejected','suppressed')),
   attempts integer not null default 0,
@@ -40,6 +41,9 @@ create table if not exists public.meta_conversion_events (
   updated_at timestamptz not null default now(),
   unique(environment,pixel_id,event_name,source_key)
 );
+-- Nullable for existing events; never invent historical matching evidence.
+alter table public.meta_conversion_events add column if not exists matching jsonb;
 create index if not exists meta_conversion_events_status_idx on public.meta_conversion_events(status,occurred_at);
+create index if not exists meta_conversion_events_reporting_idx on public.meta_conversion_events(environment,pixel_id,occurred_at);
 create index if not exists meta_conversion_events_context_idx on public.meta_conversion_events(context_id);
 create index if not exists meta_tracking_bindings_context_idx on public.meta_tracking_bindings(context_id);

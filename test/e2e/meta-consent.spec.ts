@@ -76,3 +76,24 @@ test("a failed preference save is visible, restores the button and supports retr
   await expect(page.getByRole("button", { name: "Turn off", exact: true })).toBeVisible();
   await expect(page.locator("#advertising-preferences").getByRole("alert")).toHaveCount(0);
 });
+
+test("an opted-in visitor's new ad arrival is saved before PageView and an opt-out stays off", async ({ page, context, baseURL }) => {
+  const fixture = await trackingFixture(page, context, baseURL!);
+  await context.addCookies([{ name: "mn_marketing", value: "granted", url: baseURL! }]);
+  let saved = false;
+  await page.route("**/api/marketing/events", async route => {
+    expect(saved).toBe(true);
+    const body = route.request().postDataJSON(); fixture.events.push(body);
+    await route.fulfill({ json: { accepted: true, eventId: body.eventId } });
+  });
+  page.on("response", response => { if (response.url().endsWith("/api/marketing/consent") && response.request().method()==="POST") saved=true; });
+  await page.goto("/en?fbclid=newAd&campaign_id=111&adset_id=222&ad_id=333");
+  await expect.poll(()=>fixture.events.length).toBeGreaterThan(0);
+  expect(fixture.preferences).toHaveLength(1);
+  expect(fixture.preferences[0]).toMatchObject({ source: "site_default", sourceUrl: expect.stringContaining("ad_id=333") });
+  expect(fixture.pixelLoads()).toBe(0);
+  await context.addCookies([{ name: "mn_marketing", value: "denied", url: baseURL! }]);
+  const configured = page.waitForResponse(response=>response.url().endsWith("/api/marketing/consent") && response.request().method()==="GET");
+  await page.goto("/en?fbclid=anotherAd&campaign_id=444"); await configured;
+  expect(fixture.preferences).toHaveLength(1);
+});

@@ -923,16 +923,18 @@
       "number": 19,
       "resource": "Outbox ownership \u2014 OMS and connection FOR UPDATE SKIP LOCKED; Meta event FOR UPDATE",
       "disposition": "narrow",
-      "invariant": "Only one owner may apply an OMS fulfilment event, transfer a verified connection into the Meta outbox, or dispatch a Meta conversion; retries retain event identity and a failed outbox write preserves server confirmation.",
-      "acquisition": "Explicit event publication or dispatch transaction. Connection recovery runs after the MCP response or from maintenance; ordinary MCP requests do not acquire it.",
-      "permittedWork": "Revalidate ownership, consent and affected row identities; apply bounded event/task writes only. Connection recovery handles at most 25 rows and serializes only allowlisted event metadata. Matching and external provider effects remain outside the protected phase.",
-      "release": "OMS releases after its bounded event/order transaction. Connection recovery commits the deduplicated enqueue and recorded marker together. Meta dispatch commits its 30-second lease before provider HTTP; receipts remain fenced by that lease.",
+      "invariant": "Only one owner may apply an OMS fulfilment event, transfer a verified connection into the Meta outbox, or dispatch a Meta conversion; retries retain event identity and a failed outbox write preserves server confirmation. A tracking context publishes a coherent ad/click snapshot, and concurrent capture cannot reverse withdrawal.",
+      "acquisition": "Explicit event publication or dispatch transaction. Connection recovery runs after the MCP response or from maintenance; ordinary MCP requests do not acquire it. Browser capture/preference mutations serialize only their own context row; ordinary context reads remain unlocked.",
+      "permittedWork": "Revalidate ownership, consent and affected row identities; apply bounded event/task writes only. Connection recovery handles at most 25 rows and serializes only allowlisted event metadata. Matching and external provider effects remain outside the protected phase. Context writes preserve one allowlisted campaign/click snapshot; event snapshots are fixed at enqueue and cleared on withdrawal.",
+      "release": "OMS releases after its bounded event/order transaction. Connection recovery commits the deduplicated enqueue and recorded marker together. Meta dispatch commits its 30-second lease before provider HTTP; receipts remain fenced by that lease. Context capture commits before responding to the browser; it never calls Meta under a lock.",
       "callers": [
         "lib/agentic/retail/mock-thailand.ts",
         "lib/agentic/store/postgres.ts",
         "lib/agentic/store/postgres.ts:claimOutboxBatch",
         "lib/meta-dispatch.ts:sendMetaEvent",
-        "lib/connect-verification.ts:flushConnectMeta"
+        "lib/connect-verification.ts:flushConnectMeta",
+        "app/api/marketing/events/route.ts:POST",
+        "lib/meta-tracking.ts:setMetaPreference"
       ],
       "tests": [
         "test/service-efficiency/retained-claims.integration.test.ts",
@@ -968,6 +970,10 @@
         {
           "file": "test/connect-verification.integration.test.ts",
           "name": "keeps the verified record if the advertising outbox write fails and retries without duplicates"
+        },
+        {
+          "file": "test/meta-tracking.integration.test.ts",
+          "name": "serializes competing attribution updates and rechecks withdrawal before enqueue"
         }
       ],
       "historicalCallers": [
@@ -2264,16 +2270,6 @@
       "justification": "Only conflicting incomplete receipt claims serialize. Completed replay is read-only; a fresh INSERT already owns its row."
     },
     {
-      "file": "lib/meta-dispatch.ts",
-      "owner": "sendMetaEvent",
-      "key": "853c1e08f7521a3faa7ce384e5e045bd61a68c7f235af6ad7cdd53df33d76725",
-      "statement": "`select e.*,c.consent_granted,c.expires_at,c.matching from public.meta_conversion_events e join public.meta_tracking_contexts c on c.id=e.context_id where e.id=${eventId}::uuid for update of e`",
-      "mechanisms": [
-        19
-      ],
-      "justification": "Claim one conversion by ID, recheck consent/destination and write a bounded lease in a short transaction. No provider I/O holds the row lock; a conditional lease receipt prevents a stale sender from overriding withdrawal or a newer owner."
-    },
-    {
       "file": "lib/connect-verification.ts",
       "owner": "flushConnectMeta",
       "key": "e07f2b4f9c49ff87fd33f2316c9e1df3c806cb7b2bb5e0df58af361b253fc27f",
@@ -2282,6 +2278,36 @@
         19
       ],
       "justification": "Claim at most 25 verified connections before atomically inserting their deduplicated Meta event/task and marking the connection recorded. SKIP LOCKED lets concurrent recovery callers take distinct batches; rollback leaves confirmation intact and retryable. Provider HTTP runs later in the Meta dispatcher after commit."
+    },
+    {
+      "file": "app/api/marketing/events/route.ts",
+      "owner": "POST",
+      "key": "e9ae8a49efc8e68fca096598b30d524d13cd8f6acef1cd3e19033ab6e473e172",
+      "statement": "`select matching,attribution,consent_granted,expires_at from public.meta_tracking_contexts where id=${context.id}::uuid for update`",
+      "mechanisms": [
+        19
+      ],
+      "justification": "Serialize one browser context against competing ad/preference updates, revalidate withdrawal and expiry after acquiring its row, then atomically record the attribution/matching snapshot and outbox task. No provider I/O is inside the transaction."
+    },
+    {
+      "file": "lib/meta-dispatch.ts",
+      "owner": "sendMetaEvent",
+      "key": "14dc39181f4c060f0e0871260e537d7f532625bbe0ea374c27204ae87055dc76",
+      "statement": "`select e.*,c.consent_granted,c.expires_at,c.matching as context_matching from public.meta_conversion_events e join public.meta_tracking_contexts c on c.id=e.context_id where e.id=${eventId}::uuid for update of e`",
+      "mechanisms": [
+        19
+      ],
+      "justification": "Claim one conversion by ID, recheck consent/destination and write a bounded lease in a short transaction. Read its immutable matching snapshot, with legacy fallback. No provider I/O holds the row lock; the receipt is fenced by the lease."
+    },
+    {
+      "file": "lib/meta-tracking.ts",
+      "owner": "setMetaPreference",
+      "key": "d443cab51124bb4acf3a7035d72e0875394192750093e5fa80f1cd94b76ac58c",
+      "statement": "`select matching,attribution from public.meta_tracking_contexts where id=${id}::uuid and environment=${config.environment} for update`",
+      "mechanisms": [
+        19
+      ],
+      "justification": "Lock only the existing browser context while preserving its original click timestamp and updating one coherent ad-ID group. Prevent an automatic retry from reversing explicit withdrawal; commit before browser or provider work."
     }
   ]
 }

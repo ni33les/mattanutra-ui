@@ -77,6 +77,8 @@ export function metaCustomData(name: MetaEventName, value: unknown, environment:
   if (["landing", "assessment", "results", "offer", "basket", "checkout", "confirmation", "content", "connect", "connect_guide", "connect_verified"].includes(String(input.stage))) data.funnel_stage = String(input.stage);
   if (connection && ["claude", "perplexity", "chatgpt", "grok"].includes(String(input.provider))) data.provider = String(input.provider);
   if (!connection && ["precision", "pro"].includes(String(input.offer))) data.offer = String(input.offer);
+  if (["Purchase", "InitiateCheckout", "SelectOffer", "AddToCart"].includes(name)
+    && ["plan", "products"].includes(String(input.purchase_type))) data.purchase_type = String(input.purchase_type);
   if (name === "QuizProgress" && [25, 50, 75].includes(Number(input.progress))) data.progress = Number(input.progress);
   if (["Purchase", "InitiateCheckout", "SelectOffer", "AddToCart"].includes(name)) {
     if (typeof input.value === "number" && Number.isFinite(input.value) && input.value >= 0 && input.value <= 1e9) data.value = Math.round(input.value * 100) / 100;

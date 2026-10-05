@@ -10,7 +10,7 @@ export async function sendMetaEvent(eventId: string, fetchImpl: typeof fetch = f
   const config = metaConfig();
   const lease = randomUUID();
   const claimed = await withDatabaseTransaction(sql, async tx => {
-    const [event] = await tx`select e.*,c.consent_granted,c.expires_at,c.matching from public.meta_conversion_events e
+    const [event] = await tx`select e.*,c.consent_granted,c.expires_at,c.matching as context_matching from public.meta_conversion_events e
       join public.meta_tracking_contexts c on c.id=e.context_id where e.id=${eventId}::uuid for update of e`;
     if (!event || ["accepted", "rejected", "suppressed"].includes(event.status)) return { status: event?.status ?? "missing" };
     if (!config.enabled) throw new Error("Campaign delivery is disabled or unconfigured");
@@ -33,12 +33,15 @@ export async function sendMetaEvent(eventId: string, fetchImpl: typeof fetch = f
   // The short claim transaction has committed. Provider I/O never holds database locks.
 
     const matching: Record<string, string | string[]> = {};
+    // New events retain their original click/browser evidence across later visits and retries.
+    // Legacy rows have no snapshot; keep their existing delivery behavior without a backfill.
+    const evidence = event.matching ?? event.context_matching;
     for (const key of ["em", "ph"] as const) {
-      const values = event.matching?.[key];
+      const values = evidence?.[key];
       if (Array.isArray(values) && values.length && values.every(v => typeof v === "string" && /^[a-f0-9]{64}$/.test(v))) matching[key] = values;
     }
     for (const key of ["fbp", "fbc", "client_ip_address", "client_user_agent"] as const) {
-      if (typeof event.matching?.[key] === "string") matching[key] = event.matching[key];
+      if (typeof evidence?.[key] === "string") matching[key] = evidence[key];
     }
     const raw = event.custom_data;
     const customData = metaCustomData(event.event_name as MetaEventName, {

@@ -1346,7 +1346,7 @@ function PricingSection({
       return;
     }
 
-    void trackMetaEvent("SelectOffer", { planId, locale, offer: plan, stage: "offer" });
+    void trackMetaEvent("SelectOffer", { planId, locale, offer: plan, purchase_type: "plan", stage: "offer" });
     setPendingPlan(plan);
     window.location.href = paymentCheckoutPath(locale, {
       plan,
