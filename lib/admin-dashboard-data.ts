@@ -1,4 +1,4 @@
-import { funnelBpmSource } from "@/lib/admin-funnel-events";
+import { funnelBpmSource, isPlanPaymentEvent, planPaymentEventSql } from "@/lib/admin-funnel-events";
 import { getSql } from "@/lib/db";
 import {
   adminDashboardFilterSql,
@@ -76,23 +76,6 @@ const rateIds: AdminDashboardRateId[] = [
   "proRate",
   "paidRate"
 ];
-
-const paidEventNames = new Set([
-  "checkout_completed",
-  "checkout_paid",
-  "payment_completed",
-  "payment_confirmed",
-  "payment_succeeded",
-  "plan_paid"
-]);
-
-const paidEventStatuses = new Set([
-  "complete",
-  "completed",
-  "paid",
-  "success",
-  "succeeded"
-]);
 
 export function normalizeAdminDashboardRange(
   value: string | string[] | undefined
@@ -308,12 +291,7 @@ function rowKpiId(row: BpmConversionRow): AdminDashboardKpiId | null {
     return "free";
   }
 
-  const isPaidEvent =
-    paidEventNames.has(row.event_name) ||
-    (row.event_type === "payment" &&
-      Boolean(row.event_status && paidEventStatuses.has(row.event_status)));
-
-  if (!isPaidEvent) {
+  if (!isPlanPaymentEvent(row)) {
     return null;
   }
 
@@ -486,26 +464,7 @@ export async function getAdminDashboardData(
             and (
               funnel_event_name in ('free_email_requested', 'healthscore_viewed', 'healthscore_page_viewed')
               or (
-                (
-                  event_name in (
-                    'checkout_completed',
-                    'checkout_paid',
-                    'payment_completed',
-                    'payment_confirmed',
-                    'payment_succeeded',
-                    'plan_paid'
-                  )
-                  or (
-                    event_type = 'payment'
-                    and event_status in (
-                      'complete',
-                      'completed',
-                      'paid',
-                      'success',
-                      'succeeded'
-                    )
-                  )
-                )
+                ${planPaymentEventSql(sql)}
                 and selected_plan in ('precision', 'pro')
               )
             )
@@ -528,26 +487,7 @@ export async function getAdminDashboardData(
             and (
               funnel_event_name in ('free_email_requested', 'healthscore_viewed', 'healthscore_page_viewed')
             or (
-              (
-                event_name in (
-                  'checkout_completed',
-                  'checkout_paid',
-                  'payment_completed',
-                  'payment_confirmed',
-                  'payment_succeeded',
-                  'plan_paid'
-                )
-                or (
-                  event_type = 'payment'
-                  and event_status in (
-                    'complete',
-                    'completed',
-                    'paid',
-                    'success',
-                    'succeeded'
-                  )
-                )
-              )
+              ${planPaymentEventSql(sql)}
               and selected_plan in ('precision', 'pro')
             )
             )

@@ -1,4 +1,4 @@
-import { funnelBpmSource, webEntryEventNames, webJourneyEventNames } from "@/lib/admin-funnel-events";
+import { funnelBpmSource, planPaymentEventNames, planPaymentEventSql, webEntryEventNames, webJourneyEventNames } from "@/lib/admin-funnel-events";
 import { getPharmacySourceFunnel, type PharmacySourceFunnel } from "@/lib/pharmacy-funnel";
 import { getAdminMcpFunnel, type McpFunnelReport } from "@/lib/admin-mcp-funnel";
 import { metaDiagnostics, type MetaDiagnostics } from "@/lib/meta-diagnostics";
@@ -240,23 +240,6 @@ const views = new Set<AdminExternalQueryView>([
   "tasks"
 ]);
 
-const paidEventNames = new Set([
-  "checkout_completed",
-  "checkout_paid",
-  "payment_completed",
-  "payment_confirmed",
-  "payment_succeeded",
-  "plan_paid"
-]);
-
-const paidEventStatuses = new Set([
-  "complete",
-  "completed",
-  "paid",
-  "success",
-  "succeeded"
-]);
-
 function markdownFromBlogBody(body?: BlogArticleBody | null) {
   if (!body) {
     return null;
@@ -411,7 +394,7 @@ async function getCampaigns(params: QueryParams): Promise<AdminCampaignsData> {
       select * from ${funnelBpmSource(sql)}
       where journey_channel='web' and ${start ? sql`occurred_at >= ${start} and` : sql``}
         ${adminDashboardFilterSql(sql, params.filters)}
-        and (funnel_event_name=any(${[...webJourneyEventNames, ...paidEventNames]}::text[])
+        and (funnel_event_name=any(${[...webJourneyEventNames, ...planPaymentEventNames]}::text[])
           or event_type='payment')
     ), plan_links as materialized (
       select id,ray,plan_id,occurred_at from matched_events where plan_id is not null
@@ -454,17 +437,11 @@ async function getCampaigns(params: QueryParams): Promise<AdminCampaignsData> {
       count(distinct subject) filter (where event_name = 'free_email_requested')::int as free_requests,
       count(distinct subject) filter (
         where selected_plan = 'precision'
-          and (
-            event_name = any(${[...paidEventNames]}::text[])
-            or (event_type = 'payment' and event_status = any(${[...paidEventStatuses]}::text[]))
-          )
+          and ${planPaymentEventSql(sql)}
       )::int as precision_conversions,
       count(distinct subject) filter (
         where selected_plan = 'pro'
-          and (
-            event_name = any(${[...paidEventNames]}::text[])
-            or (event_type = 'payment' and event_status = any(${[...paidEventStatuses]}::text[]))
-          )
+          and ${planPaymentEventSql(sql)}
       )::int as pro_conversions
     from campaign_events
     group by grouping sets ((source, medium, campaign, campaign_id, affiliate, promo_code), ())
@@ -590,24 +567,18 @@ async function getLeads(params: QueryParams): Promise<AdminLeadsData> {
         bool_or(event_name = 'free_email_sent') as free_email_sent,
         bool_or(
           selected_plan = 'precision'
-          and (
-            event_name = any(${[...paidEventNames]}::text[])
-            or (event_type = 'payment' and event_status = any(${[...paidEventStatuses]}::text[]))
-          )
+          and ${planPaymentEventSql(sql)}
         ) as precision_paid,
         bool_or(
           selected_plan = 'pro'
-          and (
-            event_name = any(${[...paidEventNames]}::text[])
-            or (event_type = 'payment' and event_status = any(${[...paidEventStatuses]}::text[]))
-          )
+          and ${planPaymentEventSql(sql)}
         ) as pro_paid
       from lead_events
       where subject is not null
       group by subject
       having bool_or(
         event_name = any(${[...leadEventNames]}::text[])
-        or event_name = any(${[...paidEventNames]}::text[])
+        or event_name = any(${[...planPaymentEventNames]}::text[])
         or selected_plan is not null
         or email_hash is not null
         or plan_id is not null

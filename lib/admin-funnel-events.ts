@@ -1,8 +1,28 @@
 import type postgres from "postgres";
 
+// Product payments and payment-related bookkeeping are not plan purchases.
+export const planPaymentEventNames = [
+  "checkout_completed", "checkout_paid", "payment_completed", "payment_confirmed",
+  "payment_succeeded", "payment_fulfillment_succeeded", "plan_paid"
+] as const;
+
+// Older named purchase events use BPM's default "observed" status.
+const planPaymentStatuses = ["observed", "complete", "completed", "paid", "success", "succeeded"];
+
+export function isPlanPaymentEvent(row: { event_name: string; event_status: string | null }) {
+  return planPaymentEventNames.some(name => name === row.event_name) &&
+    (row.event_status === null || planPaymentStatuses.includes(row.event_status));
+}
+
+export function planPaymentEventSql(sql: postgres.Sql) {
+  return sql`(event_name = any(${[...planPaymentEventNames]}::text[])
+    and (event_status is null or event_status = any(${planPaymentStatuses}::text[])))`;
+}
+
 /** Journey is separate from acquisition (Facebook, TikTok, referral, etc.).
  * Assessment provenance wins over browser hints, including MCP's retail bridge.
  * Normalize on read: never manufacture historical events or replay Meta exports.
+ * Exclude identified automation and demo events without deleting audit evidence.
  */
 export function funnelBpmSource(sql: postgres.Sql) {
   return sql`(
@@ -31,6 +51,11 @@ export function funnelBpmSource(sql: postgres.Sql) {
         else b.event_name
       end as funnel_event_name
     from public.bpm b
+    where coalesce(b.user_agent, '') !~* '(bot|crawler|spider|headless|playwright|facebookexternalhit|meta-externalagent)'
+      and coalesce(b.emitted_by, '') not in ('dev_campaign_seed', 'payment_skip_mock')
+      and nullif(b.properties->>'seedName', '') is null
+      and coalesce(b.properties->>'mocked', 'false') <> 'true'
+      and coalesce(b.properties->>'paymentSkipped', 'false') <> 'true'
   ) bpm`;
 }
 

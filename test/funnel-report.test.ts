@@ -44,6 +44,57 @@ it("does not treat earlier or unrelated purchases as conversion from a later Hea
   assert.equal(flow.summary.conversionRate,0);
 });
 
+it("keeps product payments and failed checkouts out of paid plan conversions", () => {
+  const flow = buildAdminFlowData("all", [
+    event("healthscore_viewed", 0, { plan_id: "product-only" }),
+    event("retail_product_payment_succeeded", 1, {
+      plan_id: "product-only", selected_plan: "precision", event_type: "payment", event_status: "paid"
+    }),
+    event("checkout_completed", 2, {
+      plan_id: "unpaid", selected_plan: "precision", event_type: "payment", event_status: "processing"
+    }),
+    event("payment_succeeded", 3, {
+      plan_id: "failed", selected_plan: "pro", event_type: "payment", event_status: "failed"
+    })
+  ]);
+  const count = (id: string) => flow.nodes.find(row => row.id === id)?.count;
+  assert.equal(count("precisionPaid"), 0);
+  assert.equal(count("proPaid"), 0);
+  assert.equal(count("productPaymentSucceeded"), 1);
+  assert.equal(flow.summary.converted, 0);
+});
+
+it("counts one plan purchase when payment and fulfillment both succeed", () => {
+  const flow = buildAdminFlowData("all", [
+    event("healthscore_viewed", 0, { plan_id: "paid" }),
+    ...["payment_succeeded", "payment_fulfillment_succeeded"].map((name, index) => event(name, index + 1, {
+      plan_id: "paid", selected_plan: "precision", event_type: "payment", event_status: "paid"
+    }))
+  ]);
+  assert.equal(flow.nodes.find(row => row.id === "precisionPaid")?.count, 1);
+  assert.deepEqual(flow.transitions?.precisionConversions, { numerator: 1, denominator: 1 });
+});
+
+it("shows each rate's recorded base without treating alternative outcomes as drop-offs", () => {
+  for (const locale of ["en", "th", "zh-CN"] as const) {
+    const html = renderToStaticMarkup(createElement(FunnelStageTable, { locale, caption: "Web", rows: [
+      { id: "started", label: "Starts", count: 20, color: "start", numerator: 20, denominator: 174, conversionBasis: "Web journeys" },
+      { id: "precision", label: "Precision", count: 4, color: "conversion", numerator: 4, denominator: 8, conversionBasis: "HealthScore arrivals", showDropoff: false },
+      { id: "pro", label: "Pro", count: 0, color: "conversion", numerator: 0, denominator: 8, conversionBasis: "HealthScore arrivals", showDropoff: false },
+      { id: "orders", label: "Orders", count: 0, color: "order", numerator: 0, denominator: 8, conversionBasis: "HealthScore arrivals", showDropoff: false }
+    ] }));
+    const rows = [...html.matchAll(/<tr\b[^>]*>(.*?)<\/tr>/gs)].slice(1).map(match => match[1]);
+    const cells = rows.map(row => [...row.matchAll(/<td\b[^>]*>(.*?)<\/td>/gs)].map(match => match[1]));
+    assert.equal(cells[0][1], "154");
+    assert.match(cells[0][2], /11\.5%.*20 \/ 174/s);
+    for (let i = 1; i < cells.length; i++) {
+      assert.equal(cells[i][1], "—");
+      assert.match(cells[i][2], i === 1 ? /50%.*4 \/ 8/s : /0%.*0 \/ 8/s);
+    }
+    assert.doesNotMatch(html, /NaN|Infinity/);
+  }
+});
+
 it("keeps retail unpaid order count distinct from converted journeys", () => {
   const base={pharmacy:"fixture",source:"in_store" as const,ray:"r",planId:"p"};
   const rows=summarizePharmacySources([

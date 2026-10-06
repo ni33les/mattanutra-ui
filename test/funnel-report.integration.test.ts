@@ -12,6 +12,7 @@ mock.module("../lib/db.ts", {namedExports:{...db,getSql:()=>scoped}});
 const {funnelBpmSource}=await import("../lib/admin-funnel-events.ts");
 const {metaResourceChannel}=await import("../lib/meta-tracking.ts");
 const {getAdminFlowData}=await import("../lib/admin-flow-data.ts");
+const {getAdminDashboardData}=await import("../lib/admin-dashboard-data.ts");
 const {getAdminExternalQueryData}=await import("../lib/admin-query-data.ts");
 after(db.closeSqlPool);
 
@@ -61,4 +62,58 @@ it("queries real SQL: recovers web history while excluding retail and MCP bridge
     assert.equal(displayed.nodes.find(row=>row.id==="healthscoreDisplayed")?.count,1);
     throw rollback;
   });}catch(error){if(error!==rollback)throw error;}finally{scoped=sql;}
+});
+
+it("excludes automated and demo events consistently and separates product payments from plan purchases", async () => {
+  const rollback = new Error("fixture rollback");
+  try { await sql.begin(async tx => {
+    scoped = tx;
+    const campaign = `fixture-funnel-${randomUUID()}`, paid = randomUUID(), productOnly = randomUUID();
+    for (const plan of [paid, productOnly]) {
+      await tx`insert into public.assessments(plan_id,locale,selected_plan,status,answers)
+        values(${plan}::uuid,'en','precision','captured','{}')`;
+    }
+    async function add(input: {
+      name?: string; plan?: string; agent?: string; emitter?: string;
+      properties?: Record<string, unknown>; status?: string;
+    }) {
+      await tx`insert into public.bpm(id,ray,plan_id,event_name,event_type,event_status,selected_plan,path,
+        traffic_source,utm_campaign,locale,user_agent,emitted_by,properties,occurred_at)
+        values(${randomUUID()}::uuid,${randomUUID()}::uuid,${input.plan ?? null}::uuid,
+          ${input.name ?? "home_viewed"},${input.plan ? "payment" : "traffic"},${input.status ?? "paid"},
+          ${input.plan ? "precision" : null},'/en','direct',${campaign},'en',${input.agent ?? null},
+          ${input.emitter ?? null},${tx.json(input.properties ?? {})},now())`;
+    }
+    await add({ agent: "Mozilla/5.0 Chrome/145.0.0.0 Safari/537.36" });
+    await add({ name: "payment_succeeded", plan: paid });
+    await add({ name: "payment_fulfillment_succeeded", plan: paid });
+    await add({ name: "retail_product_payment_succeeded", plan: productOnly });
+    await add({ name: "checkout_completed", plan: productOnly, status: "processing" });
+    for (const agent of ["Googlebot/2.1", "Mozilla/5.0 HeadlessChrome/153.0.0.0", "meta-externalagent/1.1", "Playwright"]) {
+      await add({ agent });
+    }
+    await add({ emitter: "dev_campaign_seed" });
+    await add({ properties: { seedName: "campaign-demo" } });
+    await add({ name: "plan_paid", plan: productOnly, emitter: "payment_skip_mock" });
+    await add({ name: "payment_succeeded", plan: productOnly, properties: { mocked: true } });
+    await add({ name: "plan_paid", plan: productOnly, properties: { paymentSkipped: true } });
+
+    const filters = { ...emptyAdminDashboardFilters, campaign };
+    const flow = await getAdminFlowData("all", filters);
+    assert.equal(flow.databaseAvailable, true);
+    const count = (id: string) => flow.nodes.find(row => row.id === id)?.count;
+    assert.equal(count("landingViewed"), 1);
+    assert.equal(count("precisionPaid"), 1);
+    assert.equal(count("productPaymentSucceeded"), 1);
+    const dashboard = await getAdminDashboardData("all", filters);
+    assert.equal(dashboard.databaseAvailable, true);
+    assert.equal(dashboard.kpis.find(row => row.id === "precision")?.value, 1);
+    const report = await getAdminExternalQueryData("campaigns", new URLSearchParams({ range: "all", campaign }));
+    const data = report.data as { summary: { landed: number; precisionConversions: number } };
+    assert.equal(data.summary.landed, 1);
+    assert.equal(data.summary.precisionConversions, 1);
+    const [raw] = await tx`select count(*)::int as n from public.bpm where utm_campaign=${campaign}`;
+    assert.equal(raw.n, 14, "Reporting exclusions preserve the original audit events");
+    throw rollback;
+  }); } catch (error) { if (error !== rollback) throw error; } finally { scoped = sql; }
 });

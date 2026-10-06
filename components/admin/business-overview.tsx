@@ -28,7 +28,8 @@ import {
 
 type BusinessFunnelStage = Readonly<{
   count: number;
-  denominator: number | null;
+  conversionBasis?: string;
+  isOutcome?: boolean;
   id: AdminConversionTargetId;
   isEntry?: boolean;
   label: string;
@@ -38,6 +39,7 @@ type BusinessFunnelStage = Readonly<{
 function businessFunnelStages(
   flowData: AdminFlowData,
   labels: AdminContent,
+  locale: Locale,
   targets: AdminConversionTargets = flowData.targets
 ): BusinessFunnelStage[] {
   const landed = flowNodeCount(flowData, "landingViewed");
@@ -48,7 +50,6 @@ function businessFunnelStages(
   return [
     {
       count: landed,
-      denominator: null,
       id: "landingVisitors",
       isEntry: true,
       label: labels.atAGlance.landingVisitors,
@@ -56,42 +57,45 @@ function businessFunnelStages(
     },
     {
       count: started,
-      denominator: landed,
+      conversionBasis: funnelReportCopy[locale].visits,
       id: "assessmentStarts",
       label: labels.atAGlance.assessmentStarts,
       targetConversion: targets.assessmentStarts
     },
     {
       count: completed,
-      denominator: started,
+      conversionBasis: labels.atAGlance.assessmentStarts,
       id: "assessmentCompletions",
       label: labels.atAGlance.assessmentCompletions,
       targetConversion: targets.assessmentCompletions
     },
     {
       count: healthScore,
-      denominator: completed,
+      conversionBasis: labels.atAGlance.assessmentCompletions,
       id: "healthScoreViews",
       label: labels.atAGlance.healthScoreViews,
       targetConversion: targets.healthScoreViews
     },
     {
       count: flowNodeCount(flowData, "precisionPaid"),
-      denominator: healthScore,
+      conversionBasis: funnelReportCopy[locale].reached,
+      isOutcome: true,
       id: "precisionConversions",
       label: labels.atAGlance.precisionConversions,
       targetConversion: targets.precisionConversions
     },
     {
       count: flowNodeCount(flowData, "proPaid"),
-      denominator: healthScore,
+      conversionBasis: funnelReportCopy[locale].reached,
+      isOutcome: true,
       id: "proConversions",
       label: labels.atAGlance.proConversions,
       targetConversion: targets.proConversions
     },
     {
       count: flowNodeCount(flowData, "retailOrderCreated"),
-      denominator: healthScore,
+      conversionBasis: funnelReportCopy[locale].reached,
+      isOutcome: true,
       id: "productOrders",
       label: labels.atAGlance.productOrders,
       targetConversion: targets.productOrders
@@ -218,7 +222,7 @@ export function BusinessFunnelTable({
       ) : null}
       <p className="mt-2 text-sm text-gray-600">{funnelReportCopy[locale].webNote}</p>
       <FunnelStageTable locale={locale} caption={funnelReportCopy[locale].web} targets={showTargets}
-        rows={businessFunnelStages(flowData, labels, activeTargets).map((stage, index): FunnelTableRow => ({
+        rows={businessFunnelStages(flowData, labels, locale, activeTargets).map((stage, index): FunnelTableRow => ({
           id: stage.id,
           label: stage.id === "landingVisitors" ? funnelReportCopy[locale].visits : stage.id === "healthScoreViews" ? funnelReportCopy[locale].reached : stage.label,
           count: stage.count,
@@ -226,6 +230,8 @@ export function BusinessFunnelTable({
           entry: stage.isEntry,
           denominator: flowData.transitions?.[stage.id]?.denominator,
           numerator: flowData.transitions?.[stage.id]?.numerator,
+          conversionBasis: stage.conversionBasis,
+          showDropoff: !stage.isOutcome,
           target: stage.targetConversion,
           targetControl: editingTargets ? <input
             aria-label={`${labels.atAGlance.target}: ${stage.label}`}
@@ -236,6 +242,7 @@ export function BusinessFunnelTable({
               setDraftTargets(current => ({ ...current, [stage.id]: Number.isFinite(parsed) ? Math.max(0, Math.min(100, parsed)) : 0 }));
             }} /> : undefined
         }))} />
+      <p className="mt-3 text-xs text-gray-600">{funnelReportCopy[locale].outcomesNote}</p>
       <p className="mt-3 text-xs text-gray-600">{funnelReportCopy[locale].evidence
         .replace("{displayed}", formatNumber(flowNodeCount(flowData, "healthscoreDisplayed"), locale))
         .replace("{arrivals}", formatNumber(flowNodeCount(flowData, "healthscoreViewed") - flowNodeCount(flowData, "healthscoreDisplayed"), locale))}</p>

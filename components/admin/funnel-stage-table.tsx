@@ -8,6 +8,7 @@ export const funnelStageColors = {
 export type FunnelTableRow = {
   id: string; label: string; count: number; color: keyof typeof funnelStageColors;
   denominator?: number | null; numerator?: number; entry?: boolean; target?: number; targetControl?: ReactNode;
+  conversionBasis?: string; showDropoff?: boolean;
 };
 const columns = {
   en: ["Stage", "Count", "Drop-off", "Conversion", "Target", "Actual vs target"],
@@ -29,7 +30,7 @@ export function FunnelStageTable({ rows, locale, targets = false, caption }: {
         const linked = row.numerator;
         const valid = row.denominator != null && row.denominator > 0 && linked != null && linked >= 0 && linked <= row.denominator;
         const conversion = row.entry ? (row.count ? 100 : null) : valid ? 100 * linked! / row.denominator! : null;
-        const dropoff = valid ? row.denominator! - linked! : null;
+        const dropoff = valid && row.showDropoff !== false ? row.denominator! - linked! : null;
         const delta = conversion != null && row.target != null ? conversion - row.target : null;
         const color = funnelStageColors[row.color];
         return <tr key={row.id} style={{ backgroundColor: `${color}08` }}>
@@ -38,7 +39,12 @@ export function FunnelStageTable({ rows, locale, targets = false, caption }: {
           </th>
           <td className="px-4 py-3 text-right font-semibold tabular-nums text-gray-900">{number.format(row.count)}</td>
           <td className="px-4 py-3 text-right tabular-nums text-gray-600">{dropoff == null ? "—" : number.format(dropoff)}</td>
-          <td className="px-4 py-3 text-right tabular-nums text-gray-600">{conversion == null ? "—" : `${number.format(conversion)}%`}</td>
+          <td className="px-4 py-3 text-right tabular-nums text-gray-600">
+            {conversion == null ? "—" : `${number.format(conversion)}%`}
+            {valid && row.conversionBasis && <span className="mt-1 block text-xs text-gray-500">
+              {number.format(linked!)} / {number.format(row.denominator!)} · {row.conversionBasis}
+            </span>}
+          </td>
           {targets && <><td className="px-4 py-3 text-right tabular-nums">{row.targetControl ?? (row.target == null ? "—" : `${number.format(row.target)}%`)}</td>
             <td className={`whitespace-nowrap px-4 py-3 text-right font-semibold tabular-nums ${delta == null ? "text-gray-500" : delta >= 0 ? "text-green-700" : "text-red-700"}`}>
               {delta == null ? "—" : `${delta >= 0 ? "+" : ""}${number.format(delta)} pp`}

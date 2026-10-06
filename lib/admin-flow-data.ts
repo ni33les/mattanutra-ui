@@ -1,4 +1,4 @@
-import { funnelBpmSource, webJourneyEventNames } from "@/lib/admin-funnel-events";
+import { funnelBpmSource, isPlanPaymentEvent, planPaymentEventNames, webJourneyEventNames } from "@/lib/admin-funnel-events";
 import { getAdminMcpFunnel, type McpFunnelReport } from "@/lib/admin-mcp-funnel";
 import { getPharmacySourceFunnel, type PharmacySourceFunnel } from "@/lib/pharmacy-funnel";
 import { getSql } from "@/lib/db";
@@ -236,23 +236,6 @@ const edgeDefinitions: AdminFlowEdge[] = [
   }))
 ];
 
-const paidEventNames = new Set([
-  "checkout_completed",
-  "checkout_paid",
-  "payment_completed",
-  "payment_confirmed",
-  "payment_succeeded",
-  "plan_paid"
-]);
-
-const paidEventStatuses = new Set([
-  "complete",
-  "completed",
-  "paid",
-  "success",
-  "succeeded"
-]);
-
 function addMinutes(date: Date, minutes: number) {
   return new Date(date.getTime() + minutes * 60_000);
 }
@@ -483,14 +466,6 @@ function emptyFlowSeries(range: AdminDashboardRange) {
   };
 }
 
-function isPaidEvent(row: FlowRow) {
-  return (
-    paidEventNames.has(row.event_name) ||
-    (row.event_type === "payment" &&
-      Boolean(row.event_status && paidEventStatuses.has(row.event_status)))
-  );
-}
-
 function nodesForRow(row: FlowRow): AdminFlowNodeId[] {
   if (
     row.event_name === "home_viewed" ||
@@ -530,11 +505,11 @@ function nodesForRow(row: FlowRow): AdminFlowNodeId[] {
     return ["planSelected"];
   }
 
-  if (isPaidEvent(row) && row.selected_plan === "precision") {
+  if (isPlanPaymentEvent(row) && row.selected_plan === "precision") {
     return ["precisionPaid"];
   }
 
-  if (isPaidEvent(row) && row.selected_plan === "pro") {
+  if (isPlanPaymentEvent(row) && row.selected_plan === "pro") {
     return ["proPaid"];
   }
 
@@ -1025,7 +1000,7 @@ export async function getAdminFlowData(range: AdminDashboardRange, filters: Admi
   if (!sql) return emptyFlow(range);
   try {
     const start = queryStartForRange(range);
-    const names = [...webJourneyEventNames, ...paidEventNames];
+    const names = [...webJourneyEventNames, ...planPaymentEventNames];
     const [targets, rows, pharmacySources, mcp] = await Promise.all([
       getAdminConversionTargets(),
       sql<FlowRow[]>`
