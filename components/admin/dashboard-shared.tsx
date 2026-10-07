@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { HealthspanLogo } from "@/components/healthspan-logo";
 import { adminDashboardFilterEntries, type AdminDashboardFilters } from "@/lib/admin-dashboard-filters";
 import type { AdminTaskVisibilityRow } from "@/lib/admin-execution";
+import type { AdminLeadsData } from "@/lib/admin-query-data";
 import { nutritionRevealPath } from "@/lib/nutrition-paths";
 import type { AdminDashboardRange } from "@/lib/admin-dashboard-data";
 import type { AdminConversionTargetId, AdminFlowData, AdminFlowNodeId } from "@/lib/admin-flow-data";
@@ -107,6 +108,25 @@ export function adminHref(
   }
 
   return `/${locale}/admin/dashboard?${params.toString()}`;
+}
+
+export function adminLeadHref(
+  href: string,
+  data: Pick<AdminLeadsData, "search" | "status" | "pagination">,
+  cursor = 0
+) {
+  const [path, query] = href.split("?");
+  const params = new URLSearchParams(query);
+  Object.entries(data.search).forEach(([key, value]) => {
+    if (value) params.set(key, value);
+    else params.delete(key);
+  });
+  if (data.status) params.set("status", data.status);
+  else params.delete("status");
+  params.set("limit", String(data.pagination.limit));
+  if (cursor > 0) params.set("cursor", String(cursor));
+  else params.delete("cursor");
+  return `${path}?${params.toString()}`;
 }
 
 export function adminTaskVisibilityHref({

@@ -331,7 +331,7 @@ export default async function LocalizedAdminDashboardPage({
   } else if (view === "foods") {
     foodsData = await getAdminFoodsData();
   } else if (view === "leads") {
-    leadsData = await getAdminLeadsData(range, filters);
+    leadsData = await getAdminLeadsData(range, filters, query);
   } else if (
     view === "stock" ||
     view === "retail-audit" ||

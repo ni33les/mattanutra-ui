@@ -638,6 +638,21 @@ export type AdminContent = Readonly<{
   };
   flowTitle: string;
   marketingPages: {
+    advancedFilters: string;
+    searchEvents: string;
+    search: string;
+    searchHint: string;
+    dateFrom: string;
+    dateTo: string;
+    dateHint: string;
+    previous: string;
+    next: string;
+    firstPage: string;
+    lastPage: string;
+    showing: string;
+    of: string;
+    pageSize: string;
+    allStages: string;
     affiliate: string;
     assessmentCompletions: string;
     assessmentStarts: string;
@@ -1441,6 +1456,21 @@ const baseContent = {
     },
     flowTitle: "Conversions",
     marketingPages: {
+      advancedFilters: "More filters",
+      searchEvents: "Search lead events",
+      search: "Search leads",
+      searchHint: "Search any part of an email, ID, email hash, source, campaign, or event. Text filters ignore case and match partial values.",
+      dateFrom: "From date",
+      dateTo: "To date",
+      dateHint: "Dates include the whole end day and replace the timeframe above. Time zone:",
+      previous: "Previous",
+      next: "Next",
+      firstPage: "First",
+      lastPage: "Last",
+      showing: "Showing",
+      of: "of",
+      pageSize: "Rows per page",
+      allStages: "All stages",
       affiliate: "Affiliate",
       assessmentCompletions: "Completed",
       assessmentStarts: "Started",
@@ -2354,6 +2384,21 @@ const baseContent = {
     },
     flowTitle: "คอนเวอร์ชัน",
     marketingPages: {
+      advancedFilters: "ตัวกรองเพิ่มเติม",
+      searchEvents: "ค้นหาเหตุการณ์ของลีด",
+      search: "ค้นหาลีด",
+      searchHint: "ค้นหาบางส่วนของอีเมล, ID, Email hash, แหล่งที่มา, แคมเปญ หรือเหตุการณ์ ตัวกรองข้อความไม่แยกตัวพิมพ์ใหญ่และเล็ก",
+      dateFrom: "ตั้งแต่วันที่",
+      dateTo: "ถึงวันที่",
+      dateHint: "รวมตลอดวันสุดท้ายและใช้แทนช่วงเวลาด้านบน เขตเวลา:",
+      previous: "ก่อนหน้า",
+      next: "ถัดไป",
+      firstPage: "หน้าแรก",
+      lastPage: "หน้าสุดท้าย",
+      showing: "แสดง",
+      of: "จาก",
+      pageSize: "แถวต่อหน้า",
+      allStages: "ทุกขั้นตอน",
       affiliate: "Affiliate",
       assessmentCompletions: "เสร็จ",
       assessmentStarts: "เริ่ม",

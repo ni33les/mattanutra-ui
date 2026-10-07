@@ -154,3 +154,7 @@ GET /api/admin/query/agents
 ```
 
 Shared query parameters include `range`, `locale`, `device`, `source`, `campaign`, `affiliate`, `planId`, `ray`, `emailHash`, `status`, `limit`, and `cursor`.
+
+Lead queries also accept `q` (case-insensitive partial search), `dateFrom` and `dateTo` (`YYYY-MM-DD`), and `timeZone` (an IANA time zone, default `Asia/Bangkok`). Explicit dates replace `range`; the end date includes its entire calendar day. Lead text filters such as `source`, `campaign`, `planId`, `ray`, and `emailHash` also support literal partial matches. Follow `pagination.nextCursor` until it is `null` to retrieve every matching lead; `summary` covers the full result, independent of page size. Lead interaction histories are included without the former 80-event cap.
+
+To run the lead database regression tests, set `ADMIN_LEADS_TEST_DB` to a PostgreSQL connection with permission to create databases and run `npm test`. The tests create and remove their own isolated database.

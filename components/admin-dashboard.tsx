@@ -70,6 +70,7 @@ import {
   SidebarContent,
   adminLocaleTextClass,
   adminExecutionEventsHref,
+  adminHref,
   classNames,
   formatGeneratedAt,
   useLiveAdminData
@@ -575,6 +576,7 @@ export function AdminDashboard({
                   filters={filters}
                   labels={labels}
                   locale={locale}
+                  leadsData={view === "leads" ? leadsData : undefined}
                   view={view}
                 />
                 {view === "campaigns" ||
@@ -585,6 +587,7 @@ export function AdminDashboard({
                     accessToken={accessToken}
                     filters={filters}
                     locale={locale}
+                    leadsData={view === "leads" ? leadsData : undefined}
                     range={data.range}
                     view={view}
                   />
@@ -600,6 +603,7 @@ export function AdminDashboard({
                   filters={filters}
                   labels={labels}
                   locale={locale}
+                  leadsData={view === "leads" ? leadsData : undefined}
                   range={data.range}
                   view={view}
                 />
@@ -682,6 +686,7 @@ export function AdminDashboard({
             />
           ) : view === "leads" ? (
             <AdminLeadsView
+              baseHref={adminHref(locale, accessToken, data.range, view, filters)}
               data={leadsData}
               labels={labels}
               locale={locale}

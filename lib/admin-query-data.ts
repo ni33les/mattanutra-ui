@@ -8,16 +8,26 @@ import {
 } from "@/lib/admin-dashboard-data";
 import {
   adminDashboardFilterSql,
+  adminTextSearchPattern,
   type AdminDashboardFilters
 } from "@/lib/admin-dashboard-filters";
 import {
   adminQueryEnvelope,
   dashboardQueryParams,
+  normalizeAdminQueryCursor,
   normalizeAdminQueryParams,
+  normalizeQueryLimit,
   paginateAdminRows,
   type AdminQueryPagination,
   type AdminQueryParams
 } from "@/lib/admin-query-helpers";
+import {
+  adminLeadSearchSql,
+  emptyAdminLeadSearch,
+  adminLeadTimeSql,
+  normalizeAdminLeadSearch,
+  type AdminLeadSearch
+} from "@/lib/admin-lead-search";
 import { getAdminCommunicationsData } from "@/lib/admin-communications";
 import {
   getAdminAgentsData,
@@ -136,9 +146,16 @@ export type AdminLeadEventRow = Readonly<{
 
 export type AdminLeadsData = Readonly<{
   databaseAvailable: boolean;
-  pagination?: AdminQueryPagination;
+  pagination: AdminQueryPagination;
   rows: AdminLeadRow[];
+  search: AdminLeadSearch;
+  status: string;
   summary: Readonly<{
+    communicationIssues: number;
+    free: number;
+    pendingReviews: number;
+    precision: number;
+    pro: number;
     total: number;
   }>;
 }>;
@@ -203,7 +220,10 @@ export function emptyLeadsData(): AdminLeadsData {
   return {
     databaseAvailable: false,
     rows: [],
-    summary: { total: 0 }
+    search: emptyAdminLeadSearch,
+    status: "",
+    pagination: { cursor: null, limit: 50, nextCursor: null },
+    summary: { total: 0, communicationIssues: 0, free: 0, pendingReviews: 0, precision: 0, pro: 0 }
   };
 }
 
@@ -288,52 +308,6 @@ export function normalizeAdminExternalQueryView(
 
 function flowNodeCount(flow: AdminFlowData, id: string) {
   return flow.nodes.find((node) => node.id === id)?.count ?? 0;
-}
-
-function currentLeadStage(row: {
-  assessment_resume_requested?: boolean;
-  free_email_requested: boolean;
-  free_email_sent: boolean;
-  healthscore_viewed: boolean;
-  landed: boolean;
-  precision_paid: boolean;
-  pro_paid: boolean;
-  submitted: boolean;
-  started: boolean;
-}) {
-  if (row.pro_paid) {
-    return "pro";
-  }
-
-  if (row.precision_paid) {
-    return "precision";
-  }
-
-  if (row.free_email_sent) {
-    return "free_sent";
-  }
-
-  if (row.free_email_requested) {
-    return "free_requested";
-  }
-
-  if (row.healthscore_viewed) {
-    return "healthscore";
-  }
-
-  if (row.submitted) {
-    return "assessment_completed";
-  }
-
-  if (row.assessment_resume_requested) {
-    return "resume_requested";
-  }
-
-  if (row.started) {
-    return "assessment_started";
-  }
-
-  return row.landed ? "landed" : "observed";
 }
 
 function campaignSummary(rows: readonly AdminCampaignRow[]): AdminCampaignSummary {
@@ -486,39 +460,44 @@ async function getCampaigns(params: QueryParams): Promise<AdminCampaignsData> {
 
 async function getLeads(params: QueryParams): Promise<AdminLeadsData> {
   const sql = getSql();
+  const pagination: AdminQueryPagination = {
+    cursor: params.cursor > 0 ? String(params.cursor) : null,
+    limit: params.limit,
+    nextCursor: null
+  };
 
   if (!sql) {
-    return emptyLeadsData();
+    return {
+      databaseAvailable: false,
+      rows: [],
+      pagination,
+      search: params.leadSearch,
+      status: params.status,
+      summary: { total: 0, communicationIssues: 0, free: 0, pendingReviews: 0, precision: 0, pro: 0 }
+    };
   }
 
-  const start = adminDashboardRangeStart(params.range);
-  const rows = await sql<
-    Array<{
-      campaign: string | null;
-      communication_issues: number | string | null;
-      contact_email: string | null;
-      email_hash: string | null;
-      first_seen_at: Date | string;
-      free_email_requested: boolean;
-      free_email_sent: boolean;
-      healthscore_viewed: boolean;
-      landed: boolean;
-      last_event: string;
-      last_seen_at: Date | string;
-      locale: string | null;
-      pending_reviews: number | string | null;
-      plan_id: string | null;
-      precision_paid: boolean;
-      pro_paid: boolean;
-      ray: string | null;
-      selected_plan: string | null;
-      source: string | null;
-      assessment_resume_requested: boolean;
-      started: boolean;
-      subject: string;
-      submitted: boolean;
-    }>
-  >`
+  type LeadQueryRow = {
+    campaign: string | null;
+    communication_issues: number;
+    current_stage: string;
+    contact_email: string | null;
+    email_hash: string | null;
+    first_seen_at: string;
+    last_event: string;
+    last_seen_at: string;
+    locale: string | null;
+    pending_reviews: number;
+    plan_id: string | null;
+    ray: string | null;
+    selected_plan: string | null;
+    source: string | null;
+    subject: string;
+  };
+  const [result] = await sql<Array<{
+    rows: LeadQueryRow[];
+    summary: AdminLeadsData["summary"];
+  }>>`
     with lead_events as (
       select
         coalesce(
@@ -536,22 +515,26 @@ async function getLeads(params: QueryParams): Promise<AdminLeadsData> {
         funnel_event_name as event_name,
         event_type,
         event_status,
-        occurred_at
+        occurred_at,
+        id,
+        ${adminDashboardFilterSql(sql, params.filters, true)} as matches_filters,
+        (${adminDashboardFilterSql(sql, params.filters, true)}
+          and ${adminLeadSearchSql(sql, params.leadSearch)}) as matches_search
       from ${funnelBpmSource(sql)}
-      where journey_channel='web' and ${start ? sql`occurred_at >= ${start} and` : sql``}
-        ${adminDashboardFilterSql(sql, params.filters)}
+      where journey_channel = 'web' and ${adminLeadTimeSql(sql, params.range, params.leadSearch)}
     ),
     lead_rows as (
       select
         subject,
-        (array_remove(array_agg(ray order by occurred_at desc), null))[1] as ray,
-        (array_remove(array_agg(plan_id order by occurred_at desc), null))[1] as plan_id,
-        (array_remove(array_agg(email_hash order by occurred_at desc), null))[1] as email_hash,
-        (array_remove(array_agg(locale order by occurred_at desc), null))[1] as locale,
-        (array_remove(array_agg(selected_plan order by occurred_at desc), null))[1] as selected_plan,
-        (array_remove(array_agg(source order by occurred_at desc), null))[1] as source,
-        (array_remove(array_agg(campaign order by occurred_at desc), null))[1] as campaign,
-        (array_agg(event_name order by occurred_at desc))[1] as last_event,
+        (array_remove(array_agg(ray order by occurred_at desc, id desc), null))[1] as ray,
+        (array_remove(array_agg(plan_id order by occurred_at desc, id desc), null))[1] as plan_id,
+        (array_remove(array_agg(email_hash order by occurred_at desc, id desc), null))[1] as email_hash,
+        (array_remove(array_agg(locale order by occurred_at desc, id desc), null))[1] as locale,
+        (array_remove(array_agg(selected_plan order by occurred_at desc, id desc), null))[1] as selected_plan,
+        (array_remove(array_agg(source order by occurred_at desc, id desc), null))[1] as source,
+        (array_remove(array_agg(campaign order by occurred_at desc, id desc), null))[1] as campaign,
+        (array_agg(event_name order by occurred_at desc, id desc))[1] as last_event,
+        bool_or(matches_search) as matches_search,
         min(occurred_at) as first_seen_at,
         max(occurred_at) as last_seen_at,
         bool_or(event_name in (
@@ -582,14 +565,34 @@ async function getLeads(params: QueryParams): Promise<AdminLeadsData> {
         or selected_plan is not null
         or email_hash is not null
         or plan_id is not null
-      )
-    )
-    select
-      lead_rows.*,
-      contact_emails.contact_email,
-      coalesce(review_counts.pending_reviews, 0)::int as pending_reviews,
-      coalesce(communication_counts.communication_issues, 0)::int as communication_issues
-    from lead_rows
+      ) and bool_or(matches_filters)
+    ),
+    staged_leads as (
+      select *, case
+        when pro_paid then 'pro'
+        when precision_paid then 'precision'
+        when free_email_sent then 'free_sent'
+        when free_email_requested then 'free_requested'
+        when healthscore_viewed then 'healthscore'
+        when submitted then 'assessment_completed'
+        when assessment_resume_requested then 'resume_requested'
+        when started then 'assessment_started'
+        when landed then 'landed'
+        else 'observed'
+      end as current_stage
+      from lead_rows
+    ),
+    matched_leads as (
+      select * from staged_leads
+      where (${params.status} = '' or current_stage = ${params.status})
+    ),
+    enriched_leads as (
+      select
+        lead_rows.*,
+        contact_emails.contact_email,
+        coalesce(review_counts.pending_reviews, 0)::int as pending_reviews,
+        coalesce(communication_counts.communication_issues, 0)::int as communication_issues
+      from matched_leads lead_rows
     left join lateral (
       select contact_email
       from (
@@ -624,28 +627,50 @@ async function getLeads(params: QueryParams): Promise<AdminLeadsData> {
       order by updated_at desc
       limit 1
     ) contact_emails on true
-    left join lateral (
-      select count(*)::int as pending_reviews
-      from public.tasks
-      where tasks.plan_id::text = lead_rows.plan_id
-        and tasks.task_type in ('classify_supplement', 'review_supplement_for_plan')
-        and tasks.status not in ('completed', 'failed', 'cancelled', 'skipped')
-    ) review_counts on lead_rows.plan_id is not null
-    left join lateral (
-      select count(*)::int as communication_issues
-      from public.communication_messages
-      where communication_messages.plan_id::text = lead_rows.plan_id
-        and communication_messages.status in ('failed', 'no_channel')
-    ) communication_counts on lead_rows.plan_id is not null
-    order by lead_rows.last_seen_at desc
-    limit 1000
+      left join lateral (
+        select count(*)::int as pending_reviews
+        from public.tasks
+        where tasks.plan_id = lead_rows.plan_id::uuid
+          and tasks.task_type in ('classify_supplement', 'review_supplement_for_plan')
+          and tasks.status not in ('completed', 'failed', 'cancelled', 'skipped')
+      ) review_counts on lead_rows.plan_id is not null
+      left join lateral (
+        select count(*)::int as communication_issues
+        from public.communication_messages
+        where communication_messages.plan_id = lead_rows.plan_id::uuid
+          and communication_messages.status in ('failed', 'no_channel')
+      ) communication_counts on lead_rows.plan_id is not null
+    ),
+    filtered_leads as (
+      select * from enriched_leads
+      where matches_search or contact_email ilike ${params.leadSearch.q ? adminTextSearchPattern(params.leadSearch.q) : null}
+    ),
+    summary as (
+      select json_build_object(
+        'total', count(*),
+        'pendingReviews', coalesce(sum(pending_reviews), 0),
+        'communicationIssues', coalesce(sum(communication_issues), 0),
+        'free', count(*) filter (where current_stage in ('free_sent', 'free_requested')),
+        'precision', count(*) filter (where current_stage = 'precision'),
+        'pro', count(*) filter (where current_stage = 'pro')
+      ) as summary
+      from filtered_leads
+    ),
+    page as (
+      select * from filtered_leads
+      order by last_seen_at desc, subject asc
+      limit ${params.limit} offset ${params.cursor}
+    )
+    select summary.summary,
+      coalesce((select json_agg(page order by last_seen_at desc, subject asc) from page), '[]'::json) as rows
+    from summary
   `;
-  const mappedRows = rows
+  const pageRows = result.rows
     .map((row): AdminLeadRow => ({
       campaign: row.campaign,
       communicationIssues: Number(row.communication_issues) || 0,
+      currentStage: row.current_stage,
       contactEmail: row.contact_email,
-      currentStage: currentLeadStage(row),
       emailHash: row.email_hash,
       events: [],
       firstSeenAt: new Date(row.first_seen_at).toISOString(),
@@ -658,9 +683,7 @@ async function getLeads(params: QueryParams): Promise<AdminLeadsData> {
       selectedPlan: row.selected_plan,
       source: row.source,
       subject: row.subject
-    }))
-    .filter((row) => !params.status || row.currentStage === params.status);
-  const { pageRows, pagination } = paginateAdminRows(mappedRows, params);
+    }));
   const subjects = pageRows.map((row) => row.subject);
   const eventRows = subjects.length
     ? await sql<
@@ -705,19 +728,8 @@ async function getLeads(params: QueryParams): Promise<AdminLeadsData> {
             coalesce(nullif(utm_campaign, ''), nullif(campaign_name, '')) as campaign,
             error_message,
             occurred_at
-          from public.bpm
-          where ${start ? sql`occurred_at >= ${start} and` : sql``}
-            ${adminDashboardFilterSql(sql, params.filters)}
-        ),
-        ranked_events as (
-          select
-            *,
-            row_number() over (
-              partition by subject
-              order by occurred_at asc, id asc
-            ) as event_index
-          from event_rows
-          where subject = any(${subjects}::text[])
+          from ${funnelBpmSource(sql)}
+          where journey_channel = 'web' and ${adminLeadTimeSql(sql, params.range, params.leadSearch)}
         )
         select
           subject,
@@ -736,8 +748,8 @@ async function getLeads(params: QueryParams): Promise<AdminLeadsData> {
           campaign,
           error_message,
           occurred_at
-        from ranked_events
-        where event_index <= 80
+        from event_rows
+        where subject = any(${subjects}::text[])
         order by subject asc, occurred_at asc, id asc
       `
     : [];
@@ -773,10 +785,15 @@ async function getLeads(params: QueryParams): Promise<AdminLeadsData> {
   return {
     databaseAvailable: true,
     rows: rowsWithEvents,
-    summary: {
-      total: mappedRows.length
-    },
-    pagination
+    search: params.leadSearch,
+    status: params.status,
+    summary: result.summary,
+    pagination: {
+      ...pagination,
+      nextCursor: params.cursor + params.limit < result.summary.total
+        ? String(params.cursor + params.limit)
+        : null
+    }
   };
 }
 
@@ -796,14 +813,30 @@ export async function getAdminCampaignsData(
 export async function getAdminLeadsData(
   range: AdminDashboardRange,
   filters: AdminDashboardFilters,
-  status = "",
-  limit = 100
+  query: Record<string, string | string[] | undefined> = {}
 ) {
+  const first = (value: string | string[] | undefined) =>
+    Array.isArray(value) ? value[0] : value;
+  const params = {
+    ...dashboardQueryParams({
+      filters,
+      limit: normalizeQueryLimit(first(query.limit) ?? "50"),
+      range,
+      status: first(query.status)
+    }),
+    cursor: normalizeAdminQueryCursor(first(query.cursor) ?? null),
+    leadSearch: normalizeAdminLeadSearch(query)
+  };
   try {
-    return await getLeads(dashboardQueryParams({ filters, limit, range, status }));
+    return await getLeads(params);
   } catch (error) {
     console.error("Unable to load admin leads data", error);
-    return emptyLeadsData();
+    return {
+      ...emptyLeadsData(),
+      search: params.leadSearch,
+      status: params.status,
+      pagination: { cursor: params.cursor > 0 ? String(params.cursor) : null, limit: params.limit, nextCursor: null }
+    };
   }
 }
 
@@ -1291,8 +1324,9 @@ export async function getAdminExternalQueryData(
 
   if (view === "leads") {
     const data = await getLeads(params);
+    const envelope = adminQueryEnvelope(data, params, data.pagination);
 
-    return adminQueryEnvelope(data, params, data.pagination);
+    return { ...envelope, filters: { ...envelope.filters, ...params.leadSearch } };
   }
 
   if (view === "content") {

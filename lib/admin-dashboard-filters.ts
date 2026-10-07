@@ -155,9 +155,14 @@ export function hasAdminDashboardFilters(filters: AdminDashboardFilters) {
   return adminDashboardFilterEntries(filters).length > 0;
 }
 
+export function adminTextSearchPattern(value: string) {
+  return `%${value.replace(/[\\%_]/g, "\\$&")}%`;
+}
+
 export function adminDashboardFilterSql(
   sql: postgres.Sql,
-  filters: AdminDashboardFilters
+  filters: AdminDashboardFilters,
+  partialMatch = false
 ) {
   const affiliate = filters.affiliate || null;
   const campaign = filters.campaign || null;
@@ -171,6 +176,12 @@ export function adminDashboardFilterSql(
   const ray = filters.ray || null;
   const selectedPlan = filters.selectedPlan || null;
   const source = filters.source || null;
+  const matches = (column: string, value: string | null, caseSensitive = false) =>
+    partialMatch
+      ? sql`${sql(column)}::text ilike ${value ? adminTextSearchPattern(value) : null}`
+      : caseSensitive
+        ? sql`${sql(column)}::text = ${value}`
+        : sql`lower(${sql(column)}::text) = lower(${value})`;
 
   return sql`
     (${locale}::text is null or locale = any(string_to_array(${locale}, ',')))
@@ -179,28 +190,28 @@ export function adminDashboardFilterSql(
       or lower(coalesce(device_type, '')) = any(string_to_array(${device}, ','))
     )
     and (${selectedPlan}::text is null or selected_plan::text = ${selectedPlan})
-    and (${planId}::text is null or plan_id::text = ${planId})
-    and (${ray}::text is null or ray::text = ${ray})
-    and (${emailHash}::text is null or email_hash = ${emailHash})
+    and (${planId}::text is null or ${matches("plan_id", planId, true)})
+    and (${ray}::text is null or ${matches("ray", ray, true)})
+    and (${emailHash}::text is null or ${matches("email_hash", emailHash, true)})
     and (
       ${source}::text is null
-      or lower(coalesce(utm_source, '')) = lower(${source})
-      or lower(coalesce(traffic_source, '')) = lower(${source})
-      or lower(coalesce(source_channel, '')) = lower(${source})
+      or ${matches("utm_source", source)}
+      or ${matches("traffic_source", source)}
+      or ${matches("source_channel", source)}
     )
-    and (${medium}::text is null or lower(utm_medium) = lower(${medium}))
+    and (${medium}::text is null or ${matches("utm_medium", medium)})
     and (
       ${campaign}::text is null
-      or lower(coalesce(utm_campaign, '')) = lower(${campaign})
-      or lower(coalesce(campaign_name, '')) = lower(${campaign})
+      or ${matches("utm_campaign", campaign)}
+      or ${matches("campaign_name", campaign)}
     )
-    and (${campaignId}::text is null or lower(campaign_id) = lower(${campaignId}))
+    and (${campaignId}::text is null or ${matches("campaign_id", campaignId)})
     and (
       ${affiliate}::text is null
-      or lower(coalesce(affiliate_id, '')) = lower(${affiliate})
-      or lower(coalesce(affiliate_ref, '')) = lower(${affiliate})
-      or lower(coalesce(affiliate_sub_id, '')) = lower(${affiliate})
+      or ${matches("affiliate_id", affiliate)}
+      or ${matches("affiliate_ref", affiliate)}
+      or ${matches("affiliate_sub_id", affiliate)}
     )
-    and (${promoCode}::text is null or lower(promo_code) = lower(${promoCode}))
+    and (${promoCode}::text is null or ${matches("promo_code", promoCode)})
   `;
 }

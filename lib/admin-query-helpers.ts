@@ -6,11 +6,17 @@ import {
   normalizeAdminDashboardFilters,
   type AdminDashboardFilters
 } from "@/lib/admin-dashboard-filters";
+import {
+  emptyAdminLeadSearch,
+  normalizeAdminLeadSearch,
+  type AdminLeadSearch
+} from "@/lib/admin-lead-search";
 
 export type AdminQueryParams = Readonly<{
   cursor: number;
   filters: AdminDashboardFilters;
   limit: number;
+  leadSearch: AdminLeadSearch;
   range: AdminDashboardRange;
   status: string;
 }>;
@@ -41,10 +47,12 @@ export function normalizeQueryLimit(value: string | null) {
   return Math.max(1, Math.min(100, Math.round(parsed)));
 }
 
-function normalizeCursor(value: string | null) {
+export function normalizeAdminQueryCursor(value: string | null) {
   const parsed = value ? Number(value) : 0;
 
-  return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : 0;
+  return Number.isSafeInteger(Math.floor(parsed)) && parsed > 0
+    ? Math.floor(parsed)
+    : 0;
 }
 
 export function normalizeAdminQueryParams(
@@ -53,9 +61,10 @@ export function normalizeAdminQueryParams(
   const record = paramsRecord(searchParams);
 
   return {
-    cursor: normalizeCursor(searchParams.get("cursor")),
+    cursor: normalizeAdminQueryCursor(searchParams.get("cursor")),
     filters: normalizeAdminDashboardFilters(record),
     limit: normalizeQueryLimit(searchParams.get("limit")),
+    leadSearch: normalizeAdminLeadSearch(record),
     range: normalizeAdminDashboardRange(searchParams.get("range") ?? undefined),
     status: (searchParams.get("status") ?? "").trim().slice(0, 80)
   };
@@ -93,12 +102,11 @@ export function adminQueryEnvelope(
       status: params.status || undefined
     },
     generatedAt: new Date().toISOString(),
-    pagination:
-      pagination ?? {
-        cursor: params.cursor > 0 ? String(params.cursor) : null,
-        limit: params.limit,
-        nextCursor: null
-      }
+    pagination: pagination ?? {
+      cursor: params.cursor > 0 ? String(params.cursor) : null,
+      limit: params.limit,
+      nextCursor: null
+    }
   };
 }
 
@@ -117,6 +125,7 @@ export function dashboardQueryParams({
     cursor: 0,
     filters,
     limit: Math.max(1, Math.min(100, Math.round(limit))),
+    leadSearch: emptyAdminLeadSearch,
     range,
     status: status.trim().slice(0, 80)
   };

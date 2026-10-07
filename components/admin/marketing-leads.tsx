@@ -1,7 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import type { AdminLeadEventRow, AdminLeadRow, AdminLeadsData } from "@/lib/admin-query-data";
+import type {
+  AdminLeadEventRow,
+  AdminLeadRow,
+  AdminLeadsData
+} from "@/lib/admin-query-data";
 import type { Locale } from "@/lib/i18n";
 import type { AdminContent } from "@/components/admin/dashboard-content";
 import { SupplementListMeta } from "@/components/admin/safety-views";
@@ -9,6 +13,7 @@ import {
   BusinessStatsGrid,
   PlanIdLink,
   adminLocaleTextClass,
+  adminLeadHref,
   businessMetricColors,
   classNames,
   compactId,
@@ -83,30 +88,19 @@ function leadEventContext(labels: AdminContent, event: AdminLeadEventRow) {
 }
 
 export function AdminLeadsView({
+  baseHref,
   data,
   labels,
   locale
 }: Readonly<{
+  baseHref: string;
   data: AdminLeadsData;
   labels: AdminContent;
   locale: Locale;
 }>) {
   const [selectedLead, setSelectedLead] = useState<AdminLeadRow | null>(null);
-  const pendingReviews = data.rows.reduce(
-    (total, row) => total + row.pendingReviews,
-    0
-  );
-  const communicationIssues = data.rows.reduce(
-    (total, row) => total + row.communicationIssues,
-    0
-  );
-  const freeLeads = data.rows.filter((row) =>
-    row.currentStage.startsWith("free")
-  ).length;
-  const precisionLeads = data.rows.filter(
-    (row) => row.currentStage === "precision"
-  ).length;
-  const proLeads = data.rows.filter((row) => row.currentStage === "pro").length;
+  const { pendingReviews, communicationIssues, free, precision, pro } =
+    data.summary;
   const leadMetrics: BusinessMetric[] = [
     {
       color: businessMetricColors.total,
@@ -134,7 +128,7 @@ export function AdminLeadsView({
       id: "leadsPlanStages",
       label: `${labels.marketingPages.freeRequests} / ${labels.marketingPages.precisionConversions} / ${labels.marketingPages.proConversions}`,
       series: [],
-      value: `${formatNumber(freeLeads, locale)} / ${formatNumber(precisionLeads, locale)} / ${formatNumber(proLeads, locale)}`
+      value: `${formatNumber(free, locale)} / ${formatNumber(precision, locale)} / ${formatNumber(pro, locale)}`
     }
   ];
 
@@ -143,6 +137,15 @@ export function AdminLeadsView({
       <BusinessStatsGrid metrics={leadMetrics} />
 
       <div className="mt-8 overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-200">
+        <LeadPagination
+          cursor={Number(data.pagination.cursor) || 0}
+          hrefForCursor={(cursor) => adminLeadHref(baseHref, data, cursor)}
+          labels={labels}
+          limit={data.pagination.limit}
+          locale={locale}
+          rowCount={data.rows.length}
+          total={data.summary.total}
+        />
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
@@ -160,7 +163,9 @@ export function AdminLeadsView({
                   <th
                     className={classNames(
                       "px-4 py-3 text-left text-xs font-semibold text-gray-500",
-                      locale === "en" ? "uppercase tracking-[0.14em]" : adminLocaleTextClass(locale, "label")
+                      locale === "en"
+                        ? "uppercase tracking-[0.14em]"
+                        : adminLocaleTextClass(locale, "label")
                     )}
                     key={heading}
                     scope="col"
@@ -193,6 +198,15 @@ export function AdminLeadsView({
             </tbody>
           </table>
         </div>
+        <LeadPagination
+          cursor={Number(data.pagination.cursor) || 0}
+          hrefForCursor={(cursor) => adminLeadHref(baseHref, data, cursor)}
+          labels={labels}
+          limit={data.pagination.limit}
+          locale={locale}
+          rowCount={data.rows.length}
+          total={data.summary.total}
+        />
       </div>
 
       {selectedLead ? (
@@ -204,6 +218,101 @@ export function AdminLeadsView({
         />
       ) : null}
     </section>
+  );
+}
+
+function LeadPagination({
+  ariaLabel,
+  cursor,
+  hrefForCursor,
+  labels,
+  limit,
+  locale,
+  onPage,
+  rowCount,
+  total
+}: Readonly<{
+  ariaLabel?: string;
+  cursor: number;
+  hrefForCursor?: (cursor: number) => string;
+  labels: AdminContent;
+  limit: number;
+  locale: Locale;
+  onPage?: (cursor: number) => void;
+  rowCount: number;
+  total: number;
+}>) {
+  const lastCursor = Math.max(0, (Math.ceil(total / limit) - 1) * limit);
+  const controls = [
+    {
+      label: labels.marketingPages.firstPage,
+      target: 0,
+      disabled: cursor === 0
+    },
+    {
+      label: labels.marketingPages.previous,
+      target: Math.max(0, Math.min(lastCursor, cursor - limit)),
+      disabled: cursor === 0
+    },
+    {
+      label: labels.marketingPages.next,
+      target: cursor + limit,
+      disabled: cursor + limit >= total
+    },
+    {
+      label: labels.marketingPages.lastPage,
+      target: lastCursor,
+      disabled: cursor >= lastCursor
+    }
+  ];
+
+  return (
+    <nav
+      aria-label={ariaLabel ?? labels.marketingPages.totalLeads}
+      className="flex flex-wrap items-center justify-between gap-3 border-y border-gray-100 px-4 py-3"
+    >
+      <p className="text-sm text-gray-600" aria-live="polite">
+        {labels.marketingPages.showing}{" "}
+        {rowCount > 0
+          ? `${formatNumber(cursor + 1, locale)}–${formatNumber(cursor + rowCount, locale)}`
+          : "0"}{" "}
+        {labels.marketingPages.of} {formatNumber(total, locale)}
+      </p>
+      <div className="flex flex-wrap gap-2">
+        {controls.map(({ label, target, disabled }) => {
+          const className =
+            "rounded-md px-3 py-2 text-sm font-semibold ring-1 ring-inset ring-gray-200";
+          if (disabled)
+            return (
+              <span
+                aria-disabled="true"
+                className={`${className} text-gray-300`}
+                key={label}
+              >
+                {label}
+              </span>
+            );
+          return hrefForCursor ? (
+            <a
+              className={`${className} text-gray-700 hover:bg-gray-50`}
+              href={hrefForCursor(target)}
+              key={label}
+            >
+              {label}
+            </a>
+          ) : (
+            <button
+              className={`${className} text-gray-700 hover:bg-gray-50`}
+              key={label}
+              onClick={() => onPage?.(target)}
+              type="button"
+            >
+              {label}
+            </button>
+          );
+        })}
+      </div>
+    </nav>
   );
 }
 
@@ -249,7 +358,9 @@ function LeadRow({
       </td>
       <td className="px-4 py-4 text-sm text-gray-600">
         <div>{optionalLabel(row.source)}</div>
-        <div className="mt-1 text-xs text-gray-400">{optionalLabel(row.campaign)}</div>
+        <div className="mt-1 text-xs text-gray-400">
+          {optionalLabel(row.campaign)}
+        </div>
       </td>
       <td className="px-4 py-4 text-sm text-gray-600">
         <PlanIdLink
@@ -259,7 +370,9 @@ function LeadRow({
           stopPropagation={true}
         />
         <div className="mt-1 text-xs text-gray-400">
-          {row.selectedPlan ? readableToken(row.selectedPlan) : optionalLabel(row.locale)}
+          {row.selectedPlan
+            ? readableToken(row.selectedPlan)
+            : optionalLabel(row.locale)}
         </div>
       </td>
       <td className="px-4 py-4 text-sm font-medium text-gray-900">
@@ -268,7 +381,9 @@ function LeadRow({
       <td className="px-4 py-4 text-sm font-medium text-gray-900">
         {formatNumber(row.communicationIssues, locale)}
       </td>
-      <td className="px-4 py-4 text-sm text-gray-600">{readableToken(row.lastEvent)}</td>
+      <td className="px-4 py-4 text-sm text-gray-600">
+        {readableToken(row.lastEvent)}
+      </td>
       <td className="px-4 py-4 text-sm text-gray-500">
         {formatGeneratedAt(row.lastSeenAt, locale)}
       </td>
@@ -287,133 +402,185 @@ function LeadDetailsModal({
   onClose: () => void;
   row: AdminLeadRow;
 }>) {
+  const [eventSearch, setEventSearch] = useState("");
+  const [eventCursor, setEventCursor] = useState(0);
+  const search = eventSearch.trim().toLowerCase();
+  const events = row.events.filter(
+    (event) =>
+      !search ||
+      [
+        event.eventName,
+        readableToken(event.eventName),
+        event.eventType,
+        event.eventStatus,
+        event.actorType,
+        event.source,
+        event.campaign,
+        event.path,
+        event.route,
+        event.planId,
+        event.ray,
+        event.emailHash,
+        event.errorMessage
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase()
+        .includes(search)
+  );
+  const pageEvents = events.slice(eventCursor, eventCursor + 25);
+
   return (
     <AdminModal onClose={onClose} panelClassName="max-w-4xl">
-          <div className="flex items-start justify-between gap-4 border-b border-gray-100 px-6 py-5 pr-14">
-            <div>
-              <p
-                className={classNames(
-                  "text-xs font-semibold text-gray-400",
-                  locale === "en" ? "uppercase tracking-[0.16em]" : adminLocaleTextClass(locale, "label")
-                )}
-              >
-                {labels.marketingPages.interactionThread}
-              </p>
-              <h2 className="mt-2 text-xl font-semibold text-gray-900">
-                {leadDisplayName(row)}
-              </h2>
-            </div>
-          </div>
+      <div className="flex items-start justify-between gap-4 border-b border-gray-100 px-6 py-5 pr-14">
+        <div>
+          <p
+            className={classNames(
+              "text-xs font-semibold text-gray-400",
+              locale === "en"
+                ? "uppercase tracking-[0.16em]"
+                : adminLocaleTextClass(locale, "label")
+            )}
+          >
+            {labels.marketingPages.interactionThread}
+          </p>
+          <h2 className="mt-2 text-xl font-semibold text-gray-900">
+            {leadDisplayName(row)}
+          </h2>
+        </div>
+      </div>
 
-          <div className="max-h-[75vh] space-y-6 overflow-y-auto px-6 py-6">
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-              <SupplementListMeta
-                label={labels.marketingPages.groupedBy}
-                value={leadGroupLabel(labels, row)}
-              />
-              <SupplementListMeta
-                label={labels.marketingPages.currentStage}
-                value={readableToken(row.currentStage)}
-              />
-              <SupplementListMeta
-                label={labels.marketingPages.firstSeen}
-                value={formatGeneratedAt(row.firstSeenAt, locale)}
-              />
-              <SupplementListMeta
-                label={labels.marketingPages.lastSeen}
-                value={formatGeneratedAt(row.lastSeenAt, locale)}
-              />
-              <SupplementListMeta
-                label={labels.marketingPages.ray}
-                value={row.ray}
-              />
-              <SupplementListMeta
-                label="Email"
-                value={row.contactEmail}
-              />
-              <SupplementListMeta
-                label={labels.marketingPages.emailHash}
-                value={row.emailHash}
-              />
-              <SupplementListMeta
-                label={labels.marketingPages.plan}
-                value={<PlanIdLink locale={locale} planId={row.planId} />}
-              />
-              <SupplementListMeta
-                label={labels.marketingPages.source}
-                value={[row.source, row.campaign].filter(Boolean).join(" / ")}
-              />
-            </div>
+      <div className="max-h-[75vh] space-y-6 overflow-y-auto px-6 py-6">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <SupplementListMeta
+            label={labels.marketingPages.groupedBy}
+            value={leadGroupLabel(labels, row)}
+          />
+          <SupplementListMeta
+            label={labels.marketingPages.currentStage}
+            value={readableToken(row.currentStage)}
+          />
+          <SupplementListMeta
+            label={labels.marketingPages.firstSeen}
+            value={formatGeneratedAt(row.firstSeenAt, locale)}
+          />
+          <SupplementListMeta
+            label={labels.marketingPages.lastSeen}
+            value={formatGeneratedAt(row.lastSeenAt, locale)}
+          />
+          <SupplementListMeta
+            label={labels.marketingPages.ray}
+            value={row.ray}
+          />
+          <SupplementListMeta label="Email" value={row.contactEmail} />
+          <SupplementListMeta
+            label={labels.marketingPages.emailHash}
+            value={row.emailHash}
+          />
+          <SupplementListMeta
+            label={labels.marketingPages.plan}
+            value={<PlanIdLink locale={locale} planId={row.planId} />}
+          />
+          <SupplementListMeta
+            label={labels.marketingPages.source}
+            value={[row.source, row.campaign].filter(Boolean).join(" / ")}
+          />
+        </div>
 
-            <div>
-              <p
-                className={classNames(
-                  "mb-3 text-xs font-semibold text-gray-400",
-                  locale === "en" ? "uppercase tracking-[0.16em]" : adminLocaleTextClass(locale, "label")
-                )}
-              >
-                {labels.marketingPages.events}
-              </p>
-              {row.events.length > 0 ? (
-                <div className="space-y-3">
-                  {row.events.map((event) => {
-                    const context = leadEventContext(labels, event);
+        <div>
+          <p
+            className={classNames(
+              "mb-3 text-xs font-semibold text-gray-400",
+              locale === "en"
+                ? "uppercase tracking-[0.16em]"
+                : adminLocaleTextClass(locale, "label")
+            )}
+          >
+            {labels.marketingPages.events}
+          </p>
+          <input
+            aria-label={labels.marketingPages.searchEvents}
+            className="mb-3 block w-full rounded-md px-3 py-2 text-sm ring-1 ring-inset ring-gray-200 focus:ring-2 focus:ring-[#1FA77A]"
+            onChange={(event) => {
+              setEventSearch(event.target.value);
+              setEventCursor(0);
+            }}
+            placeholder={labels.marketingPages.searchEvents}
+            type="search"
+            value={eventSearch}
+          />
+          {pageEvents.length > 0 ? (
+            <div className="space-y-3">
+              {pageEvents.map((event) => {
+                const context = leadEventContext(labels, event);
 
-                    return (
-                      <article
-                        className="rounded-xl bg-gray-50 p-4 ring-1 ring-gray-100"
-                        key={event.id}
-                      >
-                        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                          <div className="min-w-0">
-                            <p
-                              className={classNames(
-                                "text-xs font-semibold text-gray-400",
-                                locale === "en" ? "uppercase tracking-[0.14em]" : adminLocaleTextClass(locale, "label")
-                              )}
-                            >
-                              {readableToken(event.eventType)} ·{" "}
-                              {readableToken(event.eventStatus)} ·{" "}
-                              {readableToken(event.actorType)}
-                            </p>
-                            <p className="mt-1 text-sm font-semibold text-gray-900">
-                              {readableToken(event.eventName)}
-                            </p>
-                            {context.length > 0 ? (
-                              <p className="mt-1 text-xs text-gray-500">
-                                {context.join(" · ")}
-                              </p>
-                            ) : null}
-                            {event.errorMessage ? (
-                              <p className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-xs font-medium text-red-700 ring-1 ring-red-100">
-                                {event.errorMessage}
-                              </p>
-                            ) : null}
-                          </div>
-                          <p className="shrink-0 text-xs font-medium text-gray-500">
-                            {formatGeneratedAt(event.occurredAt, locale)}
+                return (
+                  <article
+                    className="rounded-xl bg-gray-50 p-4 ring-1 ring-gray-100"
+                    key={event.id}
+                  >
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="min-w-0">
+                        <p
+                          className={classNames(
+                            "text-xs font-semibold text-gray-400",
+                            locale === "en"
+                              ? "uppercase tracking-[0.14em]"
+                              : adminLocaleTextClass(locale, "label")
+                          )}
+                        >
+                          {readableToken(event.eventType)} ·{" "}
+                          {readableToken(event.eventStatus)} ·{" "}
+                          {readableToken(event.actorType)}
+                        </p>
+                        <p className="mt-1 text-sm font-semibold text-gray-900">
+                          {readableToken(event.eventName)}
+                        </p>
+                        {context.length > 0 ? (
+                          <p className="mt-1 text-xs text-gray-500">
+                            {context.join(" · ")}
                           </p>
-                        </div>
-                      </article>
-                    );
-                  })}
-                </div>
-              ) : (
-                <p className="rounded-xl bg-gray-50 px-4 py-6 text-sm font-medium text-gray-500 ring-1 ring-gray-100">
-                  {labels.marketingPages.noLeadEvents}
-                </p>
-              )}
+                        ) : null}
+                        {event.errorMessage ? (
+                          <p className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-xs font-medium text-red-700 ring-1 ring-red-100">
+                            {event.errorMessage}
+                          </p>
+                        ) : null}
+                      </div>
+                      <p className="shrink-0 text-xs font-medium text-gray-500">
+                        {formatGeneratedAt(event.occurredAt, locale)}
+                      </p>
+                    </div>
+                  </article>
+                );
+              })}
             </div>
-          </div>
-          <div className="flex justify-end border-t border-gray-100 px-6 py-4">
-            <button
-              className="rounded-md bg-white px-3.5 py-2.5 text-sm font-semibold text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50"
-              onClick={onClose}
-              type="button"
-            >
-              {labels.supplements.close}
-            </button>
-          </div>
+          ) : (
+            <p className="rounded-xl bg-gray-50 px-4 py-6 text-sm font-medium text-gray-500 ring-1 ring-gray-100">
+              {labels.marketingPages.noLeadEvents}
+            </p>
+          )}
+          <LeadPagination
+            ariaLabel={labels.marketingPages.events}
+            cursor={eventCursor}
+            labels={labels}
+            limit={25}
+            locale={locale}
+            onPage={setEventCursor}
+            rowCount={pageEvents.length}
+            total={events.length}
+          />
+        </div>
+      </div>
+      <div className="flex justify-end border-t border-gray-100 px-6 py-4">
+        <button
+          className="rounded-md bg-white px-3.5 py-2.5 text-sm font-semibold text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50"
+          onClick={onClose}
+          type="button"
+        >
+          {labels.supplements.close}
+        </button>
+      </div>
     </AdminModal>
   );
 }
