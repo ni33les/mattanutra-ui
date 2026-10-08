@@ -651,6 +651,7 @@ export function AdminDashboard({
             />
           ) : view === "flow" ? (
             <AdminFlowView
+              canReadLeads={adminContext.permissions.includes("marketing.read") && adminContext.permissions.includes("performance.read")}
               accessToken={accessToken}
               flowData={flowData}
               labels={labels}
@@ -674,6 +675,7 @@ export function AdminDashboard({
             />
           ) : view === "glance" ? (
             <AdminAtAGlanceView
+              canReadLeads={adminContext.permissions.includes("marketing.read") && adminContext.permissions.includes("performance.read")}
               accessToken={accessToken}
               alertsData={alertsData}
               communicationsData={communicationsData}

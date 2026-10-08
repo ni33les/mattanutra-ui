@@ -260,8 +260,7 @@ function buildBuckets(range: AdminDashboardRange, rows: BpmConversionRow[]) {
   return buckets;
 }
 
-export function adminDashboardRangeStart(range: AdminDashboardRange) {
-  const now = new Date();
+export function adminDashboardRangeStart(range: AdminDashboardRange, now = new Date()) {
 
   if (range === "all") {
     return null;

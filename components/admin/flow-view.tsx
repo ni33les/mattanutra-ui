@@ -22,11 +22,13 @@ import {
 } from "@/components/admin/dashboard-shared";
 
 export function AdminFlowView({
+  canReadLeads = false,
   accessToken,
   flowData,
   labels,
   locale
 }: Readonly<{
+  canReadLeads?: boolean;
   accessToken: string;
   flowData: AdminFlowData;
   labels: AdminContent;
@@ -84,6 +86,7 @@ export function AdminFlowView({
   return (
     <>
       <BusinessStatsGrid
+        layout="stacked"
         metrics={metrics}
         onMetricSelect={setSelectedMetricId}
         selectedMetricId={selectedMetric.id}
@@ -95,17 +98,18 @@ export function AdminFlowView({
         metric={selectedMetric}
       />
 
-      <div className="mt-8">
+      <div className="mt-8 grid w-full min-w-0 grid-cols-1 gap-8 [&>section]:mt-0 [&>section]:min-w-0">
         <BusinessFunnelTable
+          canReadLeads={canReadLeads}
           accessToken={accessToken}
           flowData={flowData}
           labels={labels}
           locale={locale}
           showTargets={true}
         />
+        <PharmacySourceFunnelTable rows={flowData.pharmacySources ?? []} locale={locale} report={flowData.questionnaire} labels={labels} canReadLeads={canReadLeads} />
+        <McpFunnelTable data={flowData.mcp} locale={locale} />
       </div>
-      <PharmacySourceFunnelTable rows={flowData.pharmacySources ?? []} locale={locale} />
-      <McpFunnelTable data={flowData.mcp} locale={locale} />
     </>
   );
 }

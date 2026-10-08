@@ -4,6 +4,7 @@ import { useState } from "react";
 import { FunnelStageTable, type FunnelTableRow } from "./funnel-stage-table";
 import { funnelReportCopy } from "@/lib/funnel-report-copy";
 import { PharmacySourceFunnelTable } from "./pharmacy-source-funnel";
+import { QuestionnaireFunnel } from "./questionnaire-funnel";
 import { McpFunnelTable } from "./mcp-funnel-table";
 import type { AdminDashboardData } from "@/lib/admin-dashboard-data";
 import type { AdminDashboardFilters } from "@/lib/admin-dashboard-filters";
@@ -104,12 +105,14 @@ function businessFunnelStages(
 }
 
 export function BusinessFunnelTable({
+  canReadLeads = false,
   accessToken,
   flowData,
   labels,
   locale,
   showTargets = false
 }: Readonly<{
+  canReadLeads?: boolean;
   accessToken?: string;
   flowData: AdminFlowData;
   labels: AdminContent;
@@ -246,11 +249,13 @@ export function BusinessFunnelTable({
       <p className="mt-3 text-xs text-gray-600">{funnelReportCopy[locale].evidence
         .replace("{displayed}", formatNumber(flowNodeCount(flowData, "healthscoreDisplayed"), locale))
         .replace("{arrivals}", formatNumber(flowNodeCount(flowData, "healthscoreViewed") - flowNodeCount(flowData, "healthscoreDisplayed"), locale))}</p>
+      <QuestionnaireFunnel report={flowData.questionnaire} journey="web" locale={locale} labels={labels} canReadLeads={canReadLeads} />
     </section>
   );
 }
 
 export function AdminAtAGlanceView({
+  canReadLeads = false,
   accessToken,
   alertsData,
   communicationsData,
@@ -261,6 +266,7 @@ export function AdminAtAGlanceView({
   locale,
   reviewQueueData
 }: Readonly<{
+  canReadLeads?: boolean;
   accessToken: string;
   alertsData: AdminTechnicalAlertsData;
   communicationsData: AdminCommunicationsData;
@@ -363,6 +369,7 @@ export function AdminAtAGlanceView({
   return (
     <>
       <BusinessStatsGrid
+        layout="stacked"
         metrics={metrics}
         onMetricSelect={setSelectedMetricId}
         selectedMetricId={selectedMetric.id}
@@ -374,9 +381,9 @@ export function AdminAtAGlanceView({
         metric={selectedMetric}
       />
 
-      <div className="mt-8 grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)]">
-        <BusinessFunnelTable flowData={flowData} labels={labels} locale={locale} />
-        <PharmacySourceFunnelTable rows={flowData.pharmacySources ?? []} locale={locale} />
+      <div className="mt-8 grid w-full min-w-0 grid-cols-1 gap-8 [&>section]:mt-0 [&>section]:min-w-0">
+        <BusinessFunnelTable flowData={flowData} labels={labels} locale={locale} canReadLeads={canReadLeads} />
+        <PharmacySourceFunnelTable rows={flowData.pharmacySources ?? []} locale={locale} report={flowData.questionnaire} labels={labels} canReadLeads={canReadLeads} />
         <McpFunnelTable data={flowData.mcp} locale={locale} />
 
         <section className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-gray-200">

@@ -501,6 +501,8 @@ export function permissionForAdminRequest(
     return write ? "performance.write" : "performance.read";
   }
 
+  if (pathname === "/api/admin/questionnaire-dropoffs") return "marketing.read";
+
   if (pathname.startsWith("/api/admin/query/")) {
     const view = pathname.split("/").pop();
 

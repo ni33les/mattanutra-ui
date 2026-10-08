@@ -7,6 +7,7 @@ import { assessmentInputHash, loadGenerationInput, withGenerationInput } from "@
 import { captureInputProvenance, inputProvenance } from "@/lib/assessment-input-provenance";
 import { toAssessmentAnswers } from "@/lib/questionnaire/normalize";
 import { deserializeState } from "@/lib/questionnaire/engine";
+import { captureQuestionnaireContext } from "@/lib/questionnaire/telemetry";
 import { buildInitialAnswers } from "@/components/assessment-flow-state";
 import { createAssessmentSnapshot, DEFAULT_ASSESSMENT_PLAN, type AssessmentSnapshot } from "@/lib/assessment-snapshot";
 import { getStoredAssessmentPrefill, isUuid, persistAssessmentSubmission, toJsonValue } from "@/lib/assessment-store";
@@ -147,7 +148,7 @@ export async function captureAssessment(bodyValue: unknown, options: { planId?: 
   const bpm = bpmContextFromBody(body);
   if (!replayed) void writeBpmEvent({ actorType: "visitor", attribution: { ...bpm.attribution, ...(pharmacy && acquisition ? pharmacyBpmAttribution(pharmacy.slug, acquisition) : {}) }, eventName: requestedPlanId ? "assessment_recaptured" : "assessment_captured",
     eventType: "funnel", locale, planId: result.planId, ray: acquisition?.ray ?? (typeof bpm.ray === "string" ? bpm.ray : null),
-    properties: { revision: result.revision } }).catch(() => undefined);
+    properties: { revision: result.revision, ...captureQuestionnaireContext(body.questionnaireState) } }).catch(() => undefined);
   return result;
 }
 

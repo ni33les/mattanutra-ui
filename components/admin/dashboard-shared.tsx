@@ -828,11 +828,13 @@ function formatBusinessMetricAxisValue(
 }
 
 export function BusinessStatsGrid({
+  layout = "responsive",
   metrics,
   metricHref,
   onMetricSelect,
   selectedMetricId
 }: Readonly<{
+  layout?: "responsive" | "stacked";
   metrics: BusinessMetric[];
   metricHref?: (id: BusinessMetric["id"]) => string;
   onMetricSelect?: (id: BusinessMetric["id"]) => void;
@@ -840,7 +842,12 @@ export function BusinessStatsGrid({
 }>) {
   return (
     <div className="mt-8 overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-200">
-      <div className="grid grid-cols-1 gap-px bg-gray-900/5 sm:grid-cols-2 xl:grid-cols-4">
+      <div
+        className={classNames(
+          "grid grid-cols-1 gap-px bg-gray-900/5",
+          layout === "responsive" && "sm:grid-cols-2 xl:grid-cols-4"
+        )}
+      >
         {metrics.map((metric) => {
           const selected = metric.id === selectedMetricId;
           const content = (

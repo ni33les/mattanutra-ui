@@ -16,6 +16,7 @@ import {
 } from "@/lib/rate-limit";
 import { createLogger } from "@/lib/logger";
 import type { QuestionnaireChannel } from "@/lib/questionnaire/types";
+import { questionnaireAttemptContext } from "@/lib/questionnaire/telemetry";
 
 export const runtime = "nodejs";
 
@@ -121,13 +122,12 @@ export async function POST(request: Request) {
         planId: body.planId || state.planId || undefined,
         properties: {
           channel: state.channel,
-          questionnaireVersion: "v6-conversational",
-          sessionId: state.sessionId,
           sectionIndex,
           part: sectionIndex + 1,
           precision: computePrecision(getDefinition(state), state),
           turnIndex: state.turnIndex,
-          answerKeys: Object.keys(state.answers)
+          answerKeys: Object.keys(state.answers),
+          ...questionnaireAttemptContext(state)
         },
         ray: typeof bpm.ray === "string" ? bpm.ray : null
       }).catch((err) => log.warn("checkpoint bpm failed", { err }));

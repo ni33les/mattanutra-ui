@@ -391,7 +391,7 @@ function LeadRow({
   );
 }
 
-function LeadDetailsModal({
+export function LeadDetailsModal({
   labels,
   locale,
   onClose,
@@ -421,7 +421,8 @@ function LeadDetailsModal({
         event.planId,
         event.ray,
         event.emailHash,
-        event.errorMessage
+        event.errorMessage,
+        event.question
       ]
         .filter(Boolean)
         .join(" ")
@@ -541,6 +542,7 @@ function LeadDetailsModal({
                             {context.join(" · ")}
                           </p>
                         ) : null}
+                        {event.question ? <p className="mt-1 text-sm text-gray-700">{event.question}</p> : null}
                         {event.errorMessage ? (
                           <p className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-xs font-medium text-red-700 ring-1 ring-red-100">
                             {event.errorMessage}

@@ -1,5 +1,6 @@
 "use client";
-import { getBpmPayload } from "@/lib/bpm-client";
+import { getBpmPayload, trackBpmEvent } from "@/lib/bpm-client";
+import { questionnaireAttemptContext } from "@/lib/questionnaire/telemetry";
 import { useCallback, useEffect, useRef, useState, type MutableRefObject } from "react";
 import { finalizeAssessmentCapture } from "@/lib/questionnaire/agents/capture-agent";
 import type { QuestionnaireState } from "@/lib/questionnaire/types";
@@ -39,7 +40,12 @@ export function useQuestionnaireCapture(input: {
           paymentId: options.paymentId || draft.paymentId, pharmacyId: options.pharmacyId, resumeToken: options.resumeToken,
           fetchImpl: (url, init) => fetchWithBodyDeadline(url, { ...init, signal: controller.signal }, 30_000) });
         controller.signal.throwIfAborted();
-        if (!captured.ok || !captured.planId || captured.revision === undefined) throw new Error(captured.error || "Capture failed");
+        if (!captured.ok || !captured.planId || captured.revision === undefined) {
+          trackBpmEvent("chat_capture_failed", { eventType: "funnel", locale: options.locale,
+            planId: options.returningPlanId || state.planId || undefined,
+            properties: { ...questionnaireAttemptContext(state), clientAt: Date.now() } });
+          throw new Error(captured.error || "Capture failed");
+        }
         receipt = { planId: captured.planId, revision: captured.revision, inputHash: captured.inputHash };
         draft = { ...draft, revision: receipt.revision, captured: receipt, state: { ...state, phase: "complete", planId: receipt.planId }, updatedAt: Date.now() };
         options.save(draft);

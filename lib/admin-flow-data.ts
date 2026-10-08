@@ -8,6 +8,8 @@ import {
 } from "@/lib/admin-dashboard-filters";
 import type { AdminDashboardRange } from "@/lib/admin-dashboard-data";
 import { writeBpmEvent } from "@/lib/bpm";
+import { getQuestionnaireFunnelReport } from "@/lib/admin-questionnaire-data";
+import type { QuestionnaireFunnelReport } from "@/lib/questionnaire-dropoffs";
 
 export type AdminFlowNodeId =
   | "assessmentStarted"
@@ -63,6 +65,7 @@ export type AdminFlowEdge = Readonly<{
 }>;
 
 export type AdminFlowData = Readonly<{
+  questionnaire?: QuestionnaireFunnelReport;
   journeyChannel?: "web";
   mcp?: McpFunnelReport;
   transitions?: Partial<Record<AdminConversionTargetId, { numerator: number; denominator: number }>>;
@@ -1001,7 +1004,7 @@ export async function getAdminFlowData(range: AdminDashboardRange, filters: Admi
   try {
     const start = queryStartForRange(range);
     const names = [...webJourneyEventNames, ...planPaymentEventNames];
-    const [targets, rows, pharmacySources, mcp] = await Promise.all([
+    const [targets, rows, pharmacySources, mcp, questionnaire] = await Promise.all([
       getAdminConversionTargets(),
       sql<FlowRow[]>`
         select id::text,ray::text,plan_id::text,funnel_event_name as event_name,event_type,event_status,selected_plan::text,occurred_at
@@ -1011,9 +1014,10 @@ export async function getAdminFlowData(range: AdminDashboardRange, filters: Admi
           and (funnel_event_name=any(${names}::text[]) or event_type='payment')
         order by occurred_at,id limit 100000`,
       getPharmacySourceFunnel(start, filters),
-      getAdminMcpFunnel(start)
+      getAdminMcpFunnel(start),
+      getQuestionnaireFunnelReport(range, filters)
     ]);
-    return { ...buildAdminFlowData(range, rows, targets), pharmacySources, mcp };
+    return { ...buildAdminFlowData(range, rows, targets), pharmacySources, mcp, questionnaire };
   } catch (error) {
     console.error("Unable to load admin flow data", error);
     return emptyFlow(range);

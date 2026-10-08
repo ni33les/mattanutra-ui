@@ -22,6 +22,8 @@ import {
 import { chatDraftStorageKey, parseChatDraft, resolveChatDraft, updateChatDraft, type ChatDraft, type ServerChatDraft } from "@/lib/questionnaire/browser-draft";
 import { useQuestionnaireCapture } from "@/components/chat-questionnaire/use-questionnaire-capture";
 import { emitQuestionnaireEvents } from "@/lib/questionnaire/agents/progress-agent";
+import { questionnaireAttemptContext } from "@/lib/questionnaire/telemetry";
+import { useQuestionnaireTelemetry } from "./use-questionnaire-telemetry";
 import { NongPoseImage } from "@/components/chat-questionnaire/nong-pose-image";
 import type {
   LogMessage,
@@ -185,6 +187,9 @@ export function ChatQuestionnaire({
   const ui = definition.ui;
   const prompt = state ? getNextPrompt(state) : null;
   const currentTurn: TurnDef | null = prompt?.turn ?? null;
+  const telemetry = useQuestionnaireTelemetry({ state, turn: currentTurn, locale, review: reviewRequested,
+    planId: returningPlanId, visible: uiScreen === "chat" && !stageFlash && !reviewOpen && state?.phase === "active" });
+  const { display: questionDisplay, stamp: questionStamp, close: closeQuestionDisplay } = telemetry;
 
   /** Premium progress meter (v14 HTML): Part N of 6 · % + encouragement + remaining. */
   const progressMeta = useMemo(() => {
@@ -263,7 +268,9 @@ export function ChatQuestionnaire({
   }, [uiScreen, progressMeta.barPct, locale, state?.sessionId]);
 
   const track = useCallback(
-    async (events: readonly QuestionnaireEvent[]) => {
+    async (events: readonly QuestionnaireEvent[], next: QuestionnaireState) => {
+      const context = questionnaireAttemptContext(next, reviewRequested);
+      const display = questionDisplay();
       await emitQuestionnaireEvents(
         events,
         (eventName, payload) => {
@@ -271,13 +278,17 @@ export function ChatQuestionnaire({
             eventType: payload?.eventType as "funnel" | undefined,
             locale: payload?.locale ?? locale,
             planId: payload?.planId,
-            properties: payload?.properties
+            properties: { ...payload?.properties, ...context,
+              ...(display && (payload?.properties?.turnKey === display.turnKey || eventName === "chat_complete")
+                ? { displayId: display.displayId, turnKey: display.turnKey,
+                  turnIndex: display.turnIndex, sectionIndex: display.sectionIndex } : {}),
+              ...questionStamp() }
           });
         },
         { locale, planId: returningPlanId, channel: "web" }
       );
     },
-    [locale, returningPlanId]
+    [locale, returningPlanId, reviewRequested, questionDisplay, questionStamp]
   );
 
   const persistCheckpoint = useCallback(
@@ -315,7 +326,7 @@ export function ChatQuestionnaire({
     const started = startQuestionnaire(initial);
     setState(started.state);
     setUiScreen("chat");
-    void track(started.events);
+    void track(started.events, started.state);
     saveLocalState(locale, started.state);
   }, [locale, saveLocalState, track]);
 
@@ -510,12 +521,14 @@ export function ChatQuestionnaire({
       next: QuestionnaireState,
       events: readonly QuestionnaireEvent[]
     ) => {
+      // Record the answer before a section transition can be interrupted.
+      void track(events, next);
+      closeQuestionDisplay();
       const partBreak = events.find((e) => e.type === "chat_part_break");
       // Section stage only on true part boundaries (engine chat_part_break).
       if (partBreak && partBreak.type === "chat_part_break") {
         await showStageFlash(partBreak.sectionIndex, () => setState(next));
       } else setState(next);
-      void track(events);
       const sectionDone = events.find((e) => e.type === "chat_section_done");
       await persistCheckpoint(
         next,
@@ -538,6 +551,7 @@ export function ChatQuestionnaire({
       persistCheckpoint,
       showFinishStage,
       showStageFlash,
+      closeQuestionDisplay,
       track
     ]
   );
@@ -628,6 +642,7 @@ export function ChatQuestionnaire({
   }
 
   function resumeRestart() {
+    closeQuestionDisplay();
     clearLocalState();
     finalizing.current = false;
     capture.reset();
@@ -656,6 +671,7 @@ export function ChatQuestionnaire({
     }
 
     setReviewOpen(false);
+    closeQuestionDisplay();
     setState(result.state);
     saveLocalState(locale, result.state);
   }
@@ -1470,7 +1486,8 @@ export function ChatQuestionnaire({
 
       <div className="mn-chat-q__frame">
         {/* Single scroll page: question + answers together (not a bottom dock). */}
-        <div className="mn-chat-q__page" ref={logScrollRef} inert={Boolean(stageFlash)}>
+        <div className="mn-chat-q__page" ref={logScrollRef} inert={Boolean(stageFlash)}
+          onInputCapture={telemetry.activity} onPointerDownCapture={telemetry.activity} onKeyDownCapture={telemetry.activity}>
           <div className="mn-chat-q__log" role="log" aria-live="polite">
             {state?.log.map((msg, index) => renderLogItem(msg, index))}
           </div>

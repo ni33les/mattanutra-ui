@@ -127,6 +127,7 @@ export type AdminLeadRow = Readonly<{
 }>;
 
 export type AdminLeadEventRow = Readonly<{
+  question?: string | null;
   actorType: string;
   campaign: string | null;
   emailHash: string | null;
