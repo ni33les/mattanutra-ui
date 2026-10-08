@@ -37,16 +37,45 @@ export async function loadQuestionnaireReport(range: AdminDashboardRange, filter
       select distinct "attemptKey" from event_history where "inScope"
         and ("eventName" in ('chat_question_viewed','chat_start') or properties->>'attemptId' is null)
     )
-    select history.*, ${contacts ? sql`coalesce(
-      (select a.contact_email from public.assessments a where a.plan_id::text=history."planId"),
-      (select d.contact_email from public.assessment_resume_drafts d where d.contact_email is not null
-        and (d.plan_id::text=history."planId" or d.email_hash=history."emailHash"
-          or d.questionnaire_state->>'sessionId'=history.properties->>'sessionId')
-        order by d.updated_at desc limit 1))` : sql`null::text`} as "contactEmail"
+    select history.*, null::text as "contactEmail"
     from event_history history join cohort using ("attemptKey")
     order by history."occurredAt", history.id
   `;
-  return buildQuestionnaireReport({ rows: rows.map(row => ({ ...row, occurredAt: new Date(row.occurredAt).toISOString() })), generatedAt, range, filters });
+  const result = buildQuestionnaireReport({ rows: rows.map(row => ({ ...row, occurredAt: new Date(row.occurredAt).toISOString() })), generatedAt, range, filters });
+  if (contacts && result.attempts.length) {
+    // Resolve contacts in bulk. Repeating correlated lookups for every event can
+    // time out before pagination on a large questionnaire history.
+    const events = result.attempts.flatMap(attempt => attempt.events);
+    const unique = (values: (string | null | undefined)[]) => [...new Set(values.filter((value): value is string => Boolean(value)))];
+    const plans = unique(events.map(event => event.planId)), hashes = unique(events.map(event => event.emailHash));
+    const sessions = unique(events.map(event => event.properties.sessionId));
+    const [assessments, drafts] = await Promise.all([
+      sql<{ planId: string; email: string }[]>`select plan_id::text as "planId", contact_email as email
+        from public.assessments where plan_id=any(${plans}::uuid[]) and contact_email is not null`,
+      sql<{ planId: string | null; emailHash: string | null; sessionId: string | null; email: string }[]>`
+        select plan_id::text as "planId", email_hash as "emailHash", questionnaire_state->>'sessionId' as "sessionId", contact_email as email
+        from public.assessment_resume_drafts where contact_email is not null and
+          (plan_id=any(${plans}::uuid[]) or email_hash=any(${hashes}::text[]) or questionnaire_state->>'sessionId'=any(${sessions}::text[]))
+        order by updated_at desc, id`
+    ]);
+    const assessmentEmails = new Map(assessments.map(row => [row.planId, row.email]));
+    const draftContacts = new Map<string, { email: string; rank: number }>();
+    drafts.forEach((draft, rank) => {
+      for (const [kind, key] of [["plan", draft.planId], ["hash", draft.emailHash], ["session", draft.sessionId]]) {
+        if (key && !draftContacts.has(`${kind}:${key}`)) draftContacts.set(`${kind}:${key}`, { email: draft.email, rank });
+      }
+    });
+    for (const attempt of result.attempts) {
+      for (const event of [...attempt.events].reverse()) {
+        const matches = [["plan", event.planId], ["hash", event.emailHash], ["session", event.properties.sessionId]]
+          .flatMap(([kind, key]) => key && draftContacts.has(`${kind}:${key}`) ? [draftContacts.get(`${kind}:${key}`)!] : [])
+          .sort((a, b) => a.rank - b.rank);
+        const email = (event.planId && assessmentEmails.get(event.planId)) || matches[0]?.email;
+        if (email) { attempt.contactEmail = email; break; }
+      }
+    }
+  }
+  return result;
 }
 
 export async function getQuestionnaireFunnelReport(range: AdminDashboardRange, filters: AdminDashboardFilters): Promise<QuestionnaireFunnelReport> {

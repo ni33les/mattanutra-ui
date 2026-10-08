@@ -26,7 +26,7 @@ before(async()=>{
     device_type text,event_name text,event_type text,event_status text,occurred_at timestamptz,
     path text default '/en/nutrition/quiz',route text,user_agent text,emitted_by text,properties jsonb default '{}');
     create table public.assessments(plan_id uuid primary key,contact_email text,answers jsonb default '{}');
-    create table public.assessment_resume_drafts(plan_id uuid,email_hash text,contact_email text,updated_at timestamptz,questionnaire_state jsonb);
+    create table public.assessment_resume_drafts(id uuid primary key default gen_random_uuid(),plan_id uuid,email_hash text,contact_email text,updated_at timestamptz,questionnaire_state jsonb);
   `);
   await sql`insert into public.bpm(id,ray,event_name,event_type,event_status,occurred_at,utm_campaign,traffic_source,locale,properties)
     select gen_random_uuid(),('10000000-0000-4000-8000-'||lpad(n::text,12,'0'))::uuid,'chat_question_viewed','funnel','observed',
@@ -39,6 +39,8 @@ before(async()=>{
     ${sql.json({attemptId:"attempt-1210",questionnaireVersion:"v6-conversational"})})`;
   await sql`insert into public.assessment_resume_drafts(contact_email,updated_at,questionnaire_state)
     values('Case.Fragment@Example.test',now(),${sql.json({sessionId:"session-1205"})})`;
+  await sql`insert into public.assessment_resume_drafts(contact_email,updated_at,questionnaire_state)
+    values('older@example.test',now()-interval '1 day',${sql.json({sessionId:"session-1205"})})`;
   for(const [n,source] of [[2001,"in_store"],[2002,"business_card"]] as const) await sql`
     insert into public.bpm(id,ray,event_name,event_type,occurred_at,utm_campaign,traffic_source,source_channel,source_detail,properties)
     values(gen_random_uuid(),${id(n)}::uuid,'chat_question_viewed','funnel','2026-10-08T00:00:00Z',${campaign},'pharmacy','fixture-shop',${source},
@@ -74,6 +76,7 @@ it("partial email matching and lead timelines retain the question context",async
   assert.equal(page.total,1);assert.equal(page.rows[0].key,"attempt-1205");
   assert.equal(page.lead!.contactEmail,"Case.Fragment@Example.test");
   assert.ok(page.lead!.events[0].question);
+  assert.equal((await getQuestionnaireDropoffs({...request,q:"older@example.test"})).total,0);
   assert.equal((await getQuestionnaireDropoffs({...request,q:"%"})).total,0);
 });
 it("pharmacy drill-down respects both pharmacy and acquisition source",async()=>{
