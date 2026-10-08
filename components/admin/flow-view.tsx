@@ -86,7 +86,6 @@ export function AdminFlowView({
   return (
     <>
       <BusinessStatsGrid
-        layout="stacked"
         metrics={metrics}
         onMetricSelect={setSelectedMetricId}
         selectedMetricId={selectedMetric.id}
