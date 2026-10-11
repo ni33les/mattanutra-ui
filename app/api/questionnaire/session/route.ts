@@ -17,6 +17,7 @@ import {
 import { createLogger } from "@/lib/logger";
 import type { QuestionnaireChannel } from "@/lib/questionnaire/types";
 import { questionnaireAttemptContext } from "@/lib/questionnaire/telemetry";
+import { screenProgress } from "@/lib/questionnaire/screens";
 
 export const runtime = "nodejs";
 
@@ -124,7 +125,8 @@ export async function POST(request: Request) {
           channel: state.channel,
           sectionIndex,
           part: sectionIndex + 1,
-          precision: computePrecision(getDefinition(state), state),
+          ...(state.version === "v15.5-screens" ? { completionPct: screenProgress(state) }
+            : { precision: computePrecision(getDefinition(state), state) }),
           turnIndex: state.turnIndex,
           answerKeys: Object.keys(state.answers),
           ...questionnaireAttemptContext(state)

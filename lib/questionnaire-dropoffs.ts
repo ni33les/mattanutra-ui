@@ -10,7 +10,7 @@ export const questionnaireEventNames = ["chat_start", "chat_question_viewed", "c
 export type QuestionnaireJourney = "web" | "retail";
 export type QuestionnaireBucket = "dropped" | "unknown" | "transition" | "submission_failed" | "submission_pending" | "active" | "completed";
 export type QuestionProperties = {
-  attemptId?: string; sessionId?: string; questionnaireVersion?: string; turnKey?: string; displayId?: string;
+  attemptId?: string; sessionId?: string; questionnaireVersion?: string; turnKey?: string; displayId?: string; screenId?: string;
   clientAt?: number; telemetryEventId?: string; postCompletionReview?: boolean;
 };
 export type QuestionnaireEventRow = {
@@ -41,7 +41,7 @@ export type QuestionnaireDropoffPage = {
 };
 
 export function questionLabel(key: string | null, version: string, locale: Locale) {
-  const definition = getQuestionnaireDefinition(locale);
+  const definition = getQuestionnaireDefinition(locale, version);
   if (!key || version !== definition.version) return null;
   const turn = definition.turns.find(t => t.k === key);
   return turn ? { question: turn.q, section: definition.sections[turn.sec]?.title ?? "", order: definition.turns.indexOf(turn) } : null;
@@ -111,8 +111,13 @@ export function buildQuestionnaireReport(input: {
     const captured = events.some(e => ["assessment_captured", "assessment_recaptured", "assessment_submitted"].includes(e.eventName));
     const complete = events.some(e => e.eventName === "chat_complete");
     const failed = events.some(e => e.eventName === "chat_capture_failed");
-    const open = latestView && latestRawView === latestView && !resolved(latestView, events)
-      && (!lastAnswer || eventTime(lastAnswer) < eventTime(latestView));
+    const groupedView = latestView?.properties.questionnaireVersion === "v15.5-screens" && latestView.properties.screenId;
+    const screenViews = groupedView ? [...new Map(views.filter(view => view.properties.screenId === groupedView)
+      .map(view => [view.properties.turnKey, view])).values()] : [];
+    const openView = groupedView ? screenViews.find(view => !resolved(view, events)) : latestView;
+    const open = openView && latestRawView === latestView && !resolved(openView, events)
+      && (groupedView ||
+        !lastAnswer || eventTime(lastAnswer) < eventTime(openView));
     let bucket: QuestionnaireBucket;
     if (captured) bucket = "completed";
     else if (failed) bucket = "submission_failed";
@@ -124,7 +129,7 @@ export function buildQuestionnaireReport(input: {
     const version = latestView?.properties.questionnaireVersion ?? last.properties.questionnaireVersion ?? "unknown";
     const attempt: QuestionnaireAttempt = {
       key, journey: entry.journey, pharmacy: entry.pharmacy, source: entry.source, version, bucket,
-      questionKey: open ? latestView!.properties.turnKey! : null, lastAnsweredKey: lastAnswer?.properties.turnKey ?? null,
+      questionKey: open ? openView!.properties.turnKey! : null, lastAnsweredKey: lastAnswer?.properties.turnKey ?? null,
       firstSeenAt: events[0].occurredAt, lastSeenAt: new Date(lastActivity).toISOString(),
       ray: events.findLast(e => e.ray)?.ray ?? null, planId: events.findLast(e => e.planId)?.planId ?? null,
       emailHash: events.findLast(e => e.emailHash)?.emailHash ?? null,
@@ -148,8 +153,8 @@ export function buildQuestionnaireReport(input: {
       row.reached++;
       const currentView = views.findLast(v => v.properties.turnKey === questionKey && v.properties.questionnaireVersion === questionVersion)!;
       if (resolved(currentView, events)) row.continued++;
-      else if (currentView === latestView && bucket === "dropped") row.dropped++;
-      else if (currentView === latestView && bucket === "active") row.inProgress++;
+      else if (currentView === openView && bucket === "dropped") row.dropped++;
+      else if (currentView === openView && bucket === "active") row.inProgress++;
       else row.unknown++;
     }
   }

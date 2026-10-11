@@ -1,60 +1,48 @@
-import { readFileSync } from "node:fs";
 import { expect, test } from "../helpers/offline-browser";
 
-// Measured from the supplied, unmodified HTML in Chromium, not from application CSS.
-const reference = JSON.parse(readFileSync("test/pharmacy-landing/reference.json", "utf8"));
 const slug = "matcher-v5-isolated-fixture-retailer";
-// Production minification omits default gradient endpoints. Private family names
-// change CSS quoting only; the independently verified font bytes stay identical.
-const canonicalCss = (css: Record<string, string>) => ({ ...css,
-  fontFamily: css.fontFamily.replaceAll("Pharmacy ", "").replaceAll('"', ""),
-  backgroundImage: css.backgroundImage.replace(/\) 0%,/g, "),").replace(/\) 100%\)$/g, "))")
-});
-for (const view of reference.views) {
-  test(`PHARM-LANDING ${view.locale} ${view.width}px matches the supplied content and geometry`, async ({ page }, info) => {
-    await page.setViewportSize({ width: view.width, height: 1000 });
-    await page.emulateMedia({ reducedMotion: "reduce" });
-    await page.goto(`/${view.locale}/retail/${slug}/landing`);
-    await page.evaluate(() => document.fonts.ready);
-    const landing = page.getByTestId("pharmacy-landing");
-    await expect(landing).toBeVisible();
-    await expect(page.locator(".mn-titlebar")).toBeVisible();
-    await expect(page.locator("footer")).toBeVisible();
-    const hero = landing.locator(".hero-section");
-    await expect(hero).toBeVisible();
-    const bounds = (await hero.boundingBox())!;
-    for (const key of ["width", "height"] as const) expect(Math.abs(bounds[key] - view.hero[key]), `hero ${key}`).toBeLessThan(1);
-    for (const expected of view.elements) {
-      const el = hero.locator(expected.selector);
-      await expect(el).toHaveCount(1);
-      expect(await el.innerText(), expected.selector).toBe(expected.text);
-      const box = (await el.boundingBox())!;
-      const actual = { x: box.x - bounds.x, y: box.y - bounds.y, width: box.width, height: box.height };
-      for (const key of ["x", "y", "width", "height"] as const) expect(Math.abs(actual[key] - expected.rect[key]), `${expected.selector} ${key}`).toBeLessThan(1);
-      const css = await el.evaluate(e => {
-        const s = getComputedStyle(e);
-        return Object.fromEntries(["fontFamily", "fontSize", "fontWeight", "fontStyle", "lineHeight", "letterSpacing", "color", "backgroundImage", "borderRadius", "textAlign"].map(k => [k, String(s[k as keyof CSSStyleDeclaration])]));
-      });
-      expect(canonicalCss(css), expected.selector).toEqual(canonicalCss(expected.css));
-    }
-    const href = await hero.locator(".primary-cta").getAttribute("href");
-    const target = new URL(href!, page.url());
-    expect(target.pathname).toBe(`/${view.locale}/retail/${slug}/quiz`);
-    expect(target.searchParams.get("session")).toBeTruthy();
-    expect(target.searchParams.get("source")).toBe("in_store");
-    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(view.width);
-    await page.screenshot({ path: info.outputPath("landing.png"), fullPage: true });
-  });
-}
+// Text and compact card dimensions come from the v15.5 handoff. Site chrome
+// remains platform-owned, so old standalone-page pixel offsets are obsolete.
+const reference = {
+  en: { headline: "Stop guessing.", cta: "Find What’s Right for Me" },
+  th: { headline: "เลิกเดา", cta: "มาดูกันว่าอาหารเสริมอะไรบ้างที่เหมาะกับคุณ" },
+  "zh-CN": { headline: "不再猜测", cta: "找到适合我的方案" }
+} as const;
 
-test("PHARM-LANDING Chinese retains localized content and pharmacy questionnaire routing", async ({ page }) => {
-  await page.goto(`/zh-CN/retail/${slug}/landing`);
-  const landing = page.getByTestId("pharmacy-landing");
-  await expect(landing.getByRole("heading", { level: 1 })).toContainText("不再猜测");
-  const target = new URL((await landing.getByRole("link").getAttribute("href"))!, page.url());
-  expect(target.pathname).toBe(`/zh-CN/retail/${slug}/quiz`);
-  expect(target.searchParams.get("source")).toBe("in_store");
-  expect(target.searchParams.get("session")).toBe(new URL(page.url()).searchParams.get("session"));
-  await expect(page.locator(".mn-titlebar")).toBeVisible();
-  await expect(page.locator("footer")).toBeVisible();
-});
+for (const locale of ["en", "th", "zh-CN"] as const) {
+  for (const width of [390, 1280]) {
+    test(`PHARM-LANDING ${locale} ${width}px preserves the QR destination and compact assessment card`, async ({ page }, info) => {
+      await page.setViewportSize({ width, height: 900 });
+      await page.emulateMedia({ reducedMotion: "reduce" });
+      await page.goto(`/${locale}/retail/${slug}/landing?source=business_card`);
+      await page.evaluate(() => document.fonts.ready);
+      const landing = page.getByTestId("pharmacy-landing");
+      await expect(landing).toBeVisible();
+      await expect(landing.getByRole("heading", { level: 1 })).toContainText(reference[locale].headline);
+      await expect(page.locator(".mn-titlebar")).toBeVisible();
+      await expect(page.locator("footer")).toBeVisible();
+      const cta = landing.getByRole("link", { name: new RegExp(reference[locale].cta) });
+      await expect(cta).toBeVisible();
+      const target = new URL((await cta.getAttribute("href"))!, page.url());
+      expect(target.pathname).toBe(`/${locale}/retail/${slug}/quiz`);
+      expect(target.searchParams.get("source")).toBe("business_card");
+      expect(target.searchParams.get("session")).toBe(new URL(page.url()).searchParams.get("session"));
+      expect(target.searchParams.get("session")).toMatch(/^[0-9a-f-]{36}$/);
+      const mascot = landing.locator('img[src="/assets/questionnaire/v15-5/nong-pharmacy-celebrate.webp"]');
+      await expect(mascot).toBeVisible();
+      expect(await mascot.evaluate(image => (image as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
+      const card = landing.locator('section[aria-labelledby="pharmacy-page-title"]');
+      const bounds = (await card.boundingBox())!;
+      expect(bounds.width).toBeLessThanOrEqual(620);
+      expect(bounds.width).toBeGreaterThan(width < 620 ? width - 65 : 580);
+      expect((await cta.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(width);
+      await page.screenshot({ path: info.outputPath("landing.png"), fullPage: true });
+      await cta.click();
+      await expect(page.locator('[data-question="firstName"]')).toBeVisible();
+      await expect(page.getByTestId("questionnaire-welcome")).toHaveCount(0);
+      expect(new URL(page.url()).searchParams.get("session")).toBe(target.searchParams.get("session"));
+      expect(new URL(page.url()).searchParams.get("source")).toBe("business_card");
+    });
+  }
+}

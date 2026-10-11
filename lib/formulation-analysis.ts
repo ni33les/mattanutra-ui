@@ -116,6 +116,7 @@ function buildAssessmentSafetyContext(answers: unknown) {
     familyHistory: compactStringArray(record, "family"),
     foodRestrictions: {
       allergies: compactStringArray(record, "allergies"),
+      avoid: compactText(record, "avoid"),
       diet: compactText(record, "diet"),
       frequency: isRecord(record.foodFrequency) ? record.foodFrequency : {}
     },
@@ -146,7 +147,8 @@ function buildAssessmentSafetyContext(answers: unknown) {
     recentSurgery: compactText(record, "surgery"),
     sex: compactText(record, "sex"),
     supplementSensitivities: {
-      classes: compactStringArray(record, "suppAllergies")
+      classes: compactStringArray(record, "suppAllergies"),
+      other: compactStringArray(record, "suppAllergies").includes("other") ? compactText(record, "otherSupp") : null
     },
     supplementsCurrentlyUsed: compactText(record, "supplements"),
     trackerData: {

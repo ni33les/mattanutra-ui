@@ -81,7 +81,7 @@ function runLeafBurst(count = 8) {
   }
 }
 
-type ChatQuestionnaireProps = Readonly<{
+export type ChatQuestionnaireProps = Readonly<{
   locale: Locale;
   sessionId?: string;
   reviewRequested?: boolean;
@@ -109,7 +109,7 @@ function resultsPath(
     : nutritionHealthScorePath(locale, planId);
 }
 
-export function ChatQuestionnaire({
+export function LegacyChatQuestionnaire({
   locale,
   sessionId,
   reviewRequested = false,
@@ -1577,3 +1577,5 @@ export function ChatQuestionnaire({
     </div>
   );
 }
+
+export { ScreenQuestionnaire as ChatQuestionnaire } from "./screen-questionnaire";

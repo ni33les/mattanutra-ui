@@ -1,0 +1,125 @@
+{
+  "en": {
+    "tagline": "Knowing the Right Amount",
+    "eyebrow": "Your personalised supplement assessment",
+    "headline": "Stop guessing.<br><em>Start knowing.</em>",
+    "promise": [
+      [
+        "intro",
+        "Tell us about your health, lifestyle, medications and goals."
+      ],
+      [
+        "science",
+        "MattaNutra considers your answers alongside scientific evidence on <strong>160+ supplement ingredients</strong>, built-in safety checks, thoughtfully designed algorithms and AI-assisted analysis."
+      ],
+      [
+        "result",
+        "The result is a supplement plan built around you."
+      ]
+    ],
+    "cta": "Find What’s Right for Me",
+    "commitment": [
+      "Thorough by design",
+      "FREE"
+    ],
+    "privacy": "Private and secure · Your information is never sold",
+    "trust": [
+      "Physician-founded",
+      "Science-led",
+      "Thai FDA–registered products only"
+    ],
+    "availNow": "Now available in",
+    "availSoon": "Coming soon",
+    "countries": [
+      "Thailand"
+    ],
+    "soon": [
+      "Singapore",
+      "Malaysia",
+      "Philippines"
+    ],
+    "mascotAlt": "Nong Matta welcoming you"
+  },
+  "th": {
+    "tagline": "รู้ปริมาณที่พอดี",
+    "eyebrow": "",
+    "headline": "เลิกเดา<br><em>เริ่มรู้จริง</em>",
+    "promise": [
+      [
+        "intro",
+        "ไม่แน่ใจว่าจะเลือกอาหารเสริมตัวไหนดี?"
+      ],
+      [
+        "step",
+        "ตอบคำถามเกี่ยวกับสุขภาพและการใช้ชีวิตของคุณ"
+      ],
+      [
+        "result",
+        "MattaNutra จะช่วยเลือกอาหารเสริมที่เหมาะกับคุณโดยเฉพาะ"
+      ],
+      [
+        "free",
+        "ฟรี"
+      ]
+    ],
+    "cta": "มาดูกันว่าอาหารเสริมอะไรบ้างที่เหมาะกับคุณ",
+    "commitment": [
+      "ละเอียดเพื่อความแม่นยำ"
+    ],
+    "privacy": "เป็นส่วนตัวและปลอดภัย · เราไม่ขายข้อมูลของคุณ",
+    "trust": [
+      "ก่อตั้งโดยแพทย์",
+      "ยึดหลักวิทยาศาสตร์",
+      "เฉพาะผลิตภัณฑ์ที่ขึ้นทะเบียน อย."
+    ],
+    "availNow": "พร้อมให้บริการแล้วใน",
+    "availSoon": "เปิดเร็ว ๆ นี้",
+    "countries": [
+      "ไทย"
+    ],
+    "soon": [
+      "สิงคโปร์",
+      "มาเลเซีย",
+      "ฟิลิปปินส์"
+    ],
+    "mascotAlt": "น้อง Matta ต้อนรับคุณ"
+  },
+  "zh": {
+    "tagline": "了解合适的剂量",
+    "eyebrow": "您的个性化营养补充评估",
+    "headline": "不再猜测，<br><em>开始了解。</em>",
+    "promise": [
+      [
+        "intro",
+        "告诉我们您的健康状况、生活方式、用药和目标。"
+      ],
+      [
+        "science",
+        "MattaNutra 结合您的回答、科学证据、安全信息、算法及 AI 辅助分析，为您制定个性化营养补充方案。"
+      ]
+    ],
+    "cta": "找到适合我的方案",
+    "commitment": [
+      "细致评估，为您考虑",
+      "免费"
+    ],
+    "privacy": "私密安全 · 我们绝不出售您的信息",
+    "trust": [
+      "由医生创立",
+      "以科学为基础",
+      "仅使用泰国 FDA 注册产品"
+    ],
+    "availNow": "现已在以下地区提供",
+    "availSoon": "即将推出",
+    "countries": [
+      "泰国"
+    ],
+    "soon": [
+      "新加坡",
+      "马来西亚",
+      "菲律宾"
+    ],
+    "mascotAlt": "Nong Matta 欢迎您",
+    "zhNotice": "欢迎页面已切换为中文；经审核的中文医学问卷仍在准备中。"
+  }
+}

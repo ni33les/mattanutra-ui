@@ -6,6 +6,7 @@ import { effectiveQuestionnaireAnswers, isWebPurchaseQuestion, questionnaireChan
  */
 
 import { getQuestionnaireDefinition } from "@/lib/questionnaire/definition";
+import { screenQuestionnaireComplete } from "@/lib/questionnaire/screens";
 import { isTurnVisible, selectReaction } from "@/lib/questionnaire/reactions";
 import type {
   ApplyAnswerResult,
@@ -74,7 +75,7 @@ export function createInitialState(input: {
 }
 
 export function getDefinition(state: QuestionnaireState): QuestionnaireDefinition {
-  return getQuestionnaireDefinition(state.locale);
+  return getQuestionnaireDefinition(state.locale, state.version);
 }
 
 export function getTurn(
@@ -1247,6 +1248,7 @@ export function getNextPrompt(state: QuestionnaireState): NextPrompt {
 }
 
 export function isQuestionnaireComplete(state: QuestionnaireState): boolean {
+  if (state.version === "v15.5-screens") return screenQuestionnaireComplete(state);
   if (state.phase === "complete") {
     return true;
   }
@@ -1406,7 +1408,7 @@ export function deserializeState(raw: string): QuestionnaireState | null {
 
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)
       || typeof parsed.sessionId !== "string" || !parsed.sessionId || parsed.sessionId.length > 200
-      || parsed.version !== "v6-conversational" || !["en", "th", "zh-CN"].includes(parsed.locale)
+      || !["v6-conversational", "v15.5-screens"].includes(parsed.version) || !["en", "th", "zh-CN"].includes(parsed.locale)
       || !["intro", "active", "resume_prompt", "complete", "completing", "failed"].includes(parsed.phase)
       || !parsed.answers || typeof parsed.answers !== "object" || Array.isArray(parsed.answers)
       || !Array.isArray(parsed.log) || parsed.log.length > 1000
@@ -1415,6 +1417,14 @@ export function deserializeState(raw: string): QuestionnaireState | null {
       || !parsed.fired || typeof parsed.fired !== "object") {
       return null;
     }
+
+    if (parsed.version === "v15.5-screens" && (
+      parsed.screenId !== undefined && typeof parsed.screenId !== "string"
+      || parsed.screenReview !== undefined && typeof parsed.screenReview !== "boolean"
+      || parsed.screenEdit !== undefined && typeof parsed.screenEdit !== "boolean"
+      || parsed.completedScreens !== undefined && (!Array.isArray(parsed.completedScreens) || !parsed.completedScreens.every(key => typeof key === "string"))
+      || parsed.autoFilled !== undefined && (!Array.isArray(parsed.autoFilled) || !parsed.autoFilled.every(key => typeof key === "string"))
+    )) return null;
 
     // Backfill v6 fields if restoring older drafts
     const restored: QuestionnaireState = {

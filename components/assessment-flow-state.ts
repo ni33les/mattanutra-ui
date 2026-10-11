@@ -15,6 +15,13 @@ export type FoodFrequencyKey =
   | "redmeat";
 
 export type Answers = {
+  /** Supplied only by the grouped questionnaire; absent on historical assessments. */
+  avoid?: string;
+  otherSupp?: string;
+  consentSafety?: boolean;
+  labsHave?: "yes" | "no" | "notnow";
+  labDate?: string;
+  answerStatus?: Record<"height" | "weight", "known" | "unknown" | "unanswered">;
   activity: string;
   age: string;
   alcohol: string;

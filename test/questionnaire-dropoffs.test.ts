@@ -102,6 +102,29 @@ it("question labels use versioned definitions and preserve Chinese's English fal
   assert.equal(questionLabel("firstName","v6-conversational","zh-CN")!.question,questionLabel("firstName","v6-conversational","en")!.question);
   assert.notEqual(questionLabel("firstName","v6-conversational","th")!.question,questionLabel("firstName","v6-conversational","en")!.question);
   assert.equal(questionLabel("firstName","missing","en"),null);
+  assert.ok(questionLabel("firstName","v15.5-screens","en"));
+  assert.equal(questionLabel("firstName","v15.5-screens","zh-CN")!.question,questionLabel("firstName","v15.5-screens","en")!.question);
+  assert.equal(questionLabel("budget","v15.5-screens","en"),null);
+});
+it("grouped questionnaire capture closes its versioned attempt without copying answers",()=>{
+  const state = {...createInitialState({locale:"en",sessionId:"grouped-session"}), version:"v15.5-screens", startedAt:base};
+  const context = captureQuestionnaireContext(state);
+  assert.equal(context.questionnaireVersion,"v15.5-screens");
+  assert.equal("answers" in context,false);
+  const properties = {...event("").properties,...context};
+  const report=build([event("chat_question_viewed",0,{properties}),event("assessment_captured",2,{properties})]);
+  assert.equal(report.attempts[0].bucket,"completed");
+  assert.equal(report.report.groups[0].questions[0].version,"v15.5-screens");
+});
+it("answering one block does not hide abandonment of another block on the same screen",()=>{
+  const properties = {...event("").properties, questionnaireVersion:"v15.5-screens", screenId:"basics"};
+  const age = event("chat_question_viewed",0,{properties:{...properties,turnKey:"age",displayId:"age"}});
+  const sex = event("chat_question_viewed",1,{properties:{...properties,turnKey:"sex",displayId:"sex"}});
+  const result = build([age,sex,event("chat_answer",2,{properties:sex.properties})],1802);
+  assert.equal(result.attempts[0].bucket,"dropped");
+  assert.equal(result.attempts[0].questionKey,"age");
+  assert.equal(result.report.groups[0].questions.find(row=>row.key==="age")!.dropped,1);
+  assert.equal(result.report.groups[0].questions.find(row=>row.key==="sex")!.continued,1);
 });
 it("stable attempt and display identifiers survive resume while restart is independent of capture IDs",()=>{
   const state=startQuestionnaire(createInitialState({locale:"en",sessionId:"saved-session"})).state;

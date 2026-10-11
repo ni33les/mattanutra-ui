@@ -106,11 +106,13 @@ function hasAnyToken(values: readonly string[], tokens: readonly string[]) {
 function safetyIntake(answers: unknown) {
   const record = objectValue(answers);
   const allergenInputs = [
+    ...stringArray(record.allergies),
     ...stringArray(record.foodAllergens),
     ...stringArray(record.allergens),
     ...splitFreeText(record.foodAllergyNotes)
   ];
   const avoidances = [
+    ...splitFreeText(record.avoid),
     ...stringArray(record.avoidedFoods),
     ...stringArray(record.foodAvoidances),
     ...splitFreeText(record.foodAvoidances),

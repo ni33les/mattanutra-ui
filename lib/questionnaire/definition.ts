@@ -1,5 +1,7 @@
 import en from "@/content/questionnaire/v6/en.json" with { type: "json" };
 import th from "@/content/questionnaire/v6/th.json" with { type: "json" };
+import screenEn from "@/content/questionnaire/v15-5/en.json" with { type: "json" };
+import screenTh from "@/content/questionnaire/v15-5/th.json" with { type: "json" };
 import type {
   QuestionnaireDefinition,
   QuestionnaireLocale
@@ -15,8 +17,12 @@ const DEFINITIONS: Record<"en" | "th", QuestionnaireDefinition> = {
  * dedicated file exists (same turn keys / values).
  */
 export function getQuestionnaireDefinition(
-  locale: QuestionnaireLocale | string
+  locale: QuestionnaireLocale | string,
+  version = "v6-conversational"
 ): QuestionnaireDefinition {
+  if (version === "v15.5-screens") {
+    return (locale === "th" ? screenTh : screenEn) as QuestionnaireDefinition;
+  }
   if (locale === "th") {
     return DEFINITIONS.th;
   }

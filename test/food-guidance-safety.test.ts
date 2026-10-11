@@ -57,7 +57,10 @@ describe("food guidance safety policy", () => {
     );
   });
 
-  it("removes disclosed allergens and avoided foods before storage", async () => {
+  for (const [name, answers] of [
+    ["classic", { foodAllergens: ["fish"], foodAvoidances: "kimchi", foodSafetyAcknowledged: true }],
+    ["grouped questionnaire", { allergies: ["fish"], avoid: "kimchi", disclosure: true }]
+  ] as const) it(`removes disclosed allergens and avoided foods before storage (${name})`, async () => {
     const guidance: FoodGuidanceBlueprint = {
       foodGuidance: [
         {
@@ -176,11 +179,7 @@ describe("food guidance safety policy", () => {
         afterCommit: (effect) => {
           afterCommitEffects.push(effect);
         },
-        answers: {
-          foodAllergens: ["fish"],
-          foodAvoidances: "kimchi",
-          foodSafetyAcknowledged: true
-        },
+        answers,
         audit: async (event) => {
           auditEvents.push(event.eventType);
         },

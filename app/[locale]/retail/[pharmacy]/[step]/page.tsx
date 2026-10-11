@@ -63,10 +63,11 @@ export default async function PharmacyJourneyPage({ params, searchParams }: {
     }
     content = <PharmacyAcquisitionContext slug={pharmacy.slug} acquisition={acquisition}>{content}</PharmacyAcquisitionContext>;
   }
-  return <main className={`mn-customer-shell flex min-h-screen flex-col bg-background text-foreground${step === "quiz" ? " mn-customer-shell--quiz" : ""}`}>
+  const focusedEntry = step === "landing" || step === "quiz";
+  return <main className={`mn-customer-shell flex min-h-screen flex-col bg-background text-foreground${focusedEntry ? " mn-customer-shell--quiz" : ""}`}>
     <TitleBar currentLocale={locale} currentPath={currentPath} title={dictionary.hero.eyebrow}
-      assessmentHref={pharmacyPath(locale, slug, "quiz", {source: entrySource, session: step === "landing" ? query.session : undefined})} variant={step === "quiz" ? "quiz" : "default"} />
+      assessmentHref={pharmacyPath(locale, slug, "quiz", {source: entrySource, session: step === "landing" ? query.session : undefined})} variant={focusedEntry ? "quiz" : "default"} />
     {content}
-    {step !== "quiz" && <SiteFooter locale={locale} content={dictionary.footer} />}
+    {!focusedEntry && <SiteFooter locale={locale} content={dictionary.footer} />}
   </main>;
 }

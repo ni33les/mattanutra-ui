@@ -1,61 +1,109 @@
 import { randomUUID } from "node:crypto";
-import { applyAnswer, createInitialState, getDefinition, startQuestionnaire } from "../../lib/questionnaire/engine";
-import { expect, test } from "../helpers/offline-browser";
+import { expect, test, type Page } from "../helpers/offline-browser";
+import { applyAnswer, createInitialState, startQuestionnaire } from "../../lib/questionnaire/engine";
+import en from "../../content/questionnaire/v15-5/en.json" with { type: "json" };
+import th from "../../content/questionnaire/v15-5/th.json" with { type: "json" };
+
+const slug = "matcher-v5-isolated-fixture-retailer";
+const copy = (locale: string) => locale === "th" ? th : en;
+async function choose(page: Page, locale: string, key: string, value: string) {
+  const turn = copy(locale).turns.find(turn => turn.k === key)!;
+  const label = turn.opts?.find(option => option.v === value)?.l;
+  expect(label, `Choice ${key}=${value} exists in the supplied questionnaire`).toBeTruthy();
+  await page.locator(`[data-question="${key}"]`).getByRole("button", { name: label!, exact: true }).click();
+}
+async function advance(page: Page, screen: string) {
+  await page.getByTestId("questionnaire-next").click();
+  await expect(page.locator(`[data-screen="${screen}"]`)).toBeVisible();
+}
 
 for (const [locale, pharmacy] of [["en", false], ["th", true], ["zh-CN", true]] as const) {
-  test(`QUIZ-MOTION ${locale} section handoff settles the next question before uncovering it`, async ({ page }) => {
-    let state = startQuestionnaire(createInitialState({ locale, channel: "web", sessionId: randomUUID() })).state;
-    for (const [key, value] of [["firstName", "Maya"], ["goals", ["energy", "sleep"]]] as const) {
-      const answer = applyAnswer(state, key, value);
-      expect(answer.ok).toBe(true);
-      if (!answer.ok) throw new Error("Invalid transition fixture");
-      state = answer.state;
-    }
-    const definition = getDefinition(state);
-    expect(definition.turns[state.turnIndex].k).toBe("symptoms");
+  test(`QUIZ-MOTION ${locale} grouped answers remain stable across back, reload and resume`, async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
-    await page.addInitScript(({ state }) => {
-      localStorage.setItem(`mn-questionnaire:v1:${state.sessionId}`, JSON.stringify({ version: 1, state, revision: 0,
-        captured: null, contactEmail: null, paymentId: null, updatedAt: Date.now() }));
-      const scrolls: string[] = [];
-      Object.assign(window, { quizScrolls: scrolls });
-      const intoView = Element.prototype.scrollIntoView, scrollTo = Element.prototype.scrollTo;
-      Element.prototype.scrollIntoView = function (options) {
-        if (typeof options === "object" && options.behavior === "smooth") scrolls.push("intoView");
-        return intoView.call(this, options);
-      };
-      Element.prototype.scrollTo = function (...args: Parameters<typeof scrollTo>) {
-        if (typeof args[0] === "object" && args[0].behavior === "smooth") scrolls.push("scrollTo");
-        return scrollTo.apply(this, args);
-      };
-    }, { state });
-    const path = pharmacy ? "/retail/matcher-v5-isolated-fixture-retailer/quiz" : "/nutrition/quiz";
-    await page.goto(`/${locale}${path}?session=${state.sessionId}`);
-    await page.getByRole("button", { name: definition.ui.resumeYes, exact: true }).click();
-    const symptoms = definition.turns.find(t => t.k === "symptoms")!;
-    await page.getByRole("button", { name: symptoms.opts!.find(o => o.v === "great")!.l, exact: true }).click();
-    await page.evaluate(() => { (window as unknown as { quizScrolls: string[] }).quizScrolls.length = 0; });
-    await page.getByTestId("question-answers").locator(".mn-chat-q__primary").click();
-    await expect(page.getByTestId("section-stage-overlay")).toBeVisible();
-    const question = page.getByTestId("paged-question");
-    await expect(question).toContainText(definition.turns.find(t => t.k === "sex")!.q, { timeout: 1000 });
-    await expect(page.getByTestId("section-stage-overlay")).toBeVisible();
-    // The old question must never flash back during the overlay's fade-out.
-    await expect.poll(() => question.evaluate(el => [...el.getAnimations(), ...el.querySelector(".mn-chat-q__bubble")!.getAnimations()].filter(a => a.playState === "running").length), { timeout: 700 }).toBe(0);
-    await expect(page.getByTestId("section-stage-overlay")).toBeVisible();
-    await expect(page.getByTestId("section-stage-overlay")).toHaveCount(0);
-    const before = await question.boundingBox();
-    await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
-    expect(await question.boundingBox()).toEqual(before);
-    expect(await page.evaluate(() => (window as unknown as { quizScrolls: string[] }).quizScrolls)).toEqual([]);
-    expect(await page.locator(".mn-chat-q__page").evaluate(el => el.scrollTop)).toBe(0);
-    expect(await page.getByTestId("question-answers").evaluate(el => el.contains(document.activeElement))).toBe(true);
-    await page.screenshot({ path: test.info().outputPath(`section-${locale}.png`), fullPage: true });
-    // Normal question changes retain one entrance; reduced motion remains immediate.
     await page.emulateMedia({ reducedMotion: "reduce" });
-    await page.getByTestId("question-answers").locator("button.mn-chat-q__chip").first().click();
-    await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
-    await expect(question).toContainText(definition.turns.find(t => t.k === "age")!.q);
-    await expect(page.getByTestId("section-stage-overlay")).toHaveCount(0);
+    await page.route("**/api/bpm", route => route.fulfill({ json: { ok: true } }));
+    const session = randomUUID();
+    const path = pharmacy ? `/retail/${slug}/quiz` : "/nutrition/quiz";
+    await page.goto(`/${locale}${path}?session=${session}&source=business_card`);
+    if (!pharmacy) await page.getByTestId("questionnaire-welcome-cta").click();
+    await page.locator('[data-question="firstName"]').getByRole("textbox").fill("Maya");
+    await advance(page, "goals");
+    await choose(page, locale, "goals", "energy");
+    await choose(page, locale, "goals", "sleep");
+    await advance(page, "symptoms");
+    await choose(page, locale, "symptoms", "great");
+    await advance(page, "basics");
+    await expect(page.locator('[data-question="age"]')).toBeVisible();
+    await expect(page.locator('[data-question="sex"]')).toBeVisible();
+    await expect(page.getByTestId("questionnaire-next")).toBeDisabled();
+    await choose(page, locale, "age", "36-45");
+    await expect(page.getByTestId("questionnaire-next")).toBeDisabled();
+    await choose(page, locale, "sex", "female");
+    await advance(page, "repro");
+    await expect(page.locator('[data-question="reproStatus"]')).toBeVisible();
+    await page.getByTestId("questionnaire-back").click();
+    await expect(page.locator('[data-screen="basics"]')).toBeVisible();
+    const age = copy(locale).turns.find(turn => turn.k === "age")!.opts!.find(option => option.v === "36-45")!.l;
+    await expect(page.locator('[data-question="age"]').getByRole("button", { name: age, exact: true })).toHaveAttribute("aria-pressed", "true");
+    await choose(page, locale, "sex", "male");
+    await advance(page, "sleep");
+    await expect(page.locator('[data-question="sleepHrs"]')).toBeVisible();
+    await expect(page.locator('[data-question="energy"]')).toBeVisible();
+    await choose(page, locale, "sleepHrs", "7-8");
+    await expect(page.getByTestId("questionnaire-next")).toBeDisabled();
+    await page.reload();
+    await page.getByTestId("questionnaire-resume").click();
+    await expect(page.locator('[data-screen="sleep"]')).toBeVisible();
+    const sleep = copy(locale).turns.find(turn => turn.k === "sleepHrs")!.opts!.find(option => option.v === "7-8")!.l;
+    await expect(page.locator('[data-question="sleepHrs"]').getByRole("button", { name: sleep, exact: true })).toHaveAttribute("aria-pressed", "true");
+    expect(new URL(page.url()).searchParams.get("session")).toBe(session);
+    await choose(page, locale, "energy", "good");
+    await advance(page, "move");
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(390);
+    await page.screenshot({ path: test.info().outputPath(`grouped-${locale}.png`), fullPage: true });
   });
 }
+
+for (const locale of ["en", "th", "zh-CN"] as const) {
+  test(`QUIZ-WELCOME ${locale} published web quiz requires its start action and explains the optional price`, async ({ page }) => {
+    await page.goto(`/${locale}/nutrition/quiz`);
+    const welcome = page.getByTestId("questionnaire-welcome");
+    await expect(welcome).toBeVisible();
+    await expect(welcome).toContainText("690");
+    await expect(page.locator('[data-question="firstName"]')).toHaveCount(0);
+    expect(new URL(page.url()).pathname).toBe(`/${locale}/nutrition/quiz`);
+    await page.reload();
+    await expect(welcome).toBeVisible();
+    await expect(page.getByTestId("questionnaire-resume")).toHaveCount(0);
+    await page.getByTestId("questionnaire-welcome-cta").click();
+    await expect(page.locator('[data-question="firstName"]')).toBeVisible();
+    await expect(welcome).toHaveCount(0);
+  });
+}
+
+test("QUIZ-RESUME an unfinished previous questionnaire keeps its answers in the grouped flow", async ({ page }) => {
+  const session = randomUUID();
+  let state = startQuestionnaire(createInitialState({ locale: "en", channel: "web", sessionId: session })).state;
+  for (const [key, answer] of [["firstName", "Saved visitor"], ["goals", ["energy", "sleep"]]] as const) {
+    const result = applyAnswer(state, key, answer);
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error("Invalid previous-version fixture");
+    state = result.state;
+  }
+  expect(state.version).toBe("v6-conversational");
+  await page.addInitScript(saved => {
+    localStorage.setItem(`mn-questionnaire:v1:${saved.sessionId}`, JSON.stringify({ version: 1, state: saved,
+      revision: 0, captured: null, contactEmail: null, paymentId: null, updatedAt: Date.now() }));
+  }, state);
+  await page.goto(`/en/nutrition/quiz?session=${session}`);
+  await page.getByTestId("questionnaire-resume").click();
+  await expect(page.locator('[data-screen="symptoms"]')).toBeVisible();
+  await page.getByTestId("questionnaire-back").click();
+  await expect(page.locator('[data-question="goals"] button[data-value="energy"]')).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator('[data-question="goals"] button[data-value="sleep"]')).toHaveAttribute("aria-pressed", "true");
+  await page.getByTestId("questionnaire-back").click();
+  await expect(page.locator('[data-question="firstName"]').getByRole("textbox")).toHaveValue("Saved visitor");
+  const migrated = await page.evaluate(id => JSON.parse(localStorage.getItem(`mn-questionnaire:v1:${id}`)!), session);
+  expect(migrated.state.version).toBe("v15.5-screens");
+  expect(migrated.state.sessionId).toBe(session);
+});

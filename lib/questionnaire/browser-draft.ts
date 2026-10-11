@@ -43,6 +43,12 @@ export function chatAnswersFromAssessment(value: unknown) {
   const answers = value as Record<string, unknown>;
   const raw: Record<string, unknown> = Object.fromEntries(Object.entries(answers).filter(([, v]) => v !== "" && v !== null && v !== undefined && (!Array.isArray(v) || v.length > 0)));
   if (answers.heightCm && answers.weightKg) raw.hw = { h: answers.heightCm, w: answers.weightKg };
+  const statuses = answers.answerStatus as Record<string, unknown> | undefined;
+  for (const key of ["height", "weight"] as const) {
+    const measurement = answers[key === "height" ? "heightCm" : "weightKg"];
+    if (statuses?.[key]) raw[`${key}Status`] = statuses[key];
+    if (measurement) raw[key] = measurement;
+  }
   if (answers.vo2 || answers.hrv) raw.fitness = { vo2: answers.vo2 ?? "", hrv: answers.hrv ?? "" };
   const skin = ["I", "II", "III", "IV", "V", "VI"].indexOf(String(answers.skin));
   if (skin >= 0) raw.skin = String(skin + 1);

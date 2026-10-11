@@ -1,50 +1,80 @@
+import Image from "next/image";
 import Link from "next/link";
 import type { Locale } from "@/lib/i18n";
-import { pharmacyCopy } from "@/lib/pharmacy-copy";
 import { pharmacyPath } from "@/lib/pharmacy-journey";
+import landingPack from "@/content/questionnaire/v15-5/pharmacy-landing.json";
+import welcomePack from "@/content/questionnaire/v6/welcome.json";
 import styles from "./landing.module.css";
 
-const headlines = {
-  en: ["Stop guessing.", "Start knowing."],
-  th: ["เลิกเดา", "เริ่มรู้จริง"],
-  "zh-CN": ["不再猜测，", "开始了解。"]
-};
+type PharmacyLandingProps = Readonly<{
+  locale: Locale;
+  slug: string;
+  name: string;
+  query?: Record<string, string | undefined>;
+}>;
 
-export function PharmacyLanding({ locale, slug, name, query = {} }: { locale: Locale; slug: string; name: string; query?: Record<string, string | undefined> }) {
-  const copy = pharmacyCopy[locale];
-  const thai = locale === "th";
-  return <div className={styles.landing} lang={locale} data-testid="pharmacy-landing" aria-label={name}>
-    <section className="hero-section" aria-labelledby="pharmacy-page-title">
-      <div className="ambient ambient-one" aria-hidden="true" />
-      <div className="ambient ambient-two" aria-hidden="true" />
-      {/* The exact handoff artwork; explicit dimensions preserve its original inline geometry. */}
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src="/assets/library/nong/nong-celebrate.webp" width={118} height={118} className="nong-matta"
-        alt={thai ? "น้อง Matta ต้อนรับคุณ" : locale === "en" ? "Nong Matta welcoming you" : "Nong Matta 欢迎您"} />
-      {!thai && <p className="eyebrow">{copy.eyebrow}</p>}
-      <h1 id="pharmacy-page-title">{headlines[locale][0]}<br /><em>{headlines[locale][1]}</em></h1>
-      {thai ? <div className="promise-card" aria-label="สิ่งที่คุณจะได้รับจากแบบประเมิน">
-        <p className="intro-copy">ไม่แน่ใจว่าจะเลือกอาหารเสริมตัวไหนดี?</p>
-        <p className="simple-step">ตอบคำถามเกี่ยวกับสุขภาพและการใช้ชีวิตของคุณ</p>
-        <p className="simple-result">MattaNutra จะช่วยเลือกอาหารเสริมที่เหมาะกับคุณโดยเฉพาะ</p>
-        <p className="hero-free">ฟรี</p>
-      </div> : <>
-        <p className="intro-copy">{copy.intro}</p>
-        {locale === "en" ? <>
-          <p className="science-copy">MattaNutra considers your answers alongside scientific evidence on <strong>160+ supplement ingredients</strong>, built-in safety checks, thoughtfully designed algorithms and AI-assisted analysis.</p>
-          <p className="result-copy">The result is a supplement plan built around you.</p>
-        </> : <p className="science-copy">{copy.body}</p>}
-      </>}
-      <Link className="primary-cta" href={pharmacyPath(locale, slug, "quiz", query)}>
-        <span className="cta-label"><span>{copy.start}</span>{" "}<span>→</span></span>
-      </Link>
-      <div className="commitment-line" aria-label={thai ? "รายละเอียดแบบประเมิน" : locale === "en" ? "Assessment details" : "评估详情"}>
-        <span>{copy.thorough}</span>{!thai && <span className="free-note">{copy.free}</span>}
-      </div>
-      <p className="privacy-line">{copy.privacy}</p>
-      <div className="trust-line" aria-label={thai ? "เหตุผลที่คุณไว้วางใจ MattaNutra ได้" : locale === "en" ? "Why trust MattaNutra" : "信任 MattaNutra 的理由"}>
-        {[copy.founded, copy.science, copy.registered].map(text => <span key={text}>{text}</span>)}
-      </div>
-    </section>
-  </div>;
+export function PharmacyLanding({ locale, slug, name, query = {} }: PharmacyLandingProps) {
+  const language = locale === "zh-CN" ? "zh" : locale;
+  const copy = landingPack[language];
+  const legal = welcomePack[language];
+  const quizPath = pharmacyPath(locale, slug, "quiz", query);
+
+  return (
+    <div className={styles.landing} lang={locale} data-testid="pharmacy-landing" aria-label={name}>
+      <section className={styles.card} aria-labelledby="pharmacy-page-title">
+        <div className={styles.hero}>
+          <Image
+            src="/assets/questionnaire/v15-5/nong-pharmacy-celebrate.webp"
+            width={180}
+            height={228}
+            className={styles.mascot}
+            alt={copy.mascotAlt}
+            priority
+            unoptimized
+          />
+          <div>
+            {copy.eyebrow ? <p className={styles.eyebrow}>{copy.eyebrow}</p> : null}
+            <h1 id="pharmacy-page-title" dangerouslySetInnerHTML={{ __html: copy.headline }} />
+          </div>
+        </div>
+        <div className={styles.promise}>
+          {copy.promise.map(([kind, text]) => (
+            <p key={kind} className={styles[kind]} dangerouslySetInnerHTML={{ __html: text }} />
+          ))}
+        </div>
+        <div className={styles.action}>
+          <Link
+            className={styles.cta}
+            href={quizPath}
+            data-bpm-event="pharmacy_landing_assessment_clicked"
+            data-bpm-label={copy.cta}
+            data-bpm-target={quizPath}
+            data-bpm-type="funnel"
+          >
+            <span>{copy.cta}</span><span aria-hidden="true">→</span>
+          </Link>
+          <div className={styles.commitment}>
+            {copy.commitment.map((text) => text === "FREE" || text === "ฟรี" || text === "免费"
+              ? <strong key={text}>{text}</strong>
+              : <span key={text}>{text}</span>)}
+          </div>
+          <p className={styles.privacy}>{copy.privacy}</p>
+          <div className={styles.trust}>
+            {copy.trust.map((text) => <span key={text}>{text}</span>)}
+          </div>
+          {locale === "zh-CN" ? <p className={styles.notice} role="status">{legal.zhNotice}</p> : null}
+        </div>
+      </section>
+      <footer className={styles.footer}>
+        <p>
+          <strong>{copy.availNow}</strong> {copy.countries.join(" · ")}
+          {" · "}<strong>{copy.availSoon}</strong> {copy.soon.join(" · ")}
+        </p>
+        <nav aria-label={legal.privacyFooterLink}>
+          <Link href={`/${locale}/privacy`}>{legal.privacyFooterLink}</Link>
+          <Link href={`/${locale}/terms`}>{legal.termsLink}</Link>
+        </nav>
+      </footer>
+    </div>
+  );
 }

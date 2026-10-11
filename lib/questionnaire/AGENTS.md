@@ -1,6 +1,6 @@
 # Questionnaire agent group
 
-Deterministic chat questionnaire (**v6-conversational** schema; **v14** web UX with welcome landing + start CTA, calculating screen, review/edit). Reference: `files/v14.html`. Shared turn protocol for **web, LINE, and AI chats**.
+The web questionnaire uses **v15.5-screens**, with 24 compact screens in six sections, explicit Continue, review/edit, and the existing capture/recovery flow. Reference content is extracted into `content/questionnaire/v15-5`. The **v6-conversational** protocol remains available for LINE and AI chats and historical drafts; do not change its version or reinterpret its saved turn indices.
 
 Web chat must never show **sex at birth** in any locale — always **sex**:
 - EN: “What is your sex?”

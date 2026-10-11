@@ -156,7 +156,7 @@ export function toAssessmentAnswers(
   }
 
   // consentSafety is chat-only; treat agreement as disclosure reinforcement
-  if (asBoolean(raw.consentSafety) && !answers.disclosure) {
+  if (raw.questionnaireVersion !== "v15.5-screens" && asBoolean(raw.consentSafety) && !answers.disclosure) {
     answers.disclosure = true;
   }
 
@@ -196,15 +196,14 @@ export function toAssessmentAnswers(
 
   // Food frequency f_* keys
   const foodFrequency = { ...answers.foodFrequency };
+  if (raw.foodFrequency && typeof raw.foodFrequency === "object") {
+    Object.assign(foodFrequency, raw.foodFrequency);
+  }
   for (const key of FOOD_KEYS) {
     const flat = raw[`f_${key}`];
     if (flat !== undefined && flat !== null) {
       foodFrequency[key] = asString(flat);
     }
-  }
-
-  if (raw.foodFrequency && typeof raw.foodFrequency === "object") {
-    Object.assign(foodFrequency, raw.foodFrequency);
   }
 
   answers.foodFrequency = foodFrequency;
@@ -262,8 +261,37 @@ export function toAssessmentAnswers(
     Object.assign(labUnits, raw.labUnits);
   }
 
+  // Resumed canonical drafts carry nested values too. Explicit edits, including
+  // clearing a result, take precedence over those older nested values.
+  for (const rawKey of Object.keys(LAB_KEY_MAP).filter(key => key.startsWith("lab_"))) {
+    const canonical = LAB_KEY_MAP[rawKey];
+    if (Object.hasOwn(raw, rawKey)) {
+      if (raw[rawKey] === undefined || raw[rawKey] === null || raw[rawKey] === "") delete labs[canonical];
+      else labs[canonical] = asString(raw[rawKey]);
+    }
+    const unitKey = `unit_${rawKey.slice(4)}`;
+    if (Object.hasOwn(raw, unitKey)) labUnits[canonical] = asString(raw[unitKey]);
+  }
+
   answers.labs = labs;
   answers.labUnits = labUnits;
+
+  if (raw.questionnaireVersion === "v15.5-screens") {
+    answers.consentSafety = raw.consentSafety === true;
+    answers.disclosure = raw.disclosure === true;
+    answers.avoid = asString(raw.avoid);
+    answers.otherSupp = asString(raw.otherSupp);
+    answers.labsHave = ["yes", "no", "notnow"].includes(String(raw.labsHave))
+      ? raw.labsHave as "yes" | "no" | "notnow" : undefined;
+    answers.labDate = asString(raw.labDate);
+    answers.answerStatus = {
+      height: raw.heightStatus === "known" ? "known" : raw.heightStatus === "unknown" ? "unknown" : "unanswered",
+      weight: raw.weightStatus === "known" ? "known" : raw.weightStatus === "unknown" ? "unknown" : "unanswered"
+    };
+    answers.heightCm = raw.heightStatus === "known" ? asString(raw.height) : "";
+    answers.weightKg = raw.weightStatus === "known" ? asString(raw.weight) : "";
+    if (answers.labsHave !== "yes") { answers.labs = {}; answers.labUnits = {}; answers.labDate = ""; }
+  }
 
   // Free-text avoid / otherSupp live outside Answers; keep on answers via cast if needed later.
   // otherMed / otherTracker already mapped.

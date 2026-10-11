@@ -20,7 +20,7 @@ export async function loadQuestionnaireReport(range: AdminDashboardRange, filter
       select id::text, event_name as "eventName", occurred_at as "occurredAt",
         coalesce(nullif(properties->>'attemptId',''), 'legacy:' || coalesce(nullif(ray::text,id::text),plan_id::text,id::text)) as "attemptKey",
         jsonb_strip_nulls(jsonb_build_object('attemptId',properties->>'attemptId', 'sessionId',properties->>'sessionId',
-          'questionnaireVersion',properties->>'questionnaireVersion','turnKey',properties->>'turnKey',
+          'questionnaireVersion',properties->>'questionnaireVersion','turnKey',properties->>'turnKey','screenId',properties->>'screenId',
           'displayId',properties->>'displayId','clientAt',properties->'clientAt',
           'telemetryEventId',properties->>'telemetryEventId','postCompletionReview',properties->'postCompletionReview')) as properties,
         ((${start}::timestamptz is null or occurred_at >= ${start}) and ${adminDashboardFilterSql(sql, filters)}) as "inScope",

@@ -13,6 +13,7 @@ export type TurnKind =
   | "confirm"
   | "gate"
   | "sliders"
+  | "measurements"
   | "swatch"
   | "fitness"
   | "labs";
@@ -28,6 +29,7 @@ export type TurnCondition =
 export type TurnOption = Readonly<{
   l: string;
   v: string;
+  short?: string;
 }>;
 
 export type TurnDef = Readonly<{
@@ -39,6 +41,7 @@ export type TurnDef = Readonly<{
   finish?: number | boolean;
   k: string;
   kind: TurnKind;
+  layout?: string;
   max?: number;
   /** Skip section intro card for this turn (v6 firstName). */
   nosec?: number | boolean;
@@ -175,6 +178,11 @@ export type QuestionnairePhase =
   | "failed";
 
 export type QuestionnaireState = Readonly<{
+  /** v15.5 browser screen navigation; v6 chat sessions remain supported. */
+  screenId?: string;
+  screenReview?: boolean;
+  screenEdit?: boolean;
+  completedScreens?: readonly string[];
   answers: QuestionnaireAnswers;
   /** Keys auto-filled by vegan diet path (cleared if diet changes). */
   autoFilled: readonly string[];

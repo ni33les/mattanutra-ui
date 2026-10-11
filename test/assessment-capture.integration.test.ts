@@ -8,6 +8,8 @@ import { closeSqlPool, getSql, withDatabaseTransaction } from "../lib/db.ts";
 import { createServerQuestionnaireCoordinator } from "../lib/questionnaire/server.ts";
 import { createInitialState, fastForwardQuestionnaire, serializeState } from "../lib/questionnaire/engine.ts";
 import { whileWriterHeld } from "./helpers/held-writer.ts";
+import { createScreenState, fastForwardScreens, updateScreenAnswer } from "../lib/questionnaire/screens.ts";
+import { buildCapturePayload } from "../lib/questionnaire/agents/capture-agent.ts";
 
 const databaseUrl = process.env.TEST_DB_URL;
 assert.ok(databaseUrl, "Assessment capture tests require isolated PostgreSQL");
@@ -62,6 +64,27 @@ describe("shared assessment capture on PostgreSQL", () => {
     const retry = await retryAssessmentHealthScore(first.planId, "en");
     assert.ok(retry.taskId);
     assert.equal((await retryAssessmentHealthScore(first.planId, "en")).taskId, retry.taskId);
+  });
+  it("persists the grouped questionnaire with explicit unknowns and unchanged capture replay", async () => {
+    let state = fastForwardScreens(createScreenState("th", randomUUID()));
+    state = updateScreenAnswer(state, "heightStatus", "unknown");
+    state = updateScreenAnswer(state, "avoid", "kimchi");
+    state = { ...state, answers: { ...state.answers, disclosure: true }, phase: "complete", completedAt: Date.now() };
+    const input = { answers: buildCapturePayload(state).answers, questionnaireState: state,
+      sessionId: state.sessionId, locale: "th", intent: "capture" };
+    const unconfirmed = { ...state, answers: { ...state.answers, disclosure: false } };
+    await assert.rejects(captureAssessment({ ...input, answers: buildCapturePayload(unconfirmed).answers,
+      questionnaireState: unconfirmed }, request()), { code: "invalid_questionnaire_state" });
+    const options = request();
+    const first = await captureAssessment(input, options); plans.push(first.planId);
+    assert.deepEqual(await captureAssessment(input, options), first);
+    const [stored] = await getSql()!`select answers, questionnaire_state, input_revision from assessments where plan_id=${first.planId}`;
+    assert.equal(stored.questionnaire_state.version, "v15.5-screens");
+    assert.equal(stored.answers.heightCm, "");
+    assert.equal(stored.answers.answerStatus.height, "unknown");
+    assert.equal(stored.answers.avoid, "kimchi");
+    assert.equal(stored.answers.disclosure, true);
+    assert.equal(Number(stored.input_revision), 1);
   });
   it("rejects malformed answers, unknown updates and stale edits", async () => {
     await assert.rejects(captureAssessment({ ...body, answers: [] }, request()), { code: "invalid_capture" });

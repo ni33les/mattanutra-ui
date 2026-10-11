@@ -12,6 +12,7 @@ export function questionnaireAttemptContext(state: QuestionnaireState, review = 
 }
 
 export type QuestionDisplay = ReturnType<typeof questionnaireAttemptContext> & {
+  screenId?: string;
   turnKey: string;
   turnIndex: number;
   sectionIndex: number;
@@ -32,7 +33,7 @@ export class QuestionDisplayTracker {
   show(state: QuestionnaireState, turnKey: string, sectionIndex: number, review = false, now = Date.now()) {
     const context = questionnaireAttemptContext(state, review);
     if (this.display?.attemptId === context.attemptId && this.display.turnKey === turnKey) return null;
-    this.display = { ...context, turnKey, turnIndex: state.turnIndex, sectionIndex, displayId: globalThis.crypto.randomUUID() };
+    this.display = { ...context, ...(state.screenId ? { screenId: state.screenId } : {}), turnKey, turnIndex: state.turnIndex, sectionIndex, displayId: globalThis.crypto.randomUUID() };
     this.activityAt = now;
     return { ...this.display, ...this.stamp(now) };
   }
@@ -50,7 +51,7 @@ export class QuestionDisplayTracker {
 export function captureQuestionnaireContext(state: unknown) {
   if (!state || typeof state !== "object" || Array.isArray(state)) return {};
   const value = state as QuestionnaireState;
-  if (value.version !== "v6-conversational" || typeof value.sessionId !== "string" || !value.sessionId || value.sessionId.length > 200) return {};
+  if (!["v6-conversational", "v15.5-screens"].includes(value.version) || typeof value.sessionId !== "string" || !value.sessionId || value.sessionId.length > 200) return {};
   if (value.startedAt !== null && (!Number.isSafeInteger(value.startedAt) || value.startedAt < 0)) return {};
   return questionnaireAttemptContext(value);
 }

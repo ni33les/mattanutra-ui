@@ -7,6 +7,7 @@ import { funnelRequestKey } from "@/lib/funnel-request-key";
 
 import { toAssessmentAnswers, extraChatFields } from "@/lib/questionnaire/normalize";
 import { computePrecision, getDefinition } from "@/lib/questionnaire/engine";
+import { screenProgress } from "@/lib/questionnaire/screens";
 import type {
   QuestionnaireEvent,
   QuestionnaireState,
@@ -51,12 +52,13 @@ export type CaptureFinalizeResult = Readonly<{
 export function buildCapturePayload(state: QuestionnaireState) {
   const definition = getDefinition(state);
   const answers = toAssessmentAnswers(effectiveQuestionnaireAnswers(state.answers, state.channel));
-  const precision = computePrecision(definition, state);
+  const precision = state.version === "v15.5-screens" ? null : computePrecision(definition, state);
 
   return {
     version: state.version,
     lang: state.locale,
     precision,
+    ...(state.version === "v15.5-screens" ? { completionPct: screenProgress(state) } : {}),
     answers,
     chatAnswers: effectiveQuestionnaireAnswers(state.answers, state.channel),
     extra: extraChatFields(state.answers),
@@ -96,7 +98,7 @@ export async function finalizeAssessmentCapture(
         ...((input.bpm?.properties as object) || {}),
         channel: input.state.channel,
         questionnaireVersion: input.state.version,
-        precision: payload.precision,
+        ...(payload.precision === null ? { completionPct: payload.completionPct } : { precision: payload.precision }),
         sessionId: input.state.sessionId,
         chatExtra: payload.extra
       }

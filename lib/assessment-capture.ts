@@ -6,7 +6,7 @@ import { resolvePharmacyAcquisition, pharmacyBpmAttribution } from "@/lib/pharma
 import { assessmentInputHash, loadGenerationInput, withGenerationInput } from "@/lib/assessment-revisions";
 import { captureInputProvenance, inputProvenance } from "@/lib/assessment-input-provenance";
 import { toAssessmentAnswers } from "@/lib/questionnaire/normalize";
-import { deserializeState } from "@/lib/questionnaire/engine";
+import { deserializeState, isQuestionnaireComplete } from "@/lib/questionnaire/engine";
 import { captureQuestionnaireContext } from "@/lib/questionnaire/telemetry";
 import { buildInitialAnswers } from "@/components/assessment-flow-state";
 import { createAssessmentSnapshot, DEFAULT_ASSESSMENT_PLAN, type AssessmentSnapshot } from "@/lib/assessment-snapshot";
@@ -40,7 +40,8 @@ function record(value: unknown): Record<string, unknown> {
 export function validateCaptureAnswers(value: unknown, channel: QuestionnaireChannel = "web") {
   const answers = record(value);
   if (!Object.keys(answers).length || JSON.stringify(answers).length > 65_536) throw new FunnelError("Assessment answers are required", 400, "invalid_answers");
-  const shape = { ...buildInitialAnswers(), reassessmentEmail: "" } as Record<string, unknown>;
+  const shape = { ...buildInitialAnswers(), reassessmentEmail: "", avoid: "", otherSupp: "", consentSafety: false,
+    labsHave: "", labDate: "", answerStatus: {} } as Record<string, unknown>;
   for (const [key, answer] of Object.entries(answers)) {
     if (key === "inputProvenance") {
       if (!inputProvenance(answer)) throw new FunnelError("Invalid assessment input provenance", 400, "invalid_answers");
@@ -54,6 +55,18 @@ export function validateCaptureAnswers(value: unknown, channel: QuestionnaireCha
         ? answer && typeof answer === "object" && !Array.isArray(answer) && Object.entries(answer).every(([k, v]) => k.length <= 100 && typeof v === "string" && v.length <= 1000)
         : typeof answer === typeof expected && (typeof answer !== "string" || answer.length <= 5000);
     if (!valid) throw new FunnelError(`Invalid assessment answer: ${key}`, 400, "invalid_answers");
+    if (key === "labsHave" && !["yes", "no", "notnow"].includes(String(answer))) {
+      throw new FunnelError("Invalid lab availability", 400, "invalid_answers");
+    }
+    if (key === "answerStatus" && (!Object.keys(answer as object).every(name => name === "height" || name === "weight")
+      || !Object.values(answer as object).every(status => ["known", "unknown", "unanswered"].includes(status)))) {
+      throw new FunnelError("Invalid measurement status", 400, "invalid_answers");
+    }
+    if (key === "labDate" && answer !== "" && (typeof answer !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(answer)
+      || !Number.isFinite(Date.parse(answer)) || new Date(answer).toISOString().slice(0, 10) !== answer
+      || answer > new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Bangkok" }))) {
+      throw new FunnelError("Invalid lab date", 400, "invalid_answers");
+    }
   }
   const effective = effectiveQuestionnaireAnswers(answers, channel);
   return { ...buildInitialAnswers(effective), inputProvenance: inputProvenance(effective.inputProvenance) ?? captureInputProvenance(effective), ...(answers.reassessmentEmail ? { reassessmentEmail: answers.reassessmentEmail } : {}) };
@@ -122,7 +135,8 @@ export async function captureAssessment(bodyValue: unknown, options: { planId?: 
     const identity = await persistAssessmentSubmission({ answers, contactEmail, locale, selectedPlan, skipHealthScore, snapshot, status: "captured" });
     if (body.questionnaireState !== undefined) {
       const state = deserializeState(JSON.stringify(body.questionnaireState));
-      if (!state || state.locale !== locale || assessmentInputHash(validateCaptureAnswers(toAssessmentAnswers(state.answers), channel)) !== assessmentInputHash(rawAnswers)) throw new FunnelError("Invalid questionnaire state", 400, "invalid_questionnaire_state");
+      if (!state || state.locale !== locale || state.version === "v15.5-screens" && !isQuestionnaireComplete(state)
+        || assessmentInputHash(validateCaptureAnswers(toAssessmentAnswers(state.answers), channel)) !== assessmentInputHash(rawAnswers)) throw new FunnelError("Invalid questionnaire state", 400, "invalid_questionnaire_state");
       await tx`update public.assessments set questionnaire_state = ${tx.json(toJsonValue({ ...state, planId, assessmentRevision: identity.revision }))}
         where plan_id = ${planId}::uuid`;
     } else {
