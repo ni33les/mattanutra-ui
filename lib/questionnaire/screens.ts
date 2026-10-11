@@ -67,7 +67,7 @@ export function screenProgress(state: QuestionnaireState): number {
 
 /** Keep valid earlier answers and discard only answers made inapplicable by a branch. */
 export function updateScreenAnswer(state: QuestionnaireState, key: string, value: unknown): QuestionnaireState {
-  const answers = { ...state.answers, [key]: value, questionnaireVersion: SCREEN_QUESTIONNAIRE_VERSION };
+  const answers: QuestionnaireAnswers = { ...state.answers, [key]: value, questionnaireVersion: SCREEN_QUESTIONNAIRE_VERSION };
   if (key !== "disclosure") answers.disclosure = false;
   let autoFilled = state.autoFilled.filter(item => item !== key);
   const definition = screenDefinition(state);
@@ -129,7 +129,7 @@ export function previousScreen(state: QuestionnaireState): QuestionnaireState {
 /** Migration is explicit: old default measurements must have been answered to be trusted. */
 export function migrateScreenState(source: QuestionnaireState): QuestionnaireState {
   const wasCurrent = source.version === SCREEN_QUESTIONNAIRE_VERSION;
-  const answers = { ...source.answers, questionnaireVersion: SCREEN_QUESTIONNAIRE_VERSION };
+  const answers: QuestionnaireAnswers = { ...source.answers, questionnaireVersion: SCREEN_QUESTIONNAIRE_VERSION };
   for (const key of removedKeys) delete answers[key];
   const hw = answers.hw && typeof answers.hw === "object" ? answers.hw as Record<string, unknown> : {};
   for (const key of ["height", "weight"] as const) {
@@ -156,7 +156,7 @@ export function createScreenState(locale: QuestionnaireLocale, sessionId: string
 }
 
 export function fastForwardScreens(state: QuestionnaireState): QuestionnaireState {
-  let next = { ...state, phase: "active" as const, startedAt: state.startedAt ?? Date.now() };
+  let next: QuestionnaireState = { ...state, phase: "active", startedAt: state.startedAt ?? Date.now() };
   for (const turn of screenDefinition(next).turns) {
     if (!isTurnVisible(turn, next.answers)) continue;
     if (turn.kind === "measurements") { next = updateScreenAnswer(next, "height", "175"); next = updateScreenAnswer(next, "weight", "72"); }
