@@ -118,7 +118,9 @@ for (const [locale, pharmacy] of [["en", false], ["th", true]] as const) {
     expect(body.answers).toMatchObject({ firstName: "Maya", heightCm: "", weightKg: "72", energy: "excellent", family: ["unsure"],
       allergies: ["milk"], avoid: "No grapefruit", otherSupp: "Reaction to an unidentified supplement",
       medTypes: ["other"], otherMed: "Prescribed medicine, details to discuss", labs: { vitd: "42" }, labUnits: { vitd: "nmol/L" }, disclosure: true });
-    expect(body.questionnaireState).toMatchObject({ version: "v15.5-screens", sessionId: session, phase: "complete",
+    // The shared capture adapter marks the outgoing request as in flight; the
+    // receipt changes it to complete only after the server acknowledges it.
+    expect(body.questionnaireState).toMatchObject({ version: "v15.5-screens", sessionId: session, phase: "completing",
       answers: { heightStatus: "unknown", weightStatus: "known", labsHave: "yes" } });
     if (pharmacy) {
       expect(body.pharmacyId).toBe("matcher-v5-isolated-fixture-retailer");
