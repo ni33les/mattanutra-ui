@@ -206,7 +206,7 @@ export function ScreenQuestionnaire({ locale, sessionId, reviewRequested = false
       <div className={styles.progressText}><span>{section.eyebrow} · {progress}%</span><span aria-live="polite">{saveFailed ? x.saveUnavailable : x.savedTag}</span></div>
       <div className={styles.bar} role="progressbar" aria-label={x.progressLabel} aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress}><div className={styles.fill} style={{ width: `${progress}%` }} /></div>
     </div></div>
-    <main className={`${styles.main} ${current.id === "name" && !state.screenReview ? styles.name : ""}`}>
+    <div className={`${styles.main} ${current.id === "name" && !state.screenReview ? styles.name : ""}`}>
       <header className={styles.heading}><p className={styles.eyebrow}>{section.eyebrow}</p><h1 ref={headingRef} tabIndex={-1} className={styles.title}>{state.screenReview ? x.reviewTitle : current.id === "name" ? x.introTitle : section.title}</h1>
         {current.id !== "name" && !state.screenReview ? <p className={styles.description}>{section.desc}</p> : null}</header>
       {state.screenReview || current.nong ? <div className={styles.nong}><Image width={84} height={120} alt="" src={`/assets/questionnaire/v15-5/nong-${state.screenReview ? "wai" : current.nong === "safety" ? "reassuring" : current.nong === "final" ? "sincere" : "open"}.webp`} />
@@ -226,7 +226,7 @@ export function ScreenQuestionnaire({ locale, sessionId, reviewRequested = false
         {current.id === "diet" && state.autoFilled.length ? <div className={`${styles.card} ${styles.review}`}><p className={styles.hint}>{x.inferred}</p>
           {state.autoFilled.map(key => { const turn = definition.turns.find(item => item.k === key)!; return <p key={key} className={styles.hint}>{turn.q} — {answerLabel(turn)}</p>; })}</div> : null}</>}
       {showDevShortcut ? <button type="button" className={styles.dev} data-testid="dev-fill-questionnaire" onClick={devFill}>{x.devFill}</button> : null}
-    </main>
+    </div>
     <div className={styles.footer}><div className={styles.footerInner}>
       {currentIndex > 0 || state.screenReview || state.screenEdit ? <button type="button" data-testid="questionnaire-back" className={styles.secondary} onClick={() => { telemetry.close(); commit(previousScreen(state)); }}>{x.back}</button> : null}
       {state.screenReview ? <button type="button" data-testid="questionnaire-submit" className={styles.primary} disabled={!screenQuestionnaireComplete(state)} onClick={submit}>{x.submit}</button>

@@ -7,7 +7,7 @@
 .main { max-width:620px; margin:auto; padding:26px 16px 20px; }
 .heading { margin:0 3px 18px; }
 .eyebrow { color:#8a754b; font-size:.68rem; letter-spacing:.09em; text-transform:uppercase; font-weight:600; }
-.title { font-family:var(--font-serif),Georgia,serif; font-size:1.7rem; line-height:1.25; font-weight:600; margin-top:5px; }
+.title { font-family:var(--mn-font-display),Georgia,serif; font-size:1.7rem; line-height:1.25; font-weight:600; margin-top:5px; }
 .description { font-size:.84rem; color:#637568; line-height:1.65; margin-top:7px; }
 .nong { display:flex; align-items:center; gap:16px; padding:4px 8px 22px; font-size:.98rem; line-height:1.65; }
 .nong img { width:78px; height:108px; object-fit:contain; flex-shrink:0; }
@@ -16,7 +16,7 @@
 .question + .question { border-top:1px solid #e9ede6; }
 .questionTitle { float:left; width:100%; font-size:1rem; font-weight:600; line-height:1.55; margin-bottom:15px; }
 .questionTitle + * { clear:both; }
-.name .questionTitle { font-family:var(--font-serif),Georgia,serif; font-size:1.8rem; line-height:1.3; }
+.name .questionTitle { font-family:var(--mn-font-display),Georgia,serif; font-size:1.8rem; line-height:1.3; }
 .options { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:9px; }
 .stack { grid-template-columns:1fr; }
 .three { grid-template-columns:repeat(3,minmax(0,1fr)); }
@@ -60,6 +60,6 @@
 .dev { display:block; padding:8px 12px; margin:20px auto 0; color:#796a44; font-size:.75rem; text-decoration:underline; }
 .resume { margin:40px auto; max-width:540px; padding:26px; }
 .resumeActions { display:flex; gap:12px; margin-top:22px; }
-:global(html[lang=th]) .title,:global(html[lang=th]) .name .questionTitle { font-family:var(--font-thai),sans-serif; font-size:1.4rem; line-height:1.6; }
+:global(html[lang=th]) .title,:global(html[lang=th]) .name .questionTitle { font-family:var(--mn-font-thai),sans-serif; font-size:1.4rem; line-height:1.6; }
 @media(max-width:380px) { .main{padding:18px 10px;} .question{padding:20px 14px;} .option{padding:12px 9px;gap:7px;font-size:.8rem;} .measurements{gap:10px;} }
 @media(prefers-reduced-motion:reduce) { .fill,.option{transition:none;} }
