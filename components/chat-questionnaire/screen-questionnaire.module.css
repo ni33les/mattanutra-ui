@@ -8,6 +8,7 @@
 .heading { margin:0 3px 18px; }
 .eyebrow { color:#8a754b; font-size:.68rem; letter-spacing:.09em; text-transform:uppercase; font-weight:600; }
 .title { font-family:var(--mn-font-display),Georgia,serif; font-size:1.7rem; line-height:1.25; font-weight:600; margin-top:5px; }
+.title:focus { outline:none; }
 .description { font-size:.84rem; color:#637568; line-height:1.65; margin-top:7px; }
 .nong { display:flex; align-items:center; gap:16px; padding:4px 8px 22px; font-size:.98rem; line-height:1.65; }
 .nong img { width:78px; height:108px; object-fit:contain; flex-shrink:0; }
@@ -60,6 +61,6 @@
 .dev { display:block; padding:8px 12px; margin:20px auto 0; color:#796a44; font-size:.75rem; text-decoration:underline; }
 .resume { margin:40px auto; max-width:540px; padding:26px; }
 .resumeActions { display:flex; gap:12px; margin-top:22px; }
-:global(html[lang=th]) .title,:global(html[lang=th]) .name .questionTitle { font-family:var(--mn-font-thai),sans-serif; font-size:1.4rem; line-height:1.6; }
+:global(html:lang(th)) .title,:global(html:lang(th)) .name .questionTitle { font-family:var(--mn-font-thai),sans-serif; font-size:1.4rem; line-height:1.6; }
 @media(max-width:380px) { .main{padding:18px 10px;} .question{padding:20px 14px;} .option{padding:12px 9px;gap:7px;font-size:.8rem;} .measurements{gap:10px;} }
 @media(prefers-reduced-motion:reduce) { .fill,.option{transition:none;} }
