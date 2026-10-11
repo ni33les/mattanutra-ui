@@ -90,8 +90,8 @@ export function updateScreenAnswer(state: QuestionnaireState, key: string, value
     delete answers.labs; delete answers.labUnits; delete answers.labDate;
   }
   if (key === "height" || key === "weight") answers[`${key}Status`] = value === "" || value === null ? "unanswered" : "known";
-  if (key === "heightStatus" && value !== "known") answers.height = null;
-  if (key === "weightStatus" && value !== "known") answers.weight = null;
+  if (key === "heightStatus" && value !== "known") answers.height = value === "unknown" ? null : "";
+  if (key === "weightStatus" && value !== "known") answers.weight = value === "unknown" ? null : "";
   answers.hw = { h: answers.heightStatus === "known" ? answers.height : null, w: answers.weightStatus === "known" ? answers.weight : null };
   return { ...state, answers, autoFilled, phase: "active", completedAt: null };
 }
@@ -104,6 +104,16 @@ export function toggleScreenChoice(state: QuestionnaireState, turn: TurnDef, val
 export function openScreen(state: QuestionnaireState, id: string, editing = false): QuestionnaireState {
   const screen = questionnaireScreens.find(item => item.id === id) ?? questionnaireScreens[0];
   const turns = screenTurns({ ...state, screenEdit: editing }, screen);
+  // Apply configured starting values only when the measurement controls open.
+  // Empty strings are explicit clears; unknown choices also remain untouched.
+  if (turns.some(turn => turn.kind === "measurements")) {
+    const { meta } = screenDefinition(state);
+    for (const key of ["height", "weight"] as const) {
+      if (state.answers[`${key}Status`] !== "unknown" && state.answers[key] == null) {
+        state = updateScreenAnswer(state, key, String(meta[key].default));
+      }
+    }
+  }
   return { ...state, phase: "active", screenReview: false, screenEdit: editing, screenId: screen.id,
     turnIndex: screenDefinition(state).turns.findIndex(turn => turn.k === turns[0]?.k) };
 }

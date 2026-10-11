@@ -57,10 +57,14 @@ describe("v15.5 grouped questionnaire", () => {
     assert.ok(state.answers.diet);
     assert.equal(state.answers.disclosure, false);
   });
-  it("never fills measurements with defaults and preserves independent unknown statuses", () => {
+  it("starts measurements at configured defaults and preserves edits, clears and unknowns through navigation and resume", () => {
     let state = openScreen(blank(), "body");
     const body = questionnaireScreens.find(screen => screen.id === "body")!;
-    assert.equal(screenComplete(state, body), false);
+    assert.equal(screenComplete(state, body), true);
+    assert.equal(state.answers.height, "175");
+    assert.equal(state.answers.weight, "72");
+    assert.equal(toAssessmentAnswers(state.answers).heightCm, "175");
+    assert.equal(toAssessmentAnswers(state.answers).weightKg, "72");
     state = updateScreenAnswer(state, "heightStatus", "unknown");
     state = updateScreenAnswer(state, "weight", "0");
     assert.equal(screenComplete(state, body), false);
@@ -71,6 +75,16 @@ describe("v15.5 grouped questionnaire", () => {
     assert.equal(payload.weightKg, "73.5");
     assert.deepEqual(payload.answerStatus, { height: "unknown", weight: "known" });
     assert.equal(state.answers.height, null);
+    state = openScreen(migrateScreenState(deserializeState(JSON.stringify(state))!), "body");
+    assert.equal(state.answers.heightStatus, "unknown");
+    assert.equal(state.answers.height, null);
+    assert.equal(state.answers.weight, "73.5");
+    state = updateScreenAnswer(state, "heightStatus", "unanswered");
+    state = updateScreenAnswer(state, "weight", "");
+    state = openScreen(migrateScreenState(deserializeState(JSON.stringify(state))!), "body");
+    assert.equal(state.answers.height, "");
+    assert.equal(state.answers.weight, "");
+    assert.equal(screenComplete(state, body), false);
   });
   it("validates labs and future dates, keeps chosen units and clears stale results on gate changes", () => {
     let state = updateScreenAnswer(blank(), "labsHave", "yes");

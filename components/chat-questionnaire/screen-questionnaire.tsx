@@ -145,7 +145,7 @@ export function ScreenQuestionnaire({ locale, sessionId, reviewRequested = false
     onEmailSubmit={fallbackEmail} />;
   if (mode === "resume") return <div className={styles.shell}><section className={`${styles.card} ${styles.resume}`}>
     <h1 className={styles.title}>{copy.ui.resumeQ}</h1><div className={styles.resumeActions}>
-      <button type="button" className={styles.primary} data-testid="questionnaire-resume" onClick={() => { commit({ ...state, phase: "active" }); setMode("quiz"); }}>{copy.ui.resumeYes}</button>
+      <button type="button" className={styles.primary} data-testid="questionnaire-resume" onClick={() => { commit(state.screenReview ? { ...state, phase: "active" } : openScreen(state, state.screenId ?? "name", state.screenEdit)); setMode("quiz"); }}>{copy.ui.resumeYes}</button>
       <button type="button" className={styles.secondary} data-testid="questionnaire-restart" onClick={() => begin(true)}>{copy.ui.resumeNo}</button>
     </div></section></div>;
 

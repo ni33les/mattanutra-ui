@@ -43,7 +43,9 @@ for (const [locale, pharmacy] of [["en", false], ["th", true]] as const) {
     await select(page, "alcohol", "none");
     await select(page, "caffeine", "1");
     await next(page, "body");
-    await expect(page.getByTestId("questionnaire-next")).toBeDisabled();
+    await expect(page.locator("#height")).toHaveValue("175");
+    await expect(page.locator("#weight")).toHaveValue("72");
+    await expect(page.getByTestId("questionnaire-next")).toBeEnabled();
     await page.locator("#height").fill("0");
     await page.locator("#weight").fill("72");
     await expect(page.getByTestId("questionnaire-next")).toBeDisabled();
