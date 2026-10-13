@@ -6,7 +6,7 @@ import type Stripe from "stripe";
 import postgres from "postgres";
 import { fixtureDatabaseUrl, cleanupFixtureRelationships } from "./helpers/fixture-teardown.ts";
 import { closeSqlPool, databaseTransactionActive, getSql, withDatabaseTransaction } from "../lib/db.ts";
-import { bindMetaContext, enqueueMetaEvent, recordMetaPurchase, requestMetaContext, setMetaConsent, setMetaPreference } from "../lib/meta-tracking.ts";
+import { bindMetaContext, enqueueMetaEvent, metaExternalId, recordMetaCheckout, recordMetaPharmacyOrder, recordMetaPlanMilestone, recordMetaPurchase, requestMetaContext, setMetaConsent, setMetaPreference } from "../lib/meta-tracking.ts";
 import { sendMetaEvent } from "../lib/meta-dispatch.ts";
 import { metaCampaignReport } from "../lib/meta-campaign-report.ts";
 import { metaDiagnostics } from "../lib/meta-diagnostics.ts";
@@ -19,7 +19,7 @@ const { POST: savePreference } = await import("../app/api/marketing/consent/rout
 
 assert.ok(process.env.TEST_DB_URL, "This integration test requires isolated PostgreSQL");
 describe("preference-controlled, durable and isolated Meta delivery", () => {
-  const contexts: string[] = [], payments: string[] = [], retail: string[] = [], requestKeys: string[] = [];
+  const contexts: string[] = [], payments: string[] = [], retail: string[] = [], pharmacyOrders: string[] = [], requestKeys: string[] = [];
   const planId = randomUUID();
   before(async () => {
     fixtureDatabaseUrl();
@@ -45,6 +45,7 @@ describe("preference-controlled, durable and isolated Meta delivery", () => {
       await tx`delete from public.payments where id=any(${payments}::uuid[])`;
       await tx`delete from public.funnel_requests where request_key=any(${requestKeys})`;
       await tx`delete from public.retail_checkout_payments where id=any(${retail}::uuid[])`;
+      await tx`delete from public.retail_customer_orders where id=any(${pharmacyOrders}::uuid[])`;
       await tx`delete from public.assessments where plan_id=${planId}::uuid`;
     });
     await closeSqlPool();
@@ -66,9 +67,34 @@ describe("preference-controlled, durable and isolated Meta delivery", () => {
     assert.equal(await requestMetaContext(request()), null);
     const c = await consent();
     assert.equal(await requestMetaContext(request(c.id, false)), null);
-    const response = await browserEvent(new Request("https://dev.mattanutra.com/api/marketing/events", {
-      method: "POST", headers: request(c.id).headers, body: JSON.stringify({ name: "Purchase", eventId: randomUUID(), sessionId: randomUUID(), sourceUrl: "/en", data: { value: 690, currency: "THB" } }) }));
-    assert.equal(response.status, 400);
+    for (const name of ["Purchase", "OrderSubmitted"]) {
+      const response = await browserEvent(new Request("https://dev.mattanutra.com/api/marketing/events", {
+        method: "POST", headers: request(c.id).headers, body: JSON.stringify({ name, eventId: randomUUID(), sessionId: randomUUID(), sourceUrl: "/en", data: { value: 690, currency: "THB" } }) }));
+      assert.equal(response.status, 400);
+    }
+  });
+  it("returns the original PageView receipt after a lost response without another outbox event", async () => {
+    const c = await consent(), eventId = randomUUID(), sessionId = randomUUID();
+    const capture = () => browserEvent(new Request("https://dev.mattanutra.com/api/marketing/events", {
+      method: "POST", headers: c.request.headers,
+      body: JSON.stringify({ name: "PageView", eventId, sessionId, sourceUrl: "/th", data: { locale: "th", channel: "web" } }) }));
+    const first = await (await capture()).json(), second = await (await capture()).json();
+    assert.equal(first.accepted,true); assert.equal(first.eventId,eventId); assert.deepEqual(second,first);
+    assert.equal((await getSql()!`select count(*)::int as n from public.meta_conversion_events where context_id=${c.id}::uuid`)[0].n,1);
+  });
+  it("links an anonymous landing visit to the captured customer without exporting contact details", async () => {
+    const c = await queued();
+    await withDatabaseTransaction(getSql()!, tx=>bindMetaContext(tx,"plan",planId,c.request,{email:"buyer@example.com"}));
+    const milestone = await withDatabaseTransaction(getSql()!, tx=>recordMetaPlanMilestone(tx,planId,"EmailCapture","en"));
+    assert.ok(milestone);
+    const outbound: Array<{user_data:Record<string,unknown>}> = [];
+    const send: typeof fetch = async (_url,init)=>{outbound.push(JSON.parse(String(init?.body)).data[0]);return new Response('{"events_received":1}');};
+    await sendMetaEvent(c.eventId,send); await sendMetaEvent(milestone,send);
+    assert.deepEqual(outbound[0].user_data.external_id,[metaExternalId(c.id)]);
+    assert.deepEqual(outbound[1].user_data.external_id,[metaExternalId(c.id),metaExternalId(planId)]);
+    assert.deepEqual(outbound[1].user_data.em,[metaExternalId("buyer@example.com")]);
+    assert.doesNotMatch(JSON.stringify(outbound),/buyer@example/);
+    await getSql()!`delete from public.meta_tracking_bindings where resource_type='plan' and resource_id=${planId} and context_id=${c.id}::uuid`;
   });
   it("records automatic activation separately and keeps a saved opt-out on automatic retries", async () => {
     const saved = await setMetaPreference(request(), true, "/en", "site_default"); contexts.push(saved.id);
@@ -200,7 +226,20 @@ describe("preference-controlled, durable and isolated Meta delivery", () => {
     const c = await consent("site_default"), key = randomUUID(); requestKeys.push(key);
     const session = await createStripeCheckoutSession({ locale: "en", selectedPlan: "precision", sourceSurface: "landing", idempotencyKey: key, request: c.request });
     payments.push(session.paymentId);
-    assert.equal((await getSql()!`select count(*)::int as n from public.meta_conversion_events where context_id=${c.id}::uuid`)[0].n,0);
+    const [checkout] = await getSql()!`select id,event_name,custom_data from public.meta_conversion_events where context_id=${c.id}::uuid`;
+    assert.equal(checkout.event_name,"InitiateCheckout");
+    assert.equal(checkout.custom_data.value,690); assert.equal(checkout.custom_data.currency,"THB");
+    assert.equal(checkout.custom_data.offer,"precision");
+    // Browser delivery reuses the server receipt and cannot replace the verified price.
+    const body = { name: "InitiateCheckout", eventId: randomUUID(), sessionId: randomUUID(), attemptId: session.paymentId,
+      sourceUrl: "/en/nutrition/payment/checkout", data: { value: 1, currency: "USD" } };
+    const response = await browserEvent(new Request("https://dev.mattanutra.com/api/marketing/events", {
+      method: "POST", headers: c.request.headers, body: JSON.stringify(body) }));
+    const receipt = await response.json();
+    assert.equal(response.status,200); assert.equal(receipt.accepted,true); assert.equal(receipt.eventId,checkout.id);
+    assert.equal(receipt.data.value,690); assert.equal(receipt.data.currency,"THB");
+    await createStripeCheckoutSession({ locale: "en", selectedPlan: "precision", sourceSurface: "landing", idempotencyKey: key, request: c.request });
+    assert.equal((await getSql()!`select count(*)::int as n from public.meta_conversion_events where context_id=${c.id}::uuid`)[0].n,1);
     await completeMockPayment({ paymentId: session.paymentId });
     await completeMockPayment({ paymentId: session.paymentId });
     const events = await getSql()!`select * from public.meta_conversion_events where context_id=${c.id}::uuid and event_name='Purchase'`;
@@ -214,14 +253,17 @@ describe("preference-controlled, durable and isolated Meta delivery", () => {
     await sendMetaEvent(events[0].id, async (_url, init) => { outbound.push(JSON.parse(String(init?.body)).data[0]); return new Response('{"events_received":1}'); });
     assert.equal(outbound[0].event_name,"DEV_Purchase"); assert.equal(outbound[0].action_source,"website");
     assert.deepEqual(outbound[0].custom_data,events[0].custom_data);
+    assert.deepEqual((outbound[0].user_data as Record<string,unknown>).external_id,[metaExternalId(c.id)]);
   });
   it("commits retail confirmation and outbox together and deduplicates the corresponding MCP purchase", async () => {
     const c = await consent();
     const [p] = await getSql()!<RetailSessionPayment[]>`insert into public.retail_checkout_payments (id,plan_id,amount,currency,stripe_mode,idempotency_key)
       values (${randomUUID()}::uuid,${planId}::uuid,250000000,'THB','test',${randomUUID()}) returning *`;
     retail.push(p.id);
-    await withDatabaseTransaction(getSql()!, tx=>bindMetaContext(tx,"retail",p.id,c.request,{ email: " Fixture@Example.com ",phone: "+66812345678" }));
+    await withDatabaseTransaction(getSql()!, tx=>bindMetaContext(tx,"retail",p.id,c.request,{ email: " Fixture@Example.com ",phone: "+66812345678",country:"TH" }));
     const session = { id: `cs_fixture_${p.id}`, payment_status:"paid",status:"complete",amount_total:25000,currency:"thb",livemode:false,metadata:{paymentId:p.id} } as Stripe.Checkout.Session;
+    await recordRetailProviderSession(getSql()!,p,{...session,payment_status:"unpaid",status:"open"});
+    assert.equal((await getSql()!`select count(*)::int as n from public.meta_conversion_events where context_id=${c.id}::uuid and event_name='Purchase'`)[0].n,0);
     await assert.rejects(withDatabaseTransaction(getSql()!, async tx => { await recordRetailProviderSession(tx,p,session); throw new Error("interrupted"); }), /interrupted/);
     assert.equal((await getSql()!`select paid_at from public.retail_checkout_payments where id=${p.id}::uuid`)[0].paid_at,null);
     assert.equal((await getSql()!`select count(*)::int as n from public.meta_conversion_events where context_id=${c.id}::uuid`)[0].n,0);
@@ -236,6 +278,17 @@ describe("preference-controlled, durable and isolated Meta delivery", () => {
     const [event] = await getSql()!`select custom_data,matching from public.meta_conversion_events where source_key=${`purchase:${session.id}`}`;
     assert.equal(event.custom_data.purchase_type,"products"); assert.equal(event.custom_data.offer,undefined);
     assert.match(event.matching.em[0],/^[a-f0-9]{64}$/); assert.match(event.matching.ph[0],/^[a-f0-9]{64}$/);
+    assert.deepEqual(event.matching.country,[metaExternalId("th")]);
+    const checkout = { type: "retail" as const, id: p.id, planId, amount: 250, currency: "THB", locale: "th" };
+    await withDatabaseTransaction(getSql()!, tx=>recordMetaCheckout(tx,checkout));
+    await withDatabaseTransaction(getSql()!, tx=>recordMetaCheckout(tx,checkout));
+    const checkouts = await getSql()!`select id,custom_data from public.meta_conversion_events where context_id=${c.id}::uuid and event_name='InitiateCheckout'`;
+    assert.equal(checkouts.length,1); assert.equal(checkouts[0].custom_data.value,250);
+    assert.equal(checkouts[0].custom_data.purchase_type,"products"); assert.equal(checkouts[0].custom_data.locale,"th");
+    let outbound: Record<string,unknown> | undefined;
+    await sendMetaEvent(checkouts[0].id,async (_url,init)=>{outbound=JSON.parse(String(init?.body)).data[0];return new Response('{"events_received":1}');});
+    assert.deepEqual((outbound!.user_data as Record<string,unknown>).country,[metaExternalId("th")]);
+    assert.deepEqual((outbound!.user_data as Record<string,unknown>).external_id,[metaExternalId(c.id),metaExternalId(planId)]);
   });
   it("records Pro separately from Precision with the actual payment locale and amount", async () => {
     const c = await consent(), key = randomUUID(); requestKeys.push(key);
@@ -246,6 +299,39 @@ describe("preference-controlled, durable and isolated Meta delivery", () => {
     const [payment] = await getSql()!`select amount from public.payments where id=${session.paymentId}::uuid`;
     assert.equal(event.custom_data.offer,"pro"); assert.equal(event.custom_data.purchase_type,"plan");
     assert.equal(event.custom_data.locale,"zh-CN"); assert.equal(event.custom_data.value,Number(payment.amount)/1_000_000);
+  });
+  it("atomically records each unpaid pharmacy order once without inventing a paid conversion", async () => {
+    const sql = getSql()!, c = await consent(), id = randomUUID();
+    const [organisation] = await sql`select id from public.organisations where slug='mattanutra'`;
+    await withDatabaseTransaction(sql,tx=>bindMetaContext(tx,"plan",planId,c.request));
+    const order = (orderId: string) => ({ id: orderId, planId, locale: "th", total: 17, currency: "THB" });
+    const save = async (orderId: string, rollback = false) => withDatabaseTransaction(sql,async tx=>{
+      await tx`insert into public.retail_customer_orders(id,organisation_id,order_number,source,status,currency,metadata)
+        values (${orderId}::uuid,${organisation.id}::uuid,${`fixture-${orderId}`},'pharmacy','placed','THB','{"paymentMethod":"pay_at_till","paymentStatus":"unpaid"}')`;
+      const eventId = await recordMetaPharmacyOrder(tx,order(orderId));
+      if (rollback) throw new Error("Interrupted unpaid order");
+      return eventId;
+    });
+    await assert.rejects(save(id,true),/Interrupted unpaid order/);
+    assert.equal((await sql`select count(*)::int as n from public.retail_customer_orders where id=${id}::uuid`)[0].n,0);
+    assert.equal((await sql`select count(*)::int as n from public.meta_conversion_events where context_id=${c.id}::uuid`)[0].n,0);
+    pharmacyOrders.push(id);
+    const eventId = await save(id); assert.ok(eventId);
+    await withDatabaseTransaction(sql,tx=>recordMetaPharmacyOrder(tx,order(id)));
+    const second = randomUUID(); pharmacyOrders.push(second); await save(second);
+    const events = await sql`select event_name,custom_data from public.meta_conversion_events where context_id=${c.id}::uuid`;
+    assert.equal(events.length,2); assert.ok(events.every(event=>event.event_name==='OrderSubmitted'));
+    assert.equal(events[0].custom_data.value,17); assert.equal(events[0].custom_data.currency,"THB");
+    assert.equal(events[0].custom_data.locale,"th"); assert.equal(events[0].custom_data.channel,"retail");
+    assert.equal(events[0].custom_data.purchase_type,"products");
+    let outbound: Record<string,unknown> | undefined;
+    await sendMetaEvent(eventId,async (_url,init)=>{outbound=JSON.parse(String(init?.body)).data[0];return new Response('{"events_received":1}');});
+    assert.equal(outbound!.event_name,"DEV_OrderSubmitted");
+    assert.equal((await sql`select metadata->>'paymentStatus' as status from public.retail_customer_orders where id=${id}::uuid`)[0].status,"unpaid");
+    await setMetaConsent(c.request,false);
+    const optedOut = randomUUID(); pharmacyOrders.push(optedOut); assert.equal(await save(optedOut),null);
+    assert.equal((await sql`select count(*)::int as n from public.meta_conversion_events where context_id=${c.id}::uuid`)[0].n,2);
+    await sql`delete from public.meta_tracking_bindings where resource_type='plan' and resource_id=${planId} and context_id=${c.id}::uuid`;
   });
   it("retries outside database transactions with original event ID/time and only allowed fields", async () => {
     const c = await queued();
@@ -264,6 +350,7 @@ describe("preference-controlled, durable and isolated Meta delivery", () => {
     assert.equal(bodies[0].data[0].event_name,"DEV_PageView");
     assert.equal(bodies[0].data[0].user_data.client_user_agent,"Fixture browser");
     assert.equal(bodies[0].data[0].user_data.client_ip_address,"192.0.2.15");
+    assert.deepEqual(bodies[0].data[0].user_data.external_id,[metaExternalId(c.id)]);
     assert.doesNotMatch(JSON.stringify(bodies),/private|healthscore|supplements/);
     await sendMetaEvent(c.eventId,async()=>{throw new Error("must not resubmit an accepted event");});
   });

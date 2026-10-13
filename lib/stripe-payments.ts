@@ -1,4 +1,4 @@
-import { bindMetaContext } from "@/lib/meta-tracking";
+import { bindMetaContext, recordMetaCheckout } from "@/lib/meta-tracking";
 import { existingPaymentAccounting, recordPaymentAccountingOnce } from "@/lib/payment-accounting";
 import { effectivePayment, preparePaymentFulfillment, newlyConfirmedFulfillment } from "@/lib/payment-fulfillment-evidence";
 import { claimFunnelRequest } from "@/lib/funnel-idempotency";
@@ -1080,6 +1080,11 @@ export async function createStripeCheckoutSession(input: CheckoutSessionInput) {
     return insertPayment(tx, { config, locale: input.locale, paymentId, planId: input.planId, selectedPlan: input.selectedPlan, sourceSurface: input.sourceSurface });
   });
   if (!payment.paid_at) await withDatabaseTransaction(sql, tx => bindMetaContext(tx, "payment", payment.id, input.request));
+  const captureCheckout = () => withDatabaseTransaction(sql, tx => recordMetaCheckout(tx, {
+    type: "payment", id: payment.id, planId: payment.plan_id,
+    amount: Number(payment.amount) / AMOUNT_MICROS_PER_UNIT, currency: payment.currency,
+    locale: payment.locale, selectedPlan: payment.selected_plan
+  })).catch(() => { console.warn("Meta checkout capture deferred to browser retry"); });
   if (payment.status === "fulfillment_failed" && payment.paid_at && payment.stripe_checkout_session_id) {
     await fulfillCheckoutSession(payment.stripe_checkout_session_id, { source: "return_page", request: input.request });
     return { paymentId, clientSecret: null, mock: config.mode === "mock", publishableKey: config.publishableKey,
@@ -1109,6 +1114,7 @@ export async function createStripeCheckoutSession(input: CheckoutSessionInput) {
         expectedStatuses: ["created", "checkout_session_created", "checkout_opened", "processing"] });
       throw new FunnelError("This checkout attempt has ended. Start a new attempt.", 409, "checkout_expired");
     }
+    await captureCheckout();
     return { paymentId, clientSecret: existing.client_secret, mock: false, publishableKey: config.publishableKey };
   }
   const checkoutRequestedEvent = {
@@ -1176,6 +1182,7 @@ export async function createStripeCheckoutSession(input: CheckoutSessionInput) {
       console.warn("Mock checkout session follow-up failed", error);
     });
 
+    await captureCheckout();
     return {
       clientSecret: null,
       mock: true,
@@ -1267,6 +1274,7 @@ export async function createStripeCheckoutSession(input: CheckoutSessionInput) {
     valueCurrency: payment.currency
   }).catch(() => undefined);
 
+  await captureCheckout();
   return {
     mock: false,
     clientSecret: session.client_secret,

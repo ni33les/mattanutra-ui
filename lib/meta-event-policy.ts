@@ -1,6 +1,8 @@
-/** The complete export boundary. Internal BPM payloads must never be spread into Meta events. */
+import { isLocale } from "@/lib/i18n";
+
+/** The explicit event payload boundary. Internal BPM payloads must never be spread into Meta events. */
 export type MetaEnvironment = "dev" | "uat" | "prd";
-export const META_EVENTS = ["PageView", "ViewContent", "QuizStart", "QuizProgress", "QuizSubmitted", "Lead", "EmailCapture", "Contact", "SelectOffer", "AddToCart", "InitiateCheckout", "Purchase", "McpProviderSelected", "McpUrlCopied", "McpProviderOpened", "McpPromptCopied", "McpConnectionVerified"] as const;
+export const META_EVENTS = ["PageView", "ViewContent", "QuizStart", "QuizProgress", "QuizSubmitted", "Lead", "EmailCapture", "Contact", "SelectOffer", "AddToCart", "InitiateCheckout", "OrderSubmitted", "Purchase", "McpProviderSelected", "McpUrlCopied", "McpProviderOpened", "McpPromptCopied", "McpConnectionVerified"] as const;
 export type MetaEventName = typeof META_EVENTS[number];
 export type MetaPublicConfig = { environment: MetaEnvironment; pixelId: string; enabled: boolean };
 export const META_CONSENT_COOKIE = "mn_marketing";
@@ -30,8 +32,8 @@ export function sanitiseMetaUrl(value: unknown, env: MetaEnvironment): string | 
     const local = env === "dev" && ["localhost", "127.0.0.1"].includes(url.hostname);
     if (url.origin !== expected.origin && !(env === "prd" && url.hostname === "www.mattanutra.com" && url.protocol === "https:") && !local) return null;
     if (/\/(admin|api)(\/|$)/.test(url.pathname)) return null;
-    const match = url.pathname.match(/^\/(en|th|zh-CN)(?:\/(.*))?\/?$/);
-    if (!match) return null;
+    const match = url.pathname.match(/^\/([^/]+)(?:\/(.*))?\/?$/);
+    if (!match || !isLocale(match[1])) return null;
     const [, locale, tail = ""] = match;
     const exact = ["", "privacy", "terms", "assessment", "assessment/results", "nutrition/refine", "nutrition/quiz", "nutrition/healthscore", "nutrition/progress", "nutrition/reveal", "nutrition/payment/checkout", "nutrition/payment/return", "basket/checkout", "basket/return", "order/track", "library"];
     const path = /^connect(?:\/(?:claude|perplexity|chatgpt|grok))?\/?$/.test(tail) ? tail.replace(/\/$/, "")
@@ -50,32 +52,26 @@ export function sanitiseMetaUrl(value: unknown, env: MetaEnvironment): string | 
   } catch { return null; }
 }
 
-function publicPixelUrlSafe(url: URL, env: MetaEnvironment) {
-  if (!/^\/(en|th|zh-CN)(?:\/(?:privacy|terms))?\/?$/.test(url.pathname)
-    || !sanitiseMetaUrl(url.href, env) || url.hash) return false;
-  // Native Pixel reads the whole URL. Permit opaque ad IDs, never arbitrary UTM
-  // text, contact details or health-related campaign names.
-  return [...url.searchParams].every(([key, value]) => key === "fbclid"
-    ? /^[\w-]{1,500}$/.test(value)
-    : ["campaign_id", "adset_id", "ad_id", "creative_id"].includes(key) && /^\d{1,25}$/.test(value));
+/** Native Pixel covers customer pages and reads their actual URLs/referrers. */
+export function browserPixelPageSafe(value: string, _referrer: string, env: MetaEnvironment) {
+  try {
+    const url = new URL(value);
+    const local = env === "dev" && ["localhost", "127.0.0.1"].includes(url.hostname) && ["http:", "https:"].includes(url.protocol);
+    if (url.origin !== metaOrigin(env) && !(env === "prd" && url.origin === "https://www.mattanutra.com") && !local) return false;
+    return isLocale(url.pathname.split("/")[1]) && !/\/(admin|api)(\/|$)/.test(url.pathname);
+  } catch { return false; }
 }
 
-const publicPixelReferrers = new Set([
-  "https://www.facebook.com/", "https://l.facebook.com/", "https://m.facebook.com/", "https://lm.facebook.com/",
-  "https://business.facebook.com/", "https://adsmanager.facebook.com/",
-  "https://www.instagram.com/", "https://l.instagram.com/", "https://www.google.com/"
-]);
-
-/** Native Pixel sees the real URL and DOM. Personalised pages use CAPI only. */
-export function browserPixelPageSafe(value: string, referrer: string, env: MetaEnvironment) {
-  try {
-    if (!publicPixelUrlSafe(new URL(value), env)) return false;
-    if (!referrer) return true;
-    const ref = new URL(referrer);
-    // Meta's setup tools send a Business/Ads Manager origin as the referrer.
-    // Only allow those exact roots; unknown paths, queries and fragments stay private.
-    return publicPixelReferrers.has(ref.href) || publicPixelUrlSafe(ref, env);
-  } catch { return false; }
+export function metaPageStage(pathname: string) {
+  const path = pathname.split("/").slice(2).join("/");
+  if (/^connect(?:\/|$)/.test(path)) return path === "connect" ? "connect" : "connect_guide";
+  if (/(?:^|\/)(?:return|track)(?:\/|$)/.test(path)) return "confirmation";
+  if (/(?:^|\/)checkout(?:\/|$)/.test(path)) return "checkout";
+  if (/(?:^|\/)(?:healthscore|results|reveal|plan)(?:\/|$)/.test(path)) return "results";
+  if (/(?:^|\/)(?:assessment|quiz|refine|progress)(?:\/|$)/.test(path)) return "assessment";
+  if (/^basket(?:\/|$)/.test(path)) return "basket";
+  if (/^(?:library|blog|privacy|terms)(?:\/|$)/.test(path)) return "content";
+  return "landing";
 }
 
 export function metaCustomData(name: MetaEventName, value: unknown, environment: MetaEnvironment) {
@@ -83,17 +79,17 @@ export function metaCustomData(name: MetaEventName, value: unknown, environment:
   const data: Record<string, string | number> = { mn_env: environment, event_schema: "1" };
   const connection = name.startsWith("Mcp") || String(input.stage).startsWith("connect");
   if (!connection && typeof input.planId === "string" && uuidPattern.test(input.planId)) data.plan_id = input.planId;
-  if (["en", "th", "zh-CN"].includes(String(input.locale))) data.locale = String(input.locale);
+  if (typeof input.locale === "string" && isLocale(input.locale)) data.locale = input.locale;
   if (["web", "retail", "mcp", "pharmacy", "mcp_web"].includes(String(input.channel))) {
     data.channel = input.channel === "pharmacy" ? "retail" : input.channel === "mcp_web" ? "mcp" : String(input.channel);
   }
   if (["landing", "assessment", "results", "offer", "basket", "checkout", "confirmation", "content", "connect", "connect_guide", "connect_verified"].includes(String(input.stage))) data.funnel_stage = String(input.stage);
   if (connection && ["claude", "perplexity", "chatgpt", "grok"].includes(String(input.provider))) data.provider = String(input.provider);
   if (!connection && ["precision", "pro"].includes(String(input.offer))) data.offer = String(input.offer);
-  if (["Purchase", "InitiateCheckout", "SelectOffer", "AddToCart"].includes(name)
+  if (["Purchase", "OrderSubmitted", "InitiateCheckout", "SelectOffer", "AddToCart"].includes(name)
     && ["plan", "products"].includes(String(input.purchase_type))) data.purchase_type = String(input.purchase_type);
   if (name === "QuizProgress" && [25, 50, 75].includes(Number(input.progress))) data.progress = Number(input.progress);
-  if (["Purchase", "InitiateCheckout", "SelectOffer", "AddToCart"].includes(name)) {
+  if (["Purchase", "OrderSubmitted", "InitiateCheckout", "SelectOffer", "AddToCart"].includes(name)) {
     if (typeof input.value === "number" && Number.isFinite(input.value) && input.value >= 0 && input.value <= 1e9) data.value = Math.round(input.value * 100) / 100;
     if (typeof input.currency === "string" && /^[A-Z]{3}$/.test(input.currency)) data.currency = input.currency;
   }

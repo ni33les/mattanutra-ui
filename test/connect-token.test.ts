@@ -37,11 +37,11 @@ describe("anonymous connection verification boundaries", () => {
     assert.equal(connectHref("th", "grok", query), "/th/connect/grok?campaign_id=123&ad_id=456&fbclid=opaqueClick");
     assert.deepEqual(connectCampaign(query), { campaign_id: "123", ad_id: "456" });
   });
-  it("never exports setup tokens, prompts or health/supplement details and keeps these pages CAPI-only", () => {
+  it("excludes setup tokens, prompts and health details from explicit event payloads", () => {
     const url = "https://mattanutra.com/zh-CN/connect/claude?connect_token=secret&prompt=private&planId=" + randomUUID();
     assert.equal(sanitiseMetaUrl(url, "prd"), "https://mattanutra.com/zh-CN/connect/claude");
     assert.equal(sanitiseMetaUrl("https://mattanutra.com/en/connect/unknown", "prd"), null);
-    assert.equal(browserPixelPageSafe(url, "", "prd"), false);
+    assert.equal(browserPixelPageSafe(url, "", "prd"), true);
     assert.deepEqual(metaCustomData("McpConnectionVerified", { provider: "claude", locale: "zh-CN", stage: "connect_verified", campaign_id: "123",
       planId: randomUUID(), prompt: "private", connect_token: "secret", supplements: ["private"], email: "private", health: 1 }, "prd"),
       { mn_env: "prd", event_schema: "1", locale: "zh-CN", funnel_stage: "connect_verified", provider: "claude", campaign_id: "123" });

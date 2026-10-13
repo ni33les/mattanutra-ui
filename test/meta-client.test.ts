@@ -63,6 +63,31 @@ describe("Meta browser event receipts", () => {
     assert.deepEqual(pixelCalls[0][4], { eventID: requests[1].eventId });
   });
 
+  it("recovers from a lost response and transient server failure using one event ID", async t => {
+    const requests: ReturnType<typeof eventRequest>[] = [];
+    t.mock.method(globalThis, "fetch", async (_url, init) => {
+      const body = eventRequest(init); requests.push(body);
+      if (requests.length === 1) throw new Error("lost response");
+      if (requests.length === 2) return new Response("retry", { status: 503 });
+      return Response.json({ accepted: true, eventId: body.eventId });
+    });
+    await trackMetaEvent("PageView", {}, crypto.randomUUID());
+    assert.equal(requests.length, 3);
+    assert.equal(new Set(requests.map(request => request.eventId)).size, 1);
+    assert.equal(pixelCalls.length, 1);
+    assert.deepEqual(pixelCalls[0][4], { eventID: requests[0].eventId });
+  });
+
+  it("does not misattribute a delayed PageView to the next customer page", async t => {
+    const response = deferredResponse();
+    t.mock.method(globalThis, "fetch", () => response.promise);
+    const sent = trackMetaEvent("PageView", {}, crypto.randomUUID());
+    location.href = "https://mattanutra.com/en/nutrition/quiz";
+    response.resolve(Response.json({ accepted: true, eventId: receiptId }));
+    await sent;
+    assert.equal(pixelCalls.length, 0);
+  });
+
   it("does not emit or suppress retries for malformed acceptance receipts", async t => {
     const malformed = [null, {}, { accepted: "true", eventId: receiptId }, { accepted: 1, eventId: receiptId },
       { accepted: true }, { accepted: true, eventId: 123 }, { accepted: true, eventId: "invalid" }];
@@ -111,10 +136,26 @@ describe("Meta browser event receipts", () => {
     const response = deferredResponse();
     t.mock.method(globalThis, "fetch", () => response.promise);
     const sent = trackMetaEvent("PageView", {}, crypto.randomUUID());
-    location.href = "https://mattanutra.com/en/nutrition/healthscore?planId=private";
+    location.href = "https://mattanutra.com/en/admin/dashboard";
     response.resolve(Response.json({ accepted: true, eventId: receiptId }));
     await sent;
     assert.equal(pixelCalls.length, 0);
+  });
+
+  it("sends native funnel events on customer pages with the authoritative checkout receipt", async t => {
+    const attemptId = crypto.randomUUID();
+    location.href = "https://www.mattanutra.com/zh-CN/basket/checkout?access=opaque";
+    page.referrer = "https://mattanutra.com/zh-CN/nutrition/reveal?planId=opaque";
+    t.mock.method(globalThis, "fetch", async () => Response.json({ accepted: true, eventId: receiptId,
+      data: { mn_env: "uat", event_schema: "1", locale: "zh-CN", funnel_stage: "checkout", purchase_type: "products", value: 250, currency: "THB", email: "excluded@example.com" } }));
+    await trackMetaEvent("InitiateCheckout", { attemptId, value: 1, currency: "USD" });
+    assert.deepEqual(pixelCalls, [["trackSingle", pixelId, "InitiateCheckout", {
+      mn_env: "prd", event_schema: "1", locale: "zh-CN", funnel_stage: "checkout", purchase_type: "products", value: 250, currency: "THB"
+    }, { eventID: receiptId }]]);
+    await trackMetaEvent("InitiateCheckout", { attemptId });
+    assert.equal(pixelCalls.length, 1);
+    await trackMetaEvent("InitiateCheckout", { attemptId: crypto.randomUUID() });
+    assert.equal(pixelCalls.length, 2);
   });
 
   it("retains the configured destination for an in-flight accepted event", async t => {

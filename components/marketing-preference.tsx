@@ -2,7 +2,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import type { Locale } from "@/lib/i18n";
-import { browserPixelPageSafe, type MetaPublicConfig } from "@/lib/meta-event-policy";
+import { browserPixelPageSafe, metaPageStage, type MetaPublicConfig } from "@/lib/meta-event-policy";
 import { metaCampaignAttribution, metaClickId } from "@/lib/meta-attribution";
 import { configureMetaClient, marketingGranted, marketingPreferenceSaved, META_PREFERENCE_CHANGED, saveMarketingPreference, trackMetaEvent } from "@/lib/meta-client";
 
@@ -10,7 +10,7 @@ let initialPreference: Promise<boolean> | undefined;
 const startupRetryDelays = [500, 1500];
 
 export function MarketingPreference({ locale }: { locale: Locale }) {
-  const [config, setConfig] = useState<MetaPublicConfig>({ enabled: false, pixelId: "", environment: "dev" });
+  const [config, setConfig] = useState<MetaPublicConfig | null>(null);
   const navigation = useRef({ key: "", id: "" });
   const pathname = usePathname(), search = useSearchParams().toString();
   const [choice, setChoice] = useState(0);
@@ -23,7 +23,7 @@ export function MarketingPreference({ locale }: { locale: Locale }) {
     let controller: AbortController | undefined;
     let latestConfig: MetaPublicConfig | undefined;
     const configure = (value: MetaPublicConfig) => {
-      if (active) { configureMetaClient(value); setConfig(value); }
+      if (active) setConfig(value);
     };
     const initialise = async (attempt: number) => {
       controller = new AbortController();
@@ -71,13 +71,14 @@ export function MarketingPreference({ locale }: { locale: Locale }) {
     return () => window.removeEventListener(META_PREFERENCE_CHANGED, changed);
   }, []);
   useLayoutEffect(() => {
-    if (config.enabled && window.fbq && !browserPixelPageSafe(location.href, document.referrer, config.environment)) {
+    if (config?.enabled && window.fbq && !browserPixelPageSafe(location.href, document.referrer, config.environment)) {
       window.fbq("consent", "revoke");
       location.reload();
     }
-  }, [pathname, search, config.environment, config.enabled]);
+  }, [pathname, search, config?.environment, config?.enabled]);
   useEffect(() => {
-    if (!config.enabled || excluded || !marketingGranted()) return;
+    if (!config) return;
+    if (!config.enabled || excluded || !marketingGranted()) { configureMetaClient(config); return; }
     if (browserPixelPageSafe(location.href, document.referrer, config.environment) && !window.fbq) {
       const queue: unknown[][] = [];
       const fbq = Object.assign((...args: unknown[]) => { if (fbq.callMethod) fbq.callMethod(...args); else queue.push(args); },
@@ -90,9 +91,11 @@ export function MarketingPreference({ locale }: { locale: Locale }) {
       script.referrerPolicy = "no-referrer"; document.head.appendChild(script);
     }
     window.fbq?.("consent", "grant");
+    // Install the Pixel queue before releasing funnel events captured during startup.
+    configureMetaClient(config);
     const navigationKey = `${pathname}?${search}:${choice}`;
     if (navigation.current.key !== navigationKey) navigation.current = { key: navigationKey, id: crypto.randomUUID() };
-    void trackMetaEvent("PageView", { locale, provider: /\/connect\/(claude|perplexity|chatgpt|grok)/.exec(pathname)?.[1], stage: pathname.includes("/connect") ? pathname.split("/").length > 3 ? "connect_guide" : "connect" : pathname.includes("checkout") ? "checkout" : pathname.includes("quiz") ? "assessment" : pathname.includes("healthscore") || pathname.includes("reveal") ? "results" : "landing" }, `navigation:${navigation.current.id}`);
+    void trackMetaEvent("PageView", { locale, provider: /\/connect\/(claude|perplexity|chatgpt|grok)/.exec(pathname)?.[1], stage: metaPageStage(pathname) }, `navigation:${navigation.current.id}`);
     // Next's client navigation retains third-party scripts. Cross the boundary with a fresh document.
     const onClick = (event: MouseEvent) => {
       const link = event.target instanceof Element ? event.target.closest("a[href]") as HTMLAnchorElement | null : null;

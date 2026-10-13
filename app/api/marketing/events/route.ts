@@ -16,7 +16,7 @@ export async function POST(request: Request) {
     const raw = await request.text();
     if (raw.length > 8192) return NextResponse.json({ error: "Event too large" }, { status: 413 });
     const body = JSON.parse(raw);
-    if (!META_EVENTS.includes(body.name) || ["Purchase", "Lead", "QuizSubmitted", "EmailCapture", "McpConnectionVerified"].includes(body.name) || !uuidPattern.test(body.eventId || "") || !uuidPattern.test(body.sessionId || "")) {
+    if (!META_EVENTS.includes(body.name) || ["Purchase", "OrderSubmitted", "Lead", "QuizSubmitted", "EmailCapture", "McpConnectionVerified"].includes(body.name) || !uuidPattern.test(body.eventId || "") || !uuidPattern.test(body.sessionId || "")) {
       return NextResponse.json({ error: "Invalid browser milestone" }, { status: 400 });
     }
     const sourceUrl = sanitiseMetaUrl(body.sourceUrl, config.environment);
@@ -31,7 +31,7 @@ export async function POST(request: Request) {
     const dimension = String(data.funnel_stage).startsWith("connect") ? `${data.provider || ""}:${data.locale || ""}:` : "";
     const key = name === "InitiateCheckout" ? `checkout:${attemptId}` : name === "PageView" || name === "AddToCart" ? body.eventId
       : `${body.sessionId}:${data.plan_id || "visit"}:${name}:${dimension}${data.progress ?? data.offer ?? data.funnel_stage ?? ""}`;
-    const eventId = await withDatabaseTransaction(sql, async tx => {
+    const receipt = await withDatabaseTransaction(sql, async tx => {
       // Serialize capture against other tabs before taking the event's attribution snapshot.
       const [current] = await tx`select matching,attribution,consent_granted,expires_at from public.meta_tracking_contexts where id=${context.id}::uuid for update`;
       if (!current?.consent_granted || new Date(current.expires_at).getTime() <= Date.now()) return null;
@@ -40,9 +40,17 @@ export async function POST(request: Request) {
         !!matching.fbc && matching.fbc !== current?.matching?.fbc);
       await tx`update public.meta_tracking_contexts set matching=matching || ${tx.json(matching)},attribution=${tx.json(campaign)},updated_at=now()
         where id=${context.id}::uuid and consent_granted`;
-      return enqueueMetaEvent(tx, { context: { ...context, attribution: campaign, matching: { ...current.matching, ...matching } }, name,
+      // Recover a lost response without losing native delivery or changing verified checkout values.
+      const [existing] = await tx`select id,custom_data from public.meta_conversion_events
+        where environment=${config.environment} and pixel_id=${config.pixelId} and event_name=${name}
+          and source_key=${`browser:${key}`} and context_id=${context.id}::uuid`;
+      if (existing) return { eventId: existing.id as string, data: existing.custom_data };
+      const eventId = await enqueueMetaEvent(tx, { context: { ...context, attribution: campaign, matching: { ...current.matching, ...matching } }, name,
         sourceKey: `browser:${key}`, eventId: body.eventId, sourceUrl, data: { ...data, planId: data.plan_id, stage: data.funnel_stage } });
+      if (!eventId) return null;
+      const [captured] = await tx`select custom_data from public.meta_conversion_events where id=${eventId}::uuid`;
+      return { eventId, data: captured.custom_data };
     });
-    return NextResponse.json({ accepted: !!eventId, eventId }, { headers: { "Cache-Control": "no-store" } });
+    return NextResponse.json({ accepted: !!receipt, eventId: receipt?.eventId ?? null, ...(receipt ? { data: receipt.data } : {}) }, { headers: { "Cache-Control": "no-store" } });
   } catch { return NextResponse.json({ error: "Could not record campaign event" }, { status: 503 }); }
 }

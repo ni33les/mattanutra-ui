@@ -1,17 +1,26 @@
 import { test, expect, type Page, type BrowserContext } from "@playwright/test";
 import { connectCopy } from "../../lib/connect-copy";
 import { connectProviders } from "../../lib/connect";
-const locales = ["en", "th", "zh-CN"] as const;
+import { publicLocales as locales } from "../../lib/i18n";
+const expectedMcpUrl = process.env.CONNECT_E2E_MCP_URL || "https://dev.mattanutra.com/api/mcp";
 
 async function marketing(page: Page, context: BrowserContext, baseURL: string, optedOut = false) {
   const events: Record<string, unknown>[] = [];
   let pixelLoads = 0, attempts = 0;
   await context.addCookies([{ name: "mn_marketing", value: optedOut ? "denied" : "granted", url: baseURL }]);
-  await page.route("**/api/marketing/consent", route => route.fulfill({ json: { environment: "dev", enabled: true, pixelId: "123456789012345" } }));
+  await page.route("**/api/**", route => ["POST", "PUT", "PATCH", "DELETE"].includes(route.request().method())
+    ? route.fulfill({ json: { accepted: true } }) : route.continue());
+  await page.route("**/api/marketing/consent", route => route.fulfill({ json: {
+    environment: "dev", enabled: true, pixelId: "123456789012345",
+    ...(route.request().method() === "POST" ? { granted: !optedOut } : {})
+  } }));
   await page.route("**/api/marketing/events", route => { events.push(route.request().postDataJSON()); return route.fulfill({ json: { accepted: true, eventId: route.request().postDataJSON().eventId } }); });
   await page.route("**/api/connect/events", route => route.fulfill({ json: { accepted: true } }));
   await page.route("**/api/connect/attempts**", route => { attempts++; return route.abort(); });
-  await page.route("https://connect.facebook.net/**", route => { pixelLoads++; return route.fulfill({ body: "" }); });
+  await page.route("https://connect.facebook.net/**", route => {
+    pixelLoads++;
+    return route.fulfill({ contentType: "application/javascript", body: "window.__pixelCalls=window.fbq.queue.slice();window.fbq.callMethod=(...args)=>window.__pixelCalls.push(args);" });
+  });
   return { events, pixelLoads: () => pixelLoads, attempts: () => attempts };
 }
 
@@ -21,15 +30,19 @@ test("15 concise localized pages show a plain URL and setup instructions without
   for (const locale of locales) {
     for (const provider of [undefined, ...connectProviders]) {
       const path = `/${locale}/connect${provider ? `/${provider}` : ""}`;
+      const previousLoads = fixture.pixelLoads();
       const response = await page.goto(path);
       expect(response?.status()).toBe(200);
-      expect(response?.headers()["content-security-policy"]).not.toContain("facebook");
+      expect(response?.headers()["content-security-policy"]).toContain("https://connect.facebook.net");
+      await expect.poll(fixture.pixelLoads).toBe(previousLoads + 1);
+      await expect.poll(() => page.evaluate(() => ((window as unknown as { __pixelCalls?: unknown[][] }).__pixelCalls ?? [])
+        .some(call => call[0] === "trackSingleCustom" && call[2] === "DEV_PageView"))).toBe(true);
       await expect(page.locator("h1")).toBeVisible();
       await expect(page.locator('link[rel="canonical"]')).toHaveAttribute("href", new RegExp(`${path}$`));
       for (const language of locales) await expect(page.locator(`link[rel="alternate"][hreflang="${language === 'th' ? 'th-TH' : language}"]`)).toHaveCount(1);
       await expect(page.locator('meta[property="og:image"]')).toHaveAttribute("content", new RegExp(`share-${locale}\\.png$`));
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-      await expect(page.locator("#connect-url")).toHaveValue(/^https:\/\/dev\.mattanutra\.com\/api\/mcp$/);
+      await expect(page.locator("#connect-url")).toHaveValue(expectedMcpUrl);
       await expect(page.getByRole("button", { name: connectCopy[locale].copyUrl, exact: true })).toBeVisible();
       await expect(page.getByText(connectCopy[locale].privacy, { exact: true })).toBeVisible();
       await expect(page.locator(".mn-connect-status, #connection-test, .mn-connect-faq, input:not([readonly]), textarea")).toHaveCount(0);
@@ -39,7 +52,7 @@ test("15 concise localized pages show a plain URL and setup instructions without
       if (provider === "chatgpt") await expect(page.locator(".mn-connect-instructions")).toContainText("Developer mode");
     }
   }
-  expect(fixture.pixelLoads()).toBe(0); expect(fixture.attempts()).toBe(0);
+  expect(fixture.pixelLoads()).toBe(locales.length * (connectProviders.length + 1)); expect(fixture.attempts()).toBe(0);
 });
 
 test("deep links, redirects and language switching retain provider and allowed campaign identifiers", async ({ page, context, baseURL }) => {
@@ -63,11 +76,11 @@ test("copy works directly without creating or polling attempts, even with an old
   await page.addInitScript(() => sessionStorage.setItem("mn:connect:attempt:claude", JSON.stringify({ id: "a5252813-4567-4d12-aeff-3e94f852225f", status: "pending", expiresAt: "2099-01-01", connectionUrl: "https://dev.mattanutra.com/api/mcp?connect_token=old-private" })));
   await page.goto("/en/connect");
   await page.getByRole("button", { name: connectCopy.en.copyUrl, exact: true }).click();
-  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe("https://dev.mattanutra.com/api/mcp");
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(expectedMcpUrl);
   await expect.poll(() => fixture.events.filter(e => e.name === "McpUrlCopied").length).toBe(1);
   await page.locator('.mn-connect-provider[href*="claude"]').click();
   await page.getByRole("button", { name: connectCopy.en.copyUrl, exact: true }).click();
-  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe("https://dev.mattanutra.com/api/mcp");
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(expectedMcpUrl);
   await expect.poll(() => fixture.events.filter(e => e.name === "McpUrlCopied").length).toBe(2);
   await page.clock.install(); await page.clock.fastForward(125000);
   expect(fixture.attempts()).toBe(0);
@@ -81,6 +94,6 @@ test("clipboard failure offers manual copying and preserves advertising opt-out"
   await page.getByRole("button", { name: connectCopy.th.copyUrl, exact: true }).click();
   await expect(page.getByText(connectCopy.th.copyFailed, { exact: true })).toBeVisible();
   await expect(page.locator("#connect-url")).toBeFocused();
-  expect(await page.locator("#connect-url").evaluate((el: HTMLInputElement) => el.selectionEnd! - el.selectionStart!)).toBe("https://dev.mattanutra.com/api/mcp".length);
+  expect(await page.locator("#connect-url").evaluate((el: HTMLInputElement) => el.selectionEnd! - el.selectionStart!)).toBe(expectedMcpUrl.length);
   expect(fixture.events).toHaveLength(0); expect(fixture.pixelLoads()).toBe(0); expect(fixture.attempts()).toBe(0);
 });

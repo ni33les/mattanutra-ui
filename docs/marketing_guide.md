@@ -61,11 +61,13 @@ https://mattanutra.com/th/assessment?utm_source=facebook&utm_medium=paid_social&
 
 Facebook usually appends `fbclid` automatically. BPM will capture it where present.
 
-## Meta Pixel + Conversions API (quiz funnel)
+## Meta Pixel + Conversions API
 
-The current integration and runtime configuration are documented in [Meta campaign tracking](meta-campaign-tracking.md). Browser Pixel runs on eligible public home/legal pages; personalized assessment, results and checkout pages send allowlisted milestones through the Conversions API (CAPI). A Pixel Helper warning on a personalized page does not establish that CAPI has failed.
+The current integration and runtime configuration are documented in [Meta campaign tracking](meta-campaign-tracking.md). Browser Pixel runs on every customer page in each registered language, including assessment, results, plan/product checkout, payment return and order tracking. Admin and API pages are excluded. CAPI also records allowed funnel milestones and verified payments.
 
-For browser detection, test `https://mattanutra.com/en` from Meta Events Manager. A saved advertising opt-out keeps tracking off; the Privacy page has the preference control. Native Pixel supports numeric Meta campaign/ad IDs and a valid `fbclid`. The free-text UTM and internal campaign names in the examples above are retained for internal attribution and keep native Pixel off; server export excludes those names.
+For browser detection, enter `https://www.mattanutra.com` or `https://mattanutra.com` in Meta Events Manager. Root URLs redirect to the preferred language; explicit `/en`, `/th` and `/zh-CN` pages also work. A saved advertising opt-out keeps tracking off; the Privacy page has the preference control. Query parameters, fragments and referrers do not disable native Pixel. Its browser library reads actual URLs and referrers, including the UTM/internal campaign names in the examples above and any capability URLs. Explicit custom data and CAPI source URLs remain filtered; that filtering does not sanitize native Pixel's URL fields.
+
+The Event Setup Tool requires its `www.facebook.com/signals/iwl.js` script, which the customer-page CSP allows alongside the two exact configured gateway origins. Check the browser console for blocked script/connection requests if the setup tool fails. Configuration and event capture have bounded retries; repeated event requests reuse their ID, and a delayed native event is not reassigned to a different page after navigation. See the technical guide for the exact CSP destinations and diagnostics. A Meta script loading successfully is separate from an event being accepted or attributed.
 
 For Meta campaign reporting, use resolved numeric IDs in Ads Manager's URL parameters:
 
@@ -77,16 +79,18 @@ campaign_id={{campaign.id}}&adset_id={{adset.id}}&ad_id={{ad.id}}
 
 | Milestone | Meta event | When it fires |
 | --- | --- | --- |
+| Customer page visited | `PageView` | Each customer-page navigation with advertising measurement enabled |
 | Quiz started | Custom `QuizStart` | Assessment / chat actually starts |
 | Quiz answers locked | Custom `QuizSubmitted` | Server confirms assessment submission |
 | First usable HealthScore | `Lead` | Server confirms results are ready |
 | Email captured | Custom `EmailCapture` | Server records the email milestone |
 | Results page view | `ViewContent` | HealthScore page viewed |
 | LINE connected | `Contact` | Successful LINE connection |
-| Checkout ready | `InitiateCheckout` | A usable checkout attempt exists |
+| Checkout ready | `InitiateCheckout` | Server records a usable checkout with its saved value/currency; browser mirrors the same receipt ID |
+| Pharmacy order submitted | `OrderSubmitted` | Server records each saved pay-at-till order once with its value/currency; the order remains unpaid |
 | Paid conversion | `Purchase` | Verified payment confirmation with the saved amount and currency |
 
-Runtime tracking requires `META_TRACKING_ENABLED=true`, a valid pixel ID and a CAPI token. Set `MATTANUTRA_ENV` and use environment-specific `FACEBOOK_PIXEL_ID_DEV/UAT/PRD` and `FACEBOOK_CAPI_ACCESS_TOKEN_DEV/UAT/PRD` values. DEV/UAT event names have `DEV_`/`UAT_` prefixes even when a dataset is shared. Use `FACEBOOK_CAPI_TEST_EVENT_CODE_UAT` for UAT diagnostics. Browser and server copies use the same event name and ID for deduplication.
+Runtime tracking requires `META_TRACKING_ENABLED=true`, a valid pixel ID and a CAPI token. Set `MATTANUTRA_ENV` and use environment-specific `FACEBOOK_PIXEL_ID_DEV/UAT/PRD` and `FACEBOOK_CAPI_ACCESS_TOKEN_DEV/UAT/PRD` values. DEV/UAT event names have `DEV_`/`UAT_` prefixes even when a dataset is shared. Use `FACEBOOK_CAPI_TEST_EVENT_CODE_UAT` for UAT diagnostics. Browser and server copies use the same event name and ID for deduplication. A stable hashed tracking-context ID links landing and checkout activity even before a plan exists; normalized contact/country hashes supplement matching when available. Purchase value and currency come from verified payment records, never an arbitrary browser event or a receipt-page visit.
 
 ### Campaign setup
 

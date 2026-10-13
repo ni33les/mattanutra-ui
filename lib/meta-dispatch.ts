@@ -36,7 +36,7 @@ export async function sendMetaEvent(eventId: string, fetchImpl: typeof fetch = f
     // New events retain their original click/browser evidence across later visits and retries.
     // Legacy rows have no snapshot; keep their existing delivery behavior without a backfill.
     const evidence = event.matching ?? event.context_matching;
-    for (const key of ["em", "ph"] as const) {
+    for (const key of ["em", "ph", "country"] as const) {
       const values = evidence?.[key];
       if (Array.isArray(values) && values.length && values.every(v => typeof v === "string" && /^[a-f0-9]{64}$/.test(v))) matching[key] = values;
     }
@@ -47,7 +47,9 @@ export async function sendMetaEvent(eventId: string, fetchImpl: typeof fetch = f
     const customData = metaCustomData(event.event_name as MetaEventName, {
       ...raw, planId: raw.plan_id, stage: raw.funnel_stage
     }, config.environment);
-    if (customData.plan_id) matching.external_id = [metaExternalId(String(customData.plan_id))];
+    // Keep anonymous landing visits and buy-before-quiz purchases in the same journey.
+    matching.external_id = [metaExternalId(String(event.context_id)),
+      ...(customData.plan_id ? [metaExternalId(String(customData.plan_id))] : [])];
     const payload = { data: [{ event_name: metaEventName(event.event_name as MetaEventName, config.environment),
       event_id: event.id, event_time: Math.floor(new Date(event.occurred_at).getTime() / 1000), action_source: "website",
       event_source_url: sanitiseMetaUrl(event.source_url, config.environment), user_data: matching, custom_data: customData }],

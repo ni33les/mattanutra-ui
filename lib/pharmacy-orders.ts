@@ -1,4 +1,5 @@
 import { hasHealthScoreAiCopy } from "@/lib/healthscore-readiness";
+import { bindMetaContext, recordMetaPharmacyOrder } from "@/lib/meta-tracking";
 import { randomUUID } from "node:crypto";
 import { getSql, withDatabaseTransaction } from "@/lib/db";
 import { getStoredAssessmentPrefill, getStoredFormulationRead, isUuid, toJsonValue } from "@/lib/assessment-store";
@@ -78,7 +79,7 @@ export async function readPharmacyOrder(planId: string, slug: string, orderId?: 
   return order ? { receipt: order.metadata.receipt as PharmacyOrderReceipt, result: order.metadata.result as FormulationResult, locale: isLocale(order.metadata.locale) ? order.metadata.locale : assessment.locale } : null;
 }
 
-export async function createPharmacyOrder(value: unknown, key: string): Promise<PharmacyOrderReceipt> {
+export async function createPharmacyOrder(value: unknown, key: string, request?: Request): Promise<PharmacyOrderReceipt> {
   const input = value as Record<string, unknown> | null;
   if (!input || !isUuid(String(input.planId)) || typeof input.pharmacy !== "string" || !isLocale(input.locale) ||
       !Number.isSafeInteger(input.expectedRevision) || Number(input.expectedRevision) < 1) {
@@ -115,6 +116,9 @@ export async function createPharmacyOrder(value: unknown, key: string): Promise<
       values (${receipt.id}::uuid, ${quote.pharmacy.id}::uuid, ${receipt.reference}, 'pharmacy', ${receipt.customerName}, 'placed', ${receipt.currency}, now(),
         ${tx.json(metadata)})`;
     await tx`insert into public.retail_customer_order_lines ${tx(orderLines)}`;
+    await bindMetaContext(tx, "plan", planId, request);
+    await recordMetaPharmacyOrder(tx, { id: receipt.id, planId, locale,
+      total: receipt.total, currency: receipt.currency });
     await completeFunnelRequest(tx, "pharmacy-order", key, receipt);
     // Durable notification admission participates in the existing task transaction;
     // the worker performs delivery after commit.

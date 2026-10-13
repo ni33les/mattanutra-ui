@@ -126,13 +126,17 @@ const securityHeaders = [
       ])
 ];
 
-// Native Pixel is allowed only on public home/legal documents. Personalised
-// documents retain the restrictive policy and export solely through our server.
-const publicMarketingHeaders = securityHeaders.filter(header => header.key === "Content-Security-Policy").map(header => ({
+// These exact OpenBridge origins are configured for pixel 27629903823308584;
+// permit their event requests without trusting other Cloud Run or AWS tenants.
+const metaGatewayOrigins = [
+  "https://mpc-prod-27-s6uit34pua-uk.a.run.app",
+  "https://5z-2b6b7616f94640c2840d1841e1ac24c3.ecs.us-east-1.on.aws"
+];
+const customerMarketingHeaders = securityHeaders.filter(header => header.key === "Content-Security-Policy").map(header => ({
   ...header,
   value: header.value
-    .replace("script-src 'self'", "script-src 'self' https://connect.facebook.net")
-    .replace("connect-src 'self'", "connect-src 'self' https://connect.facebook.net https://www.facebook.com")
+    .replace("script-src 'self'", "script-src 'self' https://connect.facebook.net https://www.facebook.com/signals/iwl.js")
+    .replace("connect-src 'self'", `connect-src 'self' https://connect.facebook.net https://www.facebook.com ${metaGatewayOrigins.join(" ")}`)
     .replace("img-src 'self'", "img-src 'self' https://www.facebook.com")
 }));
 
@@ -161,8 +165,12 @@ const nextConfig: NextConfig = {
         headers: securityHeaders,
         source: "/(.*)"
       },
-      { source: `/:locale(${publicLocaleRoutePattern})`, headers: publicMarketingHeaders },
-      { source: `/:locale(${publicLocaleRoutePattern})/:document(privacy|terms)`, headers: publicMarketingHeaders },
+      // Cover every customer page in each registered language, including funnels.
+      { source: `/:locale(${publicLocaleRoutePattern})`, headers: customerMarketingHeaders },
+      { source: `/:locale(${publicLocaleRoutePattern})/:path*`, headers: customerMarketingHeaders },
+      // Later matching headers restore the restrictive policy for internal pages.
+      { source: `/:locale(${publicLocaleRoutePattern})/:internal(admin|api)`, headers: securityHeaders },
+      { source: `/:locale(${publicLocaleRoutePattern})/:internal(admin|api)/:path*`, headers: securityHeaders },
       {
         headers: [
           {

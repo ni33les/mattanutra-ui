@@ -1,4 +1,4 @@
-import { bindMetaContext, recordMetaPurchase } from "@/lib/meta-tracking";
+import { bindMetaContext, recordMetaCheckout, recordMetaPurchase } from "@/lib/meta-tracking";
 import { readStoredMatching, frozenCheckoutIdentityJson } from "@/lib/recommendation-storage";
 import { MATCHER_VERSION } from "@/lib/matcher/config";
 import { requireCurrentProductSelection } from "@/lib/assessment-product-preferences";
@@ -1107,6 +1107,10 @@ async function continueRetailCheckoutPayment(sql: RetailCheckoutDb, payment: Che
     await bindMetaContext(tx, "retail", payment.id, input.request, { email: payment.customer_email, phone: payment.customer_phone, country: String(objectValue(payment.shipping_address).country ?? "") });
     if (typeof metadata.agenticOrderId === "string") await bindMetaContext(tx, "agentic", metadata.agenticOrderId, input.request);
   });
+  const captureCheckout = () => withDatabaseTransaction(sql as Db, tx => recordMetaCheckout(tx, {
+    type: "retail", id: payment.id, planId: payment.plan_id,
+    amount: totalAmount, currency, locale: payment.locale
+  })).catch(() => { console.warn("Meta checkout capture deferred to browser retry"); });
 
   void writeBpmEvent({
     actorType: "visitor",
@@ -1166,6 +1170,7 @@ async function continueRetailCheckoutPayment(sql: RetailCheckoutDb, payment: Che
       valueCurrency: currency
     });
 
+    await captureCheckout();
     return {
       mock: true,
       paymentId: payment.id,
@@ -1259,6 +1264,7 @@ async function continueRetailCheckoutPayment(sql: RetailCheckoutDb, payment: Che
     valueCurrency: currency
   });
 
+  await captureCheckout();
   return {
     clientSecret: session.client_secret,
     mock: false,

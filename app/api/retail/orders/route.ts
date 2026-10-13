@@ -7,7 +7,7 @@ const json = (value: unknown) => Response.json(value, { headers: { "Cache-Contro
 export async function POST(request: Request) {
   const limited = enforceRateLimit(request, publicRateLimits.assessmentPlanMutation);
   if (limited) return limited;
-  try { return json(await createPharmacyOrder(await request.json(), request.headers.get("Idempotency-Key") ?? "")); }
+  try { return json(await createPharmacyOrder(await request.json(), request.headers.get("Idempotency-Key") ?? "", request)); }
   catch (error) { return funnelErrorResponse(error); }
 }
 export async function GET(request: Request) {

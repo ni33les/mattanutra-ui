@@ -96,6 +96,8 @@ export async function bindMetaContext(sql: Db, resourceType: Resource, resourceI
     ? hashPhoneForFacebook(international) : null;
   if (email) matching.em = [email];
   if (phone) matching.ph = [phone];
+  const country = contact?.country?.trim().toLowerCase();
+  if (country && /^[a-z]{2}$/.test(country)) matching.country = [metaExternalId(country)];
   await sql`insert into public.meta_tracking_bindings(resource_type,resource_id,context_id)
     values (${resourceType},${resourceId},${context.id}::uuid) on conflict(resource_type,resource_id) do nothing`;
   if (Object.keys(matching).length) await sql`update public.meta_tracking_contexts set matching=matching || ${sql.json(matching)},updated_at=now()
@@ -159,11 +161,38 @@ export async function recordMetaPurchase(sql: Db, input: {
     sourceUrl: `/${input.locale || "en"}/${input.type === "payment" ? "nutrition/payment/return" : "basket/return"}` });
 }
 
+/** Record a usable checkout even if its browser closes before the response arrives. */
+export async function recordMetaCheckout(sql: Db, input: {
+  type: "payment" | "retail"; id: string; planId: string | null;
+  amount: number; currency: string; locale: string; selectedPlan?: string | null;
+}) {
+  const context = await boundMetaContext(sql, input.type, input.id);
+  if (!context) return null;
+  const channel = await metaResourceChannel(sql, input.planId, input.type, input.id);
+  return enqueueMetaEvent(sql, { context, name: "InitiateCheckout", sourceKey: `browser:checkout:${input.id}`,
+    data: { channel, planId: input.planId, value: input.amount, currency: input.currency.toUpperCase(),
+      purchase_type: input.type === "payment" ? "plan" : "products", offer: input.type === "payment" ? input.selectedPlan : undefined,
+      locale: input.locale, stage: "checkout" },
+    sourceUrl: `/${input.locale}/${input.type === "payment" ? "nutrition/payment/checkout" : "basket/checkout"}` });
+}
+
 export async function recordMetaPlanMilestone(sql: Db, planId: string, name: "Lead" | "QuizSubmitted" | "EmailCapture", locale: string, sourceSuffix = "") {
   const context = await boundMetaContext(sql, "plan", planId);
   if (!context) return null;
   const channel = await metaResourceChannel(sql, planId, "plan", planId);
   return enqueueMetaEvent(sql, { context, name, sourceKey: `${name}:${planId}:${sourceSuffix}`, data: { channel, planId, locale, stage: name === "Lead" ? "results" : "assessment" } });
+}
+
+/** Called in the pharmacy order transaction; an unpaid order is never a Purchase. */
+export async function recordMetaPharmacyOrder(sql: Db, input: {
+  id: string; planId: string; locale: string; total: number; currency: string;
+}) {
+  const context = await boundMetaContext(sql, "plan", input.planId);
+  if (!context) return null;
+  return enqueueMetaEvent(sql, { context, name: "OrderSubmitted", sourceKey: `pharmacy-order:${input.id}`,
+    data: { channel: "retail", planId: input.planId, locale: input.locale, stage: "confirmation",
+      purchase_type: "products", value: input.total, currency: input.currency.toUpperCase() },
+    sourceUrl: `/${input.locale}/nutrition/reveal` });
 }
 
 /** Derive server milestones from the business resource, never the last browser tab. */

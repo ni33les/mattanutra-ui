@@ -38,31 +38,49 @@ function sessionId() {
 }
 let fallbackSession: string | undefined;
 
-export function trackMetaEvent(name: MetaEventName, input: Record<string, unknown> = {}, occurrence?: string) {
+async function captureEvent(body: string) {
+  const delays = [500, 1500];
+  for (let attempt = 0; attempt <= delays.length; attempt++) {
+    if (!marketingGranted()) return null;
+    const controller = new AbortController(), timer = setTimeout(() => controller.abort(), 8000);
+    try {
+      const response = await fetch("/api/marketing/events", { method: "POST", credentials: "same-origin", keepalive: true,
+        signal: controller.signal, headers: { "content-type": "application/json" }, body });
+      if (response.ok) return await response.json();
+      if (response.status !== 429 && response.status < 500) return null;
+    } catch { /* A lost response can be retried with the same event ID. */ }
+    finally { clearTimeout(timer); }
+    if (attempt < delays.length) await new Promise(resolve => setTimeout(resolve, delays[attempt]));
+  }
+  return null;
+}
+
+export function trackMetaEvent(name: MetaEventName, input: Record<string, unknown> = {}, occurrence?: string,
+  sourceUrl = typeof window === "undefined" ? "" : location.href) {
   if (!config && typeof window !== "undefined" && (!marketingPreferenceSaved() || marketingGranted()) && waiting.length < 20) {
-    return new Promise<void>(resolve => { waiting.push(() => { void trackMetaEvent(name, input, occurrence).then(resolve); }); });
+    return new Promise<void>(resolve => { waiting.push(() => { void trackMetaEvent(name, input, occurrence, sourceUrl).then(resolve); }); });
   }
   if (!config?.enabled || !marketingGranted() || typeof window === "undefined" || /\/(admin|api)(\/|$)/.test(location.pathname)) return Promise.resolve();
   const { environment: env, pixelId } = config;
   const id = typeof input.assessmentAttemptId === "string" && uuidPattern.test(input.assessmentAttemptId) ? input.assessmentAttemptId : sessionId();
-  const data = metaCustomData(name, { channel: journeyChannelForPath(location.pathname), ...input }, env);
+  const data = metaCustomData(name, { channel: journeyChannelForPath(new URL(sourceUrl).pathname), ...input }, env);
   const dimension = String(data.funnel_stage).startsWith("connect") ? `${data.provider || ""}:${data.locale || ""}:` : "";
-  const key = occurrence || `${id}:${name}:${data.plan_id || "visit"}:${dimension}${data.progress ?? data.offer ?? data.funnel_stage ?? ""}`;
+  const key = occurrence || (name === "InitiateCheckout" && input.attemptId ? `checkout:${input.attemptId}`
+    : `${id}:${name}:${data.plan_id || "visit"}:${dimension}${data.progress ?? data.offer ?? data.funnel_stage ?? ""}`);
   if (sent.has(key)) return Promise.resolve();
   if (pending.has(key)) return pending.get(key)!;
   const eventId = crypto.randomUUID();
   const work = (async () => {
     try {
-      const response = await fetch("/api/marketing/events", { method: "POST", credentials: "same-origin", keepalive: true,
-        headers: { "content-type": "application/json" }, body: JSON.stringify({ name, eventId, sessionId: id, attemptId: input.attemptId, sourceUrl: location.href,
-          data: { ...data, planId: data.plan_id, stage: data.funnel_stage } }) });
-      if (!response.ok) return;
-      const receipt = await response.json();
+      const receipt = await captureEvent(JSON.stringify({ name, eventId, sessionId: id, attemptId: input.attemptId, sourceUrl,
+        data: { ...data, planId: data.plan_id, stage: data.funnel_stage } }));
       if (receipt?.accepted !== true || typeof receipt.eventId !== "string" || !uuidPattern.test(receipt.eventId)) return;
       sent.add(key);
-      if (marketingGranted() && browserPixelPageSafe(location.href, document.referrer, env) && window.fbq) {
+      if (marketingGranted() && location.href === sourceUrl && browserPixelPageSafe(location.href, document.referrer, env) && window.fbq) {
+        const nativeData = receipt.data && typeof receipt.data === "object"
+          ? metaCustomData(name, { ...receipt.data, planId: receipt.data.plan_id, stage: receipt.data.funnel_stage }, env) : data;
         window.fbq(env === "prd" && ["PageView", "ViewContent", "Contact", "AddToCart", "InitiateCheckout"].includes(name) ? "trackSingle" : "trackSingleCustom",
-          pixelId, metaEventName(name, env), data, { eventID: receipt.eventId });
+          pixelId, metaEventName(name, env), nativeData, { eventID: receipt.eventId });
       }
     } catch { /* Tracking never blocks the customer journey. */ }
     finally { pending.delete(key); }

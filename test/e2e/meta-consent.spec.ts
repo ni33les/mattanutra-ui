@@ -6,6 +6,8 @@ async function trackingFixture(page: Page, context: BrowserContext, baseURL: str
   let pixelLoads = 0, configRequests = 0, failNextConfiguration = false, preferenceFailures = 0;
   await context.clearCookies();
   if (initiallyDenied) await context.addCookies([{ name: "mn_marketing", value: "denied", url: baseURL }]);
+  await page.route("**/api/**", route => ["POST", "PUT", "PATCH", "DELETE"].includes(route.request().method())
+    ? route.fulfill({ json: { accepted: true } }) : route.continue());
   await page.route("**/api/marketing/consent", async route => {
     if (route.request().method() === "GET") {
       configRequests += 1;
@@ -75,7 +77,7 @@ test("automatic preference retries are bounded and a later explicit choice still
   await expect.poll(() => fixture.events.filter(event => event.name === "PageView").length).toBe(1);
 });
 
-test("tracking starts without a popup, retains page boundaries and can be turned off from Privacy", async ({ page, context, baseURL }) => {
+test("tracking starts without a popup, covers the questionnaire and can be turned off from Privacy", async ({ page, context, baseURL }) => {
   const fixture = await trackingFixture(page, context, baseURL!);
   const landing = await page.goto("/en");
   expect(landing?.headers()["content-security-policy"]).toContain("https://connect.facebook.net");
@@ -88,9 +90,11 @@ test("tracking starts without a popup, retains page boundaries and can be turned
   expect(fixture.events.every(e => e.data.mn_env === "dev")).toBe(true);
   await expect.poll(() => page.evaluate(() => (window as unknown as { __pixelCalls: unknown[][] }).__pixelCalls.some(call => call[0] === "trackSingleCustom" && call[2] === "DEV_PageView"))).toBe(true);
   const privatePage = await page.goto("/en/nutrition/quiz");
-  expect(privatePage?.headers()["content-security-policy"]).not.toContain("facebook");
-  expect(await page.evaluate(() => typeof window.fbq)).toBe("undefined");
-  expect(fixture.pixelLoads()).toBe(1);
+  expect(privatePage?.headers()["content-security-policy"]).toContain("https://connect.facebook.net");
+  await expect.poll(fixture.pixelLoads).toBe(2);
+  await expect.poll(() => page.evaluate(() => typeof window.fbq)).toBe("function");
+  await expect.poll(() => fixture.events.filter(event => event.name === "PageView").length).toBe(2);
+  await expect.poll(() => page.evaluate(() => (window as unknown as { __pixelCalls: unknown[][] }).__pixelCalls.some(call => call[0] === "trackSingleCustom" && call[2] === "DEV_PageView"))).toBe(true);
   expect(fixture.preferences).toHaveLength(1);
   await page.goto("/en/privacy");
   await page.getByRole("button", { name: "Turn off", exact: true }).click();
@@ -101,6 +105,35 @@ test("tracking starts without a popup, retains page boundaries and can be turned
   await page.goto("/en"); await configured;
   expect(fixture.events).toHaveLength(eventCount); expect(fixture.pixelLoads()).toBe(loadCount);
   expect((await context.cookies()).find(c => c.name === "mn_marketing")?.value).toBe("denied");
+});
+
+test("homepage to questionnaire client navigation retains the Pixel and sends one matching PageView per page", async ({ page, context, baseURL }) => {
+  const fixture = await trackingFixture(page, context, baseURL!);
+  await page.goto("/en");
+  const nativePageViewIds = () => page.evaluate(() => ((window as unknown as { __pixelCalls?: unknown[][] }).__pixelCalls ?? [])
+    .filter(call => call[0] === "trackSingleCustom" && call[2] === "DEV_PageView")
+    .map(call => (call[4] as { eventID: string }).eventID));
+  await expect.poll(() => fixture.events.filter(event => event.name === "PageView").length).toBe(1);
+  await expect.poll(fixture.pixelLoads).toBe(1);
+  await expect.poll(nativePageViewIds).toEqual([fixture.events.find(event => event.name === "PageView")!.eventId]);
+  const documentMarker = await page.evaluate(() => {
+    const marker = crypto.randomUUID();
+    (window as unknown as { __navigationDocument: string }).__navigationDocument = marker;
+    return marker;
+  });
+
+  await page.locator('main a[href="/en/nutrition/quiz"]').first().click();
+  await expect(page).toHaveURL(url => url.pathname === "/en/nutrition/quiz");
+  await expect.poll(() => fixture.events.filter(event => event.name === "PageView").length).toBe(2);
+  const receipts = fixture.events.filter(event => event.name === "PageView");
+  await expect.poll(nativePageViewIds).toEqual(receipts.map(event => event.eventId));
+  expect(new Set(receipts.map(event => event.eventId)).size).toBe(2);
+  expect(receipts.map(event => event.data.funnel_stage)).toEqual(["landing", "assessment"]);
+  expect(await page.evaluate(() => (window as unknown as { __navigationDocument?: string }).__navigationDocument)).toBe(documentMarker);
+  expect(fixture.pixelLoads()).toBe(1);
+  expect(fixture.preferences).toHaveLength(1);
+  expect(await page.evaluate(() => (window as unknown as { __pixelCalls: unknown[][] }).__pixelCalls
+    .filter(call => call[0] === "init").length)).toBe(1);
 });
 
 test("an existing opt-out stays off and a deliberate privacy-page choice can enable tracking", async ({ page, context, baseURL }) => {

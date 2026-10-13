@@ -4,7 +4,8 @@ import type Stripe from "stripe";
 import { assertSessionMatchesPayment, type PaymentRow } from "../lib/stripe-payments.ts";
 import type { StripePaymentConfig } from "../lib/stripe-payment-config.ts";
 import { metaConfig } from "../lib/meta-config.ts";
-import { metaCustomData, metaEventName, metaEventForBpm, sanitiseMetaUrl, browserPixelPageSafe, metaRequestOriginAllowed } from "../lib/meta-event-policy.ts";
+import { metaCustomData, metaEventName, metaEventForBpm, sanitiseMetaUrl, browserPixelPageSafe, metaRequestOriginAllowed, metaPageStage } from "../lib/meta-event-policy.ts";
+import { publicLocales } from "../lib/i18n.ts";
 const planId = "843893a8-4c1b-44d9-86f4-092e16270d1a";
 describe("campaign export boundary", () => {
   it("accepts both production hostnames behind a proxy while rejecting foreign and cross-environment origins", () => {
@@ -28,7 +29,7 @@ describe("campaign export boundary", () => {
     assert.deepEqual(metaCustomData("Purchase", { value: Infinity, currency: "private", planId: "private", progress: 35 }, "dev"), { mn_env: "dev", event_schema: "1" });
   });
   it("keeps DEV/UAT conversions out of standard production events even with a shared pixel", () => {
-    for (const name of ["PageView", "Purchase", "Lead"] as const) {
+    for (const name of ["PageView", "Purchase", "OrderSubmitted", "Lead"] as const) {
       assert.equal(metaEventName(name, "dev"), `DEV_${name}`);
       assert.equal(metaEventName(name, "uat"), `UAT_${name}`);
       assert.equal(metaEventName(name, "prd"), name);
@@ -43,6 +44,8 @@ describe("campaign export boundary", () => {
     assert.equal(metaCustomData("Purchase", { purchase_type: "products", channel: "mcp_web" }, "uat").purchase_type, "products");
     assert.equal(metaCustomData("Purchase", { purchase_type: "private-supplement", offer: "private-condition" }, "prd").purchase_type, undefined);
     assert.equal(metaCustomData("PageView", { purchase_type: "products" }, "prd").purchase_type, undefined);
+    assert.deepEqual(metaCustomData("OrderSubmitted", { purchase_type: "products", value: 17, currency: "THB", channel: "retail", locale: "th", customerName: "Private", contents: ["private-product"] }, "prd"),
+      { mn_env: "prd", event_schema: "1", locale: "th", channel: "retail", purchase_type: "products", value: 17, currency: "THB" });
   });
   it("retains permitted page/plan URLs and strips contacts, products, capabilities and arbitrary search text", () => {
     assert.equal(sanitiseMetaUrl(`https://uat.mattanutra.com/en/nutrition/healthscore?planId=${planId}&email=private&condition=private#secret`, "uat"), `https://uat.mattanutra.com/en/nutrition/healthscore?planId=${planId}`);
@@ -51,26 +54,32 @@ describe("campaign export boundary", () => {
     assert.equal(sanitiseMetaUrl("https://mattanutra.com/en", "uat"), null);
     assert.equal(sanitiseMetaUrl("https://evil.example/en", "prd"), null);
   });
-  it("never loads native Pixel on personalised pages or with a sensitive referrer", () => {
-    assert.equal(browserPixelPageSafe("https://mattanutra.com/en", "", "prd"), true);
-    for (const url of [`https://mattanutra.com/en?email=private`, `https://mattanutra.com/en/nutrition/healthscore?planId=${planId}`, "https://mattanutra.com/en/basket/checkout"]) assert.equal(browserPixelPageSafe(url, "", "prd"), false);
-    assert.equal(browserPixelPageSafe("https://mattanutra.com/en", "https://mattanutra.com/en/nutrition/healthscore?private", "prd"), false);
-    assert.equal(browserPixelPageSafe("https://mattanutra.com/en", "https://customer-private.example/en", "prd"), false);
-  });
-  it("detects native Pixel on tagged public landing pages opened from Meta tools or ads", () => {
-    const landing = "https://mattanutra.com/en?fbclid=opaque-click_123&campaign_id=111&adset_id=222&ad_id=333&creative_id=444";
-    for (const referrer of ["", "https://business.facebook.com/", "https://adsmanager.facebook.com/", "https://m.facebook.com/", "https://lm.facebook.com/", "https://l.instagram.com/"]) {
-      assert.equal(browserPixelPageSafe(landing, referrer, "prd"), true, referrer);
+  it("covers every customer route and registered language regardless of URL parameters or referrer", () => {
+    const routes = ["", "/privacy", "/terms", "/nutrition/quiz", "/assessment/results", "/nutrition/healthscore", "/nutrition/progress", "/nutrition/reveal", "/nutrition/refine", "/nutrition/payment/checkout", "/nutrition/payment/return", "/basket/checkout", "/basket/return", "/library/example", "/blog/example", "/connect/claude", "/mcp/checkout/token", "/mcp/checkout/token/return", "/order/track/token", "/retail/store/quiz", "/p/store"];
+    for (const locale of publicLocales) for (const path of routes) {
+      for (const host of ["mattanutra.com", "www.mattanutra.com"]) {
+        const url = `https://${host}/${locale}${path}?utm_campaign=autumn&access=opaque#step`;
+        assert.equal(browserPixelPageSafe(url, "https://business.facebook.com/events_manager2/", "prd"), true, url);
+        assert.ok(sanitiseMetaUrl(url, "prd"), url);
+        assert.equal(metaCustomData("PageView", { locale }, "prd").locale, locale);
+      }
     }
-    assert.equal(browserPixelPageSafe("https://www.mattanutra.com/th", landing, "prd"), true);
-    assert.equal(browserPixelPageSafe("https://mattanutra.com/en", "https://mattanutra.com/en/privacy", "prd"), true);
+    assert.equal(browserPixelPageSafe("https://mattanutra.com/en", "https://customer.example/path", "prd"), true);
+    assert.equal(browserPixelPageSafe("http://127.0.0.1:3107/th/nutrition/quiz", "", "dev"), true);
   });
-  it("rejects sensitive or malformed ad parameters and lookalike Meta referrers", () => {
-    for (const query of ["campaign_id=health-condition", "campaign_id=111&campaign_id=private", "ad_id={{ad.id}}", "fbclid=private@example.com", "fbclid=", "utm_campaign=private", "campaign_id=111&email=private", "campaign_id=" + "1".repeat(26)]) {
-      assert.equal(browserPixelPageSafe(`https://mattanutra.com/en?${query}`, "https://business.facebook.com/", "prd"), false, query);
+  it("excludes internal pages, foreign origins and other environments from the browser Pixel", () => {
+    for (const locale of publicLocales) for (const path of ["admin", "admin/dashboard", "api", "api/mcp"]) {
+      assert.equal(browserPixelPageSafe(`https://mattanutra.com/${locale}/${path}`, "", "prd"), false);
     }
-    for (const referrer of ["https://business.facebook.com.evil.example/", "http://business.facebook.com/", "https://business.facebook.com/?private=1", "https://business.facebook.com/private", "https://business.facebook.com/#private", "https://mattanutra.com/en/privacy?email=private", "https://uat.mattanutra.com/en"]) {
-      assert.equal(browserPixelPageSafe("https://mattanutra.com/en", referrer, "prd"), false, referrer);
+    for (const url of ["https://mattanutra.com/admin", "https://mattanutra.com/api/mcp", "https://mattanutra.com/unknown", "https://mattanutra.com.evil.example/en", "https://evil.example/en", "http://mattanutra.com/en", "https://www.mattanutra.com:444/en", "https://uat.mattanutra.com/en", "invalid"]) {
+      assert.equal(browserPixelPageSafe(url, "", "prd"), false, url);
+    }
+    assert.equal(browserPixelPageSafe("https://www.mattanutra.com/en", "", "uat"), false);
+  });
+  it("classifies page views across the sales funnel in every language", () => {
+    const stages = { "": "landing", "nutrition/quiz": "assessment", "assessment/results": "results", "nutrition/progress": "assessment", "nutrition/refine": "assessment", "nutrition/reveal": "results", "basket/checkout": "checkout", "nutrition/payment/return": "confirmation", "mcp/checkout/token/return": "confirmation", "order/track/token": "confirmation", "library/article": "content", "connect": "connect", "connect/claude": "connect_guide", "retail/store/quiz": "assessment", "retail/store/plan": "results" };
+    for (const locale of publicLocales) for (const [path, stage] of Object.entries(stages)) {
+      assert.equal(metaPageStage(`/${locale}/${path}`), stage, path);
     }
   });
   it("counts genuine funnel milestones rather than internal chatter or an assessment view", () => {
