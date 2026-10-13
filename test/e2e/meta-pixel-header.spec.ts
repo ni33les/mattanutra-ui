@@ -171,6 +171,7 @@ test("hydration shares the initial event ID with CAPI and each SPA visit gets ex
     return route.fulfill({ json: { ...config, granted: true } });
   });
   await page.route("**/api/marketing/events", route => {
+    if (route.request().method() === "GET") return route.fulfill({ json: { ...config, events: [] } });
     const event = route.request().postDataJSON() as CapturedEvent;
     events.push(event);
     return route.fulfill({ json: { accepted: true, eventId: event.eventId } });
