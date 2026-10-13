@@ -4,9 +4,9 @@ import type { Locale } from "@/lib/i18n";
 import { marketingGranted, META_PREFERENCE_CHANGED, saveMarketingPreference } from "@/lib/meta-client";
 
 const copy = {
-  en: { title: "Advertising preferences", body: "We use Meta to measure visits and purchases. You can turn this off without affecting your assessment. We do not share health answers, results or supplement details.", on: "On", off: "Off", enable: "Turn on", disable: "Turn off", saving: "Saving…", error: "Could not save your choice. Please try again." },
-  th: { title: "การตั้งค่าโฆษณา", body: "เราใช้ Meta เพื่อวัดผลการเข้าชมและการซื้อ คุณปิดการวัดผลได้โดยไม่กระทบแบบประเมิน เราไม่ส่งคำตอบ ผลสุขภาพ หรือรายละเอียดอาหารเสริม", on: "เปิด", off: "ปิด", enable: "เปิดการวัดผล", disable: "ปิดการวัดผล", saving: "กำลังบันทึก…", error: "บันทึกตัวเลือกไม่สำเร็จ โปรดลองอีกครั้ง" },
-  "zh-CN": { title: "广告偏好设置", body: "我们使用 Meta 衡量访问和购买。您可关闭此功能，不影响评估。我们不会分享健康答案、结果或补充剂详情。", on: "已开启", off: "已关闭", enable: "开启", disable: "关闭", saving: "正在保存…", error: "无法保存，请重试。" }
+  en: { title: "Advertising preferences", body: "We use Meta to measure visits and purchases. When available, we share hashed contact, name and location details to match these events. You can turn this off without affecting your assessment. We do not share health answers, results or supplement details.", on: "On", off: "Off", enable: "Turn on", disable: "Turn off", saving: "Saving…", error: "Could not save your choice. Please try again." },
+  th: { title: "การตั้งค่าโฆษณา", body: "เราใช้ Meta เพื่อวัดผลการเข้าชมและการซื้อ เมื่อมีข้อมูล เราจะส่งข้อมูลติดต่อ ชื่อ และพื้นที่ในรูปแบบแฮชเพื่อจับคู่เหตุการณ์เหล่านี้ คุณปิดการวัดผลได้โดยไม่กระทบแบบประเมิน เราไม่ส่งคำตอบ ผลสุขภาพ หรือรายละเอียดอาหารเสริม", on: "เปิด", off: "ปิด", enable: "เปิดการวัดผล", disable: "ปิดการวัดผล", saving: "กำลังบันทึก…", error: "บันทึกตัวเลือกไม่สำเร็จ โปรดลองอีกครั้ง" },
+  "zh-CN": { title: "广告偏好设置", body: "我们使用 Meta 衡量访问和购买。如有相关信息，我们会分享经过哈希处理的联系方式、姓名和地区信息，以匹配这些事件。您可关闭此功能，不影响评估。我们不会分享健康答案、结果或补充剂详情。", on: "已开启", off: "已关闭", enable: "开启", disable: "关闭", saving: "正在保存…", error: "无法保存，请重试。" }
 };
 
 export function MarketingPrivacySettings({ locale }: { locale: Locale }) {

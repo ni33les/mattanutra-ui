@@ -7,11 +7,12 @@ import type { JourneyChannel } from "@/lib/journey-channel";
 import { AGENT_CAPABILITIES } from "@/lib/system-agents";
 import { metaConfig } from "@/lib/meta-config";
 import { metaCampaignAttribution, metaClickId, metaFbc } from "@/lib/meta-attribution";
-import { hashEmailForFacebook, hashPhoneForFacebook } from "@/lib/facebook-capi";
+import { META_HASHED_MATCHING_FIELDS, metaContactMatching, metaHashedMatching, metaMatchingIdentitiesConflict, withoutMetaContactMatching, type MetaContact } from "@/lib/meta-matching";
 import { META_CONSENT_COOKIE, META_CONTEXT_COOKIE, META_CONSENT_VERSION, metaCustomData, sanitiseMetaUrl, uuidPattern, type MetaEventName, type MetaPreferenceSource } from "@/lib/meta-event-policy";
 
 type Db = postgres.Sql | postgres.TransactionSql;
 type Resource = "plan" | "payment" | "retail" | "agentic";
+type MetaResource = { type: Resource; id: string };
 export type MetaContext = { id: string; environment: string; consent_granted: boolean; attribution: Record<string, string>; matching: Record<string, string | string[]> };
 export function marketingCookie(request: Request, name: string) {
   const value = request.headers.get("cookie")?.split(";").map(v => v.trim()).find(v => v.startsWith(`${name}=`))?.slice(name.length + 1);
@@ -81,28 +82,60 @@ export async function setMetaPreference(request: Request, granted: boolean, sour
 }
 
 /** Called only after the application validates/captures the associated business resource. */
-export async function bindMetaContext(sql: Db, resourceType: Resource, resourceId: string, request?: Request, contact?: { email?: string | null; phone?: string | null; country?: string | null }) {
+export async function bindMetaContext(sql: Db, resourceType: Resource, resourceId: string, request?: Request, contact?: MetaContact) {
   const context = await requestMetaContext(request, sql);
   if (!context) return null;
   const matching: Record<string, string | string[]> = request ? metaMatchingFromRequest(request, undefined, context.matching) : {};
   // Page capture owns the click. A checkout waiting on another tab must not restore an older fbc.
   delete matching.fbc;
-  const email = hashEmailForFacebook(contact?.email);
-  const rawPhone = contact?.phone?.trim() ?? "";
-  // A national number is ambiguous without its country. Do not guess a Thai number for other markets.
-  const international = rawPhone.startsWith("+") ? rawPhone : rawPhone.startsWith("00") ? `+${rawPhone.slice(2)}`
-    : contact?.country === "TH" ? rawPhone : "";
-  const phone = international && international.replace(/\D/g, "").length >= 8 && international.replace(/\D/g, "").length <= 15
-    ? hashPhoneForFacebook(international) : null;
-  if (email) matching.em = [email];
-  if (phone) matching.ph = [phone];
-  const country = contact?.country?.trim().toLowerCase();
-  if (country && /^[a-z]{2}$/.test(country)) matching.country = [metaExternalId(country)];
+  Object.assign(matching, metaContactMatching(contact));
+  const changedIdentity = metaMatchingIdentitiesConflict(context.matching, matching);
   await sql`insert into public.meta_tracking_bindings(resource_type,resource_id,context_id)
     values (${resourceType},${resourceId},${context.id}::uuid) on conflict(resource_type,resource_id) do nothing`;
-  if (Object.keys(matching).length) await sql`update public.meta_tracking_contexts set matching=matching || ${sql.json(matching)},updated_at=now()
+  if (Object.keys(matching).length) await sql`update public.meta_tracking_contexts set
+    matching=(case when ${changedIdentity} then matching - ${[...META_HASHED_MATCHING_FIELDS]}::text[] else matching end) || ${sql.json(matching)},updated_at=now()
     where id=${context.id}::uuid and consent_granted`;
-  return context;
+  return { ...context, matching: { ...(changedIdentity ? withoutMetaContactMatching(context.matching) : context.matching), ...matching } };
+}
+
+/** Read only contacts belonging to this consented journey, never a client-supplied plan ID.
+ * The latest resource of each kind supplies its related assessment/checkout contacts.
+ * Biological sex, age, health answers and free-text summaries are deliberately not selected.
+ */
+async function storedMetaContact(sql: Db, context: MetaContext, resource?: MetaResource, explicit?: MetaContact): Promise<Record<string, string[]>> {
+  const contacts = await sql<MetaContact[]>`select
+      coalesce(nullif(p.customer_email,''),nullif(r.customer_email,''),a.contact_email) as email,
+      r.customer_phone as phone,
+      case when coalesce(nullif(p.customer_email,''),nullif(r.customer_email,'')) is null or nullif(a.contact_email,'') is null
+        or lower(trim(coalesce(nullif(p.customer_email,''),r.customer_email)))=lower(trim(a.contact_email)) then a.first_name end as "firstName",
+      coalesce(nullif(r.shipping_address->>'country',''),case when coalesce(nullif(p.customer_email,''),nullif(r.customer_email,'')) is null
+        or nullif(a.contact_email,'') is null or lower(trim(coalesce(nullif(p.customer_email,''),r.customer_email)))=lower(trim(a.contact_email))
+        then a.answers->>'country' end) as country,
+      r.shipping_address->>'city' as city, r.shipping_address->>'province' as region,
+      r.shipping_address->>'postalCode' as "postalCode"
+    from (
+      select distinct on (b.resource_type) b.resource_type,b.created_at,
+        case when b.resource_id ~* ${uuidPattern.source} then b.resource_id::uuid end as resource_id
+      from public.meta_tracking_bindings b
+      join public.meta_tracking_contexts c on c.id=b.context_id
+      where b.context_id=${context.id}::uuid and c.environment=${context.environment}
+        and c.consent_granted and c.expires_at>now() and b.resource_type in ('plan','payment','retail')
+      order by b.resource_type,case when b.resource_type=${resource?.type ?? null} and b.resource_id=${resource?.id ?? null} then 0 else 1 end,
+        b.created_at desc,b.resource_id desc
+    ) b
+    left join public.payments p on b.resource_type='payment' and p.id=b.resource_id
+    left join public.retail_checkout_payments r on b.resource_type='retail' and r.id=b.resource_id
+    left join public.assessments a on a.plan_id=case when b.resource_type='plan' then b.resource_id
+      when b.resource_type='payment' then p.plan_id else r.plan_id end
+    order by case when b.resource_type=${resource?.type ?? null} and b.resource_id=${resource?.id ?? null}::uuid then 0 else 1 end,
+      b.created_at desc,case b.resource_type when 'retail' then 0 when 'payment' then 1 else 2 end`;
+  // Verified event contact takes precedence; older bound contacts fill only compatible identities.
+  let matching = metaContactMatching(explicit);
+  for (const contact of contacts) {
+    const candidate = metaContactMatching(contact);
+    if (!metaMatchingIdentitiesConflict(matching, candidate)) matching = { ...candidate, ...matching };
+  }
+  return matching;
 }
 
 export async function boundMetaContext(sql: Db, resourceType: Resource, resourceId: string) {
@@ -117,9 +150,21 @@ export async function boundMetaContext(sql: Db, resourceType: Resource, resource
 export async function enqueueMetaEvent(sql: Db, input: {
   context: MetaContext; name: MetaEventName; sourceKey: string; data?: Record<string, unknown>;
   sourceUrl?: unknown; occurredAt?: Date | string; eventId?: string;
+  resource?: MetaResource; contact?: MetaContact;
 }) {
   const config = metaConfig();
   if (!config.enabled || input.context.environment !== config.environment || !input.context.consent_granted) return null;
+  // Enrich every newly captured event; accepted/history snapshots remain immutable.
+  // Existing context hashes retain explicitly captured identifiers when a stored field is unavailable.
+  const contactMatching = await storedMetaContact(sql, input.context, input.resource, input.contact);
+  const changedIdentity = metaMatchingIdentitiesConflict(input.context.matching, contactMatching);
+  const matching = { ...(changedIdentity ? withoutMetaContactMatching(input.context.matching) : input.context.matching), ...contactMatching };
+  const hashed = Object.fromEntries(Object.entries(metaHashedMatching(contactMatching))
+    .filter(([key, value]) => changedIdentity || JSON.stringify(input.context.matching[key]) !== JSON.stringify(value)));
+  // An older confirmed payment must not replace the newer browser's contact identity.
+  if (Object.keys(hashed).length && !(input.resource && changedIdentity)) await sql`update public.meta_tracking_contexts set
+    matching=(case when ${changedIdentity} then matching - ${[...META_HASHED_MATCHING_FIELDS]}::text[] else matching end) || ${sql.json(hashed)},updated_at=now()
+    where id=${input.context.id}::uuid and environment=${config.environment} and consent_granted and expires_at>now()`;
   const id = input.eventId && uuidPattern.test(input.eventId) ? input.eventId : randomUUID();
   const data = metaCustomData(input.name, { ...input.context.attribution, ...input.data }, config.environment);
   if (input.name === "Purchase" && (typeof data.value !== "number" || typeof data.currency !== "string")) throw new Error("Verified purchase amount and currency are required");
@@ -127,7 +172,7 @@ export async function enqueueMetaEvent(sql: Db, input: {
   const [inserted] = await sql<{ id: string }[]>`insert into public.meta_conversion_events
     (id,environment,pixel_id,event_name,source_key,context_id,source_url,custom_data,matching,occurred_at)
     values (${id}::uuid,${config.environment},${config.pixelId},${input.name},${input.sourceKey},${input.context.id}::uuid,
-      ${sourceUrl},${sql.json(data)},${sql.json(input.context.matching)},${input.occurredAt ?? new Date()})
+      ${sourceUrl},${sql.json(data)},${sql.json(matching)},${input.occurredAt ?? new Date()})
     on conflict(environment,pixel_id,event_name,source_key) do nothing returning id`;
   if (!inserted) return null;
   const { task } = await createTask({ actorType: "deterministic", taskType: "send_meta_event", title: `Send ${config.environment.toUpperCase()} campaign event`,
@@ -149,12 +194,8 @@ export async function recordMetaPurchase(sql: Db, input: {
   const context = await boundMetaContext(sql, input.type, input.id);
   if (!context) return null;
   const channel = await metaResourceChannel(sql, input.planId, input.type, input.id);
-  const hash = hashEmailForFacebook(input.email);
-  if (hash) {
-    await sql`update public.meta_tracking_contexts set matching=matching || ${sql.json({ em: [hash] })} where id=${context.id}::uuid and consent_granted`;
-    context.matching = { ...context.matching, em: [hash] };
-  }
   return enqueueMetaEvent(sql, { context, name: "Purchase", sourceKey: `purchase:${input.sessionId || `${input.type}:${input.id}`}`,
+    resource: { type: input.type, id: input.id }, contact: { email: input.email },
     occurredAt: input.paidAt, data: { channel, planId: input.planId, value: input.amount, currency: input.currency.toUpperCase(),
       purchase_type: input.type === "payment" ? "plan" : "products", offer: input.type === "payment" ? input.selectedPlan : undefined,
       locale: input.locale || "en", stage: "confirmation" },
@@ -170,6 +211,7 @@ export async function recordMetaCheckout(sql: Db, input: {
   if (!context) return null;
   const channel = await metaResourceChannel(sql, input.planId, input.type, input.id);
   return enqueueMetaEvent(sql, { context, name: "InitiateCheckout", sourceKey: `browser:checkout:${input.id}`,
+    resource: { type: input.type, id: input.id },
     data: { channel, planId: input.planId, value: input.amount, currency: input.currency.toUpperCase(),
       purchase_type: input.type === "payment" ? "plan" : "products", offer: input.type === "payment" ? input.selectedPlan : undefined,
       locale: input.locale, stage: "checkout" },
@@ -180,7 +222,8 @@ export async function recordMetaPlanMilestone(sql: Db, planId: string, name: "Le
   const context = await boundMetaContext(sql, "plan", planId);
   if (!context) return null;
   const channel = await metaResourceChannel(sql, planId, "plan", planId);
-  return enqueueMetaEvent(sql, { context, name, sourceKey: `${name}:${planId}:${sourceSuffix}`, data: { channel, planId, locale, stage: name === "Lead" ? "results" : "assessment" } });
+  return enqueueMetaEvent(sql, { context, name, sourceKey: `${name}:${planId}:${sourceSuffix}`, resource: { type: "plan", id: planId },
+    data: { channel, planId, locale, stage: name === "Lead" ? "results" : "assessment" } });
 }
 
 /** Called in the pharmacy order transaction; an unpaid order is never a Purchase. */
@@ -190,6 +233,7 @@ export async function recordMetaPharmacyOrder(sql: Db, input: {
   const context = await boundMetaContext(sql, "plan", input.planId);
   if (!context) return null;
   return enqueueMetaEvent(sql, { context, name: "OrderSubmitted", sourceKey: `pharmacy-order:${input.id}`,
+    resource: { type: "plan", id: input.planId },
     data: { channel: "retail", planId: input.planId, locale: input.locale, stage: "confirmation",
       purchase_type: "products", value: input.total, currency: input.currency.toUpperCase() },
     sourceUrl: `/${input.locale}/nutrition/reveal` });

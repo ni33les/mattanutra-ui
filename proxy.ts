@@ -7,6 +7,7 @@ import {
 } from "@/lib/i18n";
 import { shouldRedirectToHttps } from "@/lib/https-redirect";
 import { localePathRequiresNoStore } from "@/lib/public-cache-policy";
+import { META_PAGE_PATH_HEADER } from "@/lib/meta-page-request";
 
 const publicFile = /\.(.*)$/;
 const removedLocales = new Set(["es"]);
@@ -109,10 +110,12 @@ export function proxy(request: NextRequest) {
   const pathnameLocale = pathname.split("/")[1];
 
   if (isLocale(pathnameLocale)) {
-    const response = NextResponse.next();
+    const requestHeaders = new Headers(request.headers);
+    requestHeaders.set(META_PAGE_PATH_HEADER, pathname);
+    const response = NextResponse.next({ request: { headers: requestHeaders } });
 
-    // Only stamp no-store on personal/admin/funnel locale paths.
-    // Marketing pages (home, library, terms, privacy) keep default/ISR cache policy.
+    // Explicitly prevent caching personal/admin/funnel paths. The locale layout
+    // renders the preference-aware header per request; public data stays cached.
     if (localePathRequiresNoStore(pathname)) {
       return withNoStore(response);
     }

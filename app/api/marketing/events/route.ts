@@ -2,10 +2,53 @@ import { NextResponse } from "next/server";
 import { getSql, withDatabaseTransaction } from "@/lib/db";
 import { enforceRateLimit, publicRateLimits } from "@/lib/rate-limit";
 import { metaConfig } from "@/lib/meta-config";
-import { META_EVENTS, metaCustomData, metaRequestOriginAllowed, sanitiseMetaUrl, uuidPattern, type MetaEventName } from "@/lib/meta-event-policy";
+import { META_EVENTS, META_AUTHORITATIVE_EVENTS, metaCustomData, metaRequestOriginAllowed, sanitiseMetaUrl, uuidPattern, type MetaEventName } from "@/lib/meta-event-policy";
 import { enqueueMetaEvent, metaMatchingFromRequest, requestMetaContext } from "@/lib/meta-tracking";
 import { metaCampaignAttribution } from "@/lib/meta-attribution";
 export const runtime = "nodejs";
+const authoritativeNames = META_AUTHORITATIVE_EVENTS;
+const receiptWindowMs = 10 * 60_000;
+
+/** Browser copies read confirmed server milestones; they cannot author those milestones. */
+export async function GET(request: Request) {
+  const limited = enforceRateLimit(request, { name: "meta-event-receipts", limit: 120, windowMs: 60_000 });
+  if (limited) return limited;
+  const config = metaConfig();
+  const headers = { "Cache-Control": "private, no-store", Vary: "Cookie" };
+  const empty = { environment: config.environment, pixelId: config.pixelId, events: [] };
+  if (request.headers.get("sec-fetch-site") === "cross-site"
+    || request.headers.has("origin") && !metaRequestOriginAllowed(request, config.environment)) {
+    return NextResponse.json({ error: "Invalid origin" }, { status: 403, headers });
+  }
+  if (!config.enabled) return NextResponse.json(empty, { headers });
+  const now = Date.now();
+  const after = new URL(request.url).searchParams.get("after");
+  const requestedSince = after === null ? now - receiptWindowMs : Date.parse(after);
+  if (after !== null && (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z$/.test(after)
+    || !Number.isFinite(requestedSince) || requestedSince > now)) {
+    return NextResponse.json({ error: "Invalid receipt window" }, { status: 400, headers });
+  }
+  try {
+    const sql = getSql(); if (!sql) throw new Error("Database unavailable");
+    const context = await requestMetaContext(request, sql);
+    if (!context) return NextResponse.json(empty, { headers });
+    // Recheck stored consent in the query; never expose another visitor/environment's records.
+    // A rejected CAPI delivery is still a real milestone eligible for browser fallback.
+    const events = await sql`select e.id,e.event_name,e.occurred_at,e.custom_data
+      from public.meta_conversion_events e join public.meta_tracking_contexts c on c.id=e.context_id
+      where e.context_id=${context.id}::uuid and e.environment=${config.environment} and e.pixel_id=${config.pixelId}
+        and c.environment=${config.environment} and c.consent_granted and c.expires_at>now()
+        and e.event_name=any(${[...authoritativeNames]}) and e.status<>'suppressed'
+        and e.occurred_at>=${new Date(Math.max(requestedSince, now - receiptWindowMs))} and e.occurred_at<=${new Date(now)}
+      order by e.occurred_at desc,e.id desc limit 50`;
+    return NextResponse.json({ ...empty, events: events.map(event => {
+      const raw = event.custom_data && typeof event.custom_data === "object" && !Array.isArray(event.custom_data) ? event.custom_data : {};
+      return { eventId: event.id, name: event.event_name, occurredAt: new Date(event.occurred_at).toISOString(),
+        data: metaCustomData(event.event_name as MetaEventName, { ...raw, planId: raw.plan_id, stage: raw.funnel_stage }, config.environment) };
+    }) }, { headers });
+  } catch { return NextResponse.json({ error: "Could not load campaign receipts" }, { status: 503, headers }); }
+}
+
 export async function POST(request: Request) {
   const limited = enforceRateLimit(request, publicRateLimits.bpmPost); if (limited) return limited;
   const config = metaConfig();
@@ -16,7 +59,7 @@ export async function POST(request: Request) {
     const raw = await request.text();
     if (raw.length > 8192) return NextResponse.json({ error: "Event too large" }, { status: 413 });
     const body = JSON.parse(raw);
-    if (!META_EVENTS.includes(body.name) || ["Purchase", "OrderSubmitted", "Lead", "QuizSubmitted", "EmailCapture", "McpConnectionVerified"].includes(body.name) || !uuidPattern.test(body.eventId || "") || !uuidPattern.test(body.sessionId || "")) {
+    if (!META_EVENTS.includes(body.name) || authoritativeNames.includes(body.name) || !uuidPattern.test(body.eventId || "") || !uuidPattern.test(body.sessionId || "")) {
       return NextResponse.json({ error: "Invalid browser milestone" }, { status: 400 });
     }
     const sourceUrl = sanitiseMetaUrl(body.sourceUrl, config.environment);

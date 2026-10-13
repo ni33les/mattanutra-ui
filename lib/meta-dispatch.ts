@@ -3,6 +3,7 @@ import { getSql, withDatabaseTransaction } from "@/lib/db";
 import { metaConfig } from "@/lib/meta-config";
 import { META_EVENTS, metaCustomData, metaEventName, sanitiseMetaUrl, uuidPattern, type MetaEventName } from "@/lib/meta-event-policy";
 import { metaExternalId } from "@/lib/meta-tracking";
+import { metaHashedMatching } from "@/lib/meta-matching";
 
 export async function sendMetaEvent(eventId: string, fetchImpl: typeof fetch = fetch) {
   if (!uuidPattern.test(eventId)) throw new Error("Invalid marketing event");
@@ -32,14 +33,10 @@ export async function sendMetaEvent(eventId: string, fetchImpl: typeof fetch = f
   const { event } = claimed;
   // The short claim transaction has committed. Provider I/O never holds database locks.
 
-    const matching: Record<string, string | string[]> = {};
     // New events retain their original click/browser evidence across later visits and retries.
     // Legacy rows have no snapshot; keep their existing delivery behavior without a backfill.
     const evidence = event.matching ?? event.context_matching;
-    for (const key of ["em", "ph", "country"] as const) {
-      const values = evidence?.[key];
-      if (Array.isArray(values) && values.length && values.every(v => typeof v === "string" && /^[a-f0-9]{64}$/.test(v))) matching[key] = values;
-    }
+    const matching: Record<string, string | string[]> = metaHashedMatching(evidence);
     for (const key of ["fbp", "fbc", "client_ip_address", "client_user_agent"] as const) {
       if (typeof evidence?.[key] === "string") matching[key] = evidence[key];
     }

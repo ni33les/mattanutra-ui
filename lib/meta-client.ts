@@ -1,5 +1,6 @@
 "use client";
 import { journeyChannelForPath } from "@/lib/journey-channel";
+import type { MetaBootstrapPageView } from "@/lib/meta-pixel-bootstrap";
 import { META_CONSENT_COOKIE, browserPixelPageSafe, metaCustomData, metaEventForBpm, metaEventName, type MetaEventName, type MetaPreferenceSource, type MetaPublicConfig, uuidPattern } from "@/lib/meta-event-policy";
 let config: MetaPublicConfig | null = null;
 const sent = new Set<string>();
@@ -56,9 +57,9 @@ async function captureEvent(body: string) {
 }
 
 export function trackMetaEvent(name: MetaEventName, input: Record<string, unknown> = {}, occurrence?: string,
-  sourceUrl = typeof window === "undefined" ? "" : location.href) {
+  sourceUrl = typeof window === "undefined" ? "" : location.href, bootstrap?: MetaBootstrapPageView) {
   if (!config && typeof window !== "undefined" && (!marketingPreferenceSaved() || marketingGranted()) && waiting.length < 20) {
-    return new Promise<void>(resolve => { waiting.push(() => { void trackMetaEvent(name, input, occurrence, sourceUrl).then(resolve); }); });
+    return new Promise<void>(resolve => { waiting.push(() => { void trackMetaEvent(name, input, occurrence, sourceUrl, bootstrap).then(resolve); }); });
   }
   if (!config?.enabled || !marketingGranted() || typeof window === "undefined" || /\/(admin|api)(\/|$)/.test(location.pathname)) return Promise.resolve();
   const { environment: env, pixelId } = config;
@@ -69,14 +70,18 @@ export function trackMetaEvent(name: MetaEventName, input: Record<string, unknow
     : `${id}:${name}:${data.plan_id || "visit"}:${dimension}${data.progress ?? data.offer ?? data.funnel_stage ?? ""}`);
   if (sent.has(key)) return Promise.resolve();
   if (pending.has(key)) return pending.get(key)!;
-  const eventId = crypto.randomUUID();
+  // The parser already sent the first PageView. Reuse its ID for CAPI and never
+  // replay its native copy after hydration, including capture retries.
+  const headerPageView = name === "PageView" && bootstrap?.sourceUrl === sourceUrl
+    && bootstrap.environment === env && bootstrap.pixelId === pixelId && uuidPattern.test(bootstrap.eventId);
+  const eventId = headerPageView ? bootstrap.eventId : crypto.randomUUID();
   const work = (async () => {
     try {
       const receipt = await captureEvent(JSON.stringify({ name, eventId, sessionId: id, attemptId: input.attemptId, sourceUrl,
         data: { ...data, planId: data.plan_id, stage: data.funnel_stage } }));
       if (receipt?.accepted !== true || typeof receipt.eventId !== "string" || !uuidPattern.test(receipt.eventId)) return;
       sent.add(key);
-      if (marketingGranted() && location.href === sourceUrl && browserPixelPageSafe(location.href, document.referrer, env) && window.fbq) {
+      if (!headerPageView && marketingGranted() && location.href === sourceUrl && browserPixelPageSafe(location.href, document.referrer, env) && window.fbq) {
         const nativeData = receipt.data && typeof receipt.data === "object"
           ? metaCustomData(name, { ...receipt.data, planId: receipt.data.plan_id, stage: receipt.data.funnel_stage }, env) : data;
         window.fbq(env === "prd" && ["PageView", "ViewContent", "Contact", "AddToCart", "InitiateCheckout"].includes(name) ? "trackSingle" : "trackSingleCustom",

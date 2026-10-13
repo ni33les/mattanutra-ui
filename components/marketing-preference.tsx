@@ -5,13 +5,15 @@ import type { Locale } from "@/lib/i18n";
 import { browserPixelPageSafe, metaPageStage, type MetaPublicConfig } from "@/lib/meta-event-policy";
 import { metaCampaignAttribution, metaClickId } from "@/lib/meta-attribution";
 import { configureMetaClient, marketingGranted, marketingPreferenceSaved, META_PREFERENCE_CHANGED, saveMarketingPreference, trackMetaEvent } from "@/lib/meta-client";
+import type { MetaBootstrapPageView } from "@/lib/meta-pixel-bootstrap";
+import { startMetaReceiptDelivery } from "@/lib/meta-browser-delivery";
 
 let initialPreference: Promise<boolean> | undefined;
 const startupRetryDelays = [500, 1500];
 
 export function MarketingPreference({ locale }: { locale: Locale }) {
   const [config, setConfig] = useState<MetaPublicConfig | null>(null);
-  const navigation = useRef({ key: "", id: "" });
+  const navigation = useRef<{ key: string; id: string; bootstrap?: MetaBootstrapPageView }>({ key: "", id: "" });
   const pathname = usePathname(), search = useSearchParams().toString();
   const [choice, setChoice] = useState(0);
   const grantedPreference = useRef(marketingGranted());
@@ -94,8 +96,15 @@ export function MarketingPreference({ locale }: { locale: Locale }) {
     // Install the Pixel queue before releasing funnel events captured during startup.
     configureMetaClient(config);
     const navigationKey = `${pathname}?${search}:${choice}`;
-    if (navigation.current.key !== navigationKey) navigation.current = { key: navigationKey, id: crypto.randomUUID() };
-    void trackMetaEvent("PageView", { locale, provider: /\/connect\/(claude|perplexity|chatgpt|grok)/.exec(pathname)?.[1], stage: metaPageStage(pathname) }, `navigation:${navigation.current.id}`);
+    if (navigation.current.key !== navigationKey) {
+      // Only the first navigation owns the parser's PageView. Returning to its
+      // URL or explicitly re-enabling tracking creates a new occurrence.
+      const bootstrap = !navigation.current.key && window.__mnMetaPageView?.sourceUrl === location.href
+        ? window.__mnMetaPageView : undefined;
+      navigation.current = { key: navigationKey, id: crypto.randomUUID(), bootstrap };
+    }
+    void trackMetaEvent("PageView", { locale, provider: /\/connect\/(claude|perplexity|chatgpt|grok)/.exec(pathname)?.[1], stage: metaPageStage(pathname) },
+      `navigation:${navigation.current.id}`, location.href, navigation.current.bootstrap);
     // Next's client navigation retains third-party scripts. Cross the boundary with a fresh document.
     const onClick = (event: MouseEvent) => {
       const link = event.target instanceof Element ? event.target.closest("a[href]") as HTMLAnchorElement | null : null;
@@ -110,6 +119,11 @@ export function MarketingPreference({ locale }: { locale: Locale }) {
     document.addEventListener("click", onClick, true);
     return () => document.removeEventListener("click", onClick, true);
   }, [config, excluded, pathname, search, locale, choice]);
+
+  useEffect(() => {
+    if (!config?.enabled || excluded || !marketingGranted()) return;
+    return startMetaReceiptDelivery(config);
+  }, [config, excluded, choice]);
 
   return null;
 }

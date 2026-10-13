@@ -107,7 +107,7 @@ describe("public cache and crawl policy", () => {
     assert.match(nextConfig, /localeNoStoreHeaderSources/);
     assert.doesNotMatch(
       nextConfig,
-      /source:\s*`\/:locale\(\$\{publicLocaleRoutePattern\}\)\/:path\*`/
+      /source:\s*`\/:locale\(\$\{publicLocaleRoutePattern\}\)\/:path\*`,\s*headers:\s*noStoreHeaders/
     );
     assert.match(proxySource, /localePathRequiresNoStore/);
     assert.match(robotsSource, /robotsDisallowPaths/);

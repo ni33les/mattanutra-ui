@@ -43,6 +43,50 @@ describe("Meta browser event receipts", () => {
     }
   });
 
+  it("captures the header PageView using its original ID without replaying the browser copy", async t => {
+    const bootstrap = { eventId: crypto.randomUUID(), sourceUrl: location.href, pixelId, environment: "prd" as const };
+    const requests: ReturnType<typeof eventRequest>[] = [];
+    t.mock.method(globalThis, "fetch", async (_url, init) => {
+      const body = eventRequest(init); requests.push(body);
+      return Response.json({ accepted: true, eventId: body.eventId });
+    });
+    const occurrence = crypto.randomUUID();
+    await trackMetaEvent("PageView", {}, occurrence, location.href, bootstrap);
+    await trackMetaEvent("PageView", {}, occurrence, location.href, bootstrap);
+    assert.deepEqual(requests.map(request => request.eventId), [bootstrap.eventId]);
+    assert.deepEqual(pixelCalls, []);
+  });
+
+  it("retains the header event ID across a lost capture response and later retry", async t => {
+    const bootstrap = { eventId: crypto.randomUUID(), sourceUrl: location.href, pixelId, environment: "prd" as const };
+    const requests: ReturnType<typeof eventRequest>[] = [];
+    t.mock.method(globalThis, "fetch", async (_url, init) => {
+      const body = eventRequest(init); requests.push(body);
+      if (requests.length === 1) throw new Error("lost response");
+      return Response.json({ accepted: true, eventId: body.eventId });
+    });
+    await trackMetaEvent("PageView", {}, crypto.randomUUID(), location.href, bootstrap);
+    assert.deepEqual(requests.map(request => request.eventId), [bootstrap.eventId, bootstrap.eventId]);
+    assert.deepEqual(pixelCalls, []);
+  });
+
+  it("does not use a bootstrap from another destination, source page, or for a conversion", async t => {
+    const bootstrap = { eventId: crypto.randomUUID(), sourceUrl: location.href, pixelId, environment: "prd" as const };
+    const requests: ReturnType<typeof eventRequest>[] = [];
+    t.mock.method(globalThis, "fetch", async (_url, init) => {
+      const body = eventRequest(init); requests.push(body);
+      return Response.json({ accepted: true, eventId: body.eventId });
+    });
+    for (const invalid of [
+      { ...bootstrap, pixelId: "123456789" }, { ...bootstrap, environment: "uat" as const },
+      { ...bootstrap, sourceUrl: "https://mattanutra.com/th" }, { ...bootstrap, eventId: "invalid" }
+    ]) await trackMetaEvent("PageView", {}, crypto.randomUUID(), location.href, invalid);
+    await trackMetaEvent("ViewContent", {}, crypto.randomUUID(), location.href, bootstrap);
+    assert.equal(requests.length, 5);
+    assert.equal(pixelCalls.length, 5);
+    assert.ok(requests.every(request => request.eventId !== bootstrap.eventId));
+  });
+
   it("allows a rejected HTTP 200 receipt to be retried and emits only the accepted event", async t => {
     const occurrence = crypto.randomUUID();
     const requests: ReturnType<typeof eventRequest>[] = [];

@@ -1,14 +1,15 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
+import { unstable_cache } from "next/cache";
 import { LandingPage } from "@/components/landing-page";
 import { SiteFooter } from "@/components/site-footer";
 import { TitleBar } from "@/components/title-bar";
 import {
   getHomepageTestimonials
 } from "@/lib/blog";
-import { checkDatabaseConnection } from "@/lib/db";
 import { getDictionary, isLocale, locales, type Locale } from "@/lib/i18n";
 import { getFeaturedLibraryArticles } from "@/lib/library";
+import { marketingPageRevalidateSeconds } from "@/lib/public-cache-policy";
 import { nutritionQuizPath } from "@/lib/nutrition-paths";
 import { localizedRouteMetadata } from "@/lib/seo";
 import { siteBaseUrl } from "@/lib/site-url";
@@ -23,10 +24,14 @@ export function generateStaticParams() {
   return locales.map((locale) => ({ locale }));
 }
 
-// Homepage is marketing content: short ISR so testimonials / library teasers refresh.
-// Keep in sync with marketingPageRevalidateSeconds in lib/public-cache-policy.ts
-// (Next segment config requires a static numeric literal).
+// Public data keeps its short refresh window even though the shared header
+// makes the page dynamic. Segment config still requires a numeric literal.
 export const revalidate = 300;
+const cachedHomepageTestimonials = unstable_cache(
+  (locale: Locale) => getHomepageTestimonials(locale, 4),
+  ["public-homepage-testimonials"],
+  { revalidate: marketingPageRevalidateSeconds }
+);
 
 function isProductionBuildPhase() {
   return process.env.NEXT_PHASE === "phase-production-build";
@@ -55,7 +60,7 @@ export default async function Home({ params }: HomeProps) {
   const dictionary = getDictionary(locale);
   const assessmentPath = nutritionQuizPath(locale);
 
-  // Featured Library cards are static file-backed content (safe at build time).
+  // Library cards combine static files with cached published content.
   // Testimonials stay empty during the production build phase to avoid DB access.
   const libraryArticles = await getFeaturedLibraryArticles(locale, 3);
 
@@ -79,10 +84,7 @@ export default async function Home({ params }: HomeProps) {
     );
   }
 
-  const databaseReady = await checkDatabaseConnection();
-  const testimonials = databaseReady
-    ? await getHomepageTestimonials(locale, 4)
-    : [];
+  const testimonials = await cachedHomepageTestimonials(locale);
   const baseUrl = siteBaseUrl();
   const jsonLd = {
     "@context": "https://schema.org",

@@ -1,3 +1,4 @@
+import { unstable_cache } from "next/cache.js";
 import type { BlogArticleBody, BlogPost } from "@/lib/blog";
 import {
   getPublishedBlogPost,
@@ -21,6 +22,27 @@ import {
   type VisualKnowledgeTranslation
 } from "@/lib/library-static";
 import { absoluteUrl } from "@/lib/seo";
+import { marketingPageRevalidateSeconds } from "@/lib/public-cache-policy";
+
+// The shared layout renders per visitor. Cache only these published-content
+// reads so public pages retain their previous five-minute refresh window.
+const cachedPublishedLibrarySummaries = unstable_cache(
+  async (locale: Locale) => (await getPublishedBlogPosts(locale, 500))
+    .map(summaryFromPost)
+    .filter((summary): summary is LibraryArticleSummary => summary !== null),
+  ["public-library-summaries"],
+  { revalidate: marketingPageRevalidateSeconds }
+);
+const cachedPublishedLibraryPost = unstable_cache(
+  getPublishedBlogPost,
+  ["public-library-post"],
+  { revalidate: marketingPageRevalidateSeconds }
+);
+const cachedPublishedLibraryLocalePaths = unstable_cache(
+  getPublishedBlogPostLocalePaths,
+  ["public-library-locale-paths"],
+  { revalidate: marketingPageRevalidateSeconds }
+);
 
 export type LibraryCategorySlug =
   | "energy-longevity"
@@ -393,11 +415,11 @@ function summaryFromPost(post: BlogPost): LibraryArticleSummary | null {
   };
 }
 
-async function publishedLibraryPosts(locale: Locale) {
+async function publishedLibrarySummaries(locale: Locale) {
   try {
-    return await getPublishedBlogPosts(locale, 500);
+    return await cachedPublishedLibrarySummaries(locale);
   } catch {
-    return [] as BlogPost[];
+    return [] as LibraryArticleSummary[];
   }
 }
 
@@ -412,16 +434,11 @@ export async function getLibraryArticles(locale: Locale) {
     }
   }
 
-  for (const post of await publishedLibraryPosts(locale)) {
-    if (summaries.has(post.slug)) {
+  for (const summary of await publishedLibrarySummaries(locale)) {
+    if (summaries.has(summary.slug)) {
       continue;
     }
-
-    const summary = summaryFromPost(post);
-
-    if (summary) {
-      summaries.set(summary.slug, summary);
-    }
+    summaries.set(summary.slug, summary);
   }
 
   return [...summaries.values()].sort((first, second) => {
@@ -535,7 +552,7 @@ export async function getLibraryArticle(
   let post: BlogPost | null = null;
 
   try {
-    post = await getPublishedBlogPost(locale, slug);
+    post = await cachedPublishedLibraryPost(locale, slug);
   } catch {
     post = null;
   }
@@ -577,7 +594,7 @@ export async function getLibraryArticleLocalePaths(
 
   if (slug) {
     try {
-      const paths = await getPublishedBlogPostLocalePaths(translationGroupIdOrSlug);
+      const paths = await cachedPublishedLibraryLocalePaths(translationGroupIdOrSlug);
 
       if (Object.keys(paths).length > 0) {
         return Object.fromEntries(

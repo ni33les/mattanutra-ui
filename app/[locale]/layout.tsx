@@ -1,10 +1,16 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
 import { notFound } from "next/navigation";
+import { cookies, headers } from "next/headers";
 import type { ReactNode } from "react";
 import { Suspense } from "react";
 import { BpmTracker } from "@/components/bpm-tracker";
 import { MarketingPreference } from "@/components/marketing-preference";
+import { metaPublicConfig } from "@/lib/meta-config";
+import { META_CONSENT_COOKIE, metaCustomData, metaEventName, metaPageStage } from "@/lib/meta-event-policy";
+import { metaPixelBootstrapScript } from "@/lib/meta-pixel-bootstrap";
+import { META_PAGE_PATH_HEADER } from "@/lib/meta-page-request";
+import { journeyChannelForPath } from "@/lib/journey-channel";
 import "../globals.css";
 import "../library-article-body.css";
 import "../customer.css";
@@ -16,9 +22,9 @@ import {
   localeHtmlLang
 } from "@/lib/i18n";
 
-// Marketing pages under this layout use ISR / default caching.
-// Personal funnels (admin, assessment, basket, nutrition, order) set
-// force-dynamic on their own route segments.
+// The header uses runtime tracking config and the visitor's opt-out. Render it
+// per request so build-time env and another visitor's preference cannot leak
+// through the full-route cache. Page/data-level caches can still be used.
 
 type LocaleLayoutProps = Readonly<{
   children: ReactNode;
@@ -110,8 +116,21 @@ export default async function LocaleLayout({
     notFound();
   }
 
+  const [requestHeaders, requestCookies] = await Promise.all([headers(), cookies()]);
+  const pathname = requestHeaders.get(META_PAGE_PATH_HEADER) ?? "";
+  const config = metaPublicConfig();
+  const publicPage = pathname.split("/")[1] === locale && !/\/(admin|api)(\/|$)/.test(pathname);
+  const enabled = config.enabled && publicPage && requestCookies.get(META_CONSENT_COOKIE)?.value !== "denied";
+  const bootstrap = enabled ? metaPixelBootstrapScript(config, metaCustomData("PageView", {
+    locale, channel: journeyChannelForPath(pathname), stage: metaPageStage(pathname),
+    provider: /\/connect\/(claude|perplexity|chatgpt|grok)/.exec(pathname)?.[1]
+  }, config.environment)) : "";
+
   return (
     <html dir={localeDirection(locale)} lang={localeHtmlLang(locale)}>
+      <head>
+        {bootstrap && <script id="meta-pixel-base" dangerouslySetInnerHTML={{ __html: bootstrap }} />}
+      </head>
       <body
         className={[
           bodyFont.variable,
@@ -121,6 +140,14 @@ export default async function LocaleLayout({
           thaiSerifFont.variable
         ].join(" ")}
       >
+        {bootstrap && (
+          <noscript>
+            {/* An image fallback belongs in body, not head (HTML parsing rules). */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img height="1" width="1" style={{ display: "none" }} alt=""
+              src={`https://www.facebook.com/tr?id=${encodeURIComponent(config.pixelId)}&ev=${metaEventName("PageView", config.environment)}&noscript=1`} />
+          </noscript>
+        )}
         <Suspense fallback={null}><BpmTracker locale={locale} /></Suspense>
         <Suspense fallback={null}>
           <MarketingPreference locale={locale} />
