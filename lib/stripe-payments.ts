@@ -25,7 +25,7 @@ import { isLocale, type Locale } from "@/lib/i18n";
 import { nutritionProgressPath, nutritionQuizPath, nutritionRevealPath } from "@/lib/nutrition-paths";
 import { paymentReturnPath, type PaymentSourceSurface } from "@/lib/payment-paths";
 import { writePaymentBpmEvent } from "@/lib/payment-bpm";
-import { checkoutReturnOrigin } from "@/lib/checkout-return-origin";
+import { newPlanCheckoutReturnUrl, planCheckoutReturnUrl } from "@/lib/checkout-return-origin";
 import { assertPaymentSchema } from "@/lib/stripe-payment-schema";
 import {
   AMOUNT_MICROS_PER_UNIT,
@@ -410,12 +410,14 @@ async function insertPayment(
     planId?: string | null;
     selectedPlan: AssessmentPlan;
     sourceSurface: PaymentSourceSurface;
+    request?: Request;
   }>
 ) {
   const plan = paymentPlan(input.selectedPlan);
   const metadata = {
     mattanutraEnv: input.config.env,
-    sourceSurface: input.sourceSurface
+    sourceSurface: input.sourceSurface,
+    stripeCheckoutReturnUrl: newPlanCheckoutReturnUrl(input.locale, input.request)
   };
   const rows = await sql<PaymentRow[]>`
     with inserted_payment as (
@@ -445,7 +447,7 @@ async function insertPayment(
         'micros',
         'THB',
         ${input.config.mode},
-        ${sql.json(toJsonValue({ mattanutraEnv: input.config.env }))}::jsonb,
+        ${sql.json(toJsonValue(metadata))}::jsonb,
         now(),
         now()
       )
@@ -1077,7 +1079,7 @@ export async function createStripeCheckoutSession(input: CheckoutSessionInput) {
     }
     const existing = await getPaymentRowById(tx, paymentId);
     if (existing) return existing;
-    return insertPayment(tx, { config, locale: input.locale, paymentId, planId: input.planId, selectedPlan: input.selectedPlan, sourceSurface: input.sourceSurface });
+    return insertPayment(tx, { config, locale: input.locale, paymentId, planId: input.planId, selectedPlan: input.selectedPlan, sourceSurface: input.sourceSurface, request: input.request });
   });
   if (!payment.paid_at) await withDatabaseTransaction(sql, tx => bindMetaContext(tx, "payment", payment.id, input.request));
   const captureCheckout = () => withDatabaseTransaction(sql, tx => recordMetaCheckout(tx, {
@@ -1219,7 +1221,7 @@ export async function createStripeCheckoutSession(input: CheckoutSessionInput) {
         sourceSurface: input.sourceSurface
       }
     },
-    return_url: `${checkoutReturnOrigin(input.request)}${paymentReturnPath(input.locale)}?session_id={CHECKOUT_SESSION_ID}`,
+    return_url: planCheckoutReturnUrl(input.locale, payment.metadata?.stripeCheckoutReturnUrl),
     redirect_on_completion: "if_required",
     ui_mode: "embedded_page"
   }, { idempotencyKey: `web-checkout:${config.env}:${paymentId}` });

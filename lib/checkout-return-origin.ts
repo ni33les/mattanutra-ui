@@ -1,4 +1,6 @@
 import { siteBaseUrl } from "@/lib/site-url";
+import type { Locale } from "@/lib/i18n";
+import { paymentReturnPath } from "@/lib/payment-paths";
 
 /** Keep host-only checkout cookies on return without trusting arbitrary Host/Origin values. */
 export function checkoutReturnOrigin(request?: Request, configuredSiteUrl = siteBaseUrl()) {
@@ -18,4 +20,17 @@ export function checkoutReturnOrigin(request?: Request, configuredSiteUrl = site
   if (origin) return allowed.has(origin) ? origin : configuredOrigin;
   const requestOrigin = new URL(request.url).origin;
   return allowed.has(requestOrigin) ? requestOrigin : configuredOrigin;
+}
+
+/** Persist this server-created value when inserting a payment, before provider I/O. */
+export function newPlanCheckoutReturnUrl(locale: Locale, request?: Request) {
+  return `${checkoutReturnOrigin(request)}${paymentReturnPath(locale)}?session_id={CHECKOUT_SESSION_ID}`;
+}
+
+/** A replay must keep the original Stripe parameters, including legacy attempts. */
+export function planCheckoutReturnUrl(locale: Locale, storedReturnUrl: unknown, configuredSiteUrl = siteBaseUrl()) {
+  if (typeof storedReturnUrl === "string" && storedReturnUrl) return storedReturnUrl;
+  // Older rows may have reached Stripe before the response was saved locally.
+  // Preserve their historical configured-host URL rather than the retry's host.
+  return `${configuredSiteUrl}${paymentReturnPath(locale)}?session_id={CHECKOUT_SESSION_ID}`;
 }

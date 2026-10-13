@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
-import { checkoutReturnOrigin } from "../lib/checkout-return-origin.ts";
+import { checkoutReturnOrigin, newPlanCheckoutReturnUrl, planCheckoutReturnUrl } from "../lib/checkout-return-origin.ts";
 
 const apex = "https://mattanutra.com";
 const www = "https://www.mattanutra.com";
@@ -63,10 +63,34 @@ describe("checkout return origin", () => {
     });
   });
 
-  it("uses the originating request in both Stripe session return URLs", () => {
-    for (const file of ["stripe-payments", "retail-product-checkout"]) {
-      const source = readFileSync(new URL(`../lib/${file}.ts`, import.meta.url), "utf8");
-      assert.match(source, /return_url: `\$\{checkoutReturnOrigin\(input\.request\)\}[^`]+\{CHECKOUT_SESSION_ID\}/);
+  it("keeps a new plan's original return URL when the retry changes host, locale or configuration", () => {
+    environment("prd", () => {
+      const previous = process.env.NEXT_PUBLIC_SITE_URL;
+      process.env.NEXT_PUBLIC_SITE_URL = apex;
+      try {
+        const persisted = newPlanCheckoutReturnUrl("th", request(www));
+        assert.equal(persisted, `${www}/th/nutrition/payment/return?session_id={CHECKOUT_SESSION_ID}`);
+        assert.equal(planCheckoutReturnUrl("th", persisted, apex), persisted);
+        assert.equal(planCheckoutReturnUrl("en", persisted, "https://changed-config.example"), persisted);
+      } finally {
+        if (previous === undefined) delete process.env.NEXT_PUBLIC_SITE_URL;
+        else process.env.NEXT_PUBLIC_SITE_URL = previous;
+      }
+    });
+  });
+
+  it("preserves the historical configured URL for legacy plan attempts with a lost provider response", () => {
+    for (const missing of [undefined, null, ""]) {
+      assert.equal(planCheckoutReturnUrl("en", missing, apex),
+        `${apex}/en/nutrition/payment/return?session_id={CHECKOUT_SESSION_ID}`);
     }
+  });
+
+  it("freezes new plan URLs before creating Stripe sessions and keeps product request origin", () => {
+    const plan = readFileSync(new URL("../lib/stripe-payments.ts", import.meta.url), "utf8");
+    const retail = readFileSync(new URL("../lib/retail-product-checkout.ts", import.meta.url), "utf8");
+    assert.match(plan, /stripeCheckoutReturnUrl: newPlanCheckoutReturnUrl\(input\.locale, input\.request\)/);
+    assert.match(plan, /return_url: planCheckoutReturnUrl\(input\.locale, payment\.metadata\?\.stripeCheckoutReturnUrl\)/);
+    assert.match(retail, /return_url: `\$\{checkoutReturnOrigin\(input\.request\)\}[^`]+\{CHECKOUT_SESSION_ID\}/);
   });
 });
