@@ -25,7 +25,7 @@ import { isLocale, type Locale } from "@/lib/i18n";
 import { nutritionProgressPath, nutritionQuizPath, nutritionRevealPath } from "@/lib/nutrition-paths";
 import { paymentReturnPath, type PaymentSourceSurface } from "@/lib/payment-paths";
 import { writePaymentBpmEvent } from "@/lib/payment-bpm";
-import { siteBaseUrl } from "@/lib/site-url";
+import { checkoutReturnOrigin } from "@/lib/checkout-return-origin";
 import { assertPaymentSchema } from "@/lib/stripe-payment-schema";
 import {
   AMOUNT_MICROS_PER_UNIT,
@@ -1219,7 +1219,7 @@ export async function createStripeCheckoutSession(input: CheckoutSessionInput) {
         sourceSurface: input.sourceSurface
       }
     },
-    return_url: `${siteBaseUrl()}${paymentReturnPath(input.locale)}?session_id={CHECKOUT_SESSION_ID}`,
+    return_url: `${checkoutReturnOrigin(input.request)}${paymentReturnPath(input.locale)}?session_id={CHECKOUT_SESSION_ID}`,
     redirect_on_completion: "if_required",
     ui_mode: "embedded_page"
   }, { idempotencyKey: `web-checkout:${config.env}:${paymentId}` });

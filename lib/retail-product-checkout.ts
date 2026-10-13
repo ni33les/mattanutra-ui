@@ -22,7 +22,7 @@ import {
 import {
   resolveRegionalBasketAvailability
 } from "@/lib/retail-cart-availability";
-import { siteBaseUrl } from "@/lib/site-url";
+import { checkoutReturnOrigin } from "@/lib/checkout-return-origin";
 import {
   AMOUNT_MICROS_PER_UNIT,
   STRIPE_MINOR_UNITS_PER_MAJOR,
@@ -1231,7 +1231,7 @@ async function continueRetailCheckoutPayment(sql: RetailCheckoutDb, payment: Che
         ...(frozenAgenticOrderId ? { agenticOrderId: frozenAgenticOrderId } : {})
       }
     },
-    return_url: `${siteBaseUrl()}/${payment.locale}/basket/return?session_id={CHECKOUT_SESSION_ID}`,
+    return_url: `${checkoutReturnOrigin(input.request)}/${payment.locale}/basket/return?session_id={CHECKOUT_SESSION_ID}`,
     ui_mode: "embedded_page"
   };
   const resumed = await ensureRetailProviderSession({ sql, payment, parameters, provider: {
