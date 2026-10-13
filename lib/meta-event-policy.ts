@@ -50,18 +50,31 @@ export function sanitiseMetaUrl(value: unknown, env: MetaEnvironment): string | 
   } catch { return null; }
 }
 
+function publicPixelUrlSafe(url: URL, env: MetaEnvironment) {
+  if (!/^\/(en|th|zh-CN)(?:\/(?:privacy|terms))?\/?$/.test(url.pathname)
+    || !sanitiseMetaUrl(url.href, env) || url.hash) return false;
+  // Native Pixel reads the whole URL. Permit opaque ad IDs, never arbitrary UTM
+  // text, contact details or health-related campaign names.
+  return [...url.searchParams].every(([key, value]) => key === "fbclid"
+    ? /^[\w-]{1,500}$/.test(value)
+    : ["campaign_id", "adset_id", "ad_id", "creative_id"].includes(key) && /^\d{1,25}$/.test(value));
+}
+
+const publicPixelReferrers = new Set([
+  "https://www.facebook.com/", "https://l.facebook.com/", "https://m.facebook.com/", "https://lm.facebook.com/",
+  "https://business.facebook.com/", "https://adsmanager.facebook.com/",
+  "https://www.instagram.com/", "https://l.instagram.com/", "https://www.google.com/"
+]);
+
 /** Native Pixel sees the real URL and DOM. Personalised pages use CAPI only. */
 export function browserPixelPageSafe(value: string, referrer: string, env: MetaEnvironment) {
   try {
-    const url = new URL(value);
-    if (!/^\/(en|th|zh-CN)(?:\/(?:privacy|terms))?\/?$/.test(url.pathname)) return false;
-    const safe = sanitiseMetaUrl(value, env);
-    if (!safe || url.hash || [...url.searchParams.keys()].some(key => key !== "fbclid")) return false;
-    if (referrer) {
-      const ref = new URL(referrer);
-      if (ref.search || ref.hash || (!['https://www.facebook.com/', 'https://l.facebook.com/', 'https://www.instagram.com/', 'https://www.google.com/'].includes(ref.href) && !(ref.origin === url.origin && /^\/(en|th|zh-CN)\/?$/.test(ref.pathname)))) return false;
-    }
-    return true;
+    if (!publicPixelUrlSafe(new URL(value), env)) return false;
+    if (!referrer) return true;
+    const ref = new URL(referrer);
+    // Meta's setup tools send a Business/Ads Manager origin as the referrer.
+    // Only allow those exact roots; unknown paths, queries and fragments stay private.
+    return publicPixelReferrers.has(ref.href) || publicPixelUrlSafe(ref, env);
   } catch { return false; }
 }
 

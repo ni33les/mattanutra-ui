@@ -63,45 +63,30 @@ Facebook usually appends `fbclid` automatically. BPM will capture it where prese
 
 ## Meta Pixel + Conversions API (quiz funnel)
 
-MattaNutra loads the Meta Pixel on customer pages and mirrors key BPM milestones to Meta.
+The current integration and runtime configuration are documented in [Meta campaign tracking](meta-campaign-tracking.md). Browser Pixel runs on eligible public home/legal pages; personalized assessment, results and checkout pages send allowlisted milestones through the Conversions API (CAPI). A Pixel Helper warning on a personalized page does not establish that CAPI has failed.
 
-### Primary ad optimisation event
+For browser detection, test `https://mattanutra.com/en` from Meta Events Manager. A saved advertising opt-out keeps tracking off; the Privacy page has the preference control. Native Pixel supports numeric Meta campaign/ad IDs and a valid `fbclid`. The free-text UTM and internal campaign names in the examples above are retained for internal attribution and keep native Pixel off; server export excludes those names.
 
-| Goal | Meta event | When it fires |
+For Meta campaign reporting, use resolved numeric IDs in Ads Manager's URL parameters:
+
+```text
+campaign_id={{campaign.id}}&adset_id={{adset.id}}&ad_id={{ad.id}}
+```
+
+### Funnel events
+
+| Milestone | Meta event | When it fires |
 | --- | --- | --- |
-| **Quiz finisher (use for Leads campaigns)** | **`Lead`** | HealthScore results ready (`healthscore_ready`) — not quiz open |
-| Quiz opened | Custom `QuizStart` | Assessment / chat view or start |
-| Quiz answers locked | Custom `QuizSubmitted` | Assessment submitted / calculating |
-| Email captured | Custom `EmailCapture` | Delivery email on results path |
+| Quiz started | Custom `QuizStart` | Assessment / chat actually starts |
+| Quiz answers locked | Custom `QuizSubmitted` | Server confirms assessment submission |
+| First usable HealthScore | `Lead` | Server confirms results are ready |
+| Email captured | Custom `EmailCapture` | Server records the email milestone |
 | Results page view | `ViewContent` | HealthScore page viewed |
-| LINE connect code issued | `Subscribe` | Successful LINE connect CTA |
-| Retail checkout | `InitiateCheckout` | Product basket checkout viewed |
-| Paid conversion | `Purchase` | Payment succeeded |
+| LINE connected | `Contact` | Successful LINE connection |
+| Checkout ready | `InitiateCheckout` | A usable checkout attempt exists |
+| Paid conversion | `Purchase` | Verified payment confirmation with the saved amount and currency |
 
-Browser + server use the same `event_id` (`facebookEventId`) so Meta can dedupe.
-
-### Environment (keep UAT and PRD separate)
-
-| Variable | Where | Purpose |
-| --- | --- | --- |
-| `MATTANUTRA_ENV` / `NEXT_PUBLIC_MATTANUTRA_ENV` | App | `uat` or `prd` — required for isolation |
-| `NEXT_PUBLIC_FACEBOOK_PIXEL_ID` | Client | Pixel ID — **use a different Pixel for UAT vs PRD** |
-| `FACEBOOK_CAPI_ACCESS_TOKEN` or `_UAT` / `_PRD` | Server | CAPI token — **separate per environment** |
-| `FACEBOOK_PIXEL_ID` | Server | Optional server pixel id (same isolation rules) |
-| `FACEBOOK_CAPI_TEST_EVENT_CODE` / `_UAT` | Server UAT | Test Events code (never on PRD) |
-| `FACEBOOK_ALLOW_SHARED_PIXEL=true` | Rare | Opt-in only if UAT must share the production Pixel |
-
-The production default Pixel (`27629903823308584`) is applied **only on PRD**. UAT will not use it unless `FACEBOOK_ALLOW_SHARED_PIXEL=true`. Events are also tagged with `mn_env`.
-
-Without `FACEBOOK_CAPI_ACCESS_TOKEN` (for that env), browser Pixel still works if configured; server CAPI is a no-op.
-
-### Test checklist (Events Manager → Test Events)
-
-1. Set `FACEBOOK_CAPI_TEST_EVENT_CODE` on UAT if testing CAPI.
-2. Open the quiz → expect `PageView` + `QuizStart` (not `Lead`).
-3. Complete the quiz through HealthScore ready → expect **`Lead`**.
-4. Optional: LINE CTA success → expect `Subscribe`.
-5. Confirm browser and server rows share the same event id / are deduped.
+Runtime tracking requires `META_TRACKING_ENABLED=true`, a valid pixel ID and a CAPI token. Set `MATTANUTRA_ENV` and use environment-specific `FACEBOOK_PIXEL_ID_DEV/UAT/PRD` and `FACEBOOK_CAPI_ACCESS_TOKEN_DEV/UAT/PRD` values. DEV/UAT event names have `DEV_`/`UAT_` prefixes even when a dataset is shared. Use `FACEBOOK_CAPI_TEST_EVENT_CODE_UAT` for UAT diagnostics. Browser and server copies use the same event name and ID for deduplication.
 
 ### Campaign setup
 

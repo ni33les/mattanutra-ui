@@ -7,30 +7,66 @@ import { metaCampaignAttribution, metaClickId } from "@/lib/meta-attribution";
 import { configureMetaClient, marketingGranted, marketingPreferenceSaved, META_PREFERENCE_CHANGED, saveMarketingPreference, trackMetaEvent } from "@/lib/meta-client";
 
 let initialPreference: Promise<boolean> | undefined;
+const startupRetryDelays = [500, 1500];
 
 export function MarketingPreference({ locale }: { locale: Locale }) {
   const [config, setConfig] = useState<MetaPublicConfig>({ enabled: false, pixelId: "", environment: "dev" });
   const navigation = useRef({ key: "", id: "" });
   const pathname = usePathname(), search = useSearchParams().toString();
   const [choice, setChoice] = useState(0);
+  const grantedPreference = useRef(marketingGranted());
   const excluded = /\/(admin|api)(\/|$)/.test(pathname);
   useEffect(() => {
     if (excluded) return;
     let active = true;
-    void fetch("/api/marketing/consent", { cache: "no-store" }).then(response => response.ok ? response.json() : null).then(async value => {
-      if (active && value && ["dev", "uat", "prd"].includes(value.environment)) {
+    let retryTimer: ReturnType<typeof setTimeout> | undefined;
+    let controller: AbortController | undefined;
+    let latestConfig: MetaPublicConfig | undefined;
+    const configure = (value: MetaPublicConfig) => {
+      if (active) { configureMetaClient(value); setConfig(value); }
+    };
+    const initialise = async (attempt: number) => {
+      controller = new AbortController();
+      const timeout = setTimeout(() => controller?.abort(), 8000);
+      try {
+        const response = await fetch("/api/marketing/consent", { cache: "no-store", signal: controller.signal });
+        if (!response.ok) throw new Error("Could not load advertising configuration");
+        const value = await response.json();
+        if (!value || !["dev", "uat", "prd"].includes(value.environment) || typeof value.enabled !== "boolean" || typeof value.pixelId !== "string") {
+          throw new Error("Invalid advertising configuration");
+        }
+        if (!active) return;
+        latestConfig = value;
         const adArrival = metaClickId(location.href, value.environment) || Object.keys(metaCampaignAttribution(location.href, value.environment)).length > 0;
         if (value.enabled && (!marketingPreferenceSaved() || marketingGranted() && adArrival)) {
           initialPreference ??= saveMarketingPreference(true, "site_default");
-          try { await initialPreference; } catch { initialPreference = undefined; }
+          const saving = initialPreference;
+          // Coalesce only an in-flight save; later mounts may need a fresh context.
+          try { await saving; } finally { if (initialPreference === saving) initialPreference = undefined; }
         }
-        if (active) { configureMetaClient(value); setConfig(value); }
+        configure(value);
+      } catch {
+        if (!active) return;
+        if (attempt < startupRetryDelays.length) {
+          retryTimer = setTimeout(() => { void initialise(attempt + 1); }, startupRetryDelays[attempt]);
+        } else if (latestConfig) {
+          // A later explicit Privacy choice can still start tracking after retries end.
+          configure(latestConfig);
+        }
+      } finally {
+        clearTimeout(timeout);
       }
-    }).catch(() => undefined);
-    return () => { active = false; };
+    };
+    void initialise(0);
+    return () => { active = false; clearTimeout(retryTimer); controller?.abort(); };
   }, [excluded]);
   useEffect(() => {
-    const changed = () => setChoice(value => value + 1);
+    const changed = () => {
+      const granted = marketingGranted();
+      if (grantedPreference.current === granted) return;
+      grantedPreference.current = granted;
+      setChoice(value => value + 1);
+    };
     window.addEventListener(META_PREFERENCE_CHANGED, changed);
     return () => window.removeEventListener(META_PREFERENCE_CHANGED, changed);
   }, []);

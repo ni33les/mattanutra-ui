@@ -57,6 +57,22 @@ describe("campaign export boundary", () => {
     assert.equal(browserPixelPageSafe("https://mattanutra.com/en", "https://mattanutra.com/en/nutrition/healthscore?private", "prd"), false);
     assert.equal(browserPixelPageSafe("https://mattanutra.com/en", "https://customer-private.example/en", "prd"), false);
   });
+  it("detects native Pixel on tagged public landing pages opened from Meta tools or ads", () => {
+    const landing = "https://mattanutra.com/en?fbclid=opaque-click_123&campaign_id=111&adset_id=222&ad_id=333&creative_id=444";
+    for (const referrer of ["", "https://business.facebook.com/", "https://adsmanager.facebook.com/", "https://m.facebook.com/", "https://lm.facebook.com/", "https://l.instagram.com/"]) {
+      assert.equal(browserPixelPageSafe(landing, referrer, "prd"), true, referrer);
+    }
+    assert.equal(browserPixelPageSafe("https://www.mattanutra.com/th", landing, "prd"), true);
+    assert.equal(browserPixelPageSafe("https://mattanutra.com/en", "https://mattanutra.com/en/privacy", "prd"), true);
+  });
+  it("rejects sensitive or malformed ad parameters and lookalike Meta referrers", () => {
+    for (const query of ["campaign_id=health-condition", "campaign_id=111&campaign_id=private", "ad_id={{ad.id}}", "fbclid=private@example.com", "fbclid=", "utm_campaign=private", "campaign_id=111&email=private", "campaign_id=" + "1".repeat(26)]) {
+      assert.equal(browserPixelPageSafe(`https://mattanutra.com/en?${query}`, "https://business.facebook.com/", "prd"), false, query);
+    }
+    for (const referrer of ["https://business.facebook.com.evil.example/", "http://business.facebook.com/", "https://business.facebook.com/?private=1", "https://business.facebook.com/private", "https://business.facebook.com/#private", "https://mattanutra.com/en/privacy?email=private", "https://uat.mattanutra.com/en"]) {
+      assert.equal(browserPixelPageSafe("https://mattanutra.com/en", referrer, "prd"), false, referrer);
+    }
+  });
   it("counts genuine funnel milestones rather than internal chatter or an assessment view", () => {
     assert.equal(metaEventForBpm("chat_view"), null);
     assert.equal(metaEventForBpm("chat_start"), "QuizStart");

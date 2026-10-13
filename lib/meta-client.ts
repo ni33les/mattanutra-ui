@@ -43,7 +43,8 @@ export function trackMetaEvent(name: MetaEventName, input: Record<string, unknow
     return new Promise<void>(resolve => { waiting.push(() => { void trackMetaEvent(name, input, occurrence).then(resolve); }); });
   }
   if (!config?.enabled || !marketingGranted() || typeof window === "undefined" || /\/(admin|api)(\/|$)/.test(location.pathname)) return Promise.resolve();
-  const env = config.environment, id = typeof input.assessmentAttemptId === "string" && uuidPattern.test(input.assessmentAttemptId) ? input.assessmentAttemptId : sessionId();
+  const { environment: env, pixelId } = config;
+  const id = typeof input.assessmentAttemptId === "string" && uuidPattern.test(input.assessmentAttemptId) ? input.assessmentAttemptId : sessionId();
   const data = metaCustomData(name, { channel: journeyChannelForPath(location.pathname), ...input }, env);
   const dimension = String(data.funnel_stage).startsWith("connect") ? `${data.provider || ""}:${data.locale || ""}:` : "";
   const key = occurrence || `${id}:${name}:${data.plan_id || "visit"}:${dimension}${data.progress ?? data.offer ?? data.funnel_stage ?? ""}`;
@@ -57,10 +58,11 @@ export function trackMetaEvent(name: MetaEventName, input: Record<string, unknow
           data: { ...data, planId: data.plan_id, stage: data.funnel_stage } }) });
       if (!response.ok) return;
       const receipt = await response.json();
+      if (receipt?.accepted !== true || typeof receipt.eventId !== "string" || !uuidPattern.test(receipt.eventId)) return;
       sent.add(key);
-      if (receipt.accepted && marketingGranted() && browserPixelPageSafe(location.href, document.referrer, env) && window.fbq) {
+      if (marketingGranted() && browserPixelPageSafe(location.href, document.referrer, env) && window.fbq) {
         window.fbq(env === "prd" && ["PageView", "ViewContent", "Contact", "AddToCart", "InitiateCheckout"].includes(name) ? "trackSingle" : "trackSingleCustom",
-          config!.pixelId, metaEventName(name, env), data, { eventID: receipt.eventId });
+          pixelId, metaEventName(name, env), data, { eventID: receipt.eventId });
       }
     } catch { /* Tracking never blocks the customer journey. */ }
     finally { pending.delete(key); }

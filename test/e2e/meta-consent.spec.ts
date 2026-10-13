@@ -3,13 +3,17 @@ import { test, expect, type BrowserContext, type Page } from "@playwright/test";
 async function trackingFixture(page: Page, context: BrowserContext, baseURL: string, initiallyDenied = false) {
   const events: Array<{ name: string; eventId: string; data: Record<string, unknown> }> = [];
   const preferences: Array<{ granted: boolean; source: string }> = [];
-  let pixelLoads = 0, failNextPreference = false;
+  let pixelLoads = 0, configRequests = 0, failNextConfiguration = false, preferenceFailures = 0;
   await context.clearCookies();
   if (initiallyDenied) await context.addCookies([{ name: "mn_marketing", value: "denied", url: baseURL }]);
   await page.route("**/api/marketing/consent", async route => {
-    if (route.request().method() === "GET") return route.fulfill({ json: { environment: "dev", enabled: true, pixelId: "123456789012345" } });
+    if (route.request().method() === "GET") {
+      configRequests += 1;
+      if (failNextConfiguration) { failNextConfiguration = false; return route.fulfill({ status: 503, json: { error: "unavailable" } }); }
+      return route.fulfill({ json: { environment: "dev", enabled: true, pixelId: "123456789012345" } });
+    }
     const body = route.request().postDataJSON(); preferences.push(body);
-    if (failNextPreference) { failNextPreference = false; return route.fulfill({ status: 503, json: { error: "unavailable" } }); }
+    if (preferenceFailures > 0) { preferenceFailures -= 1; return route.fulfill({ status: 503, json: { error: "unavailable" } }); }
     await context.addCookies([{ name: "mn_marketing", value: body.granted ? "granted" : "denied", url: baseURL }]);
     await route.fulfill({ json: { granted: body.granted } });
   });
@@ -21,8 +25,55 @@ async function trackingFixture(page: Page, context: BrowserContext, baseURL: str
     pixelLoads += 1;
     await route.fulfill({ contentType: "application/javascript", body: "window.__pixelCalls=window.fbq.queue.slice();window.fbq.callMethod=(...args)=>window.__pixelCalls.push(args);" });
   });
-  return { events, preferences, pixelLoads: () => pixelLoads, failNext: () => { failNextPreference = true; } };
+  return { events, preferences, pixelLoads: () => pixelLoads, configRequests: () => configRequests,
+    failConfig: () => { failNextConfiguration = true; }, failNext: (count = 1) => { preferenceFailures = count; } };
 }
+
+for (const failure of ["configuration", "preference"] as const) {
+  test(`tracking recovers from a transient startup ${failure} failure without duplicate PageViews`, async ({ page, context, baseURL }) => {
+    const fixture = await trackingFixture(page, context, baseURL!);
+    if (failure === "configuration") fixture.failConfig(); else fixture.failNext();
+    await page.goto("/en");
+    await expect.poll(() => fixture.events.filter(event => event.name === "PageView").length).toBe(1);
+    expect(fixture.configRequests()).toBeGreaterThanOrEqual(2);
+    expect(fixture.preferences).toHaveLength(failure === "configuration" ? 1 : 2);
+    await expect.poll(fixture.pixelLoads).toBe(1);
+    await expect.poll(() => page.evaluate(() => (window as unknown as { __pixelCalls: unknown[][] }).__pixelCalls.filter(call => call[0] === "trackSingleCustom" && call[2] === "DEV_PageView").length)).toBe(1);
+
+    // Retrying/saving the same granted preference must not count another visit.
+    await page.evaluate(async () => {
+      window.dispatchEvent(new Event("mn:marketing-preference-changed"));
+      window.dispatchEvent(new Event("mn:marketing-preference-changed"));
+      await new Promise(resolve => setTimeout(resolve, 100));
+    });
+    expect(fixture.events.filter(event => event.name === "PageView")).toHaveLength(1);
+  });
+}
+
+test("startup recovery preserves an existing opt-out", async ({ page, context, baseURL }) => {
+  const fixture = await trackingFixture(page, context, baseURL!, true);
+  fixture.failConfig();
+  await page.goto("/en");
+  await expect.poll(fixture.configRequests).toBeGreaterThanOrEqual(2);
+  expect(fixture.preferences).toHaveLength(0);
+  expect(fixture.events).toHaveLength(0);
+  expect(fixture.pixelLoads()).toBe(0);
+  expect((await context.cookies()).find(cookie => cookie.name === "mn_marketing")?.value).toBe("denied");
+});
+
+test("automatic preference retries are bounded and a later explicit choice still works", async ({ page, context, baseURL }) => {
+  const fixture = await trackingFixture(page, context, baseURL!);
+  fixture.failNext(3);
+  await page.goto("/en/privacy");
+  await expect.poll(() => fixture.preferences.length).toBe(3);
+  expect(fixture.events).toHaveLength(0);
+  expect(fixture.pixelLoads()).toBe(0);
+  await page.getByRole("button", { name: "Turn on", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Turn off", exact: true })).toBeVisible();
+  expect(fixture.preferences).toHaveLength(4);
+  expect(fixture.preferences.at(-1)).toMatchObject({ granted: true, source: "explicit" });
+  await expect.poll(() => fixture.events.filter(event => event.name === "PageView").length).toBe(1);
+});
 
 test("tracking starts without a popup, retains page boundaries and can be turned off from Privacy", async ({ page, context, baseURL }) => {
   const fixture = await trackingFixture(page, context, baseURL!);
@@ -91,7 +142,7 @@ test("an opted-in visitor's new ad arrival is saved before PageView and an opt-o
   await expect.poll(()=>fixture.events.length).toBeGreaterThan(0);
   expect(fixture.preferences).toHaveLength(1);
   expect(fixture.preferences[0]).toMatchObject({ source: "site_default", sourceUrl: expect.stringContaining("ad_id=333") });
-  expect(fixture.pixelLoads()).toBe(0);
+  await expect.poll(fixture.pixelLoads).toBe(1);
   await context.addCookies([{ name: "mn_marketing", value: "denied", url: baseURL! }]);
   const configured = page.waitForResponse(response=>response.url().endsWith("/api/marketing/consent") && response.request().method()==="GET");
   await page.goto("/en?fbclid=anotherAd&campaign_id=444"); await configured;

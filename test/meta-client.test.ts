@@ -1,0 +1,130 @@
+import assert from "node:assert/strict";
+import { afterEach, beforeEach, describe, it } from "node:test";
+import { configureMetaClient, trackMetaEvent } from "../lib/meta-client.ts";
+
+const pixelId = "27629903823308584";
+const sessionId = "843893a8-4c1b-44d9-86f4-092e16270d1a";
+const receiptId = "500e9000-b443-4898-9d9b-0563cbfb5164";
+const browserGlobals = ["window", "document", "location", "sessionStorage"] as const;
+let originals: Map<string, PropertyDescriptor | undefined>;
+let pixelCalls: unknown[][];
+let page: { cookie: string; referrer: string };
+
+function eventRequest(init?: RequestInit) {
+  return JSON.parse(String(init?.body)) as { eventId: string; name: string };
+}
+
+function deferredResponse() {
+  let resolve!: (response: Response) => void;
+  const promise = new Promise<Response>(done => { resolve = done; });
+  return { promise, resolve };
+}
+
+describe("Meta browser event receipts", () => {
+  beforeEach(() => {
+    originals = new Map(browserGlobals.map(key => [key, Object.getOwnPropertyDescriptor(globalThis, key)]));
+    pixelCalls = [];
+    page = { cookie: "mn_marketing=granted", referrer: "" };
+    const values = {
+      window: { fbq: (...args: unknown[]) => pixelCalls.push(args) },
+      document: page,
+      location: new URL("https://mattanutra.com/en"),
+      sessionStorage: { getItem: () => sessionId, setItem: () => {} }
+    };
+    for (const key of browserGlobals) Object.defineProperty(globalThis, key, { configurable: true, writable: true, value: values[key] });
+    configureMetaClient({ enabled: true, environment: "prd", pixelId });
+  });
+
+  afterEach(() => {
+    for (const key of browserGlobals) {
+      const original = originals.get(key);
+      if (original) Object.defineProperty(globalThis, key, original);
+      else Reflect.deleteProperty(globalThis, key);
+    }
+  });
+
+  it("allows a rejected HTTP 200 receipt to be retried and emits only the accepted event", async t => {
+    const occurrence = crypto.randomUUID();
+    const requests: ReturnType<typeof eventRequest>[] = [];
+    const fetch = t.mock.method(globalThis, "fetch", async (_url, init) => {
+      const request = eventRequest(init);
+      requests.push(request);
+      return Response.json({ accepted: requests.length > 1, eventId: request.eventId });
+    });
+
+    await trackMetaEvent("PageView", { stage: "landing" }, occurrence);
+    assert.equal(pixelCalls.length, 0);
+    await trackMetaEvent("PageView", { stage: "landing" }, occurrence);
+    await trackMetaEvent("PageView", { stage: "landing" }, occurrence);
+
+    assert.equal(fetch.mock.callCount(), 2);
+    assert.equal(pixelCalls.length, 1);
+    assert.deepEqual(pixelCalls[0].slice(0, 3), ["trackSingle", pixelId, "PageView"]);
+    assert.deepEqual(pixelCalls[0][4], { eventID: requests[1].eventId });
+  });
+
+  it("does not emit or suppress retries for malformed acceptance receipts", async t => {
+    const malformed = [null, {}, { accepted: "true", eventId: receiptId }, { accepted: 1, eventId: receiptId },
+      { accepted: true }, { accepted: true, eventId: 123 }, { accepted: true, eventId: "invalid" }];
+    let receipt: unknown;
+    const fetch = t.mock.method(globalThis, "fetch", async () => Response.json(receipt));
+    for (const invalid of malformed) {
+      const occurrence = crypto.randomUUID(), previousCalls = pixelCalls.length;
+      receipt = invalid;
+      await trackMetaEvent("PageView", {}, occurrence);
+      assert.equal(pixelCalls.length, previousCalls);
+      receipt = { accepted: true, eventId: receiptId };
+      await trackMetaEvent("PageView", {}, occurrence);
+      assert.equal(pixelCalls.length, previousCalls + 1);
+    }
+    assert.equal(fetch.mock.callCount(), malformed.length * 2);
+  });
+
+  it("coalesces pending sends and successful duplicates while preserving the server deduplication ID", async t => {
+    const occurrence = crypto.randomUUID(), response = deferredResponse();
+    const fetch = t.mock.method(globalThis, "fetch", () => response.promise);
+    const first = trackMetaEvent("PageView", {}, occurrence);
+    const duplicate = trackMetaEvent("PageView", {}, occurrence);
+    assert.equal(duplicate, first);
+    assert.equal(fetch.mock.callCount(), 1);
+    assert.equal(pixelCalls.length, 0);
+
+    response.resolve(Response.json({ accepted: true, eventId: receiptId }));
+    await Promise.all([first, duplicate]);
+    await trackMetaEvent("PageView", {}, occurrence);
+    assert.equal(fetch.mock.callCount(), 1);
+    assert.equal(pixelCalls.length, 1);
+    assert.deepEqual(pixelCalls[0][4], { eventID: receiptId });
+  });
+
+  it("does not forward an accepted receipt after marketing consent has been revoked", async t => {
+    const response = deferredResponse();
+    t.mock.method(globalThis, "fetch", () => response.promise);
+    const sent = trackMetaEvent("PageView", {}, crypto.randomUUID());
+    page.cookie = "mn_marketing=denied";
+    response.resolve(Response.json({ accepted: true, eventId: receiptId }));
+    await sent;
+    assert.equal(pixelCalls.length, 0);
+  });
+
+  it("checks the current page before forwarding a receipt after navigation", async t => {
+    const response = deferredResponse();
+    t.mock.method(globalThis, "fetch", () => response.promise);
+    const sent = trackMetaEvent("PageView", {}, crypto.randomUUID());
+    location.href = "https://mattanutra.com/en/nutrition/healthscore?planId=private";
+    response.resolve(Response.json({ accepted: true, eventId: receiptId }));
+    await sent;
+    assert.equal(pixelCalls.length, 0);
+  });
+
+  it("retains the configured destination for an in-flight accepted event", async t => {
+    const response = deferredResponse();
+    t.mock.method(globalThis, "fetch", () => response.promise);
+    const sent = trackMetaEvent("PageView", {}, crypto.randomUUID());
+    configureMetaClient({ enabled: true, environment: "uat", pixelId: "different-pixel" });
+    response.resolve(Response.json({ accepted: true, eventId: receiptId }));
+    await sent;
+    assert.equal(pixelCalls.length, 1);
+    assert.deepEqual(pixelCalls[0].slice(0, 3), ["trackSingle", pixelId, "PageView"]);
+  });
+});
