@@ -1,9 +1,4 @@
 import type { Metadata } from "next";
-import {
-  DM_Sans,
-  Fraunces,
-  Noto_Sans_Thai
-} from "next/font/google";
 import localFont from "next/font/local";
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
@@ -32,21 +27,32 @@ type LocaleLayoutProps = Readonly<{
   }>;
 }>;
 
-const bodyFont = DM_Sans({
-  subsets: ["latin"],
+// Bundle fonts so production builds do not depend on Google Fonts responses.
+const bodyFont = localFont({
+  src: "../../public/assets/pharmacy/fonts/dm-sans.ttf",
   variable: "--mn-font-body",
   display: "swap",
-  weight: "variable",
-  axes: ["opsz"]
+  weight: "100 1000",
+  style: "normal",
+  adjustFontFallback: "Arial"
 });
 
-const displayFont = Fraunces({
-  subsets: ["latin"],
+const displayFont = localFont({
+  src: [
+    {
+      path: "../../public/assets/pharmacy/fonts/fraunces.ttf",
+      weight: "100 900",
+      style: "normal"
+    },
+    {
+      path: "../../public/assets/pharmacy/fonts/fraunces-italic.ttf",
+      weight: "100 900",
+      style: "italic"
+    }
+  ],
   variable: "--mn-font-display",
   display: "swap",
-  style: ["normal", "italic"],
-  weight: "variable",
-  axes: ["opsz"]
+  adjustFontFallback: "Times New Roman"
 });
 
 // Google intermittently returns extensionless URLs that next/font cannot parse.
@@ -58,11 +64,13 @@ const monoFont = localFont({
   fallback: ["monospace"]
 });
 
-const thaiFont = Noto_Sans_Thai({
-  subsets: ["thai"],
-  weight: ["400", "500", "600", "700"],
+const thaiFont = localFont({
+  src: "../../public/assets/pharmacy/fonts/noto-sans-thai.ttf",
+  weight: "400 700",
+  style: "normal",
   variable: "--mn-font-thai",
-  display: "swap"
+  display: "swap",
+  adjustFontFallback: "Arial"
 });
 
 // Reuse the site's bundled variable font; Google can return extensionless URLs

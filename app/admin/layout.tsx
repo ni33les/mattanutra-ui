@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { DM_Sans } from "next/font/google";
+import localFont from "next/font/local";
 import type { ReactNode } from "react";
 import "../globals.css";
 
@@ -13,10 +13,13 @@ export const metadata: Metadata = {
   title: "MattaNutra Admin"
 };
 
-const bodyFont = DM_Sans({
-  subsets: ["latin"],
+const bodyFont = localFont({
+  src: "../../public/assets/pharmacy/fonts/dm-sans.ttf",
   variable: "--mn-font-body",
-  display: "swap"
+  display: "swap",
+  weight: "100 1000",
+  style: "normal",
+  adjustFontFallback: "Arial"
 });
 
 export default function AdminLayout({
