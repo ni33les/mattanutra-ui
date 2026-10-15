@@ -67,6 +67,27 @@ function assertRawHead(html: string) {
   expect(script[0].slice(0, script[0].indexOf(">") + 1)).not.toMatch(/\bsrc=/);
 }
 
+async function expectPreservedHead(page: Page, html: string) {
+  const original = await page.evaluate(source => {
+    const document = new DOMParser().parseFromString(source, "text/html");
+    return {
+      title: document.title,
+      description: document.querySelector('meta[name="description"]')?.getAttribute("content"),
+      stylesheets: Array.from(document.querySelectorAll('link[rel="stylesheet"]'), link => link.getAttribute("href")!)
+    };
+  }, html);
+  expect(original.title).not.toBe("");
+  expect(original.stylesheets.length).toBeGreaterThan(0);
+  await expect(page).toHaveTitle(original.title);
+  await expect(page.locator('head meta[name="description"]')).toHaveAttribute("content", original.description!);
+  const loadedStylesheets = await page.evaluate(() => Array.from(document.styleSheets, sheet => {
+    if (!sheet.href) return "";
+    const url = new URL(sheet.href);
+    return `${url.pathname}${url.search}`;
+  }));
+  expect(loadedStylesheets).toEqual(expect.arrayContaining(original.stylesheets));
+}
+
 test("the raw HTML puts the executable Pixel in head for all locales and the root redirect", async ({ request }) => {
   for (const locale of ["en", "th", "zh-CN"]) {
     const response = await request.get(`/${locale}`);
@@ -122,6 +143,26 @@ test("an existing opt-out omits both the script and image before hydration", asy
   expect(counts).toEqual({ library: 0, images: 0 });
 });
 
+test("an opted-out public page preserves styles and metadata after hydration", async ({ page, context, baseURL }) => {
+  const counts = await interceptMeta(context, baseURL!);
+  const api = await failApis(page);
+  const errors: string[] = [];
+  page.on("pageerror", error => errors.push(error.message));
+  await context.addCookies([{ name: "mn_marketing", value: "denied", url: baseURL! }]);
+  const response = await page.goto("/en");
+  expect(response?.ok()).toBe(true);
+  // Consent requests originate in a React effect, proving hydration has run.
+  // Wait for its bounded retries too, so the assertion covers later rerenders.
+  await expect.poll(() => api.consent).toBe(3);
+  await expectPreservedHead(page, await response!.text());
+  await expect(page.locator("main")).toHaveCSS("display", "flex");
+  await expect(page.locator("main")).toHaveCSS("flex-direction", "column");
+  await expect(page.locator("#meta-pixel-base")).toHaveCount(0);
+  expect(await page.evaluate(() => typeof window.fbq)).toBe("undefined");
+  expect(counts).toEqual({ library: 0, images: 0 });
+  expect(errors).toEqual([]);
+});
+
 test("the noscript fallback is in body and works when JavaScript is disabled", async ({ browser, baseURL }) => {
   const context = await browser.newContext({ baseURL, javaScriptEnabled: false });
   try {
@@ -148,18 +189,35 @@ test("the noscript fallback is in body and works when JavaScript is disabled", a
   } finally { await context.close(); }
 });
 
-test("internal admin pages contain and load no Pixel", async ({ page, context, baseURL }) => {
-  const counts = await interceptMeta(context, baseURL!);
-  await failApis(page);
-  const response = await page.goto("/en/admin/login");
-  expect(response?.ok()).toBe(true);
-  const html = await response!.text();
-  expect([...html.matchAll(scriptPattern)]).toHaveLength(0);
-  expect(html).not.toContain("facebook.com/tr?");
-  await expect(page.locator("#meta-pixel-base")).toHaveCount(0);
-  expect(await page.evaluate(() => typeof window.fbq)).toBe("undefined");
-  expect(counts).toEqual({ library: 0, images: 0 });
-});
+for (const locale of ["en", "th", "zh-CN"]) {
+  test(`${locale} admin preserves styles and metadata after hydration without loading Pixel`, async ({ page, context, baseURL }) => {
+    const counts = await interceptMeta(context, baseURL!);
+    await failApis(page);
+    const errors: string[] = [];
+    page.on("pageerror", error => errors.push(error.message));
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    const response = await page.goto(`/${locale}/admin/login`);
+    expect(response?.ok()).toBe(true);
+    const html = await response!.text();
+    expect([...html.matchAll(scriptPattern)]).toHaveLength(0);
+    expect(html).not.toContain("facebook.com/tr?");
+
+    // A handled form submission and rendered fixture error prove this is the
+    // hydrated client UI. The intercepted error prevents a passkey prompt.
+    await page.locator('input[type="email"]').fill("admin-css-fixture@example.test");
+    await page.locator('form button[type="submit"]').click();
+    await expect(page.getByText("Fixture API outage", { exact: true })).toBeVisible();
+    await expectPreservedHead(page, html);
+    await expect(page.locator("main")).toHaveCSS("display", "flex");
+    await expect(page.locator("main")).toHaveCSS("background-color", "rgb(248, 250, 252)");
+    await expect(page.locator("main section")).toHaveCSS("display", "grid");
+    await expect(page.locator("main section")).toHaveCSS("border-radius", "16px");
+    await expect(page.locator("#meta-pixel-base")).toHaveCount(0);
+    expect(await page.evaluate(() => typeof window.fbq)).toBe("undefined");
+    expect(counts).toEqual({ library: 0, images: 0 });
+    expect(errors).toEqual([]);
+  });
+}
 
 test("hydration shares the initial event ID with CAPI and each SPA visit gets exactly one new PageView", async ({ page, context, baseURL }) => {
   const counts = await interceptMeta(context, baseURL!);

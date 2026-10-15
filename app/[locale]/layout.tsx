@@ -129,7 +129,8 @@ export default async function LocaleLayout({
   return (
     <html dir={localeDirection(locale)} lang={localeHtmlLang(locale)}>
       <head>
-        {bootstrap && <script id="meta-pixel-base" dangerouslySetInnerHTML={{ __html: bootstrap }} />}
+        {/* An empty string makes React treat head as text and clear Next's styles during hydration. */}
+        {bootstrap ? <script id="meta-pixel-base" dangerouslySetInnerHTML={{ __html: bootstrap }} /> : null}
       </head>
       <body
         className={[
@@ -140,14 +141,14 @@ export default async function LocaleLayout({
           thaiSerifFont.variable
         ].join(" ")}
       >
-        {bootstrap && (
+        {bootstrap ? (
           <noscript>
             {/* An image fallback belongs in body, not head (HTML parsing rules). */}
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img height="1" width="1" style={{ display: "none" }} alt=""
               src={`https://www.facebook.com/tr?id=${encodeURIComponent(config.pixelId)}&ev=${metaEventName("PageView", config.environment)}&noscript=1`} />
           </noscript>
-        )}
+        ) : null}
         <Suspense fallback={null}><BpmTracker locale={locale} /></Suspense>
         <Suspense fallback={null}>
           <MarketingPreference locale={locale} />
