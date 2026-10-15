@@ -103,7 +103,7 @@ test("capture failure, persistence failure, reload and analysis retry remain sep
   await page.getByTestId("retry-analysis").click();
   expect(captures).toBe(2);
   await expect(page).toHaveURL(new RegExp(`healthscore\\?plan=${captured.planId}`));
-  await expect(page.locator(".mn-healthscore-v7")).toBeVisible();
+  await expect(page.getByTestId("healthscore")).toBeVisible();
 });
 
 for (const locale of ["en", "th", "zh-CN"] as const) {

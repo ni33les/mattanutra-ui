@@ -5,13 +5,14 @@ import { computeHealthScore } from '../../lib/health-score.ts';
 import { waitForHealthScoreCopy } from '../../lib/healthscore-copy-client.ts';
 
 const read = (path: string) => readFileSync(new URL(`../../${path}`, import.meta.url), 'utf8');
-test('HS-PAR-01 retain evaluated / set-aside / shortlisted layout with the actual formula count', () => {
+test('HS-PAR-01 retain actual formula count and deterministic evaluated / set-aside / shortlisted data', () => {
   const score = computeHealthScore({ goals: ['energy'], sex: 'male' }, 'en', { evaluatedIngredientCount: 142, chosenNutrients: 10 });
   assert.deepEqual(score.pageContent!.locked.subtraction, { mode: 'nutrients', evaluated: 142, setAside: 132, chosen: 10 });
   const source = read('components/nutrition-flow/healthscore-panel.tsx');
-  assert.match(source, /subtraction\.evaluated,[\s\S]*subtraction\.setAside,[\s\S]*subtraction\.chosen/);
+  assert.match(source, /evaluated: subtraction\.evaluated/);
+  assert.match(source, /chosen: subtraction\.chosen/);
   assert.match(source, /localize\(ai\?\.subtractionBody, locale\)/);
-  assert.match(read('components/nutrition-flow/healthscore-panel-copy.ts'), /subtractionEyebrow: "How your formula was built"/);
+  assert.match(source, /data-testid="healthscore-shortlist"/);
 });
 
 test('HS-PAR-02 advice alone cannot release chat/classic/direct HealthScore polling', async t => {

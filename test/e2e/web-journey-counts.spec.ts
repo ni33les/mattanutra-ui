@@ -37,12 +37,13 @@ for (const locale of ['en', 'th', 'zh-CN']) test(`WEB-JOURNEY-BROWSER-01 ${local
     const count = formulation.supplementBreakdown.length;
     expect(count).toBeGreaterThan(0);
     await page.goto(`/${locale}/nutrition/healthscore?plan=${fixture.planId}`);
-    const section = page.locator('.mn-hs-shortlist-section');
+    const section = page.getByTestId('healthscore-shortlist');
     await section.scrollIntoViewIfNeeded();
-    await expect(section.locator('.n')).toHaveCount(3);
-    await expect(section.locator('.n').nth(2)).toHaveText(String(count));
-    const totals = (await section.locator('.n').allTextContents()).map(Number);
-    expect(totals[0] - totals[1]).toBe(totals[2]);
+    const statistics = section.locator('.stat strong');
+    await expect(statistics).toHaveCount(3);
+    await expect(statistics.nth(1)).toHaveText('✓');
+    await expect(statistics.nth(2)).toHaveText(String(count));
+    expect(Number(await statistics.first().textContent())).toBeGreaterThanOrEqual(count);
     const retry = await page.request.post(`/api/assessment/${fixture.planId}/healthscore/retry`, { data: { locale } });
     expect(retry.status()).toBe(200);
     expect(await sql`select id from tasks where plan_id=${fixture.planId}::uuid and task_type='generate_supplement_guidance' order by id`).toEqual(before);

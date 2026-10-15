@@ -1,0 +1,2023 @@
+/* Adapted from the supplied v8.4 design; all presentation stays inside this page. */
+.mn-healthscore-v8 {
+  width: 100%;
+  min-width: 0;
+  --ink: #0A2540;
+  --ink-soft: #1E3A5F;
+  --teal: #2D8F72;
+  --teal-deep: #1F6E58;
+  --teal-light: #4DB497;
+  --gold: #B8943D;
+  --gold-soft: #D4B871;
+  --cream: #FAF6EC;
+  --cream-deep: #F2EBD8;
+  --mint: #EAF3EC;
+  --paper: #FEFCF7;
+  --ash: #596573;
+  --line: #E5E1D4;
+  --radius: 24px;
+  --shadow: 0 32px 80px -54px rgba(10,37,64,.55);
+  --shadow-sm: 0 12px 32px -22px rgba(10,37,64,.5);
+  --body: var(--mn-font-body, "DM Sans"), var(--mn-font-thai, sans-serif), Arial, sans-serif;
+  --display: var(--mn-font-display, Georgia), Georgia, serif;
+}
+
+.mn-healthscore-v8 * {
+  box-sizing: border-box;
+}
+
+.mn-healthscore-v8 {
+  scroll-behavior: smooth;
+  scroll-padding-top: 24px;
+}
+
+.mn-healthscore-v8 {
+  margin: 0;
+  background: var(--cream);
+  color: var(--ink);
+  font: 16px/1.6 var(--body);
+  -webkit-font-smoothing: antialiased;
+}
+
+.mn-healthscore-v8:has(.dock:not([hidden])) {
+  padding-bottom: 115px;
+}
+
+.mn-healthscore-v8.results-only .hero {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+/* Leave room for the site's existing sticky title bar when following links. */
+.mn-healthscore-v8 #insights,
+.mn-healthscore-v8 #full-report,
+.mn-healthscore-v8 #clarity {
+  scroll-margin-top: 160px;
+}
+
+.mn-healthscore-v8 .hero-intro,
+.mn-healthscore-v8 .finding,
+.mn-healthscore-v8 .pillar-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+html[lang="zh-CN"] .mn-healthscore-v8 {
+  --body: "PingFang SC", "Microsoft YaHei", var(--mn-font-body, sans-serif), sans-serif;
+  --display: "PingFang SC", "Microsoft YaHei", var(--mn-font-body, sans-serif), sans-serif;
+}
+
+html[lang="zh-CN"] .mn-healthscore-v8 h1,
+html[lang="zh-CN"] .mn-healthscore-v8 h2,
+html[lang="zh-CN"] .mn-healthscore-v8 h3 {
+  line-height: 1.4;
+  letter-spacing: 0;
+}
+
+.mn-healthscore-v8 button,
+.mn-healthscore-v8 a,
+.mn-healthscore-v8 input,
+.mn-healthscore-v8 select,
+.mn-healthscore-v8 summary {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.mn-healthscore-v8 button,
+.mn-healthscore-v8 select {
+  font: inherit;
+}
+
+.mn-healthscore-v8 button,
+.mn-healthscore-v8 a,
+.mn-healthscore-v8 summary {
+  touch-action: manipulation;
+}
+
+.mn-healthscore-v8 button,
+.mn-healthscore-v8 summary {
+  cursor: pointer;
+}
+
+.mn-healthscore-v8 button {
+  color: inherit;
+}
+
+.mn-healthscore-v8 a {
+  color: var(--teal-deep);
+  text-underline-offset: 4px;
+}
+
+.mn-healthscore-v8 button:focus-visible,
+.mn-healthscore-v8 a:focus-visible,
+.mn-healthscore-v8 summary:focus-visible,
+.mn-healthscore-v8 select:focus-visible {
+  outline: 3px solid #B8943D;
+  outline-offset: 4px;
+}
+
+.mn-healthscore-v8 button[disabled] {
+  cursor: wait;
+  opacity: .7;
+}
+
+.mn-healthscore-v8 [hidden] {
+  display: none !important;
+}
+
+.mn-healthscore-v8 img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+.mn-healthscore-v8 h1,
+.mn-healthscore-v8 h2,
+.mn-healthscore-v8 h3,
+.mn-healthscore-v8 p {
+  margin: 0;
+}
+
+.mn-healthscore-v8 h1,
+.mn-healthscore-v8 h2,
+.mn-healthscore-v8 h3 {
+  font-family: var(--display);
+  font-weight: 400;
+  line-height: 1.14;
+  letter-spacing: -.025em;
+}
+
+.mn-healthscore-v8 h1 {
+  font-size: clamp(30px,3.7vw,47px);
+}
+
+.mn-healthscore-v8 h2 {
+  font-size: clamp(27px,3vw,38px);
+}
+
+.mn-healthscore-v8 h3 {
+  font-size: 23px;
+}
+
+.mn-healthscore-v8 p+p {
+  margin-top: 12px;
+}
+
+.mn-healthscore-v8 .wrap {
+  width: min(1080px,calc(100% - 48px));
+  margin-inline: auto;
+}
+
+.mn-healthscore-v8 .eyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .15em;
+  text-transform: uppercase;
+  color: var(--teal-deep);
+}
+
+.mn-healthscore-v8 .muted {
+  color: var(--ash);
+}
+
+.mn-healthscore-v8 .small {
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.mn-healthscore-v8 .progress-nav {
+  list-style: none;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 22px;
+  padding: 17px 0;
+  margin: 0;
+  font-size: 12px;
+  color: var(--ash);
+}
+
+.mn-healthscore-v8 .progress-nav li {
+  display: flex;
+  gap: 7px;
+  align-items: center;
+}
+
+.mn-healthscore-v8 .progress-nav li+li:before {
+  content: '';
+  width: 28px;
+  height: 1px;
+  background: var(--line);
+  margin-right: 15px;
+}
+
+.mn-healthscore-v8 .step-dot {
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  width: 21px;
+  height: 21px;
+  font-size: 10px;
+}
+
+.mn-healthscore-v8 .done .step-dot {
+  color: var(--teal-deep);
+  border-color: #c1dbc9;
+  background: var(--mint);
+}
+
+.mn-healthscore-v8 .current {
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.mn-healthscore-v8 .current .step-dot {
+  background: var(--ink);
+  color: white;
+  border-color: var(--ink);
+}
+
+.mn-healthscore-v8 .hero {
+  display: grid;
+  grid-template-columns: minmax(0,1.12fr) minmax(0,.88fr);
+  gap: 38px;
+  align-items: start;
+  padding: 25px 0 38px;
+}
+
+.mn-healthscore-v8 .hero-title {
+  margin: 10px 0 12px;
+  max-width: 18ch;
+}
+
+.mn-healthscore-v8 .goal-line {
+  font-size: 15px;
+  color: var(--ink-soft);
+  margin-bottom: 22px;
+  max-width: 50ch;
+}
+
+.mn-healthscore-v8 .scorecard {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  padding: 20px 24px;
+  box-shadow: var(--shadow-sm);
+  position: relative;
+  overflow: hidden;
+}
+
+.mn-healthscore-v8 .scorecard:before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  height: 3px;
+  background: linear-gradient(90deg,var(--teal),var(--gold-soft),var(--teal));
+}
+
+.mn-healthscore-v8 .score-main {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+.mn-healthscore-v8 .score-num {
+  font-family: var(--display);
+  font-size: 82px;
+  line-height: 1;
+  font-weight: 400;
+  letter-spacing: -.06em;
+  white-space: nowrap;
+}
+
+.mn-healthscore-v8 .score-num small {
+  font-family: var(--body);
+  font-size: 15px;
+  letter-spacing: 0;
+  color: var(--ash);
+  margin-left: 4px;
+}
+
+.mn-healthscore-v8 .band {
+  font-size: 13px;
+  font-weight: 600;
+  display: inline-block;
+  color: var(--teal-deep);
+  margin-bottom: 6px;
+}
+
+.mn-healthscore-v8 .score-text {
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--ink-soft);
+}
+
+.mn-healthscore-v8 .score-disclaimer {
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--ash);
+  margin-top: 13px;
+}
+
+.mn-healthscore-v8 .insight {
+  margin-top: 20px;
+  border-left: 2px solid var(--gold-soft);
+  padding-left: 15px;
+}
+
+.mn-healthscore-v8 .insight h2 {
+  font-family: var(--body);
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 0;
+  line-height: 1.45;
+  margin-bottom: 5px;
+}
+
+.mn-healthscore-v8 .insight p {
+  font-size: 14px;
+  color: var(--ink-soft);
+  line-height: 1.55;
+}
+
+.mn-healthscore-v8 .offer {
+  background: radial-gradient(circle at 0 0,rgba(77,180,151,.18),transparent 58%),linear-gradient(140deg,#10324d,#0A2540);
+  color: var(--paper);
+  border-radius: 24px;
+  padding: 29px;
+  box-shadow: var(--shadow);
+  position: relative;
+}
+
+.mn-healthscore-v8 .offer .eyebrow {
+  color: #cfbc86;
+}
+
+.mn-healthscore-v8 .offer h2 {
+  font-size: 34px;
+  line-height: 1.12;
+  margin: 10px 0 12px;
+}
+
+.mn-healthscore-v8 .offer p {
+  color: #e0e9ec;
+}
+
+.mn-healthscore-v8 .offer .offer-sub {
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.mn-healthscore-v8 .offer-list {
+  padding: 0;
+  list-style: none;
+  font-size: 14px;
+  line-height: 1.4;
+  margin: 16px 0 20px;
+}
+
+.mn-healthscore-v8 .offer-list li {
+  display: flex;
+  gap: 9px;
+  margin: 8px 0;
+}
+
+.mn-healthscore-v8 .check {
+  color: #8cddba;
+  font-weight: 700;
+}
+
+.mn-healthscore-v8 .price-line {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin: 12px 0;
+}
+
+.mn-healthscore-v8 .price {
+  font: 48px/1 var(--display);
+  letter-spacing: -.04em;
+}
+
+.mn-healthscore-v8 .price-line .small {
+  color: #d7e3e7;
+}
+
+.mn-healthscore-v8 .buy {
+  border: 1px solid transparent;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  min-height: 54px;
+  padding: 14px 21px;
+  width: 100%;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.35;
+  text-decoration: none;
+  background: var(--teal-deep);
+  color: white;
+  transition: background .15s,transform .15s;
+}
+
+.mn-healthscore-v8 .buy:hover {
+  background: #185540;
+  transform: translateY(-1px);
+}
+
+.mn-healthscore-v8 .offer .buy,
+.mn-healthscore-v8 .close-offer .buy {
+  background: #d6bd78;
+  color: #0A2540;
+}
+
+.mn-healthscore-v8 .offer .buy:hover,
+.mn-healthscore-v8 .close-offer .buy:hover {
+  background: #e6cc86;
+}
+
+.mn-healthscore-v8 .arrow {
+  font-size: 20px;
+  line-height: 1;
+}
+
+.mn-healthscore-v8 .payment-note {
+  text-align: center;
+  font-size: 12px;
+  line-height: 1.5;
+  margin: 10px 0 0 !important;
+}
+
+.mn-healthscore-v8 .offer .payment-note {
+  color: #dce7e9;
+}
+
+.mn-healthscore-v8 .guarantee-link {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 7px;
+  color: #e5d49f;
+  font-size: 12px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  padding: 11px 0 0;
+}
+
+.mn-healthscore-v8 .trust-inline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px 15px;
+  margin: 14px 0 0;
+  color: var(--ash);
+  font-size: 12px;
+}
+
+.mn-healthscore-v8 .trust-inline span:before {
+  content: '✓';
+  color: var(--teal-deep);
+  margin-right: 5px;
+}
+
+.mn-healthscore-v8 .read-results {
+  display: inline-block;
+  margin-top: 15px;
+  font-size: 13px;
+  padding: 6px 0;
+}
+
+.mn-healthscore-v8 .section {
+  padding-block: 36px;
+}
+
+.mn-healthscore-v8 .section-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: end;
+  gap: 25px;
+  margin-bottom: 23px;
+}
+
+.mn-healthscore-v8 .section-head h2 {
+  margin-top: 8px;
+  max-width: 22ch;
+}
+
+.mn-healthscore-v8 .section-head p {
+  max-width: 38ch;
+  font-size: 14px;
+  color: var(--ash);
+}
+
+.mn-healthscore-v8 .findings {
+  display: grid;
+  grid-template-columns: repeat(3,minmax(0,1fr));
+  gap: 16px;
+}
+
+.mn-healthscore-v8 .findings.one {
+  grid-template-columns: 1fr;
+}
+
+.mn-healthscore-v8 .finding {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 23px;
+  box-shadow: var(--shadow-sm);
+}
+
+.mn-healthscore-v8 .finding .index {
+  font-family: var(--display);
+  color: var(--teal-deep);
+  font-size: 27px;
+}
+
+.mn-healthscore-v8 .finding h3 {
+  margin: 12px 0 10px;
+  font-size: 22px;
+  line-height: 1.2;
+}
+
+.mn-healthscore-v8 .finding p {
+  font-size: 14px;
+  color: var(--ink-soft);
+  line-height: 1.65;
+}
+
+.mn-healthscore-v8 .selection {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  align-items: center;
+  margin-top: 22px;
+  background: var(--mint);
+  padding: 24px 28px;
+  border: 1px solid #d7e6d8;
+  border-radius: 18px;
+}
+
+.mn-healthscore-v8 .selection h3 {
+  font-size: 24px;
+  margin-bottom: 7px;
+}
+
+.mn-healthscore-v8 .selection p {
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+
+.mn-healthscore-v8 .selection-numbers {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 14px;
+}
+
+.mn-healthscore-v8 .selection-numbers .stat {
+  text-align: center;
+  flex: 1;
+}
+
+.mn-healthscore-v8 .stat strong {
+  display: block;
+  font: 38px/1.15 var(--display);
+}
+
+.mn-healthscore-v8 .stat:last-child strong {
+  color: var(--teal-deep);
+}
+
+.mn-healthscore-v8 .stat span {
+  font-size: 11px;
+  color: var(--ink-soft);
+  display: block;
+  line-height: 1.4;
+  margin-top: 5px;
+}
+
+.mn-healthscore-v8 .selection-numbers .to {
+  color: #8a916d;
+}
+
+.mn-healthscore-v8 .mid-action {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 25px;
+  border-bottom: 1px solid var(--line);
+  padding: 25px 0;
+}
+
+.mn-healthscore-v8 .mid-action p {
+  font-family: var(--display);
+  font-size: 22px;
+  line-height: 1.25;
+}
+
+.mn-healthscore-v8 .mid-action .buy {
+  width: auto;
+  min-width: 255px;
+}
+
+.mn-healthscore-v8 .mid-action .small {
+  font-family: var(--body);
+  font-size: 12px;
+  margin-top: 5px;
+  color: var(--ash);
+}
+
+.mn-healthscore-v8 .deliverable {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 42px;
+  align-items: center;
+}
+
+.mn-healthscore-v8 .deliverable h2 {
+  margin: 10px 0 16px;
+  max-width: 20ch;
+}
+
+.mn-healthscore-v8 .deliverable p {
+  color: var(--ink-soft);
+  font-size: 15px;
+}
+
+.mn-healthscore-v8 .deliverable .note {
+  background: var(--mint);
+  border-radius: 12px;
+  padding: 14px 16px;
+  margin-top: 18px;
+  font-size: 13px;
+  border-left: 3px solid var(--teal);
+}
+
+.mn-healthscore-v8 .plan-preview {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 8px 22px 22px 8px;
+  padding: 27px 28px;
+  box-shadow: var(--shadow);
+  border-left: 5px solid var(--teal-deep);
+}
+
+.mn-healthscore-v8 .plan-preview .doc-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 10px;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 18px;
+}
+
+.mn-healthscore-v8 .doc-title h3 {
+  font-size: 24px;
+}
+
+.mn-healthscore-v8 .doc-title .mini {
+  font-size: 10px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--ash);
+  margin-bottom: 7px;
+}
+
+.mn-healthscore-v8 .doc-title .monogram {
+  font: 26px var(--display);
+  color: var(--teal-deep);
+}
+
+.mn-healthscore-v8 .plan-row {
+  display: grid;
+  grid-template-columns: 28px 1fr;
+  gap: 12px;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.mn-healthscore-v8 .plan-row:last-child {
+  border: 0;
+  padding-bottom: 0;
+}
+
+.mn-healthscore-v8 .plan-row .n {
+  font-size: 12px;
+  color: var(--teal-deep);
+  margin-top: 3px;
+}
+
+.mn-healthscore-v8 .plan-row strong {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.mn-healthscore-v8 .plan-row p {
+  font-size: 12px;
+  color: var(--ash);
+  margin-top: 3px;
+}
+
+.mn-healthscore-v8 .report {
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: var(--paper);
+  overflow: hidden;
+}
+
+.mn-healthscore-v8 .report>summary {
+  padding: 24px 28px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  list-style: none;
+}
+
+.mn-healthscore-v8 .report>summary::-webkit-details-marker {
+  display: none;
+}
+
+.mn-healthscore-v8 .report .summary-label {
+  font-size: 22px;
+  font-family: var(--display);
+  line-height: 1.25;
+}
+
+.mn-healthscore-v8 .report .summary-sub {
+  display: block;
+  font: 13px/1.5 var(--body);
+  color: var(--ash);
+  margin-top: 5px;
+}
+
+.mn-healthscore-v8 .plus {
+  font-size: 26px;
+  line-height: 1;
+  color: var(--teal-deep);
+  font-weight: 400;
+}
+
+.mn-healthscore-v8 .report[open] .plus,
+.mn-healthscore-v8 .faq details[open] .plus {
+  transform: rotate(45deg);
+}
+
+.mn-healthscore-v8 .report-body {
+  padding: 0 28px 28px;
+}
+
+.mn-healthscore-v8 .pillars {
+  border-top: 1px solid var(--line);
+  padding-top: 8px;
+}
+
+.mn-healthscore-v8 .pillar {
+  display: grid;
+  grid-template-columns: 180px 1fr 45px;
+  align-items: center;
+  gap: 16px;
+  padding: 15px 0;
+  border-bottom: 1px solid #eee9dd;
+  font-size: 13px;
+}
+
+.mn-healthscore-v8 .pillar:last-child {
+  border: 0;
+}
+
+.mn-healthscore-v8 .pillar small {
+  display: block;
+  color: var(--teal-deep);
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.mn-healthscore-v8 .track {
+  height: 7px;
+  border-radius: 9px;
+  background: #ede6d4;
+  overflow: hidden;
+}
+
+.mn-healthscore-v8 .fill {
+  height: 100%;
+  border-radius: 9px;
+  background: linear-gradient(90deg,var(--teal-light),var(--teal-deep));
+}
+
+.mn-healthscore-v8 .fill.low {
+  background: linear-gradient(90deg,var(--gold-soft),var(--gold));
+}
+
+.mn-healthscore-v8 .pillar .value {
+  text-align: right;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.mn-healthscore-v8 .report-note {
+  margin-top: 19px;
+  background: var(--mint);
+  padding: 15px 18px;
+  border-radius: 12px;
+  font-size: 13px;
+}
+
+.mn-healthscore-v8 .method {
+  margin-top: 20px;
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+
+.mn-healthscore-v8 .method strong {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 14px;
+}
+
+.mn-healthscore-v8 .trust-band {
+  display: grid;
+  grid-template-columns: repeat(3,1fr);
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  padding: 25px 0;
+  gap: 26px;
+}
+
+.mn-healthscore-v8 .trust-item h3 {
+  font-family: var(--body);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0;
+  line-height: 1.4;
+  margin-bottom: 6px;
+}
+
+.mn-healthscore-v8 .trust-item p {
+  font-size: 12px;
+  color: var(--ash);
+}
+
+.mn-healthscore-v8 .trust-item+.trust-item {
+  border-left: 1px solid var(--line);
+  padding-left: 26px;
+}
+
+.mn-healthscore-v8 .steps {
+  display: grid;
+  grid-template-columns: repeat(3,1fr);
+  gap: 30px;
+  margin-top: 24px;
+}
+
+.mn-healthscore-v8 .journey-step {
+  border-top: 2px solid #c7d9cb;
+  padding-top: 17px;
+}
+
+.mn-healthscore-v8 .journey-step .num {
+  font: 28px var(--display);
+  color: var(--teal-deep);
+}
+
+.mn-healthscore-v8 .journey-step h3 {
+  font-size: 22px;
+  margin: 9px 0;
+}
+
+.mn-healthscore-v8 .journey-step p {
+  font-size: 14px;
+  color: var(--ink-soft);
+}
+
+.mn-healthscore-v8 .faq-layout {
+  display: grid;
+  grid-template-columns: .75fr 1.25fr;
+  gap: 40px;
+}
+
+.mn-healthscore-v8 .faq-layout h2 {
+  margin: 9px 0 14px;
+}
+
+.mn-healthscore-v8 .faq details {
+  border-bottom: 1px solid var(--line);
+}
+
+.mn-healthscore-v8 .faq summary {
+  list-style: none;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 15px;
+  min-height: 60px;
+  padding: 16px 0;
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1.5;
+}
+
+.mn-healthscore-v8 .faq summary::-webkit-details-marker {
+  display: none;
+}
+
+.mn-healthscore-v8 .faq details p {
+  font-size: 14px;
+  color: var(--ink-soft);
+  padding: 0 28px 20px 0;
+}
+
+.mn-healthscore-v8 .guarantee {
+  display: flex;
+  align-items: center;
+  gap: 25px;
+  background: var(--mint);
+  border: 1px solid #d6e5d9;
+  border-radius: 20px;
+  padding: 25px 30px;
+  margin-top: 28px;
+  scroll-margin-top: 20px;
+}
+
+.mn-healthscore-v8 .guarantee img {
+  width: 86px;
+  flex-shrink: 0;
+  max-height: 142px;
+  object-fit: contain;
+}
+
+.mn-healthscore-v8 .guarantee h3 {
+  font-size: 25px;
+  margin-bottom: 10px;
+}
+
+.mn-healthscore-v8 .guarantee p {
+  font-size: 14px;
+  color: var(--ink-soft);
+  max-width: 66ch;
+}
+
+.mn-healthscore-v8 .close-offer {
+  background: radial-gradient(circle at 18% 0%,rgba(77,180,151,.18),transparent 55%),linear-gradient(135deg,var(--teal-deep),#103b39);
+  color: white;
+  border-radius: 24px;
+  padding: 34px 38px;
+  display: grid;
+  grid-template-columns: 1.15fr .85fr;
+  gap: 35px;
+  align-items: center;
+}
+
+.mn-healthscore-v8 .close-offer .eyebrow {
+  color: #deca92;
+}
+
+.mn-healthscore-v8 .close-offer h2 {
+  margin: 10px 0;
+  font-size: 34px;
+}
+
+.mn-healthscore-v8 .close-offer p {
+  color: #e3efea;
+  font-size: 14px;
+}
+
+.mn-healthscore-v8 .close-offer .payment-note {
+  font-size: 12px;
+}
+
+.mn-healthscore-v8 .dock {
+  position: fixed;
+  bottom: 0;
+  inset-inline: 0;
+  z-index: 40;
+  background: rgba(254,252,247,.98);
+  border-top: 1px solid var(--line);
+  box-shadow: 0 -6px 22px rgba(10,37,64,.07);
+  padding: 12px 0 max(12px,env(safe-area-inset-bottom));
+}
+
+.mn-healthscore-v8 .dock .wrap {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.mn-healthscore-v8 .dock strong {
+  font: 29px/1.15 var(--display);
+}
+
+.mn-healthscore-v8 .dock .small {
+  display: block;
+  font-size: 11px;
+  margin-top: 3px;
+  color: var(--ash);
+}
+
+.mn-healthscore-v8 .dock .buy {
+  width: auto;
+  min-width: 260px;
+}
+
+.mn-healthscore-v8 .dock-label {
+  font-size: 12px;
+  color: var(--ash);
+  margin-left: 9px;
+}
+
+.mn-healthscore-v8 .error-msg {
+  color: #a1352c;
+  font-size: 13px;
+}
+
+.mn-healthscore-v8 .status {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 115px;
+  z-index: 60;
+  max-width: calc(100% - 32px);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 12px 18px;
+  box-shadow: var(--shadow-sm);
+  font-size: 13px;
+}
+
+.mn-healthscore-v8 .status:empty {
+  display: none;
+}
+
+html[lang="th"] .mn-healthscore-v8 {
+  --display: var(--mn-font-thai, sans-serif), Tahoma, sans-serif;
+}
+
+html[lang="th"] .mn-healthscore-v8 h1 {
+  font-size: clamp(27px,3.2vw,38px);
+  line-height: 1.4;
+  letter-spacing: -.025em;
+}
+
+html[lang="th"] .mn-healthscore-v8 h2,
+html[lang="th"] .mn-healthscore-v8 h3 {
+  line-height: 1.4;
+  letter-spacing: -.02em;
+}
+
+html[lang="th"] .mn-healthscore-v8 .offer h2 {
+  font-size: 28px;
+}
+
+html[lang="th"] .mn-healthscore-v8 .score-num,
+html[lang="th"] .mn-healthscore-v8 .price,
+html[lang="th"] .mn-healthscore-v8 .stat strong,
+html[lang="th"] .mn-healthscore-v8 .dock strong {
+  font-family: var(--mn-font-display, Georgia), Georgia, serif;
+}
+
+html[lang="th"] .mn-healthscore-v8 .eyebrow {
+  letter-spacing: .04em;
+  font-size: 12px;
+}
+
+html[lang="th"] .mn-healthscore-v8 .hero-title {
+  max-width: none;
+}
+
+html[lang="th"] .mn-healthscore-v8 .close-offer h2 {
+  font-size: 28px;
+}
+
+@media (min-width:1100px) {
+  .mn-healthscore-v8 .hero {
+    gap: 50px;
+  }
+
+  .mn-healthscore-v8 .hero .offer {
+    margin-top: 3px;
+  }
+}
+
+@media (max-width:800px) {
+  .mn-healthscore-v8 .hero {
+    grid-template-columns: 1fr;
+    gap: 22px;
+    padding-top: 17px;
+  }
+
+  .mn-healthscore-v8 .hero-title {
+    max-width: none;
+  }
+
+  .mn-healthscore-v8 .goal-line {
+    margin-bottom: 15px;
+  }
+
+  .mn-healthscore-v8 .scorecard {
+    padding: 17px 20px;
+  }
+
+  .mn-healthscore-v8 .score-main {
+    gap: 20px;
+  }
+
+  .mn-healthscore-v8 .score-num {
+    font-size: 68px;
+  }
+
+  .mn-healthscore-v8 .insight {
+    margin-top: 15px;
+  }
+
+  .mn-healthscore-v8 .offer {
+    padding: 24px;
+  }
+
+  .mn-healthscore-v8 .offer h2 {
+    font-size: 30px;
+  }
+
+  .mn-healthscore-v8 .offer-list {
+    margin: 12px 0 16px;
+  }
+
+  .mn-healthscore-v8 .hero .trust-inline {
+    display: none;
+  }
+
+  .mn-healthscore-v8 .hero .read-results {
+    margin-top: 10px;
+  }
+
+  .mn-healthscore-v8 .section {
+    padding-block: 28px;
+  }
+
+  .mn-healthscore-v8 .section-head {
+    display: block;
+  }
+
+  .mn-healthscore-v8 .section-head p {
+    margin-top: 12px;
+    max-width: none;
+  }
+
+  .mn-healthscore-v8 .findings {
+    grid-template-columns: 1fr;
+  }
+
+  .mn-healthscore-v8 .finding {
+    padding: 20px;
+  }
+
+  .mn-healthscore-v8 .finding .index {
+    font-size: 21px;
+    float: left;
+    margin-right: 12px;
+  }
+
+  .mn-healthscore-v8 .finding h3 {
+    margin: 0 0 10px;
+    font-size: 22px;
+  }
+
+  .mn-healthscore-v8 .selection {
+    grid-template-columns: 1fr;
+    padding: 22px;
+    gap: 20px;
+  }
+
+  .mn-healthscore-v8 .deliverable {
+    gap: 25px;
+  }
+
+  .mn-healthscore-v8 .mid-action {
+    gap: 15px;
+  }
+
+  .mn-healthscore-v8 .mid-action p {
+    font-size: 20px;
+  }
+
+  .mn-healthscore-v8 .mid-action .buy {
+    min-width: 230px;
+  }
+
+  .mn-healthscore-v8 .trust-band {
+    gap: 16px;
+  }
+
+  .mn-healthscore-v8 .trust-item+.trust-item {
+    padding-left: 16px;
+  }
+
+  .mn-healthscore-v8 .steps {
+    gap: 20px;
+  }
+
+  .mn-healthscore-v8 .faq-layout {
+    gap: 25px;
+    grid-template-columns: .7fr 1.3fr;
+  }
+
+  .mn-healthscore-v8 .close-offer {
+    padding: 28px;
+    gap: 25px;
+  }
+
+  .mn-healthscore-v8 .close-offer h2 {
+    font-size: 29px;
+  }
+}
+
+@media (max-width:560px) {
+  .mn-healthscore-v8 .wrap {
+    width: calc(100% - 32px);
+  }
+
+  .mn-healthscore-v8 .progress-nav {
+    font-size: 10px;
+    gap: 9px;
+    padding-block: 12px;
+  }
+
+  .mn-healthscore-v8 .progress-nav li {
+    gap: 5px;
+  }
+
+  .mn-healthscore-v8 .progress-nav li+li:before {
+    width: 12px;
+    margin-right: 5px;
+  }
+
+  .mn-healthscore-v8 .step-dot {
+    width: 18px;
+    height: 18px;
+    font-size: 9px;
+  }
+
+  .mn-healthscore-v8 .hero {
+    padding: 12px 0 22px;
+    gap: 18px;
+  }
+
+  .mn-healthscore-v8 .hero-title {
+    font-size: 29px;
+    margin: 7px 0 9px;
+  }
+
+  .mn-healthscore-v8 .hero .eyebrow {
+    font-size: 10px;
+  }
+
+  .mn-healthscore-v8 .goal-line {
+    font-size: 13px;
+    line-height: 1.5;
+    margin-bottom: 13px;
+  }
+
+  .mn-healthscore-v8 .scorecard {
+    padding: 13px 16px;
+    border-radius: 16px;
+  }
+
+  .mn-healthscore-v8 .score-main {
+    gap: 17px;
+  }
+
+  .mn-healthscore-v8 .score-num {
+    font-size: 61px;
+  }
+
+  .mn-healthscore-v8 .score-text {
+    font-size: 12px;
+    line-height: 1.5;
+  }
+
+  .mn-healthscore-v8 .band {
+    font-size: 12px;
+    margin-bottom: 3px;
+  }
+
+  .mn-healthscore-v8 .score-disclaimer {
+    font-size: 10px;
+    margin-top: 9px;
+  }
+
+  .mn-healthscore-v8 .insight {
+    margin-top: 12px;
+    padding-left: 12px;
+  }
+
+  .mn-healthscore-v8 .insight h2 {
+    font-size: 14px;
+    margin-bottom: 3px;
+  }
+
+  .mn-healthscore-v8 .insight p {
+    font-size: 12px;
+    line-height: 1.55;
+  }
+
+  .mn-healthscore-v8 .offer {
+    padding: 20px;
+    border-radius: 20px;
+  }
+
+  .mn-healthscore-v8 .offer h2 {
+    font-size: 27px;
+    margin: 7px 0 8px;
+  }
+
+  .mn-healthscore-v8 .offer .offer-sub {
+    font-size: 13px;
+  }
+
+  .mn-healthscore-v8 .offer-list {
+    font-size: 13px;
+    margin: 11px 0 13px;
+  }
+
+  .mn-healthscore-v8 .offer-list li {
+    margin: 6px 0;
+  }
+
+  .mn-healthscore-v8 .price-line {
+    margin: 10px 0;
+  }
+
+  .mn-healthscore-v8 .price {
+    font-size: 41px;
+  }
+
+  .mn-healthscore-v8 .buy {
+    font-size: 14px;
+    min-height: 50px;
+    padding: 13px 18px;
+  }
+
+  .mn-healthscore-v8 .offer .guarantee-link {
+    font-size: 11px;
+    padding-top: 9px;
+  }
+
+  .mn-healthscore-v8 .payment-note {
+    font-size: 11px;
+  }
+
+  .mn-healthscore-v8 .section-head {
+    margin-bottom: 18px;
+  }
+
+  .mn-healthscore-v8 .section-head h2 {
+    font-size: 28px;
+  }
+
+  .mn-healthscore-v8 .section-head p {
+    font-size: 13px;
+  }
+
+  .mn-healthscore-v8 .section {
+    padding-block: 24px;
+  }
+
+  .mn-healthscore-v8 .finding h3 {
+    font-size: 21px;
+  }
+
+  .mn-healthscore-v8 .finding p {
+    font-size: 13px;
+  }
+
+  .mn-healthscore-v8 .mid-action {
+    display: block;
+  }
+
+  .mn-healthscore-v8 .mid-action .buy {
+    width: 100%;
+    margin-top: 15px;
+  }
+
+  .mn-healthscore-v8 .deliverable {
+    grid-template-columns: 1fr;
+  }
+
+  .mn-healthscore-v8 .deliverable h2 {
+    font-size: 29px;
+  }
+
+  .mn-healthscore-v8 .plan-preview {
+    padding: 22px;
+  }
+
+  .mn-healthscore-v8 .report>summary {
+    padding: 20px;
+  }
+
+  .mn-healthscore-v8 .report .summary-label {
+    font-size: 21px;
+  }
+
+  .mn-healthscore-v8 .report-body {
+    padding: 0 20px 22px;
+  }
+
+  .mn-healthscore-v8 .pillar {
+    grid-template-columns: 1fr 40px;
+    gap: 8px;
+    grid-template-areas: 'name value' 'bar bar';
+    padding-block: 13px;
+  }
+
+  .mn-healthscore-v8 .pillar .pillar-name {
+    grid-area: name;
+  }
+
+  .mn-healthscore-v8 .pillar .value {
+    grid-area: value;
+  }
+
+  .mn-healthscore-v8 .pillar .track {
+    grid-area: bar;
+  }
+
+  .mn-healthscore-v8 .trust-band {
+    grid-template-columns: 1fr;
+    gap: 16px;
+    padding-block: 22px;
+  }
+
+  .mn-healthscore-v8 .trust-item+.trust-item {
+    border-left: 0;
+    padding-left: 0;
+  }
+
+  .mn-healthscore-v8 .trust-item {
+    display: grid;
+    grid-template-columns: 1fr 1.2fr;
+    gap: 12px;
+    align-items: start;
+  }
+
+  .mn-healthscore-v8 .trust-item h3 {
+    margin: 0;
+    font-size: 13px;
+  }
+
+  .mn-healthscore-v8 .trust-item p {
+    font-size: 11px;
+  }
+
+  .mn-healthscore-v8 .steps {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+
+  .mn-healthscore-v8 .journey-step {
+    display: grid;
+    grid-template-columns: 28px 1fr;
+    gap: 4px 15px;
+    padding-top: 14px;
+  }
+
+  .mn-healthscore-v8 .journey-step .num {
+    grid-row: 1/3;
+    font-size: 23px;
+  }
+
+  .mn-healthscore-v8 .journey-step h3 {
+    margin: 0 0 4px;
+    font-size: 21px;
+  }
+
+  .mn-healthscore-v8 .journey-step p {
+    font-size: 13px;
+    grid-column: 2;
+  }
+
+  .mn-healthscore-v8 .faq-layout {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .mn-healthscore-v8 .faq-layout h2 {
+    font-size: 28px;
+  }
+
+  .mn-healthscore-v8 .faq summary {
+    font-size: 14px;
+  }
+
+  .mn-healthscore-v8 .faq details p {
+    font-size: 13px;
+  }
+
+  .mn-healthscore-v8 .guarantee {
+    padding: 20px 16px;
+    gap: 16px;
+    margin-top: 24px;
+  }
+
+  .mn-healthscore-v8 .guarantee img {
+    width: 64px;
+    max-height: 106px;
+  }
+
+  .mn-healthscore-v8 .guarantee h3 {
+    font-size: 21px;
+    margin-bottom: 7px;
+  }
+
+  .mn-healthscore-v8 .guarantee p {
+    font-size: 12px;
+  }
+
+  .mn-healthscore-v8 .close-offer {
+    grid-template-columns: 1fr;
+    padding: 25px;
+    gap: 20px;
+  }
+
+  .mn-healthscore-v8 .close-offer h2 {
+    font-size: 28px;
+  }
+
+  .mn-healthscore-v8 .close-offer p {
+    font-size: 13px;
+  }
+
+  .mn-healthscore-v8 .close-offer .price-line {
+    margin-top: 0;
+  }
+
+  .mn-healthscore-v8 .dock {
+    padding-top: 10px;
+  }
+
+  .mn-healthscore-v8 .dock .wrap {
+    gap: 12px;
+  }
+
+  .mn-healthscore-v8 .dock strong {
+    font-size: 28px;
+  }
+
+  .mn-healthscore-v8 .dock-label {
+    display: none;
+  }
+
+  .mn-healthscore-v8 .dock .small {
+    font-size: 10px;
+    max-width: 110px;
+  }
+
+  .mn-healthscore-v8 .dock .buy {
+    min-width: 0;
+    max-width: 220px;
+    flex: 1;
+    padding: 12px 16px;
+  }
+
+  .mn-healthscore-v8 .dock .buy .arrow {
+    display: none;
+  }
+
+  html[lang="th"] .mn-healthscore-v8 .hero-title {
+    font-size: 26px;
+    line-height: 1.4;
+  }
+
+  html[lang="th"] .mn-healthscore-v8 .offer h2 {
+    font-size: 24px;
+  }
+
+  html[lang="th"] .mn-healthscore-v8 .finding h3 {
+    font-size: 20px;
+  }
+
+  html[lang="th"] .mn-healthscore-v8 .guarantee h3 {
+    font-size: 19px;
+  }
+
+  html[lang="th"] .mn-healthscore-v8 .close-offer h2 {
+    font-size: 25px;
+  }
+}
+
+/* The first mobile offer is deliberately compact: the detailed contents follow below. */
+
+@media (max-width:800px) {
+  .mn-healthscore-v8 .hero .offer h2,
+  .mn-healthscore-v8 .hero .offer-list,
+  .mn-healthscore-v8 .hero .offer .price-line {
+    display: none;
+  }
+
+  .mn-healthscore-v8 .hero .offer .offer-sub {
+    margin: 9px 0 15px;
+  }
+
+  .mn-healthscore-v8 .hero .offer {
+    padding: 21px 23px;
+  }
+
+  .mn-healthscore-v8 .hero .offer .eyebrow {
+    font-size: 12px;
+    letter-spacing: .06em;
+  }
+
+  .mn-healthscore-v8 .hero .payment-note {
+    font-size: 12px;
+  }
+
+  .mn-healthscore-v8 .hero .offer .guarantee-link {
+    padding-top: 8px;
+  }
+
+  .mn-healthscore-v8 .hero .offer-sub {
+    font-size: 14px;
+  }
+
+  .mn-healthscore-v8 .hero .read-results {
+    margin-top: 8px;
+  }
+}
+
+/* Requested v8 refinements: shared green trust treatment and delivery photo. */
+
+.mn-healthscore-v8 .trust-band {
+  border: 0;
+  padding: 0;
+  gap: 14px;
+  align-items: stretch;
+}
+
+.mn-healthscore-v8 .trust-item,
+.mn-healthscore-v8 .close-offer {
+  background: radial-gradient(circle at 18% 0%,rgba(77,180,151,.18),transparent 55%),linear-gradient(135deg,var(--teal-deep),#103b39);
+}
+
+.mn-healthscore-v8 .trust-item {
+  display: block;
+  border: 0;
+  border-radius: 18px;
+  padding: 24px;
+  color: #fff;
+  box-shadow: var(--shadow-sm);
+}
+
+.mn-healthscore-v8 .trust-item+.trust-item {
+  border: 0;
+  padding-left: 24px;
+}
+
+.mn-healthscore-v8 .trust-item h3 {
+  color: #fff;
+  margin: 0 0 8px;
+}
+
+.mn-healthscore-v8 .trust-item p {
+  color: #e3efea;
+}
+
+.mn-healthscore-v8 .delivery-box {
+  max-width: 860px;
+  margin: 30px auto 0;
+}
+
+.mn-healthscore-v8 .delivery-box img {
+  width: 100%;
+  height: auto;
+  border-radius: 20px;
+}
+
+.mn-healthscore-v8 .delivery-box figcaption {
+  max-width: 700px;
+  margin: 14px auto 0;
+  text-align: center;
+  color: var(--ink-soft);
+  font-size: 13px;
+  line-height: 1.6;
+  padding-inline: 12px;
+}
+
+@media (max-width:560px) {
+  .mn-healthscore-v8 .trust-item,
+  .mn-healthscore-v8 .trust-item+.trust-item {
+    padding: 20px 22px;
+  }
+
+  .mn-healthscore-v8 .delivery-box {
+    margin-top: 25px;
+  }
+
+  .mn-healthscore-v8 .delivery-box img {
+    border-radius: 16px;
+  }
+
+  .mn-healthscore-v8 .delivery-box figcaption {
+    font-size: 12px;
+    margin-top: 12px;
+    padding-inline: 4px;
+  }
+}
+
+@media (prefers-reduced-motion:reduce) {
+  .mn-healthscore-v8 {
+    scroll-behavior: auto;
+  }
+
+  .mn-healthscore-v8 *,
+  .mn-healthscore-v8 *:before,
+  .mn-healthscore-v8 *:after {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+
+@media print {
+  .mn-healthscore-v8 .buy,
+  .mn-healthscore-v8 .dock,
+  .mn-healthscore-v8 .read-results,
+  .mn-healthscore-v8 .progress-nav,
+  .mn-healthscore-v8 .guarantee-link {
+    display: none !important;
+  }
+
+  .mn-healthscore-v8 {
+    padding: 0 !important;
+    background: white;
+  }
+
+  .mn-healthscore-v8 .wrap {
+    width: 100%;
+  }
+
+  .mn-healthscore-v8 .hero,
+  .mn-healthscore-v8 .deliverable,
+  .mn-healthscore-v8 .close-offer,
+  .mn-healthscore-v8 .faq-layout {
+    display: block;
+  }
+
+  .mn-healthscore-v8 .offer,
+  .mn-healthscore-v8 .close-offer {
+    background: #eee;
+    color: #0A2540;
+    box-shadow: none;
+  }
+
+  .mn-healthscore-v8 .offer p,
+  .mn-healthscore-v8 .close-offer p {
+    color: #0A2540;
+  }
+
+  .mn-healthscore-v8 .section {
+    break-inside: avoid;
+  }
+
+  .mn-healthscore-v8 .report-body {
+    display: block;
+  }
+
+  .mn-healthscore-v8 .report,
+  .mn-healthscore-v8 .finding {
+    break-inside: avoid;
+  }
+}
+
+/* v8.1: detail is permanently visible; the green banner treatment is shared. */
+
+.mn-healthscore-v8 .report-heading {
+  padding: 24px 28px;
+}
+
+.mn-healthscore-v8 .report-body {
+  display: block;
+}
+
+.mn-healthscore-v8 .report .summary-label {
+  margin: 0;
+}
+
+.mn-healthscore-v8 .report-heading .summary-sub {
+  margin-top: 5px;
+}
+
+@media (max-width:560px) {
+  .mn-healthscore-v8 .report-heading {
+    padding: 20px;
+  }
+}
+
+/* v8.2: compact, controllable bilingual sample animation. */
+
+.mn-healthscore-v8 .sample-section {
+  border-block: 1px solid var(--line);
+  margin-top: 26px;
+  padding: 32px 0;
+}
+
+.mn-healthscore-v8 .sample-intro {
+  max-width: 660px;
+  margin: 0 auto 22px;
+  text-align: center;
+}
+
+.mn-healthscore-v8 .sample-intro h2 {
+  font-size: clamp(27px,3vw,36px);
+  margin: 10px 0 12px;
+}
+
+.mn-healthscore-v8 .sample-intro p {
+  font-size: 14px;
+  color: var(--ink-soft);
+  max-width: 60ch;
+  margin-inline: auto;
+}
+
+.mn-healthscore-v8 .sample-player {
+  width: min(100%,310px);
+  margin: 0 auto;
+}
+
+.mn-healthscore-v8 .sample-player video {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 9/16;
+  background: var(--cream);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  box-shadow: var(--shadow-sm);
+}
+
+.mn-healthscore-v8 .sample-controls {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.mn-healthscore-v8 .sample-controls button {
+  border: 1px solid #b4cabc;
+  border-radius: 999px;
+  background: var(--paper);
+  padding: 9px 17px;
+  min-height: 42px;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--teal-deep);
+}
+
+.mn-healthscore-v8 .sample-controls button:hover {
+  background: var(--mint);
+}
+
+.mn-healthscore-v8 .sample-cost {
+  font-size: 12px;
+  color: var(--ash);
+  text-align: center;
+  max-width: 590px;
+  margin: 16px auto 0;
+}
+
+@media (max-width:560px) {
+  .mn-healthscore-v8 .sample-section {
+    padding-block: 25px;
+  }
+
+  .mn-healthscore-v8 .sample-intro p {
+    font-size: 13px;
+  }
+
+  .mn-healthscore-v8 .sample-player {
+    max-width: 290px;
+  }
+
+  .mn-healthscore-v8 .sample-cost {
+    font-size: 11px;
+  }
+}
+
+@media print {
+  .mn-healthscore-v8 .sample-controls {
+    display: none;
+  }
+
+  .mn-healthscore-v8 .sample-player {
+    max-width: 200px;
+  }
+}
+
+/* v8.4: trust and payment methods stay beside the first mobile purchase button. */
+
+.mn-healthscore-v8 .payment-methods {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 15px;
+}
+
+.mn-healthscore-v8 .payment-methods>span {
+  display: inline-flex;
+  gap: 7px;
+  align-items: center;
+  border: 1px solid rgba(225,235,231,.35);
+  border-radius: 7px;
+  padding: 6px 10px;
+  font-size: 12px;
+  color: #fff;
+  line-height: 1.25;
+}
+
+.mn-healthscore-v8 .payment-methods svg {
+  width: 19px;
+  height: 19px;
+  fill: currentColor;
+  flex-shrink: 0;
+}
+
+.mn-healthscore-v8 .offer .stripe-note {
+  color: #cfdbde;
+  font-size: 10px;
+  text-align: center;
+  margin: 7px 0 0;
+}
+
+.mn-healthscore-v8 .hero-assurance {
+  text-align: center;
+  border-top: 1px solid rgba(255,255,255,.18);
+  padding-top: 13px;
+  margin-top: 14px;
+  color: #edf5f1;
+}
+
+.mn-healthscore-v8 .hero-assurance strong {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.mn-healthscore-v8 .hero-assurance small {
+  display: block;
+  font-size: 10px;
+  color: #cfdbde;
+  margin-top: 5px;
+}
+
+.mn-healthscore-v8 .hero-assurance>span {
+  display: block;
+  font-size: 11px;
+  line-height: 1.5;
+  margin-top: 2px;
+  color: #e8d5a0;
+}
+
+.mn-healthscore-v8 .report-section {
+  padding-top: 8px;
+  padding-bottom: 22px;
+}
+
+.mn-healthscore-v8 .proof-action {
+  padding-bottom: 26px;
+}
+
+.mn-healthscore-v8 .proof-action .selection {
+  margin-top: 0;
+}
+
+@media (min-width:801px) {
+  .mn-healthscore-v8 .findings.two {
+    grid-template-columns: repeat(2,minmax(0,1fr));
+  }
+}
+
+@media (max-width:560px) {
+  .mn-healthscore-v8 .hero-assurance {
+    padding-top: 11px;
+    margin-top: 12px;
+  }
+
+  .mn-healthscore-v8 .payment-methods {
+    margin-top: 12px;
+  }
+
+  .mn-healthscore-v8 .payment-methods>span {
+    font-size: 11px;
+  }
+
+  .mn-healthscore-v8 .report-section {
+    padding-top: 5px;
+  }
+
+  .mn-healthscore-v8 .proof-action {
+    padding-bottom: 20px;
+  }
+}

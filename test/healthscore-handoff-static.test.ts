@@ -68,23 +68,21 @@ describe("healthscore handoff fixtures", () => {
     assert.match(validator, /HEALTHSCORE_COPY_FORBIDDEN_SUBSTRINGS/);
   });
 
-  it("locks UI gotcha selectors from the FINAL handoff", () => {
+  it("retains the historical handoff while the current page uses the v8 presentation", () => {
     const panel = readFileSync(
       new URL("../components/nutrition-flow/healthscore-panel.tsx", import.meta.url),
       "utf8"
     );
     const css = readFileSync(
-      new URL("../app/customer.css", import.meta.url),
+      new URL("../components/nutrition-flow/healthscore-v8.css", import.meta.url),
       "utf8"
     );
     const gotchas = read("FINAL/06_GOTCHAS.md");
 
     assert.match(gotchas, /spectrum marker DOM order/i);
-    assert.match(panel, /Handoff 06_GOTCHAS §3/);
-    assert.match(panel, /setTimeout\(\(\) => setVisible\(true\), 1800\)/);
-    assert.match(css, /\.mn-healthscore-v7 section\.wrap/);
-    assert.match(css, /@media \(max-width: 740px\)[\s\S]*section\.wrap[\s\S]*96px 18px/);
-    assert.match(css, /stroke-width: 1\.6/);
+    assert.match(panel, /mn-healthscore-v8/);
+    assert.match(css, /\.mn-healthscore-v8/);
+    assert.doesNotMatch(panel, /MN_PROFILES|profilePicker/);
   });
 
   it("matches EN finding headlines to the handoff content library", () => {

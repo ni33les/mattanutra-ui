@@ -1,182 +1,24 @@
 "use client";
-import { trackMetaEvent } from "@/lib/meta-client";
-import { trackBpmEvent } from "@/lib/bpm-client";
 
 import Image from "next/image";
-import {
-  ArrowRightIcon,
-  CheckCircleIcon,
-  ShieldCheckIcon,
-} from "@heroicons/react/24/outline";
 import { type ReactNode, useEffect, useRef, useState } from "react";
-import type { AssessmentPlan } from "@/lib/assessment-snapshot";
+import { trackMetaEvent } from "@/lib/meta-client";
+import { trackBpmEvent } from "@/lib/bpm-client";
 import {
   DEFAULT_HEALTHSCORE_EVALUATED_INGREDIENT_COUNT,
-  type HealthScoreGapCard,
-  type HealthScoreMethodCard,
   type HealthScorePageAiCard,
   type HealthScoreResult,
   type LocalizedHealthScoreText,
 } from "@/lib/health-score";
 import type { Locale } from "@/lib/i18n";
+import { pageCopy } from "@/components/nutrition-flow/healthscore-panel-copy";
 import {
-  pageCopy,
-  type HealthScorePageCopy,
-  type PricePlan,
-} from "@/components/nutrition-flow/healthscore-panel-copy";
+  healthScoreV8Copy,
+  type HealthScoreV8Copy,
+} from "@/components/nutrition-flow/healthscore-v8-copy";
 import { paymentCheckoutPath } from "@/lib/payment-paths";
 import { cx } from "@/components/nutrition-flow/ui";
-
-function clamp(value: number, min = 0, max = 100) {
-  return Math.max(min, Math.min(max, value));
-}
-
-function scorePosition(score: number) {
-  return clamp(((score - 30) / 62) * 100);
-}
-
-function useReducedMotion() {
-  const [reduced, setReduced] = useState(() =>
-    typeof window === "undefined"
-      ? false
-      : window.matchMedia("(prefers-reduced-motion: reduce)").matches,
-  );
-
-  useEffect(() => {
-    const query = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const listener = (event: MediaQueryListEvent) => setReduced(event.matches);
-
-    query.addEventListener("change", listener);
-
-    return () => query.removeEventListener("change", listener);
-  }, []);
-
-  return reduced;
-}
-
-function useInViewOnce<T extends HTMLElement>(margin = "0px 0px -12% 0px") {
-  const reducedMotion = useReducedMotion();
-  const ref = useRef<T | null>(null);
-  const [visible, setVisible] = useState(true);
-
-  useEffect(() => {
-    if (reducedMotion) {
-      return undefined;
-    }
-
-    const element = ref.current;
-
-    if (!element || typeof IntersectionObserver === "undefined") {
-      return undefined;
-    }
-
-    const prepareFrame = window.requestAnimationFrame(() => setVisible(false));
-
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry?.isIntersecting) {
-          window.cancelAnimationFrame(prepareFrame);
-          setVisible(true);
-          observer.disconnect();
-        }
-      },
-      { rootMargin: margin, threshold: 0.1 },
-    );
-
-    observer.observe(element);
-
-    const fallback = window.setTimeout(() => setVisible(true), 1800);
-
-    return () => {
-      window.cancelAnimationFrame(prepareFrame);
-      window.clearTimeout(fallback);
-      observer.disconnect();
-    };
-  }, [margin, reducedMotion]);
-
-  return { ref, visible: visible || reducedMotion } as const;
-}
-
-function RevealBlock({
-  children,
-  className = "",
-  delay = 0,
-}: Readonly<{
-  children: ReactNode;
-  className?: string;
-  delay?: 0 | 1 | 2 | 3 | 4;
-}>) {
-  const { ref, visible } = useInViewOnce<HTMLDivElement>();
-
-  return (
-    <div
-      ref={ref}
-      className={cx(
-        "reveal",
-        delay === 1 && "d1",
-        delay === 2 && "d2",
-        delay === 3 && "d3",
-        delay === 4 && "d4",
-        visible && "in",
-        className,
-      )}
-    >
-      {children}
-    </div>
-  );
-}
-
-function CountUpNumber({
-  active = true,
-  className,
-  // Handoff 00_HANDOFF: cubic ease-out 1-(1-p)^3 over 1100ms.
-  duration = 1100,
-  value,
-}: Readonly<{
-  active?: boolean;
-  className?: string;
-  duration?: number;
-  value: number;
-}>) {
-  const reducedMotion = useReducedMotion();
-  const [display, setDisplay] = useState(value);
-
-  useEffect(() => {
-    if (reducedMotion || !active) {
-      return undefined;
-    }
-
-    let frame = 0;
-    let startedAt: number | null = null;
-
-    function tick(now: number) {
-      if (startedAt === null) {
-        startedAt = now;
-        setDisplay(0);
-      }
-
-      const progress = clamp((now - startedAt) / duration);
-      // Cubic ease-out matches the designed scorecard animation.
-      const eased = 1 - Math.pow(1 - progress, 3);
-
-      setDisplay(Math.round(value * eased));
-
-      if (progress < 1) {
-        frame = requestAnimationFrame(tick);
-      }
-    }
-
-    frame = requestAnimationFrame(tick);
-
-    return () => cancelAnimationFrame(frame);
-  }, [active, duration, reducedMotion, value]);
-
-  return (
-    <span className={className}>
-      {reducedMotion || !active ? value : display}
-    </span>
-  );
-}
+import "./healthscore-v8.css";
 
 function renderInlineMarkup(value: string) {
   const pieces = value.split(/(<\/?(?:b|em)>)/gi);
@@ -320,31 +162,6 @@ function displayPillarLabel(
   );
 }
 
-function displayPillarTag(tag: string | null | undefined, locale: Locale) {
-  if (!tag) {
-    return null;
-  }
-
-  if (textFitsLocale(tag, locale)) {
-    return tag;
-  }
-
-  const labels = pageCopy[locale].tagLabels;
-
-  return tag
-    .split("/")
-    .map((part) => {
-      const key = part.trim().toLowerCase();
-
-      return labels[key as keyof typeof labels] ?? part.trim();
-    })
-    .join(" / ");
-}
-
-function lowestDomain(result: HealthScoreResult) {
-  return [...result.domains].sort((left, right) => left.score - right.score)[0];
-}
-
 function normalizedPillars(result: HealthScoreResult) {
   return (
     result.pageContent?.locked.pillars ??
@@ -360,1039 +177,184 @@ function normalizedPillars(result: HealthScoreResult) {
   );
 }
 
-function fallbackGapCards(
-  result: HealthScoreResult,
-  locale: Locale,
-): HealthScoreGapCard[] {
-  const lowest = lowestDomain(result);
-  const cards: HealthScoreGapCard[] = pageCopy[locale].fallbackGaps.map(
-    (card) => ({
-      ...card,
-    }),
-  );
 
-  if (lowest) {
-    cards[0] = {
-      body: lowest.description || cards[0].body,
-      headline: lowest.label,
-      tag: cards[0].tag,
-      value: `${lowest.score}`,
-    };
-  }
-
-  return cards;
-}
-
-function gapCards(result: HealthScoreResult, locale: Locale) {
-  const seeds =
-    result.pageContent?.copySeeds.gapTrio ?? fallbackGapCards(result, locale);
-
-  return seeds.slice(0, 3);
-}
-
-function methodCards(
-  result: HealthScoreResult,
-  locale: Locale,
-): HealthScoreMethodCard[] {
-  return (
-    result.pageContent?.copySeeds.methodCards ??
-    pageCopy[locale].fallbackMethodCards
-  ).slice(0, 3);
-}
-
-function findings(result: HealthScoreResult, locale: Locale) {
-  const seedFindings = result.pageContent?.copySeeds.findings;
-
-  if (seedFindings && seedFindings.length > 0) {
-    return seedFindings.slice(0, 3);
-  }
-
-  const lowest = lowestDomain(result);
-
-  return [
-    {
-      body: lowest?.description ?? pageCopy[locale].fallbackFindingBody,
-      code: lowest?.id ?? "LOWEST_PILLAR",
-      headline: lowest?.label ?? pageCopy[locale].fallbackFindingTitle,
-      icon: "spark",
-    },
-  ];
-}
-
-type HealthScoreViewModel = Readonly<{
-  bandLine: string;
-  bandPill: string;
-  copy: HealthScorePageCopy;
-  findings: ReturnType<typeof findings>;
-  findingsEyebrow: string;
-  findingsHeadline: string;
-  findingsSub: string;
-  firstName?: string;
-  gapCards: HealthScoreGapCard[];
-  heroBody: string;
-  heroTitle: string;
-  highestLeverageBody: string;
-  locale: Locale;
-  median: number;
-  methodCards: HealthScoreMethodCard[];
-  methodHeadline: string;
-  opportunityPill: string;
-  pillarHeadline: string;
-  pillars: ReturnType<typeof normalizedPillars>;
-  percentile: number;
-  relativityHeadline: string;
-  relativitySub: string;
-  result: HealthScoreResult;
-  score: number;
-  spectrum: Readonly<{
-    gapLeft: number;
-    gapWidth: number;
-    legendCaptions: readonly [string, string, string];
-    medianMarker: number;
-    scoreMarker: number;
-  }>;
-  strengthNote: string;
-  subtraction: Readonly<{
-    body: string;
-    labels: readonly [string, string, string];
-    numbers: readonly (number | null)[];
-  }>;
-}>;
 
 function buildHealthScoreViewModel({
   firstName,
   locale,
   result,
-}: Readonly<{
-  firstName?: string;
-  locale: Locale;
-  result: HealthScoreResult;
-}>): HealthScoreViewModel {
-  const copy = pageCopy[locale];
+}: Readonly<{ firstName?: string; locale: Locale; result: HealthScoreResult }>) {
   const page = result.pageContent;
   const ai = page?.aiCopy;
-  const score = page?.locked.score ?? result.score;
-  const median = page?.locked.median ?? page?.copySeeds.relativity.spectrumMedian ?? 60;
-  const percentile = page?.locked.percentile ?? 0;
-  const relativity = page?.copySeeds.relativity;
   const subtraction = page?.locked.subtraction ?? {
     chosen: null,
     evaluated: DEFAULT_HEALTHSCORE_EVALUATED_INGREDIENT_COUNT,
-    mode: "nutrients" as const,
     setAside: null,
   };
-  const subtractionSeed = page?.copySeeds.subtraction;
-  const scoreMarker = relativity?.spectrumYouPct ?? scorePosition(score);
-  const medianMarker = relativity?.spectrumMedianPct ?? scorePosition(median);
-
   return {
-    bandLine: localize(ai?.bandLine, locale),
-    bandPill: localizedLegacyText(
-      page?.copySeeds.bandPill,
-      locale,
-      displayBand(result.band, locale),
-    ),
-    copy,
-    findings: findings(result, locale),
-    findingsEyebrow:
-      page?.copySeeds.findingsMode === "strengths"
-        ? copy.pillarsEyebrow
-        : copy.whatCaught,
-    findingsHeadline: localize(ai?.findingsHeadline, locale),
-    findingsSub: localize(ai?.findingsSub, locale),
     firstName,
-    gapCards: gapCards(result, locale),
-    heroBody: localize(ai?.heroBody, locale),
-    heroTitle: localize(ai?.heroTitle, locale),
-    highestLeverageBody: localize(ai?.highestLeverageBody, locale),
     locale,
-    median,
-    methodCards: methodCards(result, locale),
-    methodHeadline: localize(ai?.methodHeadline, locale),
-    opportunityPill: localizedLegacyText(
-      page?.copySeeds.opportunityPill,
-      locale,
-      percentile >= 80 ? copy.topTier : copy.pillOpportunity,
-    ),
-    pillarHeadline: localize(ai?.pillarHeadline, locale),
+    score: page?.locked.score ?? result.score,
+    band: displayBand(page?.locked.band ?? result.band, locale),
     pillars: normalizedPillars(result),
-    percentile,
-    relativityHeadline: relativity?.headline ?? "",
-    relativitySub: relativity?.sub ?? "",
-    result,
-    score,
-    spectrum: {
-      gapLeft: relativity?.spectrumGapLeftPct ?? Math.min(scoreMarker, medianMarker),
-      gapWidth:
-        relativity?.spectrumGapWidthPct ?? Math.abs(scoreMarker - medianMarker),
-      legendCaptions: relativity?.legendCaptions ?? [
-        copy.spectrumWhere,
-        score >= median ? copy.spectrumGapAhead : copy.spectrumGapBehind,
-        copy.spectrumHeadroom,
-      ],
-      medianMarker,
-      scoreMarker,
-    },
+    heroTitle: localize(ai?.heroTitle, locale),
+    heroBody: localize(ai?.heroBody, locale),
+    bandLine: localize(ai?.bandLine, locale),
+    highestLeverageBody: localize(ai?.highestLeverageBody, locale),
     strengthNote: localize(ai?.strengthNote, locale),
-    subtraction: {
-      body: localize(ai?.subtractionBody, locale),
-      labels: [
-        localizedLegacyText(
-          subtractionSeed?.labelEvaluated,
-          locale,
-          copy.evaluatedFallback,
-        ),
-        localizedLegacyText(
-          subtractionSeed?.labelSetAside,
-          locale,
-          copy.setAsideFallback,
-        ),
-        localizedLegacyText(
-          subtractionSeed?.labelChosen,
-          locale,
-          copy.chosenFallback,
-        ),
-      ],
-      numbers: [
-        subtraction.evaluated,
-        subtraction.setAside,
-        subtraction.chosen,
-      ],
-    },
+    subtractionBody: localize(ai?.subtractionBody, locale),
+    findings: (ai?.findings ?? []).map((aiCard) => ({
+      headline: aiCardHeadline(aiCard, locale),
+      body: aiCardBody(aiCard, locale),
+    })).filter((card) => card.headline && card.body).slice(0, 3),
+    evaluated: subtraction.evaluated,
+    chosen: subtraction.chosen,
   };
 }
 
-function ScoreSpectrum({
-  model,
-}: Readonly<{
-  model: HealthScoreViewModel;
-}>) {
-  const { copy, median, score, spectrum } = model;
-  const { ref, visible } = useInViewOnce<HTMLDivElement>();
-  // Handoff 06_GOTCHAS §3: render the leftward marker first so captions scan cleanly.
-  // gap-mode (score < median): YOU left → first; rank-mode: MED left → first.
-  const ahead = score >= median;
-  const medianMarkerElement = (
-    <div
-      className="marker med"
-      style={{ left: `${spectrum.medianMarker}%` }}
-    >
-      <span className="cap bot">
-        {copy.spectrumTypical} · {median}
-      </span>
-    </div>
-  );
-  const scoreMarkerElement = (
-    <div
-      className="marker you"
-      style={{ left: `${spectrum.scoreMarker}%` }}
-    >
-      <span className="cap top">
-        {copy.spectrumYou} · {score}
-      </span>
-    </div>
-  );
+type HealthScoreViewModel = ReturnType<typeof buildHealthScoreViewModel>;
 
+function Lines({ text }: Readonly<{ text: string }>) {
+  return text.split("\n").map((line, index) => (
+    <span key={index}>{index > 0 ? <br /> : null}{line}</span>
+  ));
+}
+
+function PaymentNote({ copy }: Readonly<{ copy: HealthScoreV8Copy }>) {
+  return <p className="payment-note">{copy.once} · {copy.noSub}<br />{copy.separate}</p>;
+}
+
+function PaymentMethods({ copy }: Readonly<{ copy: HealthScoreV8Copy }>) {
   return (
-    <div className="spectrum" ref={ref}>
-      <div className="spec-track">
-        <div className="spec-bar" />
-        <div className="spec-grow">{copy.spectrumHeadroom}</div>
-        {spectrum.gapWidth > 0 ? (
-          <div
-            aria-hidden={true}
-            className="spec-gap"
-            style={{ left: `${spectrum.gapLeft}%`, width: `${spectrum.gapWidth}%` }}
-          />
-        ) : null}
-        <div
-          aria-hidden={true}
-          className="spec-fill"
-          style={{ width: visible ? `${spectrum.scoreMarker}%` : 0 }}
-        />
-        {ahead ? (
-          <>
-            {medianMarkerElement}
-            {scoreMarkerElement}
-          </>
-        ) : (
-          <>
-            {scoreMarkerElement}
-            {medianMarkerElement}
-          </>
-        )}
-      </div>
-      <div className="spec-ends">
-        <span>{copy.spectrumStart}</span>
-        <span>{copy.spectrumEnd}</span>
-      </div>
-      <div className="spec-legend">
-        <span className="inline-flex items-center gap-1.5">
-          <span className="lg-sw bg-[var(--mn-teal-deep)]" />
-          {spectrum.legendCaptions[0]}
+    <>
+      <div className="payment-methods" aria-label={copy.paymentLabel}>
+        <span>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3h6v6H3zM15 3h6v6h-6zM3 15h6v6H3zM14 13h3v3h-3zM19 13h2v5h-2zM13 19h4v2h-4zM19 20h2v1h-2z" /></svg>
+          {copy.paymentPromptPay}
         </span>
-        <span className="inline-flex items-center gap-1.5">
-          <span className="lg-sw border border-dashed border-[var(--mn-teal)] bg-[color-mix(in_srgb,var(--mn-teal)_10%,transparent)]" />
-          {spectrum.legendCaptions[1]}
-        </span>
-        <span className="inline-flex items-center gap-1.5">
-          <span className="lg-sw bg-[linear-gradient(90deg,var(--mn-teal-glow),transparent)]" />
-          {spectrum.legendCaptions[2]}
+        <span>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="3" fill="none" stroke="currentColor" strokeWidth="1.8" /><path d="M3 9h18v3H3zM5 15h5v1H5z" /></svg>
+          {copy.paymentCards}
         </span>
       </div>
-    </div>
+      <p className="stripe-note">{copy.stripe}</p>
+    </>
   );
 }
 
-function HealthScoreHero({
-  model,
-}: Readonly<{
-  model: HealthScoreViewModel;
-}>) {
-  const {
-    bandLine,
-    bandPill,
-    copy,
-    firstName,
-    heroBody,
-    heroTitle,
-    locale,
-    opportunityPill,
-    score,
-  } = model;
-  const { ref: scoreRef, visible: scoreVisible } =
-    useInViewOnce<HTMLDivElement>();
-  const headline = firstName
-    ? locale === "en"
-      ? heroTitle.replace(/^You\b/, "you")
-      : heroTitle
-    : heroTitle;
+function SamplePlan({ locale, copy }: Readonly<{ locale: Locale; copy: HealthScoreV8Copy }>) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [playing, setPlaying] = useState(false);
+  const [failed, setFailed] = useState(false);
+  // The supplied example is available in English and Thai; its illustrative
+  // nature and all surrounding controls remain localized in Chinese as well.
+  const mediaLocale = locale === "th" ? "th" : "en";
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    const pauseWhenHidden = () => {
+      if (document.visibilityState !== "visible") video.pause();
+    };
+    const observer = typeof IntersectionObserver === "undefined" ? null
+      : new IntersectionObserver(([entry]) => {
+        if (!entry?.isIntersecting) video.pause();
+      });
+    observer?.observe(video);
+    document.addEventListener("visibilitychange", pauseWhenHidden);
+    return () => {
+      observer?.disconnect();
+      document.removeEventListener("visibilitychange", pauseWhenHidden);
+      video.pause();
+    };
+  }, [mediaLocale]);
+
+  async function play(replay = false) {
+    const video = videoRef.current;
+    if (!video) return;
+    if (replay) video.currentTime = 0;
+    if (!replay && !video.paused) {
+      video.pause();
+      return;
+    }
+    setFailed(false);
+    try {
+      await video.play();
+    } catch {
+      setFailed(true);
+    }
+  }
 
   return (
-    <header className="hero wrap">
-      <RevealBlock>
-        <span className="eyebrow">
-          {copy.assessmentComplete}
-        </span>
-      </RevealBlock>
-      <RevealBlock delay={1}>
-        <h1
-          className={cx(
-            "goalmirror",
-            locale === "en" ? "text-balance" : "break-words",
-          )}
-          data-testid="reveal-hero-name"
-        >
-          {firstName ? `${firstName}, ` : null}
-          {renderInlineMarkup(headline)}
-        </h1>
-      </RevealBlock>
-      <RevealBlock delay={2}>
-        <p className={cx("hero-sub", copy.bodyClass)}>
-          {renderInlineMarkup(heroBody)}
-        </p>
-      </RevealBlock>
-
-      <RevealBlock delay={3}>
-        <aside
-          className="scorecard"
-          ref={scoreRef}
-        >
-          <div className="score-top">
-            <span className="band-pill">
-              {bandPill}
-            </span>
-            <span className="opp-pill">
-              {opportunityPill}
-            </span>
-          </div>
-
-          <div className="bignum">
-            <CountUpNumber
-              active={scoreVisible}
-              duration={1100}
-              value={score}
-            />
-            <span className="of">
-              {copy.scoreOutOf}
-            </span>
-          </div>
-
-          <p className={cx("scoreline", copy.bodyClass)}>
-            {renderInlineMarkup(bandLine)}
-          </p>
-
-          <ScoreSpectrum model={model} />
-        </aside>
-      </RevealBlock>
-    </header>
-  );
-}
-
-function GapCards({
-  model,
-}: Readonly<{
-  model: HealthScoreViewModel;
-}>) {
-  const {
-    copy,
-    gapCards: cards,
-    locale,
-    relativityHeadline,
-    relativitySub,
-    result,
-    score,
-  } = model;
-  const ai = result.pageContent?.aiCopy;
-
-  return (
-    <section className="wrap" id="signals">
-      <RevealBlock className="sec-head">
-        <p className="eyebrow">
-          {copy.scoreMeaningEyebrow(score)}
-        </p>
-        <h2 className={locale === "en" ? "text-balance" : ""}>
-          {renderInlineMarkup(relativityHeadline)}
-        </h2>
-        <p className={copy.bodyClass}>
-          {renderInlineMarkup(relativitySub)}
-        </p>
-      </RevealBlock>
-      <div className="gaprow">
-        {cards.map((card, index) => {
-          const aiCard = ai?.gapTrio?.[index];
-          const tag = localizedLegacyText(card.tag, locale);
-
-          return (
-            <RevealBlock
-              delay={(index + 1) as 1 | 2 | 3}
-              key={`${card.tag}-${card.value}-${index}`}
-            >
-              <article className="gapcard">
-                <span className="gn">
-                  {tag}
-                </span>
-                <div className="gpct">
-                  {card.value}
-                </div>
-                <h3>
-                  {renderInlineMarkup(aiCardHeadline(aiCard, locale))}
-                </h3>
-                <p className={copy.bodyClass}>
-                  {renderInlineMarkup(aiCardBody(aiCard, locale))}
-                </p>
-              </article>
-            </RevealBlock>
-          );
-        })}
+    <section className="section sample-section" aria-labelledby="sample-title">
+      <div className="sample-intro">
+        <div className="eyebrow">{copy.sampleEye}</div>
+        <h2 id="sample-title">{copy.sampleTitle}</h2>
+        <p id="sample-description">{copy.sampleSub}</p>
       </div>
-    </section>
-  );
-}
-
-function PillarBars({
-  model,
-}: Readonly<{
-  model: HealthScoreViewModel;
-}>) {
-  const {
-    copy,
-    highestLeverageBody,
-    locale,
-    pillarHeadline,
-    pillars,
-    strengthNote,
-  } = model;
-  const { ref, visible } = useInViewOnce<HTMLDivElement>();
-
-  return (
-    <section className="wrap">
-      <RevealBlock className="sec-head">
-        <p className="eyebrow">
-          {copy.pillarEyebrow}
-        </p>
-        <h2 className={locale === "en" ? "text-balance" : ""}>
-          {renderInlineMarkup(pillarHeadline)}
-        </h2>
-      </RevealBlock>
-
-      <RevealBlock delay={1}>
-        <div
-          className="pillars"
-          ref={ref}
+      <div className="sample-player">
+        <video
+          key={mediaLocale}
+          ref={videoRef}
+          id="sample-video"
+          controls muted playsInline preload="none"
+          width="720" height="1280"
+          poster={`/healthscore/v8-4/poster-${mediaLocale}.webp`}
+          aria-label={copy.sampleVideoLabel}
+          aria-describedby="sample-description sample-cost"
+          onPlay={() => setPlaying(true)}
+          onPause={() => setPlaying(false)}
+          onEnded={() => setPlaying(false)}
+          onError={() => setFailed(true)}
         >
-          {pillars.map((pillar) =>
-            (() => {
-              const pillarTag = displayPillarTag(pillar.tag, locale);
-
-              return (
-                <div
-                  className={cx(
-                    "prow",
-                    pillar.isHero && "hero",
-                  )}
-                  key={pillar.id}
-                >
-                  <div className="pname">
-                    <h3>
-                      {displayPillarLabel(pillar, locale)}
-                      {pillarTag ? (
-                        <span className="gtag">
-                          {copy.goalLinkedLabel} · {pillarTag}
-                        </span>
-                      ) : null}
-                    </h3>
-                  </div>
-                  <div className="ptrack">
-                    <div
-                      className={cx("pfill", pillar.fillClass)}
-                      style={{ width: visible ? `${clamp(pillar.value)}%` : 0 }}
-                    />
-                  </div>
-                  <span className="pval">
-                    {pillar.value}%
-                  </span>
-                </div>
-              );
-            })(),
-          )}
-          {highestLeverageBody ? (
-            <div className="leverbox">
-              <p className={copy.bodyClass}>
-                {renderInlineMarkup(highestLeverageBody)}
-              </p>
-            </div>
-          ) : null}
-          {strengthNote ? (
-            <p
-              className={cx(
-                "notebox",
-                copy.bodyClass,
-              )}
-            >
-              {renderInlineMarkup(strengthNote)}
-            </p>
-          ) : null}
+          <source src={`/healthscore/v8-4/sample-${mediaLocale}.mp4`} type="video/mp4" />
+          {copy.sampleFallback}
+        </video>
+        <div className="sample-controls">
+          <button type="button" onClick={() => void play()} aria-controls="sample-video">{playing ? copy.samplePause : copy.samplePlay}</button>
+          <button type="button" onClick={() => void play(true)} aria-controls="sample-video">{copy.sampleReplay}</button>
         </div>
-      </RevealBlock>
-    </section>
-  );
-}
-
-function FindingsSection({
-  model,
-}: Readonly<{
-  model: HealthScoreViewModel;
-}>) {
-  const {
-    copy,
-    findings: items,
-    findingsEyebrow,
-    findingsHeadline,
-    findingsSub,
-    locale,
-    result,
-  } = model;
-  const ai = result.pageContent?.aiCopy;
-
-  return (
-    <section className="wrap">
-      <RevealBlock className="sec-head">
-        <p className="eyebrow">
-          {findingsEyebrow}
-        </p>
-        <h2 className={locale === "en" ? "text-balance" : ""}>
-          {renderInlineMarkup(findingsHeadline)}
-        </h2>
-        <p className={copy.bodyClass}>
-          {renderInlineMarkup(findingsSub)}
-        </p>
-      </RevealBlock>
-      <div className="finds">
-        {items.map((item, index) => {
-          const aiCard = ai?.findings?.[index];
-          const isSingle = items.length === 1;
-
-          return (
-            <RevealBlock
-              className={isSingle ? "mn-hs-find-single" : ""}
-              delay={(index + 1) as 1 | 2 | 3}
-              key={`${item.code}-${index}`}
-            >
-              <article
-                className={cx(
-                  "find",
-                  index === 0 && "open",
-                )}
-              >
-                <div className="fic">
-                  {item.icon === "sun" ? "☼" : item.icon === "◎" ? "◎" : "✦"}
-                </div>
-                <h3>
-                  {renderInlineMarkup(aiCardHeadline(aiCard, locale))}
-                </h3>
-                <p className={copy.bodyClass}>
-                  {renderInlineMarkup(aiCardBody(aiCard, locale))}
-                </p>
-              </article>
-            </RevealBlock>
-          );
-        })}
+        {failed ? <p role="status" className="sample-cost">{copy.sampleFallback}</p> : null}
       </div>
+      <p className="sample-cost" id="sample-cost">{copy.sampleNote}</p>
     </section>
   );
 }
 
-function SubtractionBeat({
-  model,
-}: Readonly<{
-  model: HealthScoreViewModel;
-}>) {
-  const { copy, locale, subtraction } = model;
-  const { ref, visible } = useInViewOnce<HTMLDivElement>();
-
+function DetailedReport({ model, copy }: Readonly<{ model: HealthScoreViewModel; copy: HealthScoreV8Copy }>) {
   return (
-    <section className="wrap mn-hs-shortlist-section">
-      <RevealBlock>
-        <div
-          className="subtract"
-          ref={ref}
-        >
-          <p className="eyebrow">
-            {copy.subtractionEyebrow}
-          </p>
-          <div className="subnums">
-            {subtraction.numbers.map((number, index) => (
-              <div
-                className="contents"
-                key={`${subtraction.labels[index]}-${number}`}
-              >
-                <div className={cx("subn", index === 0 ? "a" : index === 1 ? "b" : "c")}>
-                  <CountUpNumber
-                    active={visible}
-                    className="n"
-                    duration={900 + index * 200}
-                    value={number ?? 0}
-                  />
-                  <p
-                    className={cx(
-                      "l",
-                      locale !== "en" && "normal-case tracking-normal",
-                    )}
-                  >
-                    {subtraction.labels[index]}
-                  </p>
+    <section className="section report-section">
+      <div className="report" id="full-report" aria-labelledby="report-title">
+        <div className="report-heading">
+          <h2 className="summary-label" id="report-title">{copy.reportTitle}</h2>
+          <p className="summary-sub">{copy.reportSub}</p>
+        </div>
+        <div className="report-body">
+          <div className="pillars">
+            {model.pillars.map((pillar) => (
+              <div className="pillar" key={pillar.id}>
+                <div className="pillar-name">
+                  {displayPillarLabel(pillar, model.locale)}
+                  {pillar.goalLinked ? <small>{copy.goalLinked}</small> : null}
                 </div>
-                {index < subtraction.numbers.length - 1 ? (
-                  <ArrowRightIcon
-                    aria-hidden={true}
-                    className="subarrow"
-                  />
-                ) : null}
+                <div className="track" aria-hidden="true">
+                  <div className={cx("fill", pillar.value < 50 && "low")} style={{ width: `${Math.max(0, Math.min(100, pillar.value))}%` }} />
+                </div>
+                <div className="value">{pillar.value}%</div>
               </div>
             ))}
           </div>
-          <p
-            className={cx(
-              "",
-              copy.bodyClass,
-            )}
-          >
-            {renderInlineMarkup(subtraction.body)}
-          </p>
+          {model.highestLeverageBody ? <p className="report-note">{renderInlineMarkup(model.highestLeverageBody)}</p> : null}
+          {model.strengthNote ? <p className="method"><strong>{copy.strengthPrefix}</strong>{renderInlineMarkup(model.strengthNote)}</p> : null}
+          <div className="method"><strong>{copy.reportMethodTitle}</strong><p>{copy.reportMethod}</p></div>
         </div>
-      </RevealBlock>
-    </section>
-  );
-}
-
-function MethodCards({
-  model,
-}: Readonly<{
-  model: HealthScoreViewModel;
-}>) {
-  const { copy, locale, methodCards: cards, methodHeadline, result } = model;
-  const ai = result.pageContent?.aiCopy;
-
-  return (
-    <section className="wrap mn-hs-method-section">
-      <RevealBlock className="sec-head">
-        <p className="eyebrow">
-          {copy.methodEyebrow}
-        </p>
-        <h2 className={locale === "en" ? "text-balance" : ""}>
-          {renderInlineMarkup(methodHeadline)}
-        </h2>
-      </RevealBlock>
-      <div className="method">
-        {cards.map((card, index) => {
-          const aiCard = ai?.methodCards?.[index];
-
-          return (
-            <RevealBlock
-              delay={(index + 1) as 1 | 2 | 3}
-              key={`${card.title}-${index}`}
-            >
-              <article className="mstep">
-                <div className="mn">
-                  {card.number ?? index + 1}
-                </div>
-                <h3>
-                  {renderInlineMarkup(aiCardHeadline(aiCard, locale))}
-                </h3>
-                <p className={copy.bodyClass}>
-                  {renderInlineMarkup(aiCardBody(aiCard, locale))}
-                </p>
-              </article>
-            </RevealBlock>
-          );
-        })}
-      </div>
-      <RevealBlock delay={2}>
-        <div className="trustline">
-          <CheckCircleIcon
-            aria-hidden={true}
-            className="mt-0.5 size-5 shrink-0"
-          />
-          <p className={cx("text-sm", copy.bodyClass)}>{copy.trustLine}</p>
-        </div>
-      </RevealBlock>
-    </section>
-  );
-}
-
-function TrustCard({ locale }: Readonly<{ locale: Locale }>) {
-  const copy = pageCopy[locale];
-
-  return (
-    <section className="wrap mn-hs-trust-section">
-      <RevealBlock>
-        <div className="trustcard">
-          {copy.trustCard.map((item, index) => (
-            <div className="tc-col" key={item.title}>
-              <span className="tc-ic" aria-hidden="true">
-                {index === 0 ? (
-                  <svg viewBox="0 0 24 24">
-                    <circle cx="12" cy="12" r="9" />
-                    <path d="M12 7v5l3 2" />
-                  </svg>
-                ) : index === 1 ? (
-                  <svg viewBox="0 0 24 24">
-                    <path d="M12 4 2 9l10 5 10-5-10-5z" />
-                    <path d="M6 11v4c0 1.5 3 3 6 3s6-1.5 6-3v-4" />
-                    <path d="M22 9v5" />
-                  </svg>
-                ) : (
-                  <svg viewBox="0 0 24 24">
-                    <rect x="3.5" y="3.5" width="17" height="17" rx="3" />
-                    <path d="M12 8v8M8 12h8" />
-                  </svg>
-                )}
-              </span>
-              <div className="tc-txt">
-                <h4>{item.title}</h4>
-                <p>{item.body}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-      </RevealBlock>
-    </section>
-  );
-}
-
-function PriceHeroIntro({
-  firstName,
-  locale,
-}: Readonly<{
-  firstName?: string;
-  locale: Locale;
-}>) {
-  const copy = pageCopy[locale];
-  const priceHero = copy.priceHero;
-  const ctaEyebrow = firstName
-    ? `${firstName} — ${priceHero.ctaEyebrow}`
-    : priceHero.ctaEyebrow;
-
-  return (
-    <div className="priceHero">
-      <div>
-        <span className="eyebrow">{ctaEyebrow}</span>
-        <h2>{priceHero.title}</h2>
-        <p className={cx("p1", copy.bodyClass)}>
-          {renderInlineMarkup(priceHero.body)}
-        </p>
-        <ul className="trustChecks">
-          {priceHero.trustChecks.map((item) => (
-            <li key={item}>
-              <span className="tck">✓</span>
-              {item}
-            </li>
-          ))}
-        </ul>
-        <p className={cx("p2", copy.bodyClass)}>
-          {renderInlineMarkup(priceHero.service)}
-        </p>
-        <p className={cx("price-clarify", copy.bodyClass)}>
-          {renderInlineMarkup(priceHero.clarify)}
-        </p>
-      </div>
-      <figure
-        aria-label={priceHero.alt}
-        className="boxFigure"
-      >
-        <Image
-          alt={priceHero.alt}
-          height={760}
-          src="/healthscore/box-v7.jpg"
-          unoptimized={true}
-          width={960}
-        />
-        <figcaption className="boxCaption">
-          {priceHero.boxCaptionPrefix}{" "}
-          <b>{priceHero.boxCaptionStrong}</b>{" "}
-          {priceHero.boxCaptionSuffix}
-        </figcaption>
-      </figure>
-    </div>
-  );
-}
-
-function PromiseIcon({ index }: Readonly<{ index: number }>) {
-  if (index === 0) {
-    return (
-      <svg viewBox="0 0 24 24">
-        <circle cx="10.5" cy="10.5" r="6" />
-        <path d="m20 20-5-5" />
-      </svg>
-    );
-  }
-
-  if (index === 1) {
-    return (
-      <svg viewBox="0 0 24 24">
-        <path d="M5 19s1-10 9-13c-1 6-4 11-9 13z" />
-        <path d="M5 19c2-3 5-5 9-6" />
-      </svg>
-    );
-  }
-
-  if (index === 2) {
-    return (
-      <svg viewBox="0 0 24 24">
-        <circle cx="12" cy="8" r="3.5" />
-        <path d="M5 20c0-3.5 3-6 7-6s7 2.5 7 6" />
-      </svg>
-    );
-  }
-
-  return (
-    <svg viewBox="0 0 24 24">
-      <path d="M12 20s-7-4.5-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.5-7 10-7 10z" />
-    </svg>
-  );
-}
-
-function PromiseStrip({ locale }: Readonly<{ locale: Locale }>) {
-  const copy = pageCopy[locale];
-  const tones = ["clarity", "guidance", "personalized", "confidence"] as const;
-
-  return (
-    <div className="promises">
-      {copy.promises.map(([title, subtitle], index) => (
-        <div className={cx("promise", tones[index])} key={title}>
-          <PromiseIcon index={index} />
-          <div className="pTxt">
-            <span className="pTitle">{title}</span>
-            <span className="pSub">{subtitle}</span>
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function DecisionFrame({ locale }: Readonly<{ locale: Locale }>) {
-  const copy = pageCopy[locale];
-
-  return (
-    <div className="decision">
-      <span className="deye">{copy.decision.eyebrow}</span>
-      <h3>{copy.decision.title}</h3>
-      <p className={cx("dlead", copy.bodyClass)}>
-        {copy.decision.lead}
-      </p>
-      <div className="decisionRows">
-        <div className="drow">
-          <p className={cx("dtxt", copy.bodyClass)}>
-            {copy.decision.optionFormula}
-          </p>
-        </div>
-        <div className="drow">
-          <p className={cx("dtxt", copy.bodyClass)}>
-            {copy.decision.optionProtocol}
-          </p>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function PriceCard({
-  disabled = false,
-  featured = false,
-  isPending = false,
-  onSelect,
-  pendingLabel,
-  plan,
-}: Readonly<{
-  disabled?: boolean;
-  featured?: boolean;
-  isPending?: boolean;
-  onSelect: () => void;
-  pendingLabel: string;
-  plan: PricePlan;
-}>) {
-  const extraBlocks = "extraBlocks" in plan ? plan.extraBlocks : undefined;
-  const includes = "includes" in plan ? plan.includes : undefined;
-
-  return (
-    <article className={cx("plan", featured && "dark")}>
-      <span className={cx("badge", featured ? "badge-pop" : "badge-gold")}>
-        {plan.badge}
-      </span>
-      <span className={cx("ptype", featured && "dk")}>
-        <span className="tdot">{featured ? "♡" : "◎"}</span>
-        {plan.eyebrow}
-      </span>
-      <h3>{plan.name}</h3>
-      <p className={cx("pdesc", featured && "dk")}>
-        {plan.description}
-      </p>
-      <div className="priceblk">
-        <span className={cx("was", featured && "dk")}>{plan.was}</span>
-        <span className={cx("save", featured ? "save-amber" : "save-green")}>
-          {plan.save}
-        </span>
-      </div>
-      <div className="priceblk big">
-        <span className={cx("cur", featured && "dk")}>THB</span>
-        <span className={cx("now", featured && "dk")}>{plan.price}</span>
-        <span className={cx("per", featured && "dk")}>{plan.term}</span>
-      </div>
-      <p className={cx("subnote", featured && "dk")}>{plan.fine}</p>
-      <button
-        className={cx("btn", featured ? "btn-teal" : "btn-primary")}
-        disabled={disabled}
-        onClick={onSelect}
-        type="button"
-      >
-        {isPending ? pendingLabel : plan.cta}
-        {isPending ? null : (
-          <ArrowRightIcon aria-hidden={true} className="size-4" />
-        )}
-      </button>
-      {includes ? (
-        <div className="includes">
-          <span className="ck-t">✓</span>
-          <span>{includes}</span>
-          <span className="plus">PLUS</span>
-        </div>
-      ) : null}
-      {extraBlocks?.map((block) => (
-        <div className="featblock" key={block.title}>
-          <div className="fbic">{block.icon}</div>
-          <div>
-            <h4>{block.title}</h4>
-            <p>{block.body}</p>
-          </div>
-        </div>
-      ))}
-      <ul className={cx("feat", featured && "dk")}>
-        {plan.features.map((feature) => (
-          <li key={feature}>
-            <span className="ck">✓</span>
-            {feature}
-          </li>
-        ))}
-      </ul>
-      <div className={cx("guarantee", featured && "dk")}>
-        <ShieldCheckIcon
-          aria-hidden={true}
-          className="gck"
-        />
-        <span>
-          <b>{plan.guarantee}.</b> {plan.guaranteeBody}
-        </span>
-      </div>
-    </article>
-  );
-}
-
-function PricingSection({
-  firstName,
-  locale,
-  planId,
-}: Readonly<{
-  firstName?: string;
-  locale: Locale;
-  planId?: string;
-}>) {
-  const copy = pageCopy[locale];
-  const [pendingPlan, setPendingPlan] = useState<AssessmentPlan | null>(null);
-
-  async function startPlan(plan: AssessmentPlan) {
-    if (!planId || pendingPlan) {
-      return;
-    }
-
-    void trackMetaEvent("SelectOffer", { planId, locale, offer: plan, purchase_type: "plan", stage: "offer" });
-    setPendingPlan(plan);
-    window.location.href = paymentCheckoutPath(locale, {
-      plan,
-      planId,
-      sourceSurface: "healthscore",
-    });
-  }
-
-  return (
-    <section className="wrap mn-hs-pricing-section" id="pricing">
-      <RevealBlock>
-        <PriceHeroIntro firstName={firstName} locale={locale} />
-      </RevealBlock>
-      <RevealBlock delay={1}>
-        <PromiseStrip locale={locale} />
-      </RevealBlock>
-      <RevealBlock delay={2}>
-        <DecisionFrame locale={locale} />
-      </RevealBlock>
-      <div className="pricing">
-        {copy.plans.map((plan, index) => (
-          <RevealBlock delay={(index + 1) as 1 | 2} key={plan.name}>
-            <PriceCard
-              disabled={!planId || Boolean(pendingPlan)}
-              featured={index === 1}
-              isPending={
-                (index === 0 && pendingPlan === "precision") ||
-                (index === 1 && pendingPlan === "pro")
-              }
-              onSelect={() => void startPlan(index === 0 ? "precision" : "pro")}
-              pendingLabel={copy.preparing}
-              plan={plan}
-            />
-          </RevealBlock>
-        ))}
       </div>
     </section>
   );
 }
 
 function HealthScoreExperience({
-  firstName,
-  locale,
-  planId,
-  result,
-  showPricing,
+  firstName, locale, planId, result, showPricing,
 }: Readonly<{
   firstName?: string;
   locale: Locale;
@@ -1400,7 +362,19 @@ function HealthScoreExperience({
   result: HealthScoreResult;
   showPricing: boolean;
 }>) {
+  const copy = healthScoreV8Copy[locale];
+  const model = buildHealthScoreViewModel({ firstName, locale, result });
+  const rootRef = useRef<HTMLElement>(null);
   const trackedDisplay = useRef("");
+  const navigationStarted = useRef(false);
+  const [pending, setPending] = useState(false);
+  const [showDock, setShowDock] = useState(false);
+  const insight = model.findings[0];
+  const hasShortlist = Number.isInteger(model.chosen) && (model.chosen ?? 0) > 0;
+  const headline = model.heroTitle
+    ? `${firstName ? `${firstName}, ` : ""}${firstName && locale === "en" ? model.heroTitle.replace(/^You\b/, "you") : model.heroTitle}`
+    : firstName ? copy.heading.replace("{name}", firstName) : copy.headingNoName;
+
   useEffect(() => {
     const key = `${planId}:${locale}`;
     const recordDisplay = () => {
@@ -1412,70 +386,176 @@ function HealthScoreExperience({
     document.addEventListener("visibilitychange", recordDisplay);
     return () => document.removeEventListener("visibilitychange", recordDisplay);
   }, [planId, locale]);
-  const rootRef = useRef<HTMLElement | null>(null);
-  const model = buildHealthScoreViewModel({ firstName, locale, result });
 
   useEffect(() => {
-    const frame = window.requestAnimationFrame(() => {
-      rootRef.current?.classList.add("is-enhanced");
-    });
+    if (!showPricing || !planId || typeof IntersectionObserver === "undefined") return;
+    const buttons = Array.from(rootRef.current?.querySelectorAll<HTMLElement>("[data-inline-buy]") ?? []);
+    const first = buttons[0];
+    if (!first) return;
+    const update = () => {
+      const pastHero = first.getBoundingClientRect().bottom <= 0;
+      const anyVisible = buttons.some((button) => {
+        const rect = button.getBoundingClientRect();
+        return rect.bottom > 0 && rect.top < window.innerHeight;
+      });
+      setShowDock(pastHero && !anyVisible);
+    };
+    const observer = new IntersectionObserver(update, { threshold: [0, 1] });
+    buttons.forEach((button) => observer.observe(button));
+    update();
+    window.addEventListener("resize", update);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", update);
+    };
+  }, [planId, showPricing]);
 
-    return () => window.cancelAnimationFrame(frame);
-  }, []);
+  function startPlan() {
+    if (!planId || navigationStarted.current) return;
+    navigationStarted.current = true;
+    setPending(true);
+    void trackMetaEvent("SelectOffer", {
+      planId, locale, offer: "precision", purchase_type: "plan", stage: "offer",
+    });
+    window.location.href = paymentCheckoutPath(locale, {
+      plan: "precision", planId, sourceSurface: "healthscore",
+    });
+  }
+
+  function buyButton(position: string, short = false) {
+    return (
+      <button
+        type="button"
+        className="buy"
+        data-buy={position}
+        data-inline-buy={position === "dock" ? undefined : ""}
+        disabled={!planId || pending}
+        aria-busy={pending}
+        onClick={startPlan}
+      >
+        <span>{pending ? copy.opening : short ? copy.ctaShort : copy.cta}</span>
+        <span className="arrow" aria-hidden="true">→</span>
+      </button>
+    );
+  }
 
   return (
-    <section className="mn-healthscore-v7" ref={rootRef}>
-      <HealthScoreHero model={model} />
-      <GapCards model={model} />
-      <PillarBars model={model} />
-      <FindingsSection model={model} />
-      <SubtractionBeat model={model} />
-      <MethodCards model={model} />
-      <TrustCard locale={locale} />
-      {showPricing ? (
-        <PricingSection firstName={firstName} locale={locale} planId={planId} />
-      ) : null}
+    <section className={cx("mn-healthscore-v8", !showPricing && "results-only")} ref={rootRef} data-testid="healthscore">
+      <div className="wrap">
+        <ol className="progress-nav" aria-label={copy.steps.join(" → ")}>
+          {copy.steps.map((step, index) => (
+            <li key={step} className={index === 0 ? "done" : index === 1 ? "current" : ""} aria-current={index === 1 ? "step" : undefined}>
+              <span className="step-dot" aria-hidden="true">{index === 0 ? "✓" : index + 1}</span>{step}
+            </li>
+          ))}
+        </ol>
+        <section className="hero" aria-labelledby="hero-title">
+          <div className="hero-intro">
+            <div className="eyebrow">{copy.complete}</div>
+            <h1 className="hero-title" id="hero-title" data-testid="reveal-hero-name">{renderInlineMarkup(headline)}</h1>
+            {model.heroBody ? <p className="goal-line">{renderInlineMarkup(model.heroBody)}</p> : null}
+            <div className="scorecard">
+              <div className="score-main">
+                <div className="score-num" aria-label={`${copy.scoreLabel} ${model.score}/100`}>{model.score}<small>/100</small></div>
+                <div><span className="band">{model.band}</span><p className="score-text">{renderInlineMarkup(model.bandLine)}</p></div>
+              </div>
+              <p className="score-disclaimer">{copy.scoreBasis}</p>
+            </div>
+            {insight ? <div className="insight"><h2>{renderInlineMarkup(insight.headline)}</h2><p>{renderInlineMarkup(insight.body)}</p></div> : null}
+          </div>
+          {showPricing ? (
+            <div>
+              <div className="offer">
+                <div className="eyebrow">{copy.product}</div>
+                <h2><Lines text={copy.offerTitle} /></h2>
+                <p className="offer-sub">{copy.offerSub}</p>
+                <ul className="offer-list">{copy.offerItems.map((item) => <li key={item}><span className="check" aria-hidden="true">✓</span><span>{item}</span></li>)}</ul>
+                <div className="price-line"><span className="price">฿690</span><span className="small">{copy.once}<br />{copy.noSub}</span></div>
+                {buyButton("hero")}
+                <PaymentNote copy={copy} />
+                <PaymentMethods copy={copy} />
+                <a className="guarantee-link" href="#clarity">{copy.guaranteeLink}</a>
+                <div className="hero-assurance"><strong>{copy.heroTrust}</strong><small>{copy.heroEducation}</small><span>Mahidol · Princeton · Stanford · Harvard</span></div>
+              </div>
+              <a className="read-results" href={model.findings.length ? "#insights" : "#full-report"}>{copy.readMore}</a>
+            </div>
+          ) : null}
+        </section>
+
+        {model.findings.length ? (
+          <section className="section" id="insights" aria-labelledby="proof-title">
+            <div className="section-head"><div><div className="eyebrow">{copy.proofEyebrow}</div><h2 id="proof-title"><Lines text={copy.proofTitle} /></h2></div><p>{copy.proofSub}</p></div>
+            <div className={cx("findings", model.findings.length === 1 && "one", model.findings.length === 2 && "two")}>
+              {model.findings.map((finding, index) => (
+                <article className="finding" key={index}>
+                  <span className="index" aria-hidden="true">{String(index + 1).padStart(2, "0")}</span>
+                  <h3>{renderInlineMarkup(finding.headline)}</h3><p>{renderInlineMarkup(finding.body)}</p>
+                </article>
+              ))}
+            </div>
+          </section>
+        ) : null}
+        <DetailedReport model={model} copy={copy} />
+        <div className="proof-action">
+          {hasShortlist ? (
+            <div className="selection" data-testid="healthscore-shortlist">
+              <div><h3>{copy.selectionTitle}</h3><p>{model.subtractionBody ? renderInlineMarkup(model.subtractionBody) : copy.selectionBody}</p></div>
+              <div className="selection-numbers">
+                <div className="stat"><strong>{model.evaluated}</strong><span>{copy.evaluated}</span></div>
+                <span className="to" aria-hidden="true">→</span>
+                <div className="stat"><strong aria-hidden="true">✓</strong><span>{copy.matched}</span></div>
+                <span className="to" aria-hidden="true">→</span>
+                <div className="stat"><strong>{model.chosen}</strong><span>{copy.chosen}</span></div>
+              </div>
+            </div>
+          ) : null}
+          {showPricing ? <div className="mid-action"><div><p>{copy.midTitle}</p><p className="small">{copy.midSub}</p></div>{buyButton("insights")}</div> : null}
+        </div>
+
+        {showPricing ? (
+          <>
+            <SamplePlan copy={copy} locale={locale} />
+            <section className="section deliverable" aria-labelledby="inside-title">
+              <div><div className="eyebrow">{copy.insideEye}</div><h2 id="inside-title"><Lines text={copy.insideTitle} /></h2><p>{copy.insideBody}</p><p className="note">{copy.insideNote}</p></div>
+              <div className="plan-preview">
+                <div className="doc-title"><div><div className="mini">{copy.docLabel}</div><h3>{copy.docTitle}</h3></div><span className="monogram" aria-hidden="true">M.</span></div>
+                {copy.contents.map(([title, body], index) => <div className="plan-row" key={title}><span className="n" aria-hidden="true">{String(index + 1).padStart(2, "0")}</span><div><strong>{title}</strong><p>{body}</p></div></div>)}
+              </div>
+            </section>
+            <div className="trust-band">{copy.trust.map(([title, body]) => <div className="trust-item" key={title}><h3>{title}</h3><p>{body}</p></div>)}</div>
+            <section className="section" aria-labelledby="journey-title">
+              <div className="section-head"><div><div className="eyebrow">{copy.journeyEye}</div><h2 id="journey-title"><Lines text={copy.journeyTitle} /></h2></div></div>
+              <div className="steps">{copy.journey.map(([title, body], index) => <div className="journey-step" key={title}><span className="num" aria-hidden="true">{String(index + 1).padStart(2, "0")}</span><h3>{title}</h3><p>{body}</p></div>)}</div>
+              <figure className="delivery-box">
+                <Image src="/healthscore/v8-4/box.webp" alt={copy.boxAlt} width={1536} height={1024} sizes="(max-width: 560px) calc(100vw - 32px), (max-width: 908px) calc(100vw - 48px), 860px" />
+                <figcaption>{copy.boxCaption}</figcaption>
+              </figure>
+            </section>
+            <section className="section" aria-labelledby="faq-title">
+              <div className="faq-layout">
+                <div><div className="eyebrow">{copy.faqEye}</div><h2 id="faq-title"><Lines text={copy.faqTitle} /></h2></div>
+                <div className="faq">{copy.faqs.map(([question, answer], index) => <details key={question} id={`faq-${index}`}><summary><span>{question}</span><span className="plus" aria-hidden="true">+</span></summary><p>{answer}</p></details>)}</div>
+              </div>
+              <div className="guarantee" id="clarity"><Image src="/healthscore/v8-4/nong.webp" alt="" width={86} height={140} /><div><h3>{copy.guaranteeTitle}</h3><p>{copy.guaranteeBody}</p></div></div>
+            </section>
+            <section className="section">
+              <div className="close-offer">
+                <div><div className="eyebrow">{copy.closeEye}</div><h2><Lines text={copy.closeTitle} /></h2><p>{copy.closeBody}</p></div>
+                <div><div className="price-line"><span className="price">฿690</span><span className="small">{copy.once}<br />{copy.noSub}</span></div>{buyButton("closing")}<PaymentNote copy={copy} /></div>
+              </div>
+            </section>
+          </>
+        ) : null}
+      </div>
+      {showPricing ? <aside className="dock" hidden={!showDock} aria-label={copy.product}><div className="wrap"><div><strong>฿690</strong><span className="dock-label">{copy.planPayment}</span><span className="small">{copy.separate}</span></div>{buyButton("dock", true)}</div></aside> : null}
     </section>
   );
 }
 
-export function HealthScorePanel({
-  firstName,
-  locale,
-  result,
-}: Readonly<{
-  firstName?: string;
-  locale: Locale;
-  result: HealthScoreResult;
-}>) {
-  return (
-    <HealthScoreExperience
-      firstName={firstName}
-      locale={locale}
-      result={result}
-      showPricing={false}
-    />
-  );
+export function HealthScorePanel(props: Readonly<{ firstName?: string; locale: Locale; result: HealthScoreResult }>) {
+  return <HealthScoreExperience {...props} showPricing={false} />;
 }
 
-export function HealthScorePaymentPanel({
-  firstName,
-  locale,
-  planId,
-  result,
-}: Readonly<{
-  firstName?: string;
-  locale: Locale;
-  planId?: string;
-  result: HealthScoreResult;
-}>) {
-  return (
-    <HealthScoreExperience
-      firstName={firstName}
-      locale={locale}
-      planId={planId}
-      result={result}
-      showPricing={true}
-    />
-  );
+export function HealthScorePaymentPanel(props: Readonly<{ firstName?: string; locale: Locale; planId?: string; result: HealthScoreResult }>) {
+  return <HealthScoreExperience {...props} showPricing={true} />;
 }

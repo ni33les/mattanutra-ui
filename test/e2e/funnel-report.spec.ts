@@ -64,7 +64,7 @@ for(const locale of ["en","th","zh-CN"]){
     expect(seen.filter(event=>event.eventName==="healthscore_viewed")).toHaveLength(0);
     await fixture({action:"formula",locale,planId});
     await page.reload();
-    await expect(page.locator(".mn-healthscore-v7")).toBeVisible();
+    await expect(page.getByTestId("healthscore")).toBeVisible();
     await expect.poll(()=>seen.filter(event=>event.eventName==="healthscore_viewed").length).toBe(1);
     const display=seen.find(event=>event.eventName==="healthscore_viewed")!;
     expect(display.planId).toBe(planId);expect(display.properties?.journeyChannel).toBe("web");

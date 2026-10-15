@@ -52,6 +52,6 @@ for(const locale of ['en','th','zh-CN']) test(`HS-WAIT-BROWSER-01 ${locale} inli
     await expect(page.getByTestId('calc-fallback')).toHaveCount(0);await expect(calc.locator('.mn-quiz-calc__spinner')).toBeVisible();
     await sql`update assessment_healthscore_results set result=${sql.json(copy.result)} where plan_id=${fixture.planId}::uuid and locale=${locale}`;
     ready=true;await page.clock.fastForward(2000);
-    await expect(page.locator('.mn-healthscore-v7')).toBeVisible();expect(emails).toBe(2);
+    await expect(page.getByTestId('healthscore')).toBeVisible();expect(emails).toBe(2);
   }finally{await sql.end();await rm(dir,{recursive:true,force:true});}
 });
