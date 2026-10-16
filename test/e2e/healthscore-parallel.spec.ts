@@ -127,9 +127,11 @@ for (const outcome of ['zero', 'failed', 'stale-revision', 'stale-locale'] as co
         await tx`update formulations set assessment_revision=-1 where plan_id=${fixture.planId}::uuid`;
       });
       let reads = 0, refreshed = false;
-      page.on('requestfinished', request => {
-        const target = new URL(request.url());
-        if (target.pathname === '/en/nutrition/healthscore' && target.searchParams.has('_rsc')) refreshed = true;
+      page.on('response', response => {
+        const target = new URL(response.url());
+        // RSC responses may keep streaming after the refresh is accepted.
+        // Its HTTP response proves the stale-value handler requested a refresh.
+        if (response.status() === 200 && target.pathname === '/en/nutrition/healthscore' && target.searchParams.has('_rsc')) refreshed = true;
       });
       await page.route(`**/api/assessment/${fixture.planId}/journey?**`, route => {
         reads++;
@@ -163,7 +165,7 @@ for (const outcome of ['zero', 'failed', 'stale-revision', 'stale-locale'] as co
 test('HS-PAR-BROWSER-03 pharmacy keeps products and ordering gated until matching finishes', async ({ page }) => {
   const seed = async (ready: boolean, existing: unknown = null) => {
     const { stdout } = await execute(process.execPath, ['--experimental-strip-types', '--import', './test/helpers/offline-network.mjs', '--import', './scripts/register-ts-path-loader.mjs', '--input-type=module', '-e',
-      `import {seedPharmacyFixture} from './test/helpers/pharmacy-fixture.ts';import {closeSqlPool} from './lib/db.ts';try{console.log('FIXTURE:'+JSON.stringify(await seedPharmacyFixture('en',process.argv[1]==='true',JSON.parse(process.argv[2]))));}finally{await closeSqlPool();}`, String(ready), JSON.stringify(existing)], { env: process.env, timeout: 30000 });
+      `import {seedPharmacyFixture} from './test/helpers/pharmacy-fixture.ts';import {closeSqlPool} from './lib/db.ts';import {warmLiveRetailSnapshot} from './lib/agentic/catalogue/live.ts';import {warmSupplementEffectiveAvailability} from './lib/supplement-country-availability.ts';try{const fixture=await seedPharmacyFixture('en',process.argv[1]==='true',JSON.parse(process.argv[2]));await Promise.all([warmLiveRetailSnapshot('TH'),warmSupplementEffectiveAvailability('TH')]);console.log('FIXTURE:'+JSON.stringify(fixture));}finally{await closeSqlPool();}`, String(ready), JSON.stringify(existing)], { env: process.env, timeout: 30000 });
     return JSON.parse(stdout.split('\n').find(line => line.startsWith('FIXTURE:'))!.slice(8));
   };
   const sql = postgres(url.href, { max: 1, prepare: false });
