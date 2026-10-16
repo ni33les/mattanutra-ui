@@ -38,7 +38,7 @@ describe("HealthScore presentation boundaries", () => {
     assert.match(routeSource, /PublicNutritionShell/);
     assert.match(routeSource, /HealthScoreCopyGate/);
     assert.match(routeSource, /readyForHealthScore/);
-    assert.match(routeSource, /chosenNutrients === null/);
+    assert.doesNotMatch(routeSource, /chosenNutrients === null/);
     assert.match(routeSource, /hasHealthScoreAiCopy/);
     assert.match(routeSource, /routeKey: "nutritionHealthScore"/);
     assert.match(routeSource, /indexable: !plan/);

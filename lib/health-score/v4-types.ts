@@ -73,6 +73,8 @@ export type HealthScorePageAiCard = Readonly<{
 }>;
 
 export type HealthScorePageAiCopy = Readonly<{
+  /** Missing on historical full-page copy. */
+  version?: 2;
   bandLine?: LocalizedHealthScoreText;
   gapTrio?: HealthScorePageAiCard[];
   heroBody?: LocalizedHealthScoreText;

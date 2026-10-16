@@ -1,21 +1,8 @@
 import { canonicalHash } from "@/lib/agentic/value/canonical";
 import type { Locale } from "@/lib/i18n";
+import { HEALTHSCORE_COPY_TEXT_KEYS, HEALTHSCORE_COPY_VERSION, LEGACY_HEALTHSCORE_COPY_TEXT_KEYS } from "@/lib/health-score-copy-contract";
 const asRecord = (value: unknown): Record<string, unknown> => value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
 const asArray = (value: unknown): unknown[] => Array.isArray(value) ? value : [];
-const HEALTHSCORE_AI_TEXT_KEYS = [
-  "bandLine",
-  "findingsHeadline",
-  "findingsSub",
-  "heroBody",
-  "heroTitle",
-  "highestLeverageBody",
-  "methodHeadline",
-  "pillarHeadline",
-  "relativityHeadline",
-  "relativitySub",
-  "strengthNote",
-  "subtractionBody"
-] as const;
 
 function localizedHealthScoreTextPresent(value: unknown, locale?: Locale) {
   if (typeof value === "string") {
@@ -44,9 +31,12 @@ function healthScoreAiCardPresent(value: unknown, locale?: Locale) {
 
 export function hasHealthScoreAiCopy(value: unknown, locale?: Locale) {
   const aiCopy = asRecord(asRecord(asRecord(value).pageContent).aiCopy);
+  if (aiCopy.version !== undefined && aiCopy.version !== HEALTHSCORE_COPY_VERSION) return false;
+  const compact = aiCopy.version === HEALTHSCORE_COPY_VERSION;
+  const textKeys = compact ? HEALTHSCORE_COPY_TEXT_KEYS : [...HEALTHSCORE_COPY_TEXT_KEYS, ...LEGACY_HEALTHSCORE_COPY_TEXT_KEYS];
 
   if (
-    !HEALTHSCORE_AI_TEXT_KEYS.every((key) =>
+    !textKeys.every((key) =>
       localizedHealthScoreTextPresent(aiCopy[key], locale)
     )
   ) {
@@ -58,8 +48,7 @@ export function hasHealthScoreAiCopy(value: unknown, locale?: Locale) {
   const methodCards = asArray(aiCopy.methodCards);
 
   return (
-    gaps.length > 0 &&
-    gaps.every(card => healthScoreAiCardPresent(card, locale)) &&
+    (compact || (gaps.length > 0 && gaps.every(card => healthScoreAiCardPresent(card, locale)))) &&
     findings.length > 0 &&
     findings.every(card => healthScoreAiCardPresent(card, locale)) &&
     methodCards.length === 3 &&

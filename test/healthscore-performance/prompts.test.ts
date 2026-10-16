@@ -4,7 +4,7 @@ import test, { type TestContext } from "node:test";
 import { analyzeFormulationWithGrok } from "../../lib/formulation-analysis.ts";
 import { analyzeHealthScoreAdviceWithUsage } from "../../lib/health-score-analysis.ts";
 import { callGrokChatCompletion } from "../../lib/grok-client.ts";
-import { answers, formulaInput, formulaResponse, healthFixture } from "./fixtures.ts";
+import { answers, formulaInput, formulaResponse, compactHealthFixture as healthFixture } from "./fixtures.ts";
 
 type Schema = { properties: Record<string, Schema>; items: Schema; required: string[]; type?: string; minItems?: number; maxItems?: number };
 type Request = { messages: { content: string; role: string }[]; response_format: {
@@ -77,7 +77,7 @@ test("HS-PERF-03: formula request has a strict provider schema and consistent na
   assert.doesNotMatch(request.messages[1].content, /set supplement\.en/);
 });
 
-for (const locale of ["en", "th", "zh-CN"] as const) test(`HS-PERF-04 ${locale}: compact HealthScore retains facts and all localized copy slots`, async t => {
+for (const locale of ["en", "th", "zh-CN"] as const) test(`HS-PERF-04 ${locale}: compact HealthScore retains all facts and displayed web/pharmacy copy`, async t => {
   const fixture = healthFixture(locale);
   const original = structuredClone(fixture.input.healthScore);
   const requests = capture(t, [fixture.response]);
@@ -89,16 +89,23 @@ for (const locale of ["en", "th", "zh-CN"] as const) test(`HS-PERF-04 ${locale}:
   const request = requests[0], content = request.messages[1].content, prompt = JSON.parse(content);
   const baseline = JSON.parse(readFileSync(new URL("./baseline-prompts.json", import.meta.url), "utf8"))[locale];
   const originalPrompt = JSON.parse(baseline);
-  const { instructions: originalInstructions, ...originalFacts } = originalPrompt;
-  const { instructions, ...facts } = prompt;
+  const { instructions: originalInstructions, contract: originalContract, ...originalFacts } = originalPrompt;
+  const { instructions, contract, ...facts } = prompt;
   assert.deepEqual(facts, originalFacts);
-  assert.deepEqual(instructions.slice(0, -2), originalInstructions.slice(0, -1));
+  const retired = ["findingsHeadline", "findingsSub", "gapTrio", "methodHeadline", "pillarHeadline", "relativityHeadline", "relativitySub"];
+  for (const key of retired) delete originalContract.pageCopy[key];
+  assert.deepEqual(contract, { pageCopy: { ...originalContract.pageCopy, version: 2 } });
+  // Changed instructions describe the smaller response only; all content restrictions survive.
+  assert.deepEqual(instructions.slice(0, -2).filter((_: string, i: number) => ![2, 6, 8].includes(i)),
+    originalInstructions.slice(0, -1).filter((_: string, i: number) => ![2, 6, 8].includes(i)));
   assert.equal(content, JSON.stringify(prompt));
   assert.ok(content.indexOf('"contract":') < content.indexOf('"assessment":'));
   const schema = request.response_format.json_schema?.schema;
   assert.equal(request.response_format.type, "json_schema");
   assert.equal(schema?.properties.pageCopy.properties.findings.minItems, fixture.response.pageCopy.findings.length);
-  assert.equal(schema?.properties.pageCopy.properties.gapTrio.maxItems, fixture.response.pageCopy.gapTrio.length);
+  assert.equal(schema?.properties.pageCopy.properties.methodCards.minItems, 3);
+  assert.deepEqual(schema?.properties.pageCopy.properties.version, { type: "integer", enum: [2] });
+  for (const key of retired) assert.equal(Object.hasOwn(schema!.properties.pageCopy.properties, key), false, key);
   assert.deepEqual([...schema?.properties.pageCopy.required].sort(), Object.keys(fixture.response.pageCopy).sort());
 });
 

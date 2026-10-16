@@ -6,5 +6,6 @@ export async function getHealthScoreCopySnapshot(planId: string, locale?: string
   if (!status) return null;
   return { planId, revision: status.revision, locale: status.locale, copyReady: status.copyReady, copyFailed: status.copyFailed,
     readyForHealthScore: status.readyForHealthScore, healthScorePageFailed: status.healthScorePageFailed,
+    preparedNutrientCount: status.preparedNutrientCount, preparedFormulaFailed: status.preparedFormulaFailed,
     generationStatus: status.copyReady ? "ready" : status.copyFailed ? "failed" : "pending", resultVersion: status.resultVersion };
 }

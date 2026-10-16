@@ -1,5 +1,6 @@
 import type { HealthScoreResult } from "@/lib/health-score";
 import { WEB_FORMULATION_INGREDIENT_LIMIT } from "@/lib/formulation-types";
+import { HEALTHSCORE_COPY_TEXT_KEYS, HEALTHSCORE_COPY_VERSION } from "@/lib/health-score-copy-contract";
 
 // Provider shape constraints supplement (never replace) the existing semantic
 // validators. Cached/historical results continue through their existing readers.
@@ -37,12 +38,9 @@ export function healthScoreResponseSchema(healthScore: HealthScoreResult) {
   return {
     name: "healthscore_copy", strict: true,
     schema: object({ pageCopy: object({
-      ...textFields([
-        "bandLine", "heroBody", "heroTitle", "findingsHeadline", "findingsSub", "highestLeverageBody",
-        "methodHeadline", "pillarHeadline", "relativityHeadline", "relativitySub", "strengthNote", "subtractionBody"
-      ]),
+      version: { type: "integer", enum: [HEALTHSCORE_COPY_VERSION] },
+      ...textFields(HEALTHSCORE_COPY_TEXT_KEYS),
       findings: cards("headline", seeds?.findings.length),
-      gapTrio: cards("headline", seeds?.gapTrio.length),
       methodCards: cards("title", 3)
     }) })
   };

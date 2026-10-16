@@ -12,7 +12,7 @@ test('HS-WAIT-01 the HealthScore foreground window is five minutes without chang
 for (const elapsed of [91_000,301_000]) test(`HS-WAIT-02 pending work still opens automatically after ${elapsed}ms`, async t => {
   let now=0,reads=0;
   t.mock.method(Date,'now',()=>now);
-  t.mock.method(globalThis,'fetch',async()=>{reads++;if(reads===1)now=elapsed;return Response.json({copyReady:true,readyForHealthScore:reads>1,copyFailed:false,healthScorePageFailed:false});});
+  t.mock.method(globalThis,'fetch',async()=>{reads++;if(reads===1)now=elapsed;return Response.json({copyReady:reads>1,readyForHealthScore:reads>1,copyFailed:false,healthScorePageFailed:false});});
   const result=await waitForHealthScoreCopy(`wait-${elapsed}`,'en',new AbortController().signal);
   assert.equal(result.status,'ready');assert.equal(reads,2);
 });

@@ -50,3 +50,13 @@ export function healthFixture(locale: Locale = "en") {
     } }
   };
 }
+
+export function compactHealthFixture(locale: Locale = "en") {
+  const fixture = healthFixture(locale);
+  const copy = fixture.response.pageCopy;
+  return { ...fixture, response: { pageCopy: {
+    version: 2 as const, bandLine: copy.bandLine, heroBody: copy.heroBody, heroTitle: copy.heroTitle,
+    highestLeverageBody: copy.highestLeverageBody, strengthNote: copy.strengthNote,
+    subtractionBody: copy.subtractionBody, findings: copy.findings, methodCards: copy.methodCards
+  } } };
+}

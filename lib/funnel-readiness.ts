@@ -83,12 +83,14 @@ export async function getFunnelReadiness(planId: string, localeOption?: string |
   const locale = row.requested_locale as Locale;
   const copyReady = row.skip_healthscore === true || (row.copy_ready ?? hasHealthScoreAiCopy(row.health_score, locale));
   const copyFailed = !copyReady && ["failed", "cancelled", "completed"].includes(row.copy_status ?? "");
-  // HealthScore needs advice and the formula's ingredient count. Product
-  // matching continues independently and gates only reveal.
+  // The score opens as soon as its current localized advice is ready. Formula
+  // preparation and matching continue independently and still gate reveal.
   const preparedFormula = row.prepared_formula_version != null;
-  const readyForHealthScore = Boolean(copyReady && preparedFormula);
-  const healthScorePageFailed = !readyForHealthScore && (copyFailed ||
-    (!preparedFormula && ["failed", "cancelled", "completed"].includes(row.formula_status ?? "")));
+  const preparedNutrientCount = preparedFormula && row.prepared_visible_count != null
+    ? Number(row.prepared_visible_count) : null;
+  const preparedFormulaFailed = !preparedFormula && ["failed", "cancelled", "completed"].includes(row.formula_status ?? "");
+  const readyForHealthScore = Boolean(copyReady);
+  const healthScorePageFailed = copyFailed;
   const hasPaidPlan = Boolean(row.selected_plan || row.payment_status);
   const fulfillmentStatus = row.fulfillment_input
     ? (await paymentFulfillmentEvidence(sql, row.fulfillment_input as FulfillmentPayment)).status
@@ -109,7 +111,7 @@ export async function getFunnelReadiness(planId: string, localeOption?: string |
     : row.formula_status === "completed" ? "inconsistent"
     : ["failed", "cancelled"].includes(row.formula_status ?? "") ? "failed" : "pending";
   return { ...timeline, planId, locale, revision: Number(row.input_revision), inputHash: row.input_hash as string | null,
-    copyReady, copyFailed, readyForHealthScore, healthScorePageFailed,
+    copyReady, copyFailed, readyForHealthScore, healthScorePageFailed, preparedNutrientCount, preparedFormulaFailed,
     hasHealthScore: copyReady, hasPaidPlan, fulfillmentStatus, fulfillmentError: fulfillmentStatus === "complete" ? null : row.fulfillment_error as string | null,
     formulationStatus, refreshPending: ["queued", "reserved", "running", "needs_review", "waiting_approval"].includes(row.product_task_status ?? ""), generationStatus: timeline.readyForReveal ? "ready" : timeline.failed ? "failed" : "pending",
     resultVersion: [row.input_revision, locale, FUNNEL_GENERATOR_VERSION, row.score_version ? new Date(row.score_version).getTime() : 0,

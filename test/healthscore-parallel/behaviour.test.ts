@@ -15,23 +15,31 @@ test('HS-PAR-01 retain actual formula count and deterministic evaluated / set-as
   assert.match(source, /data-testid="healthscore-shortlist"/);
 });
 
-test('HS-PAR-02 advice alone cannot release chat/classic/direct HealthScore polling', async t => {
-  const states = [
-    { copyReady: true, copyFailed: false, readyForHealthScore: false, healthScorePageFailed: false },
-    { copyReady: true, copyFailed: false, readyForHealthScore: true, healthScorePageFailed: false }
-  ];
+test('HS-PAR-02 complete advice releases chat/classic/direct HealthScore while formula preparation continues', async t => {
   let reads = 0;
-  t.mock.method(globalThis, 'fetch', async () => Response.json(states[Math.min(reads++, 1)]));
+  t.mock.method(globalThis, 'fetch', async () => {
+    reads++;
+    return Response.json({ copyReady: true, copyFailed: false, readyForHealthScore: true, healthScorePageFailed: false,
+      preparedNutrientCount: null, preparedFormulaFailed: false, readyForReveal: false, formulationStatus: 'pending' });
+  });
   const result = await waitForHealthScoreCopy('parallel-fixture', 'en', new AbortController().signal);
-  assert.equal(result.status, 'ready'); assert.equal(reads, 2);
+  assert.equal(result.status, 'ready'); assert.equal(reads, 1);
   assert.match(read('app/[locale]/nutrition/healthscore/page.tsx'), /readyForHealthScore/);
 });
 
-test('HS-PAR-03 a failed nutrient formula exposes recovery even when advice is complete', async t => {
+test('HS-PAR-03 formula and product failures do not hide complete HealthScore advice', async t => {
   let reads = 0;
-  t.mock.method(globalThis, 'fetch', async () => Response.json(++reads === 1
-    ? { copyReady: true, copyFailed: false, readyForHealthScore: false, healthScorePageFailed: true }
-    : { copyReady: false, copyFailed: true, readyForHealthScore: false, healthScorePageFailed: true }));
+  t.mock.method(globalThis, 'fetch', async () => {
+    reads++;
+    return Response.json({ copyReady: true, copyFailed: false, readyForHealthScore: true, healthScorePageFailed: false,
+      preparedNutrientCount: null, preparedFormulaFailed: true, readyForReveal: false, failed: true });
+  });
   const result = await waitForHealthScoreCopy('failed-reveal-fixture', 'en', new AbortController().signal);
-  assert.equal(result.status, 'failed'); assert.equal(reads, 1);
+  assert.equal(result.status, 'ready'); assert.equal(reads, 1);
+});
+
+test('HS-PAR-04 failed advice still exposes HealthScore recovery even if the formula is complete', async t => {
+  t.mock.method(globalThis, 'fetch', async () => Response.json({ copyReady: false, copyFailed: true,
+    readyForHealthScore: false, healthScorePageFailed: true, preparedNutrientCount: 4, preparedFormulaFailed: false }));
+  assert.equal((await waitForHealthScoreCopy('failed-advice-fixture', 'en', new AbortController().signal)).status, 'failed');
 });

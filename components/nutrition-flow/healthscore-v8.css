@@ -1993,6 +1993,10 @@ html[lang="th"] .mn-healthscore-v8 .close-offer h2 {
   margin-top: 0;
 }
 
+.mn-healthscore-v8 .selection.selection-preparing {
+  grid-template-columns: 1fr;
+}
+
 @media (min-width:801px) {
   .mn-healthscore-v8 .findings.two {
     grid-template-columns: repeat(2,minmax(0,1fr));

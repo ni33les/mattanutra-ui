@@ -129,10 +129,10 @@ export default async function NutritionHealthScorePage({
   }
 
   const [currentHealthScore, readiness, chosenNutrients] = await Promise.all([
-    getRevisionHealthScore(planId, locale), getFunnelReadiness(planId, locale),
+    getRevisionHealthScore(planId, locale, prefill.revision), getFunnelReadiness(planId, locale),
     getRevisionFormulationNutrientCount(planId, locale, prefill.revision)
   ]);
-  if (!readiness?.readyForHealthScore || readiness.revision !== prefill.revision || chosenNutrients === null || !hasHealthScoreAiCopy(currentHealthScore, locale)) {
+  if (!readiness?.readyForHealthScore || readiness.revision !== prefill.revision || !hasHealthScoreAiCopy(currentHealthScore, locale)) {
     return (
       <main className="mn-customer-shell flex min-h-screen flex-col bg-[var(--mn-cream)] text-[var(--mn-ink)]">
         <TitleBar
@@ -164,9 +164,11 @@ export default async function NutritionHealthScorePage({
         title={dictionary.hero.eyebrow}
       />
       <HealthScorePaymentPanel
+        key={`${planId}:${prefill.revision}:${locale}`}
         firstName={firstName ?? undefined}
         locale={locale}
         planId={prefill.planId ?? planId}
+        revision={prefill.revision}
         result={healthScore}
       />
       <SiteFooter content={dictionary.footer} locale={locale} />

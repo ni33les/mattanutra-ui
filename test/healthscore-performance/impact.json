@@ -1,6 +1,6 @@
 {
-  "releaseBase": "81c96c811c335decd8b9d7bcfac965737adefcfe",
-  "scope": "Formula prefix cache routing and concise ingredient prose; shared transport compatibility and unchanged HealthScore callers. No UI, scoring, readiness, database, matcher, commerce, or live reasoning changes.",
+  "releaseBase": "0887e9ed01eb05a95f29c2295b64d725f68fcd75",
+  "scope": "Versioned HealthScore visible-copy contract shared by web and pharmacy: preserve visible personalized copy, pharmacy method cards, all input facts, historical full-copy readers and field/locale/safety validation; omit unused generated headings and gap cards. Formula transport and medium reasoning remain unchanged.",
   "files": [
     {
       "file": "test/healthscore-performance/prompts.test.ts",
@@ -21,6 +21,11 @@
       "file": "test/healthscore-performance/formula-cache.test.ts",
       "expectedCases": 7,
       "reason": "Immutable message isolation, provider routing identity, retry preservation, unrelated caller compatibility and distinct prose roles in three locales"
+    },
+    {
+      "file": "test/healthscore-performance/compact-copy.test.ts",
+      "expectedCases": 6,
+      "reason": "Three-locale visible-copy completeness, pharmacy method cards, unknown-version rejection, historical compatibility and unchanged numeric/length/forbidden-copy checks"
     }
   ],
   "expectationChanges": [
@@ -28,7 +33,16 @@
     "HealthScore copy reasoning medium -> low after bounded English/Thai/Chinese provider probes; explicit environment overrides remain supported.",
     "New AI responses use strict JSON schemas; unrelated callers retain JSON-object mode. Existing semantic validators and bounded retries are unchanged.",
     "Formula prompt v1 -> v2-compact-structured; all input facts and requested outputs retained, supplement.en instruction corrected to the existing plain-string contract.",
-    "Formula prompt v2 -> v3-cached-concise: two compact user messages preserve all facts; three ingredient prose fields have distinct concise roles. No fields or cautions removed. Medium formula reasoning remains the default."
+    "Formula prompt v2 -> v3-cached-concise: two compact user messages preserve all facts; three ingredient prose fields have distinct concise roles. No fields or cautions removed. Medium formula reasoning remains the default.",
+    "HealthScore prompt/cache identity v9-compact-structured -> v10-visible-copy, response pageCopy.version=2. New responses omit six unused section text fields and gapTrio; retain all web copy, findings and three pharmacy methodCards. Unversioned historical copies retain their original completeness/validation contract."
   ],
-  "previousReleaseBase": "b2bba18e1855b9a0230250ae6ee487a7c7df8459"
+  "previousReleaseBase": "81c96c811c335decd8b9d7bcfac965737adefcfe",
+  "knownBaselineFailures": [
+    {
+      "file": "test/healthscore-performance/prompts.test.ts",
+      "case": "HS-PERF-01: formula prompt preserves every fact with compact JSON",
+      "commit": "0887e9ed01eb05a95f29c2295b64d725f68fcd75",
+      "reason": "September frozen safety-context fixture omits the current foodRestrictions.avoid:null and supplementSensitivities.other:null fields; independently reproduced in an isolated checkout of the release base."
+    }
+  ]
 }

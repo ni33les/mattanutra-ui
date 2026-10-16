@@ -74,7 +74,7 @@ export async function loadGenerationInput(sql: postgres.Sql | postgres.Transacti
     locale: isLocale(locale) ? locale : isLocale(row.locale) ? row.locale : "en", generatorVersion: FUNNEL_GENERATOR_VERSION
   };
 }
-export async function getRevisionHealthScore(planId: string, locale: Locale): Promise<HealthScoreResult | null> {
+export async function getRevisionHealthScore(planId: string, locale: Locale, expectedRevision?: number): Promise<HealthScoreResult | null> {
   const sql = getSql();
   if (!sql) return null;
   const [row] = await sql`
@@ -84,6 +84,7 @@ export async function getRevisionHealthScore(planId: string, locale: Locale): Pr
     left join public.assessment_healthscore_results results on a.plan_id = results.plan_id and a.input_revision = results.revision
       and results.locale = ${locale} and results.generator_version = ${FUNNEL_GENERATOR_VERSION}
     where a.plan_id = ${planId}::uuid
+      ${expectedRevision === undefined ? sql`` : sql`and a.input_revision = ${expectedRevision}`}
   `;
   return row?.result ?? null;
 }

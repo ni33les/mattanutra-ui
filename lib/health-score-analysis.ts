@@ -22,6 +22,7 @@ import {
 } from "@/lib/grok-task-config";
 import type { Locale } from "@/lib/i18n";
 import { healthScoreResponseSchema } from "@/lib/ai-generation-schema";
+import { HEALTHSCORE_COPY_VERSION } from "@/lib/health-score-copy-contract";
 
 export { validateHealthScoreAiResponse };
 
@@ -39,7 +40,7 @@ export type HealthScoreAdviceAnalysis = Readonly<{
 const DEFAULT_HEALTHSCORE_COPY_MODEL = DEFAULT_GROK_MODEL;
 const DEFAULT_HEALTHSCORE_REASONING_EFFORT =
   grokTaskReasoningDefault("healthScoreCopy");
-const DEFAULT_PROMPT_VERSION = "v9-compact-structured";
+const DEFAULT_PROMPT_VERSION = "v10-visible-copy";
 const CACHE_TYPE = "healthscore_page_copy";
 const CACHE_TTL_DAYS = 7;
 const MAX_ATTEMPTS = 2;
@@ -98,19 +99,13 @@ function userPrompt({
       assessment: compactAssessmentForAdvice(answers),
       contract: {
         pageCopy: {
+          version: HEALTHSCORE_COPY_VERSION,
           bandLine: "Localized version of copySeeds.bandLine.",
-          gapTrio: "Exactly the same number/order as copySeeds.gapTrio.",
           heroBody: "Localized supporting hero paragraph.",
           heroTitle: "Localized goal mirror matching the prototype: 'You came here for...' adapted to this person's goals.",
           findings: "Exactly the same number/order as copySeeds.findings.",
-          findingsHeadline: "Localized headline for the 'What we caught' section.",
-          findingsSub: "Localized supporting line for the 'What we caught' section.",
           highestLeverageBody: "Localized body for copySeeds.highestLeverage when present; otherwise a short goal-linked pillar observation.",
           methodCards: "Exactly 3 localized method cards.",
-          methodHeadline: "Localized method section headline.",
-          pillarHeadline: "Localized headline for the pillar section, anchored to goal-linked pillars.",
-          relativityHeadline: "Localized copySeeds.relativity.headline.",
-          relativitySub: "Localized copySeeds.relativity.sub.",
           strengthNote: "Localized note about the strongest pillar or already-mastered area.",
           subtractionBody: "Localized copySeeds.subtraction.body."
         }
@@ -126,19 +121,19 @@ function userPrompt({
       instructions: [
         "Return exactly one top-level key: pageCopy.",
         `Write every user-facing field in ${displayLocaleNames[locale]} (${locale}).`,
-        "Every pageCopy field must be a plain string in the requested display locale, not a localized object.",
+        `Set pageCopy.version to ${HEALTHSCORE_COPY_VERSION}. Every text field must be a plain string in the requested display locale, not a localized object.`,
         "Every card headline/title/body must be a plain string in the requested display locale, not { en, th } or other language maps.",
         "Return only the requested display locale for user-facing prose. Do not return parallel English/Thai/Chinese copies.",
         "Use the deterministicContent.copySeeds as source material, but make the copy warmer and more specific.",
-        "Match the attached HealthScore prototype slots: hero goal mirror, score meaning, gap cards, pillar leverage, what-we-caught, subtraction beat, and method cards.",
+        "Return only the copy slots in contract.pageCopy: hero goal mirror, score meaning, pillar leverage, findings, subtraction, strength note, and the pharmacy's method cards.",
         "Do not introduce any new finding, new score reason, new safety issue, new supplement, new product, or new measurement.",
-        "For gapTrio and findings, keep the same array length, order, and purpose as the deterministic seeds.",
+        "For findings, keep the same array length, order, and purpose as the deterministic seeds.",
         "For methodCards, return exactly 3 cards and preserve the same purpose: goals direction, data/routine precision, and diet/safety focus.",
         "Use personalizationSignals to mention only signals the user actually supplied: goals, diet, activity, sleep, labs or wearables, symptoms, safety flags, lowest pillars, goal-linked pillars, findings, and subtraction mode.",
         "Keep copy concise enough for responsive cards: heroTitle under 120 English characters, card headlines under 70 English characters, card bodies under 190 English characters.",
         "No HTML tags. No markdown. No medical advice. No diagnosis. No bloodwork/lab-test/get-tested language.",
         "Do not mention that any value is locked, capped, or unmeasured.",
-        "For each pageCopy field, use integer digits only if they occur in the same field's copySeed. Numbers in other fields, locked values, or questionnaire answers are not permitted in that field. Use qualitative wording instead; do not add measurements.",
+        "For each pageCopy text field, use integer digits only if they occur in the same field's copySeed. Numbers in other fields, locked values, or questionnaire answers are not permitted in that field. Use qualitative wording instead; do not add measurements.",
         "Keep each seeded field between 0.5x and 1.5x its own copySeed character length, including each individual card headline/title and body. These per-field bounds take precedence over general brevity guidance. heroTitle has no direct seed; keep its existing 120-character guidance."
       ],
       locale,
@@ -641,6 +636,7 @@ async function readCachedAnalysis(
     }
 
     const validation = validateHealthScoreAiResponse({
+      expectedVersion: HEALTHSCORE_COPY_VERSION,
       healthScore,
       locale,
       value: cached
@@ -759,6 +755,7 @@ export async function analyzeHealthScoreAdviceWithUsage({
       });
       const content = completion.choices?.[0]?.message?.content;
       const validation = validateHealthScoreAiResponse({
+        expectedVersion: HEALTHSCORE_COPY_VERSION,
         healthScore,
         locale,
         value: parseJsonObject(content)

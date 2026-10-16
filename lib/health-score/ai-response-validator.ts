@@ -7,6 +7,7 @@ import type {
 } from "@/lib/health-score";
 import { HEALTHSCORE_COPY_FORBIDDEN_SUBSTRINGS } from "@/lib/health-score";
 import type { Locale } from "@/lib/i18n";
+import { HEALTHSCORE_COPY_TEXT_KEYS, HEALTHSCORE_COPY_VERSION } from "@/lib/health-score-copy-contract";
 
 export type ValidatedHealthScoreAiResponse = Readonly<{
   advice: HealthScoreAdvice;
@@ -514,10 +515,12 @@ function validatePageCopyAgainstSeeds({
 }
 
 export function validateHealthScoreAiResponse({
+  expectedVersion,
   healthScore,
   locale,
   value
 }: Readonly<{
+  expectedVersion?: typeof HEALTHSCORE_COPY_VERSION;
   healthScore: HealthScoreResult;
   locale: Locale;
   value: unknown;
@@ -552,6 +555,10 @@ export function validateHealthScoreAiResponse({
 
   const adviceRecord = isRecord(value.advice) ? value.advice : {};
   const pageCopyRecord = isRecord(value.pageCopy) ? value.pageCopy : {};
+  const compact = pageCopyRecord.version === HEALTHSCORE_COPY_VERSION;
+  if ((pageCopyRecord.version !== undefined && !compact) || (expectedVersion !== undefined && pageCopyRecord.version !== expectedVersion)) {
+    errors.push(`pageCopy.version must be ${HEALTHSCORE_COPY_VERSION}`);
+  }
 
   const unexpectedAdviceKeys = Object.keys(adviceRecord).filter(
     (key) =>
@@ -566,8 +573,10 @@ export function validateHealthScoreAiResponse({
     errors.push(`advice includes unexpected keys: ${unexpectedAdviceKeys.join(", ")}`);
   }
 
+  const compactKeys = new Set<string>(["version", ...HEALTHSCORE_COPY_TEXT_KEYS, "findings", "methodCards"]);
   const unexpectedPageKeys = Object.keys(pageCopyRecord).filter(
     (key) =>
+      compact ? !compactKeys.has(key) :
       key !== "bandLine" &&
       key !== "gapTrio" &&
       key !== "heroBody" &&
@@ -622,18 +631,25 @@ export function validateHealthScoreAiResponse({
   );
 
   const pageCopy = {
+    ...(compact ? { version: HEALTHSCORE_COPY_VERSION } : {}),
     bandLine: readLocalizedText(pageCopyRecord, "bandLine", "pageCopy", errors, locales),
-    gapTrio: readLocalizedCards({
+    ...(!compact ? { gapTrio: readLocalizedCards({
       errors,
       expectedLength: pageContent?.copySeeds.gapTrio.length ?? 3,
       key: "gapTrio",
       locales,
       parent: pageCopyRecord
-    }),
+    }) } : {}),
     heroBody: readLocalizedText(pageCopyRecord, "heroBody", "pageCopy", errors, locales),
     heroTitle: readLocalizedText(pageCopyRecord, "heroTitle", "pageCopy", errors, locales),
-    findingsHeadline: readLocalizedText(pageCopyRecord, "findingsHeadline", "pageCopy", errors, locales),
-    findingsSub: readLocalizedText(pageCopyRecord, "findingsSub", "pageCopy", errors, locales),
+    ...(!compact ? {
+      findingsHeadline: readLocalizedText(pageCopyRecord, "findingsHeadline", "pageCopy", errors, locales),
+      findingsSub: readLocalizedText(pageCopyRecord, "findingsSub", "pageCopy", errors, locales),
+      methodHeadline: readLocalizedText(pageCopyRecord, "methodHeadline", "pageCopy", errors, locales),
+      pillarHeadline: readLocalizedText(pageCopyRecord, "pillarHeadline", "pageCopy", errors, locales),
+      relativityHeadline: readLocalizedText(pageCopyRecord, "relativityHeadline", "pageCopy", errors, locales),
+      relativitySub: readLocalizedText(pageCopyRecord, "relativitySub", "pageCopy", errors, locales)
+    } : {}),
     highestLeverageBody: readLocalizedText(pageCopyRecord, "highestLeverageBody", "pageCopy", errors, locales),
     findings: readLocalizedCards({
       errors,
@@ -650,14 +666,10 @@ export function validateHealthScoreAiResponse({
       parent: pageCopyRecord,
       titleKey: "title"
     }),
-    methodHeadline: readLocalizedText(pageCopyRecord, "methodHeadline", "pageCopy", errors, locales),
     ...(legacyOverview ? { overview: legacyOverview } : {}),
     ...(legacyPaywallFeatures ? { paywallFeatures: legacyPaywallFeatures } : {}),
     ...(legacyPaywallSubtitle ? { paywallSubtitle: legacyPaywallSubtitle } : {}),
     ...(legacyPaywallTitle ? { paywallTitle: legacyPaywallTitle } : {}),
-    pillarHeadline: readLocalizedText(pageCopyRecord, "pillarHeadline", "pageCopy", errors, locales),
-    relativityHeadline: readLocalizedText(pageCopyRecord, "relativityHeadline", "pageCopy", errors, locales),
-    relativitySub: readLocalizedText(pageCopyRecord, "relativitySub", "pageCopy", errors, locales),
     strengthNote: readLocalizedText(pageCopyRecord, "strengthNote", "pageCopy", errors, locales),
     subtractionBody: readLocalizedText(pageCopyRecord, "subtractionBody", "pageCopy", errors, locales)
   } satisfies HealthScorePageAiCopy;

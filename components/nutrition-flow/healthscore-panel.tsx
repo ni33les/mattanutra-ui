@@ -18,6 +18,7 @@ import {
 } from "@/components/nutrition-flow/healthscore-v8-copy";
 import { paymentCheckoutPath } from "@/lib/payment-paths";
 import { cx } from "@/components/nutrition-flow/ui";
+import { useHealthScoreShortlist } from "@/components/nutrition-flow/use-healthscore-shortlist";
 import "./healthscore-v8.css";
 
 function renderInlineMarkup(value: string) {
@@ -354,23 +355,25 @@ function DetailedReport({ model, copy }: Readonly<{ model: HealthScoreViewModel;
 }
 
 function HealthScoreExperience({
-  firstName, locale, planId, result, showPricing,
+  firstName, locale, planId, revision, result, showPricing,
 }: Readonly<{
   firstName?: string;
   locale: Locale;
   planId?: string;
+  revision?: number;
   result: HealthScoreResult;
   showPricing: boolean;
 }>) {
   const copy = healthScoreV8Copy[locale];
   const model = buildHealthScoreViewModel({ firstName, locale, result });
+  const shortlist = useHealthScoreShortlist({ planId, revision, locale, initialCount: model.chosen });
   const rootRef = useRef<HTMLElement>(null);
   const trackedDisplay = useRef("");
   const navigationStarted = useRef(false);
   const [pending, setPending] = useState(false);
   const [showDock, setShowDock] = useState(false);
   const insight = model.findings[0];
-  const hasShortlist = Number.isInteger(model.chosen) && (model.chosen ?? 0) > 0;
+  const hasShortlist = Number.isInteger(shortlist.count) && (shortlist.count ?? 0) > 0;
   const headline = model.heroTitle
     ? `${firstName ? `${firstName}, ` : ""}${firstName && locale === "en" ? model.heroTitle.replace(/^You\b/, "you") : model.heroTitle}`
     : firstName ? copy.heading.replace("{name}", firstName) : copy.headingNoName;
@@ -505,8 +508,12 @@ function HealthScoreExperience({
                 <span className="to" aria-hidden="true">→</span>
                 <div className="stat"><strong aria-hidden="true">✓</strong><span>{copy.matched}</span></div>
                 <span className="to" aria-hidden="true">→</span>
-                <div className="stat"><strong>{model.chosen}</strong><span>{copy.chosen}</span></div>
+                <div className="stat"><strong>{shortlist.count}</strong><span>{copy.chosen}</span></div>
               </div>
+            </div>
+          ) : showPricing && shortlist.count === null && !shortlist.failed ? (
+            <div className="selection selection-preparing" data-testid="healthscore-formula-pending" role="status">
+              <div><h3>{copy.formulaPreparingTitle}</h3><p>{copy.formulaPreparingBody}</p></div>
             </div>
           ) : null}
           {showPricing ? <div className="mid-action"><div><p>{copy.midTitle}</p><p className="small">{copy.midSub}</p></div>{buyButton("insights")}</div> : null}
@@ -556,6 +563,6 @@ export function HealthScorePanel(props: Readonly<{ firstName?: string; locale: L
   return <HealthScoreExperience {...props} showPricing={false} />;
 }
 
-export function HealthScorePaymentPanel(props: Readonly<{ firstName?: string; locale: Locale; planId?: string; result: HealthScoreResult }>) {
+export function HealthScorePaymentPanel(props: Readonly<{ firstName?: string; locale: Locale; planId?: string; revision?: number; result: HealthScoreResult }>) {
   return <HealthScoreExperience {...props} showPricing={true} />;
 }

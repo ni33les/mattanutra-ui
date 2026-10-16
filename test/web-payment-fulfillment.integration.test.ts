@@ -6,6 +6,10 @@ import { closeSqlPool, getSql, withDatabaseTransaction } from "../lib/db.ts";
 import { persistAssessmentSubmission } from "../lib/assessment-store.ts";
 import { createAssessmentSnapshot } from "../lib/assessment-snapshot.ts";
 import { computeHealthScore } from "../lib/health-score.ts";
+import { captureAssessment } from "../lib/assessment-capture.ts";
+import { getFunnelReadiness } from "../lib/funnel-readiness.ts";
+import { FUNNEL_GENERATOR_VERSION } from "../lib/assessment-revisions.ts";
+import { completeHealthScoreFixture } from "./fixtures/healthscore.ts";
 import { enqueueWebPaymentFulfillment, fulfillWebPayment } from "../lib/web-payment-fulfillment.ts";
 import { bindPaidReservationToAssessment, completeMockPayment, createStripeCheckoutSession, fulfillCheckoutSession, type PaymentRow, updatePaymentState } from "../lib/stripe-payments.ts";
 
@@ -45,6 +49,9 @@ describe("durable web payment fulfillment on PostgreSQL", () => {
       await sql`delete from public.task_comments where task_id = any(${taskIds}::uuid[])`;
       await sql`delete from public.tasks where id = any(${taskIds}::uuid[])`;
       for (const id of plans) {
+        await sql`delete from public.product_recommendation_runs where plan_id = ${id}::uuid`;
+        await sql`delete from public.formulations where plan_id = ${id}::uuid`;
+        await sql`delete from public.assessment_healthscore_results where plan_id = ${id}::uuid`;
         await sql`delete from public.assessment_inputs where plan_id = ${id}::uuid`;
         await sql`delete from public.assessment_versions where plan_id = ${id}::uuid`;
         await sql`delete from public.assessment_version_counters where plan_id = ${id}::uuid`;
@@ -153,5 +160,47 @@ describe("durable web payment fulfillment on PostgreSQL", () => {
     const otherPlan = await seedPlan();
     assert.equal(await bindPaidReservationToAssessment({ paymentId: payment.id, planId: otherPlan, locale: "en" }), null);
     assert.equal((await getSql()!`select count(*)::int as n from public.tasks where plan_id = ${otherPlan}::uuid`)[0].n, 0);
+  });
+
+  it("accepts purchase from early HealthScore, reuses the running formula and preserves reveal gates", async () => {
+    const sql = getSql()!;
+    const { planId } = await captureAssessment({ answers: { firstName: "Early Purchase Fixture", sex: "male", age: "36-45", goals: ["energy"] },
+      locale: "en" }, { idempotencyKey: newKey() });
+    plans.push(planId);
+    await sql`insert into public.assessment_healthscore_results(plan_id,revision,locale,generator_version,result)
+      values(${planId}::uuid,1,'en',${FUNNEL_GENERATOR_VERSION},${sql.json(completeHealthScoreFixture("en"))})`;
+    const [formulaTask] = await sql`update public.tasks set status='running' where plan_id=${planId}::uuid
+      and task_type='generate_supplement_guidance' returning id`;
+    assert.ok(formulaTask);
+    const earlyScore = await getFunnelReadiness(planId, "en");
+    assert.equal(earlyScore?.readyForHealthScore, true);
+    assert.equal(earlyScore?.preparedNutrientCount, null);
+    assert.equal(earlyScore?.readyForReveal, false);
+
+    const checkout = await createStripeCheckoutSession({ locale: "en", planId, selectedPlan: "precision",
+      sourceSurface: "healthscore", idempotencyKey: newKey() });
+    ids.push(checkout.paymentId);
+    assert.ok((await completeMockPayment({ paymentId: checkout.paymentId }))?.destination);
+    await fulfillWebPayment(checkout.paymentId, dependencies);
+    const purchased = await getFunnelReadiness(planId, "en");
+    assert.equal(purchased?.fulfillmentStatus, "complete");
+    assert.equal(purchased?.hasPaidPlan, true);
+    assert.equal(purchased?.readyForHealthScore, true);
+    assert.equal(purchased?.preparedNutrientCount, null);
+    assert.equal(purchased?.readyForReveal, false);
+    assert.equal(purchased?.formulationStatus, "pending");
+    const reused = await sql`select id,status from public.tasks where plan_id=${planId}::uuid and task_type='generate_supplement_guidance'`;
+    assert.deepEqual(reused.map(row => ({ ...row })), [{ id: formulaTask.id, status: "running" }]);
+    assert.equal((await sql`select count(*)::int as n from public.finance_transactions where source_ref=${`stripe:payment:${checkout.paymentId}:nominal-revenue`}`)[0].n, 1);
+
+    await sql`insert into public.formulations(plan_id,version,assessment_revision,generation_locale,generator_version,formulation)
+      values(${planId}::uuid,1,1,'en',${FUNNEL_GENERATOR_VERSION},'{"supplementBreakdown":[{"id":"target"}]}')`;
+    const prepared = await getFunnelReadiness(planId, "en");
+    assert.equal(prepared?.preparedNutrientCount, 1);
+    assert.equal(prepared?.formulationStatus, "ready");
+    assert.equal(prepared?.readyForReveal, false);
+    await sql`insert into public.product_recommendation_runs(plan_id,assessment_revision,generation_locale,generator_version,catalogue_revision)
+      values(${planId}::uuid,1,'en',${FUNNEL_GENERATOR_VERSION},(select revision from public.catalogue_runtime_revision where singleton=true))`;
+    assert.equal((await getFunnelReadiness(planId, "en"))?.readyForReveal, true);
   });
 });

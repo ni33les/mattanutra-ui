@@ -1,11 +1,12 @@
 {
-  "releaseBase": "a797023ce588a363de7cdbee6271758d7de57a23",
-  "scope": "Restore the original HealthScore presentation; gate on parallel advice and reveal preparation; verify repeated-score input origin",
+  "releaseBase": "0887e9ed01eb05a95f29c2295b64d725f68fcd75",
+  "scope": "Open web HealthScore on complete localized advice while formula preparation continues; publish truthful current-revision shortlist counts and preserve paid reveal and pharmacy gates",
   "files": [
-    {"file":"test/healthscore-parallel/behaviour.test.ts","reason":"Three original numeric columns, client readiness and actionable preparation failures"},
-    {"file":"test/healthscore-parallel/readiness.integration.test.ts","reason":"Independent durable admission, both completion orders, unpaid preparation, revision/locale isolation, recovery and distinct submitted scores"},
+    {"file":"test/healthscore-parallel/behaviour.test.ts","reason":"Unchanged deterministic shortlist arithmetic; advice-only readiness and isolation of formula failures from HealthScore"},
+    {"file":"test/healthscore-parallel/readiness.integration.test.ts","reason":"Independent durable admission, both completion orders, pending/zero/hidden/stale counts, revision/locale/generator isolation, pharmacy gates and rejection of mixed-revision page reads"},
+    {"file":"test/web-payment-fulfillment.integration.test.ts","reason":"An early HealthScore purchase reuses the active capture formula; payment fulfillment completes once while formula and matching still gate reveal"},
     {"file":"test/health-score.test.ts","reason":"Unchanged score arithmetic and restored localized shortlist labels"},
-    {"file":"test/health-score-panel-static.test.ts","reason":"Original layout, styles, fonts, section order and personalized prose"},
+    {"file":"test/health-score-panel-static.test.ts","reason":"Existing HealthScore v8 layout and personalized prose remain intact while the shortlist can prepare in the background"},
     {"file":"test/health-score-analysis.test.ts","reason":"Complete AI narrative retained with current numeric metadata"},
     {"file":"test/healthscore-copy-static.test.ts","reason":"Complete localized advice and email acknowledgement remain enforced"},
     {"file":"test/assessment-capture.integration.test.ts","reason":"Existing capture/retry idempotency and revision rules"},
@@ -18,6 +19,9 @@
   ],
   "browser": [
     {"file":"test/e2e/healthscore-parallel.spec.ts","grep":"HS-PAR-BROWSER-01","expectedCases":3},
+    {"file":"test/e2e/healthscore-parallel.spec.ts","grep":"HS-PAR-BROWSER-02","expectedCases":4},
+    {"file":"test/e2e/healthscore-parallel.spec.ts","grep":"HS-PAR-BROWSER-03","expectedCases":1},
+    {"file":"test/e2e/healthscore-parallel.spec.ts","grep":"HS-V8-BROWSER-01","expectedCases":6},
     {"file":"test/e2e/web-journey-counts.spec.ts","grep":"WEB-JOURNEY-BROWSER-01","expectedCases":3}
   ]
 }
