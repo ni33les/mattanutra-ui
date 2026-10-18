@@ -28,12 +28,20 @@ export async function metaDiagnostics(since: Date | string | null): Promise<Meta
     sql`with confirmations as (
       select 'payment' as resource_type,id::text as resource_id,'purchase:' || coalesce(stripe_checkout_session_id,'payment:' || id::text) as source_key,paid_at
         from public.payments where paid_at>=${start}
+          and (${config.environment}<>'prd' or stripe_mode='live')
+          and coalesce(metadata->>'internal_test','false') not in ('true','1')
       union all
       select 'retail',id::text,'purchase:' || coalesce(stripe_checkout_session_id,'retail:' || id::text),paid_at
         from public.retail_checkout_payments where paid_at>=${start}
+          and (${config.environment}<>'prd' or stripe_mode='live')
+          and coalesce(metadata->>'internal_test','false') not in ('true','1')
       union all
-      select 'agentic',id::text,'purchase:' || coalesce(provider_session_id,'agentic:' || id::text),updated_at
-        from public.agentic_orders where payment_status in ('paid','partially_refunded','refunded') and updated_at>=${start}
+      select 'agentic',a.id::text,'purchase:' || coalesce(a.provider_session_id,'agentic:' || a.id::text),a.updated_at
+        from public.agentic_orders a left join public.retail_checkout_payments r
+          on r.stripe_checkout_session_id=a.provider_session_id and r.metadata->>'agenticOrderId'=a.id::text
+        where a.payment_status in ('paid','partially_refunded','refunded') and a.updated_at>=${start}
+          and (${config.environment}<>'prd' or r.stripe_mode='live')
+          and coalesce(r.metadata->>'internal_test','false') not in ('true','1')
     ), eligible as (
       select distinct p.source_key from confirmations p join public.meta_tracking_bindings b using(resource_type,resource_id)
         join public.meta_tracking_contexts c on c.id=b.context_id

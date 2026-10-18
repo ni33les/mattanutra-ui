@@ -1,5 +1,4 @@
 import { recordMetaPurchase } from "@/lib/meta-tracking";
-import { loadAgenticConfig } from "@/lib/agentic/config";
 import { operationCursor, operationCursorBytes, withoutOperationCursor, withOperationCursor } from "@/lib/agentic/store/operation-checkpoint";
 import { operationCommands } from "@/lib/agentic/store/operation-commands";
 import { notifyPlanOperationChanged } from "@/lib/agentic/plan/completion-notify";
@@ -802,10 +801,15 @@ export function createPostgresStore(inputSql: Sql, inTransaction = false, notifi
         where id = ${record.id}::uuid
       `;
       if (record.paymentStatus === "paid") {
-        const mode = loadAgenticConfig().paymentProvider;
+        // Retail and MCP project the same payment. Retain its test marker on both paths.
+        const [retailPayment] = await tx`select metadata,stripe_mode from public.retail_checkout_payments
+          where stripe_checkout_session_id=${record.providerSessionId} and metadata->>'agenticOrderId'=${record.id}`;
+        // Standalone agentic checkout is test-only; live evidence comes from the retail payment.
+        const mode = retailPayment?.stripe_mode ?? "test";
         await recordMetaPurchase(tx, { type: "agentic", id: record.id, sessionId: record.providerSessionId,
           planId: record.planId, amount: record.totalPriceMinor / 100, currency: record.currency,
-          mode: mode === "stripe_live" ? "live" : mode === "stripe_test" ? "test" : "mock", paidAt: record.updatedAt });
+          mode,
+          paidAt: record.updatedAt, metadata: retailPayment?.metadata });
       }
       });
     },

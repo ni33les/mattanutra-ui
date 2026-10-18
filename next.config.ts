@@ -126,17 +126,14 @@ const securityHeaders = [
       ])
 ];
 
-// These exact OpenBridge origins are configured for pixel 27629903823308584;
-// permit their event requests without trusting other Cloud Run or AWS tenants.
-const metaGatewayOrigins = [
-  "https://mpc-prod-27-s6uit34pua-uk.a.run.app",
-  "https://5z-2b6b7616f94640c2840d1841e1ac24c3.ecs.us-east-1.on.aws"
-];
+// Native Pixel remains allowed; the application outbox owns server delivery.
+// Do not allow the pixel's OpenBridge gateway or its fallback to forward another
+// server copy alongside our durable CAPI event.
 const customerMarketingHeaders = securityHeaders.filter(header => header.key === "Content-Security-Policy").map(header => ({
   ...header,
   value: header.value
     .replace("script-src 'self'", "script-src 'self' https://connect.facebook.net https://www.facebook.com/signals/iwl.js")
-    .replace("connect-src 'self'", `connect-src 'self' https://connect.facebook.net https://www.facebook.com ${metaGatewayOrigins.join(" ")}`)
+    .replace("connect-src 'self'", "connect-src 'self' https://connect.facebook.net https://www.facebook.com")
     .replace("img-src 'self'", "img-src 'self' https://www.facebook.com")
 }));
 

@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { getSql, withDatabaseTransaction } from "@/lib/db";
 import { metaConfig } from "@/lib/meta-config";
-import { META_EVENTS, metaCustomData, metaEventName, sanitiseMetaUrl, uuidPattern, type MetaEventName } from "@/lib/meta-event-policy";
+import { META_EVENTS, metaCustomData, metaEventEnabled, metaEventName, sanitiseMetaUrl, uuidPattern, type MetaEventName } from "@/lib/meta-event-policy";
 import { metaExternalId } from "@/lib/meta-tracking";
 import { metaHashedMatching } from "@/lib/meta-matching";
 
@@ -14,6 +14,10 @@ export async function sendMetaEvent(eventId: string, fetchImpl: typeof fetch = f
     const [event] = await tx`select e.*,c.consent_granted,c.expires_at,c.matching as context_matching from public.meta_conversion_events e
       join public.meta_tracking_contexts c on c.id=e.context_id where e.id=${eventId}::uuid for update of e`;
     if (!event || ["accepted", "rejected", "suppressed"].includes(event.status)) return { status: event?.status ?? "missing" };
+    if (!metaEventEnabled(event.event_name as MetaEventName)) {
+      await tx`update public.meta_conversion_events set status='suppressed',response_message='event_retired',updated_at=now() where id=${eventId}::uuid`;
+      return { status: "suppressed" };
+    }
     if (!config.enabled) throw new Error("Campaign delivery is disabled or unconfigured");
     if (!event.consent_granted || new Date(event.expires_at).getTime() <= Date.now() || event.environment !== config.environment || event.pixel_id !== config.pixelId || Date.now() - new Date(event.occurred_at).getTime() > 6 * 86400000) {
       await tx`update public.meta_conversion_events set status='suppressed',response_message='consent_expired_or_destination_changed',updated_at=now() where id=${eventId}::uuid`;

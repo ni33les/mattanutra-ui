@@ -82,6 +82,37 @@ describe("preference-controlled, durable and isolated Meta delivery", () => {
     assert.equal(first.accepted,true); assert.equal(first.eventId,eventId); assert.deepEqual(second,first);
     assert.equal((await getSql()!`select count(*)::int as n from public.meta_conversion_events where context_id=${c.id}::uuid`)[0].n,1);
   });
+  it("keeps Lead once per plan and retires both new and already queued QuizSubmitted events", async () => {
+    const c = await consent();
+    await withDatabaseTransaction(getSql()!, tx => bindMetaContext(tx, "plan", planId, c.request));
+    try {
+      const capture = (name: "Lead" | "QuizSubmitted") => withDatabaseTransaction(getSql()!, tx => recordMetaPlanMilestone(tx, planId, name, "en"));
+      assert.equal(await capture("QuizSubmitted"), null);
+      const lead = await capture("Lead");
+      assert.ok(lead);
+      assert.equal(await capture("Lead"), null);
+      const legacyId = randomUUID();
+      await getSql()!`insert into public.meta_conversion_events
+        (id,environment,pixel_id,event_name,source_key,context_id,custom_data,status)
+        values (${legacyId}::uuid,'dev','123456789012345','QuizSubmitted',${legacyId},${c.id}::uuid,'{}','queued')`;
+      let deliveries = 0;
+      const send: typeof fetch = async (_url, init) => {
+        deliveries++;
+        const payload = JSON.parse(String(init?.body));
+        assert.equal(payload.data[0].event_name, "DEV_Lead");
+        assert.equal(payload.data[0].event_id, lead);
+        return Response.json({ events_received: 1 });
+      };
+      assert.equal((await sendMetaEvent(legacyId, send)).status, "suppressed");
+      await sendMetaEvent(lead, send);
+      await sendMetaEvent(lead, send);
+      assert.equal(deliveries, 1);
+      const [legacy] = await getSql()!`select response_message from public.meta_conversion_events where id=${legacyId}::uuid`;
+      assert.equal(legacy.response_message, "event_retired");
+    } finally {
+      await getSql()!`delete from public.meta_tracking_bindings where resource_type='plan' and resource_id=${planId} and context_id=${c.id}::uuid`;
+    }
+  });
   it("links an anonymous landing visit to the captured customer without exporting contact details", async () => {
     const c = await queued();
     await withDatabaseTransaction(getSql()!, tx=>bindMetaContext(tx,"plan",planId,c.request,{email:"buyer@example.com"}));
@@ -385,7 +416,8 @@ describe("preference-controlled, durable and isolated Meta delivery", () => {
         values (${id}::uuid,${environment},${config.pixelId},${name},${id},${context}::uuid,${sql.json(data)},${status},${time})`;
     };
     await add("PageView",dimensions); await add("PageView",dimensions); await add("PageView",dimensions,"accepted",other.id);
-    await add("QuizSubmitted",dimensions); await add("InitiateCheckout",dimensions);
+    await add("Lead",dimensions); await add("InitiateCheckout",dimensions);
+    await add("QuizSubmitted",dimensions,"accepted",other.id); // Retired submissions do not count as completed HealthScores.
     const sale = { ...dimensions, purchase_type: "plan", offer: "precision", value: 690, currency: "THB" };
     await add("Purchase",sale); await add("Purchase",sale,"retrying"); await add("Purchase",{...sale,offer:"pro",value:100,currency:"USD"},"rejected");
     await add("Purchase",{...sale,campaign_id:"101",channel:"pharmacy",locale:"en",purchase_type:"products",offer:undefined,value:250},"accepted",other.id);

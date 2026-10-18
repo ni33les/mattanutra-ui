@@ -1,5 +1,6 @@
 import { bindMetaContext, recordMetaCheckout } from "@/lib/meta-tracking";
 import { existingPaymentAccounting, recordPaymentAccountingOnce } from "@/lib/payment-accounting";
+import { stripeInternalTestMetadata } from "@/lib/payment-internal-test";
 import { effectivePayment, preparePaymentFulfillment, newlyConfirmedFulfillment } from "@/lib/payment-fulfillment-evidence";
 import { claimFunnelRequest } from "@/lib/funnel-idempotency";
 import { FunnelError } from "@/lib/funnel-errors";
@@ -1940,6 +1941,12 @@ export async function fulfillCheckoutSession(
   const prepared = await preparePaymentFulfillment(sql, payment);
   const current = await withDatabaseTransaction(sql, async tx => {
     let [row] = await tx<PaymentRow[]>`select * from public.payments where id = ${payment.id}::uuid for update`;
+    const testMetadata = stripeInternalTestMetadata(session);
+    if (testMetadata.internal_test && row.metadata.internal_test !== true) {
+      [row] = await tx<PaymentRow[]>`update public.payments
+        set metadata = metadata || ${tx.json(testMetadata)}::jsonb, updated_at = now()
+        where id = ${row.id}::uuid returning *`;
+    }
     const confirmed = row.status === "paid" || row.status === "bound" || Boolean(row.paid_at);
     if (session.payment_status === "paid") {
       if (row.status !== "paid" && row.status !== "bound") {

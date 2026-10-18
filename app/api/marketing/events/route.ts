@@ -2,9 +2,10 @@ import { NextResponse } from "next/server";
 import { getSql, withDatabaseTransaction } from "@/lib/db";
 import { enforceRateLimit, publicRateLimits } from "@/lib/rate-limit";
 import { metaConfig } from "@/lib/meta-config";
-import { META_EVENTS, META_AUTHORITATIVE_EVENTS, metaCustomData, metaRequestOriginAllowed, sanitiseMetaUrl, uuidPattern, type MetaEventName } from "@/lib/meta-event-policy";
-import { enqueueMetaEvent, metaMatchingFromRequest, requestMetaContext } from "@/lib/meta-tracking";
+import { META_EVENTS, META_AUTHORITATIVE_EVENTS, metaCustomData, metaEventEnabled, metaRequestOriginAllowed, sanitiseMetaUrl, uuidPattern, type MetaEventName } from "@/lib/meta-event-policy";
+import { enqueueMetaEvent, metaMatchingFromRequest, recordMetaCheckout, requestMetaContext } from "@/lib/meta-tracking";
 import { metaCampaignAttribution } from "@/lib/meta-attribution";
+import { AMOUNT_MICROS_PER_UNIT } from "@/lib/stripe-payment-config";
 export const runtime = "nodejs";
 const authoritativeNames = META_AUTHORITATIVE_EVENTS;
 const receiptWindowMs = 10 * 60_000;
@@ -59,7 +60,7 @@ export async function POST(request: Request) {
     const raw = await request.text();
     if (raw.length > 8192) return NextResponse.json({ error: "Event too large" }, { status: 413 });
     const body = JSON.parse(raw);
-    if (!META_EVENTS.includes(body.name) || authoritativeNames.includes(body.name) || !uuidPattern.test(body.eventId || "") || !uuidPattern.test(body.sessionId || "")) {
+    if (!META_EVENTS.includes(body.name) || !metaEventEnabled(body.name) || authoritativeNames.includes(body.name) || !uuidPattern.test(body.eventId || "") || !uuidPattern.test(body.sessionId || "")) {
       return NextResponse.json({ error: "Invalid browser milestone" }, { status: 400 });
     }
     const sourceUrl = sanitiseMetaUrl(body.sourceUrl, config.environment);
@@ -78,16 +79,45 @@ export async function POST(request: Request) {
       // Serialize capture against other tabs before taking the event's attribution snapshot.
       const [current] = await tx`select matching,attribution,consent_granted,expires_at from public.meta_tracking_contexts where id=${context.id}::uuid for update`;
       if (!current?.consent_granted || new Date(current.expires_at).getTime() <= Date.now()) return null;
+      // A browser attempt ID is only a lookup key. A usable provider session and
+      // its binding must already exist before it can recover a checkout receipt.
+      const checkout = name === "InitiateCheckout" ? (await tx<Array<{
+        type: "payment" | "retail"; id: string; plan_id: string | null; amount: number | string;
+        currency: string; locale: string; selected_plan: string | null; status: string;
+      }>>`select 'payment' as type,p.id,p.plan_id,p.amount,p.currency,p.locale,p.selected_plan::text,p.status
+        from public.payments p join public.meta_tracking_bindings b on b.resource_type='payment' and b.resource_id=p.id::text
+        where p.id=${attemptId}::uuid and b.context_id=${context.id}::uuid
+          and nullif(trim(p.stripe_checkout_session_id),'') is not null and p.status<>'created'
+          and p.amount>0 and p.amount_unit='micros' and p.currency ~ '^[A-Z]{3}$'
+        union all
+        select 'retail' as type,p.id,p.plan_id,p.amount,p.currency,p.locale,null::text as selected_plan,p.status
+        from public.retail_checkout_payments p join public.meta_tracking_bindings b on b.resource_type='retail' and b.resource_id=p.id::text
+        where p.id=${attemptId}::uuid and b.context_id=${context.id}::uuid
+          and nullif(trim(p.stripe_checkout_session_id),'') is not null and p.status<>'created'
+          and p.amount>0 and p.amount_unit='micros' and p.currency ~ '^[A-Z]{3}$'`)[0] : null;
+      if (name === "InitiateCheckout" && !checkout) return null;
       const matching = metaMatchingFromRequest(request, body.sourceUrl, current?.matching);
       const campaign = metaCampaignAttribution(body.sourceUrl, config.environment, current?.attribution,
         !!matching.fbc && matching.fbc !== current?.matching?.fbc);
       await tx`update public.meta_tracking_contexts set matching=matching || ${tx.json(matching)},attribution=${tx.json(campaign)},updated_at=now()
         where id=${context.id}::uuid and consent_granted`;
       // Recover a lost response without losing native delivery or changing verified checkout values.
-      const [existing] = await tx`select id,custom_data from public.meta_conversion_events
+      const [existing] = await tx`select id,custom_data,status from public.meta_conversion_events
         where environment=${config.environment} and pixel_id=${config.pixelId} and event_name=${name}
           and source_key=${`browser:${key}`} and context_id=${context.id}::uuid`;
-      if (existing) return { eventId: existing.id as string, data: existing.custom_data };
+      if (existing) return checkout && existing.status === "suppressed" ? null : { eventId: existing.id as string, data: existing.custom_data };
+      if (checkout) {
+        if (!["checkout_session_created", "checkout_opened", "processing"].includes(checkout.status)) return null;
+        await recordMetaCheckout(tx, { type: checkout.type, id: checkout.id, planId: checkout.plan_id,
+          amount: Number(checkout.amount) / AMOUNT_MICROS_PER_UNIT, currency: checkout.currency,
+          locale: checkout.locale, selectedPlan: checkout.selected_plan });
+        // A concurrent server capture may have won the unique source key. Read
+        // its receipt too, so both copies always use the same server event ID.
+        const [captured] = await tx`select id,custom_data from public.meta_conversion_events
+          where environment=${config.environment} and pixel_id=${config.pixelId} and event_name=${name}
+            and source_key=${`browser:${key}`} and context_id=${context.id}::uuid and status<>'suppressed'`;
+        return captured ? { eventId: captured.id as string, data: captured.custom_data } : null;
+      }
       const eventId = await enqueueMetaEvent(tx, { context: { ...context, attribution: campaign, matching: { ...current.matching, ...matching } }, name,
         sourceKey: `browser:${key}`, eventId: body.eventId, sourceUrl, data: { ...data, planId: data.plan_id, stage: data.funnel_stage } });
       if (!eventId) return null;

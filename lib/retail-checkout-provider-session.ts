@@ -1,5 +1,6 @@
 import { withDatabaseTransaction } from "@/lib/db";
 import { recordMetaPurchase } from "@/lib/meta-tracking";
+import { stripeInternalTestMetadata } from "@/lib/payment-internal-test";
 import type Stripe from "stripe";
 import type postgres from "postgres";
 import { FunnelError } from "@/lib/funnel-errors";
@@ -53,9 +54,9 @@ export async function recordRetailProviderSession<T extends RetailSessionPayment
         else 'checkout_session_created' end,
       stripe_checkout_session_id = coalesce(stripe_checkout_session_id, ${session.id}),
       stripe_customer_id = coalesce(stripe_customer_id, ${typeof session.customer === "string" ? session.customer : null}),
-      stripe_payment_intent_id = coalesce(stripe_payment_intent_id, ${typeof session.payment_intent === "string" ? session.payment_intent : null}),
+      stripe_payment_intent_id = coalesce(stripe_payment_intent_id, ${typeof session.payment_intent === "string" ? session.payment_intent : session.payment_intent?.id ?? null}),
       paid_at = case when ${session.payment_status} = 'paid' then coalesce(paid_at, now()) else paid_at end,
-      metadata = metadata || '{"stripeSessionAttemptState":"resolved"}'::jsonb,
+      metadata = metadata || '{"stripeSessionAttemptState":"resolved"}'::jsonb || ${tx.json(stripeInternalTestMetadata(session))}::jsonb,
       updated_at = now()
     where id = ${payment.id}::uuid and (stripe_checkout_session_id is null or stripe_checkout_session_id = ${session.id})
     returning *`;
@@ -64,7 +65,7 @@ export async function recordRetailProviderSession<T extends RetailSessionPayment
     const row = updated as T & { plan_id?: string; locale?: string; customer_email?: string };
     await recordMetaPurchase(tx, { type: "retail", id: row.id, sessionId: session.id, planId: row.plan_id ?? null,
       amount: Number(row.amount) / AMOUNT_MICROS_PER_UNIT, currency: row.currency, locale: row.locale,
-      mode: session.livemode ? "live" : "test", paidAt: row.paid_at, email: row.customer_email });
+      mode: session.livemode ? "live" : "test", paidAt: row.paid_at, email: row.customer_email, metadata: row.metadata });
   }
   return updated;
   });

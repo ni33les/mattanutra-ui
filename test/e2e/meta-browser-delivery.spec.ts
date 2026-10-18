@@ -5,7 +5,7 @@ import { test, expect, type BrowserContext, type Page } from "@playwright/test";
 // browser API requests are intercepted. Receipts represent authoritative CAPI events.
 const pixelId = "123456789012345";
 const config = { enabled: true, environment: "dev", pixelId };
-const authoritativeNames = ["QuizSubmitted", "Lead", "EmailCapture", "OrderSubmitted", "McpConnectionVerified", "Purchase"] as const;
+const authoritativeNames = ["Lead", "EmailCapture", "OrderSubmitted", "McpConnectionVerified", "Purchase"] as const;
 type Receipt = {
   eventId: string;
   name: typeof authoritativeNames[number];
@@ -73,7 +73,6 @@ async function resumeVisibleDelivery(page: Page) {
 test("confirmed funnel milestones and both purchase types preserve their CAPI IDs and amounts", async ({ page, context, baseURL }) => {
   const planId = randomUUID();
   const receipts = [
-    receipt("QuizSubmitted", { plan_id: planId, funnel_stage: "assessment" }),
     receipt("Lead", { plan_id: planId }),
     receipt("EmailCapture", { plan_id: planId }),
     receipt("OrderSubmitted", { plan_id: planId, funnel_stage: "checkout", purchase_type: "products", value: 849.5, currency: "THB" }),

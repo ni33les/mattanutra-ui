@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import { after, before, describe, it } from "node:test";
 import { fixtureDatabaseUrl, cleanupFixtureRelationships } from "./helpers/fixture-teardown.ts";
 import { closeSqlPool, getSql, withDatabaseTransaction } from "../lib/db.ts";
-import { META_EVENTS } from "../lib/meta-event-policy.ts";
+import { META_EVENTS, metaEventEnabled } from "../lib/meta-event-policy.ts";
 import { metaContactMatching, metaHashedMatching } from "../lib/meta-matching.ts";
 import { bindMetaContext, enqueueMetaEvent, recordMetaPlanMilestone, recordMetaPurchase, requestMetaContext, setMetaConsent, type MetaContext } from "../lib/meta-tracking.ts";
 import { sendMetaEvent } from "../lib/meta-dispatch.ts";
@@ -64,11 +64,11 @@ describe("customer matching across Meta events", () => {
     assert.ok(event); return event;
   }
 
-  it("enriches QuizSubmitted immediately and later ViewContent without changing the anonymous PageView", async () => {
+  it("enriches Lead immediately and later ViewContent without changing the anonymous PageView", async () => {
     const c = await consent(), early = await capture(c.context, "PageView"), planId = await plan();
     const submitted = await withDatabaseTransaction(getSql()!, async tx => {
       await bindMetaContext(tx, "plan", planId, c.request);
-      return recordMetaPlanMilestone(tx, planId, "QuizSubmitted", "en");
+      return recordMetaPlanMilestone(tx, planId, "Lead", "en");
     });
     assert.ok(submitted);
     const viewed = await capture((await requestMetaContext(c.request))!, "ViewContent");
@@ -92,7 +92,7 @@ describe("customer matching across Meta events", () => {
     await withDatabaseTransaction(getSql()!, tx => bindMetaContext(tx, "retail", paymentId, c.request));
     const expected = metaContactMatching({ email: "fixture@example.com", phone: "+66812345678", firstName: "Fixture",
       country: "TH", city: "Bangkok", region: "Bangkok", postalCode: "10110" });
-    for (const name of META_EVENTS) {
+    for (const name of META_EVENTS.filter(metaEventEnabled)) {
       const outbound = await deliver(await capture((await requestMetaContext(c.request))!, name));
       assert.deepEqual(metaHashedMatching(outbound.user_data), expected, name);
       assert.equal(outbound.user_data.ln, undefined, "A full delivery name does not provide an unambiguous surname");

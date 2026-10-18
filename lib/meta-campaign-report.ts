@@ -28,7 +28,7 @@ export async function metaCampaignReport(sql: postgres.Sql, config: MetaPublicCo
     ), visitors as (
       select campaign_id,adset_id,ad_id,channel,locale,context_id,
         bool_or(event_name='PageView') as visited,bool_or(event_name='QuizStart') as started,
-        bool_or(event_name='QuizSubmitted') as completed,bool_or(event_name='InitiateCheckout') as checkout,
+        bool_or(event_name='Lead') as completed,bool_or(event_name='InitiateCheckout') as checkout,
         bool_or(event_name='Purchase') as purchased
       from events group by campaign_id,adset_id,ad_id,channel,locale,context_id
     ) select campaign_id,adset_id,ad_id,channel,locale,

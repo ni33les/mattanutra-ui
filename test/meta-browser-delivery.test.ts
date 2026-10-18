@@ -32,7 +32,7 @@ describe("confirmed Meta browser delivery", () => {
   });
 
   it("sends confirmed funnel events with original IDs and verified plan/product revenue, without capture POSTs", async t => {
-    const events = [receipt("QuizSubmitted"), receipt("Lead"), receipt("EmailCapture"), receipt("OrderSubmitted"), receipt("McpConnectionVerified"),
+    const events = [receipt("Lead"), receipt("EmailCapture"), receipt("OrderSubmitted"), receipt("McpConnectionVerified"),
       receipt("Purchase", { value: 1200, currency: "THB", purchase_type: "plan" }),
       receipt("Purchase", { value: 3150, currency: "THB", purchase_type: "products", email: "never@example.test", symptoms: "never" })];
     const fetch = t.mock.method(globalThis, "fetch", async (_url, init) => {
@@ -67,7 +67,7 @@ describe("confirmed Meta browser delivery", () => {
     t.mock.method(globalThis, "fetch", async () => response([receipt("Lead")], { pixelId: "wrong" }));
     await deliverMetaReceipts(config); assert.equal(calls.length, 0);
     t.mock.method(globalThis, "fetch", async () => response([
-      receipt("Purchase", { value: 100 }), receipt("PageView"), { ...receipt("Lead"), eventId: "invalid" },
+      receipt("QuizSubmitted"), receipt("Purchase", { value: 100 }), receipt("PageView"), { ...receipt("Lead"), eventId: "invalid" },
       { ...receipt("Lead"), occurredAt: "invalid" }, receipt("Purchase", { value: -1, currency: "THB", purchase_type: "plan" })
     ]));
     await deliverMetaReceipts(config); assert.equal(calls.length, 0);

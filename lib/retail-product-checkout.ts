@@ -1236,7 +1236,7 @@ async function continueRetailCheckoutPayment(sql: RetailCheckoutDb, payment: Che
   };
   const resumed = await ensureRetailProviderSession({ sql, payment, parameters, provider: {
     create: (params, options) => stripe.checkout.sessions.create(params, options),
-    retrieve: id => stripe.checkout.sessions.retrieve(id)
+    retrieve: id => stripe.checkout.sessions.retrieve(id, { expand: ["payment_intent"] })
   } });
   const session = resumed.session;
   if (retailPaymentConfirmed(resumed.payment) || session?.status === "complete") return resumeExistingPayment();
@@ -1827,7 +1827,7 @@ export async function completeMockRetailCheckout(input: Readonly<{
   const paid = rows[0] ?? null;
   if (paid) await recordMetaPurchase(tx, { type: "retail", id: paid.id, sessionId: paid.stripe_checkout_session_id,
     planId: paid.plan_id, amount: Number(paid.amount) / AMOUNT_MICROS_PER_UNIT, currency: paid.currency,
-    locale: paid.locale, mode: paid.stripe_mode, paidAt: paid.paid_at, email: paid.customer_email });
+    locale: paid.locale, mode: paid.stripe_mode, paidAt: paid.paid_at, email: paid.customer_email, metadata: paid.metadata });
   return paid;
   });
   if (!payment) return null;
@@ -1888,7 +1888,7 @@ export async function fulfillRetailCheckoutSession(input: Readonly<{
   if (input.sessionId) {
     const config = stripePaymentConfig(input.request);
     const stripe = stripeClient(config.secretKey);
-    const session = await stripe.checkout.sessions.retrieve(input.sessionId);
+    const session = await stripe.checkout.sessions.retrieve(input.sessionId, { expand: ["payment_intent"] });
     const rows = await sql<CheckoutPaymentRow[]>`
       select * from public.retail_checkout_payments
       where stripe_checkout_session_id = ${input.sessionId}

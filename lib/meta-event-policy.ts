@@ -4,7 +4,9 @@ import { isLocale } from "@/lib/i18n";
 export type MetaEnvironment = "dev" | "uat" | "prd";
 export const META_EVENTS = ["PageView", "ViewContent", "QuizStart", "QuizProgress", "QuizSubmitted", "Lead", "EmailCapture", "Contact", "SelectOffer", "AddToCart", "InitiateCheckout", "OrderSubmitted", "Purchase", "McpProviderSelected", "McpUrlCopied", "McpProviderOpened", "McpPromptCopied", "McpConnectionVerified"] as const;
 export type MetaEventName = typeof META_EVENTS[number];
-export const META_AUTHORITATIVE_EVENTS = ["Purchase", "OrderSubmitted", "Lead", "QuizSubmitted", "EmailCapture", "McpConnectionVerified"] as const satisfies readonly MetaEventName[];
+// Keep retired names readable in historical reports, but never capture or deliver them again.
+export const metaEventEnabled = (name: MetaEventName) => name !== "QuizSubmitted";
+export const META_AUTHORITATIVE_EVENTS = ["Purchase", "OrderSubmitted", "Lead", "EmailCapture", "McpConnectionVerified"] as const satisfies readonly MetaEventName[];
 export type MetaPublicConfig = { environment: MetaEnvironment; pixelId: string; enabled: boolean };
 export const META_CONSENT_COOKIE = "mn_marketing";
 export const META_CONTEXT_COOKIE = "mn_marketing_context";

@@ -6,9 +6,10 @@ import { createTask } from "@/lib/task-service";
 import type { JourneyChannel } from "@/lib/journey-channel";
 import { AGENT_CAPABILITIES } from "@/lib/system-agents";
 import { metaConfig } from "@/lib/meta-config";
+import { isInternalTestMetadata } from "@/lib/payment-internal-test";
 import { metaCampaignAttribution, metaClickId, metaFbc } from "@/lib/meta-attribution";
 import { META_HASHED_MATCHING_FIELDS, metaContactMatching, metaHashedMatching, metaMatchingIdentitiesConflict, withoutMetaContactMatching, type MetaContact } from "@/lib/meta-matching";
-import { META_CONSENT_COOKIE, META_CONTEXT_COOKIE, META_CONSENT_VERSION, metaCustomData, sanitiseMetaUrl, uuidPattern, type MetaEventName, type MetaPreferenceSource } from "@/lib/meta-event-policy";
+import { META_CONSENT_COOKIE, META_CONTEXT_COOKIE, META_CONSENT_VERSION, metaCustomData, metaEventEnabled, sanitiseMetaUrl, uuidPattern, type MetaEventName, type MetaPreferenceSource } from "@/lib/meta-event-policy";
 
 type Db = postgres.Sql | postgres.TransactionSql;
 type Resource = "plan" | "payment" | "retail" | "agentic";
@@ -153,7 +154,7 @@ export async function enqueueMetaEvent(sql: Db, input: {
   resource?: MetaResource; contact?: MetaContact;
 }) {
   const config = metaConfig();
-  if (!config.enabled || input.context.environment !== config.environment || !input.context.consent_granted) return null;
+  if (!config.enabled || !metaEventEnabled(input.name) || input.context.environment !== config.environment || !input.context.consent_granted) return null;
   // Enrich every newly captured event; accepted/history snapshots remain immutable.
   // Existing context hashes retain explicitly captured identifiers when a stored field is unavailable.
   const contactMatching = await storedMetaContact(sql, input.context, input.resource, input.contact);
@@ -187,10 +188,11 @@ export async function enqueueMetaEvent(sql: Db, input: {
 export async function recordMetaPurchase(sql: Db, input: {
   type: "payment" | "retail" | "agentic"; id: string; sessionId: string | null; planId: string | null;
   amount: number; currency: string; locale?: string; mode: string; paidAt?: Date | string | null; email?: string | null;
-  selectedPlan?: string | null;
+  selectedPlan?: string | null; metadata?: unknown;
 }) {
   const config = metaConfig();
-  if (!config.enabled || !input.paidAt || (config.environment === "prd" && input.mode !== "live")) return null;
+  if (!config.enabled || !input.paidAt || isInternalTestMetadata(input.metadata)
+    || (config.environment === "prd" && input.mode !== "live")) return null;
   const context = await boundMetaContext(sql, input.type, input.id);
   if (!context) return null;
   const channel = await metaResourceChannel(sql, input.planId, input.type, input.id);

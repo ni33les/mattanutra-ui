@@ -90,7 +90,7 @@ describe("authoritative browser event receipts", () => {
     const session = { id: `cs_fixture_${payment.id}`, payment_status: "unpaid", status: "open", amount_total: 25000,
       currency: "thb", livemode: false, metadata: { paymentId: payment.id } } as Stripe.Checkout.Session;
     await recordRetailProviderSession(getSql()!, payment, session);
-    assert.deepEqual(new Set((await (await receipts(c.request)).json()).events.map((event: { name: string }) => event.name)), new Set(["QuizSubmitted", "EmailCapture", "Lead"]));
+    assert.deepEqual(new Set((await (await receipts(c.request)).json()).events.map((event: { name: string }) => event.name)), new Set(["EmailCapture", "Lead"]));
     await recordRetailProviderSession(getSql()!, payment, { ...session, payment_status: "paid", status: "complete" });
     const body = await (await receipts(c.request)).json();
     const purchase = body.events.find((event: { name: string }) => event.name === "Purchase");
@@ -106,7 +106,7 @@ describe("authoritative browser event receipts", () => {
     const c = await consent(), outsider = await consent(), planId = await plan();
     const id = await withDatabaseTransaction(getSql()!, async tx => {
       await bindMetaContext(tx, "plan", planId, c.request);
-      return recordMetaPlanMilestone(tx, planId, "QuizSubmitted", "en");
+      return recordMetaPlanMilestone(tx, planId, "Lead", "en");
     });
     assert.ok(id);
     await getSql()!`update public.meta_conversion_events set source_url='https://dev.mattanutra.com/en?capability=never-export',

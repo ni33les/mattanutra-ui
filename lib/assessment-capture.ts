@@ -146,7 +146,6 @@ export async function captureAssessment(bodyValue: unknown, options: { planId?: 
       throw new FunnelError("Paid reservation could not be applied", 409, "reservation_conflict");
     }
     await bindMetaContext(tx, "plan", planId, options.request, { email: contactEmail });
-    await recordMetaPlanMilestone(tx, planId, "QuizSubmitted", locale);
     if (contactEmail) await recordMetaPlanMilestone(tx, planId, "EmailCapture", locale);
     const taskIds = await enqueueAssessmentPregenerationTasks({ answers, locale, planId });
     if (selectedPlan) await enqueueNutritionPlanTasks({ answers, locale, planId, plan: selectedPlan });
