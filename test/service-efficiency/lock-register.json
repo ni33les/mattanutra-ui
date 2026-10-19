@@ -661,10 +661,10 @@
       "number": 14,
       "resource": "Assessment row \u2014 FOR NO KEY UPDATE",
       "disposition": "narrow",
-      "invariant": "Fences answer/contact edits, replan, recovery, checkout and generation completion by assessment revision.",
+      "invariant": "Fences answer/contact edits, explicit free-web access adoption, replan, recovery, checkout and generation completion by assessment revision.",
       "acquisition": "Explicit mutation transaction or conditional write; ordinary reads never acquire this lock.",
-      "permittedWork": "Recovery prepares snapshots/readiness/tasks outside assessment locks. A short conditional UPDATE fences projection and audit by revision and xmin; reject changed recovery selection or generation. Capture and paid adoption retain atomic transactions.",
-      "release": "Capture, checkout or result-completion commit. Independent recovery holds only the projection/audit transaction.",
+      "permittedWork": "Recovery prepares snapshots/readiness/tasks outside assessment locks. A short conditional UPDATE fences projection and audit by revision and xmin; reject changed recovery selection or generation. Capture and paid adoption retain atomic transactions. Free-web adoption locks one assessment to recheck its source and grant, update journey_version, and append one audit version; no generation or external calls run under that lock.",
+      "release": "Capture, access adoption, checkout or result-completion commit or rollback. Independent recovery holds only the projection/audit transaction.",
       "callers": [
         "app/api/assessment/[planId]/product-recommendations/route.ts",
         "lib/assessment-capture.ts",
@@ -680,11 +680,13 @@
         "lib/task-result-applier.ts:applyTaskFailureResult",
         "lib/web-payment-fulfillment.ts:fulfillWebPayment",
         "scripts/apply-service-efficiency-schema.ts:module",
-        "lib/task-worker.ts:enqueueNutritionPlanTasks (conditional publication only)"
+        "lib/task-worker.ts:enqueueNutritionPlanTasks (conditional publication only)",
+        "lib/web-product-journey-adoption.ts:adoptWebProductJourney"
       ],
       "tests": [
         "test/assessment-capture.integration.test.ts",
-        "test/service-efficiency/result-preparation.test.ts"
+        "test/service-efficiency/result-preparation.test.ts",
+        "test/web-product-journey.integration.test.ts"
       ],
       "verification": "Required named cases reconciled with successful execution by lock-register-verification.json in the unchanged-source scoped gate; historical RED evidence remains separate.",
       "cases": [
@@ -731,6 +733,22 @@
         {
           "file": "test/assessment-capture.integration.test.ts",
           "name": "LOCK-REDUNDANT-05E a changed generation cannot be admitted as an unversioned task"
+        },
+        {
+          "file": "test/web-product-journey.integration.test.ts",
+          "name": "captures free access once without a paid plan, payment, revenue, or a purchase milestone"
+        },
+        {
+          "file": "test/web-product-journey.integration.test.ts",
+          "name": "preserves existing free access when a saved session resolves after new enrollment is paused"
+        },
+        {
+          "file": "test/web-product-journey.integration.test.ts",
+          "name": "adopts an old unpaid web plan on recovery without rewriting its answers or fabricating payment"
+        },
+        {
+          "file": "test/web-product-journey.integration.test.ts",
+          "name": "keeps retail and MCP assessments out of web adoption"
         }
       ],
       "historicalCallers": [
@@ -1740,6 +1758,10 @@
         {
           "file": "test/db-transactions.integration.test.ts",
           "name": "rolls back the whole phase when its deadline expires"
+        },
+        {
+          "file": "test/db-transactions.integration.test.ts",
+          "name": "keeps nested readers on a read-only repeatable snapshot while an independent writer commits"
         }
       ],
       "historicalCallers": [
@@ -1940,12 +1962,12 @@
     {
       "file": "lib/assessment-capture.ts",
       "owner": "captureAssessment",
-      "key": "0a6ab8b011bb0839eccd068ca10cfd5d263420854b2cbbb9a01a44e21a566170",
-      "statement": "`select selected_plan, input_revision, answers from public.assessments where plan_id = ${planId}::uuid for no key update`",
+      "key": "268efd4210d93bd1544614d509aabdc71cd2401cd45a35e6fecb5c5cfc1f8ad6",
+      "statement": "`select selected_plan, journey_version, input_revision, answers from public.assessments where plan_id = ${planId}::uuid for no key update`",
       "mechanisms": [
         14
       ],
-      "justification": "Fences answer/contact edits, replan, recovery, checkout and generation completion by assessment revision."
+      "justification": "Fences answer/contact edits and generation admission by the current assessment revision, and rechecks an existing free-web grant after session resolution."
     },
     {
       "file": "lib/healthscore-delivery.ts",
@@ -2308,6 +2330,16 @@
         19
       ],
       "justification": "Lock only the existing browser context while preserving its original click timestamp and updating one coherent ad-ID group. Prevent an automatic retry from reversing explicit withdrawal; commit before browser or provider work."
+    },
+    {
+      "file": "lib/web-product-journey-adoption.ts",
+      "owner": "adoptWebProductJourney",
+      "key": "05e8e78c83959e6efd4f763fa293173c048ca0183fd1ce4209235b838288de2a",
+      "statement": "`select * from public.assessments where plan_id=${planId}::uuid for no key update`",
+      "mechanisms": [
+        14
+      ],
+      "justification": "Explicit recovery rechecks the current assessment source and free-web grant under one row lock, so adoption and its audit version commit together without rewriting answers or fabricating payment."
     }
   ]
 }

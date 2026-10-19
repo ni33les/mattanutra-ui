@@ -133,7 +133,8 @@ describe("product recommendation freshness", () => {
     assert.doesNotMatch(revealPage, /detail:\s*"page"/);
     assert.doesNotMatch(revealPage, /await ensureFreshProductRecommendationsForReveal/);
     assert.doesNotMatch(revealPage, /setTimeout/);
-    assert.match(formulationPolling, /\/formulation\/refresh[\s\S]*method: "POST"/);
+    assert.match(formulationPolling, /commerce \? "journey\/retry" : "formulation\/refresh"[\s\S]*method: "POST"/);
+    assert.match(formulationPolling, /attempt > 0 \|\| \(bootstrap && !bootstrapped\.current\)/);
     assert.match(formulationRefreshRoute, /recoverFunnelWork\(planId, body\?\.locale, true\)/);
     assert.match(formulationRecovery, /ensureFreshProductRecommendationsForReveal/);
     assert.match(formulationRefreshRoute, /Cache-Control": "no-store"/);

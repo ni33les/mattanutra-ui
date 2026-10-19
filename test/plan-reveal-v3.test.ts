@@ -295,7 +295,9 @@ describe("plan reveal V3 migration", () => {
   });
 
   it("uses V14 public fonts and colour tokens as the site-wide public system", () => {
-    assert.match(localeLayout, /DM_Sans/);
+    assert.match(localeLayout, /next\/font\/local/);
+    assert.match(localeLayout, /dm-sans\.ttf/);
+    assert.match(localeLayout, /variable: "--mn-font-body"/);
     assert.doesNotMatch(localeLayout, /Manrope/);
     assert.match(globalsCss, /--foreground: #0a2540/);
     assert.match(globalsCss, /var\(--mn-font-body, "DM Sans"\)/);

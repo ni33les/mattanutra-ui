@@ -64,7 +64,8 @@ function assertOrder(source: string, labels: readonly string[]) {
 
 describe("final reveal UX", () => {
   it("shows progress while loading its saved result", () => {
-    assert.match(wrapper, /if \(loadState === "loading"\) \{\s*return <FunnelLoading locale=\{locale\} stage="opening" \/>;\s*\}/);
+    assert.match(wrapper, /const preparation = commerce \? <WebPreparationPanel/);
+    assert.match(wrapper, /if \(loadState === "loading"\) \{\s*return preparation \? <>\{preparation\}<\/> : <FunnelLoading locale=\{locale\} stage="opening" \/>;\s*\}/);
     assert.doesNotMatch(wrapper, /NutritionGuidancePreparingPanel/);
     assert.match(wrapper, /data-testid="formulation-retry"/);
   });
@@ -135,26 +136,29 @@ describe("final reveal UX", () => {
     assert.match(reveal, /min-h-\[calc\(100vh-70px\)\]/);
   });
 
-  it("routes missing and unpaid plans before entering paid reveal polling", () => {
+  it("keeps missing-assessment and legacy paywall gates before free reveal reads", () => {
     const gateStart = route.indexOf(
       "const assessment = await getStoredAssessmentPrefill(planId);",
     );
     const refreshStart = route.indexOf(
-      "if (!readiness?.readyForReveal)",
+      "const stored = commerce && readiness?.formulationStatus",
     );
     const gate = route.slice(gateStart, refreshStart);
 
     assert.ok(gateStart > -1, "reveal route should load the assessment gate");
     assert.ok(
       refreshStart > gateStart,
-      "assessment gate should run before reveal product refresh work",
+      "assessment gate should run before reading the saved formula",
     );
     assert.match(route, /import \{ notFound, redirect \} from "next\/navigation"/);
     assert.match(route, /nutritionHealthScorePath/);
     assert.match(gate, /if \(!assessment\) \{[\s\S]*notFound\(\);[\s\S]*\}/);
+    assert.match(gate, /isWebProductJourney\(readiness\?\.journeyVersion\)/);
+    assert.match(gate, /webProductJourneyEnabled\(\) && isPublicWebAssessment\(assessment\.answers\)/);
+    assert.match(gate, /if \(!commerce && !readiness\?\.readyForReveal\) redirect\(nutritionProgressPath/);
     assert.match(
       gate,
-      /if \(!assessment\.plan && !readiness\?\.hasPaidPlan\) \{[\s\S]*redirect\(nutritionHealthScorePath\(locale, planId\)\);[\s\S]*\}/,
+      /if \(!commerce && !assessment\.plan && !readiness\?\.hasFullPlanAccess\) \{[\s\S]*redirect\(nutritionHealthScorePath\(locale, planId\)\);[\s\S]*\}/,
     );
   });
 
@@ -212,13 +216,13 @@ describe("final reveal UX", () => {
   });
 
   it("applies the final reveal type system from the localized route shell", () => {
-    assert.match(layout, /DM_Sans/);
-    assert.match(layout, /Fraunces/);
-    assert.match(layout, /style:\s*\["normal", "italic"\]/);
-    assert.match(layout, /weight:\s*"variable"/);
-    assert.match(layout, /axes:\s*\["opsz"\]/);
-    assert.match(layout, /JetBrains_Mono/);
-    assert.match(layout, /Noto_Sans_Thai/);
+    assert.match(layout, /next\/font\/local/);
+    assert.match(layout, /dm-sans\.ttf[\s\S]*variable: "--mn-font-body"/);
+    assert.match(layout, /fraunces\.ttf[\s\S]*weight: "100 900"[\s\S]*style: "normal"/);
+    assert.match(layout, /fraunces-italic\.ttf[\s\S]*weight: "100 900"[\s\S]*style: "italic"/);
+    assert.match(layout, /variable: "--mn-font-display"/);
+    assert.match(layout, /jetbrains-mono\.woff2[\s\S]*variable: "--mn-font-mono"/);
+    assert.match(layout, /noto-sans-thai\.ttf[\s\S]*variable: "--mn-font-thai"/);
     assert.match(css, /\.mn-reveal-final\s*\{[\s\S]*font-family:\s*var\(--mn-font-body\)/);
     assert.match(css, /\.mn-reveal-final \.mn-reveal-font-body\s*\{[\s\S]*font-family:\s*var\(--mn-font-body\)/);
     assert.match(css, /\.mn-reveal-final \.mn-reveal-font-display\s*\{[\s\S]*font-family:\s*var\(--mn-font-display\)/);
@@ -226,7 +230,7 @@ describe("final reveal UX", () => {
     assert.doesNotMatch(css, /\.mn-reveal-final \.mn-reveal-brandbar/);
     assert.doesNotMatch(css, /\.mn-reveal-final \.mn-reveal-brand-word/);
     assert.doesNotMatch(css, /\.mn-reveal-final \.mn-reveal-brand-tagline/);
-    assert.match(reveal, /className="mn-reveal-final mn-reveal-font-body w-full"/);
+    assert.match(reveal, /className=\{`mn-reveal-final mn-reveal-font-body w-full\$\{commerce \? " mn-reveal-final--commerce" : ""\}`\}/);
     assert.match(reveal, /mn-reveal-font-display/);
     assert.match(reveal, /mn-reveal-font-mono/);
     assert.match(reveal, /mn-reveal-track-hero-title/);
