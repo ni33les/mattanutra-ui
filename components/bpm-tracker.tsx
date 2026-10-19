@@ -36,7 +36,8 @@ function pageEventForPath(pathname: string) {
     new RegExp(`^/(${localePattern})/assessment/results`).test(pathname) ||
     new RegExp(`^/(${localePattern})/${revealPathPattern}`).test(pathname)
   ) {
-    return { eventName: "formulation_page_viewed", eventType: "formulation" };
+    // A reveal route can still be generating. The content owns its visible milestones.
+    return { eventName: "reveal_page_viewed", eventType: "formulation" };
   }
 
   if (new RegExp(`^/(${localePattern})/library/`).test(pathname)) {

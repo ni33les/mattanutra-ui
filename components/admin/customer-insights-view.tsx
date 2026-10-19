@@ -87,6 +87,7 @@ const copy = {
     orderStatus: "Order status",
     panya: "Nong Mata",
     plan: "Plan",
+    paidPlanCustomers: "Paid plan customers",
     products: "Products",
     readiness: "Purchase readiness",
     segment: "Segment",
@@ -128,6 +129,7 @@ const copy = {
     orderStatus: "สถานะคำสั่งซื้อ",
     panya: "Nong Mata",
     plan: "แผน",
+    paidPlanCustomers: "ลูกค้าที่ซื้อแผน",
     products: "สินค้า",
     readiness: "ความพร้อมซื้อ",
     segment: "กลุ่ม",
@@ -169,6 +171,7 @@ const copy = {
     orderStatus: "订单状态",
     panya: "Nong Mata",
     plan: "方案",
+    paidPlanCustomers: "付费方案客户",
     products: "产品",
     readiness: "购买准备度",
     segment: "细分",
@@ -488,7 +491,7 @@ function ArchetypePanel({
                   <p className="font-bold">
                     {formatNumber(archetype.paidCustomers, locale)}
                   </p>
-                  <p>{labels.plan}</p>
+                  <p>{labels.paidPlanCustomers}</p>
                 </div>
                 <div className="rounded-lg bg-amber-50 p-2 text-amber-900">
                   <p className="font-bold">
@@ -663,7 +666,7 @@ function SegmentCard({
       <div className="mt-4 grid grid-cols-3 gap-2 text-xs">
         <div className="rounded-lg bg-emerald-50 p-2 text-emerald-800">
           <p className="font-bold">{formatNumber(segment.paidCustomers, locale)}</p>
-          <p>{labels.plan}</p>
+          <p>{labels.paidPlanCustomers}</p>
         </div>
         <div className="rounded-lg bg-blue-50 p-2 text-blue-800">
           <p className="font-bold">{formatNumber(segment.panyaEngaged, locale)}</p>
@@ -943,7 +946,7 @@ export function AdminCustomerInsightsView({
     {
       color: businessMetricColors.converted,
       id: "customerInsightsPaid",
-      label: labels.plan,
+      label: labels.paidPlanCustomers,
       series: [],
       value: formatNumber(data.summary.paidCustomers, locale)
     },

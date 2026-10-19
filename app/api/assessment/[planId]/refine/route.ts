@@ -38,7 +38,7 @@ export async function POST(
       select 1
       from public.assessments
       where plan_id = ${planId}::uuid
-        and selected_plan is not null
+        and (selected_plan is not null or journey_version = 'web-products-v1')
     ) as exists
   `;
 

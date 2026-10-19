@@ -16,6 +16,7 @@ import type { PharmacyOrderReceipt } from "@/lib/pharmacy-orders";
 import { pharmacyDeepDiveCopy } from "./deep-dive-copy";
 import styles from "./deep-dive.module.css";
 import { PharmacyLineConnect } from "./line-connect";
+import { nutritionRevealPath } from "@/lib/nutrition-paths";
 
 const normalized = (value: string) => value.toLowerCase().replace(/[\s_:-]+/g, "");
 
@@ -28,9 +29,10 @@ function Chapter({ number, label, title, image }: { number: number; label: strin
   </div>;
 }
 
-export function PharmacyDeepDive({ locale, slug, pharmacyName, planId, result, health, receipt, food, analysisNotice, retryFood }: {
+export function PharmacyDeepDive({ locale, slug, pharmacyName, planId, result, health, receipt, food, analysisNotice, retryFood, web = false }: {
   locale: Locale; slug: string; pharmacyName: string; planId: string; result: FormulationResult; health: HealthScoreResult | null;
   receipt: PharmacyOrderReceipt | null; food?: FoodGapSupportVariant; analysisNotice: ReactNode; retryFood: () => void;
+  web?: boolean;
 }) {
   const c = pharmacyCopy[locale], d = pharmacyDeepDiveCopy[locale];
   const text = (value: LocalizedText | undefined) => value ? getLocalizedText(value, locale).trim() : "";
@@ -56,8 +58,8 @@ export function PharmacyDeepDive({ locale, slug, pharmacyName, planId, result, h
   const fullRecommendedBasket = !receipt || (products.length === result.recommendations.length &&
     result.recommendations.every(p => receipt.lines.some(line => line.productId === (p.productId ?? p.id))));
   const chapterLabels = [c.picture, c.noticed, c.thinking, c.ingredients, receipt ? c.ordered : c.products, c.foods, c.safety];
-  const path = pharmacyPath(locale, slug, "plan", { plan: planId, order: receipt?.id });
-  const back = pharmacyPath(locale, slug, "reveal", { plan: planId, order: receipt?.id });
+  const path = web ? `/${locale}/nutrition/plan?plan=${encodeURIComponent(planId)}` : pharmacyPath(locale, slug, "plan", { plan: planId, order: receipt?.id });
+  const back = web ? nutritionRevealPath(locale, planId) : pharmacyPath(locale, slug, "reveal", { plan: planId, order: receipt?.id });
   const [copied, setCopied] = useState(false), [copyFailed, setCopyFailed] = useState(false);
   const date = new Date(result.generatedAt);
   const ingredientAdvice = (id: string, label: string): WebHealthAdvice[] => medical.filter(a =>
@@ -178,7 +180,7 @@ export function PharmacyDeepDive({ locale, slug, pharmacyName, planId, result, h
         <div className="pali">Mattaññutā</div><div className="measure" style={{ margin: "0 auto" }}><p>{d.meaning}</p><p>{d.closing}</p></div></div>
     </div>
     <section className="keep" data-testid="deep-dive-save"><div className="wrap keep-row"><div className="measure"><h3>{d.keep}</h3><p>{d.keepBody}</p>
-      <PharmacyLineConnect planId={planId} slug={slug} locale={locale} orderId={receipt?.id} />
+      {!web && <PharmacyLineConnect planId={planId} slug={slug} locale={locale} orderId={receipt?.id} />}
       <div className="keep-actions">
         <button className="link-button" onClick={() => { void navigator.clipboard.writeText(new URL(path, window.location.origin).href).then(() => { setCopied(true); setCopyFailed(false); }).catch(() => setCopyFailed(true)); }}>{copied ? c.copied : c.copyLink}</button>
         <a href={back}>{c.back}</a></div><p role="status">{copyFailed ? d.copyError : copied ? c.copied : ""}</p>

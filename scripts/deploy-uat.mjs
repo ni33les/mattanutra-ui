@@ -134,6 +134,7 @@ async function applyRuntimeSchema(env) {
   await run(npmCommand, ["run", "web-funnel:schema:apply"], {
     env
   });
+  await run(npmCommand, ["run", "web-products:schema:apply"], { env });
   await run(npmCommand, ["run", "agentic:schema:apply"], {
     env
   });

@@ -3,7 +3,8 @@ import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { PublicNutritionShell } from "@/components/nutrition-flow/public-nutrition-shell";
 import { HealthScoreCopyGate } from "@/components/nutrition-flow/healthscore-copy-gate";
-import { HealthScorePaymentPanel } from "@/components/nutrition-flow/healthscore-panel";
+import { HealthScorePanel, HealthScorePaymentPanel } from "@/components/nutrition-flow/healthscore-panel";
+import { webProductCopy } from "@/components/nutrition-flow/web-product-copy";
 import { SiteFooter } from "@/components/site-footer";
 import { TitleBar } from "@/components/title-bar";
 import { firstNameFromAssessmentAnswers } from "@/lib/assessment-first-name";
@@ -23,6 +24,7 @@ import { assessmentSkipsHealthScore } from "@/lib/pharmacy-in-store";
 import { getFunnelReadiness } from "@/lib/funnel-readiness";
 import { localizedRouteMetadata } from "@/lib/seo";
 import { cachedEvaluatedIngredientCatalogueCount } from "@/lib/supplement-catalogue-count";
+import { isPublicWebAssessment, isWebProductJourney, webProductJourneyEnabled } from "@/lib/web-product-journey";
 
 type NutritionHealthScorePageProps = Readonly<{
   params: Promise<{
@@ -30,6 +32,7 @@ type NutritionHealthScorePageProps = Readonly<{
   }>;
   searchParams: Promise<{
     plan?: string;
+    view?: string;
   }>;
 }>;
 
@@ -98,7 +101,7 @@ export default async function NutritionHealthScorePage({
 
   const locale: Locale = rawLocale;
   const dictionary = getDictionary(locale);
-  const { plan } = await searchParams;
+  const { plan, view } = await searchParams;
   const planId = typeof plan === "string" && isUuid(plan) ? plan : "";
 
   if (!planId) {
@@ -117,10 +120,15 @@ export default async function NutritionHealthScorePage({
     );
   }
 
-  const currentPath = nutritionHealthScorePath(locale, planId);
+  const currentPath = `${nutritionHealthScorePath(locale, planId)}${view === "optional" ? "&view=optional" : ""}`;
   const prefill = await getStoredAssessmentPrefill(planId);
 
-  if (assessmentSkipsHealthScore(prefill?.answers)) {
+  const commerce = prefill && (isWebProductJourney(prefill.journeyVersion) || (webProductJourneyEnabled() && isPublicWebAssessment(prefill.answers)));
+  if (commerce && view !== "optional") {
+    redirect(nutritionRevealPath(locale, planId));
+  }
+
+  if (!commerce && assessmentSkipsHealthScore(prefill?.answers)) {
     redirect(nutritionRevealPath(locale, planId));
   }
 
@@ -140,6 +148,7 @@ export default async function NutritionHealthScorePage({
           currentPath={currentPath}
           title={dictionary.hero.eyebrow}
         />
+        {commerce && <p className="mx-auto w-full max-w-6xl px-6 py-5"><a href={nutritionRevealPath(locale, planId)}>{webProductCopy[locale].back}</a></p>}
         <HealthScoreCopyGate locale={locale} planId={planId} />
         <SiteFooter content={dictionary.footer} locale={locale} />
       </main>
@@ -163,14 +172,15 @@ export default async function NutritionHealthScorePage({
         currentPath={currentPath}
         title={dictionary.hero.eyebrow}
       />
-      <HealthScorePaymentPanel
+      {commerce && <p className="mx-auto w-full max-w-6xl px-6 py-5"><a href={nutritionRevealPath(locale, planId)}>{webProductCopy[locale].back}</a></p>}
+      {commerce ? <HealthScorePanel firstName={firstName ?? undefined} locale={locale} planId={planId} revision={prefill.revision} result={healthScore} /> : <HealthScorePaymentPanel
         key={`${planId}:${prefill.revision}:${locale}`}
         firstName={firstName ?? undefined}
         locale={locale}
         planId={prefill.planId ?? planId}
         revision={prefill.revision}
         result={healthScore}
-      />
+      />}
       <SiteFooter content={dictionary.footer} locale={locale} />
     </main>
   );

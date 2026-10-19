@@ -12,7 +12,8 @@ import type { AssessmentPlan } from "@/lib/assessment-snapshot";
 import { isUuid } from "@/lib/assessment-store";
 import { getDictionary, isLocale, locales, type Locale } from "@/lib/i18n";
 import { getNamespace } from "@/lib/i18n-messages";
-import { nutritionQuizPath } from "@/lib/nutrition-paths";
+import { nutritionQuizPath, nutritionRevealPath } from "@/lib/nutrition-paths";
+import { webProductJourneyEnabled } from "@/lib/web-product-journey";
 import { localizedRouteMetadata } from "@/lib/seo";
 import {
   normalizePaymentPlan,
@@ -89,6 +90,7 @@ export default async function PaymentCheckoutPage({
       ? query.planId
       : null;
   const sourceSurface = normalizePaymentSourceSurface(query.source);
+  if (webProductJourneyEnabled()) redirect(planId ? nutritionRevealPath(locale, planId) : nutritionQuizPath(locale));
   const mockError = typeof query.error === "string" ? query.error.trim() : "";
   const publishableKey = stripePublishableKey();
 

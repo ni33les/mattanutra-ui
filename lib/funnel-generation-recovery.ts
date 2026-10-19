@@ -1,3 +1,4 @@
+import { isWebProductJourney } from "@/lib/web-product-journey";
 import { getSql } from "@/lib/db";
 import { loadGenerationInput, withGenerationInput } from "@/lib/assessment-revisions";
 import type { Locale } from "@/lib/i18n";
@@ -9,7 +10,7 @@ export async function recoverMissingFunnelGeneration(input: Readonly<{
   const sql = getSql();
   if (!sql || (!input.healthScoreMissing && !input.formulationMissing)) return;
   const { enqueueHealthScoreAnalysisTask, enqueueNutritionPlanTasks } = await import("@/lib/task-worker");
-  const [assessment] = await sql`select selected_plan from public.assessments
+  const [assessment] = await sql`select selected_plan, journey_version from public.assessments
     where plan_id = ${input.planId}::uuid`;
   if (!assessment) return;
   const generation = await loadGenerationInput(sql, input.planId, input.locale);
@@ -18,9 +19,9 @@ export async function recoverMissingFunnelGeneration(input: Readonly<{
     if (input.healthScoreMissing) await enqueueHealthScoreAnalysisTask({
       planId: input.planId, locale: input.locale, source: "generator_version_recovery"
     });
-    if (input.formulationMissing && assessment.selected_plan) await enqueueNutritionPlanTasks({
+    if (input.formulationMissing && (assessment.selected_plan || isWebProductJourney(assessment.journey_version))) await enqueueNutritionPlanTasks({
       planId: input.planId, locale: input.locale, answers: generation.answers,
-      plan: assessment.selected_plan === "pro" ? "pro" : "precision", recovery: generation
+      plan: assessment.selected_plan === "pro" ? "pro" : "precision", recovery: generation, accessOnly: isWebProductJourney(assessment.journey_version)
     });
   });
 }

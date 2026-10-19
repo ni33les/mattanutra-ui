@@ -12,6 +12,8 @@ import {
   nutritionRevealPath
 } from "@/lib/nutrition-paths";
 import { localizedRouteMetadata } from "@/lib/seo";
+import { getStoredAssessmentPrefill } from "@/lib/assessment-store";
+import { isPublicWebAssessment, isWebProductJourney, webProductJourneyEnabled } from "@/lib/web-product-journey";
 
 type NutritionProgressPageProps = Readonly<{
   params: Promise<{
@@ -67,6 +69,11 @@ export default async function NutritionProgressPage({
 
   if (!snapshot) {
     redirect(nutritionQuizPath(locale));
+  }
+
+  const assessment = await getStoredAssessmentPrefill(planId);
+  if (isWebProductJourney(snapshot.journeyVersion) || (webProductJourneyEnabled() && assessment && isPublicWebAssessment(assessment.answers))) {
+    redirect(nutritionRevealPath(locale, planId));
   }
 
   if (snapshot.readyForReveal) {

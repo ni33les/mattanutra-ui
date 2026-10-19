@@ -36,6 +36,7 @@ const poolInitLogged = {
 
 type PoolKind = "interactive" | "worker";
 const transactionScope = new AsyncLocalStorage<postgres.Sql>();
+const readSnapshotScope = new AsyncLocalStorage<boolean>();
 const commitEffects = new AsyncLocalStorage<Array<() => void>>();
 
 export function databaseTransactionActive() {
@@ -58,10 +59,16 @@ export function deferUntilDatabaseCommit(effect: () => void) {
 export async function withDatabaseTransaction<T>(
   sql: postgres.Sql,
   work: (tx: postgres.Sql) => Promise<T>,
-  timeoutMs = databasePhaseTimeoutMs()
+  timeoutMs = databasePhaseTimeoutMs(),
+  readSnapshot = false
 ): Promise<T> {
   const existing = transactionScope.getStore();
-  if (existing) return work(existing);
+  if (existing) {
+    if (readSnapshot && !readSnapshotScope.getStore()) {
+      throw new Error("A read snapshot must start outside an existing database write phase");
+    }
+    return work(existing);
+  }
   const parent = requestLifetime();
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(new Error("Database phase deadline exceeded")), timeoutMs);
@@ -78,15 +85,19 @@ export async function withDatabaseTransaction<T>(
           signal.addEventListener("abort", stopWaiting, { once: true });
           // A queued BEGIN cannot be cancelled by postgres.js. A late acquisition
           // checks cancellation before touching rows, then rolls back.
-          void withRequestLifetime({ ...parent, signal }, () => sql.begin(async tx => {
+          const run = async (tx: postgres.TransactionSql) => {
             acquired = true;
             signal.throwIfAborted();
-            const value = await transactionScope.run(tx as unknown as postgres.Sql, () =>
-              commitEffects.run(effects, () => work(tx as unknown as postgres.Sql))
+            const value = await readSnapshotScope.run(readSnapshot, () =>
+              transactionScope.run(tx as unknown as postgres.Sql, () =>
+                commitEffects.run(effects, () => work(tx as unknown as postgres.Sql)))
             );
             signal.throwIfAborted();
             return value;
-          })).then(value => resolve(value as T), reject);
+          };
+          void withRequestLifetime({ ...parent, signal }, () => readSnapshot
+            ? sql.begin("isolation level repeatable read read only", run)
+            : sql.begin(run)).then(value => resolve(value as T), reject);
         });
         for (const effect of effects) {
           try { effect(); } catch (error) {
@@ -109,6 +120,12 @@ export async function withDatabaseTransaction<T>(
   } finally {
     clearTimeout(timer);
   }
+}
+
+/** Database-only reads share one MVCC snapshot, including nested pool lookups.
+ * No row locks, writes, or external I/O belong in this bounded phase. */
+export function withDatabaseReadSnapshot<T>(sql: postgres.Sql, work: (tx: postgres.Sql) => Promise<T>, timeoutMs = databasePhaseTimeoutMs()) {
+  return withDatabaseTransaction(sql, work, timeoutMs, true);
 }
 
 function assertManagedDatabaseEndpoint(connection: string) {
@@ -438,16 +455,16 @@ function instrumentSql(
   Object.assign(tagged, sql);
 
   if (typeof sql.begin === "function") {
-    const originalBegin = sql.begin.bind(sql) as (
-      fn: (txn: postgres.TransactionSql) => Promise<unknown>
-    ) => Promise<unknown>;
+    const originalBegin = sql.begin.bind(sql);
 
     (tagged as postgres.Sql).begin = ((
-      fn: (txn: postgres.TransactionSql) => unknown
+      optionsOrWork: string | ((txn: postgres.TransactionSql) => unknown),
+      work?: (txn: postgres.TransactionSql) => unknown
     ) => {
+      const fn = typeof optionsOrWork === "string" ? work! : optionsOrWork;
       const acquired = measureService("db.acquire_begin_ms");
       let protectedDuration: (() => void) | undefined;
-      return originalBegin(async (txn) => {
+      const run = async (txn: postgres.TransactionSql) => {
         acquired();
         protectedDuration = measureService("db.transaction_client_ms");
         requestLifetime()?.signal.throwIfAborted();
@@ -465,7 +482,11 @@ function instrumentSql(
         `;
         configured();
         return fn(instrumented);
-      }).finally(() => protectedDuration?.());
+      };
+      // Isolation must be part of BEGIN, before the timeout setup SELECT fixes
+      // the first snapshot; SET TRANSACTION after setup would be too late.
+      return (typeof optionsOrWork === "string" ? originalBegin(optionsOrWork, run) : originalBegin(run))
+        .finally(() => protectedDuration?.());
     }) as postgres.Sql["begin"];
   }
 

@@ -1,3 +1,4 @@
+import { commerceBpmContext } from "@/lib/journey-attribution";
 import type postgres from "postgres";
 import { writeBpmEvent } from "@/lib/bpm";
 import { formatCurrencyAmount } from "@/lib/currencies";
@@ -429,7 +430,10 @@ export async function recordRetailOrderWorkflowBpm(
     planId?: string | null;
   }>
 ) {
+  const [order] = await sql`select metadata from public.retail_customer_orders where id=${input.orderId}::uuid`;
+  const acquisition = commerceBpmContext(order?.metadata);
   await writeFulfillmentBpmEvent({
+    ...acquisition,
     eventName: input.eventName,
     eventStatus: input.eventStatus,
     fulfillmentOrderId: input.orderId,
@@ -437,6 +441,7 @@ export async function recordRetailOrderWorkflowBpm(
     paymentId: input.paymentId ?? null,
     planId: input.planId ?? null,
     properties: {
+      ...acquisition.properties,
       actorPersonId: input.actorPersonId ?? null,
       assumedPersonId: input.assumedPersonId ?? null,
       organisationId: input.organisationId ?? null,

@@ -2753,7 +2753,7 @@
   },
   "customer.landing.bridge.body": {
     "audience": "customer",
-    "defaultMessage": "Start with a short, detailed questionnaire and your free Health Score. Your personalised plan — and the option to add Living Protocol — is one step away.",
+    "defaultMessage": "Answer the questionnaire, see your full personalised formula for free, then choose which products to buy.",
     "description": "Landing page copy for customer.landing.bridge.body.",
     "namespace": "customer.landing",
     "surface": "landing",
@@ -2771,7 +2771,7 @@
   },
   "customer.landing.bridge.note": {
     "audience": "customer",
-    "defaultMessage": "Free to start — no credit card required.",
+    "defaultMessage": "Free assessment and full plan. No credit card required.",
     "description": "Landing page copy for customer.landing.bridge.note.",
     "namespace": "customer.landing",
     "surface": "landing",
@@ -3104,7 +3104,7 @@
   },
   "customer.landing.faq.items.3.1": {
     "audience": "customer",
-    "defaultMessage": "Yes. The questionnaire and your Health Score are free, and no credit card is required. After you complete it, you'll see where you stand and a starting direction. The full personalised Right Amount Formula — and optional Living Protocol support — are available if you choose to go further.",
+    "defaultMessage": "Yes. Your questionnaire, full personalised formula, doses, cautions and product matches are free. You pay only if you choose products, with the total and delivery shown before payment.",
     "description": "Landing page copy for customer.landing.faq.items.3.1.",
     "namespace": "customer.landing",
     "surface": "landing",
@@ -3149,7 +3149,7 @@
   },
   "customer.landing.final.body": {
     "audience": "customer",
-    "defaultMessage": "Answer a focused set of questions, get your free Health Score, and receive your personalised starting plan — built around your body, your goals, and your day.",
+    "defaultMessage": "Answer a few focused questions, see your complete personalised supplement plan for free, and choose products that fit your needs.",
     "description": "Landing page copy for customer.landing.final.body.",
     "namespace": "customer.landing",
     "surface": "landing",
@@ -3302,7 +3302,7 @@
   },
   "customer.landing.food.cards.2.1": {
     "audience": "customer",
-    "defaultMessage": "If your meals are doing the job, Living Protocol will tell you to skip the supplement — and save your money.",
+    "defaultMessage": "Review what your meals already provide before deciding which supplements to buy.",
     "description": "Landing page copy for customer.landing.food.cards.2.1.",
     "namespace": "customer.landing",
     "surface": "landing",
@@ -3338,7 +3338,7 @@
   },
   "customer.landing.food.intro": {
     "audience": "customer",
-    "defaultMessage": "Supplements fill the gaps — but food fills them first. When Living Protocol spots something your body needs, it doesn't just reach for a capsule. It tells you which everyday foods are naturally rich in it, so you can choose: top up at dinner, or top up from the bottle. Either way, you're finally knowing, not guessing.",
+    "defaultMessage": "Food comes first. Your plan considers your diet alongside supplement recommendations and highlights everyday food support where useful.",
     "description": "Landing page copy for customer.landing.food.intro.",
     "namespace": "customer.landing",
     "surface": "landing",
@@ -3473,7 +3473,7 @@
   },
   "customer.landing.hero.microcopy": {
     "audience": "customer",
-    "defaultMessage": "Start with a free Health Score that shows where you stand. Your personalised Right Amount Formula is ready when you are.",
+    "defaultMessage": "Your assessment and full supplement plan are free. Pay only for products you choose, plus delivery.",
     "description": "Landing page copy for customer.landing.hero.microcopy.",
     "namespace": "customer.landing",
     "surface": "landing",
@@ -3572,7 +3572,7 @@
   },
   "customer.landing.how.steps.0.2": {
     "audience": "customer",
-    "defaultMessage": "A genuinely detailed set of questions — your goals & health priorities, lifestyle & activity, current medications, budget, and what you truly care about. Thorough enough to personalise your formula, with no jargon and no fluff.",
+    "defaultMessage": "Share your goals, diet, lifestyle, current supplements and relevant health details so your plan reflects your answers.",
     "description": "Landing page copy for customer.landing.how.steps.0.2.",
     "namespace": "customer.landing",
     "surface": "landing",
@@ -3626,7 +3626,7 @@
   },
   "customer.landing.how.steps.2.2": {
     "audience": "customer",
-    "defaultMessage": "Your formula is dispensed through a partner pharmacy with registered pharmacists — real people you can ask, not a guess in the aisle.",
+    "defaultMessage": "See your full formula and matched pharmacy products with prices. Remove anything you do not want to buy.",
     "description": "Landing page copy for customer.landing.how.steps.2.2.",
     "namespace": "customer.landing",
     "surface": "landing",
@@ -3635,7 +3635,7 @@
   },
   "customer.landing.how.steps.3.0": {
     "audience": "customer",
-    "defaultMessage": "Refine",
+    "defaultMessage": "Choose",
     "description": "Landing page copy for customer.landing.how.steps.3.0.",
     "namespace": "customer.landing",
     "surface": "landing",
@@ -3644,7 +3644,7 @@
   },
   "customer.landing.how.steps.3.1": {
     "audience": "customer",
-    "defaultMessage": "Part of Living Protocol",
+    "defaultMessage": "Pay only for your products",
     "description": "Landing page copy for customer.landing.how.steps.3.1.",
     "namespace": "customer.landing",
     "surface": "landing",
@@ -3653,7 +3653,7 @@
   },
   "customer.landing.how.steps.3.2": {
     "audience": "customer",
-    "defaultMessage": "With Living Protocol, your plan keeps adjusting as your goals, symptoms and lifestyle change over time.",
+    "defaultMessage": "Review products and delivery, pay securely online, and follow your pharmacy order using your private tracking link.",
     "description": "Landing page copy for customer.landing.how.steps.3.2.",
     "namespace": "customer.landing",
     "surface": "landing",
@@ -5209,7 +5209,7 @@
   },
   "customer.landing.questionnaire.reassurance": {
     "audience": "customer",
-    "defaultMessage": "✓ Free to start ✓ No credit card ✓ About 3 minutes",
+    "defaultMessage": "✓ Full plan free ✓ No credit card ✓ A few minutes",
     "description": "Landing page copy for customer.landing.questionnaire.reassurance.",
     "namespace": "customer.landing",
     "surface": "landing",
@@ -6190,7 +6190,7 @@
   },
   "customer.nutritionPublicShell.healthScore.accent": {
     "audience": "customer",
-    "defaultMessage": "before you choose a plan.",
+    "defaultMessage": "as part of your free plan.",
     "description": "Emphasized second line in the public Health Score explainer headline.",
     "namespace": "customer.nutritionPublicShell",
     "surface": "public_nutrition_shell",
@@ -6199,7 +6199,7 @@
   },
   "customer.nutritionPublicShell.healthScore.body": {
     "audience": "customer",
-    "defaultMessage": "Your Health Score is the free baseline: a clear view of where your current routine, goals, sleep, food, and supplement stack may need support.",
+    "defaultMessage": "Your optional HealthScore helps you explore your goals, sleep, diet and current routine. Your full supplement formula is also free.",
     "description": "Body copy for the public Health Score explainer shell.",
     "namespace": "customer.nutritionPublicShell",
     "surface": "public_nutrition_shell",
@@ -6307,7 +6307,7 @@
   },
   "customer.nutritionPublicShell.reveal.bullet3": {
     "audience": "customer",
-    "defaultMessage": "Designed for pharmacist-ready product matching",
+    "defaultMessage": "Choose products and pay securely online",
     "description": "Third benefit bullet for the public formula reveal explainer shell.",
     "namespace": "customer.nutritionPublicShell",
     "surface": "public_nutrition_shell",
@@ -6334,7 +6334,7 @@
   },
   "customer.nutritionPublicShell.reveal.secondary": {
     "audience": "customer",
-    "defaultMessage": "Free Health Score first",
+    "defaultMessage": "Free assessment and full formula",
     "description": "Secondary CTA helper text for the public formula reveal explainer shell.",
     "namespace": "customer.nutritionPublicShell",
     "surface": "public_nutrition_shell",
@@ -8690,7 +8690,7 @@
   },
   "customer.titleBar.links.0.0": {
     "audience": "customer",
-    "defaultMessage": "#living-protocol",
+    "defaultMessage": "#assessment",
     "description": "customer.titleBar copy for customer.titleBar.links.0.0.",
     "namespace": "customer.titleBar",
     "surface": "navigation",
@@ -8699,7 +8699,7 @@
   },
   "customer.titleBar.links.0.1": {
     "audience": "customer",
-    "defaultMessage": "Living Protocol",
+    "defaultMessage": "Free plan",
     "description": "customer.titleBar copy for customer.titleBar.links.0.1.",
     "namespace": "customer.titleBar",
     "surface": "navigation",

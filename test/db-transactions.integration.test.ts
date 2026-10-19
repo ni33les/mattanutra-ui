@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { after, before, describe, it } from "node:test";
 import postgres from "postgres";
-import { closeSqlPool, getSql, getWorkerSql, withDatabaseTransaction } from "../lib/db.ts";
+import { closeSqlPool, getSql, getWorkerSql, withDatabaseReadSnapshot, withDatabaseTransaction } from "../lib/db.ts";
 import { withRequestLifetime } from "../lib/request-lifetime.ts";
 
 const databaseUrl = process.env.TEST_DB_URL;
@@ -43,6 +43,29 @@ describe("bounded database phases on PostgreSQL", {skip: !databaseUrl}, () => {
     }), /injected_failure/);
     assert.deepEqual([...await sql`select * from public.lock_review_values order by id`], [{id: 1, value: 0}]);
     assert.equal(getSql(), sql);
+  });
+
+  it("keeps nested readers on a read-only repeatable snapshot while an independent writer commits", async () => {
+    const writer = postgres(databaseUrl!, { max: 1 });
+    try {
+      await withDatabaseReadSnapshot(getSql()!, async tx => {
+        assert.equal(getSql(), tx); assert.equal(getWorkerSql(), tx);
+        const [mode] = await tx`select current_setting('transaction_isolation') as isolation, current_setting('transaction_read_only') as readonly`;
+        assert.deepEqual(mode, { isolation: "repeatable read", readonly: "on" });
+        const before = (await tx`select value from public.lock_review_values where id=1`)[0].value;
+        await writer`update public.lock_review_values set value=value+1 where id=1`;
+        await withDatabaseReadSnapshot(getWorkerSql()!, async nested => {
+          assert.equal(nested, tx);
+          assert.equal((await getSql()!`select value from public.lock_review_values where id=1`)[0].value, before);
+        });
+      });
+      await assert.rejects(withDatabaseReadSnapshot(getSql()!, async tx => {
+        await tx`update public.lock_review_values set value=99 where id=1`;
+      }), { code: "25006" });
+      await withDatabaseTransaction(getSql()!, async () => {
+        await assert.rejects(withDatabaseReadSnapshot(getSql()!, async () => null), /outside an existing database write phase/);
+      });
+    } finally { await writer.end(); }
   });
 
   it("keeps a usable phase deadline when the statement timeout is explicitly disabled", async () => {

@@ -218,12 +218,12 @@ export function AssessmentFlow({
         setAnswers(buildInitialAnswers(effectiveQuestionnaireAnswers(saved.answers))); setContactEmail(saved.contactEmail || "");
         setSectionIndex(saved.sectionIndex || 0); setResumePlanId(saved.planId || returningPlanId || "");
         if (saved.receipt) { capturedAnswers.current = JSON.stringify(buildInitialAnswers(effectiveQuestionnaireAnswers(saved.answers))); setCapturedStatus(saved.receipt); }
-        if (saved.processing && saved.receipt?.planId) router.replace(pharmacyId ? pharmacyPath(locale, pharmacyId, "reveal", { plan: saved.receipt.planId }) : nutritionHealthScorePath(locale, saved.receipt.planId));
+        if (saved.processing && saved.receipt?.planId) router.replace(pharmacyId ? pharmacyPath(locale, pharmacyId, "reveal", { plan: saved.receipt.planId }) : skipHealthScoreStep ? nutritionRevealPath(locale, saved.receipt.planId) : nutritionHealthScorePath(locale, saved.receipt.planId));
       }
     } catch { /* Ignore drafts from another format. */ }
     setDraftReady(true);
     return () => flowController.current?.abort();
-  }, [assessmentRevision, classicDraftKey, locale, pharmacyId, returningPlanId, router, serverUpdatedAt]);
+  }, [assessmentRevision, classicDraftKey, locale, pharmacyId, returningPlanId, router, serverUpdatedAt, skipHealthScoreStep]);
   useEffect(() => {
     if (!draftReady) return;
     const matchingReceipt = capturedAnswers.current === JSON.stringify(answers) ? capturedStatus : null;

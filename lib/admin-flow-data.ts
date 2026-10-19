@@ -10,8 +10,15 @@ import type { AdminDashboardRange } from "@/lib/admin-dashboard-data";
 import { writeBpmEvent } from "@/lib/bpm";
 import { getQuestionnaireFunnelReport } from "@/lib/admin-questionnaire-data";
 import type { QuestionnaireFunnelReport } from "@/lib/questionnaire-dropoffs";
+import { getWebProductReport, type WebProductReport } from "@/lib/admin-web-product-report";
 
 export type AdminFlowNodeId =
+  | "revealOpened"
+  | "assessmentCaptured"
+  | "formulaViewed"
+  | "productsViewed"
+  | "basketConfirmed"
+  | "productCheckoutReady"
   | "assessmentStarted"
   | "assessmentSubmitted"
   | "assessmentViewed"
@@ -65,6 +72,8 @@ export type AdminFlowEdge = Readonly<{
 }>;
 
 export type AdminFlowData = Readonly<{
+  productReport?: WebProductReport;
+  productFunnel?: Array<{ id: AdminFlowNodeId; count: number; denominator: number | null; numerator: number | null }>;
   questionnaire?: QuestionnaireFunnelReport;
   journeyChannel?: "web";
   mcp?: McpFunnelReport;
@@ -132,6 +141,7 @@ export type FlowRow = Readonly<{
 }>;
 
 const coreNodeIds: AdminFlowNodeId[] = [
+  "assessmentCaptured", "revealOpened", "formulaViewed", "productsViewed", "basketConfirmed", "productCheckoutReady",
   "landingViewed",
   "assessmentViewed",
   "assessmentStarted",
@@ -183,6 +193,13 @@ const continueEdgeDefinitions: Array<
   { from: "landingViewed", to: "assessmentViewed" },
   { from: "assessmentViewed", to: "assessmentStarted" },
   { from: "assessmentStarted", to: "assessmentSubmitted" },
+  { from: "assessmentStarted", to: "assessmentCaptured" },
+  { from: "assessmentCaptured", to: "revealOpened" },
+  { from: "revealOpened", to: "formulaViewed" },
+  { from: "formulaViewed", to: "productsViewed" },
+  { from: "productsViewed", to: "basketConfirmed" },
+  { from: "basketConfirmed", to: "productCheckoutReady" },
+  { from: "productCheckoutReady", to: "productPaymentSucceeded" },
   { from: "assessmentSubmitted", to: "healthscoreViewed" },
   { from: "healthscoreViewed", to: "planSelected" },
   { from: "planSelected", to: "precisionPaid" },
@@ -491,7 +508,7 @@ function nodesForRow(row: FlowRow): AdminFlowNodeId[] {
     row.event_name === "assessment_captured" ||
     row.event_name === "assessment_recaptured"
   ) {
-    return ["assessmentSubmitted"];
+    return row.event_name === "assessment_submitted" ? ["assessmentSubmitted"] : ["assessmentSubmitted", "assessmentCaptured"];
   }
 
   if (row.event_name === "healthscore_viewed") {
@@ -503,6 +520,10 @@ function nodesForRow(row: FlowRow): AdminFlowNodeId[] {
   }
 
   if (row.event_name === "web_page_viewed") return ["landingViewed"];
+  if (row.event_name === "reveal_page_viewed") return ["landingViewed", "revealOpened"];
+  if (row.event_name === "formula_details_viewed") return ["formulaViewed"];
+  if (row.event_name === "product_matches_viewed") return ["productsViewed"];
+  if (row.event_name === "product_basket_confirmed") return ["basketConfirmed"];
 
   if (row.event_name === "plan_selected") {
     return ["planSelected"];
@@ -545,7 +566,7 @@ function nodesForRow(row: FlowRow): AdminFlowNodeId[] {
     row.event_name === "retail_product_checkout_session_created" ||
     row.event_name === "retail_product_checkout_opened"
   ) {
-    return ["productCheckoutStarted"];
+    return row.event_name === "retail_product_checkout_requested" ? ["productCheckoutStarted"] : ["productCheckoutStarted", "productCheckoutReady"];
   }
 
   if (row.event_name === "retail_product_payment_succeeded") {
@@ -971,9 +992,20 @@ export function buildAdminFlowData(range: AdminDashboardRange, rows: readonly Fl
         return entered && advanced && advanced >= entered;
       }).length
     }]));
+    const productStages: AdminFlowNodeId[] = ["landingViewed", "assessmentStarted", "assessmentCaptured", "revealOpened", "formulaViewed",
+      "productsViewed", "basketConfirmed", "productCheckoutReady", "productPaymentSucceeded", "retailOrderShipped", "retailOrderDelivered"];
+    const productFunnel = productStages.map((id, index) => {
+      const previous = productStages[index - 1];
+      return { id, count: countByNode.get(id) ?? 0, denominator: previous ? countByNode.get(previous) ?? 0 : null,
+        numerator: previous ? [...subjects.values()].filter(steps => {
+          const before = steps.get(previous), after = steps.get(id);
+          return before && after && after >= before;
+        }).length : null };
+    });
     return {
       databaseAvailable: true,
       journeyChannel: "web",
+      productFunnel,
       transitions,
       edges,
       generatedAt: new Date().toISOString(),
@@ -1004,7 +1036,7 @@ export async function getAdminFlowData(range: AdminDashboardRange, filters: Admi
   try {
     const start = queryStartForRange(range);
     const names = [...webJourneyEventNames, ...planPaymentEventNames];
-    const [targets, rows, pharmacySources, mcp, questionnaire] = await Promise.all([
+    const [targets, rows, pharmacySources, mcp, questionnaire, productReport] = await Promise.all([
       getAdminConversionTargets(),
       sql<FlowRow[]>`
         select id::text,ray::text,plan_id::text,funnel_event_name as event_name,event_type,event_status,selected_plan::text,occurred_at
@@ -1015,9 +1047,10 @@ export async function getAdminFlowData(range: AdminDashboardRange, filters: Admi
         order by occurred_at,id limit 100000`,
       getPharmacySourceFunnel(start, filters),
       getAdminMcpFunnel(start),
-      getQuestionnaireFunnelReport(range, filters)
+      getQuestionnaireFunnelReport(range, filters),
+      getWebProductReport(start, filters)
     ]);
-    return { ...buildAdminFlowData(range, rows, targets), pharmacySources, mcp, questionnaire };
+    return { ...buildAdminFlowData(range, rows, targets), pharmacySources, mcp, questionnaire, productReport };
   } catch (error) {
     console.error("Unable to load admin flow data", error);
     return emptyFlow(range);

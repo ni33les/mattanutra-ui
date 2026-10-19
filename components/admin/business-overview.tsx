@@ -3,8 +3,10 @@
 import { useState } from "react";
 import { FunnelStageTable, type FunnelTableRow } from "./funnel-stage-table";
 import { funnelReportCopy } from "@/lib/funnel-report-copy";
+import { webProductFunnelCopy } from "@/lib/web-product-funnel-copy";
 import { PharmacySourceFunnelTable } from "./pharmacy-source-funnel";
 import { QuestionnaireFunnel } from "./questionnaire-funnel";
+import { WebProductReportPanel } from "./web-product-report";
 import { McpFunnelTable } from "./mcp-funnel-table";
 import type { AdminDashboardData } from "@/lib/admin-dashboard-data";
 import type { AdminDashboardFilters } from "@/lib/admin-dashboard-filters";
@@ -175,7 +177,7 @@ export function BusinessFunnelTable({
     <section className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-gray-200">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h2 className="text-base font-semibold text-gray-900">
-          {funnelReportCopy[locale].web}
+          {webProductFunnelCopy[locale].title}
         </h2>
         {showTargets ? (
           <div className="flex items-center gap-2">
@@ -224,6 +226,15 @@ export function BusinessFunnelTable({
         </p>
       ) : null}
       <p className="mt-2 text-sm text-gray-600">{funnelReportCopy[locale].webNote}</p>
+      <p className="mt-2 text-sm text-gray-600">{webProductFunnelCopy[locale].note}</p>
+      <FunnelStageTable locale={locale} caption={webProductFunnelCopy[locale].title}
+        rows={(flowData.productFunnel ?? []).map((stage, index) => ({
+          id: stage.id, label: webProductFunnelCopy[locale].stages[stage.id], count: stage.count,
+          color: index === 0 ? "entry" : index < 3 ? "complete" : index < 6 ? "result" : index < 8 ? "conversion" : "delivered",
+          entry: index === 0, denominator: stage.denominator, numerator: stage.numerator ?? undefined
+        }))} />
+      <WebProductReportPanel report={flowData.productReport} locale={locale} />
+      <details className="mt-5"><summary className="cursor-pointer text-sm font-semibold">{webProductFunnelCopy[locale].history}</summary>
       <FunnelStageTable locale={locale} caption={funnelReportCopy[locale].web} targets={showTargets}
         rows={businessFunnelStages(flowData, labels, locale, activeTargets).map((stage, index): FunnelTableRow => ({
           id: stage.id,
@@ -249,6 +260,7 @@ export function BusinessFunnelTable({
       <p className="mt-3 text-xs text-gray-600">{funnelReportCopy[locale].evidence
         .replace("{displayed}", formatNumber(flowNodeCount(flowData, "healthscoreDisplayed"), locale))
         .replace("{arrivals}", formatNumber(flowNodeCount(flowData, "healthscoreViewed") - flowNodeCount(flowData, "healthscoreDisplayed"), locale))}</p>
+      </details>
       <QuestionnaireFunnel report={flowData.questionnaire} journey="web" locale={locale} labels={labels} canReadLeads={canReadLeads} />
     </section>
   );

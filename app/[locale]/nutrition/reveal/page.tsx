@@ -7,6 +7,7 @@ import { SiteFooter } from "@/components/site-footer";
 import { TitleBar } from "@/components/title-bar";
 import {
   getStoredAssessmentPrefill,
+  getStoredFormulationRead,
   isUuid
 } from "@/lib/assessment-store";
 import { checkDatabaseConnection } from "@/lib/db";
@@ -18,6 +19,7 @@ import {
 } from "@/lib/nutrition-paths";
 import { localizedRouteMetadata } from "@/lib/seo";
 import { getFunnelReadiness } from "@/lib/funnel-readiness";
+import { isPublicWebAssessment, isWebProductJourney, webProductJourneyEnabled } from "@/lib/web-product-journey";
 
 type NutritionRevealPageProps = Readonly<{
   params: Promise<{
@@ -107,11 +109,14 @@ export default async function NutritionRevealPage({
   }
 
   const readiness = await getFunnelReadiness(planId, locale);
-  if (!assessment.plan && !readiness?.hasPaidPlan) {
+  const commerce = isWebProductJourney(readiness?.journeyVersion) || (webProductJourneyEnabled() && isPublicWebAssessment(assessment.answers));
+  if (!commerce && !assessment.plan && !readiness?.hasFullPlanAccess) {
     redirect(nutritionHealthScorePath(locale, planId));
   }
 
-  if (!readiness?.readyForReveal) redirect(nutritionProgressPath(locale, planId));
+  if (!commerce && !readiness?.readyForReveal) redirect(nutritionProgressPath(locale, planId));
+  const stored = commerce && readiness?.formulationStatus === "ready"
+    ? await getStoredFormulationRead(planId, { locale, includeProducts: readiness.readyForReveal && !readiness.refreshPending }) : null;
 
   return (
     <main className="mn-customer-shell flex min-h-screen flex-col bg-background text-foreground">
@@ -121,6 +126,9 @@ export default async function NutritionRevealPage({
         title={dictionary.hero.eyebrow}
       />
       <FormulationResults
+        initialResult={stored?.result?.access === "full" ? stored.result : null}
+        commerce={commerce ? { answers: assessment.answers as Record<string, unknown>, initial: readiness,
+          bootstrap: !isWebProductJourney(readiness?.journeyVersion) } : undefined}
         initialStackPreference={initialStackPreference}
         locale={locale}
         planId={planId}

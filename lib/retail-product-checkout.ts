@@ -1,3 +1,4 @@
+import { assessmentCheckoutAttribution, commerceBpmContext } from "@/lib/journey-attribution";
 import { bindMetaContext, recordMetaCheckout, recordMetaPurchase } from "@/lib/meta-tracking";
 import { readStoredMatching, frozenCheckoutIdentityJson } from "@/lib/recommendation-storage";
 import { MATCHER_VERSION } from "@/lib/matcher/config";
@@ -383,6 +384,7 @@ export async function validateCurrentWebCheckoutRecommendations(sql: RetailCheck
   prepared: Awaited<ReturnType<typeof currentWebCheckoutSelection>>) {
   const proof = prepared.proof;
   if (proof.planId !== input.planId || proof.locale !== input.locale ||
+    new Set(input.selectedItemIds).size !== input.selectedItemIds.length ||
     input.selectedItemIds.length !== prepared.recommendations.length ||
     input.selectedItemIds.some(id => !prepared.recommendations.some(row => row.product_id === id))) {
     throw new FunnelError("Prepared checkout does not match the selected products.", 409, "invalid_product_selection");
@@ -823,6 +825,9 @@ export async function createRetailCheckoutSession(input: RetailCheckoutQuoteInpu
 
   let selectedProductIds = [...new Set(input.selectedItemIds.filter(isUuid))];
   if (checkoutMode === "web") {
+    if (!selectedProductIds.length || selectedProductIds.length !== input.selectedItemIds.length) {
+      throw new FunnelError("Select unique products from the current option.", 409, "invalid_product_selection");
+    }
     const saved = await findReusableWebCheckoutPayment(sql, { ...input, address, billingAddress, billingSameAsShipping, selectedProductIds });
     if (saved) return continueRetailCheckoutPayment(sql, saved, input);
   }
@@ -1006,6 +1011,7 @@ export async function createRetailCheckoutSession(input: RetailCheckoutQuoteInpu
         // retries retain their existing payment and frozen commercial facts.
         await validateCurrentWebCheckoutRecommendations(tx, { ...input, recommendationRunId: runId, selectedItemIds: selectedProductIds }, preparedSelection!);
       }
+      const acquisition = await assessmentCheckoutAttribution(tx, input.planId);
       const rows = await tx<CheckoutPaymentRow[]>`
         insert into public.retail_checkout_payments (
           id,
@@ -1051,6 +1057,7 @@ export async function createRetailCheckoutSession(input: RetailCheckoutQuoteInpu
           ${tx.json(toJsonValue(quoteLines))}::jsonb,
           ${tx.json(toJsonValue(availability))}::jsonb,
           ${tx.json(toJsonValue({
+            ...acquisition,
             agenticOrderId: checkoutMode === "agentic" ? input.agenticOrderId : null,
             billingAddress,
             billingSameAsShipping,
@@ -1113,6 +1120,7 @@ async function continueRetailCheckoutPayment(sql: RetailCheckoutDb, payment: Che
   })).catch(() => { console.warn("Meta checkout capture deferred to browser retry"); });
 
   void writeBpmEvent({
+    ...commerceBpmContext(payment.metadata, payment.stripe_mode),
     actorType: "visitor",
     emittedBy: "retail_product_checkout",
     eventName: "retail_product_checkout_requested",
@@ -1121,6 +1129,7 @@ async function continueRetailCheckoutPayment(sql: RetailCheckoutDb, payment: Che
     locale: input.locale,
     planId: input.planId,
     properties: {
+      ...commerceBpmContext(payment.metadata, payment.stripe_mode).properties,
       channel: checkoutChannel,
       checkoutPaymentId: payment.id,
       lineCount: quoteLines.length,
@@ -1155,6 +1164,7 @@ async function continueRetailCheckoutPayment(sql: RetailCheckoutDb, payment: Che
     await recordVersion(sql, payment.id, "mock_checkout_session_created", "system", "mock_product_checkout");
 
     void writeBpmEvent({
+    ...commerceBpmContext(payment.metadata, payment.stripe_mode),
       actorType: "system",
       emittedBy: "retail_product_checkout",
       eventName: "retail_product_checkout_session_created",
@@ -1163,6 +1173,7 @@ async function continueRetailCheckoutPayment(sql: RetailCheckoutDb, payment: Che
       locale: input.locale,
       planId: input.planId,
       properties: {
+      ...commerceBpmContext(payment.metadata, payment.stripe_mode).properties,
         checkoutPaymentId: payment.id,
         stripeMode: config.mode
       },
@@ -1248,6 +1259,7 @@ async function continueRetailCheckoutPayment(sql: RetailCheckoutDb, payment: Che
   await recordVersion(sql, payment.id, "checkout_session_created", "system", "stripe_product_checkout");
 
   void writeBpmEvent({
+    ...commerceBpmContext(payment.metadata, payment.stripe_mode),
     actorType: "system",
     emittedBy: "retail_product_checkout",
     eventName: "retail_product_checkout_session_created",
@@ -1256,6 +1268,7 @@ async function continueRetailCheckoutPayment(sql: RetailCheckoutDb, payment: Che
     locale: input.locale,
     planId: input.planId,
     properties: {
+      ...commerceBpmContext(payment.metadata, payment.stripe_mode).properties,
       checkoutPaymentId: payment.id,
       stripeMode: config.mode,
       stripeSessionId: session.id
@@ -1364,6 +1377,10 @@ async function createRetailCustomerOrderFromPayment(
       now(),
       ${cleanText(objectValue(payment.shipping_address).notes) || null},
       ${sql.json(toJsonValue({
+        acquisitionAttribution: paymentMetadata.acquisitionAttribution ?? null,
+        journeyVersion: paymentMetadata.journeyVersion ?? null,
+        stripeMode: payment.stripe_mode,
+        internal_test: commerceBpmContext(payment.metadata, payment.stripe_mode).properties.internal_test,
         agenticOrderId: paymentMetadata.agenticOrderId ?? null,
         billingAddress: paymentMetadata.billingAddress ?? null,
         billingSameAsShipping: paymentMetadata.billingSameAsShipping !== false,
@@ -1624,6 +1641,7 @@ async function fulfillRetailCheckoutPayment(
   });
 
   void writeBpmEvent({
+    ...commerceBpmContext(updated.metadata, updated.stripe_mode),
     actorType: "system",
     emittedBy: "retail_product_checkout",
     eventName: "retail_customer_order_created",
@@ -1632,6 +1650,7 @@ async function fulfillRetailCheckoutPayment(
     locale: updated.locale,
     planId: updated.plan_id,
     properties: {
+      ...commerceBpmContext(updated.metadata, updated.stripe_mode).properties,
       channel: objectValue(updated.metadata).channel ?? "web",
       checkoutPaymentId: updated.id,
       orderId,
@@ -1783,6 +1802,7 @@ export async function completeMockRetailCheckout(input: Readonly<{
       `mock_product_payment:${scenario}`
     );
     void writeBpmEvent({
+    ...commerceBpmContext(payment.metadata, payment.stripe_mode),
       actorType: "system",
       emittedBy: "retail_product_checkout",
       eventName: "retail_product_payment_failed",
@@ -1791,6 +1811,7 @@ export async function completeMockRetailCheckout(input: Readonly<{
       locale: payment.locale,
       planId: payment.plan_id,
       properties: {
+      ...commerceBpmContext(payment.metadata, payment.stripe_mode).properties,
         channel: objectValue(payment.metadata).channel ?? "web",
         checkoutPaymentId: payment.id,
         scenario,
@@ -1835,6 +1856,7 @@ export async function completeMockRetailCheckout(input: Readonly<{
   await recordVersion(sql, payment.id, "mock_payment_paid", "system", "mock_product_payment");
 
   void writeBpmEvent({
+    ...commerceBpmContext(payment.metadata, payment.stripe_mode),
     actorType: "system",
     emittedBy: "retail_product_checkout",
     eventName: "retail_product_payment_succeeded",
@@ -1843,6 +1865,7 @@ export async function completeMockRetailCheckout(input: Readonly<{
     locale: payment.locale,
     planId: payment.plan_id,
     properties: {
+      ...commerceBpmContext(payment.metadata, payment.stripe_mode).properties,
       channel: objectValue(payment.metadata).channel ?? "web",
       checkoutPaymentId: payment.id,
       stripeMode: payment.stripe_mode
@@ -1911,6 +1934,7 @@ export async function fulfillRetailCheckoutSession(input: Readonly<{
 
   if (retailPaymentConfirmed(payment)) {
     void writeBpmEvent({
+    ...commerceBpmContext(payment.metadata, payment.stripe_mode),
       actorType: "system",
       emittedBy: "retail_product_checkout",
       eventName: "retail_product_payment_succeeded",
@@ -1919,6 +1943,7 @@ export async function fulfillRetailCheckoutSession(input: Readonly<{
       locale: payment.locale,
       planId: payment.plan_id,
       properties: {
+      ...commerceBpmContext(payment.metadata, payment.stripe_mode).properties,
         checkoutPaymentId: payment.id,
         stripeMode: payment.stripe_mode,
         stripeSessionId: payment.stripe_checkout_session_id
@@ -1983,6 +2008,7 @@ export async function markRetailCheckoutOpened(paymentId: string) {
 
   if (payment) {
     void writeBpmEvent({
+    ...commerceBpmContext(payment.metadata, payment.stripe_mode),
       actorType: "visitor",
       emittedBy: "retail_product_checkout",
       eventName: "retail_product_checkout_opened",
@@ -1991,6 +2017,7 @@ export async function markRetailCheckoutOpened(paymentId: string) {
       locale: payment.locale,
       planId: payment.plan_id,
       properties: {
+      ...commerceBpmContext(payment.metadata, payment.stripe_mode).properties,
         checkoutPaymentId: payment.id,
         stripeMode: payment.stripe_mode
       },
@@ -2064,6 +2091,7 @@ export async function getTrackingOrderByReference(
   }
 
   void writeBpmEvent({
+    ...commerceBpmContext(row.metadata, row.stripe_mode),
     actorType: "visitor",
     emittedBy: "retail_order_tracking",
     eventName: "order_tracking_viewed",
@@ -2071,6 +2099,7 @@ export async function getTrackingOrderByReference(
     eventType: "funnel",
     locale,
     properties: {
+      ...commerceBpmContext(row.metadata, row.stripe_mode).properties,
       checkoutPaymentId: row.id,
       orderId: row.retail_customer_order_id,
       trackingReference: isTokenReference

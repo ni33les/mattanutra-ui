@@ -8,6 +8,7 @@ import {
 } from "react";
 import { Check, LoaderCircle } from "lucide-react";
 import { SafeImage } from "@/components/safe-image";
+import { PharmacyGuide } from "@/components/pharmacy/guide";
 import {
   visibleFormulaIngredients,
   localizedDoseText,
@@ -230,18 +231,7 @@ export function PharmacyCombined({
               <h3 className="mn-status-payoff">{c.payoff}</h3>
             </div>
           </div>
-          <div className="mn-guide" aria-hidden="true">
-            {(["thinking", "comparing", "celebrate"] as const).map((pose) => (
-              <SafeImage
-                key={pose}
-                className={`mn-guide-${pose}`}
-                src={`/assets/library/nong/nong-${pose === "celebrate" ? "energetic" : pose}.webp`}
-                alt=""
-                width={74}
-                height={78}
-              />
-            ))}
-          </div>
+          <PharmacyGuide />
         </div>
         {!ready && !work.failed && (
           <div className="mn-estimate">

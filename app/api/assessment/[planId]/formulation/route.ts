@@ -43,13 +43,16 @@ export async function GET(request: Request, { params }: FormulationRouteProps) {
   }
 
   const storedResult = stored.result;
+  const progress = { journeyVersion: stored.readiness?.journeyVersion, hasFullPlanAccess: stored.readiness?.hasFullPlanAccess,
+    hasConfirmedPlanPayment: stored.readiness?.hasConfirmedPlanPayment, formulaReady: stored.readiness?.formulationStatus === "ready",
+    productsReady: Boolean(stored.readiness?.readyForReveal), formulaVersion: stored.readiness?.formulaVersion, productRunId: stored.readiness?.productRunId };
 
   if (stored.readiness?.formulationStatus === "pending") {
-    return jsonNoStore({ message: "Formulation is still being prepared", status: "preparing",
+    return jsonNoStore({ ...progress, message: "Formulation is still being prepared", status: "preparing",
       revision: stored.readiness.revision, resultVersion: stored.readiness.resultVersion, generationStatus: "pending" }, { status: 202 });
   }
   if (stored.readiness?.formulationStatus === "ready") {
-    return jsonNoStore({ ...storedResult, revision: stored.readiness?.revision, resultVersion: stored.readiness?.resultVersion,
+    return jsonNoStore({ ...storedResult, ...progress, revision: stored.readiness?.revision, resultVersion: stored.readiness?.resultVersion,
       generationStatus: "ready", fulfillmentStatus: stored.readiness?.fulfillmentStatus });
   }
 

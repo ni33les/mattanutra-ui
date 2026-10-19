@@ -29,6 +29,7 @@ create trigger invalidate_legacy_plan_projection before update of result on publ
 alter table public.assessment_healthscore_results add column if not exists read_projection jsonb;
 alter table public.formulations add column if not exists read_projection jsonb;
 alter table public.assessments add column if not exists funnel_skip_healthscore boolean;
+alter table public.assessments add column if not exists journey_version text;
 
 create or replace function public.invalidate_legacy_healthscore_projection() returns trigger language plpgsql as $$
 begin
@@ -55,11 +56,11 @@ create trigger project_funnel_formulation_read before insert or update of formul
 
 create or replace function public.project_funnel_assessment_read() returns trigger language plpgsql as $$
 begin
-  new.funnel_skip_healthscore := coalesce(new.answers ? 'inStorePharmacy',false);
+  new.funnel_skip_healthscore := coalesce(new.answers ? 'inStorePharmacy',false) or coalesce(new.journey_version = 'web-products-v1',false);
   return new;
 end $$;
 drop trigger if exists project_funnel_assessment_read on public.assessments;
-create trigger project_funnel_assessment_read before insert or update of answers on public.assessments
+create trigger project_funnel_assessment_read before insert or update of answers, journey_version on public.assessments
   for each row execute function public.project_funnel_assessment_read();
 
 -- Freeze the immutable presentation/hash once, without copying baskets on polls.

@@ -445,13 +445,13 @@ function HealthScoreExperience({
   return (
     <section className={cx("mn-healthscore-v8", !showPricing && "results-only")} ref={rootRef} data-testid="healthscore">
       <div className="wrap">
-        <ol className="progress-nav" aria-label={copy.steps.join(" → ")}>
+        {showPricing && <ol className="progress-nav" aria-label={copy.steps.join(" → ")}>
           {copy.steps.map((step, index) => (
             <li key={step} className={index === 0 ? "done" : index === 1 ? "current" : ""} aria-current={index === 1 ? "step" : undefined}>
               <span className="step-dot" aria-hidden="true">{index === 0 ? "✓" : index + 1}</span>{step}
             </li>
           ))}
-        </ol>
+        </ol>}
         <section className="hero" aria-labelledby="hero-title">
           <div className="hero-intro">
             <div className="eyebrow">{copy.complete}</div>
@@ -559,7 +559,7 @@ function HealthScoreExperience({
   );
 }
 
-export function HealthScorePanel(props: Readonly<{ firstName?: string; locale: Locale; result: HealthScoreResult }>) {
+export function HealthScorePanel(props: Readonly<{ firstName?: string; locale: Locale; planId?: string; revision?: number; result: HealthScoreResult }>) {
   return <HealthScoreExperience {...props} showPricing={false} />;
 }
 

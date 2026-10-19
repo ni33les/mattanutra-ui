@@ -6,6 +6,7 @@ import { META_EVENTS, META_AUTHORITATIVE_EVENTS, metaCustomData, metaEventEnable
 import { enqueueMetaEvent, metaMatchingFromRequest, recordMetaCheckout, requestMetaContext } from "@/lib/meta-tracking";
 import { metaCampaignAttribution } from "@/lib/meta-attribution";
 import { AMOUNT_MICROS_PER_UNIT } from "@/lib/stripe-payment-config";
+import { validateWebProductMilestone } from "@/lib/meta-web-product-milestone";
 export const runtime = "nodejs";
 const authoritativeNames = META_AUTHORITATIVE_EVENTS;
 const receiptWindowMs = 10 * 60_000;
@@ -73,12 +74,20 @@ export async function POST(request: Request) {
     const attemptId = typeof body.attemptId === "string" && uuidPattern.test(body.attemptId) ? body.attemptId : null;
     if (name === "InitiateCheckout" && !attemptId) return NextResponse.json({ error: "Checkout attempt required" }, { status: 400 });
     const dimension = String(data.funnel_stage).startsWith("connect") ? `${data.provider || ""}:${data.locale || ""}:` : "";
-    const key = name === "InitiateCheckout" ? `checkout:${attemptId}` : name === "PageView" || name === "AddToCart" ? body.eventId
+    const defaultKey = name === "InitiateCheckout" ? `checkout:${attemptId}` : name === "PageView" || name === "AddToCart" ? body.eventId
       : `${body.sessionId}:${data.plan_id || "visit"}:${name}:${dimension}${data.progress ?? data.offer ?? data.funnel_stage ?? ""}`;
     const receipt = await withDatabaseTransaction(sql, async tx => {
       // Serialize capture against other tabs before taking the event's attribution snapshot.
       const [current] = await tx`select matching,attribution,consent_granted,expires_at from public.meta_tracking_contexts where id=${context.id}::uuid for update`;
       if (!current?.consent_granted || new Date(current.expires_at).getTime() <= Date.now()) return null;
+      // The saved journey, rather than an optional browser label, decides whether basket proof is required.
+      const [basketJourney] = name === "AddToCart" && typeof data.plan_id === "string"
+        ? await tx`select to_jsonb(a)->>'journey_version' as version from public.assessments a where a.plan_id=${data.plan_id}::uuid` : [];
+      const webMilestone = body.webProductMilestone !== undefined || ["formula", "products"].includes(String(data.funnel_stage))
+        || name === "AddToCart" && (data.journey_version === "web-products-v1" || basketJourney?.version === "web-products-v1");
+      const verifiedWeb = webMilestone ? await validateWebProductMilestone(tx, context.id, name, data, body.webProductMilestone) : null;
+      if (webMilestone && !verifiedWeb) return null;
+      const key = verifiedWeb?.key ?? defaultKey;
       // A browser attempt ID is only a lookup key. A usable provider session and
       // its binding must already exist before it can recover a checkout receipt.
       const checkout = name === "InitiateCheckout" ? (await tx<Array<{
@@ -105,7 +114,7 @@ export async function POST(request: Request) {
       const [existing] = await tx`select id,custom_data,status from public.meta_conversion_events
         where environment=${config.environment} and pixel_id=${config.pixelId} and event_name=${name}
           and source_key=${`browser:${key}`} and context_id=${context.id}::uuid`;
-      if (existing) return checkout && existing.status === "suppressed" ? null : { eventId: existing.id as string, data: existing.custom_data };
+      if (existing) return existing.status === "suppressed" ? null : { eventId: existing.id as string, data: existing.custom_data };
       if (checkout) {
         if (!["checkout_session_created", "checkout_opened", "processing"].includes(checkout.status)) return null;
         await recordMetaCheckout(tx, { type: checkout.type, id: checkout.id, planId: checkout.plan_id,
@@ -119,7 +128,7 @@ export async function POST(request: Request) {
         return captured ? { eventId: captured.id as string, data: captured.custom_data } : null;
       }
       const eventId = await enqueueMetaEvent(tx, { context: { ...context, attribution: campaign, matching: { ...current.matching, ...matching } }, name,
-        sourceKey: `browser:${key}`, eventId: body.eventId, sourceUrl, data: { ...data, planId: data.plan_id, stage: data.funnel_stage } });
+        sourceKey: `browser:${key}`, eventId: body.eventId, sourceUrl, data: { ...data, planId: data.plan_id, stage: data.funnel_stage, ...verifiedWeb?.data } });
       if (!eventId) return null;
       const [captured] = await tx`select custom_data from public.meta_conversion_events where id=${eventId}::uuid`;
       return { eventId, data: captured.custom_data };

@@ -1,6 +1,7 @@
 import { COVERAGE_SCALE } from "@/lib/matcher/config";
 import { isDoseError, minUnits, scaleAmount } from "@/lib/matcher/dose";
 import { knownTargetExposure, targetBasis, intakeIsKnown } from "@/lib/matcher/target-basis";
+import type { TargetCoverageRequest } from "@/lib/matcher/target-basis";
 import type { CanonicalRequest, SearchState } from "@/lib/matcher/types";
 
 function isDeferredConditional(target: CanonicalRequest["targets"][number]) {
@@ -30,7 +31,7 @@ export function coverageUnits(
 }
 
 /** Binary zero-goal coverage; never divide by zero or treat uncertain exposure as verified zero. */
-export function targetCoverageUnits(request: CanonicalRequest, target: CanonicalRequest["targets"][number], delivered: bigint) {
+export function targetCoverageUnits(request: TargetCoverageRequest, target: CanonicalRequest["targets"][number], delivered: bigint) {
   const known = knownTargetExposure(request, target, delivered);
   if (target.requested.units !== BigInt(0)) return coverageUnits(known, target.requested.units);
   const unknown = [...request.unknownIntakeSubjectIds ?? [], ...request.estimatedIntakeSubjectIds ?? []].some(id => id === '*' || id === target.subjectId) ||

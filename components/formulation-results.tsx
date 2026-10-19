@@ -30,6 +30,8 @@ import type {
   ProductStackPreference,
 } from "@/lib/formulation-types";
 import { localeHtmlLang, type Locale } from "@/lib/i18n";
+import type { NutritionJourneySnapshot } from "@/lib/nutrition-journey-read";
+import { WebPreparationPanel } from "@/components/nutrition-flow/web-preparation-panel";
 
 type FormulationResultsProps = Readonly<{
   initialResult?: FormulationResult | null;
@@ -37,6 +39,7 @@ type FormulationResultsProps = Readonly<{
   locale: Locale;
   planId: string;
   pharmacy?: { source?: PharmacySource; slug: string; name: string; revision: number; sourceLocale: Locale; receipt: PharmacyOrderReceipt | null };
+  commerce?: { answers: Record<string, unknown>; initial: NutritionJourneySnapshot | null; bootstrap: boolean };
 }>;
 
 export function FormulationResults({
@@ -45,6 +48,7 @@ export function FormulationResults({
   locale,
   planId,
   pharmacy,
+  commerce,
 }: FormulationResultsProps) {
   const labels = formulationResultsCopy[locale];
   const effectivePlanId = planId;
@@ -59,8 +63,9 @@ export function FormulationResults({
     useState<ProductStackPreference | null>(null);
 
   const pollingComplete = useCallback(() => setProductPollingPreference(null), []);
-  const { result, loadState, failed, retry, refresh: refreshFormulationResult } = useFormulationPolling(
-    effectivePlanId, pharmacy?.sourceLocale ?? locale, initialResult, productPollingPreference, pollingComplete, !pharmacy?.receipt);
+  const { result, snapshot, loadState, failed, retry, refresh: refreshFormulationResult } = useFormulationPolling(
+    effectivePlanId, pharmacy?.sourceLocale ?? locale, initialResult, productPollingPreference, pollingComplete, !pharmacy?.receipt,
+    commerce?.initial, Boolean(commerce), commerce?.bootstrap);
   const startProductStackPolling = useCallback((preference: ProductStackPreference) => {
     setProductPollingPreference(preference);
   }, []);
@@ -86,11 +91,16 @@ export function FormulationResults({
     });
   }, [productPollingPreference, result]);
 
+  const preparation = commerce ? <WebPreparationPanel answers={commerce.answers} failed={failed}
+    formulaReady={Boolean(result && result.access !== "preview")} ready={Boolean(snapshot?.readyForReveal && !snapshot.refreshPending && !snapshot.failed && result && !resultHasPendingProductRecommendations(result))}
+    locale={locale} planId={planId} retry={retry} /> : null;
+
   if (loadState === "loading") {
-    return <FunnelLoading locale={locale} stage="opening" />;
+    return preparation ? <>{preparation}</> : <FunnelLoading locale={locale} stage="opening" />;
   }
 
   if (loadState === "error" || !result) {
+    if (preparation) return <>{preparation}</>;
     return (
       <section className="mx-auto w-full max-w-6xl px-6 py-10 sm:px-8 lg:py-14">
         <div className="rounded-lg bg-white p-6 text-center ring-1 ring-foreground/10 sm:p-8">
@@ -139,7 +149,7 @@ export function FormulationResults({
       !resultHasProductStackRows(result, explicitProductStackPreference),
   );
   const productCoveragePending =
-    productStackLoading || resultHasPendingProductRecommendations(result);
+    Boolean(commerce && (!snapshot?.readyForReveal || snapshot.refreshPending || snapshot.failed)) || productStackLoading || resultHasPendingProductRecommendations(result);
   const activeProductRecommendations =
     selectedProductStackUnavailable
       ? undefined
@@ -156,8 +166,10 @@ export function FormulationResults({
 
   return (
     <>
-    {failed ? <div role="status" className="mx-auto max-w-6xl px-6">{labels.error} {recovery}</div> : null}
+    {preparation}
+    {failed && !commerce ? <div role="status" className="mx-auto max-w-6xl px-6">{labels.error} {recovery}</div> : null}
     <RevealFinalResultsPage
+      commerce={Boolean(commerce)}
       activeProductRecommendations={activeProductRecommendations}
       formattedDate={formattedDate}
       ingredients={orderedIngredients}

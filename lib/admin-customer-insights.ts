@@ -1,3 +1,4 @@
+import { funnelBpmSource, planPaymentEventSql } from "@/lib/admin-funnel-events";
 import { pharmacyAcquisitionFromAnswers, pharmacySourceLabels } from "@/lib/pharmacy-acquisition";
 import { inStorePharmacyFromAnswers } from "@/lib/pharmacy-in-store";
 import {
@@ -517,9 +518,9 @@ function fallbackNextMessage(label: string) {
 
 const segmentRules: SegmentRule[] = [
   {
-    description: "Paid customers who are already talking to Nong Mata.",
+    description: "Paid plan customers who are already talking to Nong Mata.",
     id: "panya-engaged-paid",
-    label: "Nong Mata-engaged paid customers",
+    label: "Nong Mata-engaged paid plan customers",
     matches: (customer) => Boolean(customer.selectedPlan && customer.panya.inboundCount > 0),
     reason: () => "Paid plan with inbound Nong Mata activity",
     signalMix: (customer) => [
@@ -1100,11 +1101,20 @@ async function loadCommunicationInsights(
 }
 
 function leadStage(row: {
+  formula_viewed?: boolean | null; products_viewed?: boolean | null; basket_confirmed?: boolean | null;
+  product_checkout?: boolean | null; product_paid?: boolean | null; product_shipped?: boolean | null; product_delivered?: boolean | null;
   healthscore_viewed: boolean | null;
   paid: boolean | null;
   started: boolean | null;
   submitted: boolean | null;
 }) {
+  if (row.product_delivered) return "product_delivered";
+  if (row.product_shipped) return "product_shipped";
+  if (row.product_paid) return "product_paid";
+  if (row.product_checkout) return "product_checkout";
+  if (row.basket_confirmed) return "basket_confirmed";
+  if (row.products_viewed) return "products_viewed";
+  if (row.formula_viewed) return "formula_viewed";
   if (row.paid) {
     return "paid";
   }
@@ -1153,8 +1163,15 @@ async function loadLeadInsights(
       bool_or(event_name = 'assessment_started') as started,
       bool_or(event_name in ('assessment_submitted', 'assessment_captured', 'assessment_recaptured')) as submitted,
       bool_or(event_name = 'healthscore_viewed') as healthscore_viewed,
-      bool_or(event_type = 'payment' and event_status in ('paid', 'succeeded', 'completed')) as paid
-    from public.bpm
+      bool_or(event_name='formula_details_viewed') as formula_viewed,
+      bool_or(event_name='product_matches_viewed') as products_viewed,
+      bool_or(event_name='product_basket_confirmed') as basket_confirmed,
+      bool_or(event_name='retail_product_checkout_session_created') as product_checkout,
+      bool_or(event_name='retail_product_payment_succeeded') as product_paid,
+      bool_or(event_name='retail_order_shipped') as product_shipped,
+      bool_or(event_name='retail_order_delivered') as product_delivered,
+      bool_or(${planPaymentEventSql(sql)}) as paid
+    from ${funnelBpmSource(sql)}
     where plan_id = any(${planIds}::uuid[])
     group by plan_id
   `;

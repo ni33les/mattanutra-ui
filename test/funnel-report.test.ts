@@ -16,6 +16,23 @@ const event = (name: string, minute: number, overrides: Partial<FlowRow> = {}): 
   event_status: "observed", selected_plan: null, occurred_at: time(minute), ...overrides
 });
 
+it("reports the free product funnel from real visible stages and confirmed checkout without HealthScore", () => {
+  const names = ["assessment_viewed", "assessment_started", "assessment_captured", "reveal_page_viewed",
+    "formula_details_viewed", "formula_details_viewed", "product_matches_viewed", "product_basket_confirmed",
+    "retail_product_checkout_requested", "retail_product_checkout_session_created", "retail_product_payment_succeeded",
+    "retail_product_payment_succeeded", "retail_order_shipped", "retail_order_delivered"];
+  const flow = buildAdminFlowData("all", names.map((name, index) => event(name, index, { plan_id: "free" })));
+  assert.equal(flow.nodes.find(row => row.id === "healthscoreViewed")?.count, 0);
+  for (const stage of flow.productFunnel ?? []) {
+    assert.equal(stage.count, 1, stage.id);
+    if (stage.denominator !== null) assert.equal(stage.numerator, 1, stage.id);
+  }
+  const loading = buildAdminFlowData("all", [event("reveal_page_viewed", 0), event("retail_product_checkout_requested", 1)]);
+  for (const id of ["formulaViewed", "productsViewed", "basketConfirmed", "productCheckoutReady", "productPaymentSucceeded"]) {
+    assert.equal(loading.productFunnel?.find(row => row.id === id)?.count, 0, id);
+  }
+});
+
 it("counts direct quiz entry, stitches anonymous starts to capture and deduplicates repeats", () => {
   const flow = buildAdminFlowData("all", [event("assessment_viewed",0),event("assessment_started",1),event("assessment_started",2),
     event("assessment_captured",3,{plan_id:"plan"}),event("assessment_submitted",3),event("healthscore_page_viewed",4,{plan_id:"plan"})]);

@@ -5,7 +5,7 @@ import { configureMetaClient, trackMetaEvent } from "../lib/meta-client.ts";
 const pixelId = "27629903823308584";
 const sessionId = "843893a8-4c1b-44d9-86f4-092e16270d1a";
 const receiptId = "500e9000-b443-4898-9d9b-0563cbfb5164";
-const browserGlobals = ["window", "document", "location", "sessionStorage"] as const;
+const browserGlobals = ["window", "document", "location", "sessionStorage", "localStorage"] as const;
 let originals: Map<string, PropertyDescriptor | undefined>;
 let pixelCalls: unknown[][];
 let page: { cookie: string; referrer: string };
@@ -25,11 +25,13 @@ describe("Meta browser event receipts", () => {
     originals = new Map(browserGlobals.map(key => [key, Object.getOwnPropertyDescriptor(globalThis, key)]));
     pixelCalls = [];
     page = { cookie: "mn_marketing=granted", referrer: "" };
+    const storage = new Map<string, string>();
     const values = {
       window: { fbq: (...args: unknown[]) => pixelCalls.push(args) },
       document: page,
       location: new URL("https://mattanutra.com/en"),
-      sessionStorage: { getItem: () => sessionId, setItem: () => {} }
+      sessionStorage: { getItem: () => sessionId, setItem: () => {} },
+      localStorage: { getItem: (key: string) => storage.get(key) ?? null, setItem: (key: string, value: string) => storage.set(key, value) }
     };
     for (const key of browserGlobals) Object.defineProperty(globalThis, key, { configurable: true, writable: true, value: values[key] });
     configureMetaClient({ enabled: true, environment: "prd", pixelId });
@@ -41,6 +43,25 @@ describe("Meta browser event receipts", () => {
       if (original) Object.defineProperty(globalThis, key, original);
       else Reflect.deleteProperty(globalThis, key);
     }
+  });
+
+  it("keeps result evidence on our API and sends one native copy for a durable visible milestone", async t => {
+    const evidence = { revision: 2, formulaVersion: 3, runId: crypto.randomUUID(), selectedItemIds: [crypto.randomUUID()] };
+    t.mock.method(globalThis, "fetch", async (_url, init) => {
+      const request = JSON.parse(String(init?.body));
+      assert.deepEqual(request.webProductMilestone, evidence);
+      assert.equal(request.data.runId, undefined);
+      assert.equal(request.data.selectedItemIds, undefined);
+      assert.equal(request.data.formulaVersion, undefined);
+      return Response.json({ accepted: true, eventId: receiptId, data: { stage: "formula", funnel_stage: "formula", journey_version: "web-products-v1" } });
+    });
+    const input = { planId: sessionId, stage: "formula", journey_version: "web-products-v1", webProductMilestone: evidence };
+    await trackMetaEvent("ViewContent", input, crypto.randomUUID());
+    // A reloaded module or second tab can have a different in-memory occurrence, but the server receipt is unchanged.
+    await trackMetaEvent("ViewContent", input, crypto.randomUUID());
+    assert.equal(pixelCalls.length, 1);
+    assert.equal((pixelCalls[0][4] as { eventID: string }).eventID, receiptId);
+    assert.doesNotMatch(JSON.stringify(pixelCalls), new RegExp(`${evidence.runId}|${evidence.selectedItemIds[0]}`));
   });
 
   it("captures the header PageView using its original ID without replaying the browser copy", async t => {

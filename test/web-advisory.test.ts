@@ -100,7 +100,10 @@ describe("web advisory behavior v4", () => {
     assert.throws(() => requireCurrentProductSelection({ ...selection, runSelectionRevision: 1 }), /changed/);
     assert.throws(() => requireCurrentProductSelection({ ...selection, excludedIds: [planId] }), /Replan/);
     assert.throws(() => requireCurrentProductSelection({ ...selection, candidateKey: "old-option" }), /changed/);
-    assert.throws(() => requireCurrentProductSelection({ ...selection, allowedIds: [planId, taskId] }), /Replan/, "removing part of an option requires replanning");
+    assert.doesNotThrow(() => requireCurrentProductSelection({ ...selection, allowedIds: [planId, taskId] }), "a subset of the current option can be purchased without replanning");
+    assert.throws(() => requireCurrentProductSelection({ ...selection, selectedIds: [] }), /Select unique/);
+    assert.throws(() => requireCurrentProductSelection({ ...selection, selectedIds: [planId, planId] }), /Select unique/);
+    assert.throws(() => requireCurrentProductSelection({ ...selection, selectedIds: [planId, taskId] }), /Select unique/);
     assert.deepEqual(normalizedProductExclusions([planId, planId]), [planId]);
     assert.deepEqual(normalizedProductExclusions([]), []);
     assert.throws(() => normalizedProductExclusions(Array(101).fill(planId)), /100/);

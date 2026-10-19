@@ -13,6 +13,7 @@ import { nutritionQuizPath } from "@/lib/nutrition-paths";
 import { getStoredAssessmentPrefill, isUuid } from "@/lib/assessment-store";
 import { getAssessmentResumeDraft } from "@/lib/assessment-resume-store";
 import { localizedRouteMetadata } from "@/lib/seo";
+import { isWebProductJourney, webProductJourneyEnabled } from "@/lib/web-product-journey";
 
 /**
  * Production quiz is the React ChatQuestionnaire (v6 schema + v14 UX/copy).
@@ -145,6 +146,7 @@ export default async function NutritionQuizPage({
   const serverDraft = prefill ? { ...prefill, captured: true, paymentId: effectivePaymentId }
     : resumeDraft ? { ...resumeDraft, revision: 0, captured: false } : null;
   const useChat = chatQuestionnaireEnabled(locale);
+  const skipHealthScore = webProductJourneyEnabled() || isWebProductJourney(prefill?.journeyVersion);
 
   // Quiz-focused shell (v14 HTML parity): compact titlebar (logo + site locale
   // switcher only) and no site footer — full marketing chrome is on landing pages.
@@ -158,6 +160,7 @@ export default async function NutritionQuizPage({
       />
       {useChat ? (
         <ChatQuestionnaire
+          skipHealthScore={skipHealthScore}
           locale={locale}
           sessionId={query.session || resumeDraft?.draftId || effectivePlanId || undefined}
           serverDraft={serverDraft}
@@ -171,6 +174,7 @@ export default async function NutritionQuizPage({
         />
       ) : (
         <AssessmentFlow
+          skipHealthScore={skipHealthScore}
           sessionId={query.session || resumeDraft?.draftId || undefined}
           assessmentRevision={prefill?.revision ?? 0}
           serverUpdatedAt={prefill?.updatedAt ?? resumeDraft?.updatedAt}

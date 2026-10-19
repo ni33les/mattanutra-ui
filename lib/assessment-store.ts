@@ -1,3 +1,4 @@
+import { hasFullPlanAccess, isWebProductJourney } from "@/lib/web-product-journey";
 import { historicalAssessmentReadJoin, historicalResult } from "@/lib/historical-assessment-read";
 import { formulationPlanCopy } from "@/lib/formulation-plan-copy";
 import { readStoredMatching } from "@/lib/recommendation-storage";
@@ -5,7 +6,7 @@ import { hasHealthScoreAiCopy } from "@/lib/healthscore-readiness";
 export { hasHealthScoreAiCopy } from "@/lib/healthscore-readiness";
 import { getFunnelReadiness } from "@/lib/funnel-readiness";
 import { assessmentInputHash, FUNNEL_GENERATOR_VERSION, getRevisionHealthScore } from "@/lib/assessment-revisions";
-import { withDatabaseTransaction, deferUntilDatabaseCommit } from "@/lib/db";
+import { withDatabaseTransaction, withDatabaseReadSnapshot, deferUntilDatabaseCommit } from "@/lib/db";
 import { randomUUID } from "node:crypto";
 import type postgres from "postgres";
 import {
@@ -64,6 +65,8 @@ type PersistAssessmentInput = Readonly<{
   contactEmail?: unknown;
   locale?: unknown;
   selectedPlan?: AssessmentPlan | null;
+  journeyVersion?: string | null;
+  acquisitionAttribution?: unknown;
   skipHealthScore?: boolean;
   snapshot: AssessmentSnapshot;
   status: StoredAssessmentStatus;
@@ -212,8 +215,9 @@ async function loadStoredRecommendationProductPayloads(
         and r.assessment_revision = a.input_revision and r.generation_locale = ${locale}
         and r.generator_version = ${FUNNEL_GENERATOR_VERSION}) or ${historicalResult(sql, "r")})
       and r.selection_revision = coalesce((select revision from public.assessment_product_preferences where plan_id = a.plan_id), 0)
+      and r.status in ('completed','partial')
       and coalesce(r.diagnostics ->> 'stackPreference', 'balanced') in ('compact', 'balanced')
-    order by coalesce(r.diagnostics ->> 'stackPreference', 'balanced'), r.generated_at desc
+    order by coalesce(r.diagnostics ->> 'stackPreference', 'balanced'), r.generated_at desc, r.id desc
   `;
 
   if (runs.length < 1) {
@@ -1306,6 +1310,8 @@ export async function persistAssessmentSubmission({
   contactEmail,
   locale,
   selectedPlan,
+  journeyVersion = null,
+  acquisitionAttribution = null,
   skipHealthScore = false,
   snapshot,
   status
@@ -1342,6 +1348,8 @@ export async function persistAssessmentSubmission({
         input_hash,
         locale,
         selected_plan,
+        journey_version,
+        acquisition_attribution,
         status,
         answers,
         answer_summary,
@@ -1361,6 +1369,8 @@ export async function persistAssessmentSubmission({
         ${inputHash},
         ${normalizedLocale},
         ${storedPlan},
+        ${journeyVersion},
+        ${acquisitionAttribution ? sql.json(toJsonValue(acquisitionAttribution)) : null},
         ${status},
         ${sql.json(storedAnswers)},
         ${sql.json(storedAnswerSummary)},
@@ -1382,6 +1392,8 @@ export async function persistAssessmentSubmission({
         input_hash = excluded.input_hash,
         locale = excluded.locale,
         selected_plan = excluded.selected_plan,
+        journey_version = coalesce(assessments.journey_version, excluded.journey_version),
+        acquisition_attribution = coalesce(assessments.acquisition_attribution, excluded.acquisition_attribution),
         status = case when assessments.input_hash = excluded.input_hash then assessments.status else excluded.status end,
         answers = excluded.answers,
         answer_summary = excluded.answer_summary,
@@ -1433,6 +1445,7 @@ export async function persistAssessmentSubmission({
         locale: normalizedLocale,
         queuePosition: snapshot.queuePosition,
         selectedPlan,
+        journeyVersion,
         status
       },
       changeReason: "assessment_submission",
@@ -1575,7 +1588,9 @@ export async function getStoredAssessmentPrefill(planId: string) {
       updated_at,
       health_score,
       locale,
-      selected_plan::text
+      selected_plan::text,
+      journey_version,
+      exists(select 1 from public.payments p where p.plan_id=assessments.plan_id and p.paid_at is not null) as confirmed_plan_payment
     from assessments
     where plan_id = ${planId}::uuid
     limit 1
@@ -1589,6 +1604,10 @@ export async function getStoredAssessmentPrefill(planId: string) {
   const healthScore = asRecord(row.health_score);
 
   return {
+    journeyVersion: row.journey_version as string | null,
+    hasConfirmedPlanPayment: Boolean(row.confirmed_plan_payment),
+    hasFullPlanAccess: hasFullPlanAccess({ journeyVersion: row.journey_version, selectedPlan: row.selected_plan }),
+    skipHealthScore: isWebProductJourney(row.journey_version) || Boolean(asRecord(row.answers).inStorePharmacy),
     questionnaireState: row.questionnaire_state,
     updatedAt: new Date(row.updated_at).toISOString(),
     revision: Number(row.input_revision),
@@ -1655,7 +1674,7 @@ function mapSlimFormulationResult(
   const foodsReady = Boolean(row.food_guidance);
   const result = {
     access:
-      !row.selected_plan ||
+      !hasFullPlanAccess({ journeyVersion: row.journey_version, selectedPlan: row.selected_plan }) ||
       isExampleFormulationModelVersion(row.model_version)
         ? "preview"
         : "full",
@@ -1669,6 +1688,9 @@ function mapSlimFormulationResult(
     generatedAt,
     firstName,
     planId,
+    assessmentRevision: Number(row.input_revision),
+    formulaVersion: row.formula_version == null ? undefined : Number(row.formula_version),
+    selectionRevision: Number(row.selection_revision ?? 0),
     nutritionReport: null,
     recommendations: [],
     schemaVersion: 1 as const,
@@ -1712,8 +1734,10 @@ async function loadStoredFormulationFormulaRead(
       assessments.first_name,
       assessments.locale,
       assessments.selected_plan::text,
+      assessments.journey_version,
       assessments.updated_at as assessment_updated_at,
       formulations.formulation,
+      formulations.version as formula_version,
       formulations.generated_at,
       formulations.model_version,
       food_guidance.guidance as food_guidance,
@@ -1722,14 +1746,14 @@ async function loadStoredFormulationFormulaRead(
     from assessments
     ${historicalAssessmentReadJoin(sql, "assessments", resultLocale)}
     left join lateral (
-      select formulation, generated_at, model_version
+      select formulation, version, generated_at, model_version
       from formulations
       where formulations.plan_id = assessments.plan_id
         and ((formulations.assessment_revision = assessments.input_revision
         and formulations.generation_locale = ${resultLocale} and formulations.generator_version = ${FUNNEL_GENERATOR_VERSION}) or ${historicalResult(sql, "formulations", true)})
         and (
           case
-            when assessments.selected_plan is not null then
+            when assessments.selected_plan is not null or assessments.journey_version = 'web-products-v1' then
               (
                 formulations.model_version is null
                 or formulations.model_version not like ${exampleModelPattern}
@@ -1749,7 +1773,7 @@ async function loadStoredFormulationFormulaRead(
         and food_guidance.generation_locale = ${resultLocale} and food_guidance.generator_version = ${FUNNEL_GENERATOR_VERSION}) or ${historicalResult(sql, "food_guidance")})
         and (
           case
-            when assessments.selected_plan is not null then
+            when assessments.selected_plan is not null or assessments.journey_version = 'web-products-v1' then
               (
                 food_guidance.model_version is null
                 or food_guidance.model_version not like ${exampleModelPattern}
@@ -1780,18 +1804,23 @@ export async function getStoredFormulationRead(
   planId: string,
   options: Readonly<{ includeProducts?: boolean; locale?: string | null }> = {}
 ): Promise<StoredFormulationRead | null> {
-  const readiness = await getFunnelReadiness(planId, options.locale);
-  if (!readiness) return null;
-  const status = readiness.formulationStatus === "ready" || readiness.formulationStatus === "inconsistent" ? "ready"
-    : readiness.formulationStatus === "failed" ? "failed" : "preparing";
-  // Pending reads stay small and avoid loading catalogue/product payloads on every poll.
-  if (!options.includeProducts || readiness.formulationStatus !== "ready") {
-    const slim = await loadStoredFormulationFormulaRead(planId, readiness.locale);
-    return slim ? { ...slim, status, readiness } : null;
-  }
-  const result = (await getStoredFormulationResult(planId, { locale: readiness.locale, mode: "full" }))
-    ?? await getStoredFormulationResult(planId, { locale: readiness.locale, mode: "preview" });
-  return result ? { result, status, readiness } : null;
+  const sql = getSql();
+  if (!sql || !isUuid(planId)) return null;
+  return withDatabaseReadSnapshot(sql, async () => {
+    const readiness = await getFunnelReadiness(planId, options.locale);
+    if (!readiness) return null;
+    const status = readiness.formulationStatus === "ready" || readiness.formulationStatus === "inconsistent" ? "ready"
+      : readiness.formulationStatus === "failed" ? "failed" : "preparing";
+    // Readiness, assessment identity and payload must come from the same snapshot.
+    // Pending reads stay small and avoid loading catalogue/product payloads on every poll.
+    if (!options.includeProducts || readiness.formulationStatus !== "ready") {
+      const slim = await loadStoredFormulationFormulaRead(planId, readiness.locale);
+      return slim ? { ...slim, status, readiness } : null;
+    }
+    const result = (await getStoredFormulationResult(planId, { locale: readiness.locale, mode: "full" }))
+      ?? await getStoredFormulationResult(planId, { locale: readiness.locale, mode: "preview" });
+    return result ? { result, status, readiness } : null;
+  });
 }
 
 export async function getStoredFormulationResult(
@@ -1828,8 +1857,8 @@ export async function getStoredFormulationResult(
         )`;
   const assessmentAccessFilter =
     mode === "preview"
-      ? sql`and assessments.selected_plan is null`
-      : sql`and assessments.selected_plan is not null`;
+      ? sql`and assessments.selected_plan is null and assessments.journey_version is distinct from 'web-products-v1'`
+      : sql`and (assessments.selected_plan is not null or assessments.journey_version = 'web-products-v1')`;
 
   const rows = await sql`
     select
@@ -1840,8 +1869,10 @@ export async function getStoredFormulationResult(
       assessments.first_name,
       assessments.locale,
       assessments.selected_plan::text,
+      assessments.journey_version,
       assessments.updated_at as assessment_updated_at,
       formulations.formulation,
+      formulations.version as formula_version,
       formulations.generated_at,
       formulations.model_version,
       food_guidance.guidance as food_guidance,
@@ -1873,7 +1904,7 @@ export async function getStoredFormulationResult(
     from assessments
     ${historicalAssessmentReadJoin(sql, "assessments", resultLocale)}
     left join lateral (
-      select formulation, generated_at, model_version
+      select formulation, version, generated_at, model_version
       from formulations
       where formulations.plan_id = assessments.plan_id
         and ((formulations.assessment_revision = assessments.input_revision
@@ -1955,6 +1986,7 @@ export async function getStoredFormulationResult(
         and product_recommendation_runs.generation_locale = ${resultLocale} and product_recommendation_runs.generator_version = ${FUNNEL_GENERATOR_VERSION})
           or ${historicalResult(sql, "product_recommendation_runs")})
         and product_recommendation_runs.selection_revision = coalesce((select revision from public.assessment_product_preferences where plan_id = assessments.plan_id), 0)
+        and product_recommendation_runs.status in ('completed','partial')
         and coalesce(diagnostics ->> 'stackPreference', 'balanced') in ('compact', 'balanced')
       order by
         case coalesce(diagnostics ->> 'stackPreference', 'balanced')
@@ -1962,7 +1994,7 @@ export async function getStoredFormulationResult(
           when 'compact' then 2
           else 3
         end,
-        generated_at desc
+        generated_at desc, id desc
       limit 1
     ) product_recommendation_run on true
     left join lateral (
@@ -2381,6 +2413,7 @@ export async function getStoredFormulationResult(
     generatedAt,
     firstName,
     planId,
+    formulaVersion: row.formula_version == null ? undefined : Number(row.formula_version),
     assessmentRevision: Number(row.input_revision),
     selectionRevision: Number(row.selection_revision ?? 0),
     excludedProductIds: row.excluded_product_ids ?? [],

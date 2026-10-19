@@ -1,3 +1,4 @@
+import { webProductJourneyEnabled } from "@/lib/web-product-journey";
 import { bindMetaContext, recordMetaCheckout } from "@/lib/meta-tracking";
 import { existingPaymentAccounting, recordPaymentAccountingOnce } from "@/lib/payment-accounting";
 import { stripeInternalTestMetadata } from "@/lib/payment-internal-test";
@@ -1001,6 +1002,7 @@ export function assertSessionMatchesPayment(
 }
 
 export async function createStripeCheckoutSession(input: CheckoutSessionInput) {
+  if (webProductJourneyEnabled()) throw new FunnelError("Recommendations are now free. Continue to your product recommendations.", 410, "reveal_offer_retired");
   const sql = await sqlOrThrow();
   let paymentId: string = randomUUID();
   const requestKey = input.idempotencyKey ?? input.request?.headers.get("Idempotency-Key") ?? "";
@@ -1410,6 +1412,7 @@ export async function recordPaymentPregenerationProgress(input: Readonly<{
 export async function markPaymentCancelled(input: Readonly<{
   paymentId: string;
   request?: Request;
+  retirement?: boolean;
 }>) {
   if (!isUuid(input.paymentId)) {
     return null;
@@ -1422,6 +1425,9 @@ export async function markPaymentCancelled(input: Readonly<{
   const before = await getPaymentRowById(sql, input.paymentId);
   if (!before) return null;
   if (before.status === "paid" || before.status === "bound" || before.paid_at) return mapPayment(before);
+  if (input.retirement && before.status === "processing" && before.stripe_mode !== "mock" && !before.stripe_checkout_session_id) {
+    throw new FunnelError("Payment is still processing", 409, "payment_processing");
+  }
   if (before.stripe_mode !== "mock" && before.stripe_checkout_session_id) {
     const stripe = stripeClientForConfig(stripePaymentConfig(input.request));
     let session = await stripe.checkout.sessions.retrieve(before.stripe_checkout_session_id);
@@ -1438,10 +1444,10 @@ export async function markPaymentCancelled(input: Readonly<{
   }
   const updated = await withDatabaseTransaction(sql, async tx => {
     const payment = await updatePaymentState(tx, {
-      action: "payment_cancelled", actor: "visitor", paymentId: input.paymentId,
-      reason: "visitor_cancelled_checkout", status: "cancelled",
+      action: "payment_cancelled", actor: input.retirement ? "system" : "visitor", paymentId: input.paymentId,
+      reason: input.retirement ? "reveal_offer_retired" : "visitor_cancelled_checkout", status: "cancelled",
       expectedStatuses: ["created", "checkout_session_created", "checkout_opened", "processing", "failed", "expired"],
-      metadata: { source: "checkout_cancel_action" }
+      metadata: { source: input.retirement ? "reveal_offer_retired" : "checkout_cancel_action" }
     });
     if (payment) await removeStripePaymentRevenue(tx, payment);
     return payment;
@@ -1453,7 +1459,7 @@ export async function markPaymentCancelled(input: Readonly<{
   const payment = updated;
 
   await writePaymentBpmEvent({
-    actorType: "visitor",
+    actorType: input.retirement ? "system" : "visitor",
     eventName: "payment_cancelled",
     eventStatus: "cancelled",
     locale: payment.locale,

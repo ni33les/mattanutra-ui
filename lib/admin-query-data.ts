@@ -45,6 +45,7 @@ import { getAdminTechnicalAlertsData } from "@/lib/admin-technical";
 import { getSql } from "@/lib/db";
 import type { BlogArticleBody } from "@/lib/blog";
 import type { AdminSessionContext } from "@/lib/admin-access-types";
+import { campaignSalesKey, getWebProductReport, type WebProductReport } from "@/lib/admin-web-product-report";
 
 export type AdminExternalQueryView =
   | "agents"
@@ -66,6 +67,10 @@ type QueryParams = AdminQueryParams;
 export type { AdminQueryPagination } from "@/lib/admin-query-helpers";
 
 export type AdminCampaignRow = Readonly<{
+  paidProductPayments?: number;
+  paidProductOrders?: number;
+  formulaViews?: number; productViews?: number; basketsConfirmed?: number; productCheckouts?: number; productPayments?: number;
+
   journeyChannel?: "web";
   affiliate: string | null;
   assessmentCompletions: number;
@@ -85,6 +90,10 @@ export type AdminCampaignRow = Readonly<{
 }>;
 
 export type AdminCampaignSummary = Readonly<{
+  paidProductPayments?: number;
+  paidProductOrders?: number;
+  formulaViews?: number; productViews?: number; basketsConfirmed?: number; productCheckouts?: number; productPayments?: number;
+
   assessmentCompletions: number;
   assessmentStarts: number;
   freeRequests: number;
@@ -95,6 +104,7 @@ export type AdminCampaignSummary = Readonly<{
 }>;
 
 export type AdminCampaignsData = Readonly<{
+  productReport?: WebProductReport;
   journeyChannel?: "web";
   pharmacySources?: PharmacySourceFunnel[];
   mcp?: McpFunnelReport;
@@ -295,7 +305,8 @@ const leadEventNames = new Set([
   "healthscore_page_viewed",
   "free_email_requested",
   "free_email_sent",
-  "formulation_page_viewed",
+  "formulation_page_viewed", "formula_details_viewed", "product_matches_viewed", "product_basket_confirmed",
+  "retail_product_checkout_session_created", "retail_product_payment_succeeded", "retail_order_shipped", "retail_order_delivered",
   "plan_selected"
 ]);
 
@@ -312,7 +323,7 @@ function flowNodeCount(flow: AdminFlowData, id: string) {
 }
 
 function campaignSummary(rows: readonly AdminCampaignRow[]): AdminCampaignSummary {
-  return rows.reduce(
+  return rows.reduce<AdminCampaignSummary>(
     (summary, row) => ({
       assessmentCompletions:
         summary.assessmentCompletions + row.assessmentCompletions,
@@ -322,7 +333,14 @@ function campaignSummary(rows: readonly AdminCampaignRow[]): AdminCampaignSummar
       landed: summary.landed + row.landed,
       precisionConversions:
         summary.precisionConversions + row.precisionConversions,
-      proConversions: summary.proConversions + row.proConversions
+      proConversions: summary.proConversions + row.proConversions,
+      formulaViews: (summary.formulaViews ?? 0) + (row.formulaViews ?? 0),
+      productViews: (summary.productViews ?? 0) + (row.productViews ?? 0),
+      basketsConfirmed: (summary.basketsConfirmed ?? 0) + (row.basketsConfirmed ?? 0),
+      productCheckouts: (summary.productCheckouts ?? 0) + (row.productCheckouts ?? 0),
+      productPayments: (summary.productPayments ?? 0) + (row.productPayments ?? 0),
+      paidProductPayments: (summary.paidProductPayments ?? 0) + (row.paidProductPayments ?? 0),
+      paidProductOrders: (summary.paidProductOrders ?? 0) + (row.paidProductOrders ?? 0)
     }),
     {
       assessmentCompletions: 0,
@@ -348,6 +366,7 @@ async function getCampaigns(params: QueryParams): Promise<AdminCampaignsData> {
     Array<{
       total: number;
       healthscore_displayed: number;
+      formula_views: number; product_views: number; baskets_confirmed: number; product_checkouts: number; product_payments: number;
       affiliate: string | null;
       assessment_completions: number | string;
       assessment_starts: number | string;
@@ -395,6 +414,11 @@ async function getCampaigns(params: QueryParams): Promise<AdminCampaignsData> {
     select
       grouping(source)::int as total,
       count(distinct subject) filter (where event_name='healthscore_viewed')::int as healthscore_displayed,
+      count(distinct subject) filter (where event_name='formula_details_viewed')::int as formula_views,
+      count(distinct subject) filter (where event_name='product_matches_viewed')::int as product_views,
+      count(distinct subject) filter (where event_name='product_basket_confirmed')::int as baskets_confirmed,
+      count(distinct subject) filter (where event_name in ('retail_product_checkout_session_created','retail_product_checkout_opened'))::int as product_checkouts,
+      count(distinct subject) filter (where event_name='retail_product_payment_succeeded')::int as product_payments,
       source,
       medium,
       campaign,
@@ -433,6 +457,9 @@ async function getCampaigns(params: QueryParams): Promise<AdminCampaignsData> {
     firstSeenAt: new Date(row.first_seen_at).toISOString(),
     freeRequests: Number(row.free_requests) || 0,
     healthScoreViews: Number(row.healthscore_views) || 0,
+    formulaViews: Number(row.formula_views) || 0, productViews: Number(row.product_views) || 0,
+    basketsConfirmed: Number(row.baskets_confirmed) || 0, productCheckouts: Number(row.product_checkouts) || 0,
+    productPayments: Number(row.product_payments) || 0,
     landed: Number(row.landed) || 0,
     lastSeenAt: new Date(row.last_seen_at).toISOString(),
     medium: row.medium,
@@ -442,17 +469,28 @@ async function getCampaigns(params: QueryParams): Promise<AdminCampaignsData> {
     source: row.source
   });
   const total = rows.find(row => row.total === 1);
+  const productReport = await getWebProductReport(start, params.filters);
   const mappedRows = rows.filter(row => row.total === 0).map(mapRow);
+  for (const sale of productReport?.campaigns ?? []) {
+    const index = mappedRows.findIndex(row => campaignSalesKey({ ...row, source: row.source ?? "direct" }) === campaignSalesKey(sale));
+    const paid = { paidProductPayments: sale.paidPayments, paidProductOrders: sale.orders };
+    if (index >= 0) mappedRows[index] = { ...mappedRows[index], ...paid };
+    else mappedRows.push({ ...sale, ...paid, journeyChannel: "web", assessmentCompletions: 0, assessmentStarts: 0,
+      firstSeenAt: sale.firstPaidAt, lastSeenAt: sale.lastPaidAt, freeRequests: 0, healthScoreViews: 0,
+      landed: 0, precisionConversions: 0, proConversions: 0 });
+  }
   const { pageRows, pagination } = paginateAdminRows(mappedRows, params);
 
   return {
     databaseAvailable: true,
+    productReport,
     journeyChannel: "web",
     pharmacySources: await getPharmacySourceFunnel(start, params.filters),
     mcp: await getAdminMcpFunnel(start),
     healthScoreDisplayed: Number(total?.healthscore_displayed) || 0,
     rows: pageRows,
-    summary: campaignSummary(total ? [mapRow(total)] : []),
+    summary: { ...campaignSummary(total ? [mapRow(total)] : []),
+      paidProductPayments: productReport?.sales.paidPayments ?? 0, paidProductOrders: productReport?.sales.orders ?? 0 },
     meta: await metaDiagnostics(start),
     connections: await (await import("@/lib/connect-report")).connectReport(start),
     pagination
@@ -547,6 +585,13 @@ async function getLeads(params: QueryParams): Promise<AdminLeadsData> {
         bool_or(event_name in ('assessment_submitted', 'assessment_captured', 'assessment_recaptured')) as submitted,
         bool_or(event_name in ('assessment_resume_requested', 'assessment_resume_email_sent', 'assessment_resume_opened')) as assessment_resume_requested,
         bool_or(event_name in ('healthscore_viewed','healthscore_page_viewed')) as healthscore_viewed,
+        bool_or(event_name='formula_details_viewed') as formula_viewed,
+        bool_or(event_name='product_matches_viewed') as products_viewed,
+        bool_or(event_name='product_basket_confirmed') as basket_confirmed,
+        bool_or(event_name='retail_product_checkout_session_created') as product_checkout,
+        bool_or(event_name='retail_product_payment_succeeded') as product_paid,
+        bool_or(event_name='retail_order_shipped') as product_shipped,
+        bool_or(event_name='retail_order_delivered') as product_delivered,
         bool_or(event_name = 'free_email_requested') as free_email_requested,
         bool_or(event_name = 'free_email_sent') as free_email_sent,
         bool_or(
@@ -570,6 +615,13 @@ async function getLeads(params: QueryParams): Promise<AdminLeadsData> {
     ),
     staged_leads as (
       select *, case
+        when product_delivered then 'product_delivered'
+        when product_shipped then 'product_shipped'
+        when product_paid then 'product_paid'
+        when product_checkout then 'product_checkout'
+        when basket_confirmed then 'basket_confirmed'
+        when products_viewed then 'products_viewed'
+        when formula_viewed then 'formula_viewed'
         when pro_paid then 'pro'
         when precision_paid then 'precision'
         when free_email_sent then 'free_sent'

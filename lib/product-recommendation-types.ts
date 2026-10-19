@@ -148,6 +148,7 @@ export type ProductRecommendationDiagnostics = Readonly<{
       productIds: readonly string[];
       dailyServings: readonly number[];
       coveragePercent: number;
+      coverageSnapshot?: import("@/lib/matcher/selection-coverage").SelectionCoverageSnapshot;
       priceMinor: number;
       dailyPills: number | null;
       doseFit: import("@/lib/matcher/types").DoseFitScore | null;

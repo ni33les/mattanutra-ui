@@ -11,7 +11,9 @@ export function targetBasis(target: CanonicalTarget) { return target.basis ?? "s
 
 /** Coverage is a claim about known intake. Estimates remain in dose-fit ranges,
  * but their nominal amount must not become guaranteed coverage. */
-export function knownTargetExposure(request: CanonicalRequest, target: CanonicalTarget, supplemental: bigint) {
+export type TargetCoverageRequest = Pick<CanonicalRequest, "currentSupplements" | "dietaryIntake" | "unknownIntakeSubjectIds" | "estimatedIntakeSubjectIds">;
+
+export function knownTargetExposure(request: TargetCoverageRequest, target: CanonicalTarget, supplemental: bigint) {
   const uncertainCurrent = request.currentSupplements.filter(row => row.subjectId === target.subjectId && !intakeIsKnown(row))
     .reduce((sum, row) => sum + row.daily.units, BigInt(0));
   const diet = targetBasis(target) === "total_daily" ? (request.dietaryIntake ?? [])

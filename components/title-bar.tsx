@@ -58,6 +58,7 @@ function isAssessmentStartedPath(currentPath: string, locale: Locale) {
     pathname === `/${locale}/nutrition/quiz` ||
     pathname === `/${locale}/nutrition/healthscore` ||
     pathname === `/${locale}/nutrition/reveal` ||
+    pathname === `/${locale}/nutrition/plan` ||
     pathname === `/${locale}/order/track` ||
     pathname.startsWith(`/${locale}/order/track/`) ||
     (/\/retail\/[^/]+\/(quiz|reveal|plan)$/.test(pathname)) ||

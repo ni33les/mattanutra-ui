@@ -369,6 +369,7 @@ export type FormulationResult = FormulationBlueprint & FoodGuidanceBlueprint & {
   nutritionReport?: NutritionReport | null;
   planId: string;
   assessmentRevision?: number;
+  formulaVersion?: number;
   selectionRevision?: number;
   excludedProductIds?: readonly string[];
   previewLimit?: number;

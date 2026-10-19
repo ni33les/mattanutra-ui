@@ -8,6 +8,17 @@ import { metaCustomData, metaEventName, metaEventForBpm, sanitiseMetaUrl, browse
 import { publicLocales } from "../lib/i18n.ts";
 const planId = "843893a8-4c1b-44d9-86f4-092e16270d1a";
 describe("campaign export boundary", () => {
+  it("separates progressive reveal stages without exporting result evidence or health content", () => {
+    for (const stage of ["formula", "products", "healthscore"]) {
+      assert.deepEqual(metaCustomData("ViewContent", { planId, stage, journey_version: "web-products-v1",
+        revision: 2, runId: planId, selectedItemIds: [planId], explanation: "private", condition: "private" }, "prd"),
+      { mn_env: "prd", event_schema: "1", plan_id: planId, funnel_stage: stage, journey_version: "web-products-v1" });
+    }
+    assert.equal(metaCustomData("ViewContent", { journey_version: "private-condition" }, "prd").journey_version, undefined);
+    for (const event of ["reveal_page_viewed", "formula_details_viewed", "product_matches_viewed", "web_processing_viewed"]) {
+      assert.equal(metaEventForBpm(event), null, "Only the visible-content helper authors the new Meta milestones");
+    }
+  });
   it("accepts both production hostnames behind a proxy while rejecting foreign and cross-environment origins", () => {
     const request = (origin?: string) => new Request("http://0.0.0.0:8080/api/marketing/consent", { headers: origin ? { origin } : {} });
     for (const origin of ["https://mattanutra.com", "https://www.mattanutra.com"]) assert.equal(metaRequestOriginAllowed(request(origin), "prd"), true);

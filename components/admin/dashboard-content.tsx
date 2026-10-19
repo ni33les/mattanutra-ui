@@ -1398,6 +1398,8 @@ const baseContent = {
       targetSaveError: "Could not save targets."
     },
     flowNodes: {
+      revealOpened: "Reveal opened", assessmentCaptured: "Assessment saved", formulaViewed: "Formula viewed", productsViewed: "Products viewed",
+      basketConfirmed: "Basket confirmed", productCheckoutReady: "Payment ready",
       assessmentStarted: "Started",
       assessmentSubmitted: "Submitted",
       assessmentViewed: "Assessment",
@@ -2326,6 +2328,8 @@ const baseContent = {
       targetSaveError: "ไม่สามารถบันทึกเป้าได้"
     },
     flowNodes: {
+      revealOpened: "เปิดหน้าผลลัพธ์", assessmentCaptured: "บันทึกแบบประเมิน", formulaViewed: "ดูสูตรแล้ว", productsViewed: "ดูสินค้าแล้ว",
+      basketConfirmed: "ยืนยันตะกร้า", productCheckoutReady: "พร้อมชำระเงิน",
       assessmentStarted: "เริ่มทำ",
       assessmentSubmitted: "ส่งแบบประเมิน",
       assessmentViewed: "แบบประเมิน",

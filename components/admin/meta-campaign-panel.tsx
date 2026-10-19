@@ -41,11 +41,11 @@ export function MetaCampaignPanel({ data, locale }: { data: MetaDiagnostics; loc
     </div>
     <h3 className="font-semibold">{t.activity}</h3><p className="mt-1 text-xs text-gray-600">{t.cohort}</p>
     <div className="mt-3 overflow-x-auto"><table aria-label={t.activity} className="w-full text-sm">
-      {headings([t.ids, t.flow, t.language, t.visitors, t.starts, t.completions, t.checkouts, t.buyers, t.rate], { 3: funnelStageColors.entry, 4: funnelStageColors.start, 5: funnelStageColors.complete, 6: funnelStageColors.conversion, 7: funnelStageColors.order, 8: funnelStageColors.order })}
+      {headings([t.ids, t.flow, t.language, t.visitors, t.starts, t.completions, t.formulaViews, t.productViews, t.baskets, t.checkouts, t.productBuyers, t.rate], { 3: funnelStageColors.entry, 4: funnelStageColors.start, 5: funnelStageColors.complete, 6: funnelStageColors.conversion, 7: funnelStageColors.order, 8: funnelStageColors.order })}
       <tbody className="divide-y divide-gray-100">{activity.map(row => <tr key={key(row)}>{dimensions(row)}
-        {[row.visitors, row.starts, row.completions, row.checkouts, row.purchasingVisitors].map((value, index) => <td className="p-3 tabular-nums" key={index}>{number(value)}</td>)}
-        <td className="p-3 tabular-nums">{row.purchaseRate === null ? "—" : `${number(row.purchaseRate)}%`}</td>
-      </tr>)}{!activity.length && <tr><td className="p-3 text-gray-500" colSpan={9}>{t.empty}</td></tr>}</tbody>
+        {[row.visitors, row.starts, row.completions, row.formulaViews ?? 0, row.productViews ?? 0, row.baskets ?? 0, row.productCheckouts ?? 0, row.productPurchasingVisitors ?? 0].map((value, index) => <td className="p-3 tabular-nums" key={index}>{number(value)}</td>)}
+        <td className="p-3 tabular-nums">{row.productPurchaseRate == null ? "—" : `${number(row.productPurchaseRate)}%`}</td>
+      </tr>)}{!activity.length && <tr><td className="p-3 text-gray-500" colSpan={12}>{t.empty}</td></tr>}</tbody>
     </table></div>
     <h3 className="mt-6 font-semibold">{t.sales}</h3><p className="mt-1 text-xs text-gray-600">{t.salesNote}</p>
     <div className="mt-3 overflow-x-auto"><table aria-label={t.sales} className="w-full text-sm">
