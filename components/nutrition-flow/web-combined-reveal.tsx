@@ -33,7 +33,7 @@ export function WebCombinedReveal({ locale, planId, answers, result, snapshot, f
   const c = webProductCopy[locale], shared = combinedCopy[locale], detailCopy = revealFinalCopy[locale];
   const root = useRef<HTMLDivElement>(null);
   const [copied, setCopied] = useState(false), [copyFailed, setCopyFailed] = useState(false);
-  const formula = result?.access === "full" && snapshot?.revision === result.assessmentRevision
+  const formula = result?.access === "full" && snapshot && snapshot.revision === result.assessmentRevision
     && snapshot.formulaVersion === result.formulaVersion ? result : null;
   const ingredients = visibleFormulaIngredients(formula?.supplementBreakdown ?? []).sort((a, b) => a.effectivenessRank - b.effectivenessRank);
   const option = formula ? selectProductRecommendationOption(productRecommendationOptionsForResult(formula), "balanced") : undefined;
