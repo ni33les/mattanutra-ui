@@ -118,6 +118,19 @@ it("DISC-INFRA-01 complete MCP qualification includes refinement and matching ex
   assert.deepEqual(unclassifiedMatcherConsumers(process.cwd(),inventory.node,inventory.mcp),[]);
 });
 
+it("free web product consumers retain their web or commerce ownership and PostgreSQL execution", () => {
+  const inventory = fullTestInventory();
+  const expected = {
+    web: ["test/web-product-journey.integration.test.ts", "test/meta-web-product-milestone.integration.test.ts", "test/web-selection-coverage.test.ts"],
+    commerce: ["test/meta-internal-purchases.integration.test.ts"]
+  };
+  for (const [group, files] of Object.entries(expected)) for (const file of files) {
+    assert.ok(inventory.matcherGroups[group].includes(file), `${file} belongs to ${group}`);
+    assert.equal(inventory.mcp.filter(entry => entry === file).length, 1, file);
+    assert.equal(inventory.integration.includes(file), file.includes(".integration.test."), file);
+  }
+});
+
 it("QUALITY-DISC-04 full discovery includes JavaScript cases and keeps their PostgreSQL batch distinct", async () => {
   const { mkdtempSync, mkdirSync, writeFileSync, rmSync } = await import("node:fs");
   const { tmpdir } = await import("node:os");

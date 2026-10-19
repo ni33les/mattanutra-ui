@@ -38,7 +38,7 @@ export function sanitiseMetaUrl(value: unknown, env: MetaEnvironment): string | 
     const match = url.pathname.match(/^\/([^/]+)(?:\/(.*))?\/?$/);
     if (!match || !isLocale(match[1])) return null;
     const [, locale, tail = ""] = match;
-    const exact = ["", "privacy", "terms", "assessment", "assessment/results", "nutrition/refine", "nutrition/quiz", "nutrition/healthscore", "nutrition/progress", "nutrition/reveal", "nutrition/payment/checkout", "nutrition/payment/return", "basket/checkout", "basket/return", "order/track", "library"];
+    const exact = ["", "privacy", "terms", "assessment", "assessment/results", "nutrition/refine", "nutrition/quiz", "nutrition/healthscore", "nutrition/progress", "nutrition/reveal", "nutrition/plan", "nutrition/payment/checkout", "nutrition/payment/return", "basket/checkout", "basket/return", "order/track", "library"];
     const path = /^connect(?:\/(?:claude|perplexity|chatgpt|grok))?\/?$/.test(tail) ? tail.replace(/\/$/, "")
       : exact.includes(tail.replace(/\/$/, "")) ? tail.replace(/\/$/, "")
       : tail.startsWith("library/") || tail.startsWith("blog/") ? "library"

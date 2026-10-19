@@ -13,7 +13,7 @@ export function validateMatcherFixtureCounts(counts) {
 }
 
 export function validateMatcherFixtureRelations(relations) {
-  const required = ["retail_checkout_payments", "retail_customer_orders"];
+  const required = ["retail_checkout_payments", "retail_customer_orders", "meta_tracking_contexts", "meta_tracking_bindings", "meta_conversion_events"];
   for (const name of required) assert.equal(relations[name], true, `Missing maintained MCP commerce prerequisite: ${name}`);
   return Object.fromEntries(required.map(name => [name, true]));
 }
@@ -32,7 +32,10 @@ export async function checkMatcherFixtureDatabase(env) {
   try {
     const [relations] = await sql`select
       to_regclass('public.retail_checkout_payments') is not null as retail_checkout_payments,
-      to_regclass('public.retail_customer_orders') is not null as retail_customer_orders`;
+      to_regclass('public.retail_customer_orders') is not null as retail_customer_orders,
+      to_regclass('public.meta_tracking_contexts') is not null as meta_tracking_contexts,
+      to_regclass('public.meta_tracking_bindings') is not null as meta_tracking_bindings,
+      to_regclass('public.meta_conversion_events') is not null as meta_conversion_events`;
     validateMatcherFixtureRelations(relations);
     const [payments] = await sql`select
       (select pg_get_constraintdef(oid) from pg_constraint

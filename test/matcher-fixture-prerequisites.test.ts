@@ -16,9 +16,10 @@ test("MCP-FIXTURE-02 prerequisite validation preserves declared counts and rejec
   assert.deepEqual(complete, { products: 3, productFacts: 4, supplements: 2, retailListings: 3, safetyReferences: 5 });
 });
 
-test("MCP-FIXTURE-03 the HTTP support journey requires the actual retail payment and order relations", () => {
+test("MCP-FIXTURE-03 commerce journeys require retail payment, order and conversion relations", () => {
   assert.equal(typeof prerequisites.validateMatcherFixtureRelations, "function");
-  const relations = { retail_checkout_payments: true, retail_customer_orders: true };
+  const relations = { retail_checkout_payments: true, retail_customer_orders: true,
+    meta_tracking_contexts: true, meta_tracking_bindings: true, meta_conversion_events: true };
   assert.deepEqual(prerequisites.validateMatcherFixtureRelations(relations), relations);
   for (const name of Object.keys(relations)) {
     assert.throws(() => prerequisites.validateMatcherFixtureRelations({ ...relations, [name]: false }), new RegExp(name));
