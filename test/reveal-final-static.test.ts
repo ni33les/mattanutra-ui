@@ -64,8 +64,8 @@ function assertOrder(source: string, labels: readonly string[]) {
 
 describe("final reveal UX", () => {
   it("shows progress while loading its saved result", () => {
-    assert.match(wrapper, /const preparation = commerce \? <WebPreparationPanel/);
-    assert.match(wrapper, /if \(loadState === "loading"\) \{\s*return preparation \? <>\{preparation\}<\/> : <FunnelLoading locale=\{locale\} stage="opening" \/>;\s*\}/);
+    assert.match(wrapper, /if \(commerce\) return <WebCombinedReveal/);
+    assert.match(wrapper, /if \(loadState === "loading"\) \{\s*return <FunnelLoading locale=\{locale\} stage="opening" \/>;\s*\}/);
     assert.doesNotMatch(wrapper, /NutritionGuidancePreparingPanel/);
     assert.match(wrapper, /data-testid="formulation-retry"/);
   });

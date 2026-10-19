@@ -31,7 +31,7 @@ import type {
 } from "@/lib/formulation-types";
 import { localeHtmlLang, type Locale } from "@/lib/i18n";
 import type { NutritionJourneySnapshot } from "@/lib/nutrition-journey-read";
-import { WebPreparationPanel } from "@/components/nutrition-flow/web-preparation-panel";
+import { WebCombinedReveal } from "@/components/nutrition-flow/web-combined-reveal";
 
 type FormulationResultsProps = Readonly<{
   initialResult?: FormulationResult | null;
@@ -91,16 +91,14 @@ export function FormulationResults({
     });
   }, [productPollingPreference, result]);
 
-  const preparation = commerce ? <WebPreparationPanel answers={commerce.answers} failed={failed}
-    formulaReady={Boolean(result && result.access !== "preview")} ready={Boolean(snapshot?.readyForReveal && !snapshot.refreshPending && !snapshot.failed && result && !resultHasPendingProductRecommendations(result))}
-    locale={locale} planId={planId} retry={retry} /> : null;
+  if (commerce) return <WebCombinedReveal answers={commerce.answers} failed={failed} result={result} snapshot={snapshot}
+    locale={locale} planId={planId} retry={retry} />;
 
   if (loadState === "loading") {
-    return preparation ? <>{preparation}</> : <FunnelLoading locale={locale} stage="opening" />;
+    return <FunnelLoading locale={locale} stage="opening" />;
   }
 
   if (loadState === "error" || !result) {
-    if (preparation) return <>{preparation}</>;
     return (
       <section className="mx-auto w-full max-w-6xl px-6 py-10 sm:px-8 lg:py-14">
         <div className="rounded-lg bg-white p-6 text-center ring-1 ring-foreground/10 sm:p-8">
@@ -166,7 +164,6 @@ export function FormulationResults({
 
   return (
     <>
-    {preparation}
     {failed && !commerce ? <div role="status" className="mx-auto max-w-6xl px-6">{labels.error} {recovery}</div> : null}
     <RevealFinalResultsPage
       commerce={Boolean(commerce)}

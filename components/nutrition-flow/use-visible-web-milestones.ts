@@ -28,8 +28,9 @@ export function useVisibleWebMilestones(root: RefObject<HTMLElement | null>, {
       }
       recordVisible();
     }, { threshold: 0.05 });
-    const formula = root.current.querySelector(".mn-reveal-formula-card");
-    const products = runId ? root.current.querySelector("#products .products-grid") : null;
+    // Heading or packshot visibility alone is not a result view: require a real dose / price.
+    const formula = root.current.querySelector('[data-web-result-stage="formula"] .mn-nutrient > span, .mn-reveal-formula-card .nutrient-dose');
+    const products = runId ? root.current.querySelector('[data-web-result-stage="products"] .mn-product-price, #products .products-grid [data-testid="reveal-product-price"]') : null;
     if (formula && formulaVersion) { observed.set(formula, "formula"); observer.observe(formula); }
     if (products) { observed.set(products, "products"); observer.observe(products); }
     document.addEventListener("visibilitychange", recordVisible);

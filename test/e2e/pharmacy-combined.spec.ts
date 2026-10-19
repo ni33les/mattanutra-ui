@@ -23,7 +23,8 @@ async function fixture(
       "./scripts/register-ts-path-loader.mjs",
       "--input-type=module",
       "-e",
-      `import {seedPharmacyFixture} from './test/helpers/pharmacy-fixture.ts';import {closeSqlPool} from './lib/db.ts';try{console.log('FIXTURE:'+JSON.stringify(await seedPharmacyFixture('en',process.argv[1]==='true',JSON.parse(process.argv[2]))));}finally{await closeSqlPool();}`,
+      // Fixture writes have committed; optional background work must not keep this CLI alive.
+      `import {seedPharmacyFixture} from './test/helpers/pharmacy-fixture.ts';import {closeSqlPool} from './lib/db.ts';try{console.log('FIXTURE:'+JSON.stringify(await seedPharmacyFixture('en',process.argv[1]==='true',JSON.parse(process.argv[2]))));}finally{await closeSqlPool();}process.exit(0);`,
       String(ready),
       JSON.stringify(existing ?? null),
     ],

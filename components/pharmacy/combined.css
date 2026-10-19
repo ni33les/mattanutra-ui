@@ -1624,6 +1624,23 @@
 #mn-pharmacy-combined .mn-estimate { margin:0 auto 10px; text-align:center; color:var(--mn-muted); }
 #mn-pharmacy-combined .mn-match svg { display:inline-block; vertical-align:middle; margin-right:4px; }
 
+/* Real formula details remain usable when matching is pending or needs retry. */
+#mn-pharmacy-combined .mn-window[data-formula-ready="true"] .mn-result { opacity:1; pointer-events:auto; }
+
+/* Online progressive results use the same cards and stage, with intrinsic height for explanations. */
+#mn-pharmacy-combined .mn-window[data-preserve-progress="true"][data-started-pending="true"] .mn-status-row { min-height:166px; height:166px; }
+#mn-pharmacy-combined .mn-window[data-preserve-progress="true"][data-started-pending="true"] .mn-estimate { min-height:62px; }
+#mn-pharmacy-combined .mn-window[data-preserve-progress="true"][data-formula-ready="true"] .mn-stage { height:auto; }
+#mn-pharmacy-combined .mn-window[data-preserve-progress="true"][data-formula-ready="true"] .mn-analysis,
+#mn-pharmacy-combined .mn-window[data-preserve-progress="true"][data-formula-ready="true"] .mn-result { position:relative; inset:auto; }
+#mn-pharmacy-combined .mn-window[data-preserve-progress="true"][data-formula-ready="true"] .mn-result { margin-top:34px; grid-template-rows:auto auto auto; }
+#mn-pharmacy-combined .mn-window[data-preserve-progress="true"] :is(.mn-selected-wrap,.mn-nutrient,.mn-products,.mn-group-flow) { opacity:1; transform:none; animation:none !important; transition:none; }
+#mn-pharmacy-combined .mn-nutrient-details { margin-top:10px; font-size:12px; line-height:1.5; text-align:left; font-weight:400; }
+#mn-pharmacy-combined .mn-nutrient-details summary { color:var(--mn-green); cursor:pointer; margin-top:8px; }
+#mn-pharmacy-combined .mn-nutrient-details :is(p,ul) { margin-top:8px; }
+#mn-pharmacy-combined .mn-nutrient-details strong { display:inline; font-size:inherit; font-weight:700; }
+#mn-pharmacy-combined .mn-nutrient-details span { display:inline; font-size:inherit; font-weight:inherit; color:inherit; }
+
 /* One flight continues until real readiness; its dust uses the same pausable clock. */
 #mn-pharmacy-combined .mn-flight-layer { position: absolute; inset: 0; z-index: 7; pointer-events: none; }
 #mn-pharmacy-combined .mn-window:is([data-flight="flying"], [data-flight="exiting"]) .mn-clarity-logo-shell { opacity: 1; }

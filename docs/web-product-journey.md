@@ -8,7 +8,7 @@ Capture assigns the journey identity and persists first acquisition attribution.
 
 The reveal reads current formula details with `products=0` while matching is pending, then loads products when server readiness permits. HealthScore and food generation continue independently. Formula details remain available when matching fails. A customer can resume with their existing private assessment URL; result reads do not create new tasks. Retry reuses valid results and active work under the existing generation fences.
 
-The web preparation cards use saved answers and localized copy. Rotation runs every six seconds, pauses during interaction and in hidden tabs, and respects reduced motion. Nong and the pharmacy animation are shared. Available results do not wait for animation. Optional HealthScore and detailed-plan views are free; the latter shares the pharmacy detailed presentation through a web adapter.
+The web and pharmacy reveal share the same presentation shell, five input tiles, Nong animation, ingredient grid, product checkbox cards, basket styling and detailed-plan invitation. The web adapter uses online prices and continues to the existing delivery and Stripe checkout. Saved-answer cards rotate every six seconds, pause during interaction and in hidden tabs, and respect reduced motion. Formula explanations remain expandable while matching runs; available results do not wait for animation. Optional HealthScore and detailed-plan views are free; the latter shares the pharmacy detailed presentation through a web adapter.
 
 ## Basket and payments
 
