@@ -94,7 +94,7 @@ export function WebCombinedReveal({ locale, planId, answers, result, snapshot, f
 
   return <div ref={root} data-testid="web-product-journey" data-stage={ready ? "ready" : formula ? "products" : "formula"}>
     <PharmacyRevealShell locale={locale} ready={ready} failed={failed} formulaReady={Boolean(formula)} preserveProgress
-      title={shared.title} status={formula ? c.matching : undefined} estimate={c.free}
+      title={shared.title} status={failed ? c.failed : formula ? c.matching : undefined} estimate={c.free}
       inputs={shared.inputs.map((label, index) => index === 3 ? c.availableProducts : label)}
       waitingDetails={<WebPreparationDetails answers={answers} failed={failed} ready={ready} locale={locale} planId={planId} retry={retry} />}
       result={formula ? <>
