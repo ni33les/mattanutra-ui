@@ -1,6 +1,10 @@
 .mn-web-recovery{position:relative;z-index:1;max-width:620px;margin:24px auto;padding:16px;text-align:center;color:var(--mn-ink-soft);line-height:1.6}
 .mn-web-recovery .mn-recovery-button{margin-top:12px}
 .mn-web-resume{position:relative;z-index:1;text-align:center;font-size:13px;margin:20px auto 0;max-width:650px}.mn-web-resume button,.mn-web-resume a{color:var(--mn-teal-deep);text-decoration:underline;cursor:pointer}.mn-web-resume a{overflow-wrap:anywhere}
+#mn-pharmacy-combined[data-channel=web] .mn-web-progress{display:flex;align-items:center;gap:12px;font-size:clamp(22px,2.3vw,28px);font-weight:600;line-height:1.35;color:var(--mn-ink)}
+#mn-pharmacy-combined[data-channel=web] .mn-web-progress-spinner{flex:none;width:1em;height:1em;color:var(--mn-teal);animation:mn-web-progress-spin 1s linear infinite}
+@keyframes mn-web-progress-spin{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){#mn-pharmacy-combined[data-channel=web] .mn-web-progress-spinner{animation:none}}
 #mn-pharmacy-combined[data-channel=web] .mn-products{width:min(960px,100% - 32px);margin:12px auto 24px;gap:20px}
 #mn-pharmacy-combined[data-channel=web] .mn-product{padding:18px 14px 14px}
 @media(max-width:520px){

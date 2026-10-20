@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useRef, useState } from "react";
+import { LoaderCircle } from "lucide-react";
 import { PharmacyRevealShell, PharmacyIngredientCards, PharmacyProductCard, PharmacyPlanInvitation } from "@/components/pharmacy/reveal-presentation";
 import { combinedCopy } from "@/components/pharmacy/combined-copy";
 import { WebRevealRecovery } from "./web-preparation-panel";
@@ -96,7 +97,11 @@ export function WebCombinedReveal({ locale, planId, result, snapshot, failed, re
 
   return <div ref={root} data-testid="web-product-journey" data-stage={ready ? "ready" : formula ? "products" : "formula"}>
     <PharmacyRevealShell locale={locale} ready={ready} failed={failed} formulaReady={Boolean(formula)} preserveProgress
-      title={c.ready} status={c[progress]} showEstimate={false}
+      title={c.ready} showEstimate={false}
+      status={ready || failed ? c[progress] : <span className="mn-web-progress">
+        <LoaderCircle className="mn-web-progress-spinner" aria-hidden="true" />
+        <span>{c[progress]}</span>
+      </span>}
       inputs={shared.inputs.map((label, index) => index === 3 ? c.availableProducts : label)}
       recovery={<WebRevealRecovery failed={failed} ready={ready} locale={locale} planId={planId} retry={retry} />}
       result={formula ? <>
