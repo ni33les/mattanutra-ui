@@ -17,6 +17,7 @@ import { reduceSelectionCoverage } from "@/lib/matcher/selection-coverage";
 import { trackWebProductMilestone } from "@/lib/meta-client";
 import { trackBpmEvent } from "@/lib/bpm-client";
 import { nutritionRevealPath } from "@/lib/nutrition-paths";
+import { webRevealProgress } from "@/lib/web-reveal-progress";
 import type { FormulationResult, RecommendedProduct } from "@/lib/formulation-types";
 import type { NutritionJourneySnapshot } from "@/lib/nutrition-journey-read";
 import type { Locale } from "@/lib/i18n";
@@ -41,6 +42,7 @@ export function WebCombinedReveal({ locale, planId, result, snapshot, failed, re
   const ready = Boolean(formula && snapshot?.readyForReveal && !snapshot.refreshPending && !snapshot.failed
     && (summary?.runId ?? null) === snapshot.productRunId && !resultHasPendingProductRecommendations(formula));
   const products = ready ? option?.recommendations ?? formula?.recommendations ?? [] : [];
+  const progress = webRevealProgress({ ready, failed, formulaReady: Boolean(formula), snapshot });
   const runId = ready ? summary?.runId : undefined;
   const matching = summary?.matching;
   const matchedOption = matching?.options.find(candidate => candidate.candidateKey === matching.selectedCandidateKey);
@@ -94,7 +96,7 @@ export function WebCombinedReveal({ locale, planId, result, snapshot, failed, re
 
   return <div ref={root} data-testid="web-product-journey" data-stage={ready ? "ready" : formula ? "products" : "formula"}>
     <PharmacyRevealShell locale={locale} ready={ready} failed={failed} formulaReady={Boolean(formula)} preserveProgress
-      title={shared.title} status={failed ? c.failed : formula ? c.matching : undefined} estimate={c.free}
+      title={c.ready} status={c[progress]} showEstimate={false}
       inputs={shared.inputs.map((label, index) => index === 3 ? c.availableProducts : label)}
       recovery={<WebRevealRecovery failed={failed} ready={ready} locale={locale} planId={planId} retry={retry} />}
       result={formula ? <>
@@ -111,7 +113,7 @@ export function WebCombinedReveal({ locale, planId, result, snapshot, failed, re
               </details>
             </div>} />
         </div>
-        <div className="mn-group-flow"><h3 className="mn-flow-copy">{c.matchingProducts}</h3><div className="mn-flow-mark" aria-hidden="true" /></div>
+        <div className="mn-group-flow"><h3 className="mn-flow-copy">{c.availableProducts}</h3><div className="mn-flow-mark" aria-hidden="true" /></div>
         {ready && <div id="products" className="mn-products" data-web-result-stage={products.length && priced ? "products" : undefined}>
           {products.map(product => <PharmacyProductCard key={productId(product)} locale={locale} imageUrl={product.imageUrl} name={product.name}
             coverage={product.covers.map(id => localizedSupplementName(ingredients.find(item => item.id === id)?.supplement ?? id, id, locale)).join(" · ")}
@@ -131,6 +133,7 @@ export function WebCombinedReveal({ locale, planId, result, snapshot, failed, re
             {!!affected.length && <p>{c.affected}: {affected.join(" · ")}</p>}<p>{c.fullFormula}</p>
           </div>}
           {!products.length ? <p>{c.noProducts}</p> : <>
+            <p className="mn-pre-confirm">{c.free}</p>
             <p className="mn-pre-confirm">{selectedPriced ? c.deliveryNext : c.pricingPending}</p>
             {checkoutHref ? <Link className="mn-confirm-btn" href={checkoutHref} onClick={confirmBasket}>{c.continue}</Link>
               : <button className="mn-confirm-btn" disabled>{selectedIds.length ? c.continue : c.empty}</button>}

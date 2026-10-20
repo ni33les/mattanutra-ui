@@ -66,6 +66,7 @@ export type PharmacyRevealShellProps = {
   status?: ReactNode;
   title?: ReactNode;
   estimate?: ReactNode;
+  showEstimate?: boolean;
   inputs?: readonly string[];
   testId?: string;
   readyTestId?: string;
@@ -76,7 +77,7 @@ export type PharmacyRevealShellProps = {
 /** Shared presentation only. Each channel retains its own generation, pricing and order adapter. */
 export function PharmacyRevealShell({ locale, ready, failed, formulaReady,
   matchingReady = ready, result, children, waitingDetails, recovery, status: customStatus,
-  title, estimate, inputs, testId = "pharmacy-combined", readyTestId, preserveProgress = false, rootRef,
+  title, estimate, showEstimate = true, inputs, testId = "pharmacy-combined", readyTestId, preserveProgress = false, rootRef,
 }: PharmacyRevealShellProps) {
   const c = combinedCopy[locale], p = pharmacyCopy[locale];
   const root = useRef<HTMLElement | null>(null);
@@ -120,7 +121,7 @@ export function PharmacyRevealShell({ locale, ready, failed, formulaReady,
         </div>
         <PharmacyGuide />
       </div>
-      {((!ready && !failed) || (preserveProgress && startedPending)) && <div className="mn-estimate">
+      {showEstimate && ((!ready && !failed) || (preserveProgress && startedPending)) && <div className="mn-estimate">
         <p>{estimate ?? c.estimate}</p>
         {(phase === "waiting" || phase === "matching" || (preserveProgress && startedPending)) && <p className="mn-processing-activity" data-testid="pharmacy-processing-activity" role="status">
           {!ready && !failed && <LoaderCircle aria-hidden="true" size={22} />}

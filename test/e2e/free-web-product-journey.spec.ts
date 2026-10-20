@@ -1,6 +1,7 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { expect, test, type Page } from "../helpers/offline-browser";
+import { webProductCopy } from "../../components/nutrition-flow/web-product-copy";
 const execute = promisify(execFile);
 test.setTimeout(180_000);
 async function fixture(input: Record<string, unknown>) {
@@ -20,9 +21,10 @@ function observeWebOnly(page: Page) {
   return { errors, pharmacyRequests };
 }
 
-for (const locale of ["en", "th", "zh-CN"]) {
+for (const locale of ["en", "th", "zh-CN"] as const) {
   test(`${locale}: free reveal stays on one page, exposes formula before matching and survives reload`, async ({ page }, testInfo) => {
     const channel = observeWebOnly(page);
+    const copy = webProductCopy[locale];
     await page.emulateMedia({ reducedMotion: "reduce" });
     const captured = await fixture({ action: "capture", locale });
     const rationale = locale === "th" ? "เหตุผลเฉพาะคุณสำหรับข้อมูลทดสอบ" : locale === "zh-CN" ? "适合您的测试推荐理由" : "Fixture rationale";
@@ -36,10 +38,19 @@ for (const locale of ["en", "th", "zh-CN"]) {
     const url = `/${locale}/nutrition/reveal?plan=${captured.planId}`;
     await page.goto(url);
     await expect(page.getByTestId("web-product-journey")).toHaveAttribute("data-stage", "formula");
+    const status = page.locator(".mn-status-single");
+    await expect(status).toHaveText(copy.calculating);
+    await expect(page.locator(".mn-estimate")).toHaveCount(0);
+    await expect(page.getByText(copy.free, { exact: true })).toHaveCount(0);
     await expect(page.getByTestId("web-preparation-detail")).toHaveCount(0);
     await expect(page.getByTestId("web-reveal-recovery")).toHaveCount(0);
+    if (locale === "en") {
+      await fixture({ action: "copy", planId: captured.planId, locale });
+      await expect(status).toHaveText(copy.preparing, { timeout: 20_000 });
+    }
     await fixture({ action: "formula", planId: captured.planId, locale, rationale });
     await expect(page.getByTestId("web-product-journey")).toHaveAttribute("data-stage", "products", { timeout: 20_000 });
+    await expect(status).toHaveText(copy.matching);
     const ingredient = page.locator(".mn-nutrient").first();
     const explanation = ingredient.locator("details");
     await expect(ingredient).toContainText("1000");
@@ -56,6 +67,9 @@ for (const locale of ["en", "th", "zh-CN"]) {
     const previousScroll = await page.evaluate(() => window.scrollY);
     await fixture({ action: "ready", planId: captured.planId, locale });
     await expect(page.getByTestId("web-product-journey")).toHaveAttribute("data-stage", "ready", { timeout: 20_000 });
+    await expect(status).toBeHidden();
+    await expect(page.getByText(copy.free, { exact: true })).toHaveCount(0);
+    await expect(page.locator(".mn-estimate")).toHaveCount(0);
     await expect(page.getByTestId("web-preparation-detail")).toHaveCount(0);
     await expect(page.getByTestId("web-reveal-recovery")).toHaveCount(0);
     await expect(explanation).toHaveAttribute("open", "");
@@ -147,6 +161,9 @@ test("free product basket supports removal and undo, tracks visible cards, and o
   });
   await page.goto(seeded.REVEAL_VISUAL_SMOKE_URL);
   await expect(page.getByTestId("web-product-journey")).toHaveAttribute("data-stage", "ready");
+  await expect(page.getByText(webProductCopy.en.free, { exact: true })).toHaveCount(1);
+  await expect(page.getByTestId("web-basket").getByText(webProductCopy.en.free, { exact: true })).toBeVisible();
+  await expect(page.locator(".mn-estimate")).toHaveCount(0);
   const products = page.locator("#products .mn-product"), checkboxes = products.locator(".mn-product-check");
   await expect(products).toHaveCount(2);
   const desktopProducts = await page.locator("#products").boundingBox();
