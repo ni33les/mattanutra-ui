@@ -13,12 +13,18 @@ for (const [locale, pharmacy] of [["en", false], ["th", true]] as const) {
   test(`QUIZ-CAPTURE ${locale} ${pharmacy ? "pharmacy" : "web"} grouped answers survive review edits and native capture`, async ({ page }) => {
     const session = randomUUID();
     const requests: Array<{ body: Record<string, unknown>; key: string | undefined }> = [];
+    let releaseCapture!: () => void;
+    const captureBarrier = new Promise<void>(resolve => { releaseCapture = resolve; });
     await page.emulateMedia({ reducedMotion: "reduce" });
     await page.route("**/api/bpm", route => route.fulfill({ json: { ok: true } }));
     await page.route("**/api/questionnaire/session", route => route.fulfill({ json: { ok: true } }));
     await page.route("**/api/assessment", async route => {
       requests.push({ body: route.request().postDataJSON(), key: route.request().headers()["idempotency-key"] });
-      await route.fulfill({ status: 503, json: { message: "Controlled capture barrier" } });
+      if (requests.length === 1) {
+        await captureBarrier;
+        return route.fulfill({ status: 503, json: { message: "Controlled capture barrier" } });
+      }
+      return route.fulfill({ response: await route.fetch() });
     });
     const path = pharmacy ? "/retail/matcher-v5-isolated-fixture-retailer/quiz" : "/nutrition/quiz";
     await page.goto(`/${locale}${path}?session=${session}&source=business_card`);
@@ -113,7 +119,16 @@ for (const [locale, pharmacy] of [["en", false], ["th", true]] as const) {
     await expect(page.getByTestId("questionnaire-submit")).toBeDisabled();
     await page.getByTestId("questionnaire-disclosure").check();
     await page.getByTestId("questionnaire-submit").click();
-    await expect.poll(() => requests.length).toBe(1);
+    try {
+      await expect.poll(() => requests.length).toBe(1);
+      await expect(page.getByTestId("questionnaire-review")).toBeVisible();
+      await expect(page.getByTestId("questionnaire-calculating")).toHaveCount(0);
+      await expect(page.getByTestId("questionnaire-submit")).toBeDisabled();
+      await expect(page.getByTestId("questionnaire-submit")).toHaveAttribute("aria-busy", "true");
+      await expect(page.getByTestId("questionnaire-disclosure")).toBeDisabled();
+    } finally { releaseCapture(); }
+    await expect(page.getByTestId("questionnaire-capture-error")).toBeVisible();
+    await expect(page.getByTestId("questionnaire-submit")).toBeEnabled();
     const { body, key } = requests[0];
     expect(key).toBeTruthy();
     expect(body).toMatchObject({ intent: "capture", locale, sessionId: session });
@@ -132,5 +147,24 @@ for (const [locale, pharmacy] of [["en", false], ["th", true]] as const) {
     expect(saved.state.answers.energy).toBe("excellent");
     expect(saved.state.answers.heightStatus).toBe("unknown");
     expect(saved.captured).toBeNull();
+    let releaseReveal!: () => void, revealRequested = false;
+    const revealBarrier = new Promise<void>(resolve => { releaseReveal = resolve; });
+    await page.route("**/reveal?**", async route => {
+      revealRequested = true;
+      await revealBarrier;
+      await route.continue();
+    });
+    await page.getByTestId("questionnaire-submit").click();
+    try {
+      await expect.poll(() => revealRequested).toBe(true);
+      await expect(page.getByTestId("questionnaire-review")).toBeVisible();
+      await expect(page.getByTestId("questionnaire-submit")).toBeDisabled();
+      await expect(page.getByTestId("questionnaire-calculating")).toHaveCount(0);
+      await expect(page.getByTestId("funnel-loading")).toHaveCount(0);
+    } finally { releaseReveal(); }
+    await expect(page).toHaveURL(new RegExp(`/${locale}${pharmacy ? "/retail/matcher-v5-isolated-fixture-retailer" : "/nutrition"}/reveal\\?plan=`));
+    await expect(page.getByTestId("pharmacy-combined")).toBeVisible();
+    expect(requests).toHaveLength(2);
+    expect(requests[1].key).toBe(requests[0].key);
   });
 }

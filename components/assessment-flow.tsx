@@ -1111,8 +1111,8 @@ export function AssessmentFlow({
   const currentSection = sections[Math.min(sectionIndex, sections.length - 1)];
   const renderedQuestions = currentSection.questions;
   const isFinalStep = sectionIndex === sections.length - 1;
-  const pharmacySaving = Boolean(pharmacyId && processingStatus && !processingError);
-  const primaryActionDisabled = !answers.disclosure || pharmacySaving;
+  const inlineSaving = Boolean(skipHealthScoreStep && processingStatus && !processingError);
+  const primaryActionDisabled = !answers.disclosure || inlineSaving;
 
   function goBack() {
     setProcessingError("");
@@ -1126,7 +1126,7 @@ export function AssessmentFlow({
   }
 
   function goToSection(index: number) {
-    if (pharmacySaving) return;
+    if (inlineSaving) return;
     setProcessingError("");
     if (!answers.disclosure && index !== 0) {
       return;
@@ -1156,6 +1156,7 @@ export function AssessmentFlow({
   }
 
   async function prepareHealthScoreGate(answerPayload = answers) {
+    if (captureInFlight.current || (processingStatus && !processingError)) return;
     if (contactEmailInvalid) {
       setProcessingError(ui.resume.invalid);
       return;
@@ -1172,7 +1173,7 @@ export function AssessmentFlow({
         { id: "results", state: "pending" }
       ]
     });
-    window.scrollTo({ behavior: "smooth", top: 0 });
+    if (!skipHealthScoreStep) window.scrollTo({ behavior: "smooth", top: 0 });
     trackBpmEvent("assessment_submitted", {
       eventType: "funnel",
       locale,
@@ -1207,7 +1208,7 @@ export function AssessmentFlow({
         setHealthScore(readyStatus.healthScore);
       }
       setCapturedStatus(readyStatus);
-      setProcessingStatus(null);
+      setProcessingStatus(skipHealthScoreStep ? readyStatus : null);
       setShowHealthScore(!skipHealthScoreStep);
       router.replace(
         paymentId || skipHealthScoreStep
@@ -1312,7 +1313,7 @@ export function AssessmentFlow({
 
   return (
     <main className="mx-auto w-full max-w-6xl px-6 pb-[calc(7rem+env(safe-area-inset-bottom))] pt-10 sm:px-8 sm:pb-16 lg:pt-14">
-        {processingStatus && !pharmacyId ? (<ProcessingPanel
+        {processingStatus && !skipHealthScoreStep ? (<ProcessingPanel
             error={
               processingStatus.status === "failed"
                 ? ui.processingError
@@ -1332,7 +1333,7 @@ export function AssessmentFlow({
 	          />
 	        ) : (
 	          <div className="space-y-6">
-            {pharmacySaving && <p role="status" data-testid="pharmacy-capture-status">{combinedCopy[locale].saving}</p>}
+            {pharmacyId && inlineSaving && <p role="status" data-testid="pharmacy-capture-status">{combinedCopy[locale].saving}</p>}
             {sectionIndex === 0 || !answers.disclosure ? renderPrivacyGate() : null}
             <QuestionnairePrecisionMeter precision={precision} ui={ui} />
             <div className="py-3">
@@ -1360,7 +1361,7 @@ export function AssessmentFlow({
                     <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center">
                       <button
                         type="button"
-                        disabled={sectionIndex === 0 || pharmacySaving}
+                        disabled={sectionIndex === 0 || inlineSaving}
                         className="mn-secondary-button"
                         onClick={goBack}
                       >
@@ -1370,7 +1371,7 @@ export function AssessmentFlow({
                         <button
                           type="button"
                           className="mn-secondary-button mn-secondary-button--compact"
-                          disabled={pharmacySaving}
+                          disabled={inlineSaving}
                           onClick={fillRandomDefaultsAndFinalStep}
                         >
                           {ui.devDefaults}
@@ -1381,10 +1382,11 @@ export function AssessmentFlow({
                     <button
                       type="button"
                       disabled={primaryActionDisabled}
+                      aria-busy={inlineSaving}
                       className="mn-assessment-continue-button"
                       onClick={goNext}
                     >
-                      {isFinalStep ? copy.fixedAction.generate : ui.continue}
+                      {inlineSaving ? combinedCopy[locale].saving : isFinalStep ? copy.fixedAction.generate : ui.continue}
                       {isFinalStep ? (
                         <BeakerIcon aria-hidden={true} className="size-5" />
                       ) : null}
@@ -1397,7 +1399,7 @@ export function AssessmentFlow({
               supportingNote={sectionIndex === 0 ? undefined : copy.sectionNotes[sectionIndex]}
               title={currentSection.title}
             >
-              <fieldset disabled={pharmacySaving} className="space-y-7">
+              <fieldset disabled={inlineSaving} className="space-y-7">
                 {sectionIndex === 0 ? (
                   <AssessmentIntroNote
                     body={copy.about.honestyBody}

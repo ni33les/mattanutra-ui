@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRef, useState } from "react";
 import { PharmacyRevealShell, PharmacyIngredientCards, PharmacyProductCard, PharmacyPlanInvitation } from "@/components/pharmacy/reveal-presentation";
 import { combinedCopy } from "@/components/pharmacy/combined-copy";
-import { WebPreparationDetails } from "./web-preparation-panel";
+import { WebRevealRecovery } from "./web-preparation-panel";
 import { webProductCopy } from "./web-product-copy";
 import { useVisibleWebMilestones } from "./use-visible-web-milestones";
 import { productRecommendationOptionsForResult, selectProductRecommendationOption, resultHasPendingProductRecommendations, selectedStackCoverage } from "@/components/formulation-results-helpers";
@@ -26,8 +26,8 @@ const productId = (product: RecommendedProduct) => product.productId ?? product.
 const productAmount = (product: RecommendedProduct) => product.price?.amount ?? product.retailer?.unitPriceAmount;
 
 /** Web adapter for the pharmacy presentation. All payment and order work stays in web checkout. */
-export function WebCombinedReveal({ locale, planId, answers, result, snapshot, failed, retry }: {
-  locale: Locale; planId: string; answers: Record<string, unknown>; result: FormulationResult | null;
+export function WebCombinedReveal({ locale, planId, result, snapshot, failed, retry }: {
+  locale: Locale; planId: string; result: FormulationResult | null;
   snapshot: NutritionJourneySnapshot | null; failed: boolean; retry: () => void;
 }) {
   const c = webProductCopy[locale], shared = combinedCopy[locale], detailCopy = revealFinalCopy[locale];
@@ -96,7 +96,7 @@ export function WebCombinedReveal({ locale, planId, answers, result, snapshot, f
     <PharmacyRevealShell locale={locale} ready={ready} failed={failed} formulaReady={Boolean(formula)} preserveProgress
       title={shared.title} status={failed ? c.failed : formula ? c.matching : undefined} estimate={c.free}
       inputs={shared.inputs.map((label, index) => index === 3 ? c.availableProducts : label)}
-      waitingDetails={<WebPreparationDetails answers={answers} failed={failed} ready={ready} locale={locale} planId={planId} retry={retry} />}
+      recovery={<WebRevealRecovery failed={failed} ready={ready} locale={locale} planId={planId} retry={retry} />}
       result={formula ? <>
         <div data-web-result-stage={ingredients.length ? "formula" : undefined}>
           <PharmacyIngredientCards locale={locale} ingredients={ingredients} name={firstNameFromFormulation(formula) || shared.you}

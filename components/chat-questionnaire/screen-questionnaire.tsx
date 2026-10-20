@@ -3,7 +3,8 @@
 import Image from "next/image";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { QuestionnaireWelcome } from "./questionnaire-welcome";
+import { getWelcomeCopy, QuestionnaireWelcome } from "./questionnaire-welcome";
+import { combinedCopy } from "@/components/pharmacy/combined-copy";
 import { QuestionnaireCalculating } from "./questionnaire-calculating";
 import { useQuestionnaireCapture } from "./use-questionnaire-capture";
 import { useQuestionnaireTelemetry } from "./use-questionnaire-telemetry";
@@ -23,10 +24,12 @@ import styles from "./screen-questionnaire.module.css";
 export function ScreenQuestionnaire({ locale, sessionId, reviewRequested = false, serverDraft, paymentId, pharmacyId,
   returningPlanId, resumeToken, showDevShortcut, skipHealthScore = false }: ChatQuestionnaireProps) {
   const router = useRouter();
+  const skipHealthScoreStep = skipHealthScore || Boolean(pharmacyId);
   const [state, setState] = useState<QuestionnaireState | null>(null);
   const [mode, setMode] = useState<"loading" | "welcome" | "resume" | "quiz" | "calculating">("loading");
   const [saveFailed, setSaveFailed] = useState(false);
   const draftRef = useRef<ChatDraft | null>(null);
+  const captureInFlight = useRef(false);
   const sessionRef = useRef(sessionId || returningPlanId || paymentId || crypto.randomUUID());
   const headingRef = useRef<HTMLHeadingElement>(null);
   const copy = screenCopy(locale);
@@ -44,9 +47,12 @@ export function ScreenQuestionnaire({ locale, sessionId, reviewRequested = false
   const resultPath = useCallback((id: string) => pharmacyId ? pharmacyPath(locale, pharmacyId, "reveal", { plan: id })
     : paymentId || draftRef.current?.paymentId || skipHealthScore ? nutritionRevealPath(locale, id) : nutritionHealthScorePath(locale, id), [locale, pharmacyId, paymentId, skipHealthScore]);
   const capture = useQuestionnaireCapture({ locale, paymentId, pharmacyId, returningPlanId, resumeToken,
-    skipHealthScore: skipHealthScore || Boolean(pharmacyId), draft: draftRef, save,
+    skipHealthScore: skipHealthScoreStep, draft: draftRef, save,
     onReady: id => router.replace(resultPath(id)) });
   const runCapture = capture.run;
+  const inlineCapture = mode === "calculating" && skipHealthScoreStep;
+  const inlineBusy = inlineCapture && capture.status !== "error";
+  const captureCopy = getWelcomeCopy(locale);
 
   const commit = useCallback((next: QuestionnaireState) => {
     setState(next);
@@ -120,12 +126,18 @@ export function ScreenQuestionnaire({ locale, sessionId, reviewRequested = false
     }
   }
   function submit() {
-    if (!state) return;
+    if (!state || captureInFlight.current || mode === "calculating") return;
     if (!screenQuestionnaireComplete(state)) { const missing = firstMissingScreen(state); if (missing) commit(openScreen(state, missing.id)); return; }
     const next: QuestionnaireState = { ...state, phase: "complete", completedAt: Date.now() };
     commit(next); telemetry.close(); setMode("calculating");
     trackBpmEvent("chat_complete", { eventType: "funnel", locale, properties: { ...questionnaireAttemptContext(next), completionPct: 100, ...telemetry.stamp() } });
-    void runCapture(next);
+    captureInFlight.current = true;
+    void runCapture(next).finally(() => { captureInFlight.current = false; });
+  }
+  function retryInlineCapture() {
+    if (!state || captureInFlight.current || capture.status !== "error") return;
+    captureInFlight.current = true;
+    void runCapture(state).finally(() => { captureInFlight.current = false; });
   }
   const fallbackEmail = useCallback(async (email: string) => {
     const id = draftRef.current?.captured?.planId;
@@ -138,7 +150,7 @@ export function ScreenQuestionnaire({ locale, sessionId, reviewRequested = false
 
   if (mode === "loading" || !state || !definition) return <div className={styles.shell} aria-busy="true" />;
   if (mode === "welcome") return <QuestionnaireWelcome locale={locale} onStart={() => begin()} onDevFastForward={showDevShortcut ? devFill : undefined} />;
-  if (mode === "calculating") return <QuestionnaireCalculating locale={locale} status={capture.status} canOpenResults={capture.status === "ready"}
+  if (mode === "calculating" && !skipHealthScoreStep) return <QuestionnaireCalculating locale={locale} status={capture.status} canOpenResults={capture.status === "ready"}
     onSeeResults={() => { if (capture.planId) router.replace(resultPath(capture.planId)); }}
     onRetryCapture={!capture.planId ? () => { void runCapture(state); } : undefined}
     onRetryAnalysis={capture.planId ? () => { void runCapture(state, true); } : undefined}
@@ -211,6 +223,7 @@ export function ScreenQuestionnaire({ locale, sessionId, reviewRequested = false
         {current.id !== "name" && !state.screenReview ? <p className={styles.description}>{section.desc}</p> : null}</header>
       {state.screenReview || current.nong ? <div className={styles.nong}><Image width={84} height={120} alt="" src={`/assets/questionnaire/v15-5/nong-${state.screenReview ? "wai" : current.nong === "safety" ? "reassuring" : current.nong === "final" ? "sincere" : "open"}.webp`} />
         <p>{state.screenReview ? x.summaryText : current.id === "name" ? copy.ui.introHi : current.nong === "final" ? x.finalDetails.replace("{n}", "") : section.desc}</p></div> : null}
+      <fieldset disabled={inlineCapture} style={{ display: "contents" }}>
       {state.screenReview ? <div data-testid="questionnaire-review">
         <section className={`${styles.card} ${styles.question}`}><h2 className={styles.questionTitle}>{definition.turns.find(turn => turn.k === "disclosure")!.q}</h2>
           <label className={styles.check}><input type="checkbox" data-testid="questionnaire-disclosure" checked={state.answers.disclosure === true} onChange={event => change("disclosure", event.target.checked)} /><span>{x.disclosureLabel}</span></label>
@@ -226,10 +239,13 @@ export function ScreenQuestionnaire({ locale, sessionId, reviewRequested = false
         {current.id === "diet" && state.autoFilled.length ? <div className={`${styles.card} ${styles.review}`}><p className={styles.hint}>{x.inferred}</p>
           {state.autoFilled.map(key => { const turn = definition.turns.find(item => item.k === key)!; return <p key={key} className={styles.hint}>{turn.q} — {answerLabel(turn)}</p>; })}</div> : null}</>}
       {showDevShortcut ? <button type="button" className={styles.dev} data-testid="dev-fill-questionnaire" onClick={devFill}>{x.devFill}</button> : null}
+      </fieldset>
+      {inlineCapture && capture.status === "error" ? <p className={styles.error} role="alert" data-testid="questionnaire-capture-error">{captureCopy.calcCaptureFailed}</p> : null}
     </div>
     <div className={styles.footer}><div className={styles.footerInner}>
-      {currentIndex > 0 || state.screenReview || state.screenEdit ? <button type="button" data-testid="questionnaire-back" className={styles.secondary} onClick={() => { telemetry.close(); commit(previousScreen(state)); }}>{x.back}</button> : null}
-      {state.screenReview ? <button type="button" data-testid="questionnaire-submit" className={styles.primary} disabled={!screenQuestionnaireComplete(state)} onClick={submit}>{x.submit}</button>
+      {currentIndex > 0 || state.screenReview || state.screenEdit ? <button type="button" data-testid="questionnaire-back" className={styles.secondary} disabled={inlineCapture} onClick={() => { telemetry.close(); commit(previousScreen(state)); }}>{x.back}</button> : null}
+      {inlineCapture ? <button type="button" data-testid="questionnaire-submit" className={styles.primary} disabled={inlineBusy} aria-busy={inlineBusy} onClick={retryInlineCapture}>{inlineBusy ? combinedCopy[locale].saving : captureCopy.calcRetryCapture}</button>
+        : state.screenReview ? <button type="button" data-testid="questionnaire-submit" className={styles.primary} disabled={!screenQuestionnaireComplete(state)} onClick={submit}>{x.submit}</button>
         : <button type="button" data-testid="questionnaire-next" className={styles.primary} disabled={!screenComplete(state, current)} onClick={nextScreen}>{currentIndex === visibleScreens(state).length - 1 ? x.reviewBtn : x.next}</button>}
     </div></div>
   </div>;

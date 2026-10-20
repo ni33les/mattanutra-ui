@@ -1,12 +1,12 @@
-.mn-web-preparation-details{position:relative;z-index:1;max-width:700px;margin:20px auto;text-align:center;color:var(--mn-ink)}
-.mn-web-progress-message{display:flex;justify-content:center;align-items:center;gap:10px;max-width:620px;min-height:48px;margin:18px auto;color:var(--mn-ink-soft);line-height:1.6}
-.mn-web-detail-carousel{position:relative;z-index:1;max-width:620px;margin:24px auto 0;border:1px solid var(--mn-line);border-radius:20px;background:var(--mn-paper);padding:20px}
-.mn-web-detail-carousel article{min-height:135px}.mn-web-detail-carousel h2{font-size:22px;font-family:var(--mn-font-display),Georgia,serif;line-height:1.3;margin:10px 0}.mn-web-detail-carousel p{line-height:1.6}
-.mn-web-detail-controls{display:flex;align-items:center;justify-content:center;gap:12px;margin-top:12px}.mn-web-detail-controls button{display:grid;place-items:center;width:42px;height:42px;border:1px solid var(--mn-line);border-radius:50%;background:var(--mn-cream);cursor:pointer}
+.mn-web-recovery{position:relative;z-index:1;max-width:620px;margin:24px auto;padding:16px;text-align:center;color:var(--mn-ink-soft);line-height:1.6}
+.mn-web-recovery .mn-recovery-button{margin-top:12px}
 .mn-web-resume{position:relative;z-index:1;text-align:center;font-size:13px;margin:20px auto 0;max-width:650px}.mn-web-resume button,.mn-web-resume a{color:var(--mn-teal-deep);text-decoration:underline;cursor:pointer}.mn-web-resume a{overflow-wrap:anywhere}
-.mn-web-spinner{flex-shrink:0;animation:mn-web-spin 2s linear infinite}@keyframes mn-web-spin{to{transform:rotate(360deg)}}
-[data-paused=true] .mn-web-spinner{animation-play-state:paused}
-@media(prefers-reduced-motion:reduce){.mn-web-spinner{animation:none}}
+#mn-pharmacy-combined[data-channel=web] .mn-products{width:min(960px,100% - 32px);margin:12px auto 24px;gap:20px}
+#mn-pharmacy-combined[data-channel=web] .mn-product{padding:18px 14px 14px}
+@media(max-width:520px){
+  #mn-pharmacy-combined[data-channel=web] .mn-products{width:calc(100% - 20px);gap:12px;margin-top:8px;margin-bottom:20px}
+  #mn-pharmacy-combined[data-channel=web] .mn-product{padding:14px 10px 10px}
+}
 #mn-pharmacy-combined[data-channel=web] .mn-web-ingredient-detail{font-size:12px;line-height:1.55;text-align:left;max-width:100%;overflow-wrap:anywhere}
 #mn-pharmacy-combined[data-channel=web] .mn-web-ingredient-detail>p{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;margin:8px 0}
 #mn-pharmacy-combined[data-channel=web] .mn-web-ingredient-detail details summary{cursor:pointer;color:var(--mn-green);font-weight:600;padding:6px 0}

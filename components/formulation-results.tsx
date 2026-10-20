@@ -91,7 +91,7 @@ export function FormulationResults({
     });
   }, [productPollingPreference, result]);
 
-  if (commerce) return <WebCombinedReveal answers={commerce.answers} failed={failed} result={result} snapshot={snapshot}
+  if (commerce) return <WebCombinedReveal failed={failed} result={result} snapshot={snapshot}
     locale={locale} planId={planId} retry={retry} />;
 
   if (loadState === "loading") {

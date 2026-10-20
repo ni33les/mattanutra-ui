@@ -36,7 +36,8 @@ for (const locale of ["en", "th", "zh-CN"]) {
     const url = `/${locale}/nutrition/reveal?plan=${captured.planId}`;
     await page.goto(url);
     await expect(page.getByTestId("web-product-journey")).toHaveAttribute("data-stage", "formula");
-    await expect(page.getByTestId("web-preparation-detail")).toHaveAttribute("data-card", "goals");
+    await expect(page.getByTestId("web-preparation-detail")).toHaveCount(0);
+    await expect(page.getByTestId("web-reveal-recovery")).toHaveCount(0);
     await fixture({ action: "formula", planId: captured.planId, locale, rationale });
     await expect(page.getByTestId("web-product-journey")).toHaveAttribute("data-stage", "products", { timeout: 20_000 });
     const ingredient = page.locator(".mn-nutrient").first();
@@ -55,6 +56,8 @@ for (const locale of ["en", "th", "zh-CN"]) {
     const previousScroll = await page.evaluate(() => window.scrollY);
     await fixture({ action: "ready", planId: captured.planId, locale });
     await expect(page.getByTestId("web-product-journey")).toHaveAttribute("data-stage", "ready", { timeout: 20_000 });
+    await expect(page.getByTestId("web-preparation-detail")).toHaveCount(0);
+    await expect(page.getByTestId("web-reveal-recovery")).toHaveCount(0);
     await expect(explanation).toHaveAttribute("open", "");
     await expect(explanation.locator("p").first()).toContainText(rationale);
     expect(Math.abs(await page.evaluate(() => window.scrollY) - previousScroll)).toBeLessThanOrEqual(2);
@@ -76,28 +79,18 @@ for (const locale of ["en", "th", "zh-CN"]) {
   });
 }
 
-test("details rotate every six seconds, stop on interaction/reduced motion, and show a slow notice after two minutes", async ({ page }) => {
+test("reveal omits the goals carousel and offers recovery only after a long wait", async ({ page }) => {
   const captured = await fixture({ action: "capture", locale: "en" });
   await page.clock.install();
   await page.emulateMedia({ reducedMotion: "no-preference" });
   await page.goto(`/en/nutrition/reveal?plan=${captured.planId}`);
-  const card = page.getByTestId("web-preparation-detail");
-  await expect(card).toHaveAttribute("data-card", "goals");
-  await page.getByRole("button", { name: "Next detail" }).click();
-  await page.getByRole("button", { name: "Previous detail" }).click();
-  await page.getByRole("button", { name: "Previous detail" }).evaluate(element => (element as HTMLElement).blur());
-  await page.mouse.move(0, 0);
-  await page.clock.fastForward(6100);
-  await expect(card).toHaveAttribute("data-card", "diet");
-  await page.getByRole("button", { name: "Next detail" }).click();
-  await expect(card).toHaveAttribute("data-card", "supplements");
-  await page.clock.fastForward(12_000);
-  await expect(card).toHaveAttribute("data-card", "supplements");
-  await page.getByRole("button", { name: "Next detail" }).evaluate(element => (element as HTMLElement).blur());
-  await page.mouse.move(0, 0);
-  await page.emulateMedia({ reducedMotion: "reduce" });
-  await page.clock.fastForward(120_000);
-  await expect(card).toHaveAttribute("data-card", "supplements");
+  await expect(page.getByTestId("web-product-journey")).toHaveAttribute("data-stage", "formula");
+  await expect(page.getByTestId("web-preparation-detail")).toHaveCount(0);
+  await expect(page.getByTestId("web-reveal-recovery")).toHaveCount(0);
+  await page.clock.fastForward(119_000);
+  await expect(page.getByTestId("web-reveal-recovery")).toHaveCount(0);
+  await page.clock.fastForward(2000);
+  await expect(page.getByTestId("web-preparation-detail")).toHaveCount(0);
   await expect(page.getByText("This is taking a little longer.", { exact: false })).toBeVisible();
   await expect(page.getByRole("button", { name: "Copy private plan link" })).toBeVisible();
   await expect(page.getByTestId("formulation-retry")).toHaveCount(0);
@@ -156,6 +149,9 @@ test("free product basket supports removal and undo, tracks visible cards, and o
   await expect(page.getByTestId("web-product-journey")).toHaveAttribute("data-stage", "ready");
   const products = page.locator("#products .mn-product"), checkboxes = products.locator(".mn-product-check");
   await expect(products).toHaveCount(2);
+  const desktopProducts = await page.locator("#products").boundingBox();
+  expect(desktopProducts!.width).toBeLessThanOrEqual(960);
+  expect(desktopProducts!.x).toBeGreaterThanOrEqual(100);
   for (const checkbox of await checkboxes.all()) await expect(checkbox).toBeChecked();
   expect(stages).not.toContain("product_basket_confirmed");
   expect(marketingEvents).not.toContain("AddToCart");
@@ -195,6 +191,9 @@ test("free product basket supports removal and undo, tracks visible cards, and o
   expect(state.selected_plan).toBeNull(); expect(state.payments).toBe(0);
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(seeded.REVEAL_VISUAL_SMOKE_URL);
+  const mobileProducts = await page.locator("#products").boundingBox();
+  expect(mobileProducts!.x).toBeGreaterThanOrEqual(24);
+  expect(mobileProducts!.x + mobileProducts!.width).toBeLessThanOrEqual(390 - 24);
   await checkboxes.first().uncheck();
   await page.locator(".mn-transaction").scrollIntoViewIfNeeded();
   await expect(page.locator(".mn-transaction")).toHaveCSS("opacity", "1");
