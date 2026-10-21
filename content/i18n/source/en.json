@@ -9248,7 +9248,7 @@
   },
   "seo.routes.nutritionQuiz.description": {
     "audience": "public",
-    "defaultMessage": "Start the free MattaNutra assessment to understand your goals, routine, medications, budget, and nutritional priorities.",
+    "defaultMessage": "Know what to take. And what to skip. Six short sections, about 5 minutes. Your free personal plan appears the moment you finish.",
     "description": "SEO description for the public assessment/quiz route.",
     "namespace": "seo.routes",
     "surface": "seo",
@@ -9257,7 +9257,7 @@
   },
   "seo.routes.nutritionQuiz.title": {
     "audience": "public",
-    "defaultMessage": "Free Health Score Assessment | MattaNutra",
+    "defaultMessage": "Start your free personal plan | MattaNutra",
     "description": "SEO title for the public assessment/quiz route.",
     "namespace": "seo.routes",
     "surface": "seo",

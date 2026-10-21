@@ -1,0 +1,50 @@
+{
+  "en": {
+    "eyebrow": "Your personal plan",
+    "free": "Free",
+    "headline": "Know what to take.",
+    "headlineAccent": "And what to skip.",
+    "lede": "Six short sections. Your personal plan appears the moment you finish.",
+    "cta": "Start my questionnaire",
+    "duration": "About 5 minutes",
+    "obligation": "No obligation",
+    "subscription": "No subscription",
+    "physician": "Physician-founded",
+    "products": "Thai FDA-registered products",
+    "trustAria": "Why trust MattaNutra",
+    "mascotAlt": "Nong Matta welcoming you",
+    "languageNotice": ""
+  },
+  "th": {
+    "eyebrow": "แผนอาหารเสริมเฉพาะคุณ",
+    "free": "ฟรี",
+    "headline": "รู้ว่าอะไรควรกิน",
+    "headlineAccent": "และอะไรไม่จำเป็น",
+    "lede": "ตอบคำถามสั้น ๆ 6 ส่วน แล้วดูแผนเฉพาะคุณได้ทันทีเมื่อทำเสร็จ",
+    "cta": "เริ่มทำแบบสอบถาม",
+    "duration": "ประมาณ 5 นาที",
+    "obligation": "ไม่จำเป็นต้องซื้อ",
+    "subscription": "ไม่ผูกมัดให้ซื้อประจำ",
+    "physician": "ก่อตั้งโดยแพทย์",
+    "products": "ผลิตภัณฑ์มีเลข อย. ทุกชิ้น",
+    "trustAria": "ทำไมจึงวางใจ MattaNutra",
+    "mascotAlt": "น้อง Matta ต้อนรับคุณ",
+    "languageNotice": ""
+  },
+  "zh-CN": {
+    "eyebrow": "您的个性化方案",
+    "free": "免费",
+    "headline": "知道该补充什么，",
+    "headlineAccent": "哪些不必补充。",
+    "lede": "六个简短部分。完成后即可查看您的个性化方案。",
+    "cta": "开始填写问卷",
+    "duration": "约需 5 分钟",
+    "obligation": "无需购买",
+    "subscription": "无需订阅",
+    "physician": "由医生创立",
+    "products": "产品已在泰国食品药品管理局注册",
+    "trustAria": "为什么信任 MattaNutra",
+    "mascotAlt": "Nong Matta 欢迎您",
+    "languageNotice": "欢迎页面支持中文；问卷题目目前以英文显示。"
+  }
+}
