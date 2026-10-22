@@ -480,6 +480,16 @@
     "targetSaveError": "无法保存目标。"
   },
   "flowNodes": {
+    "quizLandingViewed": "问卷落地页",
+    "resultsDisplayed": "已显示结果",
+    "deliveryDetailsCompleted": "配送资料已填写完整",
+    "productPaymentConfirmed": "已确认付款",
+    "revealOpened": "已打开结果",
+    "assessmentCaptured": "完成问卷",
+    "formulaViewed": "已查看配方",
+    "productsViewed": "已查看商品",
+    "basketConfirmed": "前往结账",
+    "productCheckoutReady": "可付款",
     "assessmentStarted": "已开始",
     "assessmentSubmitted": "已提交",
     "assessmentViewed": "评估",

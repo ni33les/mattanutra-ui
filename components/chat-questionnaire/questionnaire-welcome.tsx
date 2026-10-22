@@ -1,6 +1,8 @@
 "use client";
 
 import Image from "next/image";
+import { useEffect, useRef } from "react";
+import { observeWebQuizLanding } from "@/lib/web-quiz-landing-tracking";
 import { ArrowRight, Check, Clock3, ShieldCheck, Stethoscope } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import quizStartPack from "@/content/questionnaire/quiz-start.json";
@@ -42,18 +44,26 @@ type QuestionnaireWelcomeProps = Readonly<{
   locale: Locale;
   onStart: () => void;
   onDevFastForward?: () => void;
+  trackingSessionId?: string;
 }>;
 
 /** The route owns the standard platform header, locale switcher and footer. */
 export function QuestionnaireWelcome({
   locale,
   onStart,
-  onDevFastForward
+  onDevFastForward,
+  trackingSessionId
 }: QuestionnaireWelcomeProps) {
   const copy = quizStartCopy[locale];
+  const welcomeRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (!trackingSessionId || !welcomeRef.current) return;
+    return observeWebQuizLanding(welcomeRef.current, { locale, sessionId: trackingSessionId });
+  }, [locale, trackingSessionId]);
 
   return (
     <section
+      ref={welcomeRef}
       className={styles.welcome}
       lang={locale}
       aria-labelledby="mn-quiz-welcome-title"

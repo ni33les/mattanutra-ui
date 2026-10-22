@@ -7,17 +7,13 @@ import type { AdminFlowData } from "@/lib/admin-flow-data";
 import type { Locale } from "@/lib/i18n";
 import type { AdminContent } from "@/components/admin/dashboard-content";
 import {
-  BusinessFunnelTable
+  BusinessFunnelTable,
+  webProductSummaryMetrics,
+  WebProductConversionNote
 } from "@/components/admin/business-overview";
 import {
   BusinessStatsGrid,
   BusinessTrendChart,
-  businessMetricColors,
-  combinedSeries,
-  flowNodeSeries,
-  formatNumber,
-  formatPercent,
-  percentageMetricSeries,
   type BusinessMetric
 } from "@/components/admin/dashboard-shared";
 
@@ -34,68 +30,32 @@ export function AdminFlowView({
   labels: AdminContent;
   locale: Locale;
 }>) {
-  const precisionSeries = flowNodeSeries(flowData, "precisionPaid");
-  const proSeries = flowNodeSeries(flowData, "proPaid");
-  const productOrderSeries = flowNodeSeries(flowData, "retailOrderCreated");
-  const convertedSeries = combinedSeries(
-    precisionSeries,
-    proSeries,
-    productOrderSeries
-  );
-  const healthScoreSeries = flowNodeSeries(flowData, "healthscoreViewed");
-  const conversionRateSeries = flowData.series.conversionRate ?? percentageMetricSeries(
-    convertedSeries,
-    healthScoreSeries
-  );
-  const metrics: BusinessMetric[] = [
-    {
-      color: businessMetricColors.landingVisitors,
-      id: "landingVisitors",
-      label: labels.flowSummary.entered,
-      series: flowNodeSeries(flowData, "landingViewed"),
-      value: formatNumber(flowData.summary.entered, locale)
-    },
-    {
-      color: businessMetricColors.healthScoreViews,
-      id: "healthScoreViews",
-      label: labels.flowSummary.reachedHealthScore,
-      series: healthScoreSeries,
-      value: formatNumber(flowData.summary.reachedHealthScore, locale)
-    },
-    {
-      color: businessMetricColors.converted,
-      id: "converted",
-      label: labels.flowSummary.converted,
-      series: convertedSeries,
-      value: formatNumber(flowData.summary.converted, locale)
-    },
-    {
-      color: businessMetricColors.conversionRate,
-      format: "percent",
-      id: "conversionRate",
-      label: labels.flowSummary.conversionRate,
-      series: conversionRateSeries,
-      value: formatPercent(flowData.summary.conversionRate, locale)
-    }
-  ];
+  const metrics = webProductSummaryMetrics(flowData, locale);
   const [selectedMetricId, setSelectedMetricId] =
-    useState<BusinessMetric["id"]>("landingVisitors");
+    useState<BusinessMetric["id"]>("quizLandingViewed");
   const selectedMetric =
     metrics.find((metric) => metric.id === selectedMetricId) ?? metrics[0];
 
   return (
     <>
+      {!flowData.reportingLimitExceeded && <>
+      <div data-testid="web-product-summary">
       <BusinessStatsGrid
         metrics={metrics}
         onMetricSelect={setSelectedMetricId}
         selectedMetricId={selectedMetric.id}
       />
+      </div>
+
+      <WebProductConversionNote flowData={flowData} locale={locale} />
 
       <BusinessTrendChart
         bucketLabels={flowData.series.bucketLabels}
         locale={locale}
         metric={selectedMetric}
       />
+
+      </>}
 
       <div className="mt-8 grid w-full min-w-0 grid-cols-1 gap-8 [&>section]:mt-0 [&>section]:min-w-0">
         <BusinessFunnelTable

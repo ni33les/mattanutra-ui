@@ -1,4 +1,5 @@
 import { assessmentCheckoutAttribution, commerceBpmContext } from "@/lib/journey-attribution";
+import { recordWebDeliveryDetailsCompleted } from "@/lib/web-checkout-tracking";
 import { currentWebProductMarketSql } from "@/lib/web-product-market";
 import { bindMetaContext, recordMetaCheckout, recordMetaPurchase } from "@/lib/meta-tracking";
 import { readStoredMatching, frozenCheckoutIdentityJson } from "@/lib/recommendation-storage";
@@ -1113,6 +1114,9 @@ async function continueRetailCheckoutPayment(sql: RetailCheckoutDb, payment: Che
       returnUrl: recovered?.destination ?? retailCheckoutReturnUrl(input.locale, payment!.id) };
   }
   if (retailPaymentConfirmed(payment)) return resumeExistingPayment();
+  if (checkoutChannel === "web") await recordWebDeliveryDetailsCompleted(sql as Db, payment.id).catch(() => {
+    console.warn("Delivery completion tracking deferred to checkout retry");
+  });
   await withDatabaseTransaction(sql as Db, async tx => {
     await bindMetaContext(tx, "retail", payment.id, input.request, { email: payment.customer_email, phone: payment.customer_phone, country: String(objectValue(payment.shipping_address).country ?? "") });
     if (typeof metadata.agenticOrderId === "string") await bindMetaContext(tx, "agentic", metadata.agenticOrderId, input.request);

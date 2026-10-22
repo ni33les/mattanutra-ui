@@ -1,4 +1,4 @@
-import { funnelBpmSource, isPlanPaymentEvent, planPaymentEventNames, webJourneyEventNames } from "@/lib/admin-funnel-events";
+import { funnelBpmSource, liveFunnelAssessmentSql, isPlanPaymentEvent, planPaymentEventNames, webJourneyEventNames } from "@/lib/admin-funnel-events";
 import { getAdminMcpFunnel, type McpFunnelReport } from "@/lib/admin-mcp-funnel";
 import { getPharmacySourceFunnel, type PharmacySourceFunnel } from "@/lib/pharmacy-funnel";
 import { getSql } from "@/lib/db";
@@ -10,9 +10,14 @@ import type { AdminDashboardRange } from "@/lib/admin-dashboard-data";
 import { writeBpmEvent } from "@/lib/bpm";
 import { getQuestionnaireFunnelReport } from "@/lib/admin-questionnaire-data";
 import type { QuestionnaireFunnelReport } from "@/lib/questionnaire-dropoffs";
-import { getWebProductReport, type WebProductReport } from "@/lib/admin-web-product-report";
+import { getCurrentWebProductPaidJourneys, getWebProductReport, type WebProductPaidJourney, type WebProductReport } from "@/lib/admin-web-product-report";
+import { WEB_PRODUCT_JOURNEY_VERSION } from "@/lib/web-product-journey";
 
 export type AdminFlowNodeId =
+  | "quizLandingViewed"
+  | "resultsDisplayed"
+  | "deliveryDetailsCompleted"
+  | "productPaymentConfirmed"
   | "revealOpened"
   | "assessmentCaptured"
   | "formulaViewed"
@@ -74,12 +79,14 @@ export type AdminFlowEdge = Readonly<{
 export type AdminFlowData = Readonly<{
   productReport?: WebProductReport;
   productFunnel?: Array<{ id: AdminFlowNodeId; count: number; denominator: number | null; numerator: number | null }>;
+  productEngagement?: AdminFlowNode[];
   questionnaire?: QuestionnaireFunnelReport;
   journeyChannel?: "web";
   mcp?: McpFunnelReport;
   transitions?: Partial<Record<AdminConversionTargetId, { numerator: number; denominator: number }>>;
   pharmacySources?: PharmacySourceFunnel[];
   databaseAvailable: boolean;
+  reportingLimitExceeded?: boolean;
   edges: AdminFlowEdge[];
   generatedAt: string;
   nodes: AdminFlowNode[];
@@ -91,9 +98,12 @@ export type AdminFlowData = Readonly<{
   };
   summary: {
     conversionRate: number;
+    conversionNumerator: number;
+    conversionDenominator: number;
     converted: number;
     entered: number;
     reachedHealthScore: number;
+    reachedResults: number;
   };
   targets: AdminConversionTargets;
 }>;
@@ -138,9 +148,17 @@ export type FlowRow = Readonly<{
   plan_id: string | null;
   ray: string | null;
   selected_plan: string | null;
+  /** Persisted assessment identity; event hints cannot promote a legacy plan. */
+  journey_version?: string | null;
+  event_journey_version?: string | null;
+  path?: string | null;
+  session_id?: string | null;
+  attempt_id?: string | null;
+  post_completion_review?: boolean;
 }>;
 
 const coreNodeIds: AdminFlowNodeId[] = [
+  "quizLandingViewed", "resultsDisplayed", "deliveryDetailsCompleted", "productPaymentConfirmed",
   "assessmentCaptured", "revealOpened", "formulaViewed", "productsViewed", "basketConfirmed", "productCheckoutReady",
   "landingViewed",
   "assessmentViewed",
@@ -193,13 +211,6 @@ const continueEdgeDefinitions: Array<
   { from: "landingViewed", to: "assessmentViewed" },
   { from: "assessmentViewed", to: "assessmentStarted" },
   { from: "assessmentStarted", to: "assessmentSubmitted" },
-  { from: "assessmentStarted", to: "assessmentCaptured" },
-  { from: "assessmentCaptured", to: "revealOpened" },
-  { from: "revealOpened", to: "formulaViewed" },
-  { from: "formulaViewed", to: "productsViewed" },
-  { from: "productsViewed", to: "basketConfirmed" },
-  { from: "basketConfirmed", to: "productCheckoutReady" },
-  { from: "productCheckoutReady", to: "productPaymentSucceeded" },
   { from: "assessmentSubmitted", to: "healthscoreViewed" },
   { from: "healthscoreViewed", to: "planSelected" },
   { from: "planSelected", to: "precisionPaid" },
@@ -366,7 +377,7 @@ function bucketDateFormatter(range: AdminDashboardRange) {
   });
 }
 
-function buildFlowBuckets(range: AdminDashboardRange, rows: readonly FlowRow[]) {
+function buildFlowBuckets(range: AdminDashboardRange, rows: readonly Pick<FlowRow, "occurred_at">[]) {
   const now = new Date();
   const buckets: Array<{ end: Date; label: string; start: Date }> = [];
   const formatter = bucketDateFormatter(range);
@@ -621,9 +632,12 @@ export function emptyFlow(range: AdminDashboardRange): AdminFlowData {
     series: emptyFlowSeries(range),
     summary: {
       conversionRate: 0,
+      conversionNumerator: 0,
+      conversionDenominator: 0,
       converted: 0,
       entered: 0,
-      reachedHealthScore: 0
+      reachedHealthScore: 0,
+      reachedResults: 0
     },
     targets: defaultAdminConversionTargets
   };
@@ -763,8 +777,112 @@ export async function updateAdminConversionTargets(input: Readonly<{
   return getAdminConversionTargets();
 }
 
+const maxFlowEventRows = 100_000;
+
+const productStages: AdminFlowNodeId[] = [
+  "quizLandingViewed", "assessmentStarted", "assessmentCaptured", "revealOpened", "resultsDisplayed",
+  "basketConfirmed", "productCheckoutViewed", "deliveryDetailsCompleted", "productCheckoutReady", "productPaymentConfirmed"
+];
+const productEngagementStages: AdminFlowNodeId[] = ["formulaViewed", "productsViewed", "healthscoreDisplayed"];
+const currentOnlyNodeIds: AdminFlowNodeId[] = ["quizLandingViewed", "resultsDisplayed", "deliveryDetailsCompleted", "productPaymentConfirmed"];
+
+function isQuizArrival(row: FlowRow) {
+  return row.event_name === "web_quiz_landing_viewed" ||
+    row.event_name === "assessment_viewed" && /^\/(en|th|zh-CN)\/nutrition\/quiz\/?$/.test(row.path ?? "");
+}
+
+function currentProductNodes(row: FlowRow): AdminFlowNodeId[] {
+  if (isQuizArrival(row)) return ["quizLandingViewed"];
+  if (row.event_name === "assessment_started") return row.post_completion_review ? [] : ["assessmentStarted"];
+  if (row.event_name === "assessment_captured" || row.event_name === "assessment_recaptured") return ["assessmentCaptured"];
+  if (row.event_name === "reveal_page_viewed") return ["revealOpened"];
+  if (row.event_name === "web_results_displayed") return ["resultsDisplayed"];
+  if (row.event_name === "formula_details_viewed") return ["resultsDisplayed", "formulaViewed"];
+  if (row.event_name === "product_matches_viewed") return ["resultsDisplayed", "productsViewed"];
+  if (row.event_name === "healthscore_viewed") return ["healthscoreDisplayed"];
+  if (row.event_name === "product_basket_confirmed") return ["basketConfirmed"];
+  if (row.event_name === "retail_product_checkout_viewed") return ["productCheckoutViewed"];
+  if (row.event_name === "web_delivery_details_completed") return ["deliveryDetailsCompleted"];
+  if (row.event_name === "retail_product_checkout_session_created") return ["productCheckoutReady"];
+  // Neither payment telemetry nor an order record is proof of paid funds.
+  return [];
+}
+
+/** Explicit questionnaire identity survives long sessions and browser-ray changes.
+ * Ambiguous identities never merge two plans; old telemetry retains a bounded ray fallback.
+ * A saved legacy plan cannot enter the current cohort merely by emitting a new event. */
+function currentProductSubjects(rows: readonly FlowRow[], payments: readonly WebProductPaidJourney[]) {
+  const plans = new Map(rows.filter(row => row.plan_id).map(row => [row.plan_id!, row.journey_version]));
+  for (const payment of payments) plans.set(payment.plan_id, WEB_PRODUCT_JOURNEY_VERSION);
+  const planRows = rows.filter(row => row.plan_id).toSorted((a, b) => +new Date(a.occurred_at) - +new Date(b.occurred_at));
+  type Identity = { plans: Set<string>; captures: FlowRow[] };
+  const indexes = { attempt_id: new Map<string, Identity>(), session_id: new Map<string, Identity>(), ray: new Map<string, Identity>() };
+  for (const row of planRows) for (const field of ["attempt_id", "session_id", "ray"] as const) {
+    const value = row[field];
+    if (!value) continue;
+    const identity = indexes[field].get(value) ?? { plans: new Set<string>(), captures: [] };
+    identity.plans.add(row.plan_id!);
+    if (["assessment_captured", "assessment_recaptured"].includes(row.event_name)) identity.captures.push(row);
+    indexes[field].set(value, identity);
+  }
+  const nextEvent = (events: readonly FlowRow[], time: number) => {
+    let low = 0, high = events.length;
+    while (low < high) {
+      const middle = Math.floor((low + high) / 2);
+      if (+new Date(events[middle].occurred_at) < time) low = middle + 1;
+      else high = middle;
+    }
+    return events[low];
+  };
+  const keyFor = (row: FlowRow) => {
+    if (row.plan_id) return `plan:${row.plan_id}`;
+    const time = +new Date(row.occurred_at);
+    if (row.attempt_id) {
+      const identity = indexes.attempt_id.get(row.attempt_id);
+      if (identity?.plans.size === 1) return `plan:${identity.plans.values().next().value}`;
+      const next = nextEvent(identity?.captures ?? [], time);
+      if (next) return `plan:${next.plan_id}`;
+      return row.session_id ? `session:${row.session_id}` : `attempt:${row.attempt_id}`;
+    }
+    if (row.session_id) {
+      // Welcome has no attempt yet. A previous capture is not this new quiz.
+      const next = nextEvent(indexes.session_id.get(row.session_id)?.captures ?? [], time);
+      return next ? `plan:${next.plan_id}` : `session:${row.session_id}`;
+    }
+    const next = row.ray ? nextEvent(indexes.ray.get(row.ray)?.captures ?? [], time) : undefined;
+    if (next && +new Date(next.occurred_at) - time <= 30 * 60_000) return `plan:${next.plan_id}`;
+    return row.ray ? `ray:${row.ray}` : `row:${row.id}`;
+  };
+  const keyed = rows.map(row => ({ row, key: keyFor(row) }));
+  const arrivals = new Map<string, Date>();
+  const currentAnonymous = new Set(keyed.filter(({ row }) => row.event_name === "web_quiz_landing_viewed" ||
+    row.event_journey_version === WEB_PRODUCT_JOURNEY_VERSION).map(({ key }) => key));
+  for (const { row, key } of keyed) if (isQuizArrival(row)) {
+    const at = new Date(row.occurred_at), prior = arrivals.get(key);
+    if (!prior || at < prior) arrivals.set(key, at);
+  }
+  const subjects = new Map<string, Map<AdminFlowNodeId, Date>>();
+  const record = (key: string, id: AdminFlowNodeId, at: Date) => {
+    const steps = subjects.get(key) ?? new Map<AdminFlowNodeId, Date>();
+    const prior = steps.get(id);
+    if (!prior || at < prior) steps.set(id, at);
+    subjects.set(key, steps);
+  };
+  for (const { row, key } of keyed) {
+    const at = new Date(row.occurred_at), arrival = arrivals.get(key);
+    if (key.startsWith("plan:")) {
+      if (plans.get(key.slice(5)) !== WEB_PRODUCT_JOURNEY_VERSION) continue;
+    } else if (!currentAnonymous.has(key) || arrival && at < arrival) continue;
+    for (const id of currentProductNodes(row)) record(key, id, at);
+  }
+  for (const payment of payments) record(`plan:${payment.plan_id}`, "productPaymentConfirmed", new Date(payment.paid_at));
+  return subjects;
+}
+
 /** Pure aggregation shared by the report and regression tests. Counts never imply missing steps. */
-export function buildAdminFlowData(range: AdminDashboardRange, rows: readonly FlowRow[], targets: AdminConversionTargets = defaultAdminConversionTargets): AdminFlowData {
+export function buildAdminFlowData(range: AdminDashboardRange, rows: readonly FlowRow[], targets: AdminConversionTargets = defaultAdminConversionTargets, payments: readonly WebProductPaidJourney[] = []): AdminFlowData {
+    // Never compare complete payment facts with a silently truncated event cohort.
+    if (rows.length > maxFlowEventRows) return { ...emptyFlow(range), databaseAvailable: true, reportingLimitExceeded: true };
     const planEventsByRay = new Map<
       string,
       Array<{ planId: string; time: Date }>
@@ -835,7 +953,7 @@ export function buildAdminFlowData(range: AdminDashboardRange, rows: readonly Fl
       count: [...subjects.values()].filter((steps) => steps.has(id)).length,
       id
     }));
-    const buckets = buildFlowBuckets(range, rows);
+    const buckets = buildFlowBuckets(range, [...rows, ...payments.map(payment => ({ occurred_at: payment.paid_at }))]);
     const seriesByNode = Object.fromEntries(
       coreNodeIds.map((id) => [id, buckets.map(() => 0)])
     ) as Partial<Record<AdminFlowNodeId, number[]>>;
@@ -952,26 +1070,28 @@ export function buildAdminFlowData(range: AdminDashboardRange, rows: readonly Fl
       }
     );
     const edges = [...continueEdges, ...dropoffEdges];
-    const convertedSubjects = [...subjects.values()].filter(
-      (steps) =>
-        steps.has("precisionPaid") ||
-        steps.has("proPaid") ||
-        (steps.has("retailOrderCreated") &&
-          !steps.has("retailOrderCancelled") &&
-          !steps.has("retailOrderReturned"))
-    ).length;
-    const convertedAfterHealthScore = [...subjects.values()].filter(steps => {
-      const reached = steps.get("healthscoreViewed");
-      return reached && (["precisionPaid", "proPaid", "retailOrderCreated"] as const).some(stage => {
-        const converted = steps.get(stage);
-        return converted && converted >= reached && (stage !== "retailOrderCreated" || !steps.has("retailOrderCancelled") && !steps.has("retailOrderReturned"));
-      });
+    const productSubjects = [...currentProductSubjects(rows, payments).values()];
+    const productCount = (id: AdminFlowNodeId) => productSubjects.filter(steps => steps.has(id)).length;
+    const entered = productCount("quizLandingViewed");
+    const convertedAfterQuiz = productSubjects.filter(steps => {
+      const arrived = steps.get("quizLandingViewed"), paid = steps.get("productPaymentConfirmed");
+      return arrived && paid && paid >= arrived;
     });
+    for (const id of currentOnlyNodeIds) {
+      const count = productCount(id);
+      const node = nodes.find(node => node.id === id)!;
+      node.count = count;
+      countByNode.set(id, count);
+      seriesByNode[id] = buckets.map(bucket => productSubjects.filter(steps => {
+        const at = steps.get(id);
+        return at && at >= bucket.start && at < bucket.end;
+      }).length);
+    }
     const conversionRateSeries = buckets.map((bucket, index) => {
-      const denominator = seriesByNode.healthscoreViewed?.[index] ?? 0;
-      const numerator = convertedAfterHealthScore.filter(steps => {
-        const reached = steps.get("healthscoreViewed")!;
-        return reached >= bucket.start && reached < bucket.end;
+      const denominator = seriesByNode.quizLandingViewed?.[index] ?? 0;
+      const numerator = convertedAfterQuiz.filter(steps => {
+        const arrived = steps.get("quizLandingViewed")!;
+        return arrived >= bucket.start && arrived < bucket.end;
       }).length;
       return denominator ? 100 * numerator / denominator : 0;
     });
@@ -992,12 +1112,10 @@ export function buildAdminFlowData(range: AdminDashboardRange, rows: readonly Fl
         return entered && advanced && advanced >= entered;
       }).length
     }]));
-    const productStages: AdminFlowNodeId[] = ["landingViewed", "assessmentStarted", "assessmentCaptured", "revealOpened", "formulaViewed",
-      "productsViewed", "basketConfirmed", "productCheckoutReady", "productPaymentSucceeded", "retailOrderShipped", "retailOrderDelivered"];
     const productFunnel = productStages.map((id, index) => {
       const previous = productStages[index - 1];
-      return { id, count: countByNode.get(id) ?? 0, denominator: previous ? countByNode.get(previous) ?? 0 : null,
-        numerator: previous ? [...subjects.values()].filter(steps => {
+      return { id, count: productCount(id), denominator: previous ? productCount(previous) : null,
+        numerator: previous ? productSubjects.filter(steps => {
           const before = steps.get(previous), after = steps.get(id);
           return before && after && after >= before;
         }).length : null };
@@ -1006,6 +1124,7 @@ export function buildAdminFlowData(range: AdminDashboardRange, rows: readonly Fl
       databaseAvailable: true,
       journeyChannel: "web",
       productFunnel,
+      productEngagement: productEngagementStages.map(id => ({ id, count: productCount(id) })),
       transitions,
       edges,
       generatedAt: new Date().toISOString(),
@@ -1017,12 +1136,12 @@ export function buildAdminFlowData(range: AdminDashboardRange, rows: readonly Fl
         nodes: seriesByNode
       },
       summary: {
-        conversionRate:
-          reachedHealthScore > 0
-            ? Number(((convertedAfterHealthScore.length / reachedHealthScore) * 100).toFixed(1))
-            : 0,
-        converted: convertedSubjects,
-        entered: countByNode.get("landingViewed") ?? 0,
+        conversionRate: entered ? Number((100 * convertedAfterQuiz.length / entered).toFixed(1)) : 0,
+        conversionNumerator: convertedAfterQuiz.length,
+        conversionDenominator: entered,
+        converted: productCount("productPaymentConfirmed"),
+        entered,
+        reachedResults: productCount("resultsDisplayed"),
         reachedHealthScore
       },
       targets
@@ -1036,21 +1155,27 @@ export async function getAdminFlowData(range: AdminDashboardRange, filters: Admi
   try {
     const start = queryStartForRange(range);
     const names = [...webJourneyEventNames, ...planPaymentEventNames];
-    const [targets, rows, pharmacySources, mcp, questionnaire, productReport] = await Promise.all([
+    const [targets, rows, pharmacySources, mcp, questionnaire, productReport, paidJourneys] = await Promise.all([
       getAdminConversionTargets(),
       sql<FlowRow[]>`
-        select id::text,ray::text,plan_id::text,funnel_event_name as event_name,event_type,event_status,selected_plan::text,occurred_at
+        select id::text,ray::text,plan_id::text,funnel_event_name as event_name,event_type,event_status,selected_plan::text,occurred_at,
+          (select a.journey_version from public.assessments a where a.plan_id=bpm.plan_id
+            and ${liveFunnelAssessmentSql(sql)}) as journey_version,
+          coalesce(path,route) as path, properties->>'journeyVersion' as event_journey_version,
+          properties->>'sessionId' as session_id, properties->>'attemptId' as attempt_id,
+          coalesce(properties->>'postCompletionReview','false')='true' as post_completion_review
         from ${funnelBpmSource(sql)}
         where journey_channel='web' and (${start}::timestamptz is null or occurred_at>=${start})
           and ${adminDashboardFilterSql(sql, filters)}
           and (funnel_event_name=any(${names}::text[]) or event_type='payment')
-        order by occurred_at,id limit 100000`,
+        order by occurred_at,id limit ${maxFlowEventRows + 1}`,
       getPharmacySourceFunnel(start, filters),
       getAdminMcpFunnel(start),
       getQuestionnaireFunnelReport(range, filters),
-      getWebProductReport(start, filters)
+      getWebProductReport(start, filters, { currentJourneyOnly: true }),
+      getCurrentWebProductPaidJourneys(start, filters)
     ]);
-    return { ...buildAdminFlowData(range, rows, targets), pharmacySources, mcp, questionnaire, productReport };
+    return { ...buildAdminFlowData(range, rows, targets, paidJourneys), pharmacySources, mcp, questionnaire, productReport };
   } catch (error) {
     console.error("Unable to load admin flow data", error);
     return emptyFlow(range);

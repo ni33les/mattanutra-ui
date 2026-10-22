@@ -16,6 +16,7 @@ import { WEB_PRODUCT_JOURNEY_VERSION } from "../lib/web-product-journey.ts";
 import { completeMockPayment, createStripeCheckoutSession, fulfillCheckoutSession, markPaymentCancelled } from "../lib/stripe-payments.ts";
 import { fulfillWebPayment } from "../lib/web-payment-fulfillment.ts";
 import { createRetailCheckoutSession } from "../lib/retail-product-checkout.ts";
+import { recordWebDeliveryDetailsCompleted } from "../lib/web-checkout-tracking.ts";
 import { assessmentCheckoutAttribution } from "../lib/journey-attribution.ts";
 import { writeBpmEvent } from "../lib/bpm.ts";
 import { MATCHER_VERSION } from "../lib/matcher/config.ts";
@@ -359,14 +360,30 @@ describe("free web product journey on PostgreSQL", { concurrency: false }, () =>
     const input = { planId: captured.planId, locale: "en" as const, selectedItemIds: [productIds[0]], removedItemIds: [productIds[1]],
       recommendationRunId: runId, candidateKey: "fixture-subset", assessmentRevision: captured.revision, selectionRevision: 0,
       address: { addressLine1: "1 Fixture Road", addressLine2: "", city: "Bangkok", country: "TH", customerEmail: "checkout@fixture.test", customerName: "Fixture", phone: "0800000000", postalCode: "10110", province: "Bangkok", notes: "" } };
+    // Address completion is a server checkout boundary, even when the browser
+    // already has a cached quote and makes no availability request on submit.
+    await assert.rejects(createRetailCheckoutSession({ ...input, address: { ...input.address, postalCode: "" } }));
+    await assert.rejects(createRetailCheckoutSession({ ...input, billingSameAsShipping: false,
+      billingAddress: { ...input.address, addressLine1: "" } }));
+    await assert.rejects(createRetailCheckoutSession({ ...input, selectedItemIds: [randomUUID()] }));
+    assert.equal((await sql`select count(*)::int as n from public.bpm where plan_id=${captured.planId}::uuid and event_name='web_delivery_details_completed'`)[0].n, 0);
     const checkout = await createRetailCheckoutSession(input);
     assert.equal((await createRetailCheckoutSession(input)).paymentId, checkout.paymentId);
+    await Promise.all([recordWebDeliveryDetailsCompleted(sql, checkout.paymentId), recordWebDeliveryDetailsCompleted(sql, checkout.paymentId)]);
+    const completionEvents = await sql`select id,ray,utm_campaign,properties from public.bpm
+      where event_name='web_delivery_details_completed' and properties->>'checkoutPaymentId'=${checkout.paymentId}`;
+    assert.equal(completionEvents.length, 1, "the cached/retried payment has one durable delivery completion");
+    assert.equal(completionEvents[0].ray, acquisition.ray);
+    assert.equal(completionEvents[0].utm_campaign, acquisition.attribution.utmCampaign);
+    assert.deepEqual(completionEvents[0].properties, { journeyVersion: WEB_PRODUCT_JOURNEY_VERSION, channel: "web",
+      stripeMode: "mock", internal_test: false, checkoutPaymentId: checkout.paymentId, lineCount: 1 });
     const [payment] = await sql`select selected_item_ids,removed_item_ids,quote_lines,metadata from public.retail_checkout_payments where id=${checkout.paymentId}::uuid`;
     assert.deepEqual(payment.selected_item_ids, [productIds[0]]);
     assert.deepEqual(payment.removed_item_ids, [productIds[1]]);
     assert.equal(payment.quote_lines.length, 1);
     assert.deepEqual(payment.metadata.acquisitionAttribution, acquisition);
     assert.equal(payment.metadata.journeyVersion, WEB_PRODUCT_JOURNEY_VERSION);
+    assert.equal(payment.metadata.webDeliveryDetailsCompletedEventId, completionEvents[0].id);
     assert.equal((await sql`select count(*)::int as n from public.retail_checkout_payments where plan_id=${captured.planId}::uuid`)[0].n, 1);
     await waitFor(async () => (await sql`select count(*)::int as n from public.bpm where event_name='retail_product_checkout_session_created' and properties->>'checkoutPaymentId'=${checkout.paymentId}`)[0].n > 0, "checkout BPM event did not persist");
     const events = await sql`select ray,utm_campaign,campaign_id,properties from public.bpm where event_name in ('retail_product_checkout_requested','retail_product_checkout_session_created') and properties->>'checkoutPaymentId'=${checkout.paymentId}`;
@@ -387,6 +404,28 @@ describe("free web product journey on PostgreSQL", { concurrency: false }, () =>
     assert.equal(recovered.acquisitionAttribution?.attribution.utmCampaign, "legacy_fixture");
     assert.equal(recovered.acquisitionAttribution?.ray, ray);
     assert.equal(recovered.journeyVersion, null);
+  });
+
+  it("delivery milestones retain live/test markers and exclude MCP and legacy intents", async () => {
+    const sql = getSql()!, planId = await legacyPlan();
+    for (const [channel, journeyVersion, stripeMode, internalTest, expected] of [
+      ["web", WEB_PRODUCT_JOURNEY_VERSION, "live", false, true],
+      ["web", WEB_PRODUCT_JOURNEY_VERSION, "test", false, true],
+      ["web", WEB_PRODUCT_JOURNEY_VERSION, "mock", false, true],
+      ["web", WEB_PRODUCT_JOURNEY_VERSION, "live", true, true],
+      ["mcp", WEB_PRODUCT_JOURNEY_VERSION, "live", false, false],
+      ["web", null, "live", false, false]
+    ] as const) {
+      const paymentId = randomUUID();
+      await sql`insert into public.retail_checkout_payments (id,plan_id,amount,currency,stripe_mode,idempotency_key,selected_item_ids,metadata)
+        values (${paymentId}::uuid,${planId}::uuid,100000000,'THB',${stripeMode},${randomUUID()},${[randomUUID()]}::text[],
+          ${sql.json({ channel, journeyVersion, internal_test: internalTest, customerEmail: "never-in-analytics@fixture.test", address: "private fixture address" })})`;
+      await Promise.all([recordWebDeliveryDetailsCompleted(sql, paymentId), recordWebDeliveryDetailsCompleted(sql, paymentId)]);
+      const events = await sql`select properties from public.bpm where event_name='web_delivery_details_completed' and properties->>'checkoutPaymentId'=${paymentId}`;
+      assert.equal(events.length, expected ? 1 : 0);
+      if (expected) assert.deepEqual(events[0].properties, { journeyVersion, channel, stripeMode,
+        internal_test: internalTest, checkoutPaymentId: paymentId, lineCount: 1 });
+    }
   });
 
   it("fulfills an existing pre-rollout payment once and retires only its unpaid counterpart", async () => {

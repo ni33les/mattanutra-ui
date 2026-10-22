@@ -710,6 +710,8 @@ export type BusinessMetric = Readonly<{
   id: string;
   label: string;
   series: number[];
+  /** Omit undefined rates (for example, a bucket with no conversion denominator). */
+  seriesDefined?: boolean[];
   value: string;
 }>;
 
@@ -933,16 +935,20 @@ export function BusinessTrendChart({
   const paddingTop = 18;
   const paddingBottom = 36;
   const series = metric.series.length > 0 ? metric.series : [0];
-  const maxValue = Math.max(1, ...series);
+  const defined = (index: number) => metric.seriesDefined?.[index] ?? !metric.seriesDefined;
+  const maxValue = Math.max(1, ...series.filter((_, index) => defined(index)));
   const chartWidth = width - paddingX * 2;
   const chartHeight = height - paddingTop - paddingBottom;
   const xFor = (index: number) =>
     paddingX + (series.length <= 1 ? 0 : (index / (series.length - 1)) * chartWidth);
   const yFor = (value: number) =>
     paddingTop + chartHeight - (value / maxValue) * chartHeight;
-  const points = series
-    .map((value, index) => `${xFor(index).toFixed(1)},${yFor(value).toFixed(1)}`)
-    .join(" ");
+  const segments: string[][] = [];
+  series.forEach((value, index) => {
+    if (!defined(index)) return;
+    if (index === 0 || !defined(index - 1)) segments.push([]);
+    segments.at(-1)!.push(`${xFor(index).toFixed(1)},${yFor(value).toFixed(1)}`);
+  });
   const firstLabel = bucketLabels[0] ?? "";
   const lastLabel = bucketLabels.at(-1) ?? "";
 
@@ -991,15 +997,16 @@ export function BusinessTrendChart({
             </g>
           );
         })}
-        <polyline
+        {segments.map((points, index) => <polyline
           fill="none"
-          points={points}
+          key={index}
+          points={points.join(" ")}
           stroke={metric.color}
           strokeLinecap="round"
           strokeLinejoin="round"
           strokeWidth="4"
-        />
-        {series.map((value, index) => (
+        />)}
+        {series.map((value, index) => defined(index) ? (
           <circle
             cx={xFor(index)}
             cy={yFor(value)}
@@ -1009,7 +1016,7 @@ export function BusinessTrendChart({
             stroke={metric.color}
             strokeWidth="3"
           />
-        ))}
+        ) : null)}
         <text
           className="fill-gray-400 text-[10px]"
           textAnchor="start"

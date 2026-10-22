@@ -19,6 +19,21 @@ export function planPaymentEventSql(sql: postgres.Sql) {
     and (event_status is null or event_status = any(${planPaymentStatuses}::text[])))`;
 }
 
+/** Shared plan-level exclusions for current funnel events and durable commerce facts.
+ * The caller supplies the assessment alias `a`; keep this a lazy SQL fragment. */
+export function liveFunnelAssessmentSql(sql: postgres.Sql) {
+  return sql`(coalesce(a.answers->>'internal_test','false') not in ('true','1')
+    and not exists (select 1 from public.bpm marker where marker.plan_id=a.plan_id
+      and marker.event_name in ('assessment_captured','assessment_recaptured','assessment_submitted')
+      and (coalesce(marker.properties->>'internal_test','false') in ('true','1')
+        or coalesce(marker.properties->>'stripeMode','live') in ('test','mock')
+        or coalesce(marker.properties->>'mocked','false')='true'
+        or coalesce(marker.properties->>'paymentSkipped','false')='true'
+        or nullif(marker.properties->>'seedName','') is not null
+        or coalesce(marker.emitted_by,'') in ('dev_campaign_seed','payment_skip_mock')
+        or coalesce(marker.user_agent,'') ~* '(bot|crawler|spider|headless|playwright|facebookexternalhit|meta-externalagent)')))`;
+}
+
 /** Journey is separate from acquisition (Facebook, TikTok, referral, etc.).
  * Assessment provenance wins over browser hints, including MCP's retail bridge.
  * Normalize on read: never manufacture historical events or replay Meta exports.
@@ -68,6 +83,7 @@ export const webEntryEventNames = [
 ] as const;
 
 export const webJourneyEventNames = [...webEntryEventNames,
+      "web_quiz_landing_viewed", "web_results_displayed", "web_delivery_details_completed",
       "web_processing_viewed", "formula_details_viewed", "product_matches_viewed", "product_basket_confirmed",
       "web_generation_failed", "web_generation_retried",
       "assessment_started", "assessment_submitted", "assessment_captured", "assessment_recaptured",

@@ -1,7 +1,8 @@
 import type postgres from "postgres";
 import { getSql } from "@/lib/db";
 import { adminDashboardFilterSql, type AdminDashboardFilters } from "@/lib/admin-dashboard-filters";
-import { funnelBpmSource } from "@/lib/admin-funnel-events";
+import { funnelBpmSource, liveFunnelAssessmentSql } from "@/lib/admin-funnel-events";
+import { WEB_PRODUCT_JOURNEY_VERSION } from "@/lib/web-product-journey";
 
 export type GenerationStageReport = {
   stage: "formula" | "products";
@@ -28,7 +29,7 @@ export type WebProductReport = {
 
 /** Frozen payment acquisition wins. Old plans recover their original capture context.
  * All projections are aggregate-only; no answer or contact data leaves this query. */
-function resourceSource(sql: postgres.Sql, kind: "tasks" | "payments") {
+function resourceSource(sql: postgres.Sql, kind: "tasks" | "payments", currentJourneyOnly = false) {
   // Parenthesized fragments stay lazy through the instrumented pool wrapper.
   const resources = kind === "payments"
     ? sql`(select p.* from public.retail_checkout_payments p where p.stripe_mode='live'
@@ -38,7 +39,7 @@ function resourceSource(sql: postgres.Sql, kind: "tasks" | "payments") {
     : sql`(select t.*, t.payload as metadata from public.tasks t
         where t.task_type in ('generate_supplement_guidance','generate_product_recommendations'))`;
   return sql`(
-    select r.*, a.locale as assessment_locale, a.selected_plan,
+    select r.*, a.locale as assessment_locale, a.selected_plan, a.journey_version as assessment_journey_version,
       coalesce(acq.value->>'ray', b.ray::text) as ray, b.email_hash,
       coalesce(acq.value #>> '{attribution,deviceType}', b.device_type) as device_type,
       coalesce(acq.value #>> '{attribution,utmSource}', b.utm_source) as utm_source,
@@ -59,20 +60,34 @@ function resourceSource(sql: postgres.Sql, kind: "tasks" | "payments") {
       order by occurred_at,id limit 1) b on true
     cross join lateral (select coalesce(nullif(r.metadata->'acquisitionAttribution','null'::jsonb),
       nullif(a.acquisition_attribution,'{}'::jsonb)) as value) acq
-    where not (a.answers ? 'inStorePharmacy')
+    where (${currentJourneyOnly}=false or a.journey_version=${WEB_PRODUCT_JOURNEY_VERSION})
+      and not (a.answers ? 'inStorePharmacy')
       and coalesce(a.answers->>'channel','') <> 'mcp' and coalesce(a.answers->>'source','') <> 'mcp'
       and coalesce(r.metadata->>'channel','web')='web'
       and coalesce(r.metadata->>'internal_test','false') not in ('true','1')
       and coalesce(r.metadata->>'stripeMode','live') not in ('test','mock')
       and coalesce(r.metadata->>'mocked','false') <> 'true'
-      and coalesce(a.answers->>'internal_test','false') not in ('true','1')
-      and not exists (select 1 from public.bpm marker where marker.plan_id=a.plan_id
-        and marker.event_name in ('assessment_captured','assessment_recaptured','assessment_submitted')
-        and (coalesce(marker.properties->>'internal_test','false') in ('true','1')
-          or nullif(marker.properties->>'seedName','') is not null
-          or coalesce(marker.emitted_by,'') in ('dev_campaign_seed','payment_skip_mock')
-          or coalesce(marker.user_agent,'') ~* '(bot|crawler|spider|headless|playwright|facebookexternalhit|meta-externalagent)'))
+      and ${liveFunnelAssessmentSql(sql)}
   ) resource`;
+}
+
+/** Durable paid product facts for the current public web journey. A payment remains
+ * paid if fulfillment later fails; telemetry and order creation are not evidence.
+ * Identifiers are used only for server-side aggregation, never returned by the API. */
+export type WebProductPaidJourney = Readonly<{ plan_id: string; paid_at: Date | string }>;
+
+export async function getCurrentWebProductPaidJourneys(
+  start: Date | string | null, filters: AdminDashboardFilters
+): Promise<WebProductPaidJourney[]> {
+  const sql = getSql();
+  if (!sql) return [];
+  return sql<WebProductPaidJourney[]>`
+    select plan_id::text, min(paid_at) as paid_at
+    from ${resourceSource(sql, "payments")}
+    where assessment_journey_version=${WEB_PRODUCT_JOURNEY_VERSION} and paid_at is not null
+      and (${start}::timestamptz is null or paid_at>=${start})
+      and ${adminDashboardFilterSql(sql, filters)}
+    group by plan_id`;
 }
 
 const totalFields = ["paidPayments", "paidJourneys", "orders", "shipped", "delivered", "cancelled", "returned", "fulfillmentFailed", "paidWithoutOrder", "paymentsWithEvent", "paymentsMissingEvent"] as const;
@@ -84,12 +99,13 @@ export function campaignSalesKey(row: Pick<ProductSalesCampaign, "source" | "med
   return JSON.stringify([row.source || "direct", row.medium, row.campaign, row.campaignId, row.affiliate, row.promoCode]);
 }
 
-export async function getWebProductReport(start: Date | string | null, filters: AdminDashboardFilters): Promise<WebProductReport | undefined> {
+export async function getWebProductReport(start: Date | string | null, filters: AdminDashboardFilters,
+  options: { currentJourneyOnly?: boolean } = {}): Promise<WebProductReport | undefined> {
   const sql = getSql();
   if (!sql) return undefined;
   const generation = await sql`
     with matched as (
-      select resource.*, assessment_locale as locale from ${resourceSource(sql, "tasks")}
+      select resource.*, assessment_locale as locale from ${resourceSource(sql, "tasks", options.currentJourneyOnly)}
     ), scoped as (
       select * from matched where (${start}::timestamptz is null or created_at>=${start})
         and ${adminDashboardFilterSql(sql, filters)}
@@ -113,7 +129,7 @@ export async function getWebProductReport(start: Date | string | null, filters: 
     from scoped group by task_type`;
   const sales = await sql`
     with eligible as materialized (
-      select * from ${resourceSource(sql, "payments")}
+      select * from ${resourceSource(sql, "payments", options.currentJourneyOnly)}
     ), paid as materialized (
       select * from eligible where paid_at is not null
         and (${start}::timestamptz is null or paid_at>=${start}) and ${adminDashboardFilterSql(sql, filters)}
@@ -144,15 +160,18 @@ export async function getWebProductReport(start: Date | string | null, filters: 
       count(*) filter(where not has_event)::int as "paymentsMissingEvent"
     from grouped group by grouping sets ((source,medium,campaign,campaign_id,affiliate,promo_code),())`;
   const revenue = await sql`
-    select currency,sum(amount)::text as "amountMicros" from ${resourceSource(sql, "payments")}
+    select currency,sum(amount)::text as "amountMicros" from ${resourceSource(sql, "payments", options.currentJourneyOnly)}
     where paid_at is not null and (${start}::timestamptz is null or paid_at>=${start})
       and ${adminDashboardFilterSql(sql, filters)} group by currency order by currency`;
   const [events] = await sql`
     select count(*)::int as "paymentEvents", count(distinct properties->>'checkoutPaymentId')::int as "eventPaymentIds",
-      count(*) filter(where not exists(select 1 from ${resourceSource(sql, "payments")}
+      count(*) filter(where not exists(select 1 from ${resourceSource(sql, "payments", options.currentJourneyOnly)}
         where resource.id::text=bpm.properties->>'checkoutPaymentId' and resource.paid_at is not null))::int as "eventsWithoutPaidPayment"
     from ${funnelBpmSource(sql)} where journey_channel='web'
       and funnel_event_name='retail_product_payment_succeeded'
+      and (${options.currentJourneyOnly ?? false}=false or exists(select 1 from public.assessments a
+        where a.plan_id=bpm.plan_id and a.journey_version=${WEB_PRODUCT_JOURNEY_VERSION}
+          and ${liveFunnelAssessmentSql(sql)}))
       and (${start}::timestamptz is null or occurred_at>=${start}) and ${adminDashboardFilterSql(sql, filters)}`;
   return {
     generation: (["formula", "products"] as const).map(stage => {

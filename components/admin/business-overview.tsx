@@ -26,6 +26,7 @@ import {
   flowNodeCount,
   flowNodeSeries,
   formatNumber,
+  formatPercent,
   type BusinessMetric
 } from "@/components/admin/dashboard-shared";
 
@@ -173,12 +174,46 @@ export function BusinessFunnelTable({
     }
   }
 
+  if (flowData.reportingLimitExceeded) {
+    return <section className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-gray-200">
+      <h2 className="text-base font-semibold text-gray-900">{webProductFunnelCopy[locale].title}</h2>
+      <p className="mt-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-900" role="status" data-testid="web-reporting-limit">
+        {webProductFunnelCopy[locale].reportingLimit}
+      </p>
+      <WebProductReportPanel report={flowData.productReport} locale={locale} />
+      <QuestionnaireFunnel report={flowData.questionnaire} journey="web" locale={locale} labels={labels} canReadLeads={canReadLeads} />
+    </section>;
+  }
+
   return (
     <section className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-gray-200">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <h2 className="text-base font-semibold text-gray-900">
-          {webProductFunnelCopy[locale].title}
-        </h2>
+      <h2 className="text-base font-semibold text-gray-900">{webProductFunnelCopy[locale].title}</h2>
+      <p className="mt-2 text-sm text-gray-600">{funnelReportCopy[locale].webNote}</p>
+      <p className="mt-2 text-sm text-gray-600">{webProductFunnelCopy[locale].note}</p>
+      <div data-testid="current-web-funnel">
+        <FunnelStageTable locale={locale} caption={webProductFunnelCopy[locale].title}
+          rows={(flowData.productFunnel ?? []).map((stage, index, stages): FunnelTableRow => ({
+            id: stage.id, label: webProductFunnelCopy[locale].stages[stage.id], count: stage.count,
+            color: index === 0 ? "entry" : index < 3 ? "complete" : index < 5 ? "result" : "conversion",
+            entry: index === 0, denominator: stage.denominator, numerator: stage.numerator ?? undefined,
+            conversionBasis: index > 0 ? webProductFunnelCopy[locale].stages[stages[index - 1].id] : undefined
+          }))} />
+      </div>
+      {!flowData.productFunnel?.length && <p className="mt-3 text-sm text-gray-600">{funnelReportCopy[locale].unavailable}</p>}
+      <section className="mt-6 rounded-xl bg-gray-50 p-4" data-testid="optional-web-engagement">
+        <h3 className="text-sm font-semibold text-gray-900">{webProductFunnelCopy[locale].engagement}</h3>
+        <p className="mt-2 text-xs text-gray-600">{webProductFunnelCopy[locale].engagementNote}</p>
+        <dl className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+          {(["formulaViewed", "productsViewed", "healthscoreDisplayed"] as const).map(id => <div key={id}>
+            <dt className="text-xs text-gray-600">{webProductFunnelCopy[locale].stages[id]}</dt>
+            <dd className="font-semibold tabular-nums text-gray-900">{flowData.productEngagement ? formatNumber(flowData.productEngagement.find(stage => stage.id === id)?.count ?? 0, locale) : "—"}</dd>
+          </div>)}
+        </dl>
+      </section>
+      <WebProductReportPanel report={flowData.productReport} locale={locale} />
+      <details className="mt-6 border-t border-gray-200 pt-4" data-testid="legacy-web-funnel">
+        <summary className="cursor-pointer text-sm font-semibold text-gray-700">{webProductFunnelCopy[locale].history}</summary>
+        <div className="mt-4 flex flex-wrap items-center gap-2">
         {showTargets ? (
           <div className="flex items-center gap-2">
             {editingTargets ? (
@@ -219,22 +254,12 @@ export function BusinessFunnelTable({
             )}
           </div>
         ) : null}
-      </div>
+        </div>
       {targetSaveError ? (
         <p className="mt-3 text-sm font-medium text-red-700">
           {targetSaveError}
         </p>
       ) : null}
-      <p className="mt-2 text-sm text-gray-600">{funnelReportCopy[locale].webNote}</p>
-      <p className="mt-2 text-sm text-gray-600">{webProductFunnelCopy[locale].note}</p>
-      <FunnelStageTable locale={locale} caption={webProductFunnelCopy[locale].title}
-        rows={(flowData.productFunnel ?? []).map((stage, index) => ({
-          id: stage.id, label: webProductFunnelCopy[locale].stages[stage.id], count: stage.count,
-          color: index === 0 ? "entry" : index < 3 ? "complete" : index < 6 ? "result" : index < 8 ? "conversion" : "delivered",
-          entry: index === 0, denominator: stage.denominator, numerator: stage.numerator ?? undefined
-        }))} />
-      <WebProductReportPanel report={flowData.productReport} locale={locale} />
-      <details className="mt-5"><summary className="cursor-pointer text-sm font-semibold">{webProductFunnelCopy[locale].history}</summary>
       <FunnelStageTable locale={locale} caption={funnelReportCopy[locale].web} targets={showTargets}
         rows={businessFunnelStages(flowData, labels, locale, activeTargets).map((stage, index): FunnelTableRow => ({
           id: stage.id,
@@ -264,6 +289,29 @@ export function BusinessFunnelTable({
       <QuestionnaireFunnel report={flowData.questionnaire} journey="web" locale={locale} labels={labels} canReadLeads={canReadLeads} />
     </section>
   );
+}
+
+export function WebProductConversionNote({ flowData, locale }: { flowData: AdminFlowData; locale: Locale }) {
+  return <p className="mt-3 text-xs text-gray-600" data-testid="web-conversion-basis">
+    <span className="font-semibold tabular-nums">{formatNumber(flowData.summary.conversionNumerator, locale)} / {formatNumber(flowData.summary.conversionDenominator, locale)}</span>
+    {" · "}{webProductFunnelCopy[locale].conversionNote}
+  </p>;
+}
+
+export function webProductSummaryMetrics(flowData: AdminFlowData, locale: Locale): BusinessMetric[] {
+  const labels = webProductFunnelCopy[locale].summary;
+  return [
+    { id: "quizLandingViewed", label: labels.entered, color: businessMetricColors.landingVisitors,
+      series: flowNodeSeries(flowData, "quizLandingViewed"), value: formatNumber(flowData.summary.entered, locale) },
+    { id: "resultsDisplayed", label: labels.reachedResults, color: businessMetricColors.completed,
+      series: flowNodeSeries(flowData, "resultsDisplayed"), value: formatNumber(flowData.summary.reachedResults, locale) },
+    { id: "productPaymentConfirmed", label: labels.converted, color: businessMetricColors.converted,
+      series: flowNodeSeries(flowData, "productPaymentConfirmed"), value: formatNumber(flowData.summary.converted, locale) },
+    { id: "conversionRate", label: labels.conversionRate, color: businessMetricColors.conversionRate, format: "percent",
+      series: flowData.series.conversionRate ?? flowData.series.bucketLabels.map(() => 0),
+      seriesDefined: flowNodeSeries(flowData, "quizLandingViewed").map(count => count > 0),
+      value: flowData.summary.conversionDenominator > 0 ? formatPercent(flowData.summary.conversionRate, locale) : "—" }
+  ];
 }
 
 export function AdminAtAGlanceView({
@@ -315,82 +363,32 @@ export function AdminAtAGlanceView({
       label: labels.atAGlance.criticalAlerts
     }
   ].filter((item) => item.count > 0);
-  const metrics: BusinessMetric[] = [
-    {
-      color: businessMetricColors.landingVisitors,
-      id: "landingVisitors",
-      label: labels.atAGlance.landingVisitors,
-      series: flowNodeSeries(flowData, "landingViewed"),
-      value: formatNumber(flowNodeCount(flowData, "landingViewed"), locale)
-    },
-    {
-      color: businessMetricColors.assessmentStarts,
-      id: "assessmentStarts",
-      label: labels.atAGlance.assessmentStarts,
-      series: flowNodeSeries(flowData, "assessmentStarted"),
-      value: formatNumber(flowNodeCount(flowData, "assessmentStarted"), locale)
-    },
-    {
-      color: businessMetricColors.assessmentCompletions,
-      id: "assessmentCompletions",
-      label: labels.atAGlance.assessmentCompletions,
-      series: flowNodeSeries(flowData, "assessmentSubmitted"),
-      value: formatNumber(flowNodeCount(flowData, "assessmentSubmitted"), locale)
-    },
-    {
-      color: businessMetricColors.healthScoreViews,
-      id: "healthScoreViews",
-      label: labels.atAGlance.healthScoreViews,
-      series: flowNodeSeries(flowData, "healthscoreViewed"),
-      value: formatNumber(flowNodeCount(flowData, "healthscoreViewed"), locale)
-    },
-    {
-      color: businessMetricColors.precisionConversions,
-      id: "precisionConversions",
-      label: labels.atAGlance.precisionConversions,
-      series: flowNodeSeries(flowData, "precisionPaid"),
-      value: formatNumber(flowNodeCount(flowData, "precisionPaid"), locale)
-    },
-    {
-      color: businessMetricColors.proConversions,
-      id: "proConversions",
-      label: labels.atAGlance.proConversions,
-      series: flowNodeSeries(flowData, "proPaid"),
-      value: formatNumber(flowNodeCount(flowData, "proPaid"), locale)
-    },
-    {
-      color: businessMetricColors.contentScheduled,
-      id: "productOrders",
-      label: labels.atAGlance.productOrders,
-      series: flowNodeSeries(flowData, "retailOrderCreated"),
-      value: formatNumber(flowNodeCount(flowData, "retailOrderCreated"), locale)
-    },
-    {
-      color: businessMetricColors.pendingReviews,
-      id: "pendingReviews",
-      label: labels.atAGlance.pendingReviews,
-      series: flowData.series.bucketLabels.map(() => reviewQueueData.summary.total),
-      value: formatNumber(reviewQueueData.summary.total, locale)
-    }
-  ];
+  const metrics = webProductSummaryMetrics(flowData, locale);
   const [selectedMetricId, setSelectedMetricId] =
-    useState<BusinessMetric["id"]>("landingVisitors");
+    useState<BusinessMetric["id"]>("quizLandingViewed");
   const selectedMetric =
     metrics.find((metric) => metric.id === selectedMetricId) ?? metrics[0];
 
   return (
     <>
+      {!flowData.reportingLimitExceeded && <>
+      <div data-testid="web-product-summary">
       <BusinessStatsGrid
         metrics={metrics}
         onMetricSelect={setSelectedMetricId}
         selectedMetricId={selectedMetric.id}
       />
+      </div>
+
+      <WebProductConversionNote flowData={flowData} locale={locale} />
 
       <BusinessTrendChart
         bucketLabels={flowData.series.bucketLabels}
         locale={locale}
         metric={selectedMetric}
       />
+
+      </>}
 
       <div className="mt-8 grid w-full min-w-0 grid-cols-1 gap-8 [&>section]:mt-0 [&>section]:min-w-0">
         <BusinessFunnelTable flowData={flowData} labels={labels} locale={locale} canReadLeads={canReadLeads} />

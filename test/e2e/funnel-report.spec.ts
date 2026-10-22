@@ -1,6 +1,7 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { expect, test } from "@playwright/test";
+import { webProductFunnelCopy } from "../../lib/web-product-funnel-copy";
 
 const execute=promisify(execFile);
 test.setTimeout(120_000);
@@ -18,8 +19,8 @@ test.beforeEach(async({baseURL,context})=>{
   await context.route("**/*",route=>["localhost","127.0.0.1"].includes(new URL(route.request().url()).hostname)?route.continue():route.abort());
 });
 
-for(const locale of ["en","th","zh-CN"]){
-  test(`${locale}: Web, Retail and MCP share coloured tables on desktop and mobile`,async({baseURL,context,page})=>{
+for(const locale of ["en","th","zh-CN"] as const){
+  test(`${locale}: current web funnel and summary align on desktop and mobile`,async({baseURL,context,page})=>{
     const session=await runApp<{sessionCookie:string;csrfToken:string;sessionId:string}>(`
       import {createAdminBrowserSession} from './test/helpers/admin-browser-fixture.ts';
       import {getSql,closeSqlPool} from './lib/db.ts';
@@ -36,8 +37,27 @@ for(const locale of ["en","th","zh-CN"]){
     `);
     try{
       await context.addCookies([{name:"mn_admin_session",url:baseURL,value:session.sessionCookie},{name:"mn_admin_csrf",url:baseURL,value:session.csrfToken}]);
+      const pageErrors: string[] = [];
+      page.on("pageerror", error => pageErrors.push(error.message));
       await page.goto(`/${locale}/admin/dashboard?view=flow&range=month`);
-      for(const name of ["Web","Retail","MCP"])await expect(page.getByRole("heading",{name,exact:true})).toBeVisible();
+      const copy = webProductFunnelCopy[locale];
+      for(const name of [copy.title,"Retail","MCP"])await expect(page.getByRole("heading",{name,exact:true})).toBeVisible();
+      const stageIds = ["quizLandingViewed", "assessmentStarted", "assessmentCaptured", "revealOpened", "resultsDisplayed",
+        "basketConfirmed", "productCheckoutViewed", "deliveryDetailsCompleted", "productCheckoutReady", "productPaymentConfirmed"];
+      const current = page.getByTestId("current-web-funnel");
+      await expect(current.locator("tbody tr")).toHaveCount(10);
+      await expect(current.locator('th[scope="row"]')).toHaveText(stageIds.map(id => copy.stages[id]));
+      const legacy = page.getByTestId("legacy-web-funnel");
+      await expect(legacy).not.toHaveAttribute("open", "");
+      await expect(legacy.getByRole("button").first()).toBeHidden();
+      await expect(page.getByTestId("optional-web-engagement").getByRole("heading")).toHaveText(copy.engagement);
+      const assertSummary = async () => {
+        const summary = page.getByTestId("web-product-summary");
+        await expect(summary.getByRole("button")).toHaveCount(4);
+        for (const label of Object.values(copy.summary)) await expect(summary.getByText(label, { exact: true })).toBeVisible();
+        await expect(page.getByTestId("web-conversion-basis")).toContainText(copy.conversionNote);
+      };
+      await assertSummary();
       for(const width of [1280,390]){
         await page.setViewportSize({width,height:900});
         const tables=page.getByTestId("funnel-stage-table");
@@ -45,9 +65,21 @@ for(const locale of ["en","th","zh-CN"]){
         const colours=await tables.evaluateAll(nodes=>nodes.map(table=>getComputedStyle(table.querySelector('tbody th')!).borderLeftColor));
         expect(colours.every(colour=>colour!=="rgba(0, 0, 0, 0)")).toBe(true);
         expect(await page.locator("body").innerText()).not.toMatch(/NaN|Infinity/);
+        expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
+        await assertSummary();
+        await expect(current.getByRole("table")).toBeVisible();
         await expect(page.getByTestId("pharmacy-source-funnel").getByRole("combobox").first()).toBeEnabled();
         if(locale === "en") await page.screenshot({path:`${process.env.FUNNEL_SCREENSHOT_DIR ?? "test-results"}/funnel-${width}.png`,fullPage:true});
       }
+      await legacy.locator("summary").click();
+      await expect(legacy.getByRole("button").first()).toBeVisible();
+      await legacy.getByRole("button").first().click();
+      await expect(legacy.getByRole("spinbutton")).toHaveCount(7);
+      await expect(current.getByRole("spinbutton")).toHaveCount(0);
+      await page.goto(`/${locale}/admin/dashboard?view=glance&range=month`);
+      await assertSummary();
+      await expect(page.getByTestId("current-web-funnel").locator("tbody tr")).toHaveCount(10);
+      expect(pageErrors).toEqual([]);
     }finally{
       await runApp(`import {getSql,closeSqlPool} from './lib/db.ts';try{await getSql()\`update public.admin_sessions set revoked_at=now() where id=\${'${session.sessionId}'}::uuid\`;console.log('REPORT_FIXTURE:{}');}finally{await closeSqlPool();}`);
     }

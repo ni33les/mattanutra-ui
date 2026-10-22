@@ -69,7 +69,6 @@ export async function POST(request: Request) {
     isUuid(body.selectedRetailerOrganisationId)
       ? body.selectedRetailerOrganisationId
       : null;
-  const previewOnly = body.previewOnly === true;
 
   if (!shippingCountry || lines.length === 0) {
     return NextResponse.json(
@@ -88,9 +87,8 @@ export async function POST(request: Request) {
   void writeBpmEvent({
     actorType: planId ? "visitor" : "admin",
     emittedBy: planId ? "retail_product_checkout" : "admin_mock_basket",
-    eventName: planId && !previewOnly
-      ? "retail_delivery_details_confirmed"
-      : availability.canCheckout
+    // Country-level availability is a quote preview, never proof of a complete address.
+    eventName: availability.canCheckout
         ? "retail_basket_routing_preview"
         : "retail_basket_no_payable_local_lines",
     eventStatus: availability.canCheckout ? "available" : "blocked",

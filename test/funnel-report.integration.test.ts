@@ -117,3 +117,102 @@ it("excludes automated and demo events consistently and separates product paymen
     throw rollback;
   }); } catch (error) { if (error !== rollback) throw error; } finally { scoped = sql; }
 });
+
+it("loads the current funnel through the real instrumented pool without eager SQL fragments", async () => {
+  assert.equal(scoped, sql);
+  const flow = await getAdminFlowData("all", { ...emptyAdminDashboardFilters, campaign: `fixture-empty-${randomUUID()}` });
+  assert.equal(flow.databaseAvailable, true);
+  assert.equal(flow.productFunnel?.length, 10);
+  assert.ok(flow.productFunnel?.every(stage => stage.count === 0));
+  assert.equal(flow.summary.conversionNumerator, 0);
+  assert.equal(flow.summary.conversionDenominator, 0);
+});
+
+it("uses current live paid facts, frozen acquisition and observed quiz identity with matching time and locale filters", async () => {
+  const rollback = new Error("fixture rollback");
+  try { await sql.begin(async tx => {
+    scoped = tx;
+    const campaign = `fixture-current-funnel-${randomUUID()}`;
+    const ray = randomUUID(), session = randomUUID(), attempt = `${session}:start`;
+    const base = Date.now() - 3 * 60 * 60_000;
+    const at = (minute: number) => new Date(base + minute * 60_000);
+    async function assessment(input: { legacy?: boolean; answers?: Record<string, unknown> } = {}) {
+      const id = randomUUID();
+      await tx`insert into public.assessments(plan_id,locale,selected_plan,status,answers,journey_version,acquisition_attribution)
+        values(${id}::uuid,'en',${input.legacy ? "precision" : null},'captured',${tx.json(input.answers ?? {})},
+          ${input.legacy ? null : "web-products-v1"},${tx.json({ attribution: { utmCampaign: campaign, utmSource: "meta" } })})`;
+      return id;
+    }
+    async function payment(plan: string, input: { mode?: string; status?: string; paid?: boolean; metadata?: Record<string, unknown>; minute?: number } = {}) {
+      const id = randomUUID();
+      await tx`insert into public.retail_checkout_payments(id,plan_id,locale,status,amount,currency,stripe_mode,idempotency_key,metadata,paid_at)
+        values(${id}::uuid,${plan}::uuid,'en',${input.status ?? "paid"},100000000,'THB',${input.mode ?? "live"},${id},
+          ${tx.json(input.metadata ?? {})},${input.paid === false ? null : at(input.minute ?? 130)})`;
+    }
+    async function add(name: string, minute: number, plan: string | null, properties: Record<string, unknown> = {}, eventRay = ray) {
+      await tx`insert into public.bpm(id,ray,plan_id,event_name,event_type,event_status,path,utm_source,utm_campaign,locale,properties,occurred_at)
+        values(${randomUUID()}::uuid,${eventRay}::uuid,${plan}::uuid,${name},'funnel','observed','/en/nutrition/quiz','meta',${campaign},'en',
+          ${tx.json(properties)},${at(minute)})`;
+    }
+    const paid = await assessment(), eventless = await assessment(), unpaid = await assessment(), legacy = await assessment({ legacy: true });
+    await add("web_quiz_landing_viewed", 0, null, { sessionId: session, journeyVersion: "web-products-v1" });
+    await add("chat_start", 1, null, { sessionId: session, attemptId: attempt, journeyVersion: "web-products-v1" });
+    await add("assessment_captured", 120, paid, { sessionId: session, attemptId: attempt }, randomUUID());
+    await add("reveal_page_viewed", 121, paid);
+    await add("product_matches_viewed", 122, paid);
+    await add("product_basket_confirmed", 123, paid);
+    await add("retail_product_checkout_viewed", 124, paid);
+    await add("web_delivery_details_completed", 125, paid);
+    await add("retail_product_checkout_session_created", 126, paid);
+    await payment(paid, { status: "fulfillment_failed" });
+    await payment(paid, { minute: 131 });
+    await payment(eventless);
+    await payment(unpaid, { status: "processing", paid: false });
+    await add("retail_product_payment_succeeded", 132, unpaid);
+    await add("retail_customer_order_created", 133, unpaid);
+    await payment(legacy);
+    await add("assessment_viewed", 0, legacy);
+    await add("assessment_captured", 1, legacy);
+    await add("web_quiz_landing_viewed", 0, null, { sessionId: randomUUID(), journeyVersion: "web-products-v1" }, randomUUID());
+    // Missing payment telemetry is not a missing sale; unrelated evidence is never a sale.
+    await payment(await assessment(), { mode: "test" });
+    await payment(await assessment(), { mode: "mock" });
+    await payment(await assessment(), { metadata: { internal_test: true } });
+    await payment(await assessment(), { metadata: { channel: "mcp" } });
+    await payment(await assessment({ answers: { channel: "mcp" } }));
+    await payment(await assessment({ answers: { inStorePharmacy: { slug: "fixture" } } }));
+    const internal = await assessment({ answers: { internal_test: true } });
+    await payment(internal);
+    await add("web_quiz_landing_viewed", 0, internal);
+    await add("formula_details_viewed", 1, internal);
+    const marked = await assessment();
+    await payment(marked);
+    await add("assessment_captured", 0, marked, { stripeMode: "test" });
+    await add("web_quiz_landing_viewed", 1, marked);
+    await add("product_matches_viewed", 2, marked);
+    await payment(await assessment(), { metadata: { acquisitionAttribution: { attribution: { utmCampaign: "different-frozen-campaign" } } } });
+
+    const filters = { ...emptyAdminDashboardFilters, campaign };
+    const flow = await getAdminFlowData("all", filters);
+    assert.equal(flow.databaseAvailable, true);
+    assert.deepEqual(flow.summary, { entered: 2, reachedResults: 1, converted: 2, conversionRate: 50,
+      conversionNumerator: 1, conversionDenominator: 2, reachedHealthScore: 0 });
+    assert.deepEqual(flow.productFunnel?.find(row => row.id === "assessmentCaptured"),
+      { id: "assessmentCaptured", count: 1, denominator: 1, numerator: 1 });
+    assert.equal(flow.productFunnel?.find(row => row.id === "productPaymentConfirmed")?.count, 2);
+    assert.equal(flow.productReport?.sales.paidPayments, 3);
+    assert.equal(flow.productReport?.sales.paidJourneys, 2);
+    assert.equal(flow.productReport?.sales.fulfillmentFailed, 1);
+    assert.equal(flow.productReport?.sales.paymentsMissingEvent, 3);
+    assert.equal(flow.series.conversionRate?.at(-1), 50);
+    assert.equal(flow.series.nodes.productPaymentConfirmed?.at(-1), 2);
+    const recent = await getAdminFlowData("hour", filters);
+    assert.equal(recent.summary.entered, 0, "An earlier quiz is not manufactured inside the current time window");
+    assert.equal(recent.summary.converted, 2);
+    assert.equal(recent.summary.conversionNumerator, 0);
+    const thai = await getAdminFlowData("all", { ...filters, locale: "th" });
+    assert.equal(thai.summary.entered, 0);
+    assert.equal(thai.summary.converted, 0);
+    throw rollback;
+  }); } catch (error) { if (error !== rollback) throw error; } finally { scoped = sql; }
+});

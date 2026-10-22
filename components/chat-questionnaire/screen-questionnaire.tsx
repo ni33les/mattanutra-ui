@@ -16,6 +16,7 @@ import type { QuestionnaireState, TurnDef } from "@/lib/questionnaire/types";
 import { ASSESSMENT_FIRST_NAME_MAX_LENGTH } from "@/lib/assessment-first-name";
 import { getBpmPayload, trackBpmEvent } from "@/lib/bpm-client";
 import { trackMetaEvent } from "@/lib/meta-client";
+import { WEB_PRODUCT_JOURNEY_VERSION } from "@/lib/web-product-journey";
 import { nutritionHealthScorePath, nutritionRevealPath } from "@/lib/nutrition-paths";
 import { pharmacyPath } from "@/lib/pharmacy-journey";
 import { requestHealthScoreEmail } from "@/lib/healthscore-copy-client";
@@ -25,6 +26,7 @@ export function ScreenQuestionnaire({ locale, sessionId, reviewRequested = false
   returningPlanId, resumeToken, showDevShortcut, skipHealthScore = false }: ChatQuestionnaireProps) {
   const router = useRouter();
   const skipHealthScoreStep = skipHealthScore || Boolean(pharmacyId);
+  const newPublicWebJourney = skipHealthScore && !pharmacyId && !returningPlanId && !reviewRequested && !paymentId;
   const [state, setState] = useState<QuestionnaireState | null>(null);
   const [mode, setMode] = useState<"loading" | "welcome" | "resume" | "quiz" | "calculating">("loading");
   const [saveFailed, setSaveFailed] = useState(false);
@@ -101,7 +103,8 @@ export function ScreenQuestionnaire({ locale, sessionId, reviewRequested = false
     const initial = restart ? { ...createScreenState(locale, state.sessionId), planId: state.planId } : state;
     const next = { ...openScreen(initial, restart ? "name" : initial.screenId ?? "name"), startedAt: restart ? Date.now() : initial.startedAt ?? Date.now() };
     commit(next); setMode("quiz"); telemetry.close();
-    trackBpmEvent("chat_start", { eventType: "funnel", locale, properties: questionnaireAttemptContext(next) });
+    trackBpmEvent("chat_start", { eventType: "funnel", locale, properties: { ...questionnaireAttemptContext(next),
+      ...(newPublicWebJourney ? { journeyVersion: WEB_PRODUCT_JOURNEY_VERSION, channel: "web" } : {}) } });
   }
   function change(key: string, value: unknown) {
     if (!state) return;
@@ -149,7 +152,7 @@ export function ScreenQuestionnaire({ locale, sessionId, reviewRequested = false
   function devFill() { if (state) { commit(fastForwardScreens(state)); setMode("quiz"); } }
 
   if (mode === "loading" || !state || !definition) return <div className={styles.shell} aria-busy="true" />;
-  if (mode === "welcome") return <QuestionnaireWelcome locale={locale} onStart={() => begin()} onDevFastForward={showDevShortcut ? devFill : undefined} />;
+  if (mode === "welcome") return <QuestionnaireWelcome locale={locale} trackingSessionId={newPublicWebJourney ? state.sessionId : undefined} onStart={() => begin()} onDevFastForward={showDevShortcut ? devFill : undefined} />;
   if (mode === "calculating" && !skipHealthScoreStep) return <QuestionnaireCalculating locale={locale} status={capture.status} canOpenResults={capture.status === "ready"}
     onSeeResults={() => { if (capture.planId) router.replace(resultPath(capture.planId)); }}
     onRetryCapture={!capture.planId ? () => { void runCapture(state); } : undefined}
