@@ -14,6 +14,7 @@ import {
   isRetryableMatchingWorkItemError
 } from "@/lib/task-work-items";
 import { requireWorkerAccess } from "@/lib/worker-auth";
+import { recordRevealTaskTerminal, revealTaskContext, timeRevealTaskStage } from "@/lib/reveal-timing";
 
 export const runtime = "nodejs";
 
@@ -92,11 +93,11 @@ async function handleGET(request: Request, { params }: WorkItemRouteProps) {
     }
 
     try {
-      await failTask({
+      const task = await failTask({
         accessScope: access.scope,
         agentId,
         applyFailure: (context) =>
-          applyTaskFailureResult({
+          timeRevealTaskStage("failure_application", revealTaskContext(context.task), () => applyTaskFailureResult({
             afterCommit: context.afterCommit,
             errorMessage,
             resultPayload: context.resultPayload,
@@ -104,7 +105,7 @@ async function handleGET(request: Request, { params }: WorkItemRouteProps) {
             sql: context.sql,
             task: context.task,
             taskId: id
-          }),
+          })),
         errorMessage,
         reservationId,
         resultPayload: {
@@ -113,6 +114,7 @@ async function handleGET(request: Request, { params }: WorkItemRouteProps) {
         taskId: id,
         workerSessionId
       });
+      recordRevealTaskTerminal(task);
     } catch {
       /* fail-closed below */
     }

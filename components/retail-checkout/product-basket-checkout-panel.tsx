@@ -1,11 +1,13 @@
 "use client";
 import { trackMetaEvent } from "@/lib/meta-client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { EmbeddedCheckout, EmbeddedCheckoutProvider } from "@stripe/react-stripe-js";
 import { loadStripe } from "@stripe/stripe-js";
-import { CreditCard, Truck } from "lucide-react";
+import { ArrowRight, Check, CreditCard, House, LockKeyhole, ShieldCheck, Truck, UserRound } from "lucide-react";
 import { OrderSummary } from "@/components/retail-checkout/order-summary";
+import { CheckoutTrustHero } from "@/components/retail-checkout/checkout-trust-hero";
+import styles from "./product-basket-checkout-panel.module.css";
 import type {
   ProductBasketProduct,
   ProductBasketQuotePreview
@@ -16,6 +18,7 @@ import { formatCurrencyAmount } from "@/lib/currencies";
 import type { Locale } from "@/lib/i18n";
 import { displayCountryName, productCountryOptions } from "@/lib/product-countries";
 import { checkoutResponsibilityCopy } from "@/lib/agentic/responsibility/matrix";
+import { nutritionRevealPath } from "@/lib/nutrition-paths";
 
 const checkoutResponsibility = {
   en: checkoutResponsibilityCopy("en"),
@@ -255,6 +258,78 @@ const copy = {
 
 export const retailCheckoutCopy = copy;
 
+const webCopy = {
+  en: {
+    contactHelp: "For your order confirmation and delivery updates.",
+    contactStep: "Contact",
+    deliveryStep: "Delivery",
+    delivery: "Where shall we deliver?",
+    shipping: "Home delivery",
+    deliveryFrom: "Delivery from {pharmacy}",
+    deliveryPending: "Delivery timing will be confirmed before payment.",
+    arrivesBy: "Arrives by {date}",
+    payment: "Secure payment",
+    paymentNote: "Complete your payment securely with Stripe.",
+    continue: "Continue to secure payment",
+    assurance: "Secure payment with Stripe",
+    optionalFields: "Add apartment, building or delivery notes",
+    phonePlaceholder: "Your contact number",
+    addressPlaceholder: "House number and street",
+    notesPlaceholder: "Anything that will help the courier find you",
+    steps: "Checkout steps",
+    totalWithDelivery: "Total, including delivery",
+    paybar: "Order total and secure payment",
+    requiredDetails: "Please complete the required checkout details.",
+    province: "Province"
+  },
+  th: {
+    contactHelp: "สำหรับยืนยันคำสั่งซื้อและแจ้งสถานะการจัดส่ง",
+    contactStep: "ข้อมูลติดต่อ",
+    deliveryStep: "ที่อยู่จัดส่ง",
+    delivery: "ที่อยู่จัดส่ง",
+    shipping: "จัดส่งถึงบ้าน",
+    deliveryFrom: "จัดส่งโดย {pharmacy}",
+    deliveryPending: "แจ้งกำหนดจัดส่งให้ทราบก่อนชำระเงิน",
+    arrivesBy: "จัดส่งถึงภายใน {date}",
+    payment: "ชำระเงิน",
+    paymentNote: "ชำระเงินอย่างปลอดภัยผ่าน Stripe",
+    continue: "ไปชำระเงินอย่างปลอดภัย",
+    assurance: "ชำระเงินอย่างปลอดภัยผ่าน Stripe",
+    optionalFields: "เพิ่มชื่ออาคาร ห้องพัก หรือหมายเหตุการจัดส่ง",
+    phonePlaceholder: "เบอร์โทรศัพท์ที่ติดต่อได้",
+    addressPlaceholder: "บ้านเลขที่ ถนน ตำบล / แขวง",
+    notesPlaceholder: "เช่น จุดสังเกต หรือคำแนะนำสำหรับผู้จัดส่ง",
+    steps: "ขั้นตอนการสั่งซื้อ",
+    totalWithDelivery: "ยอดรวมค่าจัดส่ง",
+    paybar: "ยอดรวมและการชำระเงินอย่างปลอดภัย",
+    requiredDetails: "กรุณากรอกข้อมูลที่จำเป็นให้ครบถ้วน",
+    province: "จังหวัด"
+  },
+  "zh-CN": {
+    contactHelp: "用于订单确认和配送状态通知。",
+    contactStep: "联系信息",
+    deliveryStep: "配送地址",
+    delivery: "配送地址",
+    shipping: "送货上门",
+    deliveryFrom: "由 {pharmacy} 配送",
+    deliveryPending: "配送时间将在付款前确认。",
+    arrivesBy: "预计 {date} 前送达",
+    payment: "安全付款",
+    paymentNote: "通过 Stripe 安全完成付款。",
+    continue: "继续安全付款",
+    assurance: "通过 Stripe 安全付款",
+    optionalFields: "添加公寓、楼栋或配送备注",
+    phonePlaceholder: "您的联系电话",
+    addressPlaceholder: "门牌号和街道",
+    notesPlaceholder: "帮助配送员找到您的信息",
+    steps: "结账步骤",
+    totalWithDelivery: "含配送费总计",
+    paybar: "订单总计和安全付款",
+    requiredDetails: "请填写完整的必填结账信息。",
+    province: "府 / 省"
+  }
+} satisfies Record<Locale, Record<string, string>>;
+
 const countries = productCountryOptions.map((item) => ({
   code: item.code,
   name: item.label
@@ -422,6 +497,9 @@ export function ProductBasketCheckoutPanel({
 }: ProductBasketCheckoutPanelProps) {
   const labels = copy[locale];
   const checkoutMode = mode === "agentic" ? "agentic" : "web";
+  const isWeb = checkoutMode === "web";
+  const webLabels = webCopy[locale];
+  const FormContainer = isWeb ? "form" : "div";
   const [checkout, setCheckout] = useState<CheckoutState>(() => {
     const address = initialAddress();
     if (destinationCountry) {
@@ -446,6 +524,8 @@ export function ProductBasketCheckoutPanel({
   const [isCompletingMock, setIsCompletingMock] = useState(false);
   const [paymentId, setPaymentId] = useState<string | null>(null);
   const [mockReady, setMockReady] = useState(false);
+  const quoteRequest = useRef(0);
+  const webSubmissionPending = useRef(false);
   const [mockScenario, setMockScenario] = useState<(typeof RETAIL_MOCK_PAYMENT_SCENARIOS)[number]>(
     "success"
   );
@@ -466,6 +546,8 @@ export function ProductBasketCheckoutPanel({
   );
   const shippingLabels = countryFieldLabels(checkout.address.country, labels);
   const billingLabels = countryFieldLabels(checkout.billingAddress.country, labels);
+  if (isWeb && checkout.address.country === "TH") shippingLabels.province = webLabels.province;
+  if (isWeb && checkout.billingAddress.country === "TH") billingLabels.province = webLabels.province;
   const shippingErrors = useMemo(
     () =>
       validateAddress(checkout.address, labels, {
@@ -496,9 +578,17 @@ export function ProductBasketCheckoutPanel({
       ?.selectedRetailerName ??
     null;
   const deliveryPromise = quotePreview?.etaDate
-    ? `Arrives by ${formatEta(locale, quotePreview.etaDate)}`
-    : labels.deliveryPromise;
+    ? isWeb
+      ? webLabels.arrivesBy.replace("{date}", formatEta(locale, quotePreview.etaDate))
+      : `Arrives by ${formatEta(locale, quotePreview.etaDate)}`
+    : isWeb ? webLabels.deliveryPending : labels.deliveryPromise;
   const canPay = Boolean(formIsValid && (quotePreview ? quotePreview.canCheckout : true));
+  const paymentDisabled = isLoading || isCompletingMock || (isWeb
+    ? selectedItemIds.length === 0 || Boolean(quotePreview && !quotePreview.canCheckout)
+    : !canPay);
+  const paymentLabel = mockPayment || mockReady
+    ? isCompletingMock || isLoading ? labels.stripeLoading : labels.mockCta
+    : isLoading ? labels.creating : isWeb ? webLabels.continue : labels.continue;
 
   useEffect(() => {
     trackBpmEvent("retail_product_checkout_viewed", {
@@ -520,6 +610,7 @@ export function ProductBasketCheckoutPanel({
   };
 
   const resetQuoteState = () => {
+    quoteRequest.current += 1;
     setQuotePreview(null);
     setMockReady(false);
     setPaymentId(null);
@@ -581,7 +672,13 @@ export function ProductBasketCheckoutPanel({
 
       return { ...current, touched };
     });
-  }, [billingErrors, shippingErrors]);
+    if (isWeb) {
+      const shippingField = Object.keys(shippingErrors)[0];
+      const billingField = Object.keys(billingErrors)[0];
+      const firstInvalidId = shippingField ? `shipping-${shippingField}` : billingField ? `billing-${billingField}` : null;
+      if (firstInvalidId) requestAnimationFrame(() => document.getElementById(firstInvalidId)?.focus());
+    }
+  }, [billingErrors, isWeb, shippingErrors]);
 
   const loadQuotePreview = useCallback(async (options?: {
     confirmDelivery?: boolean;
@@ -595,6 +692,7 @@ export function ProductBasketCheckoutPanel({
       return initialQuotePreview;
     }
 
+    const request = ++quoteRequest.current;
     try {
       const response = await fetch("/api/retail/basket/availability", {
         body: JSON.stringify({
@@ -622,6 +720,8 @@ export function ProductBasketCheckoutPanel({
         throw new Error(body.error || labels.error);
       }
 
+      // A response for a previous delivery country must not replace its new quote.
+      if (request !== quoteRequest.current) return null;
       setQuotePreview(body.availability);
       if (options?.confirmDelivery) {
         trackBpmEvent("retail_shipping_method_selected", {
@@ -638,6 +738,7 @@ export function ProductBasketCheckoutPanel({
       }
       return body.availability;
     } catch (caught) {
+      if (request !== quoteRequest.current) return null;
       setError(caught instanceof Error ? caught.message : labels.error);
       return null;
     }
@@ -665,19 +766,19 @@ export function ProductBasketCheckoutPanel({
   const previewQuote = useCallback(async (): Promise<ProductBasketQuotePreview | null> => {
     if (!formIsValid) {
       touchInvalidFields();
-      setError("Please complete the required checkout details.");
+      setError(isWeb ? webLabels.requiredDetails : "Please complete the required checkout details.");
       return null;
     }
 
     return loadQuotePreview({ confirmDelivery: true });
-  }, [formIsValid, loadQuotePreview, touchInvalidFields]);
+  }, [formIsValid, isWeb, loadQuotePreview, touchInvalidFields, webLabels.requiredDetails]);
 
   const createSession = useCallback(async (): Promise<string | null> => {
     setError("");
 
     if (!formIsValid) {
       touchInvalidFields();
-      setError("Please complete the required checkout details.");
+      setError(isWeb ? webLabels.requiredDetails : "Please complete the required checkout details.");
       return null;
     }
 
@@ -779,6 +880,8 @@ export function ProductBasketCheckoutPanel({
     labels.cannotDeliver,
     labels.error,
     labels.unavailableBody,
+    isWeb,
+    webLabels.requiredDetails,
     formIsValid,
     locale,
     planId,
@@ -853,32 +956,36 @@ export function ProductBasketCheckoutPanel({
 
     return (
       <label
-        className="grid gap-1 text-sm font-semibold text-[var(--mn-ink)]"
+        className={isWeb ? `${styles.field} ${config.field === "customerName" || config.field === "addressLine1" || config.field === "addressLine2" ? styles.full : ""}` : "grid gap-1 text-sm font-semibold text-[var(--mn-ink)]"}
         key={`${scope}:${config.field}`}
       >
-        <span className="flex items-center justify-between gap-3">
+        <span className={isWeb ? styles.fieldLabel : "flex items-center justify-between gap-3"}>
           {label}
-          <span className="text-xs font-medium text-[var(--mn-ink-soft)]">
-            {config.optional ? labels.optional : labels.required}
+          <span className={isWeb ? styles.fieldRequirement : "text-xs font-medium text-[var(--mn-ink-soft)]"}>
+            {config.optional ? isWeb ? `(${labels.optional})` : labels.optional : isWeb ? <span aria-label={labels.required}>*</span> : labels.required}
           </span>
         </span>
         <input
           autoComplete={config.autoComplete}
-          className={inputClass(Boolean(errorMessage))}
+          aria-describedby={errorMessage ? `${scope}-${config.field}-error` : undefined}
+          aria-invalid={Boolean(errorMessage) || undefined}
+          className={isWeb ? styles.input : inputClass(Boolean(errorMessage))}
+          id={`${scope}-${config.field}`}
           inputMode={config.inputMode}
           name={config.field}
           onBlur={() => markTouched(scope, config.field)}
           onChange={(event) => updateAddress(scope, config.field, event.target.value)}
+          placeholder={isWeb ? config.field === "customerEmail" ? "you@example.com" : config.field === "phone" ? webLabels.phonePlaceholder : config.field === "addressLine1" ? webLabels.addressPlaceholder : undefined : undefined}
           required={!config.optional}
           type={config.type}
           value={address[config.field]}
         />
         {errorMessage ? (
-          <span className="text-xs font-semibold text-[var(--mn-error)]">
+          <span className="text-xs font-semibold text-[var(--mn-error)]" id={`${scope}-${config.field}-error`}>
             {errorMessage}
           </span>
         ) : null}
-        {scope === "shipping" && config.field === "phone" ? (
+        {!isWeb && scope === "shipping" && config.field === "phone" ? (
           <span className="text-xs font-medium text-[var(--mn-ink-soft)]">
             {labels.phoneHelp}
           </span>
@@ -921,10 +1028,34 @@ export function ProductBasketCheckoutPanel({
   ];
 
   return (
-    <div className="pb-32 lg:pb-0">
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start">
-        <div className="space-y-5">
-          <section className="mn-commerce-card">
+    <div className={isWeb ? styles.checkout : "pb-32 lg:pb-0"}>
+      {isWeb ? <CheckoutTrustHero locale={locale} retailerName={selectedRetailerName} /> : null}
+      <div className={isWeb ? styles.layout : "grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start"}>
+        <FormContainer
+          className={isWeb ? styles.formColumn : "space-y-5"}
+          id={isWeb ? "retail-checkout-form" : undefined}
+          onSubmit={isWeb ? async (event) => {
+            event.preventDefault();
+            if (webSubmissionPending.current || isLoading || isCompletingMock || clientSecret) return;
+            webSubmissionPending.current = true;
+            setIsLoading(true);
+            try {
+              if (mockPayment || mockReady) await runMockPayment();
+              else await createSession();
+            } finally {
+              webSubmissionPending.current = false;
+              setIsLoading(false);
+            }
+          } : undefined}
+        >
+          {isWeb ? (
+            <ol className={styles.steps} aria-label={webLabels.steps}>
+              {[webLabels.contactStep, webLabels.deliveryStep, webLabels.payment].map((step, index) => (
+                <li key={step}><b>{index + 1}</b><span>{step}</span></li>
+              ))}
+            </ol>
+          ) : null}
+          {!isWeb || mockPayment || mockReady || orderReference ? <section className={isWeb ? styles.notice : "mn-commerce-card"}>
             {checkoutMode === "agentic" || mockPayment || mockReady ? (
               <p className="mb-4 rounded-lg bg-[var(--mn-cream)] px-4 py-3 text-sm font-semibold text-[var(--mn-teal-deep)]">
                 {labels.testMode}
@@ -935,32 +1066,72 @@ export function ProductBasketCheckoutPanel({
                 {orderReference}
               </p>
             ) : null}
-            <h2 className="font-serif text-3xl font-medium text-[var(--mn-ink)]">
+            {!isWeb ? <h2 className="font-serif text-3xl font-medium text-[var(--mn-ink)]">
               {labels.title}
-            </h2>
-          </section>
+            </h2> : null}
+          </section> : null}
 
-          <section className="mn-commerce-card" aria-labelledby="checkout-contact">
+          <section className={isWeb ? styles.panel : "mn-commerce-card"} aria-labelledby="checkout-contact">
             <h3
-              className="font-serif text-2xl font-medium text-[var(--mn-ink)]"
+              className={isWeb ? styles.panelTitle : "font-serif text-2xl font-medium text-[var(--mn-ink)]"}
               id="checkout-contact"
             >
-              {labels.contact}
+              {isWeb ? <UserRound aria-hidden /> : null}{labels.contact}
             </h3>
-            <div className="mt-5 grid gap-4">
+            {isWeb ? <p className={styles.sectionHelp}>{webLabels.contactHelp} <span aria-hidden>*</span> {labels.required}</p> : null}
+            <div className={isWeb ? styles.fields : "mt-5 grid gap-4"}>
               {contactFields.map((field) =>
                 renderInput("shipping", field, shippingLabels, shippingErrors)
               )}
             </div>
           </section>
 
-          <section className="mn-commerce-card" aria-labelledby="checkout-delivery">
+          <section className={isWeb ? styles.panel : "mn-commerce-card"} aria-labelledby="checkout-delivery">
             <h3
-              className="font-serif text-2xl font-medium text-[var(--mn-ink)]"
+              className={isWeb ? styles.panelTitle : "font-serif text-2xl font-medium text-[var(--mn-ink)]"}
               id="checkout-delivery"
             >
-              {labels.delivery}
+              {isWeb ? <House aria-hidden /> : null}{isWeb ? webLabels.delivery : labels.delivery}
             </h3>
+            {isWeb ? <>
+              <div className={styles.fields}>
+                {shippingFields.map((field) => renderInput("shipping", field, shippingLabels, shippingErrors))}
+                <label className={styles.field}>
+                  <span className={styles.fieldLabel}>{labels.country} <span className={styles.fieldRequirement} aria-label={labels.required}>*</span></span>
+                  <select
+                    autoComplete="shipping country"
+                    className={styles.input}
+                    disabled={Boolean(destinationCountry)}
+                    id="shipping-country"
+                    name="country"
+                    onBlur={() => markTouched("shipping", "country")}
+                    onChange={(event) => updateAddress("shipping", "country", event.target.value)}
+                    required
+                    value={checkout.address.country}
+                  >
+                    {countries.map((country) => <option key={country.code} value={country.code}>{displayCountryName(country.code, locale)}</option>)}
+                  </select>
+                </label>
+              </div>
+              <details className={styles.optionalFields}>
+                <summary>{webLabels.optionalFields}</summary>
+                <div className={styles.fields}>
+                  {renderInput("shipping", { autoComplete: "shipping address-line2", field: "addressLine2", optional: true, type: "text" }, shippingLabels, shippingErrors)}
+                  <label className={`${styles.field} ${styles.full}`}>
+                    <span className={styles.fieldLabel}>{labels.notes} <span className={styles.fieldRequirement}>({labels.optional})</span></span>
+                    <textarea
+                      autoComplete="off"
+                      className={styles.input}
+                      name="notes"
+                      onChange={(event) => updateAddress("shipping", "notes", event.target.value)}
+                      placeholder={webLabels.notesPlaceholder}
+                      rows={2}
+                      value={checkout.address.notes}
+                    />
+                  </label>
+                </div>
+              </details>
+            </> : (
             <div className="mt-4 grid gap-4 sm:grid-cols-2">
               <label className="grid gap-1 text-sm font-semibold text-[var(--mn-ink)] sm:col-span-2">
                 <span className="flex items-center justify-between gap-3">
@@ -1033,29 +1204,30 @@ export function ProductBasketCheckoutPanel({
                 />
               </label>
             </div>
+            )}
           </section>
 
-          <section className="mn-commerce-card" aria-labelledby="checkout-shipping">
+          <section className={isWeb ? styles.panel : "mn-commerce-card"} aria-labelledby="checkout-shipping">
             <h3
-              className="font-serif text-2xl font-medium text-[var(--mn-ink)]"
+              className={isWeb ? styles.panelTitle : "font-serif text-2xl font-medium text-[var(--mn-ink)]"}
               id="checkout-shipping"
             >
-              {labels.shippingMethod}
+              {isWeb ? <Truck aria-hidden /> : null}{isWeb ? webLabels.shipping : labels.shippingMethod}
             </h3>
-            <div className="mt-4 rounded-xl bg-[var(--mn-cream)] p-4 ring-1 ring-[var(--mn-line)]">
+            <div className={isWeb ? styles.deliveryOption : "mt-4 rounded-xl bg-[var(--mn-cream)] p-4 ring-1 ring-[var(--mn-line)]"}>
               <div className="flex items-start justify-between gap-4">
                 <div className="flex gap-3">
-                  <Truck aria-hidden className="mt-0.5 size-5 text-[var(--mn-teal-deep)]" />
+                  {isWeb ? <Check aria-hidden className={styles.deliveryCheck} /> : <Truck aria-hidden className="mt-0.5 size-5 text-[var(--mn-teal-deep)]" />}
                   <div>
-                    <p className="font-bold text-[var(--mn-ink)]">
-                      {labels.shippingMethodName}
+                    <p className={isWeb ? styles.deliveryName : "font-bold text-[var(--mn-ink)]"}>
+                      {isWeb && selectedRetailerName ? webLabels.deliveryFrom.replace("{pharmacy}", selectedRetailerName) : labels.shippingMethodName}
                     </p>
-                    <p className="mt-1 text-sm text-[var(--mn-ink-soft)]">
+                    <p className={isWeb ? styles.deliveryHelp : "mt-1 text-sm text-[var(--mn-ink-soft)]"}>
                       {deliveryPromise}
                     </p>
                   </div>
                 </div>
-                <span className="font-bold text-[var(--mn-ink)]">
+                <span className={isWeb ? styles.deliveryAmount : "font-bold text-[var(--mn-ink)]"}>
                   {quotePreview
                     ? shippingAmount > 0
                       ? formatCurrencyAmount(locale, shippingAmount, currency)
@@ -1079,15 +1251,15 @@ export function ProductBasketCheckoutPanel({
             </div>
           </section>
 
-          <section className="mn-commerce-card" aria-labelledby="checkout-payment">
+          <section className={isWeb ? styles.panel : "mn-commerce-card"} aria-labelledby="checkout-payment">
             <h3
-              className="font-serif text-2xl font-medium text-[var(--mn-ink)]"
+              className={isWeb ? styles.panelTitle : "font-serif text-2xl font-medium text-[var(--mn-ink)]"}
               id="checkout-payment"
             >
-              {labels.payment}
+              {isWeb ? <LockKeyhole aria-hidden /> : null}{isWeb ? webLabels.payment : labels.payment}
             </h3>
-            <p className="mt-2 text-sm text-[var(--mn-ink-soft)]">{labels.paymentNote}</p>
-            <label className="mt-4 flex items-start gap-3 rounded-xl bg-white p-3 text-sm font-semibold text-[var(--mn-ink)] ring-1 ring-[var(--mn-line)]">
+            <p className={isWeb ? styles.paymentCopy : "mt-2 text-sm text-[var(--mn-ink-soft)]"}>{isWeb ? webLabels.paymentNote : labels.paymentNote}</p>
+            <label className={isWeb ? styles.billingSame : "mt-4 flex items-start gap-3 rounded-xl bg-white p-3 text-sm font-semibold text-[var(--mn-ink)] ring-1 ring-[var(--mn-line)]"}>
               <input
                 checked={checkout.billingSameAsShipping}
                 className="mt-1 size-4 accent-[var(--mn-teal-deep)]"
@@ -1105,28 +1277,29 @@ export function ProductBasketCheckoutPanel({
               {labels.billingSame}
             </label>
             {!checkout.billingSameAsShipping ? (
-              <div className="mt-4 rounded-xl bg-[var(--mn-cream)] p-4 ring-1 ring-[var(--mn-line)]">
+              <div className={isWeb ? styles.billingFields : "mt-4 rounded-xl bg-[var(--mn-cream)] p-4 ring-1 ring-[var(--mn-line)]"}>
                 <h4 className="font-serif text-xl font-medium text-[var(--mn-ink)]">
                   {labels.billing}
                 </h4>
-                <div className="mt-4 grid gap-4 sm:grid-cols-2">
-                  <label className="grid gap-1 text-sm font-semibold text-[var(--mn-ink)] sm:col-span-2">
-                    <span className="flex items-center justify-between gap-3">
+                <div className={isWeb ? styles.fields : "mt-4 grid gap-4 sm:grid-cols-2"}>
+                  <label className={isWeb ? styles.field : "grid gap-1 text-sm font-semibold text-[var(--mn-ink)] sm:col-span-2"}>
+                    <span className={isWeb ? styles.fieldLabel : "flex items-center justify-between gap-3"}>
                       {labels.country}
-                      <span className="text-xs font-medium text-[var(--mn-ink-soft)]">
-                        {labels.required}
+                      <span className={isWeb ? styles.fieldRequirement : "text-xs font-medium text-[var(--mn-ink-soft)]"}>
+                        {isWeb ? <span aria-label={labels.required}>*</span> : labels.required}
                       </span>
                     </span>
                     <select
                       autoComplete="billing country"
-                      className={inputClass(Boolean(visibleError("billing", "country", billingErrors)))}
+                      id="billing-country"
+                      className={isWeb ? styles.input : inputClass(Boolean(visibleError("billing", "country", billingErrors)))}
                       onBlur={() => markTouched("billing", "country")}
                       onChange={(event) => updateAddress("billing", "country", event.target.value)}
                       value={checkout.billingAddress.country}
                     >
                       {countries.map((country) => (
                         <option key={country.code} value={country.code}>
-                          {country.name}
+                          {isWeb ? displayCountryName(country.code, locale) : country.name}
                         </option>
                       ))}
                     </select>
@@ -1135,16 +1308,16 @@ export function ProductBasketCheckoutPanel({
                     renderInput("billing", field, billingLabels, billingErrors)
                   )}
                   {checkout.billingAddressLine2Visible ? (
-                    <label className="grid gap-1 text-sm font-semibold text-[var(--mn-ink)] sm:col-span-2">
-                      <span className="flex items-center justify-between gap-3">
+                    <label className={isWeb ? `${styles.field} ${styles.full} ${styles.billingOptional}` : "grid gap-1 text-sm font-semibold text-[var(--mn-ink)] sm:col-span-2"}>
+                      <span className={isWeb ? styles.fieldLabel : "flex items-center justify-between gap-3"}>
                         {labels.addressLine2}
-                        <span className="text-xs font-medium text-[var(--mn-ink-soft)]">
+                        <span className={isWeb ? styles.fieldRequirement : "text-xs font-medium text-[var(--mn-ink-soft)]"}>
                           {labels.optional}
                         </span>
                       </span>
                       <input
                         autoComplete="billing address-line2"
-                        className={inputClass(false)}
+                        className={isWeb ? styles.input : inputClass(false)}
                         onChange={(event) => updateAddress("billing", "addressLine2", event.target.value)}
                         type="text"
                         value={checkout.billingAddress.addressLine2}
@@ -1152,7 +1325,7 @@ export function ProductBasketCheckoutPanel({
                     </label>
                   ) : (
                     <button
-                      className="w-fit text-left text-sm font-bold text-[var(--mn-teal-deep)]"
+                      className={isWeb ? styles.billingOptional : "w-fit text-left text-sm font-bold text-[var(--mn-teal-deep)]"}
                       onClick={() =>
                         setCheckout((current) => ({
                           ...current,
@@ -1173,7 +1346,7 @@ export function ProductBasketCheckoutPanel({
             ) : null}
 
             {error ? (
-              <p className="mt-4 rounded-lg bg-[var(--mn-error-soft)] p-3 text-sm font-semibold text-[var(--mn-error)]">
+              <p className="mt-4 rounded-lg bg-[var(--mn-error-soft)] p-3 text-sm font-semibold text-[var(--mn-error)]" role="alert">
                 {error}
               </p>
             ) : null}
@@ -1221,9 +1394,10 @@ export function ProductBasketCheckoutPanel({
               </div>
             ) : (
               <button
-                className="mn-primary-button mt-5 w-full justify-center"
-                disabled={isLoading || isCompletingMock || !canPay}
-                onClick={() => {
+                className={isWeb ? `${styles.button} ${styles.paymentButton}` : "mn-primary-button mt-5 w-full justify-center"}
+                disabled={paymentDisabled}
+                aria-busy={isLoading || isCompletingMock}
+                onClick={isWeb ? undefined : () => {
                   if (mockPayment || mockReady) {
                     void runMockPayment();
                     return;
@@ -1231,23 +1405,21 @@ export function ProductBasketCheckoutPanel({
 
                   void createSession();
                 }}
-                type="button"
+                type={isWeb ? "submit" : "button"}
               >
-                <CreditCard aria-hidden className="size-4" />
-                {mockPayment || mockReady
-                  ? isCompletingMock || isLoading
-                    ? labels.stripeLoading
-                    : labels.mockCta
-                  : isLoading
-                    ? labels.creating
-                    : labels.continue}
+                {isWeb ? <LockKeyhole aria-hidden /> : <CreditCard aria-hidden className="size-4" />}
+                {paymentLabel}
+                {isWeb ? <ArrowRight aria-hidden /> : null}
               </button>
             )}
+            {isWeb && !mockPayment && !mockReady ? <p className={styles.assurance}><ShieldCheck aria-hidden />{webLabels.assurance}</p> : null}
           </section>
-        </div>
+        </FormContainer>
 
-        <aside className="hidden lg:block">
+        <aside className={isWeb ? styles.summaryColumn : "hidden lg:block"}>
           <OrderSummary
+            variant={isWeb ? "web" : "default"}
+            editHref={isWeb ? nutritionRevealPath(locale, planId) : undefined}
             currency={currency}
             labels={labels}
             locale={locale}
@@ -1263,22 +1435,24 @@ export function ProductBasketCheckoutPanel({
         </aside>
       </div>
 
-      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-[var(--mn-line)] bg-white/95 px-4 py-3 shadow-2xl backdrop-blur lg:hidden">
-        <div className="mx-auto flex max-w-5xl items-center justify-between gap-4">
-          <div>
-            <p className="text-xs font-semibold text-[var(--mn-ink-soft)]">
-              {selectedProducts.length} {labels.selectedItems}
+      {!isWeb || !clientSecret ? <div className={isWeb ? styles.mobilePaybar : "fixed inset-x-0 bottom-0 z-30 border-t border-[var(--mn-line)] bg-white/95 px-4 py-3 shadow-2xl backdrop-blur lg:hidden"} aria-label={isWeb ? webLabels.paybar : undefined}>
+        <div className={isWeb ? styles.mobilePaybarInner : "mx-auto flex max-w-5xl items-center justify-between gap-4"}>
+          <div className={isWeb ? styles.mobileTotal : undefined}>
+            <p className={isWeb ? styles.mobileTotalLabel : "text-xs font-semibold text-[var(--mn-ink-soft)]"}>
+              {isWeb ? webLabels.totalWithDelivery : `${selectedProducts.length} ${labels.selectedItems}`}
             </p>
-            <p className="text-lg font-bold text-[var(--mn-ink)]">
+            <p className={isWeb ? styles.mobileTotalAmount : "text-lg font-bold text-[var(--mn-ink)]"}>
               {quotePreview
                 ? formatCurrencyAmount(locale, total, currency)
-                : labels.deliveryPromise}
+                : isWeb ? "—" : labels.deliveryPromise}
             </p>
           </div>
           <button
-            className="mn-primary-button w-fit"
-            disabled={isLoading || isCompletingMock || !canPay || Boolean(clientSecret)}
-            onClick={() => {
+            className={isWeb ? styles.button : "mn-primary-button w-fit"}
+            disabled={paymentDisabled || Boolean(clientSecret)}
+            aria-busy={isLoading || isCompletingMock}
+            form={isWeb ? "retail-checkout-form" : undefined}
+            onClick={isWeb ? undefined : () => {
               if (mockPayment || mockReady) {
                 void runMockPayment();
                 return;
@@ -1286,13 +1460,14 @@ export function ProductBasketCheckoutPanel({
 
               void createSession();
             }}
-            type="button"
+            type={isWeb ? "submit" : "button"}
           >
-            <CreditCard aria-hidden className="size-4" />
-            {mockPayment || mockReady ? labels.mockCta : labels.continue}
+            {isWeb ? <LockKeyhole aria-hidden /> : <CreditCard aria-hidden className="size-4" />}
+            {isWeb ? paymentLabel : mockPayment || mockReady ? labels.mockCta : labels.continue}
+            {isWeb ? <ArrowRight aria-hidden /> : null}
           </button>
         </div>
-      </div>
+      </div> : null}
     </div>
   );
 }

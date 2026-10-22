@@ -28,6 +28,7 @@ import { bindPaidReservationToAssessment } from "@/lib/stripe-payments";
 import { enqueueAssessmentPregenerationTasks, enqueueNutritionPlanTasks, scheduleReassessmentAction } from "@/lib/task-worker";
 import { cachedEvaluatedIngredientCatalogueCount } from "@/lib/supplement-catalogue-count";
 import { bpmContextFromBody, writeBpmEvent } from "@/lib/bpm";
+import { timeRevealStage, timeRevealStageSync, type RevealTimingContext } from "@/lib/reveal-timing";
 
 export type CaptureReceipt = AssessmentSnapshot & {
   revision: number; inputHash: string; firstName: string | null; generationStatus: "pending" | "ready" | "failed";
@@ -79,6 +80,16 @@ export function validateCaptureAnswers(value: unknown, channel: QuestionnaireCha
 
 /** Shared HTTP and server-coordinator capture. The receipt, revision, binding and jobs commit together. */
 export async function captureAssessment(bodyValue: unknown, options: { planId?: string | null; idempotencyKey: string; request?: Request }): Promise<CaptureReceipt> {
+  const timing: RevealTimingContext = { planId: options.planId };
+  return timeRevealStage("capture", timing, async () => {
+    const receipt = await captureAssessmentInternal(bodyValue, options, timing);
+    timing.planId = receipt.planId;
+    timing.revision = receipt.revision;
+    return receipt;
+  });
+}
+
+async function captureAssessmentInternal(bodyValue: unknown, options: { planId?: string | null; idempotencyKey: string; request?: Request }, timing: RevealTimingContext): Promise<CaptureReceipt> {
   const body = record(bodyValue);
   if (body.intent === "process") throw new FunnelError("Payment is required before plan processing", 402, "payment_required");
   if (!isLocale(body.locale)) throw new FunnelError("Invalid assessment locale", 400, "invalid_locale");
@@ -113,13 +124,14 @@ export async function captureAssessment(bodyValue: unknown, options: { planId?: 
   if (sessionId && !isUuid(sessionId)) throw new FunnelError("Invalid questionnaire session", 400, "invalid_session");
   const requestInput = { planId: requestedPlanId, sessionId, answers, locale, contactEmail, paymentId, expectedRevision: body.expectedRevision ?? null };
   const previous = await completedFunnelRequest(sql, "assessment-capture", options.idempotencyKey, requestInput);
-  if (previous) return previous as CaptureReceipt;
+  if (previous) { timing.resultReused = true; return previous as CaptureReceipt; }
   let replayed = false;
   const result = await withDatabaseTransaction(sql, async tx => {
     const session = sessionId ? await claimFunnelRequest(tx, "assessment-session", sessionId, {}, requestedPlanId ?? undefined) : null;
     const claimed = await claimFunnelRequest(tx, "assessment-capture", options.idempotencyKey, requestInput);
-    if (claimed.response) { replayed = true; return claimed.response as CaptureReceipt; }
+    if (claimed.response) { replayed = true; timing.resultReused = true; return claimed.response as CaptureReceipt; }
     const planId = requestedPlanId ?? session?.resourceId ?? claimed.resourceId;
+    timing.planId = planId;
     await tx`update public.funnel_requests set resource_id = ${planId}::uuid where scope = 'assessment-capture' and request_key = ${options.idempotencyKey}`;
     const [current] = await tx`select selected_plan, journey_version, input_revision, answers from public.assessments where plan_id = ${planId}::uuid for no key update`;
     if (requestedPlanId && !current && resume?.planId !== planId) throw new FunnelError("Assessment not found", 404, "assessment_not_found");
@@ -142,8 +154,9 @@ export async function captureAssessment(bodyValue: unknown, options: { planId?: 
     }
     const selectedPlan = current?.selected_plan ?? (pharmacy ? DEFAULT_ASSESSMENT_PLAN : null);
     const snapshot = createAssessmentSnapshot({ planId, plan: selectedPlan ?? DEFAULT_ASSESSMENT_PLAN, status: "queued",
-      healthScore: computeHealthScore(answers, locale, { evaluatedIngredientCount: cachedEvaluatedIngredientCatalogueCount() }) });
+      healthScore: timeRevealStageSync("healthscore_compute", { planId }, () => computeHealthScore(answers, locale, { evaluatedIngredientCount: cachedEvaluatedIngredientCatalogueCount() })) });
     const identity = await persistAssessmentSubmission({ answers, contactEmail, locale, selectedPlan, journeyVersion, acquisitionAttribution: normalizeJourneyAttribution(bpmContextFromBody(body)), skipHealthScore, snapshot, status: "captured" });
+    timing.revision = identity.revision;
     if (body.questionnaireState !== undefined) {
       const state = deserializeState(JSON.stringify(body.questionnaireState));
       if (!state || state.locale !== locale || state.version === "v15.5-screens" && !isQuestionnaireComplete(state)

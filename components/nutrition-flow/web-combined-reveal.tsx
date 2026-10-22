@@ -98,7 +98,7 @@ export function WebCombinedReveal({ locale, planId, result, snapshot, failed, re
   return <div ref={root} data-testid="web-product-journey" data-stage={ready ? "ready" : formula ? "products" : "formula"}>
     <PharmacyRevealShell locale={locale} ready={ready} failed={failed} formulaReady={Boolean(formula)} preserveProgress
       title={c.ready} showEstimate={false}
-      status={ready || failed ? c[progress] : <span className="mn-web-progress">
+      status={progress === "calculating" ? "" : ready || failed ? c[progress] : <span className="mn-web-progress">
         <LoaderCircle className="mn-web-progress-spinner" aria-hidden="true" />
         <span>{c[progress]}</span>
       </span>}

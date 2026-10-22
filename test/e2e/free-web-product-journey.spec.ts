@@ -39,7 +39,9 @@ for (const locale of ["en", "th", "zh-CN"] as const) {
     await page.goto(url);
     await expect(page.getByTestId("web-product-journey")).toHaveAttribute("data-stage", "formula");
     const status = page.locator(".mn-status-single");
-    await expect(status).toHaveText(copy.calculating);
+    await expect(status).toBeEmpty();
+    await expect(status.locator(".mn-web-progress-spinner")).toHaveCount(0);
+    await expect(page.getByText(copy.calculating, { exact: true })).toHaveCount(0);
     await expect(page.locator(".mn-estimate")).toHaveCount(0);
     await expect(page.getByText(copy.free, { exact: true })).toHaveCount(0);
     await expect(page.getByTestId("web-preparation-detail")).toHaveCount(0);
@@ -47,10 +49,12 @@ for (const locale of ["en", "th", "zh-CN"] as const) {
     if (locale === "en") {
       await fixture({ action: "copy", planId: captured.planId, locale });
       await expect(status).toHaveText(copy.preparing, { timeout: 20_000 });
+      await expect(status.locator(".mn-web-progress-spinner")).toBeVisible();
     }
     await fixture({ action: "formula", planId: captured.planId, locale, rationale });
     await expect(page.getByTestId("web-product-journey")).toHaveAttribute("data-stage", "products", { timeout: 20_000 });
     await expect(status).toHaveText(copy.matching);
+    await expect(status.locator(".mn-web-progress-spinner")).toBeVisible();
     const ingredient = page.locator(".mn-nutrient").first();
     const explanation = ingredient.locator("details");
     await expect(ingredient).toContainText("1000");
@@ -72,6 +76,7 @@ for (const locale of ["en", "th", "zh-CN"] as const) {
     await expect(page.locator(".mn-estimate")).toHaveCount(0);
     await expect(page.getByTestId("web-preparation-detail")).toHaveCount(0);
     await expect(page.getByTestId("web-reveal-recovery")).toHaveCount(0);
+    await expect(page.getByRole("link", { name: copy.health, exact: true })).toBeVisible();
     await expect(explanation).toHaveAttribute("open", "");
     await expect(explanation.locator("p").first()).toContainText(rationale);
     expect(Math.abs(await page.evaluate(() => window.scrollY) - previousScroll)).toBeLessThanOrEqual(2);

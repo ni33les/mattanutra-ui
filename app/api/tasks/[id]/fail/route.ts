@@ -11,6 +11,7 @@ import { writeBpmEvent } from "@/lib/bpm";
 import { getWorkerSql } from "@/lib/db";
 import { failTask } from "@/lib/task-service";
 import { requireWorkerAccess } from "@/lib/worker-auth";
+import { recordRevealTaskTerminal, revealTaskContext, timeRevealTaskStage } from "@/lib/reveal-timing";
 
 export const runtime = "nodejs";
 
@@ -55,7 +56,7 @@ async function handlePOST(request: Request, { params }: FailTaskRouteProps) {
       accessScope: access.scope,
       agentId,
       applyFailure: (context) =>
-        applyTaskFailureResult({
+        timeRevealTaskStage("failure_application", revealTaskContext(context.task), () => applyTaskFailureResult({
           afterCommit: context.afterCommit,
           errorMessage,
           resultPayload: context.resultPayload,
@@ -63,7 +64,7 @@ async function handlePOST(request: Request, { params }: FailTaskRouteProps) {
           sql: context.sql,
           task: context.task,
           taskId: id
-        }),
+        })),
       errorMessage,
       reservationId,
       resultPayload: objectValue(body.resultPayload),
@@ -71,6 +72,7 @@ async function handlePOST(request: Request, { params }: FailTaskRouteProps) {
       workerSessionId
     });
 
+    recordRevealTaskTerminal(task);
     await writeBpmEvent({
       actorType: "worker",
       durationMs:

@@ -1,0 +1,42 @@
+.hero {
+  overflow: hidden;
+  border: 1px solid var(--mn-line);
+  border-radius: 26px;
+  background: var(--mn-paper);
+  color: var(--mn-ink);
+}
+.main { display: grid; grid-template-columns: 1.15fr 1fr; align-items: center; gap: 36px; padding: 30px 34px 24px; }
+.eyebrow { margin: 0 0 12px; color: var(--mn-teal-deep); font-size: 11px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; }
+.copy h2 { margin: 0; font-family: var(--mn-font-display), var(--mn-font-thai-serif), Georgia, serif; font-size: clamp(28px, 3vw, 39px); font-weight: 500; letter-spacing: -.025em; line-height: 1.15; }
+.copy h2 em { display: block; margin-top: 4px; color: var(--mn-teal-deep); font-weight: 400; }
+.description { max-width: 490px; margin: 18px 0 0; color: var(--mn-ink-soft); font-size: 14px; line-height: 1.75; }
+.description strong { color: var(--mn-ink); font-weight: 600; }
+.benefits { display: flex; flex-wrap: wrap; gap: 12px 20px; margin: 22px 0 0; padding: 0; list-style: none; color: var(--mn-teal-deep); font-size: 12px; font-weight: 600; }
+.benefits li { display: flex; align-items: center; gap: 7px; }
+.benefits svg { width: 17px; height: 17px; flex: none; }
+.packaging { margin: 0; min-width: 0; }
+.packaging img { display: block; width: 100%; height: auto; max-height: 255px; object-fit: cover; border-radius: 18px; }
+.packaging figcaption { margin-top: 9px; color: var(--mn-ink-soft); font-size: 10px; line-height: 1.5; text-align: center; }
+.care { display: flex; align-items: center; gap: 16px; padding: 18px 34px; background: var(--mn-teal-deep); color: #fff; }
+.portrait { width: 58px; height: 58px; flex: none; overflow: hidden; border: 2px solid #ffffff70; border-radius: 50%; background: #e5eee4; }
+.portrait img { width: 100%; height: 100%; object-fit: cover; object-position: top; }
+.identity { flex: none; max-width: 55%; }
+.identity strong { display: block; font-size: 15px; font-weight: 600; }
+.identity span { display: block; margin-top: 4px; font-size: 11px; color: #ffffffd9; }
+.care p { max-width: 410px; margin: 0 0 0 auto; font-size: 13px; line-height: 1.6; }
+.identity .genericCare { display: flex; align-items: center; gap: 9px; }
+.genericCare svg { width: 22px; height: 22px; flex: none; }
+.hero[lang="th"] .copy h2 { font-family: var(--mn-font-thai-serif), var(--mn-font-thai), serif; line-height: 1.45; font-size: clamp(26px, 2.7vw, 34px); letter-spacing: 0; }
+.hero[lang="th"] .copy h2 em { font-style: normal; }
+.hero[lang="th"] .eyebrow { letter-spacing: .02em; line-height: 1.8; }
+@media (max-width: 700px) {
+  .hero { border-radius: 20px; }
+  .main { grid-template-columns: 1fr; gap: 22px; padding: 24px 22px 18px; }
+  .copy h2 { font-size: 30px; }
+  .description { margin-top: 14px; }
+  .benefits { margin-top: 18px; gap: 10px 16px; }
+  .packaging img { max-height: none; aspect-ratio: 1.65; }
+  .care { flex-wrap: wrap; gap: 12px; padding: 18px 22px; }
+  .identity { flex: 1; max-width: none; }
+  .care p { width: 100%; max-width: none; margin: 0; font-size: 12px; }
+}
