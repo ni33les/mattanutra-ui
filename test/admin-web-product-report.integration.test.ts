@@ -20,6 +20,17 @@ async function transaction(test: (tx: postgres.TransactionSql) => Promise<void>)
   finally { scoped = sql; }
 }
 
+it("composes the report through the instrumented pool used by the dashboard", async () => {
+  // Transaction-scoped fixtures bypass the pool's executable-query wrapper.
+  // Exercise the real pool so nested SELECT fragments cannot become parameters.
+  assert.equal(scoped, sql);
+  const report = await getWebProductReport(null, { ...emptyAdminDashboardFilters, campaign: `fixture-empty-${randomUUID()}` });
+  assert.ok(report);
+  assert.deepEqual(report.generation.map(({ tasks }) => tasks), [0, 0]);
+  assert.equal(report.sales.paidPayments, 0);
+  assert.deepEqual(report.campaigns, []);
+});
+
 it("reports formula and product task lifecycle, retry/error counts, and elapsed percentiles independently", async () => transaction(async tx => {
   const campaign = `fixture-generation-${randomUUID()}`, planId = randomUUID();
   const [organisation] = await tx`select id from public.organisations where slug='mattanutra'`;

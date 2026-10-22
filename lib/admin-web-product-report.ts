@@ -29,13 +29,14 @@ export type WebProductReport = {
 /** Frozen payment acquisition wins. Old plans recover their original capture context.
  * All projections are aggregate-only; no answer or contact data leaves this query. */
 function resourceSource(sql: postgres.Sql, kind: "tasks" | "payments") {
+  // Parenthesized fragments stay lazy through the instrumented pool wrapper.
   const resources = kind === "payments"
-    ? sql`select p.* from public.retail_checkout_payments p where p.stripe_mode='live'
+    ? sql`(select p.* from public.retail_checkout_payments p where p.stripe_mode='live'
         and not exists(select 1 from public.retail_customer_orders test_order where test_order.id=p.retail_customer_order_id
           and (coalesce(test_order.metadata->>'internal_test','false') in ('true','1')
-            or coalesce(test_order.metadata->>'stripeMode','live') in ('test','mock')))`
-    : sql`select t.*, t.payload as metadata from public.tasks t
-        where t.task_type in ('generate_supplement_guidance','generate_product_recommendations')`;
+            or coalesce(test_order.metadata->>'stripeMode','live') in ('test','mock'))))`
+    : sql`(select t.*, t.payload as metadata from public.tasks t
+        where t.task_type in ('generate_supplement_guidance','generate_product_recommendations'))`;
   return sql`(
     select r.*, a.locale as assessment_locale, a.selected_plan,
       coalesce(acq.value->>'ray', b.ray::text) as ray, b.email_hash,
@@ -51,7 +52,7 @@ function resourceSource(sql: postgres.Sql, kind: "tasks" | "payments") {
       coalesce(acq.value #>> '{attribution,affiliateRef}', b.affiliate_ref) as affiliate_ref,
       coalesce(acq.value #>> '{attribution,affiliateSubId}', b.affiliate_sub_id) as affiliate_sub_id,
       coalesce(acq.value #>> '{attribution,promoCode}', b.promo_code) as promo_code
-    from (${resources}) r join public.assessments a on a.plan_id=r.plan_id
+    from ${resources} r join public.assessments a on a.plan_id=r.plan_id
     left join lateral (select * from ${funnelBpmSource(sql)}
       where plan_id=a.plan_id and journey_channel='web'
         and funnel_event_name in ('assessment_captured','assessment_recaptured','assessment_submitted')
