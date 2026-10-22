@@ -1,4 +1,5 @@
 import { isWebProductJourney } from "@/lib/web-product-journey";
+import { currentWebProductMarketSql } from "@/lib/web-product-market";
 import { historicalAssessmentReadJoin, historicalResult } from "@/lib/historical-assessment-read";
 import { paymentFulfillmentEvidence, type FulfillmentPayment } from "@/lib/payment-fulfillment-evidence";
 import { getSql } from "@/lib/db";
@@ -58,6 +59,7 @@ export async function getFunnelReadiness(planId: string, localeOption?: string |
         and r.generation_locale = coalesce(${requestedLocale}, a.locale) and r.generator_version = ${FUNNEL_GENERATOR_VERSION}) or ${historicalResult(sql, "r")})
         and r.selection_revision = coalesce((select revision from public.assessment_product_preferences where plan_id = a.plan_id), 0)
         and r.status in ('completed','partial')
+        and ${currentWebProductMarketSql(sql, "a", "r")}
         and coalesce(r.diagnostics->>'stackPreference','balanced') in ('balanced','compact')
       order by case coalesce(r.diagnostics->>'stackPreference','balanced') when 'balanced' then 1 else 2 end,
         r.generated_at desc,r.id desc limit 1

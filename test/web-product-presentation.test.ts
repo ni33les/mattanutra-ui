@@ -1,5 +1,10 @@
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { describe, it, mock } from "node:test";
+import { createRequire, register } from "node:module";
+import { createElement, type AnchorHTMLAttributes, type ImgHTMLAttributes } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import type { FormulationResult } from "../lib/formulation-types.ts";
+import type { NutritionJourneySnapshot } from "../lib/nutrition-journey-read.ts";
 import { webPreparationCards, webProductCopy } from "../components/nutrition-flow/web-product-copy.ts";
 import { webRevealProgress } from "../lib/web-reveal-progress.ts";
 
@@ -65,4 +70,66 @@ describe("free reveal progress follows available work", () => {
       for (const text of [copy.calculating, copy.preparing, copy.matching]) assert.ok(text.trim());
     }
   });
+});
+
+it("a completed empty catalogue shows availability without a zero-price basket and preserves the saved formula", async () => {
+  register("./payment-return/next-loader.mjs", import.meta.url);
+  register("./pharmacy-reveal/style-loader.mjs", import.meta.url);
+  register("./mcp-tool-card/config-loader.mjs", import.meta.url);
+  const require = createRequire(import.meta.url);
+  mock.module(require.resolve("next/link.js"), {
+    defaultExport: (props: AnchorHTMLAttributes<HTMLAnchorElement>) => createElement("a", props)
+  });
+  mock.module("../components/safe-image.tsx", {
+    namedExports: { SafeImage: (props: ImgHTMLAttributes<HTMLImageElement>) => createElement("img", props) }
+  });
+  const { WebCombinedReveal } = await import("../components/nutrition-flow/web-combined-reveal.tsx");
+  const rationale = { en: "Saved formula rationale", th: "เหตุผลสำหรับสูตรที่บันทึกไว้", "zh-CN": "已保存的配方说明" };
+  const caution = { en: "Saved ingredient caution", th: "ข้อควรระวังของสารอาหารที่บันทึกไว้", "zh-CN": "已保存的营养素注意事项" };
+  const snapshot = { revision: 1, formulaVersion: 1, readyForReveal: true, refreshPending: false,
+    failed: false, productRunId: "fixture-run" } as NutritionJourneySnapshot;
+  const result: FormulationResult = {
+    access: "full", assessmentRevision: 1, formulaVersion: 1, planId: "fixture-plan", schemaVersion: 1,
+    generatedAt: "2026-10-22T00:00:00Z", foodGuidance: [], recommendations: [],
+    assessmentSummary: { constraints: [], goals: [], plan: "precision", profile: "", region: "Singapore" },
+    supplementBreakdown: [{ id: "vitamin-d", category: "vitamin", dailyDose: "1000 IU", effectivenessRank: 1,
+      rationale, status: "add", supplement: "Vitamin D3",
+      cautions: [{ id: "fixture-caution", severity: "caution", body: caution }] }],
+    productRecommendations: { status: "ready", runId: "fixture-run", matchedCount: 0, needsCount: 1, stackCoveragePercent: 0,
+      matching: { operationalStatus: "no_purchase", selectedCandidateKey: null, options: [], alternativeSearch: undefined,
+        matchingDiagnostics: { reasonCode: "catalogue_empty", catalogueListings: 0, catalogueProducts: 0,
+          eligibleListings: 0, eligibleProducts: 0, supportedDoseVariants: 0, evaluatedNonemptyBaskets: 0,
+          rejectionCounts: [], targets: [] } } }
+  };
+  const render = (value: FormulationResult, locale: "en" | "th" | "zh-CN", current = snapshot) =>
+    renderToStaticMarkup(createElement(WebCombinedReveal, { locale, planId: result.planId, result: value,
+      snapshot: current, failed: false, retry: () => {} }));
+  for (const locale of ["en", "th", "zh-CN"] as const) {
+    const html = render(result, locale), copy = webProductCopy[locale];
+    assert.match(html, /data-testid="web-product-unavailable"/);
+    assert.ok(html.includes(copy.productsUnavailable));
+    assert.ok(html.includes(copy.planSavedWithoutProducts));
+    assert.ok(!html.includes(copy.reviewBasket));
+    assert.ok(!html.includes(`>${copy.availableProducts}<`));
+    assert.doesNotMatch(html, /data-testid="web-basket"|mn-order-total|mn-order-count|\/basket\/checkout|catalogue_empty|no_purchase|Singapore/);
+    assert.match(html, /1000 IU/);
+    assert.ok(html.includes(rationale[locale]));
+    assert.ok(html.includes(caution[locale]));
+    assert.ok(html.includes(`/${locale}/nutrition/plan?plan=fixture-plan`));
+    assert.ok(html.includes(`/${locale}/nutrition/reveal?plan=fixture-plan`));
+    assert.ok(html.includes(copy.copy));
+  }
+  const matching = result.productRecommendations!.matching!;
+  const legitimatelyEmpty = { ...result, productRecommendations: { ...result.productRecommendations!, matching: {
+    ...matching, matchingDiagnostics: { ...matching.matchingDiagnostics!, reasonCode: "targets_already_covered" as const }
+  } } };
+  assert.doesNotMatch(render(legitimatelyEmpty, "en"), /data-testid="web-product-unavailable"/);
+  assert.ok(render(legitimatelyEmpty, "en").includes(webProductCopy.en.noProducts));
+  assert.doesNotMatch(render({ ...result, supplementBreakdown: [] }, "en"), /data-testid="web-product-unavailable"/);
+  const nonempty = { ...result, recommendations: [{ id: "fixture-product", name: "Fixture product", covers: ["vitamin-d"],
+    description: "", marketplace: "Imported product" as const, price: { amount: 250, currency: "THB" }, priority: 1, tag: "", url: "" }] };
+  assert.match(render(nonempty, "en"), /data-testid="web-basket"/);
+  assert.match(render(nonempty, "en"), /\/basket\/checkout\?/);
+  assert.doesNotMatch(render(nonempty, "en"), /data-testid="web-product-unavailable"/);
+  assert.doesNotMatch(render(result, "en", { ...snapshot, readyForReveal: false }), /data-testid="web-product-unavailable"/);
 });

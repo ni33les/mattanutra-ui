@@ -4,7 +4,7 @@ import type {
   ProductRecommendationRefreshReason,
   ProductStackPreference
 } from "@/lib/formulation-types";
-import { productCountryCodeFromAnswers } from "@/lib/pharmacy-in-store";
+import { assessmentProductMarket, usesWebProductMarket } from "@/lib/web-product-market";
 
 export const PRODUCT_RECOMMENDATION_FRESHNESS_MS = 24 * 60 * 60 * 1000;
 
@@ -98,8 +98,8 @@ export async function loadProductRecommendationFreshnessSnapshot(
     now?: Date;
   }>
 ): Promise<ProductRecommendationFreshnessSnapshot | null> {
-  const assessmentRows = await sql<Array<{ answers: unknown }>>`
-    select answers
+  const assessmentRows = await sql<Array<{ answers: unknown; journey_version: string | null }>>`
+    select answers, journey_version
     from public.assessments
     where plan_id = ${input.planId}::uuid
     limit 1
@@ -110,7 +110,8 @@ export async function loadProductRecommendationFreshnessSnapshot(
     return null;
   }
 
-  const countryCode = productCountryCodeFromAnswers(assessment.answers);
+  const countryCode = assessmentProductMarket(assessment.answers, assessment.journey_version);
+  const strictMarket = usesWebProductMarket(assessment.answers, assessment.journey_version);
   const rows = await sql<Array<{
     formulation_generated_at: string | null;
     formulation_version: number | string | null;
@@ -251,7 +252,7 @@ export async function loadProductRecommendationFreshnessSnapshot(
       from public.product_recommendation_runs
       where catalogue_revision = (select revision from public.catalogue_runtime_revision where singleton=true)
         and plan_id = ${input.planId}::uuid
-        and (market_region is null or market_region = ${countryCode})
+        and (market_region = ${countryCode} or (market_region is null and ${!strictMarket}))
         and selection_revision = coalesce((select revision from public.assessment_product_preferences where plan_id = ${input.planId}::uuid), 0)
         and assessment_revision = (select input_revision from public.assessments where plan_id = ${input.planId}::uuid)
         and generation_locale = coalesce(${generationLocale(input.planId)}, (select locale from public.assessments where plan_id = ${input.planId}::uuid))

@@ -1,4 +1,5 @@
 import { hasFullPlanAccess, isWebProductJourney } from "@/lib/web-product-journey";
+import { currentWebProductMarketSql } from "@/lib/web-product-market";
 import { historicalAssessmentReadJoin, historicalResult } from "@/lib/historical-assessment-read";
 import { formulationPlanCopy } from "@/lib/formulation-plan-copy";
 import { readStoredMatching } from "@/lib/recommendation-storage";
@@ -216,6 +217,7 @@ async function loadStoredRecommendationProductPayloads(
         and r.generator_version = ${FUNNEL_GENERATOR_VERSION}) or ${historicalResult(sql, "r")})
       and r.selection_revision = coalesce((select revision from public.assessment_product_preferences where plan_id = a.plan_id), 0)
       and r.status in ('completed','partial')
+      and ${currentWebProductMarketSql(sql, "a", "r")}
       and coalesce(r.diagnostics ->> 'stackPreference', 'balanced') in ('compact', 'balanced')
     order by coalesce(r.diagnostics ->> 'stackPreference', 'balanced'), r.generated_at desc, r.id desc
   `;
@@ -1987,6 +1989,7 @@ export async function getStoredFormulationResult(
           or ${historicalResult(sql, "product_recommendation_runs")})
         and product_recommendation_runs.selection_revision = coalesce((select revision from public.assessment_product_preferences where plan_id = assessments.plan_id), 0)
         and product_recommendation_runs.status in ('completed','partial')
+        and ${currentWebProductMarketSql(sql, "assessments", "product_recommendation_runs")}
         and coalesce(diagnostics ->> 'stackPreference', 'balanced') in ('compact', 'balanced')
       order by
         case coalesce(diagnostics ->> 'stackPreference', 'balanced')
@@ -2103,7 +2106,7 @@ export async function getStoredFormulationResult(
   const recommendations =
     hasStructuredProductRecommendationRun
       ? productRecommendationItems
-      : Number(row.selection_revision ?? 0) > 0 ? [] : legacyRecommendations;
+      : isWebProductJourney(row.journey_version) || Number(row.selection_revision ?? 0) > 0 ? [] : legacyRecommendations;
   const productRecommendationCoverage = reconcileProductRecommendationCoverage({
     foodGuidance,
     rawNeedCoverage: productNeedCoverageFromDiagnostics(

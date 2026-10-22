@@ -1,4 +1,5 @@
 import { assessmentCheckoutAttribution, commerceBpmContext } from "@/lib/journey-attribution";
+import { currentWebProductMarketSql } from "@/lib/web-product-market";
 import { bindMetaContext, recordMetaCheckout, recordMetaPurchase } from "@/lib/meta-tracking";
 import { readStoredMatching, frozenCheckoutIdentityJson } from "@/lib/recommendation-storage";
 import { MATCHER_VERSION } from "@/lib/matcher/config";
@@ -400,6 +401,7 @@ export async function validateCurrentWebCheckoutRecommendations(sql: RetailCheck
       and a.input_revision = ${proof.assessmentRevision} and coalesce(p.revision, 0) = ${proof.selectionRevision}
       and r.selection_revision = coalesce(p.revision, 0) and r.generation_locale = ${proof.locale}
       and r.generator_version = ${FUNNEL_GENERATOR_VERSION} and r.status in ('completed', 'partial')
+      and ${currentWebProductMarketSql(sql, "a", "r")}
       and coalesce(r.diagnostics ->> 'stackPreference', 'balanced') = ${proof.stackPreference}
     order by r.generated_at desc, r.id desc limit 1`;
   if (current?.id !== proof.runId || String(catalogue?.revision) !== proof.catalogueRevision) {
@@ -416,6 +418,7 @@ async function readCurrentWebCheckoutSelection(sql: RetailCheckoutDb, input: Web
     where r.plan_id = ${input.planId}::uuid and r.assessment_revision = a.input_revision
       and r.generation_locale = ${input.locale} and r.generator_version = ${FUNNEL_GENERATOR_VERSION}
       and r.selection_revision = coalesce(p.revision, 0) and r.status in ('completed', 'partial')
+      and ${currentWebProductMarketSql(sql, "a", "r")}
     order by coalesce(r.diagnostics ->> 'stackPreference', 'balanced'), r.generated_at desc, r.id desc`;
   for (const run of runs) {
     if (catalogueRevision == null || run.catalogue_revision == null || String(run.catalogue_revision) !== String(catalogueRevision)) continue;

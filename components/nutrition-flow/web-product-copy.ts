@@ -3,6 +3,7 @@ import type { Locale } from "@/lib/i18n";
 
 export const webProductCopy = {
   en: {
+    productAvailability: "Product availability", productsUnavailable: "No products are currently available for this plan.", planSavedWithoutProducts: "Your supplement plan is saved. You can read the full plan or return using your private link.",
     availableProducts: "Available products", matchingProducts: "Matching your personalised plan to available products", reviewBasket: "Choose your products", deliveryNext: "Continue to enter your delivery details and pay securely with Stripe.", pricingPending: "Product pricing is being checked. Please return to your saved plan shortly.", fullFormula: "These details describe your complete recommendation. Your selected basket may cover fewer nutrients.", affected: "Nutrients affected by your selection",
     calculating: "Calculating your HealthScore", preparing: "Formulating your supplements", matching: "Matching products",
     ready: "Your personalised supplement plan", free: "Your plan is free. You only pay for the products you select and delivery.",
@@ -21,6 +22,7 @@ export const webProductCopy = {
     back: "Back to my products", health: "View my free HealthScore", plan: "Read my full plan", edit: "Review my answers", continue: "Continue to checkout", noProducts: "Your formula is ready. There are no products to purchase for this result."
   },
   th: {
+    productAvailability: "สถานะผลิตภัณฑ์", productsUnavailable: "ขณะนี้ยังไม่มีผลิตภัณฑ์ที่มีจำหน่ายสำหรับแผนนี้", planSavedWithoutProducts: "แผนอาหารเสริมของคุณได้รับการบันทึกแล้ว คุณสามารถอ่านแผนฉบับเต็มหรือกลับมาโดยใช้ลิงก์ส่วนตัวได้",
     availableProducts: "ผลิตภัณฑ์ที่มีจำหน่าย", matchingProducts: "จับคู่แผนเฉพาะคุณกับผลิตภัณฑ์ที่มีจำหน่าย", reviewBasket: "เลือกผลิตภัณฑ์ของคุณ", deliveryNext: "ดำเนินการต่อเพื่อกรอกข้อมูลจัดส่งและชำระเงินอย่างปลอดภัยผ่าน Stripe", pricingPending: "กำลังตรวจสอบราคาผลิตภัณฑ์ โปรดกลับมาที่แผนที่บันทึกไว้ในอีกสักครู่", fullFormula: "รายละเอียดนี้อธิบายคำแนะนำฉบับเต็ม ตะกร้าที่เลือกอาจครอบคลุมสารอาหารน้อยลง", affected: "สารอาหารที่ได้รับผลจากการเลือก",
     calculating: "กำลังคำนวณ HealthScore ของคุณ", preparing: "กำลังจัดสูตรอาหารเสริมของคุณ", matching: "กำลังจับคู่ผลิตภัณฑ์",
     ready: "แผนอาหารเสริมเฉพาะคุณ", free: "แผนของคุณฟรี ชำระเฉพาะผลิตภัณฑ์ที่เลือกและค่าจัดส่ง",
@@ -39,6 +41,7 @@ export const webProductCopy = {
     back: "กลับไปที่ผลิตภัณฑ์", health: "ดู HealthScore ฟรี", plan: "อ่านแผนฉบับเต็ม", edit: "ทบทวนคำตอบ", continue: "ดำเนินการชำระเงิน", noProducts: "สูตรของคุณพร้อมแล้ว ผลลัพธ์นี้ไม่มีผลิตภัณฑ์ที่ต้องซื้อ"
   },
   "zh-CN": {
+    productAvailability: "产品供应情况", productsUnavailable: "此方案目前没有可购买的产品。", planSavedWithoutProducts: "您的营养补充方案已保存。您可以阅读完整方案，或通过私人链接返回。",
     availableProducts: "可购买的产品", matchingProducts: "将您的个性化方案与可购买的产品匹配", reviewBasket: "选择您的产品", deliveryNext: "继续填写配送信息，并通过 Stripe 安全付款。", pricingPending: "正在核实产品价格，请稍后返回已保存的方案。", fullFormula: "这些详情描述完整推荐方案。您选择的购物篮可能覆盖较少的营养素。", affected: "受当前选择影响的营养素",
     calculating: "正在计算您的 HealthScore", preparing: "正在制定您的营养补充配方", matching: "正在匹配产品",
     ready: "您的个性化营养补充方案", free: "您的方案免费。您只需支付所选产品和配送费用。",

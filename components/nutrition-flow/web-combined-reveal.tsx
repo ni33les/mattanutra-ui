@@ -46,6 +46,9 @@ export function WebCombinedReveal({ locale, planId, result, snapshot, failed, re
   const progress = webRevealProgress({ ready, failed, formulaReady: Boolean(formula), snapshot });
   const runId = ready ? summary?.runId : undefined;
   const matching = summary?.matching;
+  const catalogueUnavailable = ready && ingredients.length > 0 && products.length === 0
+    && matching?.operationalStatus === "no_purchase"
+    && matching.matchingDiagnostics?.reasonCode === "catalogue_empty";
   const matchedOption = matching?.options.find(candidate => candidate.candidateKey === matching.selectedCandidateKey);
   // A different run or assessment revision must never inherit an old basket selection.
   const identity = `${planId}:${formula?.assessmentRevision}:${formula?.selectionRevision}:${runId}:${matching?.selectedCandidateKey}:${products.map(productId).join(",")}`;
@@ -102,7 +105,7 @@ export function WebCombinedReveal({ locale, planId, result, snapshot, failed, re
         <LoaderCircle className="mn-web-progress-spinner" aria-hidden="true" />
         <span>{c[progress]}</span>
       </span>}
-      inputs={shared.inputs.map((label, index) => index === 3 ? c.availableProducts : label)}
+      inputs={shared.inputs.map((label, index) => index === 3 ? catalogueUnavailable ? c.productAvailability : c.availableProducts : label)}
       recovery={<WebRevealRecovery failed={failed} ready={ready} locale={locale} planId={planId} retry={retry} />}
       result={formula ? <>
         <div data-web-result-stage={ingredients.length ? "formula" : undefined}>
@@ -118,8 +121,8 @@ export function WebCombinedReveal({ locale, planId, result, snapshot, failed, re
               </details>
             </div>} />
         </div>
-        <div className="mn-group-flow"><h3 className="mn-flow-copy">{c.availableProducts}</h3><div className="mn-flow-mark" aria-hidden="true" /></div>
-        {ready && <div id="products" className="mn-products" data-web-result-stage={products.length && priced ? "products" : undefined}>
+        {!catalogueUnavailable && <div className="mn-group-flow"><h3 className="mn-flow-copy">{c.availableProducts}</h3><div className="mn-flow-mark" aria-hidden="true" /></div>}
+        {ready && !catalogueUnavailable && <div id="products" className="mn-products" data-web-result-stage={products.length && priced ? "products" : undefined}>
           {products.map(product => <PharmacyProductCard key={productId(product)} locale={locale} imageUrl={product.imageUrl} name={product.name}
             coverage={product.covers.map(id => localizedSupplementName(ingredients.find(item => item.id === id)?.supplement ?? id, id, locale)).join(" · ")}
             price={Number.isFinite(productAmount(product)) ? formatCurrencyAmount(locale, Number(productAmount(product)), product.price?.currency ?? currency) : "—"}
@@ -128,7 +131,11 @@ export function WebCombinedReveal({ locale, planId, result, snapshot, failed, re
       </> : undefined}>
       {ready && <>
         {matchedOption && <div className="mn-web-matching-advice"><WebMatchingAdvice advice={matchedOption.advice} locale={locale} selected showDetails={false} /></div>}
-        <section className="mn-transaction" aria-labelledby="mn-web-order-title" data-testid="web-basket">
+        {catalogueUnavailable ? <section className="mn-transaction" aria-labelledby="mn-web-availability-title" data-testid="web-product-unavailable">
+          <h3 id="mn-web-availability-title">{c.productAvailability}</h3>
+          <p className="mn-order-help" role="status">{c.productsUnavailable}</p>
+          <p>{c.planSavedWithoutProducts}</p>
+        </section> : <section className="mn-transaction" aria-labelledby="mn-web-order-title" data-testid="web-basket">
           <h3 id="mn-web-order-title">{c.reviewBasket}</h3><p className="mn-order-help">{shared.help}</p>
           <div className="mn-order-summary" aria-live="polite" aria-atomic="true"><span className="mn-order-count">{selected.length} {shared.items}</span>
             <strong className="mn-order-total">{selectedPriced ? formatCurrencyAmount(locale, total, currency) : "—"}</strong></div>
@@ -143,7 +150,7 @@ export function WebCombinedReveal({ locale, planId, result, snapshot, failed, re
             {checkoutHref ? <Link className="mn-confirm-btn" href={checkoutHref} onClick={confirmBasket}>{c.continue}</Link>
               : <button className="mn-confirm-btn" disabled>{selectedIds.length ? c.continue : c.empty}</button>}
           </>}
-        </section>
+        </section>}
         <PharmacyPlanInvitation locale={locale}>
           <Link className="mn-read-now" href={`/${locale}/nutrition/plan?plan=${encodeURIComponent(planId)}`}>{c.plan}</Link>
           <Link className="mn-read-now" href={`/${locale}/nutrition/healthscore?plan=${encodeURIComponent(planId)}&view=optional`}>{c.health}</Link>

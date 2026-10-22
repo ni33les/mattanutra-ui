@@ -62,8 +62,8 @@ try {
     });
     await sql`update public.tasks set status='completed' where plan_id=${input.planId}::uuid and task_type='generate_supplement_guidance'`;
     if (input.action === "ready") {
-    await sql`insert into public.product_recommendation_runs (catalogue_revision, plan_id, assessment_revision, generation_locale, generator_version, selection_revision, diagnostics)
-      values ((select revision from public.catalogue_runtime_revision where singleton=true), ${input.planId}::uuid, ${generation.revision}, ${locale}, ${FUNNEL_GENERATOR_VERSION},
+    await sql`insert into public.product_recommendation_runs (catalogue_revision, plan_id, assessment_revision, generation_locale, generator_version, market_region, selection_revision, diagnostics)
+      values ((select revision from public.catalogue_runtime_revision where singleton=true), ${input.planId}::uuid, ${generation.revision}, ${locale}, ${FUNNEL_GENERATOR_VERSION}, 'TH',
         coalesce((select revision from public.assessment_product_preferences where plan_id = ${input.planId}::uuid), 0),
         '{"stackPreference":"balanced","matching":{"operationalStatus":"no_purchase","selectedCandidateKey":null,"options":[],"alternativeSearch":{"status":"not_needed","reason":"No purchase fixture"}}}')`;
     await sql`update public.tasks set status = 'completed' where plan_id = ${input.planId}::uuid and task_type in ('generate_supplement_guidance','generate_product_recommendations')`;

@@ -1,5 +1,7 @@
 import { safetyFollowupMessage } from "@/lib/safety-followup-message";
 import { revealTaskContext, timeRevealStageSync, timeRevealTaskStage } from "@/lib/reveal-timing";
+import { assessmentProductMarket, productTaskMarket } from "@/lib/web-product-market";
+import { isWebProductJourney } from "@/lib/web-product-journey";
 import { effectiveQuestionnaireAnswers, questionnaireChannel } from "@/lib/web-purchase-preferences";
 import type { QuestionnaireChannel } from "@/lib/questionnaire/types";
 import { sha256Hex } from '@/lib/sha256';
@@ -55,7 +57,7 @@ import {
   ADMIN_CATALOGUE_OPTIMIZATION_TASK_TYPE
 } from "@/lib/admin-catalogue-optimization-jobs";
 import { kidneyAnswerToConditionCode } from "@/lib/matcher/condition-ceilings";
-import { inStorePharmacyFromAnswers, productCountryCodeFromAnswers } from "@/lib/pharmacy-in-store";
+import { inStorePharmacyFromAnswers } from "@/lib/pharmacy-in-store";
 import {
   defaultProductCountryCode
 } from "@/lib/product-countries";
@@ -1945,11 +1947,13 @@ async function loadMatchingPlanContext(planId: string) {
       const rows = await txn<
         Array<{
           answers: unknown;
+          journey_version: string | null;
           formulation: FormulationBlueprint | null;
         }>
       >`
         select
           assessments.answers,
+          assessments.journey_version,
           formulations.formulation
         from public.assessments
         left join lateral (
@@ -1990,7 +1994,7 @@ async function buildProductRecommendationsWorkItem(task: TaskRecord) {
     throw new Error(MATCHING_PLAN_NOT_READY_MESSAGE);
   }
 
-  const countryCode = productCountryCodeFromAnswers(row.answers);
+  const countryCode = assessmentProductMarket(row.answers, row.journey_version);
   await warmSupplementEffectiveAvailability(countryCode);
   const lookup = requireCachedSupplementEffectiveAvailability(countryCode);
   const needs = enrichProductNeedsWithAvailabilityLookup(
@@ -2317,13 +2321,16 @@ async function buildTaskWorkItemInternal(task: TaskRecord): Promise<TaskWorkItem
   if (task.planId && ASSESSMENT_GENERATION_TASKS.has(task.taskType)) {
     const sql = getSql();
     if (!sql) throw new Error("Database is not configured");
-    const [row] = await sql`select input_revision, questionnaire_state->>'channel' as channel from public.assessments where plan_id = ${task.planId}::uuid`;
+    const [row] = await sql`select input_revision, answers, journey_version, questionnaire_state->>'channel' as channel from public.assessments where plan_id = ${task.planId}::uuid`;
     if (!generation || !row || generation.generatorVersion !== FUNNEL_GENERATOR_VERSION || Number(row.input_revision) !== generation.revision) {
       return { taskId: task.id, taskType: "superseded_generation" };
     }
     generation = { ...generation, channel: questionnaireChannel(generation.channel ?? row.channel),
       answers: effectiveQuestionnaireAnswers(generation.answers, questionnaireChannel(generation.channel ?? row.channel)) };
     if (task.taskType === "generate_product_recommendations") {
+      if (isWebProductJourney(row.journey_version) && productTaskMarket(task.payload) !== assessmentProductMarket(row.answers, row.journey_version)) {
+        return { taskId: task.id, taskType: "superseded_generation" };
+      }
       const reference = await loadAdminSafetyReferenceSnapshot(sql);
       if (Number(payloadRecord(task.payload).catalogueRevision) !== reference.runtimeRevision ||
           !matchesSafetyReferenceIdentity(payloadRecord(task.payload).safetyReferenceIdentity, reference)) return { taskId: task.id, taskType: "superseded_generation" };

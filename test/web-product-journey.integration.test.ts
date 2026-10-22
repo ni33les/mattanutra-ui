@@ -19,6 +19,11 @@ import { createRetailCheckoutSession } from "../lib/retail-product-checkout.ts";
 import { assessmentCheckoutAttribution } from "../lib/journey-attribution.ts";
 import { writeBpmEvent } from "../lib/bpm.ts";
 import { MATCHER_VERSION } from "../lib/matcher/config.ts";
+import { loadProductRecommendationFreshnessSnapshot } from "../lib/product-recommendation-freshness.ts";
+import { assessmentProductMarket, currentWebProductMarketSql } from "../lib/web-product-market.ts";
+import { buildTaskWorkItem } from "../lib/task-work-items.ts";
+import { getTaskBundle } from "../lib/task-service.ts";
+import { applyTaskCompletionResult } from "../lib/task-result-applier.ts";
 import { GET as readFormula } from "../app/api/assessment/[planId]/formulation/route.ts";
 
 const databaseUrl = process.env.TEST_DB_URL;
@@ -64,7 +69,7 @@ describe("free web product journey on PostgreSQL", { concurrency: false }, () =>
       await tx`delete from public.retail_checkout_payment_versions where payment_id in (select id from public.retail_checkout_payments where plan_id=any(${plans}::uuid[]))`;
       await tx`delete from public.retail_checkout_payments where plan_id=any(${plans}::uuid[])`;
       await tx`delete from public.product_recommendation_items where run_id in (select id from public.product_recommendation_runs where plan_id=any(${plans}::uuid[]))`;
-      for (const table of ["product_recommendation_runs", "formulations", "food_guidance", "nutrition_reports", "assessment_healthscore_results",
+      for (const table of ["product_recommendation_runs", "recommendations", "formulations", "food_guidance", "nutrition_reports", "assessment_healthscore_results",
         "assessment_product_preferences", "assessment_inputs", "assessment_versions", "assessment_version_counters", "assessments"]) {
         await tx.unsafe(`delete from public.${table} where plan_id=any($1::uuid[])`, [plans]);
       }
@@ -73,9 +78,9 @@ describe("free web product journey on PostgreSQL", { concurrency: false }, () =>
     if (oldFlag === undefined) delete process.env.WEB_PRODUCT_JOURNEY_ENABLED;
     else process.env.WEB_PRODUCT_JOURNEY_ENABLED = oldFlag;
   });
-  async function capture() {
+  async function capture(answerOverrides: Record<string, unknown> = {}) {
     const options = { idempotencyKey: key() };
-    const body = { answers, locale: "en", intent: "capture", sessionId: randomUUID() };
+    const body = { answers: { ...answers, ...answerOverrides }, locale: "en", intent: "capture", sessionId: randomUUID() };
     const receipt = await captureAssessment(body, options); plans.push(receipt.planId);
     return { receipt, body, options };
   }
@@ -189,14 +194,74 @@ describe("free web product journey on PostgreSQL", { concurrency: false }, () =>
     assert.equal(oldFlow.receipt.hasFullPlanAccess, false);
   });
 
-  async function matchingRun(planId: string, status: "completed" | "partial" | "failed", preference = "balanced", ageSeconds = 0) {
+  async function matchingRun(planId: string, status: "completed" | "partial" | "failed", preference = "balanced", ageSeconds = 0, market = "TH") {
     const id = randomUUID(), sql = getSql()!;
-    await sql`insert into public.product_recommendation_runs(id,plan_id,status,assessment_revision,generation_locale,generator_version,catalogue_revision,diagnostics,generated_at)
-      values(${id}::uuid,${planId}::uuid,${status},1,'en',${FUNNEL_GENERATOR_VERSION},
+    await sql`insert into public.product_recommendation_runs(id,plan_id,status,assessment_revision,generation_locale,generator_version,market_region,catalogue_revision,diagnostics,generated_at)
+      values(${id}::uuid,${planId}::uuid,${status},1,'en',${FUNNEL_GENERATOR_VERSION},${market},
         (select revision from public.catalogue_runtime_revision where singleton=true),
-        ${sql.json({ stackPreference: preference })},now()-${ageSeconds}*interval '1 second')`;
+        ${sql.json({ algorithmVersion: MATCHER_VERSION, stackPreference: preference })},now()-${ageSeconds}*interval '1 second')`;
     return id;
   }
+
+  it("recovers a saved Singapore-resident web assessment into a fresh Thailand matching task without changing health inputs", async () => {
+    const { receipt } = await capture({ country: "Singapore" });
+    const planId = receipt.planId, sql = getSql()!;
+    await formula(planId);
+    const [before] = await sql`select answers,input_revision,input_hash from public.assessments where plan_id=${planId}::uuid`;
+    const oldRuns = [await matchingRun(planId, "partial", "balanced", 2, "SG"), await matchingRun(planId, "partial", "compact", 1, "SG")];
+    const legacyProduct = { id: "old-residence-market-product", covers: ["Vitamin D"], description: "Legacy fixture",
+      marketplace: "Imported product", name: "Legacy residence-market product", priority: 1, tag: "Fixture", url: "https://fixture.invalid/sg" };
+    await sql`insert into public.recommendations(plan_id,version,assessment_revision,generation_locale,generator_version,recommendations)
+      values(${planId}::uuid,1,1,'en',${FUNNEL_GENERATOR_VERSION},${sql.json([legacyProduct])})`;
+    // Reproduce a task persisted before public-web sourcing was separated from residence.
+    const oldTasks = await sql`update public.tasks set status='completed',
+      payload=jsonb_set(payload,'{row,countryCode}','"SG"'::jsonb)
+      where plan_id=${planId}::uuid and task_type='generate_product_recommendations' returning id::text`;
+    assert.equal(oldTasks.length, 1);
+    const oldTask = (await getTaskBundle({ taskId: oldTasks[0].id })).task;
+    assert.equal((await buildTaskWorkItem(oldTask)).taskType, "superseded_generation");
+    assert.equal((await applyTaskCompletionResult({ task: oldTask, taskId: oldTask.id, resultPayload: {}, sql }) as { superseded: boolean }).superseded, true);
+    const stale = await loadProductRecommendationFreshnessSnapshot(sql, { planId, algorithmVersion: MATCHER_VERSION, stackPreference: "balanced" });
+    assert.equal(stale?.countryCode, "TH");
+    assert.equal(stale?.reason, "missing_run");
+    assert.equal(stale?.runId, null);
+    const compact = await loadProductRecommendationFreshnessSnapshot(sql, { planId, algorithmVersion: MATCHER_VERSION, stackPreference: "compact" });
+    assert.equal(compact?.runId, null, "an old residence-market run must not suppress recovery");
+    assert.equal((await getFunnelReadiness(planId, "en"))?.readyForReveal, false);
+    const body = await (await response(planId, true)).json();
+    assert.equal(body.productsReady, false);
+    assert.deepEqual(body.recommendations, [], "legacy recommendations cannot bypass the current public-web market");
+    for (const id of oldRuns) assert.equal(JSON.stringify(body).includes(id), false);
+
+    await recoverFunnelWork(planId, "en", true);
+    const currentTasks = await sql`select id::text,payload from public.tasks where plan_id=${planId}::uuid
+      and task_type='generate_product_recommendations' and payload #>> '{row,countryCode}'='TH'`;
+    assert.equal(currentTasks.length, 1, "native refresh must enqueue a new task for the public shop's market");
+    assert.notEqual(currentTasks[0].id, oldTask.id);
+    assert.equal(currentTasks[0].payload.generation.answers.country, "Singapore");
+    await recoverFunnelWork(planId, "en", true);
+    assert.equal((await sql`select count(*)::int as n from public.tasks where plan_id=${planId}::uuid
+      and task_type='generate_product_recommendations' and payload #>> '{row,countryCode}'='TH'`)[0].n, 1,
+      "repeated refresh must reuse the matching market task");
+    assert.deepEqual((await sql`select answers,input_revision,input_hash from public.assessments where plan_id=${planId}::uuid`)[0], before);
+    const currentRun = await matchingRun(planId, "completed");
+    assert.equal((await getFunnelReadiness(planId, "en"))?.productRunId, currentRun);
+    assert.equal((await (await response(planId, true)).json()).productRecommendations.runId, currentRun);
+  });
+
+  it("uses the same validated pharmacy exception in SQL and server market selection", async () => {
+    const sql = getSql()!, valid = { organisationId: "6052e03e-6619-409b-8767-02806b3df016", slug: "fixture", countryCode: "SG" };
+    for (const pharmacy of [undefined, null, {}, [], { ...valid, organisationId: "invalid" }, { ...valid, slug: " " }, valid]) {
+      const input = { country: "Singapore", ...(pharmacy === undefined ? {} : { inStorePharmacy: pharmacy }) };
+      for (const journey of [null, WEB_PRODUCT_JOURNEY_VERSION]) {
+        for (const market of ["SG", null]) {
+          const rows = await sql`select 1 from (values (${sql.json(input)}::jsonb,${journey}::text)) as a(answers,journey_version)
+            cross join (values (${market}::text)) as r(market_region) where ${currentWebProductMarketSql(sql, "a", "r")}`;
+          assert.equal(rows.length, assessmentProductMarket(input, journey) === "SG" ? 1 : 0);
+        }
+      }
+    }
+  });
 
   it("keeps a failed matching run recoverable instead of publishing it as completed empty results", async () => {
     const { receipt } = await capture(); await formula(receipt.planId);
@@ -286,8 +351,8 @@ describe("free web product journey on PostgreSQL", { concurrency: false }, () =>
     assert.equal(items.length, 2, "isolated catalogue requires two sellable references");
     const runId = randomUUID(), productIds = items.map(row => row.product_id);
     const matching = { selectedCandidateKey: "fixture-subset", options: [{ candidateKey: "fixture-subset", productIds, recommendations: [] }] };
-    await sql`insert into public.product_recommendation_runs (id,plan_id,assessment_revision,generation_locale,generator_version,selection_revision,catalogue_revision,diagnostics)
-      values (${runId}::uuid,${captured.planId}::uuid,${captured.revision},'en',${FUNNEL_GENERATOR_VERSION},0,
+    await sql`insert into public.product_recommendation_runs (id,plan_id,assessment_revision,generation_locale,generator_version,market_region,selection_revision,catalogue_revision,diagnostics)
+      values (${runId}::uuid,${captured.planId}::uuid,${captured.revision},'en',${FUNNEL_GENERATOR_VERSION},'TH',0,
         (select revision from public.catalogue_runtime_revision where singleton=true),${sql.json({ algorithmVersion: MATCHER_VERSION, stackPreference: "balanced", matching })})`;
     for (const [rank, item] of items.entries()) await sql`insert into public.product_recommendation_items (run_id,product_id,rank,url_used,price_amount)
       values (${runId}::uuid,${item.product_id}::uuid,${rank + 1},'https://fixture.invalid/product',${item.rrp_price_amount})`;

@@ -30,7 +30,7 @@ import {
 } from "@/lib/product-recommendations";
 import { warmLiveRetailSnapshot } from "@/lib/agentic/catalogue/live";
 import { warmSupplementEffectiveAvailability } from "@/lib/supplement-country-availability";
-import { productCountryCodeFromAnswers } from "@/lib/pharmacy-in-store";
+import { assessmentProductMarket } from "@/lib/web-product-market";
 import {
   loadProductRecommendationFreshnessSnapshot
 } from "@/lib/product-recommendation-freshness";
@@ -358,18 +358,18 @@ export async function enqueueHealthScoreAnalysisTask({
   });
 }
 
-type AssessmentTaskIdentity = Readonly<{ revision: number; inputHash: string; rowVersion: string; projectionBefore?: unknown }>;
+type AssessmentTaskIdentity = Readonly<{ revision: number; inputHash: string; rowVersion: string; journeyVersion: string | null; projectionBefore?: unknown }>;
 
 async function assessmentTaskIdentity(sql: postgres.Sql, planId: string, includeProjection = false): Promise<AssessmentTaskIdentity | null> {
   const [row] = await sql`
-    select input_revision, input_hash, xmin::text as row_version,
+    select input_revision, input_hash, journey_version, xmin::text as row_version,
       case when ${includeProjection} then to_jsonb(assessments.*) end as projection_before,
       case when input_hash is null then answers end as legacy_answers
     from public.assessments where plan_id = ${planId}::uuid
   `;
   if (!row) return null;
   return {
-    revision: Number(row.input_revision), rowVersion: row.row_version, projectionBefore: row.projection_before,
+    revision: Number(row.input_revision), rowVersion: row.row_version, journeyVersion: row.journey_version, projectionBefore: row.projection_before,
     inputHash: row.input_hash ?? canonicalAssessmentInputHash(row.legacy_answers)
   };
 }
@@ -487,7 +487,7 @@ export async function enqueueAssessmentPregenerationTasks({
   const identity = await assessmentTaskIdentity(sql, planId);
   if (!identity) return null;
 
-  const catalogueCountry = productCountryCodeFromAnswers(answers);
+  const catalogueCountry = assessmentProductMarket(answers, identity.journeyVersion);
 
   const warm = () => {
     void warmLiveRetailSnapshot(catalogueCountry).catch(() => undefined);
@@ -1427,6 +1427,13 @@ export async function enqueueProductRecommendationsTask({
   const dependencyTaskId =
     dependsOnTaskId && isUuid(dependsOnTaskId) ? dependsOnTaskId : null;
 
+  const row = await loadProductRecommendationFreshnessSnapshot(sql, {
+    algorithmVersion: matcherAlgorithmVersion,
+    planId,
+    stackPreference: normalizedStackPreference
+  });
+  if (!row || (row.formulationVersion < 1 && !dependencyTaskId)) return null;
+
   // A refresh may supersede a completed run, but repeating it must reuse current work.
   {
     const activeRows = await sql<Array<{ id: string }>>`
@@ -1441,6 +1448,7 @@ export async function enqueueProductRecommendationsTask({
         and payload ->> 'matcherAlgorithmVersion' = ${matcherAlgorithmVersion}
         and payload ->> 'matcherImplementationVersion' = ${matcherImplementationVersion}
         and payload ->> 'stackPreference' = ${normalizedStackPreference}
+        and payload #>> '{row,countryCode}' = ${row.countryCode}
         and coalesce(payload #>> '{productPreferences,searchEffort}', 'standard') = ${productPreferences.searchEffort}
         and (payload ->> 'catalogueRevision')::bigint = ${catalogueRevision}
         and payload #>> '{safetyReferenceIdentity,runtimeRevision}' = ${String(catalogueRevision)}
@@ -1454,19 +1462,6 @@ export async function enqueueProductRecommendationsTask({
     if (activeRows[0]?.id) {
       return activeRows[0].id;
     }
-  }
-
-  const row = await loadProductRecommendationFreshnessSnapshot(sql, {
-    algorithmVersion: matcherAlgorithmVersion,
-    planId,
-    stackPreference: normalizedStackPreference
-  });
-
-  if (
-    !row ||
-    (row.formulationVersion < 1 && !dependencyTaskId)
-  ) {
-    return null;
   }
 
   if (!forceNew && row.formulationVersion >= 1 && !row.reason) {

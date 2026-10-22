@@ -18,6 +18,7 @@ import {
 import { getSql } from "@/lib/db";
 import { appendAssessmentVersion } from "@/lib/domain-versions";
 import { productCountryCodeFromAnswers } from "@/lib/pharmacy-in-store";
+import { assessmentProductMarket, productTaskMarket } from "@/lib/web-product-market";
 import type {
   ProductSnapshot,
   MarketplaceSearchDiagnostic
@@ -499,6 +500,7 @@ async function applyPaidFormulationResult(
         addWorkEvent(task, eventType, level ?? "low", payload)
       ),
     answers: row.answers,
+    countryCode: assessmentProductMarket(row.answers, row.journey_version),
     formulation: publishedFormulation(analysis.formulation, task.payload, resultPayload),
     locale,
     plan: plan === "pro" ? "pro" : "precision",
@@ -2103,7 +2105,7 @@ export async function prepareTaskCompletionResult({ task, resultPayload, sql: sq
     if (!generation || objectValue(resultPayload).superseded === true) return {};
     const sql = sqlOverride ?? getSql();
     if (!sql || !task.planId) throw new Error("Nutrition result preparation requires its saved assessment");
-    const [row] = await sql`select answers,locale,selected_plan::text from public.assessments where plan_id=${task.planId}::uuid`;
+    const [row] = await sql`select answers,locale,selected_plan::text,journey_version from public.assessments where plan_id=${task.planId}::uuid`;
     if (!row) throw new Error("Assessment submission not found");
     const locale: Locale = generation?.locale ?? (isLocale(row.locale) ? row.locale : "en");
     const effects: TaskAfterCommitEffect[] = [];
@@ -2114,7 +2116,7 @@ export async function prepareTaskCompletionResult({ task, resultPayload, sql: sq
       } };
     if (task.taskType === "generate_supplement_guidance") {
       const requested = payloadText(task.payload,"plan") || textValue(row.selected_plan);
-      const value = await applyFormulationSafety(sql, { ...common, formulation: publishedFormulation(analysisPayload(resultPayload).formulation, task.payload, resultPayload), plan: requested === "pro" ? "pro" : "precision" });
+      const value = await applyFormulationSafety(sql, { ...common, countryCode: assessmentProductMarket(row.answers, row.journey_version), formulation: publishedFormulation(analysisPayload(resultPayload).formulation, task.payload, resultPayload), plan: requested === "pro" ? "pro" : "precision" });
       return { formulation: { value, json: JSON.stringify(toJsonValue(value)), locale, afterCommit: effects } };
     }
     const value = await applyFoodGuidanceSafety(sql, { ...common, foodGuidance: foodGuidanceAnalysisPayload(resultPayload).foodGuidance });
@@ -2122,6 +2124,7 @@ export async function prepareTaskCompletionResult({ task, resultPayload, sql: sq
   }
   let locale: Locale = generation?.locale ?? "en";
   let countryCode = productCountryCodeFromAnswers(generation?.answers);
+  if (task.taskType === "generate_product_recommendations") countryCode = productTaskMarket(task.payload) ?? countryCode;
   if (!generation && task.planId) {
     const sql = getSql();
     if (!sql) throw new Error("Database is not configured");
@@ -2470,10 +2473,14 @@ export async function applyTaskCompletionResult({
     const db = sql ?? getSql();
     if (!db) throw new Error("Database is not configured");
     const generation = generationInput(task.payload);
-    const [current] = await db`select input_revision, input_hash from public.assessments where plan_id = ${task.planId}::uuid for no key update`;
+    const [current] = await db`select input_revision, input_hash, answers, journey_version from public.assessments where plan_id = ${task.planId}::uuid for no key update`;
     if (!generation || !current || generation.generatorVersion !== FUNNEL_GENERATOR_VERSION || Number(current.input_revision) !== generation.revision ||
         (current.input_hash && current.input_hash !== generation.inputHash)) {
       return { superseded: true, message: "Assessment inputs changed; old result was not applied" };
+    }
+    if (task.taskType === "generate_product_recommendations" && isWebProductJourney(current.journey_version)
+        && productTaskMarket(task.payload) !== assessmentProductMarket(current.answers, current.journey_version)) {
+      return { superseded: true, message: "Product sourcing market changed; old result was not applied" };
     }
     if (task.taskType === "generate_food_gap_guidance") {
       const preferences = await getAssessmentProductPreferences(db, task.planId);
