@@ -34,6 +34,20 @@ it('V5-CHECKOUT-02: current provenance accepts all eight selected products and k
   assert.deepEqual(rows.map(row => row.product_id), productIds);
   assert.deepEqual(rows.map(row => row.price_amount), productIds.map((_, i) => 10 + i));
 });
+it('WEB-SUBSET-CHECKOUT: a current option subset keeps authoritative prices and all provenance checks', async () => {
+  const { sql } = database('7');
+  const subset = { ...selection, selectedItemIds: [productIds[1], productIds[5]] };
+  const prepared = await currentWebCheckoutSelection(sql, subset);
+  const rows = await validateCurrentWebCheckoutRecommendations(sql, subset, prepared);
+  assert.deepEqual(rows.map(row => [row.product_id, row.price_amount]), [[productIds[1], 11], [productIds[5], 15]]);
+  for (const selectedItemIds of [[], [productIds[1], productIds[1]], [productIds[1], '20000000-0000-4000-8000-000000000009']]) {
+    await assert.rejects(currentWebCheckoutSelection(sql, { ...subset, selectedItemIds }), /Select unique/);
+  }
+  for (const stale of [{ assessmentRevision: 2 }, { selectionRevision: 1 }, { candidateKey: 'other-option' }, { recommendationRunId: 'other-run' }]) {
+    await assert.rejects(currentWebCheckoutSelection(sql, { ...subset, ...stale }), /changed/);
+  }
+  await assert.rejects(validateCurrentWebCheckoutRecommendations(sql, { ...subset, selectedItemIds: [productIds[1], productIds[1]] }, prepared), /does not match/);
+});
 it('V5-CHECKOUT-03: exact existing intent resumes its frozen payment without catalogue or price reads', async () => {
   const intent = { address, agenticOrderId: null, billingAddress: address, billingSameAsShipping: true, channel: 'web', planId, runId, optionId: 'option', assessmentRevision: 1, selectionRevision: 0, selectedRetailerOrganisationId: null, shippingAmount: 40, selectedProductIds: productIds };
   const payment = { id: 'payment', plan_id: planId, recommendation_run_id: runId, status: 'checkout_session_created', paid_at: null, metadata: { shippingAmount: 40 }, idempotency_key: createHash('sha256').update(JSON.stringify(intent)).digest('hex'), quote_lines: [{ price: 123, quantity: 1 }] };

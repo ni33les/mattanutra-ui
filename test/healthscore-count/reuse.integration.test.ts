@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import test,{after} from 'node:test';
+import test,{after,before} from 'node:test';
 import {randomUUID} from 'node:crypto';
 import {captureAssessment,retryAssessmentHealthScore} from '../../lib/assessment-capture.ts';
 import {getSql,closeSqlPool} from '../../lib/db.ts';
@@ -12,6 +12,13 @@ import {effectiveQuestionnaireAnswers} from '../../lib/web-purchase-preferences.
 assert.ok(process.env.TEST_DB_URL,'Isolated PostgreSQL is required');
 const url=new URL(process.env.TEST_DB_URL);assert.equal(url.hostname,'127.0.0.1');assert.match(url.pathname,/^\/mattanutra_lock_review_/);
 const sql=getSql()!;after(closeSqlPool);
+const previousJourneyFlag=process.env.WEB_PRODUCT_JOURNEY_ENABLED;
+// These regressions cover prepared-formula reuse through the retired paid-reveal flow.
+before(()=>{process.env.WEB_PRODUCT_JOURNEY_ENABLED='0';});
+after(()=>{
+  if(previousJourneyFlag===undefined)delete process.env.WEB_PRODUCT_JOURNEY_ENABLED;
+  else process.env.WEB_PRODUCT_JOURNEY_ENABLED=previousJourneyFlag;
+});
 const answers={firstName:'Count fixture',age:'36-45',sex:'male',goals:['energy']};
 const ids=['vitamin-d3','omega-3','magnesium','vitamin-b12','coq10','creatine','vitamin-c','zinc','l-carnitine','selenium'];
 async function prepared(locale:'en'|'th'|'zh-CN'='en') {

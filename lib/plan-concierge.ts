@@ -135,7 +135,7 @@ async function paidPlanExists(sql: Db, planId: string) {
       select 1
       from public.assessments
       where plan_id = ${planId}::uuid
-        and selected_plan is not null
+        and (selected_plan is not null or journey_version = 'web-products-v1')
     ) as exists
   `;
 
@@ -171,7 +171,7 @@ async function planChatWelcomeState(sql: Db, planId: string) {
       ) as nutrition_ready
     from public.assessments
     where plan_id = ${planId}::uuid
-      and selected_plan is not null
+      and (selected_plan is not null or journey_version = 'web-products-v1')
     limit 1
   `;
   const row = rows[0];

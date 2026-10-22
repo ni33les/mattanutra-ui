@@ -16,6 +16,13 @@ import { bindPaidReservationToAssessment, completeMockPayment, createStripeCheck
 const databaseUrl = process.env.TEST_DB_URL;
 assert.ok(databaseUrl, "This integration test requires isolated PostgreSQL");
 describe("durable web payment fulfillment on PostgreSQL", () => {
+  const previousJourneyFlag = process.env.WEB_PRODUCT_JOURNEY_ENABLED;
+  // These fixtures exercise historical paid-reveal sessions and their fulfillment.
+  before(() => { process.env.WEB_PRODUCT_JOURNEY_ENABLED = "0"; });
+  after(() => {
+    if (previousJourneyFlag === undefined) delete process.env.WEB_PRODUCT_JOURNEY_ENABLED;
+    else process.env.WEB_PRODUCT_JOURNEY_ENABLED = previousJourneyFlag;
+  });
   const ids: string[] = [], plans: string[] = [], keys: string[] = [];
   const dependencies = {
     session: async () => null,

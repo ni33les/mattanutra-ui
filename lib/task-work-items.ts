@@ -1,4 +1,5 @@
 import { safetyFollowupMessage } from "@/lib/safety-followup-message";
+import { revealTaskContext, timeRevealStageSync, timeRevealTaskStage } from "@/lib/reveal-timing";
 import { effectiveQuestionnaireAnswers, questionnaireChannel } from "@/lib/web-purchase-preferences";
 import type { QuestionnaireChannel } from "@/lib/questionnaire/types";
 import { sha256Hex } from '@/lib/sha256';
@@ -2303,6 +2304,15 @@ const taskWorkItemHandlers: Readonly<Record<string, TaskWorkItemBuilder>> = {
 };
 
 export async function buildTaskWorkItem(task: TaskRecord): Promise<TaskWorkItem> {
+  const timing = revealTaskContext(task);
+  return timeRevealTaskStage("work_item", timing, async () => {
+    const item = await buildTaskWorkItemInternal(task);
+    timing.resultSuperseded = item.taskType === "superseded_generation";
+    return item;
+  });
+}
+
+async function buildTaskWorkItemInternal(task: TaskRecord): Promise<TaskWorkItem> {
   let generation = generationInput(task.payload);
   if (task.planId && ASSESSMENT_GENERATION_TASKS.has(task.taskType)) {
     const sql = getSql();
@@ -2331,7 +2341,7 @@ export async function buildTaskWorkItem(task: TaskRecord): Promise<TaskWorkItem>
     const item = await (generation && task.planId ? withGenerationInput(task.planId, generation, () => handler({ ...task, payload: { ...payloadRecord(task.payload), generation } })) : handler(task));
     if (generation && "answers" in item) {
       return { ...item, answers: generation.answers, locale: generation.locale, questionnaireChannel: generation.channel,
-        ...(item.taskType === "analyze_healthscore" ? { healthScore: computeHealthScore(generation.answers, generation.locale) } : {}) } as TaskWorkItem;
+        ...(item.taskType === "analyze_healthscore" ? { healthScore: timeRevealStageSync("healthscore_compute", revealTaskContext(task), () => computeHealthScore(generation.answers, generation.locale)) } : {}) } as TaskWorkItem;
     }
     return item;
   }

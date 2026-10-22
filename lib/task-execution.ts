@@ -1,4 +1,5 @@
 import { compareOverallScores } from "@/lib/matcher/practical-scoring";
+import { timeRevealTaskExecution, type RevealTimingContext } from "@/lib/reveal-timing";
 import { hasHealthScoreAiCopy } from "@/lib/assessment-store";
 import { validateLeadEmail } from "@/lib/email-validation";
 import { analyzeFoodGapSupportDeterministically } from "@/lib/food-gap-support";
@@ -242,6 +243,20 @@ function requireSentEmail(
 export async function executeTaskWorkItem(
   workItem: TaskWorkItem,
   runtime: TaskExecutionRuntime = {}
+) {
+  const timing: RevealTimingContext = { taskType: workItem.taskType,
+    taskId: "taskId" in workItem ? workItem.taskId : undefined,
+    planId: "planId" in workItem ? workItem.planId : undefined };
+  return timeRevealTaskExecution(timing, async () => {
+    const result = await executeTaskWorkItemInternal(workItem, runtime);
+    if (result && "cachedOrExisting" in result && typeof result.cachedOrExisting === "boolean") timing.resultReused = result.cachedOrExisting;
+    return result;
+  });
+}
+
+async function executeTaskWorkItemInternal(
+  workItem: TaskWorkItem,
+  runtime: TaskExecutionRuntime
 ) {
   if (workItem.taskType === "match_agentic_plan") {
     const { runAdmittedPlanOperation } = await import("@/lib/agentic/plan/service");

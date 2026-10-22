@@ -2,9 +2,11 @@
 
 import { PharmacySourceFunnelTable } from "./pharmacy-source-funnel";
 import { McpFunnelTable } from "./mcp-funnel-table";
+import { webProductFunnelCopy } from "@/lib/web-product-funnel-copy";
 import { funnelReportCopy } from "@/lib/funnel-report-copy";
 import { funnelStageColors } from "./funnel-stage-table";
 import { MetaCampaignPanel } from "./meta-campaign-panel";
+import { WebProductReportPanel } from "./web-product-report";
 import type { AdminCampaignRow, AdminCampaignsData } from "@/lib/admin-query-data";
 import type { Locale } from "@/lib/i18n";
 import { connectCopy } from "@/lib/connect-copy";
@@ -42,23 +44,23 @@ export function AdminCampaignsView({
     {
       color: businessMetricColors.healthScoreViews,
       id: "healthScoreViews",
-      label: funnelReportCopy[locale].reached,
+      label: webProductFunnelCopy[locale].stages.productsViewed,
       series: [],
-      value: formatNumber(summary.healthScoreViews, locale)
+      value: formatNumber(summary.productViews ?? 0, locale)
     },
     {
       color: businessMetricColors.freeRequests,
       id: "freeRequests",
-      label: labels.marketingPages.freeRequests,
+      label: webProductFunnelCopy[locale].stages.productCheckoutReady,
       series: [],
-      value: formatNumber(summary.freeRequests, locale)
+      value: formatNumber(summary.productCheckouts ?? 0, locale)
     },
     {
       color: businessMetricColors.converted,
       id: "converted",
-      label: `${labels.marketingPages.precisionConversions} / ${labels.marketingPages.proConversions}`,
+      label: locale === "th" ? "รายการชำระค่าสินค้าจริง" : locale === "zh-CN" ? "正式商品付款" : "Live product payments",
       series: [],
-      value: `${formatNumber(summary.precisionConversions, locale)} / ${formatNumber(summary.proConversions, locale)}`
+      value: formatNumber(summary.paidProductPayments ?? 0, locale)
     }
   ];
 
@@ -81,6 +83,7 @@ export function AdminCampaignsView({
         </table></div>}
       </div>}
       {data.meta && <MetaCampaignPanel data={data.meta} locale={locale} />}
+      <WebProductReportPanel report={data.productReport} locale={locale} />
 
       <div className="mt-8 overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-200">
         <div className="overflow-x-auto">
@@ -95,6 +98,13 @@ export function AdminCampaignsView({
                   labels.marketingPages.landed,
                   labels.marketingPages.assessmentStarts,
                   labels.marketingPages.assessmentCompletions,
+                  webProductFunnelCopy[locale].stages.formulaViewed,
+                  webProductFunnelCopy[locale].stages.productsViewed,
+                  webProductFunnelCopy[locale].stages.basketConfirmed,
+                  webProductFunnelCopy[locale].stages.productCheckoutReady,
+                  webProductFunnelCopy[locale].stages.productPaymentSucceeded,
+                  locale === "th" ? "รายการชำระเงินจริง" : locale === "zh-CN" ? "正式付款笔数" : "Live paid payments",
+                  locale === "th" ? "คำสั่งซื้อที่ชำระแล้ว" : locale === "zh-CN" ? "关联已付款订单" : "Linked paid orders",
                   funnelReportCopy[locale].reached,
                   labels.marketingPages.freeRequests,
                   labels.marketingPages.precisionConversions,
@@ -135,7 +145,7 @@ export function AdminCampaignsView({
                 <tr>
                   <td
                     className="px-4 py-10 text-center text-sm font-medium text-gray-500"
-                    colSpan={12}
+                    colSpan={19}
                   >
                     {labels.marketingPages.emptyCampaigns}
                   </td>
@@ -180,6 +190,7 @@ function CampaignRow({
       <td className="px-4 py-4 text-sm text-gray-600">
         {formatNumber(row.assessmentCompletions, locale)}
       </td>
+      {[row.formulaViews, row.productViews, row.basketsConfirmed, row.productCheckouts, row.productPayments, row.paidProductPayments, row.paidProductOrders].map((count, index) => <td key={index} className="px-4 py-4 text-sm text-gray-600">{formatNumber(count ?? 0, locale)}</td>)}
       <td className="px-4 py-4 text-sm text-gray-600">
         {formatNumber(row.healthScoreViews, locale)}
       </td>

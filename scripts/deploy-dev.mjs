@@ -21,6 +21,7 @@ const schemaScripts = [
   "product-coverage:demand-cache:schema:apply",
   "payments:schema:apply",
   "web-funnel:schema:apply",
+  "web-products:schema:apply",
   "agentic:schema:apply",
   "matcher:runtime:schema:apply"
 ];

@@ -30,6 +30,8 @@ import type {
   ProductStackPreference,
 } from "@/lib/formulation-types";
 import { localeHtmlLang, type Locale } from "@/lib/i18n";
+import type { NutritionJourneySnapshot } from "@/lib/nutrition-journey-read";
+import { WebCombinedReveal } from "@/components/nutrition-flow/web-combined-reveal";
 
 type FormulationResultsProps = Readonly<{
   initialResult?: FormulationResult | null;
@@ -37,6 +39,7 @@ type FormulationResultsProps = Readonly<{
   locale: Locale;
   planId: string;
   pharmacy?: { source?: PharmacySource; slug: string; name: string; revision: number; sourceLocale: Locale; receipt: PharmacyOrderReceipt | null };
+  commerce?: { answers: Record<string, unknown>; initial: NutritionJourneySnapshot | null; bootstrap: boolean };
 }>;
 
 export function FormulationResults({
@@ -45,6 +48,7 @@ export function FormulationResults({
   locale,
   planId,
   pharmacy,
+  commerce,
 }: FormulationResultsProps) {
   const labels = formulationResultsCopy[locale];
   const effectivePlanId = planId;
@@ -59,8 +63,9 @@ export function FormulationResults({
     useState<ProductStackPreference | null>(null);
 
   const pollingComplete = useCallback(() => setProductPollingPreference(null), []);
-  const { result, loadState, failed, retry, refresh: refreshFormulationResult } = useFormulationPolling(
-    effectivePlanId, pharmacy?.sourceLocale ?? locale, initialResult, productPollingPreference, pollingComplete, !pharmacy?.receipt);
+  const { result, snapshot, loadState, failed, retry, refresh: refreshFormulationResult } = useFormulationPolling(
+    effectivePlanId, pharmacy?.sourceLocale ?? locale, initialResult, productPollingPreference, pollingComplete, !pharmacy?.receipt,
+    commerce?.initial, Boolean(commerce), commerce?.bootstrap);
   const startProductStackPolling = useCallback((preference: ProductStackPreference) => {
     setProductPollingPreference(preference);
   }, []);
@@ -85,6 +90,9 @@ export function FormulationResults({
       );
     });
   }, [productPollingPreference, result]);
+
+  if (commerce) return <WebCombinedReveal failed={failed} result={result} snapshot={snapshot}
+    locale={locale} planId={planId} retry={retry} />;
 
   if (loadState === "loading") {
     return <FunnelLoading locale={locale} stage="opening" />;
@@ -139,7 +147,7 @@ export function FormulationResults({
       !resultHasProductStackRows(result, explicitProductStackPreference),
   );
   const productCoveragePending =
-    productStackLoading || resultHasPendingProductRecommendations(result);
+    Boolean(commerce && (!snapshot?.readyForReveal || snapshot.refreshPending || snapshot.failed)) || productStackLoading || resultHasPendingProductRecommendations(result);
   const activeProductRecommendations =
     selectedProductStackUnavailable
       ? undefined
@@ -156,8 +164,9 @@ export function FormulationResults({
 
   return (
     <>
-    {failed ? <div role="status" className="mx-auto max-w-6xl px-6">{labels.error} {recovery}</div> : null}
+    {failed && !commerce ? <div role="status" className="mx-auto max-w-6xl px-6">{labels.error} {recovery}</div> : null}
     <RevealFinalResultsPage
+      commerce={Boolean(commerce)}
       activeProductRecommendations={activeProductRecommendations}
       formattedDate={formattedDate}
       ingredients={orderedIngredients}

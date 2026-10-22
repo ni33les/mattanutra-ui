@@ -1,4 +1,5 @@
 import { parentPort } from "node:worker_threads";
+import { takeWorkerMeasurements } from "../lib/service-metrics.ts";
 import { executeTaskWorkItem } from "../lib/task-execution.ts";
 import { setMatcherSafetyCeilings, setMatcherSafetyCeilingsUnavailable } from "../lib/matcher/safety-ceilings.ts";
 import type { ThreadReply } from "../lib/thread-pool.ts";
@@ -19,5 +20,5 @@ parentPort.on("message", async (job: ProductMatchJob) => {
   } catch {
     reply = {error: "product_match_failed"};
   }
-  parentPort!.postMessage(reply);
+  parentPort!.postMessage({ ...reply, metrics: takeWorkerMeasurements() });
 });

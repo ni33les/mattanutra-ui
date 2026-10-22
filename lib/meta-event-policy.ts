@@ -38,7 +38,7 @@ export function sanitiseMetaUrl(value: unknown, env: MetaEnvironment): string | 
     const match = url.pathname.match(/^\/([^/]+)(?:\/(.*))?\/?$/);
     if (!match || !isLocale(match[1])) return null;
     const [, locale, tail = ""] = match;
-    const exact = ["", "privacy", "terms", "assessment", "assessment/results", "nutrition/refine", "nutrition/quiz", "nutrition/healthscore", "nutrition/progress", "nutrition/reveal", "nutrition/payment/checkout", "nutrition/payment/return", "basket/checkout", "basket/return", "order/track", "library"];
+    const exact = ["", "privacy", "terms", "assessment", "assessment/results", "nutrition/refine", "nutrition/quiz", "nutrition/healthscore", "nutrition/progress", "nutrition/reveal", "nutrition/plan", "nutrition/payment/checkout", "nutrition/payment/return", "basket/checkout", "basket/return", "order/track", "library"];
     const path = /^connect(?:\/(?:claude|perplexity|chatgpt|grok))?\/?$/.test(tail) ? tail.replace(/\/$/, "")
       : exact.includes(tail.replace(/\/$/, "")) ? tail.replace(/\/$/, "")
       : tail.startsWith("library/") || tail.startsWith("blog/") ? "library"
@@ -86,7 +86,8 @@ export function metaCustomData(name: MetaEventName, value: unknown, environment:
   if (["web", "retail", "mcp", "pharmacy", "mcp_web"].includes(String(input.channel))) {
     data.channel = input.channel === "pharmacy" ? "retail" : input.channel === "mcp_web" ? "mcp" : String(input.channel);
   }
-  if (["landing", "assessment", "results", "offer", "basket", "checkout", "confirmation", "content", "connect", "connect_guide", "connect_verified"].includes(String(input.stage))) data.funnel_stage = String(input.stage);
+  if (["landing", "assessment", "results", "formula", "products", "healthscore", "offer", "basket", "checkout", "confirmation", "content", "connect", "connect_guide", "connect_verified"].includes(String(input.stage))) data.funnel_stage = String(input.stage);
+  if (input.journey_version === "web-products-v1") data.journey_version = "web-products-v1";
   if (connection && ["claude", "perplexity", "chatgpt", "grok"].includes(String(input.provider))) data.provider = String(input.provider);
   if (!connection && ["precision", "pro"].includes(String(input.offer))) data.offer = String(input.offer);
   if (["Purchase", "OrderSubmitted", "InitiateCheckout", "SelectOffer", "AddToCart"].includes(name)

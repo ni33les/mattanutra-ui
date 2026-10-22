@@ -3,7 +3,11 @@ import { performance, monitorEventLoopDelay } from "node:perf_hooks";
 
 const METRIC_NAMES = ["mcp.stream_wait_ms", "mcp.stream.result", "mcp.stream.processing", "mcp.stream.disconnected", "mcp.stream.read_failed", "mcp.admission_ms", "mcp.retrieval_ms", "match.catalogue_ms", "match.compilation_ms", "match.search_ms", "match.finalization_ms", "match.publication_ms", "match.operation_ms", "match.result_reused", "match.work_joined", "match.work_started", "db.acquire_begin_ms", "db.setup_ms", "db.sql_ms", "db.statements", "db.lock_timeouts", "db.lock_statement_client_ms", "db.transaction_client_ms",
   "worker.unstarted_cleanup_failures", "worker.queue_ms", "worker.thread_wait_ms", "worker.preparation_ms", "worker.cpu_wait_ms", "worker.execute_ms", "worker.input_bytes", "worker.sampled_input_bytes", "checkpoint.encode_ms", "checkpoint.decode_ms",
-  "checkpoint.bytes", "serialization.ms", "cache.hit", "cache.miss", "cache.eviction", "cache.bytes"] as const;
+  "checkpoint.bytes", "serialization.ms", "cache.hit", "cache.miss", "cache.eviction", "cache.bytes",
+  "reveal.capture_ms", "reveal.healthscore_compute_ms", "reveal.work_item_ms", "reveal.healthscore_advice_ms", "reveal.formulation_ms",
+  "reveal.food_guidance_ms", "reveal.food_gap_guidance_ms", "reveal.product_matching_ms", "reveal.product_matching_dispatch_ms",
+  "reveal.result_preparation_ms", "reveal.result_application_ms", "reveal.failure_application_ms", "reveal.stage_failed",
+  "reveal.task_age_ms", "reveal.first_reservation_to_terminal_ms", "reveal.queue_and_dependency_wait_ms"] as const;
 export type ServiceMetric = typeof METRIC_NAMES[number];
 type Aggregate = { count: number; total: number; max: number };
 export type ServiceMetricBatch = Partial<Record<ServiceMetric, Aggregate>>;

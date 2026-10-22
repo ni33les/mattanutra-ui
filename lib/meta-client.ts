@@ -1,5 +1,7 @@
 "use client";
 import { journeyChannelForPath } from "@/lib/journey-channel";
+import { trackBpmEvent } from "@/lib/bpm-client";
+import type { Locale } from "@/lib/i18n";
 import type { MetaBootstrapPageView } from "@/lib/meta-pixel-bootstrap";
 import { META_CONSENT_COOKIE, browserPixelPageSafe, metaCustomData, metaEventForBpm, metaEventName, type MetaEventName, type MetaPreferenceSource, type MetaPublicConfig, uuidPattern } from "@/lib/meta-event-policy";
 let config: MetaPublicConfig | null = null;
@@ -78,14 +80,31 @@ export function trackMetaEvent(name: MetaEventName, input: Record<string, unknow
   const work = (async () => {
     try {
       const receipt = await captureEvent(JSON.stringify({ name, eventId, sessionId: id, attemptId: input.attemptId, sourceUrl,
+        ...(input.webProductMilestone ? { webProductMilestone: input.webProductMilestone } : {}),
         data: { ...data, planId: data.plan_id, stage: data.funnel_stage } }));
       if (receipt?.accepted !== true || typeof receipt.eventId !== "string" || !uuidPattern.test(receipt.eventId)) return;
       sent.add(key);
       if (!headerPageView && marketingGranted() && location.href === sourceUrl && browserPixelPageSafe(location.href, document.referrer, env) && window.fbq) {
         const nativeData = receipt.data && typeof receipt.data === "object"
           ? metaCustomData(name, { ...receipt.data, planId: receipt.data.plan_id, stage: receipt.data.funnel_stage }, env) : data;
-        window.fbq(env === "prd" && ["PageView", "ViewContent", "Contact", "AddToCart", "InitiateCheckout"].includes(name) ? "trackSingle" : "trackSingleCustom",
-          pixelId, metaEventName(name, env), nativeData, { eventID: receipt.eventId });
+        const storageKey = `mn:meta:visible:${env}:${pixelId}`;
+        const send = () => {
+          if (!marketingGranted() || location.href !== sourceUrl) return;
+          let delivered: string[] = [];
+          if (input.webProductMilestone) {
+            try { const saved = JSON.parse(localStorage.getItem(storageKey) ?? "[]");
+              if (Array.isArray(saved)) delivered = saved.filter(id => typeof id === "string" && uuidPattern.test(id)).slice(-200);
+            } catch { /* The server receipt ID still permits Meta deduplication. */ }
+            if (delivered.includes(receipt.eventId)) return;
+          }
+          window.fbq!(env === "prd" && ["PageView", "ViewContent", "Contact", "AddToCart", "InitiateCheckout"].includes(name) ? "trackSingle" : "trackSingleCustom",
+            pixelId, metaEventName(name, env), nativeData, { eventID: receipt.eventId });
+          if (input.webProductMilestone) {
+            try { localStorage.setItem(storageKey, JSON.stringify([...delivered, receipt.eventId].slice(-200))); } catch { /* Optional browser dedup. */ }
+          }
+        };
+        if (input.webProductMilestone && typeof navigator !== "undefined" && navigator.locks) await navigator.locks.request(storageKey, send);
+        else send();
       }
     } catch { /* Tracking never blocks the customer journey. */ }
     finally { pending.delete(key); }
@@ -98,6 +117,36 @@ export function trackMetaBpm(name: string, input: { locale?: string; planId?: st
   const event = metaEventForBpm(name); if (!event) return;
   const p = input.properties ?? {};
   void trackMetaEvent(event, { locale: input.locale, planId: input.planId, value: input.valueAmount, currency: input.valueCurrency,
-    progress: p.progress, offer: p.offer, attemptId: p.attemptId, assessmentAttemptId: p.sessionId, stage: name.includes("checkout") ? "checkout" : name.includes("viewed") ? "results" : "assessment",
+    progress: p.progress, offer: p.offer, attemptId: p.attemptId, assessmentAttemptId: p.sessionId, stage: name === "healthscore_viewed" ? "healthscore" : name.includes("checkout") ? "checkout" : name.includes("viewed") ? "results" : "assessment",
     channel: p.journeyChannel ?? p.channel ?? journeyChannelForPath(location.pathname) });
+}
+
+export type WebProductMilestoneInput = {
+  planId: string; locale: Locale; revision: number; formulaVersion?: number; runId?: string | null;
+  selectedItemIds?: readonly string[]; candidateKey?: string | null; selectionRevision?: number | null;
+  value?: number; currency?: string;
+};
+const webMilestones = new Set<string>();
+/** Called by visible content or the explicit basket-confirm button, never by a polling response. */
+export function trackWebProductMilestone(stage: "formula" | "products" | "basket", input: WebProductMilestoneInput) {
+  const selectedItemIds = [...(input.selectedItemIds ?? [])].sort();
+  const identity = `${input.planId}:${input.revision}:${input.locale}:${stage}:${stage === "formula" ? input.formulaVersion ?? "" : input.runId ?? ""}:${stage === "basket" ? selectedItemIds.join(",") : ""}`;
+  if (!Number.isSafeInteger(input.revision) || input.revision < 0 || !uuidPattern.test(input.planId)
+    || stage === "formula" && (!Number.isSafeInteger(input.formulaVersion) || Number(input.formulaVersion) < 1)
+    || stage !== "formula" && !uuidPattern.test(input.runId ?? "") || stage === "basket" && !selectedItemIds.length) return Promise.resolve();
+  if (!webMilestones.has(identity)) {
+    webMilestones.add(identity);
+    trackBpmEvent(stage === "formula" ? "formula_details_viewed" : stage === "products" ? "product_matches_viewed" : "product_basket_confirmed", {
+      eventType: "funnel", planId: input.planId, locale: input.locale,
+      properties: { journeyChannel: "web", journeyVersion: "web-products-v1", revision: input.revision,
+        formulaVersion: input.formulaVersion, runId: input.runId, selectionRevision: input.selectionRevision, selectedItemCount: selectedItemIds.length }
+    });
+  }
+  return trackMetaEvent(stage === "basket" ? "AddToCart" : "ViewContent", {
+    planId: input.planId, locale: input.locale, channel: "web", stage, journey_version: "web-products-v1",
+    ...(stage === "basket" ? { purchase_type: "products" } : {}),
+    // Validation evidence is sent only to our capture endpoint, outside Meta custom_data.
+    webProductMilestone: { revision: input.revision, formulaVersion: input.formulaVersion, runId: input.runId, selectedItemIds,
+      candidateKey: input.candidateKey, selectionRevision: input.selectionRevision }
+  }, `web-products:${identity}`);
 }

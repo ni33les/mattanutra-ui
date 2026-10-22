@@ -15,6 +15,13 @@ const { GET: receipts, POST: browserEvent } = await import("../app/api/marketing
 assert.ok(process.env.TEST_DB_URL, "This integration test requires isolated PostgreSQL");
 
 describe("authoritative browser event receipts", () => {
+  const previousJourneyFlag = process.env.WEB_PRODUCT_JOURNEY_ENABLED;
+  // Preserve coverage for receipts issued by the historical paid-reveal offer.
+  before(() => { process.env.WEB_PRODUCT_JOURNEY_ENABLED = "0"; });
+  after(() => {
+    if (previousJourneyFlag === undefined) delete process.env.WEB_PRODUCT_JOURNEY_ENABLED;
+    else process.env.WEB_PRODUCT_JOURNEY_ENABLED = previousJourneyFlag;
+  });
   const contexts: string[] = [], plans: string[] = [], payments: string[] = [], retail: string[] = [], requestKeys: string[] = [];
   before(async () => {
     fixtureDatabaseUrl();

@@ -5,6 +5,7 @@ import { headers } from "next/headers";
 import { AssessmentFlow } from "@/components/assessment-flow";
 import { ChatQuestionnaire } from "@/components/chat-questionnaire/chat-questionnaire";
 import { ServiceIssue } from "@/components/service-issue";
+import { SiteFooter } from "@/components/site-footer";
 import { TitleBar } from "@/components/title-bar";
 import { checkDatabaseConnection } from "@/lib/db";
 import { devShortcutsEnabledForHost } from "@/lib/dev-shortcuts";
@@ -13,11 +14,13 @@ import { nutritionQuizPath } from "@/lib/nutrition-paths";
 import { getStoredAssessmentPrefill, isUuid } from "@/lib/assessment-store";
 import { getAssessmentResumeDraft } from "@/lib/assessment-resume-store";
 import { localizedRouteMetadata } from "@/lib/seo";
+import { isWebProductJourney, webProductJourneyEnabled } from "@/lib/web-product-journey";
+import styles from "./quiz-page.module.css";
 
 /**
- * Production quiz is the React ChatQuestionnaire (v6 schema + v14 UX/copy).
- * Source content lives in content/questionnaire/v6; the approved HTML under
- * content/questionnaire/v14 is a reference asset only (not served).
+ * ChatQuestionnaire exposes the native v15.5 screen flow and quiz welcome.
+ * Their content lives in content/questionnaire/v15-5 and quiz-start.json;
+ * HTML handoffs remain design references rather than served pages.
  *
  * Chat kill-switch: NEXT_PUBLIC_CHAT_QUESTIONNAIRE_V6=0 (falls back to AssessmentFlow).
  */
@@ -115,15 +118,17 @@ export default async function NutritionQuizPage({
 
   if (!databaseReady) {
     return (
-      <main className="mn-customer-shell mn-customer-shell--quiz flex min-h-screen flex-col bg-background text-foreground">
+      <div className="mn-customer-shell flex min-h-screen flex-col bg-background text-foreground">
         <TitleBar
           currentLocale={locale}
           currentPath={currentPath}
           title={dictionary.hero.eyebrow}
-          variant="quiz"
         />
-        <ServiceIssue href={currentPath} locale={locale} />
-      </main>
+        <main className="flex flex-1 flex-col">
+          <ServiceIssue href={currentPath} locale={locale} />
+        </main>
+        <SiteFooter content={dictionary.footer} currentPath={currentPath} locale={locale} />
+      </div>
     );
   }
 
@@ -145,47 +150,51 @@ export default async function NutritionQuizPage({
   const serverDraft = prefill ? { ...prefill, captured: true, paymentId: effectivePaymentId }
     : resumeDraft ? { ...resumeDraft, revision: 0, captured: false } : null;
   const useChat = chatQuestionnaireEnabled(locale);
+  const skipHealthScore = webProductJourneyEnabled() || isWebProductJourney(prefill?.journeyVersion);
 
-  // Quiz-focused shell (v14 HTML parity): compact titlebar (logo + site locale
-  // switcher only) and no site footer — full marketing chrome is on landing pages.
+  // Use the shared customer chrome around the native welcome/questionnaire flow.
   return (
-    <main className="mn-customer-shell mn-customer-shell--quiz flex min-h-screen flex-col bg-background text-foreground">
+    <div className={`${styles.page} mn-customer-shell flex min-h-screen flex-col bg-background text-foreground`}>
       <TitleBar
         currentLocale={locale}
         currentPath={currentPath}
         title={dictionary.hero.eyebrow}
-        variant="quiz"
       />
-      {useChat ? (
-        <ChatQuestionnaire
-          locale={locale}
-          sessionId={query.session || resumeDraft?.draftId || effectivePlanId || undefined}
-          serverDraft={serverDraft}
-          reviewRequested={query.reassessment === "1" || query.edit === "1"}
-          paymentId={effectivePaymentId || undefined}
-          returningPlanId={
-            resumeDraft?.planId ?? prefill?.planId ?? (returningPlanId || undefined)
-          }
-          resumeToken={resumeToken || undefined}
-          showDevShortcut={showDevShortcut}
-        />
-      ) : (
-        <AssessmentFlow
-          sessionId={query.session || resumeDraft?.draftId || undefined}
-          assessmentRevision={prefill?.revision ?? 0}
-          serverUpdatedAt={prefill?.updatedAt ?? resumeDraft?.updatedAt}
-          initialStage="quiz"
-          initialSectionIndex={resumeDraft?.sectionIndex}
-          locale={locale}
-          paymentId={effectivePaymentId || undefined}
-          prefillAnswers={prefill?.answers ?? resumeDraft?.answers ?? null}
-          prefillContactEmail={prefill?.contactEmail ?? resumeDraft?.contactEmail ?? null}
-          returningHealthScore={prefill?.healthScore ?? null}
-          returningPlanId={resumeDraft?.planId ?? prefill?.planId ?? undefined}
-          resumeToken={resumeToken || undefined}
-          showDevShortcut={showDevShortcut}
-        />
-      )}
-    </main>
+      <main className="flex flex-1 flex-col">
+        {useChat ? (
+          <ChatQuestionnaire
+            skipHealthScore={skipHealthScore}
+            locale={locale}
+            sessionId={query.session || resumeDraft?.draftId || effectivePlanId || undefined}
+            serverDraft={serverDraft}
+            reviewRequested={query.reassessment === "1" || query.edit === "1"}
+            paymentId={effectivePaymentId || undefined}
+            returningPlanId={
+              resumeDraft?.planId ?? prefill?.planId ?? (returningPlanId || undefined)
+            }
+            resumeToken={resumeToken || undefined}
+            showDevShortcut={showDevShortcut}
+          />
+        ) : (
+          <AssessmentFlow
+            skipHealthScore={skipHealthScore}
+            sessionId={query.session || resumeDraft?.draftId || undefined}
+            assessmentRevision={prefill?.revision ?? 0}
+            serverUpdatedAt={prefill?.updatedAt ?? resumeDraft?.updatedAt}
+            initialStage="quiz"
+            initialSectionIndex={resumeDraft?.sectionIndex}
+            locale={locale}
+            paymentId={effectivePaymentId || undefined}
+            prefillAnswers={prefill?.answers ?? resumeDraft?.answers ?? null}
+            prefillContactEmail={prefill?.contactEmail ?? resumeDraft?.contactEmail ?? null}
+            returningHealthScore={prefill?.healthScore ?? null}
+            returningPlanId={resumeDraft?.planId ?? prefill?.planId ?? undefined}
+            resumeToken={resumeToken || undefined}
+            showDevShortcut={showDevShortcut}
+          />
+        )}
+      </main>
+      <SiteFooter content={dictionary.footer} currentPath={currentPath} locale={locale} />
+    </div>
   );
 }

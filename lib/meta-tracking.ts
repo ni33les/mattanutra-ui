@@ -167,9 +167,18 @@ export async function enqueueMetaEvent(sql: Db, input: {
     matching=(case when ${changedIdentity} then matching - ${[...META_HASHED_MATCHING_FIELDS]}::text[] else matching end) || ${sql.json(hashed)},updated_at=now()
     where id=${input.context.id}::uuid and environment=${config.environment} and consent_granted and expires_at>now()`;
   const id = input.eventId && uuidPattern.test(input.eventId) ? input.eventId : randomUUID();
-  const data = metaCustomData(input.name, { ...input.context.attribution, ...input.data }, config.environment);
+  const planId = typeof input.data?.planId === "string" && uuidPattern.test(input.data.planId) ? input.data.planId : null;
+  const [journey] = planId ? await sql`select to_jsonb(a)->>'journey_version' as version from public.assessments a
+    where a.plan_id=${planId}::uuid and (${Boolean(input.resource)} or exists(select 1 from public.meta_tracking_bindings b
+      where b.resource_type='plan' and b.resource_id=a.plan_id::text and b.context_id=${input.context.id}::uuid))` : [];
+  const data = metaCustomData(input.name, { ...input.context.attribution, ...input.data,
+    ...(journey?.version === "web-products-v1" ? { journey_version: journey.version,
+      ...(input.name === "Lead" ? { stage: "assessment" } : {}) } : {}) }, config.environment);
   if (input.name === "Purchase" && (typeof data.value !== "number" || typeof data.currency !== "string")) throw new Error("Verified purchase amount and currency are required");
-  const sourceUrl = sanitiseMetaUrl(input.sourceUrl, config.environment) || sanitiseMetaUrl(`/${data.locale || "en"}/${input.name === "Purchase" ? "nutrition/payment/return" : "nutrition/healthscore"}`, config.environment);
+  const fallbackPage = input.name === "Purchase" ? "nutrition/payment/return"
+    : data.journey_version === "web-products-v1" && ["Lead", "QuizSubmitted", "EmailCapture"].includes(input.name)
+      ? "nutrition/quiz" : "nutrition/healthscore";
+  const sourceUrl = sanitiseMetaUrl(input.sourceUrl, config.environment) || sanitiseMetaUrl(`/${data.locale || "en"}/${fallbackPage}`, config.environment);
   const [inserted] = await sql<{ id: string }[]>`insert into public.meta_conversion_events
     (id,environment,pixel_id,event_name,source_key,context_id,source_url,custom_data,matching,occurred_at)
     values (${id}::uuid,${config.environment},${config.pixelId},${input.name},${input.sourceKey},${input.context.id}::uuid,

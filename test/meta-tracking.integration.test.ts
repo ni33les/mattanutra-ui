@@ -19,12 +19,18 @@ const { POST: savePreference } = await import("../app/api/marketing/consent/rout
 
 assert.ok(process.env.TEST_DB_URL, "This integration test requires isolated PostgreSQL");
 describe("preference-controlled, durable and isolated Meta delivery", () => {
+  const previousJourneyFlag = process.env.WEB_PRODUCT_JOURNEY_ENABLED;
+  // This suite retains legacy plan-purchase coverage alongside product payments.
+  after(() => {
+    if (previousJourneyFlag === undefined) delete process.env.WEB_PRODUCT_JOURNEY_ENABLED;
+    else process.env.WEB_PRODUCT_JOURNEY_ENABLED = previousJourneyFlag;
+  });
   const contexts: string[] = [], payments: string[] = [], retail: string[] = [], pharmacyOrders: string[] = [], requestKeys: string[] = [];
   const planId = randomUUID();
   before(async () => {
     fixtureDatabaseUrl();
     Object.assign(process.env, { DB_URL: process.env.TEST_DB_URL, MATTANUTRA_ENV: "dev", STRIPE_PAYMENT_MODE: "mock",
-      META_TRACKING_ENABLED: "true", FACEBOOK_PIXEL_ID_DEV: "123456789012345", FACEBOOK_CAPI_ACCESS_TOKEN_DEV: "fixture-not-a-real-token" });
+      WEB_PRODUCT_JOURNEY_ENABLED: "0", META_TRACKING_ENABLED: "true", FACEBOOK_PIXEL_ID_DEV: "123456789012345", FACEBOOK_CAPI_ACCESS_TOKEN_DEV: "fixture-not-a-real-token" });
     await getSql()!.unsafe(readFileSync(new URL("../scripts/meta-tracking-schema.sql", import.meta.url), "utf8"));
     await getSql()!`insert into public.assessments (plan_id,locale,answers,answer_summary,health_score)
       values (${planId}::uuid,'en','{}','{}','{}')`;
@@ -417,23 +423,29 @@ describe("preference-controlled, durable and isolated Meta delivery", () => {
     };
     await add("PageView",dimensions); await add("PageView",dimensions); await add("PageView",dimensions,"accepted",other.id);
     await add("Lead",dimensions); await add("InitiateCheckout",dimensions);
+    await add("ViewContent", { ...dimensions, funnel_stage: "formula" });
+    await add("ViewContent", { ...dimensions, funnel_stage: "formula" });
+    await add("ViewContent", { ...dimensions, funnel_stage: "products" });
+    await add("AddToCart", { ...dimensions, purchase_type: "products" });
+    await add("InitiateCheckout", { ...dimensions, purchase_type: "products" });
     await add("QuizSubmitted",dimensions,"accepted",other.id); // Retired submissions do not count as completed HealthScores.
     const sale = { ...dimensions, purchase_type: "plan", offer: "precision", value: 690, currency: "THB" };
     await add("Purchase",sale); await add("Purchase",sale,"retrying"); await add("Purchase",{...sale,offer:"pro",value:100,currency:"USD"},"rejected");
+    await add("Purchase", { ...dimensions, purchase_type: "products", value: 250, currency: "THB" });
     await add("Purchase",{...sale,campaign_id:"101",channel:"pharmacy",locale:"en",purchase_type:"products",offer:undefined,value:250},"accepted",other.id);
     await add("Purchase",{...sale,channel:"mcp_web",locale:"zh-CN",purchase_type:"products",offer:undefined},"suppressed");
     await add("Purchase",{value:690,currency:"THB"});
     await add("Purchase",sale,"accepted",c.id,"uat");
     await add("Purchase",sale,"accepted",c.id,"dev","2026-09-01T00:00:00Z");
     const report = await metaCampaignReport(sql,config,"2026-10-01T00:00:00Z");
-    assert.deepEqual(report.activity,[{campaignId:"100",adsetId:"200",adId:"300",channel:"web",locale:"th",visitors:2,starts:0,completions:1,checkouts:1,purchasingVisitors:1,purchaseRate:50}]);
-    const plan = report.sales.find(row=>row.channel==="web" && row.currency==="THB")!;
+    assert.deepEqual(report.activity,[{campaignId:"100",adsetId:"200",adId:"300",channel:"web",locale:"th",visitors:2,starts:0,completions:1,checkouts:1,purchasingVisitors:1,purchaseRate:50,formulaViews:1,productViews:1,baskets:1,productCheckouts:1,productPurchasingVisitors:1,productPurchaseRate:50}]);
+    const plan = report.sales.find(row=>row.channel==="web" && row.currency==="THB" && row.purchaseType==="plan")!;
     assert.equal(plan.purchases,2); assert.equal(plan.revenue,1380); assert.equal(plan.accepted,1); assert.equal(plan.pending,1); assert.equal(plan.failed,0);
     assert.equal(report.sales.find(row=>row.currency==="USD")!.revenue,100);
     assert.equal(report.sales.find(row=>row.channel==="retail")!.purchaseType,"products");
     assert.equal(report.sales.find(row=>row.channel==="mcp")!.failed,1);
     assert.equal(report.sales.find(row=>row.channel==="unknown")!.offer,"unknown");
-    assert.equal(report.sales.reduce((sum,row)=>sum+row.purchases,0),6);
+    assert.equal(report.sales.reduce((sum,row)=>sum+row.purchases,0),7);
     assert.equal(report.adsReportingConnected,false); assert.equal(report.limited,false);
     assert.doesNotMatch(JSON.stringify(report),/fb\.1|Fixture|client_ip|client_user|email|phone/);
   });

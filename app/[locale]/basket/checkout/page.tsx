@@ -17,6 +17,8 @@ import { nutritionRevealPath } from "@/lib/nutrition-paths";
 import { localizedRouteMetadata } from "@/lib/seo";
 import { stripePaymentConfig } from "@/lib/stripe-payment-config";
 import { stripePublishableKey } from "@/lib/stripe-payments";
+import webCopy from "@/content/checkout/web.json";
+import styles from "./checkout.module.css";
 
 type BasketCheckoutPageProps = Readonly<{
   params: Promise<{ locale: string }>;
@@ -141,7 +143,10 @@ export default async function BasketCheckoutPage({
   const selection = { recommendationRunId: query.run ?? null, candidateKey: query.option ?? null,
     assessmentRevision: query.revision ? Number(query.revision) : null, selectionRevision: query.selectionRevision ? Number(query.selectionRevision) : null };
   const dictionary = getDictionary(locale);
-  const labels = getNamespace<BasketCheckoutCopy>(locale, "customer.basketCheckout");
+  const labels = {
+    ...getNamespace<BasketCheckoutCopy>(locale, "customer.basketCheckout"),
+    ...(checkoutMode === "web" ? webCopy[locale] : {})
+  };
   const currentQuery = new URLSearchParams(Object.entries(query).filter((entry): entry is [string, string] => typeof entry[1] === "string"));
   const currentPath = `/${locale}/basket/checkout?${currentQuery}`;
   const selectedBasket = agenticBasket
@@ -152,23 +157,23 @@ export default async function BasketCheckoutPage({
         locale, selection
       );
   return (
-    <main className="mn-customer-shell flex min-h-screen flex-col bg-background text-foreground">
+    <main className={`mn-customer-shell flex min-h-screen flex-col bg-background text-foreground ${checkoutMode === "web" ? styles.page : ""}`}>
       <TitleBar
         currentLocale={locale}
         currentPath={currentPath}
         title={dictionary.hero.eyebrow}
       />
-      <section className="mx-auto w-full max-w-5xl flex-1 px-6 py-12 sm:px-8 lg:py-16">
+      <section className={checkoutMode === "web" ? styles.content : "mx-auto w-full max-w-5xl flex-1 px-6 py-12 sm:px-8 lg:py-16"}>
         {checkoutMode === "agentic" ? null : (
           <Link
-            className="mb-8 inline-flex items-center gap-2 text-sm font-semibold text-[var(--mn-teal-deep)]"
+            className={styles.back}
             href={nutritionRevealPath(locale, planId)}
           >
             <ArrowLeft aria-hidden className="size-4" />
             {labels.back}
           </Link>
         )}
-        <div className="mb-8 max-w-3xl">
+        <div className={checkoutMode === "web" ? styles.intro : "mb-8 max-w-3xl"}>
           <p className="mn-mono-label text-xs font-bold uppercase tracking-[0.18em] text-[var(--mn-teal-deep)]">
             {labels.eyebrow}
           </p>

@@ -56,7 +56,7 @@ try {
     const formulaVersion = existing ? Number(existing.version) : await insertFormulationVersion(sql, {
       planId: input.planId, generation, modelVersion: "browser-fixture", formulation: {
         supplementBreakdown: input.empty ? [] : [{ id: "vitamin-d", category: "vitamin", dailyDose: { [locale]: "1000 IU" }, effectivenessRank: 1,
-          rationale: { [locale]: "Fixture rationale" }, status: "add", supplement: { [locale]: "Vitamin D" } }],
+          rationale: { [locale]: input.rationale ?? "Fixture rationale" }, status: "add", supplement: { [locale]: "Vitamin D" } }],
         sectionStatuses: { supplements: "ready", foods: "ready" }, foodGuidance: []
       }
     });

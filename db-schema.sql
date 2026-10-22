@@ -7213,3 +7213,18 @@ create index if not exists tasks_funnel_generation_idx on public.tasks
   (plan_id, (payload #>> '{generation,revision}'), (payload #>> '{generation,locale}'),
    (payload #>> '{generation,generatorVersion}'), task_type, created_at desc)
   where task_type in ('analyze_healthscore', 'generate_supplement_guidance', 'generate_product_recommendations');
+
+-- Additive: historical assessments keep their original identity until resumed.
+alter table public.assessments add column if not exists journey_version text;
+alter table public.assessments add column if not exists acquisition_attribution jsonb;
+alter table public.assessments add column if not exists funnel_skip_healthscore boolean;
+
+create or replace function public.project_funnel_assessment_read() returns trigger language plpgsql as $$
+begin
+  new.funnel_skip_healthscore := coalesce(new.answers ? 'inStorePharmacy', false)
+    or coalesce(new.journey_version = 'web-products-v1', false);
+  return new;
+end $$;
+drop trigger if exists project_funnel_assessment_read on public.assessments;
+create trigger project_funnel_assessment_read before insert or update of answers, journey_version on public.assessments
+  for each row execute function public.project_funnel_assessment_read();

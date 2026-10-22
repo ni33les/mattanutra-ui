@@ -28,6 +28,7 @@ const forwardSchemaScripts = [
   "supplements:country-availability:schema:apply",
   "supplements:safety-limit-life-stages:schema:apply",
   "assessment:schema:apply",
+  "web-products:schema:apply",
   "foods:schema:apply",
   "recommendation-insights:schema:apply",
   "locales:schema:apply",

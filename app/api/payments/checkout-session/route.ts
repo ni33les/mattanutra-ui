@@ -1,3 +1,5 @@
+import { webProductJourneyEnabled } from "@/lib/web-product-journey";
+import { nutritionRevealPath, nutritionQuizPath } from "@/lib/nutrition-paths";
 import { FunnelError, funnelErrorResponse } from "@/lib/funnel-errors";
 import { NextResponse } from "next/server";
 import { isUuid } from "@/lib/assessment-store";
@@ -64,6 +66,10 @@ export async function POST(request: Request) {
       }
     );
   }
+
+  if (webProductJourneyEnabled()) return NextResponse.json({ code: "reveal_offer_retired",
+    message: "Recommendations are now free.", destination: planId ? nutritionRevealPath(locale, planId) : nutritionQuizPath(locale)
+  }, { status: 410, headers: { "Cache-Control": "no-store" } });
 
   try {
     log.info("Stripe checkout session requested", {

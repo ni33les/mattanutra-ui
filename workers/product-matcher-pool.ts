@@ -1,6 +1,7 @@
 import { resolve } from "node:path";
 import { Worker } from "node:worker_threads";
 import { ThreadPool } from "../lib/thread-pool.ts";
+import { timeRevealTaskStage } from "../lib/reveal-timing.ts";
 import { matcherSafetyCeilings, matcherSafetyCeilingsUnavailable } from "../lib/matcher/safety-ceilings.ts";
 import type { executeTaskWorkItem } from "../lib/task-execution.ts";
 import type { TaskWorkItem } from "../lib/task-work-items.ts";
@@ -26,6 +27,10 @@ export class ProductMatcherPool {
   }
 
   async match(workItem: ProductMatchWorkItem, signal?: AbortSignal, timeoutMs = 60_000) {
+    return timeRevealTaskStage("product_matching_dispatch", workItem, () => this.matchInternal(workItem, signal, timeoutMs));
+  }
+
+  private async matchInternal(workItem: ProductMatchWorkItem, signal?: AbortSignal, timeoutMs = 60_000) {
     if (workItem.catalogueRevision !== undefined) {
       if (!workItem.safetyReferenceIdentity) throw new Error("Safety reference identity is required for product matching work");
       await refreshAdminSafetyCeilings({ runtimeRevision: workItem.catalogueRevision });

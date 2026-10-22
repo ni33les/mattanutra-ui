@@ -6,6 +6,7 @@ import {
   matcherProductCoversNeed,
   recommendWithMatcher
 } from "../lib/matcher/adapters/web.ts";
+import { reduceSelectionCoverage } from "../lib/matcher/selection-coverage.ts";
 import { COVERAGE_SCALE } from "../lib/matcher/config.ts";
 import { setMatcherSafetyCeilings } from "../lib/matcher/safety-ceilings.ts";
 import type { MatcherProduct } from "../lib/matcher/types.ts";
@@ -277,6 +278,14 @@ describe("matcher web adapter coverage mapping", () => {
       )
     );
 
+    for (const option of result.diagnostics.matching?.options ?? []) {
+      assert.ok(option.coverageSnapshot, "every newly generated option stores contribution evidence");
+      const restored = reduceSelectionCoverage(JSON.parse(JSON.stringify(option.coverageSnapshot)), option.productIds);
+      assert.equal(restored.coveragePercent, option.coveragePercent, "frozen amounts reproduce the matcher coverage after JSON persistence");
+      if (option.candidateKey === result.diagnostics.matching?.selectedCandidateKey) {
+        assert.deepEqual(new Map(restored.needCoverage.map(row => [row.id, row.coveragePercent])), byNeed);
+      }
+    }
     assert.ok((byNeed.get("supplement:magnesium") ?? 0) >= 90);
     assert.ok((byNeed.get("supplement:omega-3") ?? 0) >= 90);
     assert.equal(

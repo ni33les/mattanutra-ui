@@ -1,3 +1,6 @@
+import { freezeSelectionCoverage } from "@/lib/matcher/freeze-selection-coverage";
+import { matcherNeedCoveragePercent, needSubjectIds } from "@/lib/matcher/selection-coverage";
+export { matcherNeedCoveragePercent } from "@/lib/matcher/selection-coverage";
 import { assessPreferences, verifiedPillLowerBound } from "@/lib/matcher/preferences";
 import { productContributionAvailability } from '@/lib/matcher/product-availability';
 import { administrationDailyPills } from "@/lib/product-administration";
@@ -161,44 +164,6 @@ function toMatcherProduct(candidate: ProductCandidate): MatcherProduct {
   matcherProductByCandidate.set(candidate, mapped);
 
   return mapped;
-}
-
-function needSubjectIds(need: ProductRecommendationNeed) {
-  const sourceId = need.sourceId?.trim();
-  const id = need.id?.trim();
-  const fromPrefixed = id?.includes(":")
-    ? id.slice(id.indexOf(":") + 1)
-    : null;
-  const raw = [need.normalizedName?.trim(), sourceId, id, fromPrefixed].filter(
-    Boolean
-  ) as string[];
-
-  return [
-    ...new Set(
-      raw.flatMap((value) => [
-        value,
-        value.replace(/-/g, "_"),
-        value.replace(/_/g, "-")
-      ])
-    )
-  ];
-}
-
-export function matcherNeedCoveragePercent(
-  coverageBySubject: ReadonlyMap<string, number> | undefined,
-  need: ProductRecommendationNeed
-) {
-  if (!coverageBySubject) {
-    return 0;
-  }
-
-  let units = 0;
-
-  for (const subjectId of needSubjectIds(need)) {
-    units = Math.max(units, coverageBySubject.get(subjectId) ?? 0);
-  }
-
-  return Math.max(0, Math.min(100, units / (COVERAGE_SCALE / 100)));
 }
 
 export function matcherProductCoversNeed(
@@ -612,6 +577,7 @@ function recommendPreparedWeb(input: ProductRecommendationInput, request: Canoni
       candidateKey: `webopt_${sha256Hex([...basket.variantIds].sort().join("|")).slice(0, 20)}`,
       productIds: [...basket.productIds], dailyServings: basket.productIds.map(id => servingMultiplierFromBasket(id, basket)),
       coveragePercent: marketingCoveragePercentFromNeedCoverage(needDiagnosticsFromBasket(supplementNeeds, basket)),
+      coverageSnapshot: freezeSelectionCoverage({ request, needs: supplementNeeds, products: compiled.catalog.products, basket }),
       priceMinor: basket.priceMinor,
       dailyPills,
       doseFit: basket.doseFit ?? null, advice,

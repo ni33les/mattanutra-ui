@@ -1,0 +1,24 @@
+.mn-web-recovery{position:relative;z-index:1;max-width:620px;margin:24px auto;padding:16px;text-align:center;color:var(--mn-ink-soft);line-height:1.6}
+.mn-web-recovery .mn-recovery-button{margin-top:12px}
+.mn-web-resume{position:relative;z-index:1;text-align:center;font-size:13px;margin:20px auto 0;max-width:650px}.mn-web-resume button,.mn-web-resume a{color:var(--mn-teal-deep);text-decoration:underline;cursor:pointer}.mn-web-resume a{overflow-wrap:anywhere}
+#mn-pharmacy-combined[data-channel=web] .mn-web-progress{display:flex;align-items:center;gap:12px;font-size:clamp(22px,2.3vw,28px);font-weight:600;line-height:1.35;color:var(--mn-ink)}
+#mn-pharmacy-combined[data-channel=web] .mn-web-progress-spinner{flex:none;width:1em;height:1em;color:var(--mn-teal);animation:mn-web-progress-spin 1s linear infinite}
+@keyframes mn-web-progress-spin{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){#mn-pharmacy-combined[data-channel=web] .mn-web-progress-spinner{animation:none}}
+#mn-pharmacy-combined[data-channel=web] .mn-products{width:min(960px,100% - 32px);margin:12px auto 24px;gap:20px}
+#mn-pharmacy-combined[data-channel=web] .mn-product{padding:18px 14px 14px}
+@media(max-width:520px){
+  #mn-pharmacy-combined[data-channel=web] .mn-products{width:calc(100% - 20px);gap:12px;margin-top:8px;margin-bottom:20px}
+  #mn-pharmacy-combined[data-channel=web] .mn-product{padding:14px 10px 10px}
+}
+#mn-pharmacy-combined[data-channel=web] .mn-web-ingredient-detail{font-size:12px;line-height:1.55;text-align:left;max-width:100%;overflow-wrap:anywhere}
+#mn-pharmacy-combined[data-channel=web] .mn-web-ingredient-detail>p{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;margin:8px 0}
+#mn-pharmacy-combined[data-channel=web] .mn-web-ingredient-detail details summary{cursor:pointer;color:var(--mn-green);font-weight:600;padding:6px 0}
+#mn-pharmacy-combined[data-channel=web] .mn-web-ingredient-detail details p{margin:8px 0}
+#mn-pharmacy-combined[data-channel=web] .mn-web-caution{border-left:2px solid var(--mn-gold);padding-left:8px}
+#mn-pharmacy-combined[data-channel=web] .mn-confirm-btn{text-align:center;text-decoration:none}
+#mn-pharmacy-combined[data-channel=web] .mn-web-coverage{font-size:14px;margin:18px auto}
+#mn-pharmacy-combined[data-channel=web] .mn-web-basket-impact{max-width:620px;margin:16px auto;padding:16px;border-radius:12px;background:var(--mn-bg);font-size:13px;line-height:1.6}
+#mn-pharmacy-combined[data-channel=web] .mn-web-basket-impact p+p{margin-top:8px}
+#mn-pharmacy-combined[data-channel=web] .mn-web-matching-advice{width:min(100%,700px);margin:24px auto}
+#mn-pharmacy-combined[data-channel=web] .mn-return-path .mn-read-now{margin:12px auto}

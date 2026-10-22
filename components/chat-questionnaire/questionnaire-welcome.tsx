@@ -1,8 +1,9 @@
 "use client";
 
 import Image from "next/image";
-import Link from "next/link";
+import { ArrowRight, Check, Clock3, ShieldCheck, Stethoscope } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
+import quizStartPack from "@/content/questionnaire/quiz-start.json";
 import welcomePack from "@/content/questionnaire/v6/welcome.json";
 import styles from "./questionnaire-welcome.module.css";
 
@@ -13,9 +14,29 @@ function welcomeKeyForLocale(locale: Locale): WelcomeLang {
   return locale === "zh-CN" ? "zh" : locale;
 }
 
+// Capture, recovery and review screens continue to use their existing copy pack.
 export function getWelcomeCopy(locale: Locale): WelcomeCopy {
   return welcomePack[welcomeKeyForLocale(locale)] as WelcomeCopy;
 }
+
+type QuizStartCopy = Readonly<{
+  eyebrow: string;
+  free: string;
+  headline: string;
+  headlineAccent: string;
+  lede: string;
+  cta: string;
+  duration: string;
+  obligation: string;
+  subscription: string;
+  physician: string;
+  products: string;
+  trustAria: string;
+  mascotAlt: string;
+  languageNotice: string;
+}>;
+
+const quizStartCopy: Readonly<Record<Locale, QuizStartCopy>> = quizStartPack;
 
 type QuestionnaireWelcomeProps = Readonly<{
   locale: Locale;
@@ -23,13 +44,13 @@ type QuestionnaireWelcomeProps = Readonly<{
   onDevFastForward?: () => void;
 }>;
 
-/** The existing TitleBar owns the logo and language switch, including journey parameters. */
+/** The route owns the standard platform header, locale switcher and footer. */
 export function QuestionnaireWelcome({
   locale,
   onStart,
   onDevFastForward
 }: QuestionnaireWelcomeProps) {
-  const copy = getWelcomeCopy(locale);
+  const copy = quizStartCopy[locale];
 
   return (
     <section
@@ -38,45 +59,57 @@ export function QuestionnaireWelcome({
       aria-labelledby="mn-quiz-welcome-title"
       data-testid="questionnaire-welcome"
     >
-      <div className={styles.hero}>
-        <Image
-          alt={copy.mascotAlt}
-          className={styles.mascot}
-          height={118}
-          width={118}
-          src="/assets/questionnaire/v15-5/nong-celebrate.webp"
-          priority
-          unoptimized
-        />
-        <p className={styles.eyebrow}>{copy.badge}</p>
-        <h1
-          id="mn-quiz-welcome-title"
-          className={styles.headline}
-          dangerouslySetInnerHTML={{ __html: copy.headlineHtml }}
-        />
-        <p className={styles.intro}>{copy.brandline}</p>
-        <p className={styles.science} dangerouslySetInnerHTML={{ __html: copy.ledeHtml }} />
-        <p className={styles.result}>{copy.result}</p>
-        <button
-          type="button"
-          className={styles.cta}
-          data-testid="questionnaire-welcome-cta"
-          onClick={onStart}
-        >
-          <span>{copy.cta}</span>
-          <span aria-hidden="true">→</span>
-        </button>
-        <div className={styles.commitment}>
-          <span>{copy.metaA}</span>
-          <span>{copy.metaB}</span>
-          <strong>{copy.free}</strong>
+      <div className={styles.screen}>
+        <div className={styles.leaves} aria-hidden="true">
+          <span />
+          <span />
+          <span />
         </div>
-        <p className={styles.privacy}>{copy.private}</p>
-        <div className={styles.trust} aria-label={copy.trustAria}>
-          {[copy.trust1, copy.trust2, copy.trust3].map((text) => <span key={text}>{text}</span>)}
+        <div className={styles.hero}>
+          <Image
+            alt={copy.mascotAlt}
+            className={styles.mascot}
+            height={270}
+            width={213}
+            src="/assets/questionnaire/v15-5/nong-celebrate.webp"
+            priority
+            unoptimized
+          />
+          <p className={styles.eyebrow}>
+            {copy.eyebrow} <strong>{copy.free}</strong>
+          </p>
+          <h1 id="mn-quiz-welcome-title" className={styles.headline}>
+            {copy.headline}
+            <em>{copy.headlineAccent}</em>
+          </h1>
+          <p className={styles.lede}>{copy.lede}</p>
+          <button
+            type="button"
+            className={styles.cta}
+            data-cta="start"
+            data-testid="questionnaire-welcome-cta"
+            onClick={onStart}
+          >
+            <span>{copy.cta}</span>
+            <ArrowRight aria-hidden="true" strokeWidth={2.3} />
+          </button>
+          <ul className={styles.promise}>
+            <li><Clock3 aria-hidden="true" /><span>{copy.duration}</span></li>
+            <li><Check aria-hidden="true" /><span>{copy.obligation}</span></li>
+            <li><Check aria-hidden="true" /><span>{copy.subscription}</span></li>
+          </ul>
+          <div className={styles.trust} aria-label={copy.trustAria}>
+            <span><Stethoscope aria-hidden="true" /><span>{copy.physician}</span></span>
+            <span><ShieldCheck aria-hidden="true" /><span>{copy.products}</span></span>
+          </div>
+          {copy.languageNotice ? (
+            <p className={styles.notice} role="status">{copy.languageNotice}</p>
+          ) : null}
         </div>
-        {locale === "zh-CN" ? <p className={styles.notice} role="status">{copy.zhNotice}</p> : null}
-        {onDevFastForward ? (
+        <span className={styles.scrollHint} aria-hidden="true" />
+      </div>
+      {onDevFastForward ? (
+        <div className={styles.devArea}>
           <button
             type="button"
             className={styles.dev}
@@ -85,22 +118,8 @@ export function QuestionnaireWelcome({
           >
             Fill questionnaire (DEV)
           </button>
-        ) : null}
-      </div>
-      <footer className={styles.footer}>
-        <p className={styles.availability}>
-          <strong>{copy.availNow}</strong> {copy.countries}
-          {" · "}<strong>{copy.availSoon}</strong> {copy.soon}
-        </p>
-        <div className={styles.legal}>
-          <p>{copy.legal}</p>
-          <span dangerouslySetInnerHTML={{ __html: copy.copyright }} />
         </div>
-        <nav className={styles.links} aria-label={copy.privacyFooterLink}>
-          <Link href={`/${locale}/privacy`}>{copy.privacyFooterLink}</Link>
-          <Link href={`/${locale}/terms`}>{copy.termsLink}</Link>
-        </nav>
-      </footer>
+      ) : null}
     </section>
   );
 }

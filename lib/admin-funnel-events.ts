@@ -56,16 +56,20 @@ export function funnelBpmSource(sql: postgres.Sql) {
       and nullif(b.properties->>'seedName', '') is null
       and coalesce(b.properties->>'mocked', 'false') <> 'true'
       and coalesce(b.properties->>'paymentSkipped', 'false') <> 'true'
+      and coalesce(b.properties->>'internal_test', 'false') not in ('true','1')
+      and coalesce(b.properties->>'stripeMode', 'live') not in ('test','mock')
   ) bpm`;
 }
 
 export const webEntryEventNames = [
   "home_viewed", "blog_article_viewed", "library_article_viewed", "web_page_viewed",
   "assessment_viewed", "healthscore_page_viewed", "healthscore_viewed",
-  "formulation_page_viewed", "retail_product_checkout_viewed", "order_tracking_viewed"
+  "formulation_page_viewed", "reveal_page_viewed", "retail_product_checkout_viewed", "order_tracking_viewed"
 ] as const;
 
 export const webJourneyEventNames = [...webEntryEventNames,
+      "web_processing_viewed", "formula_details_viewed", "product_matches_viewed", "product_basket_confirmed",
+      "web_generation_failed", "web_generation_retried",
       "assessment_started", "assessment_submitted", "assessment_captured", "assessment_recaptured",
       "chat_channel_clicked", "formulation_ready", "free_email_requested", "free_email_sent", "product_clicked", "plan_selected",
       "retail_customer_order_created", "retail_delivery_details_confirmed", "retail_order_awaiting_stock", "retail_order_cancelled",

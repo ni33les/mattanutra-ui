@@ -1,3 +1,5 @@
+import { isWebProductJourney } from "@/lib/web-product-journey";
+import { adoptWebProductJourney } from "@/lib/web-product-journey-adoption";
 import { recoverMissingFunnelGeneration } from "@/lib/funnel-generation-recovery";
 import { getSql, withDatabaseTransaction } from "@/lib/db";
 import { getFunnelReadiness } from "@/lib/funnel-readiness";
@@ -14,10 +16,11 @@ import { preparePaymentFulfillment } from "@/lib/payment-fulfillment-evidence";
 export async function recoverFunnelWork(planId: string, locale: unknown, refreshOnly = false) {
   if (!isUuid(planId) || !isLocale(locale)) throw new FunnelError("Invalid assessment request", 400, "invalid_request");
   const sql = getSql(); if (!sql) throw new Error("Database is not configured");
+  await adoptWebProductJourney(planId);
   const [legacy] = await sql<PaymentRow[]>`select * from public.payments where plan_id = ${planId}::uuid
     and paid_at is not null and status = 'fulfillment_failed' order by created_at desc limit 1`;
   if (legacy?.stripe_checkout_session_id) await fulfillCheckoutSession(legacy.stripe_checkout_session_id, { source: "return_page" });
-  const [assessment] = await sql`select selected_plan from public.assessments where plan_id = ${planId}::uuid`;
+  const [assessment] = await sql`select selected_plan, journey_version from public.assessments where plan_id = ${planId}::uuid`;
   if (!assessment) throw new FunnelError("Assessment not found", 404, "assessment_not_found");
   const generation = await loadGenerationInput(sql, planId, locale);
   if (!generation) throw new FunnelError("Assessment changed; please retry", 409, "assessment_changed");
@@ -30,14 +33,14 @@ export async function recoverFunnelWork(planId: string, locale: unknown, refresh
     }
     if (!refreshOnly) {
       await enqueueHealthScoreAnalysisTask({ planId, locale });
-      if (assessment.selected_plan) await enqueueNutritionPlanTasks({ planId, plan: assessment.selected_plan, answers: generation.answers, locale, recovery: generation });
+      if (assessment.selected_plan || isWebProductJourney(assessment.journey_version)) await enqueueNutritionPlanTasks({ planId, plan: assessment.selected_plan ?? "precision", answers: generation.answers, locale, recovery: generation, accessOnly: isWebProductJourney(assessment.journey_version) });
       else if (payment) await enqueueAssessmentPregenerationTasks({ planId, answers: generation.answers, locale });
     }
-    if (assessment.selected_plan) await ensureFreshProductRecommendationsForReveal(planId);
+    if (assessment.selected_plan || isWebProductJourney(assessment.journey_version)) await ensureFreshProductRecommendationsForReveal(planId);
   });
   const readiness = await getFunnelReadiness(planId, locale);
   if (refreshOnly && readiness) await recoverMissingFunnelGeneration({ planId, locale,
     healthScoreMissing: !readiness.copyReady && !readiness.copyFailed,
-    formulationMissing: readiness.hasPaidPlan && readiness.fulfillmentStatus === "complete" && readiness.formulationStatus === "pending" });
+    formulationMissing: readiness.hasFullPlanAccess && (isWebProductJourney(readiness.journeyVersion) || readiness.fulfillmentStatus === "complete") && readiness.formulationStatus === "pending" });
   return readiness;
 }

@@ -104,7 +104,7 @@ describe("ttf ws2 Thai questionnaire port", () => {
     );
   });
 
-  it("ships the Thai questionnaire OG card and SEO title", () => {
+  it("keeps the Thai questionnaire OG card with the current landing SEO copy", () => {
     const publicOg = new URL("../public/assets/og/mattanutra-questionnaire-th.jpg", import.meta.url);
     const handoffOg = new URL("assets/og/mattanutra-questionnaire-th.jpg", handoffRoot);
     assert.ok(existsSync(publicOg));
@@ -117,11 +117,11 @@ describe("ttf ws2 Thai questionnaire port", () => {
     );
     assert.equal(
       t("th", "seo.routes.nutritionQuiz.title"),
-      "แบบประเมินสูตรปริมาณที่พอดี · MattaNutra"
+      "เริ่มรับแผนอาหารเสริมเฉพาะคุณ ฟรี | MattaNutra"
     );
     assert.equal(
       t("th", "seo.routes.nutritionQuiz.description"),
-      "แบบประเมินอาหารเสริมเฉพาะบุคคลของ MattaNutra ตอบตามความเป็นจริงเพื่อเพิ่มความแม่นยำและความปลอดภัยให้สูตรปริมาณที่พอดีของคุณ"
+      "รู้ว่าอะไรควรกิน และอะไรไม่จำเป็น ตอบคำถามสั้น ๆ 6 ส่วน ใช้เวลาประมาณ 5 นาที แล้วดูแผนเฉพาะคุณได้ทันทีเมื่อทำเสร็จ"
     );
   });
 

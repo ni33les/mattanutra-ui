@@ -53,7 +53,7 @@ export function JourneyProgress({ initial, locale, planId }: JourneyProgressProp
 
   return (
     <section>
-    {current.hasPaidPlan ? <p className="pt-6 text-center text-sm font-semibold text-[var(--mn-teal-deep)]" data-testid="payment-confirmed">
+    {current.hasConfirmedPlanPayment ? <p className="pt-6 text-center text-sm font-semibold text-[var(--mn-teal-deep)]" data-testid="payment-confirmed">
       {locale === "th" ? "ยืนยันการชำระเงินแล้ว" : locale === "zh-CN" ? "付款已确认" : "Payment confirmed"}
     </p> : null}
     <CalculatingWait copy={{ body: labels.body, disclaimer: support.calcDisclaimer,

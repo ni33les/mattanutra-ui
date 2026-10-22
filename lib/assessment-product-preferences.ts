@@ -32,7 +32,7 @@ export function requireCurrentProductSelection(input: Readonly<{ expectedAssessm
       (input.candidateKey && !input.availableCandidateKeys.includes(input.candidateKey))) {
     throw new FunnelError("Product options changed. Reload and confirm the current basket.", 409, "stale_product_selection");
   }
-  if (!input.selectedIds.length || new Set(input.selectedIds).size !== new Set(input.allowedIds).size || input.selectedIds.some(id => !input.allowedIds.includes(id) || input.excludedIds.includes(id))) {
-    throw new FunnelError("Selected products do not belong to the current option. Replan after excluding a product.", 409, "invalid_product_selection");
+  if (!input.selectedIds.length || new Set(input.selectedIds).size !== input.selectedIds.length || input.selectedIds.some(id => !input.allowedIds.includes(id) || input.excludedIds.includes(id))) {
+    throw new FunnelError("Select unique products from the current option. Replan after excluding a product.", 409, "invalid_product_selection");
   }
 }

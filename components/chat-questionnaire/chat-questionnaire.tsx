@@ -126,6 +126,7 @@ export function LegacyChatQuestionnaire({
   const logScrollRef = useRef<HTMLDivElement | null>(null);
   const composerRef = useRef<HTMLDivElement | null>(null);
   const finalizing = useRef(false);
+  const captureInFlight = useRef(false);
 
   const [uiScreen, setUiScreen] = useState<UiScreen>(pharmacyId ? "chat" : "welcome");
   const [state, setState] = useState<QuestionnaireState | null>(null);
@@ -506,11 +507,14 @@ export function LegacyChatQuestionnaire({
   }, [locale, showStageOverlay, state]);
 
   const finalize = useCallback(async (completed: QuestionnaireState) => {
-    if (!pharmacyId) runLeafBurst(10);
+    if (captureInFlight.current) return;
+    captureInFlight.current = true;
+    if (!skipHealthScoreStep) runLeafBurst(10);
     setUiScreen("calculating"); setProcessingError("");
     saveLocalState(locale, completed);
-    await runCapture(completed);
-  }, [runCapture, locale, saveLocalState, pharmacyId]);
+    try { await runCapture(completed); }
+    finally { captureInFlight.current = false; }
+  }, [runCapture, locale, saveLocalState, skipHealthScoreStep]);
 
   function retryPharmacyCapture() {
     if (state) void finalize(state);
@@ -542,7 +546,7 @@ export function LegacyChatQuestionnaire({
       if (next.phase === "complete" && !finalizing.current) {
         finalizing.current = true;
         // Match HTML finish() stage before calculating / done screen.
-        await showFinishStage();
+        if (pharmacyId || !skipHealthScoreStep) await showFinishStage();
         await finalize(next);
       }
     },
@@ -551,6 +555,8 @@ export function LegacyChatQuestionnaire({
       persistCheckpoint,
       showFinishStage,
       showStageFlash,
+      pharmacyId,
+      skipHealthScoreStep,
       closeQuestionDisplay,
       track
     ]
@@ -1403,7 +1409,7 @@ export function LegacyChatQuestionnaire({
     );
   }
 
-  if (uiScreen === "calculating" && !pharmacyId) {
+  if (uiScreen === "calculating" && !skipHealthScoreStep) {
     return (
       <QuestionnaireCalculating
         locale={locale}
@@ -1462,7 +1468,7 @@ export function LegacyChatQuestionnaire({
             type="button"
             className="mn-chat-q__review-btn"
             data-testid="review-answers-btn"
-            disabled={Boolean(stageFlash || (pharmacyId && uiScreen === "calculating"))}
+            disabled={Boolean(stageFlash || (skipHealthScoreStep && uiScreen === "calculating"))}
             onClick={() => setReviewOpen(true)}
             aria-haspopup="dialog"
           >
@@ -1497,9 +1503,9 @@ export function LegacyChatQuestionnaire({
             ref={composerRef}
             data-testid="question-answers"
           >
-            <div className="mn-chat-q__composer-inner">{renderComposer()}{pharmacyId && uiScreen === "calculating" && (
-              <div data-testid="pharmacy-capture-status" role={calcStatus === "error" ? "alert" : "status"}>
-                {calcStatus === "error" ? pharmacyCopy[locale].error : combinedCopy[locale].saving}
+            <div className="mn-chat-q__composer-inner">{renderComposer()}{skipHealthScoreStep && uiScreen === "calculating" && (
+              <div data-testid={pharmacyId ? "pharmacy-capture-status" : "questionnaire-capture-status"} role={calcStatus === "error" ? "alert" : "status"}>
+                {calcStatus === "error" ? pharmacyCopy[locale].error : <button type="button" className="mn-chat-q__primary" disabled aria-busy="true">{combinedCopy[locale].saving}</button>}
                 {calcStatus === "error" && state && <button type="button" className="mn-primary-button" onClick={retryPharmacyCapture}>{pharmacyCopy[locale].retry}</button>}
               </div>
             )}</div>

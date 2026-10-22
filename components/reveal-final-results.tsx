@@ -1,5 +1,8 @@
 "use client";
-import { trackMetaEvent } from "@/lib/meta-client";
+import { trackWebProductMilestone } from "@/lib/meta-client";
+import { reduceSelectionCoverage } from "@/lib/matcher/selection-coverage";
+import { webProductCopy } from "@/components/nutrition-flow/web-product-copy";
+import { useVisibleWebMilestones } from "@/components/nutrition-flow/use-visible-web-milestones";
 
 import type { ReactNode } from "react";
 import { pharmacyCopy } from "@/lib/pharmacy-copy";
@@ -81,6 +84,7 @@ import { organisationDispatchCity } from "@/lib/organisation-dispatch";
 type PharmacyRevealContext = Readonly<{ name: string; orderPanel: ReactNode; planHref: string; quizHref: string }>;
 
 type RevealFinalResultsPageProps = Readonly<{
+  commerce?: boolean;
   activeProductRecommendations?: FormulationResult["productRecommendations"];
   formattedDate: string;
   ingredients: FormulationIngredient[];
@@ -434,6 +438,7 @@ function fallbackDecisionCopy(
 }
 
 export function RevealFinalResultsPage({
+  commerce = false,
   activeProductRecommendations,
   formattedDate,
   ingredients,
@@ -454,6 +459,10 @@ export function RevealFinalResultsPage({
   unlockHref,
   pharmacy,
 }: RevealFinalResultsPageProps) {
+  const pageRoot = useRef<HTMLElement>(null);
+  useVisibleWebMilestones(pageRoot, { enabled: commerce && !isPreview, planId, locale,
+    revision: result.assessmentRevision ?? 0, formulaVersion: result.formulaVersion,
+    runId: productCoveragePending ? undefined : activeProductRecommendations?.runId });
   const copy = revealCopy[locale];
   const finalCopy = revealFinalCopy[locale];
   const visibleIngredients = visibleFormulaIngredients(ingredients);
@@ -491,9 +500,10 @@ export function RevealFinalResultsPage({
       : activeProductRecommendations?.needCoverage ?? [];
 
   return (
-    <section className="mn-reveal-final mn-reveal-font-body w-full">
+    <section ref={pageRoot} className={`mn-reveal-final mn-reveal-font-body w-full${commerce ? " mn-reveal-final--commerce" : ""}`}>
       <LandingReveal />
 
+      {!commerce && <>
       <section
         aria-label={copy.heroTitle}
         className="relative flex min-h-[calc(100vh-70px)] items-center justify-center overflow-hidden px-5 py-20 pb-32 text-center sm:px-8 lg:px-14"
@@ -618,6 +628,7 @@ export function RevealFinalResultsPage({
         result={result}
         supplementSelectedCount={supplementSelectedCount}
       />
+      </>}
 
       {isPreview ? (
         <div className="mn-reveal-final-wrap">
@@ -626,6 +637,7 @@ export function RevealFinalResultsPage({
       ) : null}
 
       <RevealFormulaFinalSection
+        expanded={commerce}
         activeProductRecommendations={activeProductRecommendations}
         catalogueSupplementCount={catalogueSupplementCount}
         copy={copy}
@@ -657,6 +669,11 @@ export function RevealFinalResultsPage({
         supplementSelectedCount={supplementSelectedCount}
       />
 
+      {commerce && <nav className="mn-reveal-final-wrap flex flex-wrap justify-center gap-6 border-t border-[var(--mn-line)] px-6 py-10" aria-label={webProductCopy[locale].deeper}>
+        <a className="underline" href={`/${locale}/nutrition/healthscore?plan=${encodeURIComponent(planId)}&view=optional`}>{webProductCopy[locale].health}</a>
+        <a className="underline" href={`/${locale}/nutrition/plan?plan=${encodeURIComponent(planId)}`}>{webProductCopy[locale].plan}</a>
+      </nav>}
+      {!commerce && <>
       {!pharmacy && <KhunDreamSection finalCopy={finalCopy} />}
 
       <RevealFoodSupportFinalSection
@@ -693,6 +710,7 @@ export function RevealFinalResultsPage({
         planId={planId}
         result={result}
       />
+      </>}
     </section>
   );
 }
@@ -861,6 +879,7 @@ function RevealDistillationSection({
 }
 
 function RevealFormulaFinalSection({
+  expanded = false,
   activeProductRecommendations,
   catalogueSupplementCount,
   copy,
@@ -872,6 +891,7 @@ function RevealFormulaFinalSection({
   productCoveragePending,
   result,
 }: Readonly<{
+  expanded?: boolean;
   activeProductRecommendations?: FormulationResult["productRecommendations"];
   catalogueSupplementCount: number;
   copy: typeof revealCopy.en;
@@ -1039,6 +1059,7 @@ function RevealFormulaFinalSection({
                     <input
                       aria-label={`${supplement} ${finalCopy.nutrientWhy}`}
                       className="nutrient-toggle"
+                      defaultChecked={expanded}
                       id={toggleId}
                       type="checkbox"
                     />
@@ -1297,24 +1318,17 @@ function RevealProductsFinalSection({
       ?.currency ??
     selectedBasketProducts[0]?.price?.currency ??
     "THB";
-  const selectedBasketCoverage = Math.min(
-    100,
-    Math.max(
-      0,
-      selectedBasketProducts.length === products.length
-        ? selectedCoverage
-        : selectedBasketProducts.reduce(
-            (total, product) => total + (product.stackContributionPercent ?? 0),
-            0,
-          ) || (selectedBasketProducts.length > 0 ? selectedCoverage : 0),
-    ),
-  );
   const selectedBasketIdList = selectedBasketProducts.map(
     (product) => product.productId ?? product.id,
   );
   const removedBasketIdList = removedBasketProducts.map(
     (product) => product.productId ?? product.id,
   );
+  const subsetCoverage = reduceSelectionCoverage(selectedMatchingOption?.coverageSnapshot, selectedBasketIdList);
+  const basketChanged = removedBasketIdList.length > 0;
+  const selectedBasketCoverage = !basketChanged ? selectedCoverage : subsetCoverage.coveragePercent;
+  const basketCopy = webProductCopy[locale];
+  const reducedNeeds = subsetCoverage.needCoverage.filter(need => subsetCoverage.removedNeedIds.includes(need.id));
   async function replanProducts(clear = false, expand = false) {
     setReplanning(true); setReplanError(null);
     try {
@@ -1336,7 +1350,7 @@ function RevealProductsFinalSection({
   const awaitingReplan = replanning || (requestedSelectionRevision != null &&
     (Number(result.selectionRevision ?? 0) < requestedSelectionRevision || productCoveragePending));
   const basketCheckoutHref =
-    selectedBasketIdList.length > 0 && removedBasketIdList.length === 0 && !awaitingReplan
+    selectedBasketIdList.length > 0 && !awaitingReplan && !productCoveragePending
       ? (() => {
           const params = new URLSearchParams({
             plan: planId,
@@ -1373,9 +1387,9 @@ function RevealProductsFinalSection({
   const coveredProductNeedCount = Math.min(
     Math.max(
       0,
-      formulaNeeds > 0
-        ? coveredRevealNeedCount(needCoverage)
-        : productCoveredNeedCount(products),
+      basketChanged
+        ? subsetCoverage.status === "verified" ? coveredRevealNeedCount(subsetCoverage.needCoverage) : productCoveredNeedCount(selectedBasketProducts)
+        : formulaNeeds > 0 ? coveredRevealNeedCount(needCoverage) : productCoveredNeedCount(products),
     ),
     Math.max(0, supplementSelectedCount, productNeedCount),
   );
@@ -1768,9 +1782,6 @@ function RevealProductsFinalSection({
                     {!pharmacy && <button
                       className="product-remove-btn mt-6 w-fit rounded-full border border-[var(--mn-line)] bg-transparent px-3.5 py-1.5 mn-reveal-font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--mn-ink-soft)] transition hover:border-[var(--mn-reveal-caution-edge)] hover:bg-[var(--mn-reveal-caution-bg)] hover:text-[var(--mn-reveal-caution-ink)]"
                       onClick={() => {
-                        if (!selected) void trackMetaEvent("AddToCart", { planId, locale, purchase_type: "products", stage: "basket",
-                          value: product.price?.amount ?? product.retailer?.unitPriceAmount,
-                          currency: product.price?.currency ?? selectedBasketCurrency }, `basket-add:${crypto.randomUUID()}`);
                         updateSelectedBasketIds((current) => {
                           const next = new Set(current);
                           if (selected) {
@@ -1792,12 +1803,18 @@ function RevealProductsFinalSection({
           </div>
         )}
 
+        {basketChanged && <div role="status" data-testid="basket-selection-impact" className="mt-6 rounded-xl border border-[var(--mn-line)] bg-[var(--mn-paper)] p-5 text-sm leading-6">
+          <p>{subsetCoverage.status === "verified" ? basketCopy.subset : basketCopy.unknownCoverage}</p>
+          {reducedNeeds.length > 0 && <ul className="mt-2 list-disc pl-5">{reducedNeeds.map(need => <li key={need.id}>{getLocalizedText(need.displayName, locale)}</li>)}</ul>}
+          {selectedBasketIdList.length === 0 && <p className="mt-2">{basketCopy.empty}</p>}
+        </div>}
+
         <div className="summary-card mt-9 rounded-2xl border border-[var(--mn-line)] bg-[var(--mn-paper)] px-8 py-8 text-[var(--mn-ink)]" data-reveal>
           <div className="mb-7 h-1.5 overflow-hidden rounded-full bg-[var(--mn-line)]/40">
             <div
               className="h-full rounded-full bg-linear-to-r from-[var(--mn-teal)] to-[var(--mn-teal-deep)] transition-[width] duration-1000"
               style={{
-                width: `${Math.min(100, Math.max(0, selectedBasketCoverage))}%`,
+                width: selectedBasketCoverage === null ? "0%" : `${Math.min(100, Math.max(0, selectedBasketCoverage))}%`,
               }}
             />
           </div>
@@ -1834,7 +1851,7 @@ function RevealProductsFinalSection({
             </div>
             <div className="group relative text-center">
               <p className="mn-reveal-font-display text-[32px] font-medium italic leading-none text-[var(--mn-teal-deep)]">
-                <CountUpNumber active={true} value={Math.ceil(selectedBasketCoverage)} />%
+                {selectedBasketCoverage === null ? "—" : <><CountUpNumber active={true} value={Math.ceil(selectedBasketCoverage)} />%</>}
               </p>
               <p className="mt-2 inline-flex items-center gap-1 mn-reveal-font-mono text-[10px] uppercase tracking-[0.14em] text-[var(--mn-ash)]">
                 {finalCopy.formulaMatch}
@@ -1862,8 +1879,8 @@ function RevealProductsFinalSection({
             </p>
           </div>
           {selectedBasketIdList.length > 0 ? (
-            <Link aria-disabled={!basketCheckoutHref} className="mn-reveal-final-button" href={basketCheckoutHref || "#"} onClick={event => { if (!basketCheckoutHref) event.preventDefault(); else void trackMetaEvent("AddToCart", { planId, locale, purchase_type: "products", stage: "basket", value: selectedBasketSubtotal, currency: selectedBasketCurrency }, `basket-confirm:${crypto.randomUUID()}`); }}>
-              {finalCopy.checkout}
+            <Link aria-disabled={!basketCheckoutHref} className="mn-reveal-final-button" href={basketCheckoutHref || "#"} onClick={event => { if (!basketCheckoutHref) event.preventDefault(); else void trackWebProductMilestone("basket", { planId, locale, revision: result.assessmentRevision ?? 0, runId: activeProductRecommendations?.runId, selectedItemIds: selectedBasketIdList, candidateKey: matching?.selectedCandidateKey, selectionRevision: result.selectionRevision }); }}>
+              {basketCopy.continue}
             </Link>
           ) : (
             <button

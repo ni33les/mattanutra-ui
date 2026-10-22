@@ -1,4 +1,5 @@
 import Image from "next/image";
+import { webProductJourneyEnabled } from "@/lib/web-product-journey";
 import Link from "next/link";
 import {
   ArrowRight,
@@ -114,6 +115,7 @@ export function LandingPage({
   testimonials,
 }: LandingPageProps) {
   const copy = content[locale];
+  const commerce = webProductJourneyEnabled();
   const libraryCopy = getLibraryCopy(locale);
   const libraryCategories = getLibraryCategories(locale);
   const landingLibraryCategories = ([
@@ -364,6 +366,7 @@ export function LandingPage({
       </section>
 
       <section id="living-protocol">
+        {!commerce && <>
         <div className="relative overflow-hidden border-b border-[var(--mn-line)] bg-[var(--mn-cream)]">
           <div className="mn-v15-glow mn-v15-glow--protocol" />
           <div className="mn-v15-container relative z-[1] grid items-center gap-14 py-20 lg:grid-cols-2 lg:py-24">
@@ -492,6 +495,7 @@ export function LandingPage({
           </div>
         </div>
 
+        </>}
         <div className="mn-v15-section border-y border-[var(--mn-sand-deep)] bg-[var(--mn-sand-soft)]">
           <div className="mn-v15-container">
             <div className="grid items-center gap-12 lg:grid-cols-2 lg:gap-16" data-reveal>
@@ -552,7 +556,7 @@ export function LandingPage({
           </div>
         </div>
 
-        <div className="mn-v15-difference">
+        {!commerce && <div className="mn-v15-difference">
           <div className="mx-auto max-w-3xl px-7" data-reveal>
             <p className="mn-v15-badge mn-v15-badge--dark">
               {copy.difference.eyebrow}
@@ -575,6 +579,7 @@ export function LandingPage({
           </div>
         </div>
 
+        }
         <div className="mn-v15-bridge">
           <div className="mx-auto max-w-3xl px-7 text-center" data-reveal>
             <h2>{copy.bridge.title}</h2>

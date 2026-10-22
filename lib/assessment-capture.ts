@@ -1,3 +1,6 @@
+import { getFunnelReadiness } from "@/lib/funnel-readiness";
+import { normalizeJourneyAttribution } from "@/lib/journey-attribution";
+import { WEB_PRODUCT_JOURNEY_VERSION, isWebProductJourney, webProductJourneyEnabled } from "@/lib/web-product-journey";
 import { bindMetaContext, recordMetaPlanMilestone } from "@/lib/meta-tracking";
 import { effectiveQuestionnaireAnswers, questionnaireChannel } from "@/lib/web-purchase-preferences";
 import type { QuestionnaireChannel } from "@/lib/questionnaire/types";
@@ -25,10 +28,13 @@ import { bindPaidReservationToAssessment } from "@/lib/stripe-payments";
 import { enqueueAssessmentPregenerationTasks, enqueueNutritionPlanTasks, scheduleReassessmentAction } from "@/lib/task-worker";
 import { cachedEvaluatedIngredientCatalogueCount } from "@/lib/supplement-catalogue-count";
 import { bpmContextFromBody, writeBpmEvent } from "@/lib/bpm";
+import { timeRevealStage, timeRevealStageSync, type RevealTimingContext } from "@/lib/reveal-timing";
 
 export type CaptureReceipt = AssessmentSnapshot & {
-  revision: number; inputHash: string; firstName: string | null; generationStatus: "pending";
+  revision: number; inputHash: string; firstName: string | null; generationStatus: "pending" | "ready" | "failed";
+  formulaReady: boolean; productsReady: boolean;
   paymentId: string | null; taskIds: unknown;
+  journeyVersion: string | null; hasFullPlanAccess: boolean; hasConfirmedPlanPayment: boolean; skipHealthScore: boolean;
 };
 
 function record(value: unknown): Record<string, unknown> {
@@ -74,6 +80,16 @@ export function validateCaptureAnswers(value: unknown, channel: QuestionnaireCha
 
 /** Shared HTTP and server-coordinator capture. The receipt, revision, binding and jobs commit together. */
 export async function captureAssessment(bodyValue: unknown, options: { planId?: string | null; idempotencyKey: string; request?: Request }): Promise<CaptureReceipt> {
+  const timing: RevealTimingContext = { planId: options.planId };
+  return timeRevealStage("capture", timing, async () => {
+    const receipt = await captureAssessmentInternal(bodyValue, options, timing);
+    timing.planId = receipt.planId;
+    timing.revision = receipt.revision;
+    return receipt;
+  });
+}
+
+async function captureAssessmentInternal(bodyValue: unknown, options: { planId?: string | null; idempotencyKey: string; request?: Request }, timing: RevealTimingContext): Promise<CaptureReceipt> {
   const body = record(bodyValue);
   if (body.intent === "process") throw new FunnelError("Payment is required before plan processing", 402, "payment_required");
   if (!isLocale(body.locale)) throw new FunnelError("Invalid assessment locale", 400, "invalid_locale");
@@ -99,25 +115,32 @@ export async function captureAssessment(bodyValue: unknown, options: { planId?: 
   const fallbackRay = `${rayHash.slice(0,8)}-${rayHash.slice(8,12)}-5${rayHash.slice(13,16)}-a${rayHash.slice(17,20)}-${rayHash.slice(20,32)}`;
   let acquisition = pharmacy ? resolvePharmacyAcquisition(body.bpm, existing?.answers ?? resume?.answers, requestedPlanId ?? (isUuid(String(body.sessionId)) ? String(body.sessionId) : fallbackRay)) : null;
   let answers = pharmacy ? mergeInStorePharmacyAnswers(rawAnswers, pharmacy, acquisition!) : rawAnswers;
-  const skipHealthScore = Boolean(pharmacy);
+  let journeyVersion = !pharmacy && (isWebProductJourney(existing?.journeyVersion) || channel === "web" && webProductJourneyEnabled())
+    ? WEB_PRODUCT_JOURNEY_VERSION : null;
+  let skipHealthScore = Boolean(pharmacy) || isWebProductJourney(journeyVersion);
   const sql = getSql();
   if (!sql) throw new Error("Database is not configured");
   const sessionId = typeof body.sessionId === "string" ? body.sessionId : null;
   if (sessionId && !isUuid(sessionId)) throw new FunnelError("Invalid questionnaire session", 400, "invalid_session");
   const requestInput = { planId: requestedPlanId, sessionId, answers, locale, contactEmail, paymentId, expectedRevision: body.expectedRevision ?? null };
   const previous = await completedFunnelRequest(sql, "assessment-capture", options.idempotencyKey, requestInput);
-  if (previous) return previous as CaptureReceipt;
+  if (previous) { timing.resultReused = true; return previous as CaptureReceipt; }
   let replayed = false;
   const result = await withDatabaseTransaction(sql, async tx => {
     const session = sessionId ? await claimFunnelRequest(tx, "assessment-session", sessionId, {}, requestedPlanId ?? undefined) : null;
     const claimed = await claimFunnelRequest(tx, "assessment-capture", options.idempotencyKey, requestInput);
-    if (claimed.response) { replayed = true; return claimed.response as CaptureReceipt; }
+    if (claimed.response) { replayed = true; timing.resultReused = true; return claimed.response as CaptureReceipt; }
     const planId = requestedPlanId ?? session?.resourceId ?? claimed.resourceId;
+    timing.planId = planId;
     await tx`update public.funnel_requests set resource_id = ${planId}::uuid where scope = 'assessment-capture' and request_key = ${options.idempotencyKey}`;
-    const [current] = await tx`select selected_plan, input_revision, answers from public.assessments where plan_id = ${planId}::uuid for no key update`;
+    const [current] = await tx`select selected_plan, journey_version, input_revision, answers from public.assessments where plan_id = ${planId}::uuid for no key update`;
     if (requestedPlanId && !current && resume?.planId !== planId) throw new FunnelError("Assessment not found", 404, "assessment_not_found");
     if (current && body.expectedRevision !== undefined && Number(body.expectedRevision) !== Number(current.input_revision)) {
       throw new FunnelError("Assessment answers changed. Reload the saved assessment before editing.", 409, "assessment_changed");
+    }
+    if (!pharmacy && isWebProductJourney(current?.journey_version)) {
+      journeyVersion = WEB_PRODUCT_JOURNEY_VERSION;
+      skipHealthScore = true;
     }
     const currentPharmacy = inStorePharmacyFromAnswers(current?.answers);
     if (current && (currentPharmacy?.id ?? null) !== (pharmacy?.id ?? null)) {
@@ -129,10 +152,11 @@ export async function captureAssessment(bodyValue: unknown, options: { planId?: 
       acquisition = resolvePharmacyAcquisition(body.bpm, current.answers, planId);
       answers = mergeInStorePharmacyAnswers(rawAnswers, pharmacy, acquisition);
     }
-    const selectedPlan = current?.selected_plan ?? (skipHealthScore ? DEFAULT_ASSESSMENT_PLAN : null);
+    const selectedPlan = current?.selected_plan ?? (pharmacy ? DEFAULT_ASSESSMENT_PLAN : null);
     const snapshot = createAssessmentSnapshot({ planId, plan: selectedPlan ?? DEFAULT_ASSESSMENT_PLAN, status: "queued",
-      healthScore: computeHealthScore(answers, locale, { evaluatedIngredientCount: cachedEvaluatedIngredientCatalogueCount() }) });
-    const identity = await persistAssessmentSubmission({ answers, contactEmail, locale, selectedPlan, skipHealthScore, snapshot, status: "captured" });
+      healthScore: timeRevealStageSync("healthscore_compute", { planId }, () => computeHealthScore(answers, locale, { evaluatedIngredientCount: cachedEvaluatedIngredientCatalogueCount() })) });
+    const identity = await persistAssessmentSubmission({ answers, contactEmail, locale, selectedPlan, journeyVersion, acquisitionAttribution: normalizeJourneyAttribution(bpmContextFromBody(body)), skipHealthScore, snapshot, status: "captured" });
+    timing.revision = identity.revision;
     if (body.questionnaireState !== undefined) {
       const state = deserializeState(JSON.stringify(body.questionnaireState));
       if (!state || state.locale !== locale || state.version === "v15.5-screens" && !isQuestionnaireComplete(state)
@@ -147,6 +171,7 @@ export async function captureAssessment(bodyValue: unknown, options: { planId?: 
     }
     await bindMetaContext(tx, "plan", planId, options.request, { email: contactEmail });
     if (contactEmail) await recordMetaPlanMilestone(tx, planId, "EmailCapture", locale);
+    if (isWebProductJourney(journeyVersion)) await recordMetaPlanMilestone(tx, planId, "Lead", locale);
     const taskIds = await enqueueAssessmentPregenerationTasks({ answers, locale, planId });
     if (selectedPlan) await enqueueNutritionPlanTasks({ answers, locale, planId, plan: selectedPlan });
     if (resume) await finalizeAssessmentResumeDraft({ planId, token });
@@ -154,14 +179,19 @@ export async function captureAssessment(bodyValue: unknown, options: { planId?: 
       if (!normalizeAssessmentContactEmail(rawAnswers.reassessmentEmail)) throw new FunnelError("Invalid reassessment email", 400, "invalid_email");
       await scheduleReassessmentAction({ email: rawAnswers.reassessmentEmail, locale, planId });
     }
-    const receipt: CaptureReceipt = { ...snapshot, ...identity, firstName: firstNameFromAssessmentAnswers(answers), generationStatus: "pending", paymentId: paymentId ? String(paymentId) : null, taskIds };
+    const [paymentEvidence] = await tx`select exists(select 1 from public.payments where plan_id=${planId}::uuid and paid_at is not null) as confirmed`;
+    const readiness = await getFunnelReadiness(planId, locale);
+    const receipt: CaptureReceipt = { ...snapshot, ...identity, firstName: firstNameFromAssessmentAnswers(answers), generationStatus: readiness?.readyForReveal ? "ready" : readiness?.failed ? "failed" : "pending",
+      formulaReady: readiness?.formulationStatus === "ready", productsReady: Boolean(readiness?.readyForReveal), paymentId: paymentId ? String(paymentId) : null, taskIds,
+      journeyVersion, hasFullPlanAccess: Boolean(selectedPlan) || isWebProductJourney(journeyVersion),
+      hasConfirmedPlanPayment: Boolean(paymentEvidence?.confirmed), skipHealthScore };
     await completeFunnelRequest(tx, "assessment-capture", options.idempotencyKey, receipt);
     return receipt;
   });
   const bpm = bpmContextFromBody(body);
   if (!replayed) void writeBpmEvent({ actorType: "visitor", attribution: { ...bpm.attribution, ...(pharmacy && acquisition ? pharmacyBpmAttribution(pharmacy.slug, acquisition) : {}) }, eventName: requestedPlanId ? "assessment_recaptured" : "assessment_captured",
     eventType: "funnel", locale, planId: result.planId, ray: acquisition?.ray ?? (typeof bpm.ray === "string" ? bpm.ray : null),
-    properties: { revision: result.revision, ...captureQuestionnaireContext(body.questionnaireState) } }).catch(() => undefined);
+    properties: { journeyVersion: result.journeyVersion, revision: result.revision, ...captureQuestionnaireContext(body.questionnaireState) } }).catch(() => undefined);
   return result;
 }
 

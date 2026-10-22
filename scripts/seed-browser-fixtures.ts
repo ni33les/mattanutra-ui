@@ -35,7 +35,7 @@ const planId = randomUUID(), runId = randomUUID(), paymentId = randomUUID(), ord
 const orderNumber = `E2E-${randomUUID().slice(0, 8).toUpperCase()}`;
 const outputPath = resolve(process.argv[2] ?? `/tmp/mattanutra-browser-fixtures-${Date.now()}.json`);
 const scenario = process.argv[3] ? JSON.parse(process.argv[3]) : null;
-assert.ok(scenario === null || (["numeric_preferences", "practical_advice"].includes(scenario.scenario) && isLocale(scenario.locale)), "Unknown isolated browser fixture scenario");
+assert.ok(scenario === null || (["numeric_preferences", "practical_advice", "free_products"].includes(scenario.scenario) && isLocale(scenario.locale)), "Unknown isolated browser fixture scenario");
 const locale = scenario?.locale ?? "en";
 try {
   // Organisation writes advance catalogue identity. Provision every admin
@@ -131,7 +131,8 @@ try {
   const quoteLines = recommendation.recommendations.map(row => ({ productId: row.product.id, productTitle: row.product.title, imageUrl: row.product.imageUrl ?? null,
     quantity: 1, unitPriceAmount: Number(row.unitPriceAmount ?? row.product.priceAmount), currency: row.product.currency, etaDate: null }));
   await withDatabaseTransaction(sql, async tx => {
-    await persistAssessmentSubmission({ answers, locale, status: "ready", selectedPlan: "precision", snapshot: createAssessmentSnapshot({ planId, healthScore: score }) });
+    await persistAssessmentSubmission({ answers, locale, status: "ready", selectedPlan: scenario?.scenario === "free_products" ? null : "precision",
+      journeyVersion: scenario?.scenario === "free_products" ? "web-products-v1" : null, snapshot: createAssessmentSnapshot({ planId, healthScore: score }) });
     const generation = (await loadGenerationInput(tx, planId, locale))!;
     await tx`insert into public.assessment_healthscore_results (plan_id, revision, locale, generator_version, result)
       values (${planId}::uuid, ${generation.revision}, ${locale}, ${FUNNEL_GENERATOR_VERSION}, ${tx.json(toJsonValue(score))})`;
@@ -154,7 +155,7 @@ try {
       values (${runId}::uuid, ${item.product.id}::uuid, ${item.rank}, ${item.score}, ${item.productCoveragePercent}, ${item.stackContributionPercent}, ${item.servingMultiplier},
         ${tx.json(toJsonValue(item.coveredNeeds))}, ${item.why}, ${item.url}, ${Number(item.unitPriceAmount ?? item.product.priceAmount)}, ${item.product.currency}, ${set.organisationId}::uuid,
         ${item.retailSellableProductId ?? null}::uuid, 'available_now', ${Number(item.unitPriceAmount ?? item.product.priceAmount)}, ${item.product.imageUrl ?? null})`;
-    await tx`insert into public.payments (id, plan_id, selected_plan, status, fulfillment_status, amount, stripe_mode, paid_at, metadata)
+    if (scenario?.scenario !== "free_products") await tx`insert into public.payments (id, plan_id, selected_plan, status, fulfillment_status, amount, stripe_mode, paid_at, metadata)
       values (${randomUUID()}::uuid, ${planId}::uuid, 'precision', 'paid', 'complete', 690000000, 'mock', now(), '{"source":"isolated_browser_fixture","synthetic":true}')`;
     await tx`insert into public.retail_customer_orders (id, organisation_id, order_number, source, customer_name, customer_email, status, currency, placed_at, metadata)
       values (${orderId}::uuid, ${set.organisationId}::uuid, ${orderNumber}, 'checkout', 'Browser Fixture', 'browser-fixture@example.test', 'placed', ${product.currency}, now(), '{"source":"isolated_browser_fixture","synthetic":true}')`;

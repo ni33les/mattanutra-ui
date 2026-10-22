@@ -11,6 +11,7 @@ import { writeBpmEvent } from "@/lib/bpm";
 import { getWorkerSql } from "@/lib/db";
 import { completeTask } from "@/lib/task-service";
 import { requireWorkerAccess } from "@/lib/worker-auth";
+import { recordRevealTaskTerminal, revealTaskContext, timeRevealTaskStage } from "@/lib/reveal-timing";
 
 export const runtime = "nodejs";
 
@@ -56,22 +57,23 @@ async function handlePOST(
     const task = await completeTask({
       accessScope: access.scope,
       agentId,
-      prepareResult: prepareTaskCompletionResult,
+      prepareResult: (context) => timeRevealTaskStage("result_preparation", revealTaskContext(context.task), () => prepareTaskCompletionResult(context)),
       applyResult: (context) =>
-        applyTaskCompletionResult({
+        timeRevealTaskStage("result_application", revealTaskContext(context.task), () => applyTaskCompletionResult({
           preparedResult: context.preparedResult,
           afterCommit: context.afterCommit,
           resultPayload: context.resultPayload,
           sql: context.sql,
           task: context.task,
           taskId: id
-        }),
+        })),
       reservationId,
       resultPayload: objectValue(body.resultPayload),
       taskId: id,
       workerSessionId
     });
 
+    recordRevealTaskTerminal(task);
     await writeBpmEvent({
       actorType: "worker",
       durationMs:

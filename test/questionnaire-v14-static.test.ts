@@ -157,17 +157,15 @@ describe("questionnaire v14 UX on v6 schema", () => {
     assert.doesNotMatch(welcome, /LanguageSwitcher/);
   });
 
-  it("uses quiz-focused shell (compact titlebar, no site footer)", () => {
+  it("uses the standard platform header and footer for the public quiz", () => {
     const page = readFileSync(
       join(root, "app/[locale]/nutrition/quiz/page.tsx"),
       "utf8"
     );
-    assert.match(page, /variant=\"quiz\"/);
-    assert.match(page, /mn-customer-shell--quiz/);
-    assert.doesNotMatch(page, /SiteFooter/);
-    const titleBar = readFileSync(join(root, "components/title-bar.tsx"), "utf8");
-    assert.match(titleBar, /\"quiz\"/);
-    assert.match(titleBar, /isQuiz/);
+    assert.match(page, /<TitleBar\b/);
+    assert.doesNotMatch(page, /variant=\"quiz\"/);
+    assert.match(page, /<SiteFooter\b/);
+    assert.match(page, /<SiteFooter[^>]*currentPath=\{currentPath\}/);
   });
 
   it("aligns section stage overlays with v14 HTML behaviour", () => {

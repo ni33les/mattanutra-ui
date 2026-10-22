@@ -4,6 +4,7 @@ import type { MetaPublicConfig } from "@/lib/meta-event-policy";
 export type MetaCampaignDimensions = { campaignId: string | null; adsetId: string | null; adId: string | null; channel: string; locale: string };
 export type MetaCampaignActivity = MetaCampaignDimensions & {
   visitors: number; starts: number; completions: number; checkouts: number; purchasingVisitors: number; purchaseRate: number | null;
+  formulaViews?: number; productViews?: number; baskets?: number; productCheckouts?: number; productPurchasingVisitors?: number; productPurchaseRate?: number | null;
 };
 export type MetaCampaignSales = MetaCampaignDimensions & {
   purchaseType: string; offer: string; currency: string; purchases: number; accepted: number; pending: number; failed: number; revenue: number;
@@ -23,18 +24,28 @@ export async function metaCampaignReport(sql: postgres.Sql, config: MetaPublicCo
     case when custom_data->>'locale' in ('en','th','zh-CN') then custom_data->>'locale' else 'unknown' end as locale`);
   const [activity, sales] = await Promise.all([
     sql`with events as (
-      select context_id,event_name,${dimensions} from public.meta_conversion_events
+      select context_id,event_name,custom_data,${dimensions} from public.meta_conversion_events
       where environment=${config.environment} and pixel_id=${config.pixelId} and occurred_at>=${start}
     ), visitors as (
       select campaign_id,adset_id,ad_id,channel,locale,context_id,
         bool_or(event_name='PageView') as visited,bool_or(event_name='QuizStart') as started,
         bool_or(event_name='Lead') as completed,bool_or(event_name='InitiateCheckout') as checkout,
-        bool_or(event_name='Purchase') as purchased
+        bool_or(event_name='Purchase') as purchased,
+        bool_or(event_name='ViewContent' and custom_data->>'funnel_stage'='formula') as formula_viewed,
+        bool_or(event_name='ViewContent' and custom_data->>'funnel_stage'='products') as products_viewed,
+        bool_or(event_name='AddToCart' and custom_data->>'purchase_type'='products') as basket,
+        bool_or(event_name='Purchase' and custom_data->>'purchase_type'='products') as products_purchased,
+        bool_or(event_name='InitiateCheckout' and custom_data->>'purchase_type'='products') as products_checkout
       from events group by campaign_id,adset_id,ad_id,channel,locale,context_id
     ) select campaign_id,adset_id,ad_id,channel,locale,
       count(*) filter(where visited)::int as visitors,count(*) filter(where visited and started)::int as starts,
       count(*) filter(where visited and completed)::int as completions,count(*) filter(where visited and checkout)::int as checkouts,
-      count(*) filter(where visited and purchased)::int as purchasing_visitors
+      count(*) filter(where visited and purchased)::int as purchasing_visitors,
+      count(*) filter(where visited and formula_viewed)::int as formula_views,
+      count(*) filter(where visited and products_viewed)::int as product_views,
+      count(*) filter(where visited and basket)::int as baskets,
+      count(*) filter(where visited and products_checkout)::int as product_checkouts,
+      count(*) filter(where visited and products_purchased)::int as product_purchasing_visitors
     from visitors group by campaign_id,adset_id,ad_id,channel,locale
     having bool_or(visited) order by count(*) filter(where visited) desc,campaign_id,adset_id,ad_id,channel,locale limit 201`,
     sql`with purchases as (
@@ -58,6 +69,9 @@ export async function metaCampaignReport(sql: postgres.Sql, config: MetaPublicCo
   return {
     activity: activity.slice(0, 200).map(row => ({ ...dim(row), visitors: row.visitors, starts: row.starts, completions: row.completions,
       checkouts: row.checkouts, purchasingVisitors: row.purchasing_visitors,
+      formulaViews: row.formula_views, productViews: row.product_views, baskets: row.baskets, productCheckouts: row.product_checkouts,
+      productPurchasingVisitors: row.product_purchasing_visitors,
+      productPurchaseRate: row.visitors ? 100 * row.product_purchasing_visitors / row.visitors : null,
       purchaseRate: row.visitors ? 100 * row.purchasing_visitors / row.visitors : null })),
     sales: sales.slice(0, 200).map(row => ({ ...dim(row), purchaseType: row.purchase_type, offer: row.offer, currency: row.currency,
       purchases: row.purchases, accepted: row.accepted, pending: row.pending, failed: row.failed, revenue: Number(row.revenue) })),

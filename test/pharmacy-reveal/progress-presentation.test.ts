@@ -18,6 +18,9 @@ mock.module("../../components/safe-image.tsx", {
 const { PharmacyCombined } = await import(
   "../../components/pharmacy/combined.tsx"
 );
+const { PharmacyRevealShell } = await import(
+  "../../components/pharmacy/reveal-presentation.tsx"
+);
 const reference = readFileSync(
     "test/pharmacy-reveal/combined-reference.html",
     "utf8",
@@ -230,5 +233,22 @@ test('PHARM-WAIT-06 completion/failure stops pseudo-element decoration and hidde
     }
     await page.locator('.mn-window').evaluate(el=>{el.setAttribute('data-phase','clarity');el.setAttribute('data-paused','true');});
     assert.equal(await page.locator('#mn-pharmacy-combined').evaluate(el=>el.getAnimations({subtree:true}).filter(a=>a instanceof CSSAnimation&&a.playState==='running').length),0);
+    const availableFormula = createElement("div", { className: "mn-selected-wrap" },
+      createElement("div", { className: "mn-nutrient" }, "Vitamin D3 — 1000 IU/day",
+        createElement("button", null, "Read why")));
+    await page.setContent(base + `<style>${css}</style>` + renderToStaticMarkup(createElement(PharmacyRevealShell, {
+      locale: "en", ready: false, failed: false, formulaReady: true, preserveProgress: true,
+      result: availableFormula,
+    })));
+    const matchingTop = await page.locator('.mn-selected-wrap').evaluate(el => el.getBoundingClientRect().top);
+    for (const phase of ['matching', 'failed', 'ready']) {
+      await page.locator('.mn-window').evaluate((el, value) => el.setAttribute('data-phase', value), phase);
+      assert.deepEqual(await page.locator('.mn-result').evaluate(el => ({
+        opacity: getComputedStyle(el).opacity, pointerEvents: getComputedStyle(el).pointerEvents,
+      })), { opacity: '1', pointerEvents: 'auto' });
+      assert.equal(await page.locator('.mn-nutrient').evaluate(el => getComputedStyle(el).opacity), '1');
+      assert.equal(await page.locator('.mn-selected-wrap').evaluate(el => el.getBoundingClientRect().top), matchingTop,
+        `${phase} must keep available formula content at the same position`);
+    }
   }finally{await page.close();}
 });

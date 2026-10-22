@@ -8,6 +8,17 @@ import { metaCustomData, metaEventName, metaEventForBpm, sanitiseMetaUrl, browse
 import { publicLocales } from "../lib/i18n.ts";
 const planId = "843893a8-4c1b-44d9-86f4-092e16270d1a";
 describe("campaign export boundary", () => {
+  it("separates progressive reveal stages without exporting result evidence or health content", () => {
+    for (const stage of ["formula", "products", "healthscore"]) {
+      assert.deepEqual(metaCustomData("ViewContent", { planId, stage, journey_version: "web-products-v1",
+        revision: 2, runId: planId, selectedItemIds: [planId], explanation: "private", condition: "private" }, "prd"),
+      { mn_env: "prd", event_schema: "1", plan_id: planId, funnel_stage: stage, journey_version: "web-products-v1" });
+    }
+    assert.equal(metaCustomData("ViewContent", { journey_version: "private-condition" }, "prd").journey_version, undefined);
+    for (const event of ["reveal_page_viewed", "formula_details_viewed", "product_matches_viewed", "web_processing_viewed"]) {
+      assert.equal(metaEventForBpm(event), null, "Only the visible-content helper authors the new Meta milestones");
+    }
+  });
   it("accepts both production hostnames behind a proxy while rejecting foreign and cross-environment origins", () => {
     const request = (origin?: string) => new Request("http://0.0.0.0:8080/api/marketing/consent", { headers: origin ? { origin } : {} });
     for (const origin of ["https://mattanutra.com", "https://www.mattanutra.com"]) assert.equal(metaRequestOriginAllowed(request(origin), "prd"), true);
@@ -55,7 +66,7 @@ describe("campaign export boundary", () => {
     assert.equal(sanitiseMetaUrl("https://evil.example/en", "prd"), null);
   });
   it("covers every customer route and registered language regardless of URL parameters or referrer", () => {
-    const routes = ["", "/privacy", "/terms", "/nutrition/quiz", "/assessment/results", "/nutrition/healthscore", "/nutrition/progress", "/nutrition/reveal", "/nutrition/refine", "/nutrition/payment/checkout", "/nutrition/payment/return", "/basket/checkout", "/basket/return", "/library/example", "/blog/example", "/connect/claude", "/mcp/checkout/token", "/mcp/checkout/token/return", "/order/track/token", "/retail/store/quiz", "/p/store"];
+    const routes = ["", "/privacy", "/terms", "/nutrition/quiz", "/assessment/results", "/nutrition/healthscore", "/nutrition/progress", "/nutrition/reveal", "/nutrition/plan", "/nutrition/refine", "/nutrition/payment/checkout", "/nutrition/payment/return", "/basket/checkout", "/basket/return", "/library/example", "/blog/example", "/connect/claude", "/mcp/checkout/token", "/mcp/checkout/token/return", "/order/track/token", "/retail/store/quiz", "/p/store"];
     for (const locale of publicLocales) for (const path of routes) {
       for (const host of ["mattanutra.com", "www.mattanutra.com"]) {
         const url = `https://${host}/${locale}${path}?utm_campaign=autumn&access=opaque#step`;
@@ -66,6 +77,16 @@ describe("campaign export boundary", () => {
     }
     assert.equal(browserPixelPageSafe("https://mattanutra.com/en", "https://customer.example/path", "prd"), true);
     assert.equal(browserPixelPageSafe("http://127.0.0.1:3107/th/nutrition/quiz", "", "dev"), true);
+  });
+  it("accepts detailed-plan PageViews for browser/CAPI pairing while stripping private query data", () => {
+    for (const environment of ["dev", "uat", "prd"] as const) for (const locale of publicLocales) {
+      const origin = environment === "prd" ? "https://mattanutra.com" : `https://${environment}.mattanutra.com`;
+      const path = `/${locale}/nutrition/plan`;
+      const url = `${origin}${path}?plan=${planId}&email=private&products=private&condition=private#private-section`;
+      assert.equal(browserPixelPageSafe(url, "", environment), true);
+      assert.equal(sanitiseMetaUrl(url, environment), `${origin}${path}`);
+      assert.equal(metaPageStage(path), "results");
+    }
   });
   it("excludes internal pages, foreign origins and other environments from the browser Pixel", () => {
     for (const locale of publicLocales) for (const path of ["admin", "admin/dashboard", "api", "api/mcp"]) {

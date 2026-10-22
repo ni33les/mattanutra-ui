@@ -1,3 +1,4 @@
+import { isWebProductJourney } from "@/lib/web-product-journey";
 import { recordMetaPlanMilestone } from "@/lib/meta-tracking";
 import { randomUUID } from "node:crypto";
 import { publishedFormulation } from '@/lib/formulation-availability';
@@ -399,7 +400,8 @@ async function applyHealthScoreResult(
     await sql`update public.assessments set health_score = ${prepared.json}::text::jsonb, updated_at = now()
       where plan_id = ${task.planId}::uuid and input_revision = ${generation.revision} and locale = ${generation.locale}`;
     await enqueueReadyHealthScoreDeliveries(sql, task.planId, generation.revision, generation.locale);
-    await recordMetaPlanMilestone(sql, task.planId, "Lead", generation.locale);
+    const [journey] = await sql`select journey_version from public.assessments where plan_id=${task.planId}::uuid`;
+    if (!isWebProductJourney(journey?.journey_version)) await recordMetaPlanMilestone(sql, task.planId, "Lead", generation.locale);
   }
   await eventually(afterCommit, async () => {
     await recordTaskXaiUsageCost({
@@ -450,8 +452,8 @@ async function applyPaidFormulationResult(
   }
 
   const prepared = preparedResult?.formulation;
-  const rows = prepared ? await sql`select selected_plan::text from public.assessments where plan_id=${planId}::uuid` : await sql`
-    select answers, locale, selected_plan::text
+  const rows = prepared ? await sql`select selected_plan::text, journey_version from public.assessments where plan_id=${planId}::uuid` : await sql`
+    select answers, locale, selected_plan::text, journey_version
     from public.assessments
     where plan_id = ${planId}::uuid
     limit 1
@@ -520,7 +522,7 @@ async function applyPaidFormulationResult(
     task
   });
   if (isBackgroundPregeneration) {
-    const paidSelectionReady = Boolean(textValue(row.selected_plan));
+    const paidSelectionReady = Boolean(textValue(row.selected_plan)) || isWebProductJourney(row.journey_version);
     const productRecommendationsQueued = Boolean(
       await queueProductRecommendationsForReadyPlan({
         paymentId,
@@ -648,8 +650,8 @@ async function applyFoodGuidanceResult(
   }
 
   const prepared = preparedResult?.food;
-  const rows = prepared ? await sql`select selected_plan::text from public.assessments where plan_id=${planId}::uuid` : await sql`
-    select answers, locale, selected_plan::text
+  const rows = prepared ? await sql`select selected_plan::text, journey_version from public.assessments where plan_id=${planId}::uuid` : await sql`
+    select answers, locale, selected_plan::text, journey_version
     from public.assessments
     where plan_id = ${planId}::uuid
     limit 1
@@ -702,7 +704,7 @@ async function applyFoodGuidanceResult(
     modelVersion: modelVersion(analysis),
     planId
   });
-  const paidSelectionReady = Boolean(textValue(row.selected_plan));
+  const paidSelectionReady = Boolean(textValue(row.selected_plan)) || isWebProductJourney(row.journey_version);
   const nutritionReady = paidSelectionReady
     ? await updateAssessmentReadyIfNutritionReady(sql, planId)
     : false;
@@ -2556,15 +2558,16 @@ export async function applyTaskFailureResult({
     const rows = await sql<Array<{
       locale: string | null;
       selected_plan: string | null;
+      journey_version: string | null;
     }>>`
-      select locale, selected_plan::text
+      select locale, selected_plan::text, journey_version
       from public.assessments
       where plan_id = ${task.planId}::uuid
       limit 1
     `;
     const row = rows[0];
 
-    shouldUpdateAssessmentFailure = Boolean(textValue(row?.selected_plan));
+    shouldUpdateAssessmentFailure = Boolean(textValue(row?.selected_plan)) || isWebProductJourney(row?.journey_version);
 
     if (!shouldUpdateAssessmentFailure) {
       await writeBpmEvent({

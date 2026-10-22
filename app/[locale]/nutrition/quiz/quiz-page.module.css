@@ -1,0 +1,4 @@
+/* Keep the shared footer links reachable above the active questionnaire actions. */
+.page:has([data-testid="chat-questionnaire"]) > :global(.mn-site-footer) {
+  padding-bottom: calc(5rem + env(safe-area-inset-bottom));
+}

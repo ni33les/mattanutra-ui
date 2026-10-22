@@ -143,6 +143,7 @@
     "worker:products": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs workers/runner.ts products",
     "worker:stock": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs workers/runner.ts stock",
     "worker:supplement": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs workers/runner.ts supplement",
+    "web-products:schema:apply": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/apply-web-product-journey-schema.ts",
     "web-funnel:schema:apply": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/apply-web-funnel-schema.ts",
     "web-funnel:audit": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/audit-web-funnel.ts",
     "test:full": "node scripts/run-full-test-suite.mjs",
@@ -180,7 +181,8 @@
     "validate:dev:refinement": "node scripts/mcp-721.mjs validate --package=refinement",
     "test:pharmacy": "node scripts/mcp-721.mjs test --package=pharmacy",
     "validate:dev:pharmacy": "node scripts/mcp-721.mjs validate --package=pharmacy",
-    "pharmacy-orders:schema:apply": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/apply-pharmacy-orders-schema.ts"
+    "pharmacy-orders:schema:apply": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/apply-pharmacy-orders-schema.ts",
+    "web-products:retire-reveal-checkouts": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/retire-reveal-checkouts.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1045.0",

@@ -121,15 +121,22 @@
       "file": "test/db-transactions.integration.test.ts",
       "slice": "db-consumers",
       "database": true,
-      "expectedCases": 6,
-      "reason": "Managed-pool transaction-local timeouts, shared transaction ownership and cancellation recovery"
+      "expectedCases": 7,
+      "reason": "Managed-pool transaction-local timeouts, shared transaction ownership and cancellation recovery; nested read-only repeatable snapshots stay on one connection across an independent writer commit"
     },
     {
       "file": "test/assessment-capture.integration.test.ts",
       "slice": "capture",
       "database": true,
-      "expectedCases": 11,
-      "reason": "Capture idempotency, revision fencing, contact-only preservation and transactional generation scheduling"
+      "expectedCases": 12,
+      "reason": "Capture idempotency, revision fencing, contact-only preservation and transactional generation scheduling; grouped questionnaire values and explicit unknowns survive capture replay"
+    },
+    {
+      "file": "test/web-product-journey.integration.test.ts",
+      "slice": "web-product-journey",
+      "database": true,
+      "expectedCases": 13,
+      "reason": "Free-access capture and explicit adoption preserve source, revision, audit idempotency and actual payment evidence; current formula/product readiness and subset checkout retain their generation and acquisition fences"
     },
     {
       "file": "test/web-payment-transitions.integration.test.ts",

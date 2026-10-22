@@ -1,3 +1,4 @@
+import { isWebProductJourney } from "@/lib/web-product-journey";
 import { FORMULATION_AVAILABILITY_POLICY } from '@/lib/formulation-availability';
 import { FunnelError } from "@/lib/funnel-errors";
 import { loadAdminSafetyReferenceSnapshot } from "@/lib/agentic/catalogue/load-safety-ceilings";
@@ -567,7 +568,8 @@ export async function enqueueNutritionPlanTasks({
   paymentId,
   plan,
   planId,
-  recovery
+  recovery,
+  accessOnly = false
 }: Readonly<{
   answers?: unknown;
   locale?: unknown;
@@ -575,6 +577,7 @@ export async function enqueueNutritionPlanTasks({
   plan: AssessmentPlan;
   planId: string;
   recovery?: Pick<AssessmentTaskIdentity, "revision" | "inputHash">;
+  accessOnly?: boolean;
 }>) {
   const sql = getSql();
 
@@ -584,8 +587,11 @@ export async function enqueueNutritionPlanTasks({
 
   const identity = await assessmentTaskIdentity(sql, planId, true);
   if (!identity) return null;
+  if (accessOnly && !isWebProductJourney((identity.projectionBefore as { journey_version?: unknown }).journey_version)) {
+    throw new FunnelError("Free product access is not enabled for this assessment", 403, "free_access_required");
+  }
   if (recovery && (identity.revision !== recovery.revision || identity.inputHash !== recovery.inputHash ||
-    (identity.projectionBefore as { selected_plan?: string }).selected_plan !== plan)) {
+    (!accessOnly && (identity.projectionBefore as { selected_plan?: string }).selected_plan !== plan))) {
     throw new FunnelError("Assessment changed during task preparation; retry recovery", 409, "assessment_changed");
   }
 
@@ -593,9 +599,9 @@ export async function enqueueNutritionPlanTasks({
   // xmin also rejects a newer completion/contact/plan change at the same input revision.
   const publish = (status: "failed" | "ready" | "queued", error: string | null,
     version: Parameters<typeof appendAssessmentVersion>[1]) => withDatabaseTransaction(sql, async tx => {
-    const [updated] = await tx`update public.assessments set selected_plan=${plan}, status=${status}::public.assessment_status,
+    const [updated] = await tx`update public.assessments set selected_plan=case when ${accessOnly} then selected_plan else ${plan}::public.assessment_plan end, status=${status}::public.assessment_status,
       queue_position=case when ${status === "queued"} then coalesce(queue_position,1) else 0 end,
-      error_message=${error}, plan_selected_at=coalesce(plan_selected_at,now()),
+      error_message=${error}, plan_selected_at=case when ${accessOnly} then plan_selected_at else coalesce(plan_selected_at,now()) end,
       completed_at=case when ${status === "ready"} then coalesce(completed_at,now()) else completed_at end, updated_at=now()
       where plan_id=${planId}::uuid and input_revision=${identity.revision} and xmin=${identity.rowVersion}::xid
       returning plan_id`;
@@ -675,9 +681,9 @@ export async function enqueueNutritionPlanTasks({
       await publish("failed", errorMessage, {
         afterPayload: {
           errorMessage,
-          planSelectedAt: "coalesce_current_or_now",
+          planSelectedAt: accessOnly ? "unchanged" : "coalesce_current_or_now",
           queuePosition: 0,
-          selectedPlan: plan,
+          selectedPlan: accessOnly ? (identity.projectionBefore as { selected_plan?: string }).selected_plan ?? null : plan,
           status: "failed"
         },
         changeReason: "plan_selected_reused_tasks_missing_outputs",
@@ -706,7 +712,7 @@ export async function enqueueNutritionPlanTasks({
     parentTaskId: formulationTaskId,
     plan,
     planId,
-    source: "paid_plan_adoption",
+    source: accessOnly ? "web_product_journey" : "paid_plan_adoption",
     taskGroupId
   });
   const foodGapSupportTaskId = productRecommendationTaskId
@@ -714,12 +720,12 @@ export async function enqueueNutritionPlanTasks({
         dependsOnTaskId: productRecommendationTaskId,
         parentTaskId: productRecommendationTaskId,
         planId,
-        source: "paid_plan_adoption",
+        source: accessOnly ? "web_product_journey" : "paid_plan_adoption",
         taskGroupId
       })
     : await enqueueFoodGapSupportTask({
         planId,
-        source: "paid_plan_adoption",
+        source: accessOnly ? "web_product_journey" : "paid_plan_adoption",
         taskGroupId
       });
   const nutritionReady = readiness.formulationReady;
@@ -729,9 +735,9 @@ export async function enqueueNutritionPlanTasks({
     afterPayload: {
       completedAt: nutritionReady ? "coalesce_current_or_now" : "unchanged",
       errorMessage: null,
-      planSelectedAt: "coalesce_current_or_now",
+      planSelectedAt: accessOnly ? "unchanged" : "coalesce_current_or_now",
       queuePosition: nutritionReady ? 0 : "coalesce_current_or_1",
-      selectedPlan: plan,
+      selectedPlan: accessOnly ? (identity.projectionBefore as { selected_plan?: string }).selected_plan ?? null : plan,
       status
     },
     changeReason: nutritionReady

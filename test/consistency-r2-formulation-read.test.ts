@@ -77,10 +77,10 @@ describe("consistency r2 formulation read", () => {
     assert.match(formulation, /products"\) === "1"/);
   });
 
-  it("polls lightweight versions and loads the current full payload only when that version changes", async () => {
+  it("polls lightweight versions and loads the current formula or products only when that version changes", async () => {
     const source = await readFile("components/nutrition-flow/use-formulation-polling.ts", "utf8");
     assert.match(source, /pollFunnelStatus/);
-    assert.match(source, /formulation\?locale=\$\{locale\}&products=1/);
+    assert.match(source, /formulation\?locale=\$\{locale\}&products=\$\{expected && \(!expected\.readyForReveal \|\| expected\.refreshPending\) \? 0 : 1\}/);
     assert.match(source, /snapshot\.resultVersion !== version\.current/);
     assert.match(source, /if \(request\.current\) return request\.current/);
     assert.match(source, /controller\.abort\(\)/);

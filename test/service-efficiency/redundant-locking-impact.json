@@ -12,8 +12,8 @@
     },
     {
       "file": "test/assessment-capture.integration.test.ts",
-      "reason": "Capture and retry generation admission remains transactional and preserves input identity",
-      "expectedCases": 11
+      "reason": "Capture and retry generation admission remains transactional and preserves input identity; grouped questionnaire values and explicit unknowns survive capture replay",
+      "expectedCases": 12
     },
     {
       "file": "test/healthscore-delivery.integration.test.ts",
@@ -119,8 +119,8 @@
       "file": "test/db-transactions.integration.test.ts",
       "slice": "db-consumers",
       "database": true,
-      "expectedCases": 6,
-      "reason": "Managed-pool transaction-local timeouts, shared transaction ownership and cancellation recovery"
+      "expectedCases": 7,
+      "reason": "Managed-pool transaction-local timeouts, shared transaction ownership and cancellation recovery; nested read-only repeatable snapshots stay on one connection across an independent writer commit"
     },
     {
       "file": "test/web-payment-fulfillment.integration.test.ts",

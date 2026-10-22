@@ -76,18 +76,18 @@ describe("after-pay journey progress stays truthful", () => {
     assert.match(progressCopy, /Your formula is being prepared/);
     assert.match(
       progressCopy,
-      /MattaNutra is building your personalised formula and matching the right products/
+      /Your saved answers are being used to prepare your formula and match available products\. Matching usually takes 1–2 minutes\./
     );
     assert.match(progressCopy, /Preparing your formula…/);
     assert.match(progressCopy, /กำลังจัดสูตรของคุณ/);
     assert.match(
       progressCopy,
-      /MattaNutra กำลังจัดทำสูตรเฉพาะบุคคลและจับคู่สินค้าที่เหมาะกับคุณ/
+      /กำลังใช้คำตอบที่บันทึกไว้เพื่อจัดสูตรและจับคู่ผลิตภัณฑ์ที่มีจำหน่าย โดยทั่วไปใช้เวลา 1–2 นาที/
     );
     assert.match(progressCopy, /正在准备你的配方/);
     assert.match(
       progressCopy,
-      /MattaNutra 正在为你制定个性化配方并匹配产品，通常只需几秒钟。/
+      /正在根据保存的回答制定配方并匹配可购买的产品，匹配通常需要1–2分钟。/
     );
     assert.doesNotMatch(progressUi, /Thai pharmac/i);
     assert.doesNotMatch(progressUi, /Thailand/i);
