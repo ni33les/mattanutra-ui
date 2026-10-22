@@ -17,7 +17,7 @@ test.beforeEach(async ({ page }) => {
 const landingCopy = {
   en: {
     headline: "Know what to take.And what to skip.",
-    cta: "get my free plan",
+    cta: "Get my free plan",
     lede: "Your personal supplement plan, free, the moment you finish",
     promises: ["About 5 minutes", "No obligation", "No subscription"],
     trust: ["Physician-founded", "Thai FDA-registered products"]
