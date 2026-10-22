@@ -117,7 +117,7 @@ test.describe("mobile customer UX", () => {
       await expect(page.locator(".mn-titlebar")).toBeVisible();
       await expect(page.locator("header .mn-language-switcher").first()).toBeVisible();
       await expect(page.locator(".mn-titlebar-mobile-menu summary")).toBeVisible();
-      await expect(page.locator(".mn-availability-pill").first()).toBeVisible();
+      await expect(page.locator(".mn-availability-bar")).toHaveCount(0);
 
       const visibleQuizLinks = await page
         .locator('a[href*="/nutrition/quiz"]')

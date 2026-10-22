@@ -17,15 +17,15 @@ test.beforeEach(async ({ page }) => {
 const landingCopy = {
   en: {
     headline: "Know what to take.And what to skip.",
-    cta: "Start my questionnaire",
-    lede: "Six short sections. Your personal plan appears the moment you finish.",
+    cta: "get my free plan",
+    lede: "Your personal supplement plan, free, the moment you finish",
     promises: ["About 5 minutes", "No obligation", "No subscription"],
     trust: ["Physician-founded", "Thai FDA-registered products"]
   },
   th: {
     headline: "รู้ว่าอะไรควรกินและอะไรไม่จำเป็น",
-    cta: "เริ่มทำแบบสอบถาม",
-    lede: "ตอบคำถามสั้น ๆ 6 ส่วน แล้วดูแผนเฉพาะคุณได้ทันทีเมื่อทำเสร็จ",
+    cta: "รับแผนฟรี",
+    lede: "รับแผนอาหารเสริมเฉพาะคุณ ฟรี ทันทีที่ทำเสร็จ",
     promises: ["ประมาณ 5 นาที", "ไม่จำเป็นต้องซื้อ", "ไม่ผูกมัดให้ซื้อประจำ"],
     trust: ["ก่อตั้งโดยแพทย์", "ผลิตภัณฑ์มีเลข อย. ทุกชิ้น"]
   }
@@ -96,7 +96,7 @@ for (const locale of ["en", "th", "zh-CN"] as const) {
     await expect(page.getByRole("banner")).toHaveCount(1);
     await expect(page.getByRole("main")).toHaveCount(1);
     await expect(page.getByRole("contentinfo")).toHaveCount(1);
-    await expect(page.getByRole("banner").locator(".mn-availability-bar")).toBeVisible();
+    await expect(page.getByRole("banner").locator(".mn-availability-bar")).toHaveCount(0);
     await expect(page.getByRole("contentinfo").locator(`a[href="/${locale}/privacy"]`)).toBeVisible();
     await expect(welcome).not.toContainText("690");
     if (locale !== "zh-CN") {

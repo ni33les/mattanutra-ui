@@ -16,16 +16,12 @@ type TitleBarProps = Readonly<{
   currentPath?: string;
   localizedPaths?: Partial<Record<LocaleCode, string>>;
   title: string;
-  /** quiz = compact logo + language only (v14 focused shell, no markets/nav/footer chrome). */
+  /** quiz = compact logo + language only (v14 focused shell, no nav/footer chrome). */
   variant?: "default" | "landing" | "quiz";
 }>;
 
 type TitleBarCopy = Readonly<{
   assessment: string;
-  availability: string;
-  availableCountries: readonly (readonly [string, string])[];
-  comingSoon: string;
-  comingSoonCountries: readonly (readonly [string, string])[];
   homeAria: string;
   links: readonly (readonly [string, string])[];
   logoAlt: string;
@@ -91,35 +87,6 @@ export function TitleBar({
 
   return (
     <header className={headerClass}>
-      {!isQuiz ? (
-        <div className="mn-availability-bar" aria-label={copy.availability}>
-          <div className="mn-availability-group">
-            <span className="mn-availability-label">{copy.availability}</span>
-            <span className="mn-availability-pills">
-              {copy.availableCountries.map(([flag, country]) => (
-                <span key={country} className="mn-availability-pill">
-                  <span aria-hidden>{flag}</span>
-                  <span className="mn-availability-pill-name">{country}</span>
-                </span>
-              ))}
-            </span>
-          </div>
-          <span className="mn-availability-sep" aria-hidden />
-          <div className="mn-availability-group mn-availability-group--soon">
-            <span className="mn-availability-label mn-availability-label--muted">
-              {copy.comingSoon}
-            </span>
-            <span className="mn-availability-pills">
-              {copy.comingSoonCountries.map(([flag, country]) => (
-                <span key={country} className="mn-availability-pill mn-availability-pill--soon">
-                  <span aria-hidden>{flag}</span>
-                  <span className="mn-availability-pill-name">{country}</span>
-                </span>
-              ))}
-            </span>
-          </div>
-        </div>
-      ) : null}
       <div className="mn-titlebar-main">
         <Link
           href={`/${currentLocale}`}
