@@ -100,6 +100,7 @@ export default async function BasketCheckoutPage({
   const locale: Locale = rawLocale;
   const query = await searchParams;
   const checkoutMode = query.mode === "agentic" ? "agentic" : "web";
+  const showMatchingDetails = ["dev", "uat"].includes(process.env.MATTANUTRA_ENV?.trim().toLowerCase() ?? "");
   const checkoutAccess =
     typeof query.order === "string" ? query.order.trim() : "";
   const agenticBasket =
@@ -178,7 +179,7 @@ export default async function BasketCheckoutPage({
             {selectedItemIds.length < 1 ? labels.empty : labels.body}
           </p>
         </div>
-        {checkoutMode === "web" ? <WebMatchingAdvice advice={selectedBasket.advice} locale={locale} selected /> : null}
+        {checkoutMode === "web" ? <WebMatchingAdvice advice={selectedBasket.advice} locale={locale} selected showDetails={showMatchingDetails} /> : null}
         {selectedItemIds.length < 1 ? null : (
           <ProductBasketCheckoutPanel
             {...selection}
