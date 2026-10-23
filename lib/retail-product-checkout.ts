@@ -1535,11 +1535,11 @@ async function createRetailCustomerOrderFromPayment(
 async function recordRetailCheckoutFinance(
   sql: RetailCheckoutDb,
   payment: CheckoutPaymentRow,
-  orderId: string
+  orderId: string,
+  fx: Awaited<ReturnType<typeof resolveUsdRateForCurrency>>
 ) {
   const quoteLines = arrayValue<QuoteLine>(payment.quote_lines);
   const amount = Number(payment.amount);
-  const fx = await resolveUsdRateForCurrency(payment.currency, { sql });
 
   // Completed product sales are recognised as nominal revenue (sales basis).
   // Cash bank transfers and fees are separate actual rows — never double-count.
@@ -1607,49 +1607,81 @@ async function recordRetailCheckoutFinance(
 
 async function fulfillRetailCheckoutPayment(
   sql: RetailCheckoutDb,
-  payment: CheckoutPaymentRow
+  payment: CheckoutPaymentRow,
+  confirmedAgenticOrderId?: string
 ) {
-  if (payment.status === "fulfilled" && payment.retail_customer_order_id) {
-    const existingOrder = await sql<Array<{ order_number: string }>>`
-      select order_number
-      from public.retail_customer_orders
-      where id = ${payment.retail_customer_order_id}::uuid
-      limit 1
+  // Resolving FX can call a provider. Keep it outside the payment row lock.
+  const fx = payment.status === "fulfilled" && payment.retail_customer_order_id
+    ? null
+    : await resolveUsdRateForCurrency(payment.currency, { sql });
+  const outcome = await withDatabaseTransaction(sql as Db, async tx => {
+    // The webhook and browser return can arrive together with the same paid
+    // snapshot. Re-read under one lock before creating or linking any order.
+    const [current] = await tx<CheckoutPaymentRow[]>`
+      select * from public.retail_checkout_payments
+      where id = ${payment.id}::uuid
+      for update
     `;
+    if (!current) throw new Error("Retail checkout payment was not found");
+
+    if (current.status === "fulfilled" && current.retail_customer_order_id) {
+      const [existingOrder] = await tx<Array<{ order_number: string }>>`
+        select order_number from public.retail_customer_orders
+        where id = ${current.retail_customer_order_id}::uuid
+      `;
+      if (!existingOrder) throw new Error("Retail checkout order was not found");
+      return {
+        created: false as const,
+        orderId: current.retail_customer_order_id,
+        orderNumber: existingOrder.order_number,
+        orderStatus: null,
+        payment: current,
+        trackingToken: null
+      };
+    }
+
+    // The agentic adapter is invoked after its own payment confirmation; web
+    // checkout must always have persisted provider payment evidence.
+    const confirmedByAgenticAdapter = Boolean(confirmedAgenticOrderId &&
+      objectValue(current.metadata).agenticOrderId === confirmedAgenticOrderId);
+    if (!retailPaymentConfirmed(current) && !confirmedByAgenticAdapter) {
+      throw new Error("Retail checkout payment is not confirmed");
+    }
+    if (!fx) throw new Error("Retail checkout payment state changed; retry fulfillment");
+
+    const { orderId, orderNumber, orderStatus } =
+      await createRetailCustomerOrderFromPayment(tx, current);
+    const trackingToken = randomBytes(32).toString("base64url");
+    const trackingHash = hashToken(trackingToken);
+    await recordRetailCheckoutFinance(tx, current, orderId, fx);
+    const [updated] = await tx<CheckoutPaymentRow[]>`
+      update public.retail_checkout_payments
+      set status = 'fulfilled',
+        retail_customer_order_id = ${orderId}::uuid,
+        tracking_token_hash = coalesce(tracking_token_hash, ${trackingHash}),
+        fulfilled_at = coalesce(fulfilled_at, now()),
+        updated_at = now()
+      where id = ${current.id}::uuid
+      returning *
+    `;
+    await recordVersion(tx, current.id, "retail_checkout_fulfilled", "system", "paid_product_order_created", {
+      orderId
+    });
+    return { created: true as const, orderId, orderNumber, orderStatus, payment: updated!, trackingToken };
+  });
+  const { orderId, orderNumber, orderStatus, payment: updated, trackingToken } = outcome;
+
+  if (!outcome.created) {
     await projectRetailPaidOntoAgenticOrder({
-      agenticOrderId: objectValue(payment.metadata).agenticOrderId,
-      orderNumber:
-        existingOrder[0]?.order_number ?? payment.retail_customer_order_id,
-      payment
+      agenticOrderId: objectValue(updated.metadata).agenticOrderId,
+      orderNumber,
+      payment: updated
     });
     return {
-      ...payment,
-      metadata: { ...objectValue(payment.metadata), trackingReference: existingOrder[0]?.order_number ?? payment.retail_customer_order_id }
+      ...updated,
+      metadata: { ...objectValue(updated.metadata), trackingReference: orderNumber }
     };
   }
-
-  const { orderId, orderNumber, orderStatus } =
-    await createRetailCustomerOrderFromPayment(sql, payment);
-  const trackingToken = randomBytes(32).toString("base64url");
-  const trackingHash = hashToken(trackingToken);
-
-  await recordRetailCheckoutFinance(sql, payment, orderId);
-
-  const rows = await sql<CheckoutPaymentRow[]>`
-    update public.retail_checkout_payments
-    set status = 'fulfilled',
-      retail_customer_order_id = ${orderId}::uuid,
-      tracking_token_hash = coalesce(tracking_token_hash, ${trackingHash}),
-      fulfilled_at = coalesce(fulfilled_at, now()),
-      updated_at = now()
-    where id = ${payment.id}::uuid
-    returning *
-  `;
-  const updated = rows[0] ?? payment;
-
-  await recordVersion(sql, payment.id, "retail_checkout_fulfilled", "system", "paid_product_order_created", {
-    orderId
-  });
 
   void writeBpmEvent({
     ...commerceBpmContext(updated.metadata, updated.stripe_mode),
@@ -1846,7 +1878,7 @@ export async function completeMockRetailCheckout(input: Readonly<{
   const payment = await withDatabaseTransaction(sql, async tx => {
   const rows = await tx<CheckoutPaymentRow[]>`
     update public.retail_checkout_payments
-    set status = 'paid',
+    set status = case when status = 'fulfilled' then status else 'paid' end,
       stripe_customer_id = 'mock_customer',
       stripe_payment_intent_id = ${`mock_pi_${input.paymentId}`},
       paid_at = coalesce(paid_at, now()),
@@ -2390,10 +2422,7 @@ export async function fulfillAgenticRetailCheckout(input: Readonly<{
     };
   }
 
-  const fulfilled = await fulfillRetailCheckoutPayment(sql, {
-    ...payment,
-    status: "paid"
-  });
+  const fulfilled = await fulfillRetailCheckoutPayment(sql, payment, input.agenticOrderId);
   const orderId = fulfilled.retail_customer_order_id;
 
   if (!orderId) {
