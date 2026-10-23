@@ -7,7 +7,6 @@ import type { Locale, LocaleCode } from "@/lib/i18n";
 import { getNamespace } from "@/lib/i18n-messages";
 import { nutritionQuizPath } from "@/lib/nutrition-paths";
 import { ConnectCampaignLink } from "@/components/connect-campaign-link";
-import { connectCopy } from "@/lib/connect-copy";
 
 type TitleBarProps = Readonly<{
   assessmentHref?: string;
@@ -147,7 +146,6 @@ export function TitleBar({
                 {label}
               </Link>
             ))}
-            <ConnectCampaignLink href={`/${currentLocale}/connect`} className="mn-titlebar-link">{connectCopy[currentLocale].nav}</ConnectCampaignLink>
           </nav>
         ) : null}
         <div className="mn-titlebar-actions">
@@ -178,7 +176,6 @@ export function TitleBar({
                     {label}
                   </Link>
                 ))}
-                <ConnectCampaignLink href={`/${currentLocale}/connect`} className="mn-titlebar-mobile-link">{connectCopy[currentLocale].nav}</ConnectCampaignLink>
                 <div className="mn-titlebar-mobile-actions">
                   {showAssessmentCta ? (
                     actionLabel ? <ConnectCampaignLink className="mn-titlebar-mobile-cta" href={titleCtaHref}>{actionLabel}</ConnectCampaignLink>
