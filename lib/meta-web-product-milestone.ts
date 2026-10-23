@@ -20,15 +20,17 @@ export async function validateWebProductMilestone(sql: Db, contextId: string, na
     where a.plan_id=${planId}::uuid and b.context_id=${contextId}::uuid and a.input_revision=${revision}
       and to_jsonb(a)->>'journey_version'='web-products-v1'`;
   if (!assessment) return null;
+  // Locale describes the displayed page. Saved calculations retain the trusted
+  // assessment locale, including after a customer changes the page language.
   const safeData: Record<string, string | number> = { planId, locale, channel: "web", stage, journey_version: "web-products-v1" };
   if (stage === "formula") {
     const formulaVersion = Number(evidence.formulaVersion);
     if (!Number.isSafeInteger(formulaVersion) || formulaVersion < 1) return null;
     const [formula] = await sql`select f.version from public.assessments a
-      ${historicalAssessmentReadJoin(sql, "a", locale)}
+      ${historicalAssessmentReadJoin(sql, "a", null)}
       join public.formulations f on f.plan_id=a.plan_id
       where a.plan_id=${planId}::uuid and a.input_revision=${revision}
-        and ((f.assessment_revision=a.input_revision and f.generation_locale=${locale} and f.generator_version=${FUNNEL_GENERATOR_VERSION})
+        and ((f.assessment_revision=a.input_revision and f.generation_locale=a.locale and f.generator_version=${FUNNEL_GENERATOR_VERSION})
           or ${historicalResult(sql, "f", true)})
         and (f.model_version is null or f.model_version not like '%:example') order by f.version desc limit 1`;
     return formula && Number(formula.version) === formulaVersion
@@ -37,11 +39,11 @@ export async function validateWebProductMilestone(sql: Db, contextId: string, na
   const runId = typeof evidence.runId === "string" && uuidPattern.test(evidence.runId) ? evidence.runId : null;
   if (!runId) return null;
   const [run] = await sql`select r.id from public.assessments a
-    ${historicalAssessmentReadJoin(sql, "a", locale)}
+    ${historicalAssessmentReadJoin(sql, "a", null)}
     join public.product_recommendation_runs r on r.plan_id=a.plan_id
     left join public.assessment_product_preferences p on p.plan_id=a.plan_id
     where a.plan_id=${planId}::uuid and a.input_revision=${revision} and r.id=${runId}::uuid
-      and ((r.assessment_revision=a.input_revision and r.generation_locale=${locale} and r.generator_version=${FUNNEL_GENERATOR_VERSION}
+      and ((r.assessment_revision=a.input_revision and r.generation_locale=a.locale and r.generator_version=${FUNNEL_GENERATOR_VERSION}
         and r.catalogue_revision=(select revision from public.catalogue_runtime_revision where singleton=true)) or ${historicalResult(sql, "r")})
       and r.selection_revision=coalesce(p.revision,0) and r.status in ('completed','partial')
       and exists(select 1 from public.product_recommendation_items i where i.run_id=r.id)
@@ -49,7 +51,7 @@ export async function validateWebProductMilestone(sql: Db, contextId: string, na
         where newer.plan_id=r.plan_id and newer.selection_revision=r.selection_revision
           and coalesce(newer.diagnostics->>'stackPreference','balanced')=coalesce(r.diagnostics->>'stackPreference','balanced')
           and newer.status in ('completed','partial')
-          and ((newer.assessment_revision=a.input_revision and newer.generation_locale=${locale}
+          and ((newer.assessment_revision=a.input_revision and newer.generation_locale=a.locale
             and newer.generator_version=${FUNNEL_GENERATOR_VERSION}
             and newer.catalogue_revision=(select revision from public.catalogue_runtime_revision where singleton=true))
             or ${historicalResult(sql, "newer")})

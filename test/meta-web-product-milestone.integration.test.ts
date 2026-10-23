@@ -60,11 +60,12 @@ describe("free web reveal browser/CAPI identity", () => {
     });
     await closeSqlPool();
   });
-  async function capture(stage: string, selectedItemIds: string[] = [], context = owner, revision = 1, formulaVersion = 1) {
+  async function capture(stage: string, selectedItemIds: string[] = [], context = owner, revision = 1, formulaVersion = 1,
+    locale = "th", proof: Record<string, unknown> = {}) {
     const response = await POST(new Request(request().url, { method: "POST", headers: request(context).headers,
       body: JSON.stringify({ name: stage === "basket" ? "AddToCart" : "ViewContent", eventId: randomUUID(), sessionId: randomUUID(),
-        sourceUrl: `/th/nutrition/reveal?planId=${planId}`, data: { planId, locale: "th", stage, journey_version: "web-products-v1", value: 1, currency: "USD" },
-        webProductMilestone: { revision, formulaVersion, runId, selectedItemIds, candidateKey: "fixture", selectionRevision: 0 } }) }));
+        sourceUrl: `/${locale}/nutrition/reveal?planId=${planId}`, data: { planId, locale, stage, journey_version: "web-products-v1", value: 1, currency: "USD" },
+        webProductMilestone: { revision, formulaVersion, runId, selectedItemIds, candidateKey: "fixture", selectionRevision: 0, ...proof } }) }));
     assert.equal(response.status, 200);
     return response.json();
   }
@@ -103,6 +104,50 @@ describe("free web reveal browser/CAPI identity", () => {
         data: { planId, locale: "th", stage: "basket", value: 1, currency: "USD" } }) }));
     assert.equal((await omittedProof.json()).accepted, false, "Omitting the new-flow label cannot bypass basket validation");
   });
+  it("accepts saved Thai results in English and Chinese without changing receipt deduplication or basket value", async () => {
+    for (const locale of ["en", "zh-CN"]) {
+      for (const stage of ["formula", "products", "basket"]) {
+        const selected = stage === "basket" ? [productIds[0], productIds[2]] : [];
+        const first = await capture(stage, selected, owner, 1, 1, locale);
+        assert.equal(first.accepted, true, `${locale} ${stage} reuses the saved Thai calculation`);
+        assert.equal(first.data.locale, locale);
+        assert.equal(first.data.funnel_stage, stage);
+        assert.equal(first.data.journey_version, "web-products-v1");
+        if (stage === "basket") {
+          assert.equal(first.data.value, 400);
+          assert.equal(first.data.currency, "THB");
+          assert.equal(first.data.purchase_type, "products");
+        }
+        assert.deepEqual(await capture(stage, [...selected].reverse(), owner, 1, 1, locale), first);
+        const original = await capture(stage, selected);
+        assert.notEqual(first.eventId, original.eventId, "The existing locale-specific receipt identity is preserved");
+      }
+      assert.equal((await capture("formula", [], outsider, 1, 1, locale)).accepted, false);
+      assert.equal((await capture("formula", [], owner, 1, 2, locale)).accepted, false);
+      assert.equal((await capture("products", [], owner, 2, 1, locale)).accepted, false);
+      assert.equal((await capture("basket", [productIds[0]], owner, 1, 1, locale, { candidateKey: "unknown" })).accepted, false);
+      assert.equal((await capture("basket", [productIds[0]], owner, 1, 1, locale, { selectionRevision: 1 })).accepted, false);
+      assert.equal((await capture("basket", [randomUUID()], owner, 1, 1, locale)).accepted, false);
+    }
+  });
+  it("checks replacement runs in the saved calculation language rather than the display language", async () => {
+    const rollback = new Error("locale replacement fixture rollback");
+    await assert.rejects(withDatabaseTransaction(getSql()!, async tx => {
+      const view = () => validateWebProductMilestone(tx, owner, "ViewContent",
+        { plan_id: planId, locale: "en", funnel_stage: "products" }, { revision: 1, runId });
+      await tx`insert into public.product_recommendation_runs
+        (id,plan_id,assessment_revision,generation_locale,generator_version,catalogue_revision,selection_revision,status,diagnostics,generated_at)
+        select ${randomUUID()}::uuid,plan_id,assessment_revision,'en',generator_version,catalogue_revision,selection_revision,status,diagnostics,generated_at+interval '1 second'
+        from public.product_recommendation_runs where id=${runId}::uuid`;
+      assert.ok(await view(), "An unrelated English run cannot replace the saved Thai result");
+      await tx`insert into public.product_recommendation_runs
+        (id,plan_id,assessment_revision,generation_locale,generator_version,catalogue_revision,selection_revision,status,diagnostics,generated_at)
+        select ${randomUUID()}::uuid,plan_id,assessment_revision,generation_locale,generator_version,catalogue_revision,selection_revision,status,diagnostics,generated_at+interval '2 seconds'
+        from public.product_recommendation_runs where id=${runId}::uuid`;
+      assert.equal(await view(), null, "A replacement Thai run makes the displayed old result stale");
+      throw rollback;
+    }), error => error === rollback);
+  });
   it("accepts evidenced historical output but rejects changed provenance", async () => {
     const rollback = new Error("historical fixture rollback");
     await assert.rejects(withDatabaseTransaction(getSql()!, async tx => {
@@ -123,15 +168,20 @@ describe("free web reveal browser/CAPI identity", () => {
       await tx`insert into public.product_recommendation_items(run_id,product_id,rank,price_amount,url_used)
         values(${historicalRun}::uuid,${productIds[0]}::uuid,1,100,'https://example.test/fixture')`;
       const evidence = { revision: 0, formulaVersion: 2, runId: historicalRun };
-      const view = (stage: string) => validateWebProductMilestone(tx, owner, "ViewContent",
-        { plan_id: planId, locale: "th", funnel_stage: stage }, evidence);
-      assert.ok(await view("formula")); assert.ok(await view("products"));
+      const view = (stage: string, locale: string) => validateWebProductMilestone(tx, owner, "ViewContent",
+        { plan_id: planId, locale, funnel_stage: stage }, evidence);
+      for (const locale of ["th", "en", "zh-CN"]) {
+        assert.ok(await view("formula", locale)); assert.ok(await view("products", locale));
+      }
       await tx`update public.assessments set answers='{"activity":"changed"}' where plan_id=${planId}::uuid`;
-      assert.equal(await view("formula"), null); assert.equal(await view("products"), null);
+      for (const locale of ["th", "en", "zh-CN"]) {
+        assert.equal(await view("formula", locale), null); assert.equal(await view("products", locale), null);
+      }
       throw rollback;
     }), error => error === rollback);
   });
   it("rejects another context, stale revisions and withdrawal without disturbing receipts", async () => {
+    const [before] = await getSql()!`select count(*)::int as n from public.meta_conversion_events where context_id=${owner}::uuid`;
     assert.equal((await capture("formula", [], outsider)).accepted, false);
     assert.equal((await capture("formula", [], owner, 1, 2)).accepted, false);
     assert.equal((await capture("products", [], owner, 2)).accepted, false);
@@ -140,6 +190,6 @@ describe("free web reveal browser/CAPI identity", () => {
     assert.equal((await capture("basket", [productIds[0]])).accepted, false);
     await setMetaConsent(request(owner), false);
     assert.equal((await capture("products")).accepted, false);
-    assert.equal((await getSql()!`select count(*)::int as n from public.meta_conversion_events where context_id=${owner}::uuid`)[0].n, 4);
+    assert.equal((await getSql()!`select count(*)::int as n from public.meta_conversion_events where context_id=${owner}::uuid`)[0].n, before.n);
   });
 });

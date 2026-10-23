@@ -21,14 +21,45 @@ function observeWebOnly(page: Page) {
   return { errors, pharmacyRequests };
 }
 
-test("reveal language changes keep the saved calculation and selected basket without reloading", async ({ page }) => {
+test("reveal language changes keep the saved calculation and selected basket without reloading", async ({ page, baseURL }) => {
   const channel = observeWebOnly(page);
   const { stdout } = await execute(process.execPath, ["--experimental-strip-types", "--import", "./scripts/register-ts-path-loader.mjs",
     "scripts/seed-browser-fixtures.ts", `/tmp/web-reveal-locale-${Date.now()}.json`, JSON.stringify({ scenario: "free_products", locale: "en" })],
   { env: process.env, timeout: 60_000 });
   const seeded = JSON.parse(stdout.split("\n").find(line => line.startsWith("BROWSER_FIXTURES:"))!.slice(17));
+  const trackingConfig = { enabled: true, environment: "dev", pixelId: "123456789012345" };
+  const pageViews: Array<{ eventId: string; sourceUrl: string; data: { locale: string; funnel_stage: string } }> = [];
+  const bpmLocales: string[] = [];
+  await page.context().addCookies([{ name: "mn_marketing", value: "granted", url: baseURL! }]);
+  await page.route("**/api/marketing/consent", route => route.fulfill({ json: trackingConfig }));
+  await page.route("**/api/marketing/events", route => {
+    if (route.request().method() === "GET") return route.fulfill({ json: { ...trackingConfig, events: [] } });
+    const body = route.request().postDataJSON();
+    if (body.name === "PageView") pageViews.push(body);
+    return route.fulfill({ json: { accepted: true, eventId: body.eventId, data: body.data } });
+  });
+  await page.route("https://connect.facebook.net/**", route => route.fulfill({ contentType: "application/javascript",
+    body: "window.__pixelCalls=window.fbq.queue.slice();window.fbq.callMethod=(...args)=>window.__pixelCalls.push(args);" }));
+  const expectedLocales = ["en"];
+  async function expectTrackingLocales() {
+    await expect.poll(() => pageViews.map(event => event.data.locale)).toEqual(expectedLocales);
+    await expect.poll(() => bpmLocales).toEqual(expectedLocales);
+    expect(pageViews.map(event => new URL(event.sourceUrl).pathname.split("/")[1])).toEqual(expectedLocales);
+    expect(pageViews.every(event => event.data.funnel_stage === "results")).toBe(true);
+    expect(new Set(pageViews.map(event => event.eventId)).size).toBe(expectedLocales.length);
+    await expect.poll(() => page.evaluate(() => ((window as unknown as { __pixelCalls?: unknown[][] }).__pixelCalls ?? [])
+      .flatMap(call => call[0] === "trackSingleCustom" && call[2] === "DEV_PageView"
+        ? [{ locale: (call[3] as { locale: string }).locale, eventId: (call[4] as { eventID: string }).eventID }]
+        : call[0] === "trackCustom" && call[1] === "DEV_PageView"
+          ? [{ locale: (call[2] as { locale: string }).locale, eventId: (call[3] as { eventID: string }).eventID }] : [])))
+      .toEqual(pageViews.map(event => ({ locale: event.data.locale, eventId: event.eventId })));
+  }
   const generationRequests: string[] = [];
   page.on("request", request => {
+    if (request.method() === "POST" && new URL(request.url()).pathname === "/api/bpm") {
+      const body = request.postDataJSON();
+      if (body.eventName === "reveal_page_viewed") bpmLocales.push(body.locale);
+    }
     if (request.method() === "POST" && /\/(journey\/retry|formulation\/refresh|product-recommendations)$/.test(new URL(request.url()).pathname)) {
       generationRequests.push(request.url());
     }
@@ -36,6 +67,7 @@ test("reveal language changes keep the saved calculation and selected basket wit
   await page.goto(seeded.REVEAL_VISUAL_SMOKE_URL);
   const journey = page.getByTestId("web-product-journey");
   await expect(journey).toHaveAttribute("data-stage", "ready");
+  await expectTrackingLocales();
   const checkboxes = page.locator("#products .mn-product-check");
   await expect(checkboxes).toHaveCount(2);
   await checkboxes.first().uncheck();
@@ -62,11 +94,15 @@ test("reveal language changes keep the saved calculation and selected basket wit
     const target = new URL(await checkout.getAttribute("href") ?? "", page.url());
     expect(target.pathname).toBe(`/${locale}/basket/checkout`);
     expect(target.search).toBe(before);
+    expectedLocales.push(locale);
+    await expectTrackingLocales();
   }
   await page.goBack();
   await expect(page.locator("html")).toHaveAttribute("lang", "th-TH");
   await expect(journey).toHaveAttribute("data-retained-instance", "yes");
   await expect(checkboxes.first()).not.toBeChecked();
+  expectedLocales.push("th");
+  await expectTrackingLocales();
   const thaiCheckout = await page.getByRole("link", { name: webProductCopy.th.continue, exact: true }).getAttribute("href");
   await page.reload();
   await expect(journey).toHaveAttribute("data-stage", "ready");

@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
-import type { Locale } from "@/lib/i18n";
+import { isLocale, type Locale } from "@/lib/i18n";
 import { browserPixelPageSafe, metaPageStage, type MetaPublicConfig } from "@/lib/meta-event-policy";
 import { metaCampaignAttribution, metaClickId } from "@/lib/meta-attribution";
 import { configureMetaClient, marketingGranted, marketingPreferenceSaved, META_PREFERENCE_CHANGED, saveMarketingPreference, trackMetaEvent } from "@/lib/meta-client";
@@ -11,10 +11,12 @@ import { startMetaReceiptDelivery } from "@/lib/meta-browser-delivery";
 let initialPreference: Promise<boolean> | undefined;
 const startupRetryDelays = [500, 1500];
 
-export function MarketingPreference({ locale }: { locale: Locale }) {
+export function MarketingPreference({ locale: fallbackLocale }: { locale: Locale }) {
   const [config, setConfig] = useState<MetaPublicConfig | null>(null);
   const navigation = useRef<{ key: string; id: string; bootstrap?: MetaBootstrapPageView }>({ key: "", id: "" });
   const pathname = usePathname(), search = useSearchParams().toString();
+  const routeLocale = pathname.split("/")[1];
+  const locale = isLocale(routeLocale) ? routeLocale : fallbackLocale;
   const [choice, setChoice] = useState(0);
   const grantedPreference = useRef(marketingGranted());
   const excluded = /\/(admin|api)(\/|$)/.test(pathname);

@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import { trackBpmEvent } from "@/lib/bpm-client";
-import { localeRoutePattern, type Locale } from "@/lib/i18n";
+import { isLocale, localeRoutePattern, type Locale } from "@/lib/i18n";
 
 const localePattern = localeRoutePattern();
 // Keep the canonical reveal route visible to static migration tests: nutrition\/reveal.
@@ -51,8 +51,10 @@ function pageEventForPath(pathname: string) {
   return { eventName: "page_viewed", eventType: "traffic" };
 }
 
-export function BpmTracker({ locale }: Readonly<{ locale: Locale }>) {
+export function BpmTracker({ locale: fallbackLocale }: Readonly<{ locale: Locale }>) {
   const pathname = usePathname();
+  const routeLocale = pathname.split("/")[1];
+  const locale = isLocale(routeLocale) ? routeLocale : fallbackLocale;
   const search = useSearchParams().toString();
   const lastPageKey = useRef("");
   const isAdminPath = new RegExp(`^/(${localePattern})/admin(/|$)`).test(pathname);
