@@ -33,13 +33,14 @@ export function cardOptionClasses(selected: boolean) {
 
 type SectionCardProps = Readonly<{
   children: ReactNode;
-  description?: string;
+  description?: ReactNode;
   done: boolean;
   footer?: ReactNode;
-  sectionLabel: string;
-  stepLabel: string;
+  sectionLabel?: string;
+  stepLabel?: string;
   supportingNote?: string;
   title: string;
+  titleId?: string;
 }>;
 
 type SectionProgressProps = Readonly<{
@@ -146,38 +147,39 @@ export function SectionCard({
   sectionLabel,
   stepLabel,
   supportingNote,
-  title
+  title,
+  titleId
 }: SectionCardProps) {
   return (
-    <section className="mn-section-card">
+    <section className="mn-section-card" aria-labelledby={titleId}>
       <div className="mn-section-card__header">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0">
-            <p
+            {sectionLabel && <p
               className={cx(
                 "mn-section-card__kicker",
                 done ? "mn-section-card__kicker--done" : "mn-section-card__kicker--active"
               )}
             >
               {sectionLabel}
-            </p>
-            <h2 className="mn-section-card__title">{title}</h2>
+            </p>}
+            <h2 id={titleId} className="mn-section-card__title">{title}</h2>
             {description ? (
               <p className="mn-section-card__copy">
                 {description}
               </p>
             ) : null}
           </div>
-          <div className="max-w-xl text-left lg:max-w-sm lg:text-right">
-            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+          {(stepLabel || supportingNote) && <div className="max-w-xl text-left lg:max-w-sm lg:text-right">
+            {stepLabel && <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
               {stepLabel}
-            </p>
+            </p>}
             {supportingNote ? (
               <p className="mt-2 text-sm leading-6 text-muted-foreground">
                 {supportingNote}
               </p>
             ) : null}
-          </div>
+          </div>}
         </div>
       </div>
       <div className="mn-section-card__body">

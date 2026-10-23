@@ -7,6 +7,7 @@ import { PharmacyRevealShell, PharmacyIngredientCards, PharmacyProductCard, Phar
 import { combinedCopy } from "@/components/pharmacy/combined-copy";
 import { WebRevealRecovery } from "./web-preparation-panel";
 import { webProductCopy } from "./web-product-copy";
+import { SectionCard } from "./ui";
 import { useVisibleWebMilestones } from "./use-visible-web-milestones";
 import { productRecommendationOptionsForResult, selectProductRecommendationOption, resultHasPendingProductRecommendations, selectedStackCoverage } from "@/components/formulation-results-helpers";
 import { visibleFormulaIngredients, localizedSupplementName, localizedIngredientRationale } from "@/components/formulation-support-helpers";
@@ -140,9 +141,14 @@ export function WebCombinedReveal({ locale, planId, result, snapshot, failed, re
           <h3 id="mn-web-availability-title">{c.productAvailability}</h3>
           <p className="mn-order-help" role="status">{c.productsUnavailable}</p>
           <p>{c.planSavedWithoutProducts}</p>
-        </section> : <section className="mn-transaction mn-web-basket" aria-labelledby="mn-web-order-title" data-testid="web-basket">
-          <h3 id="mn-web-order-title">{c.reviewBasket}</h3>
-          <p className="mn-order-help"><strong>{c.selectionHelp}</strong><span>{c.selectionUpdates}</span></p>
+        </section> : <div className="mn-web-basket" data-testid="web-basket">
+          <SectionCard done={false} title={c.reviewBasket} titleId="mn-web-order-title"
+            description={<><strong>{c.selectionHelp}</strong><br />{c.selectionUpdates}</>}
+            footer={!!products.length && <div className="space-y-3">
+              <p className="mn-section-card__copy">{selectedPriced ? c.deliveryNext : c.pricingPending}</p>
+              {checkoutHref ? <Link className="mn-green-button w-full gap-2" href={checkoutHref} onClick={confirmBasket}>{c.continue}<ArrowRight size={18} aria-hidden="true" /></Link>
+                : <button className="mn-green-button w-full gap-2 disabled:cursor-not-allowed disabled:opacity-50" disabled>{selectedIds.length ? c.continue : c.empty}<ArrowRight size={18} aria-hidden="true" /></button>}
+            </div>}>
           <div className="mn-order-summary" aria-live="polite" aria-atomic="true"><span className="mn-order-count">{selected.length} {shared.items}</span>
             <strong className="mn-order-total">{selectedPriced ? new Intl.NumberFormat(locale, {
               style: "currency", currency, currencyDisplay: "code", maximumFractionDigits: 0
@@ -151,14 +157,12 @@ export function WebCombinedReveal({ locale, planId, result, snapshot, failed, re
             <p className="mn-web-payment-note">{c.selectionPayment}</p>
             <section className="mn-web-pharmacy-delivery" aria-labelledby="mn-web-pharmacy-title">
               <div className="mn-web-delivery-icons" aria-hidden="true"><Store /><ArrowRight /><House /></div>
-              <h4 id="mn-web-pharmacy-title">{c.pharmacyDelivery}</h4>
+              <h3 id="mn-web-pharmacy-title">{c.pharmacyDelivery}</h3>
               <p>{pharmacyLabel ? <>{c.pharmacyLead}<strong>{pharmacyLabel}</strong>{c.pharmacyTail}</> : c.pharmacyFallback}</p>
             </section>
-            <p className="mn-pre-confirm">{selectedPriced ? c.deliveryNext : c.pricingPending}</p>
-            {checkoutHref ? <Link className="mn-confirm-btn" href={checkoutHref} onClick={confirmBasket}>{c.continue}<ArrowRight aria-hidden="true" /></Link>
-              : <button className="mn-confirm-btn" disabled>{selectedIds.length ? c.continue : c.empty}<ArrowRight aria-hidden="true" /></button>}
           </>}
-        </section>}
+          </SectionCard>
+        </div>}
         {!!products.length && <div className="mn-web-selection-details">
           <p className="mn-web-coverage">{c.coverage}: {basketCoverage == null ? "—" : `${Math.round(basketCoverage)}%`}</p>
           {!!removed.length && <div className="mn-web-basket-impact" data-testid="basket-selection-impact" role="status">
