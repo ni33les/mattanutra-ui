@@ -166,8 +166,8 @@ test("free product basket supports removal and undo, tracks visible cards, and o
   });
   await page.goto(seeded.REVEAL_VISUAL_SMOKE_URL);
   await expect(page.getByTestId("web-product-journey")).toHaveAttribute("data-stage", "ready");
-  await expect(page.getByText(webProductCopy.en.free, { exact: true })).toHaveCount(1);
-  await expect(page.getByTestId("web-basket").getByText(webProductCopy.en.free, { exact: true })).toBeVisible();
+  await expect(page.getByText(webProductCopy.en.selectionPayment, { exact: true })).toHaveCount(1);
+  await expect(page.getByTestId("web-basket").getByText(webProductCopy.en.selectionPayment, { exact: true })).toBeVisible();
   await expect(page.locator(".mn-estimate")).toHaveCount(0);
   const products = page.locator("#products .mn-product"), checkboxes = products.locator(".mn-product-check");
   await expect(products).toHaveCount(2);

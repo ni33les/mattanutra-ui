@@ -22,3 +22,49 @@
 #mn-pharmacy-combined[data-channel=web] .mn-web-basket-impact p+p{margin-top:8px}
 #mn-pharmacy-combined[data-channel=web] .mn-web-matching-advice{width:min(100%,700px);margin:24px auto}
 #mn-pharmacy-combined[data-channel=web] .mn-return-path .mn-read-now{margin:12px auto}
+
+/* Web basket presentation; pharmacy counter ordering keeps its existing layout. */
+#mn-pharmacy-combined[data-channel=web] .mn-web-basket{
+  padding:clamp(20px,4vw,38px);border-radius:22px;
+  background:linear-gradient(145deg,var(--mn-surface),color-mix(in srgb,var(--mn-soft-green) 40%,var(--mn-surface)));
+  text-align:left;font-size:clamp(16px,2vw,20px);line-height:1.5;
+}
+#mn-pharmacy-combined[data-channel=web] .mn-web-basket>h3{
+  font-family:var(--mn-font-display),var(--mn-font-thai-serif),Georgia,serif;
+  font-size:clamp(30px,4.8vw,52px);font-weight:700;line-height:1.12;letter-spacing:-.025em;
+}
+#mn-pharmacy-combined[data-channel=web] .mn-web-basket .mn-order-help{
+  margin:22px 0;color:var(--mn-text);font-weight:400;line-height:1.5;
+}
+#mn-pharmacy-combined[data-channel=web] .mn-web-basket .mn-order-help strong,
+#mn-pharmacy-combined[data-channel=web] .mn-web-basket .mn-order-help span{display:block}
+#mn-pharmacy-combined[data-channel=web] .mn-web-basket .mn-order-help strong{font-weight:700}
+#mn-pharmacy-combined[data-channel=web] .mn-web-basket .mn-order-summary{
+  flex-direction:row;flex-wrap:wrap;align-items:center;gap:10px 20px;
+  margin:0;padding:clamp(16px,2.6vw,26px);border-radius:14px;
+  background:var(--mn-text);color:var(--mn-surface);
+}
+#mn-pharmacy-combined[data-channel=web] .mn-web-basket .mn-order-count{font-size:clamp(16px,2.1vw,22px);font-weight:650}
+#mn-pharmacy-combined[data-channel=web] .mn-web-basket .mn-order-total{
+  font-size:clamp(28px,4.2vw,44px);line-height:1.15;margin-left:auto;font-variant-numeric:tabular-nums;
+}
+#mn-pharmacy-combined[data-channel=web] .mn-web-payment-note{margin:24px 0 38px;color:var(--mn-text)}
+#mn-pharmacy-combined[data-channel=web] .mn-web-pharmacy-delivery{
+  border-block:1px solid color-mix(in srgb,var(--mn-green) 22%,var(--mn-line));padding:24px 0;
+}
+#mn-pharmacy-combined[data-channel=web] .mn-web-delivery-icons{display:flex;align-items:center;gap:18px;color:var(--color-forest-deep);margin-bottom:16px}
+#mn-pharmacy-combined[data-channel=web] .mn-web-delivery-icons svg{width:40px;height:40px;stroke-width:1.65}
+#mn-pharmacy-combined[data-channel=web] .mn-web-delivery-icons svg:nth-child(2){width:28px;height:28px}
+#mn-pharmacy-combined[data-channel=web] .mn-web-pharmacy-delivery h4{
+  margin:0 0 12px;font:inherit;font-size:clamp(22px,2.6vw,28px);font-weight:750;line-height:1.3;color:var(--color-forest-deep);
+}
+#mn-pharmacy-combined[data-channel=web] .mn-web-pharmacy-delivery p{margin:0;line-height:1.6;color:var(--mn-text)}
+#mn-pharmacy-combined[data-channel=web] .mn-web-pharmacy-delivery strong{font-weight:700}
+#mn-pharmacy-combined[data-channel=web] .mn-web-basket .mn-pre-confirm{margin:22px 0 16px;text-align:left;color:var(--mn-text);font-size:clamp(15px,1.8vw,18px)}
+#mn-pharmacy-combined[data-channel=web] .mn-web-basket .mn-confirm-btn{
+  min-height:64px;padding:16px 20px;border-radius:14px;gap:18px;font-size:clamp(17px,2.3vw,24px);font-weight:700;
+  background:var(--color-forest-deep);line-height:1.35;
+}
+#mn-pharmacy-combined[data-channel=web] .mn-web-basket .mn-confirm-btn svg{flex:none;width:26px;height:26px}
+#mn-pharmacy-combined[data-channel=web] .mn-web-basket .mn-confirm-btn:focus-visible{outline:3px solid var(--mn-gold);outline-offset:4px}
+#mn-pharmacy-combined[data-channel=web] .mn-web-selection-details{width:min(100%,760px);margin:18px auto 0}

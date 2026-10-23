@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRef, useState } from "react";
-import { LoaderCircle } from "lucide-react";
+import { ArrowRight, House, LoaderCircle, Store } from "lucide-react";
 import { PharmacyRevealShell, PharmacyIngredientCards, PharmacyProductCard, PharmacyPlanInvitation } from "@/components/pharmacy/reveal-presentation";
 import { combinedCopy } from "@/components/pharmacy/combined-copy";
 import { WebRevealRecovery } from "./web-preparation-panel";
@@ -63,6 +63,11 @@ export function WebCombinedReveal({ locale, planId, result, snapshot, failed, re
     (b.totalPlanCoveragePercent ?? 0) - (a.totalPlanCoveragePercent ?? 0) ||
     (a.subtotalAmount ?? Infinity) - (b.subtotalAmount ?? Infinity) || (a.etaDate ?? "").localeCompare(b.etaDate ?? ""))[0];
   const currency = retailer?.currency ?? selected.find(product => product.price?.currency)?.price?.currency ?? products[0]?.price?.currency ?? "THB";
+  const pharmacyName = retailer?.organisationName?.trim();
+  const pharmacyCity = retailer?.dispatchCity?.trim();
+  const pharmacyLabel = pharmacyName && pharmacyCity
+    ? c.pharmacyLocation.replace("{pharmacy}", pharmacyName).replace("{city}", pharmacyCity)
+    : pharmacyName;
   const hasPrice = (product: RecommendedProduct) => Number.isFinite(productAmount(product)) && Number(productAmount(product)) > 0;
   const priced = products.every(hasPrice);
   const selectedPriced = selected.every(hasPrice);
@@ -135,22 +140,32 @@ export function WebCombinedReveal({ locale, planId, result, snapshot, failed, re
           <h3 id="mn-web-availability-title">{c.productAvailability}</h3>
           <p className="mn-order-help" role="status">{c.productsUnavailable}</p>
           <p>{c.planSavedWithoutProducts}</p>
-        </section> : <section className="mn-transaction" aria-labelledby="mn-web-order-title" data-testid="web-basket">
-          <h3 id="mn-web-order-title">{c.reviewBasket}</h3><p className="mn-order-help">{shared.help}</p>
+        </section> : <section className="mn-transaction mn-web-basket" aria-labelledby="mn-web-order-title" data-testid="web-basket">
+          <h3 id="mn-web-order-title">{c.reviewBasket}</h3>
+          <p className="mn-order-help"><strong>{c.selectionHelp}</strong><span>{c.selectionUpdates}</span></p>
           <div className="mn-order-summary" aria-live="polite" aria-atomic="true"><span className="mn-order-count">{selected.length} {shared.items}</span>
-            <strong className="mn-order-total">{selectedPriced ? formatCurrencyAmount(locale, total, currency) : "—"}</strong></div>
-          {!!products.length && <p className="mn-web-coverage">{c.coverage}: {basketCoverage == null ? "—" : `${Math.round(basketCoverage)}%`}</p>}
+            <strong className="mn-order-total">{selectedPriced ? new Intl.NumberFormat(locale, {
+              style: "currency", currency, currencyDisplay: "code", maximumFractionDigits: 0
+            }).format(total) : "—"}</strong></div>
+          {!products.length ? <p>{c.noProducts}</p> : <>
+            <p className="mn-web-payment-note">{c.selectionPayment}</p>
+            <section className="mn-web-pharmacy-delivery" aria-labelledby="mn-web-pharmacy-title">
+              <div className="mn-web-delivery-icons" aria-hidden="true"><Store /><ArrowRight /><House /></div>
+              <h4 id="mn-web-pharmacy-title">{c.pharmacyDelivery}</h4>
+              <p>{pharmacyLabel ? <>{c.pharmacyLead}<strong>{pharmacyLabel}</strong>{c.pharmacyTail}</> : c.pharmacyFallback}</p>
+            </section>
+            <p className="mn-pre-confirm">{selectedPriced ? c.deliveryNext : c.pricingPending}</p>
+            {checkoutHref ? <Link className="mn-confirm-btn" href={checkoutHref} onClick={confirmBasket}>{c.continue}<ArrowRight aria-hidden="true" /></Link>
+              : <button className="mn-confirm-btn" disabled>{selectedIds.length ? c.continue : c.empty}<ArrowRight aria-hidden="true" /></button>}
+          </>}
+        </section>}
+        {!!products.length && <div className="mn-web-selection-details">
+          <p className="mn-web-coverage">{c.coverage}: {basketCoverage == null ? "—" : `${Math.round(basketCoverage)}%`}</p>
           {!!removed.length && <div className="mn-web-basket-impact" data-testid="basket-selection-impact" role="status">
             <p>{coverage.status === "verified" ? c.subset : c.unknownCoverage}</p>
             {!!affected.length && <p>{c.affected}: {affected.join(" · ")}</p>}<p>{c.fullFormula}</p>
           </div>}
-          {!products.length ? <p>{c.noProducts}</p> : <>
-            <p className="mn-pre-confirm">{c.free}</p>
-            <p className="mn-pre-confirm">{selectedPriced ? c.deliveryNext : c.pricingPending}</p>
-            {checkoutHref ? <Link className="mn-confirm-btn" href={checkoutHref} onClick={confirmBasket}>{c.continue}</Link>
-              : <button className="mn-confirm-btn" disabled>{selectedIds.length ? c.continue : c.empty}</button>}
-          </>}
-        </section>}
+        </div>}
         <PharmacyPlanInvitation locale={locale}>
           <Link className="mn-read-now" href={`/${locale}/nutrition/plan?plan=${encodeURIComponent(planId)}`}>{c.plan}</Link>
           <Link className="mn-read-now" href={`/${locale}/nutrition/healthscore?plan=${encodeURIComponent(planId)}&view=optional`}>{c.health}</Link>
