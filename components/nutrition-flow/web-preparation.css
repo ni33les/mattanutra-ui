@@ -17,7 +17,6 @@
 #mn-pharmacy-combined[data-channel=web] .mn-web-ingredient-detail details p{margin:8px 0}
 #mn-pharmacy-combined[data-channel=web] .mn-web-caution{border-left:2px solid var(--mn-gold);padding-left:8px}
 #mn-pharmacy-combined[data-channel=web] .mn-confirm-btn{text-align:center;text-decoration:none}
-#mn-pharmacy-combined[data-channel=web] .mn-web-coverage{font-size:14px;margin:18px auto}
 #mn-pharmacy-combined[data-channel=web] .mn-web-basket-impact{max-width:620px;margin:16px auto;padding:16px;border-radius:12px;background:var(--mn-bg);font-size:13px;line-height:1.6}
 #mn-pharmacy-combined[data-channel=web] .mn-web-basket-impact p+p{margin-top:8px}
 #mn-pharmacy-combined[data-channel=web] .mn-web-matching-advice{width:min(100%,700px);margin:24px auto}

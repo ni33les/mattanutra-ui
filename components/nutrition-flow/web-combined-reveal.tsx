@@ -9,7 +9,7 @@ import { WebRevealRecovery } from "./web-preparation-panel";
 import { webProductCopy } from "./web-product-copy";
 import { SectionCard } from "./ui";
 import { useVisibleWebMilestones } from "./use-visible-web-milestones";
-import { productRecommendationOptionsForResult, selectProductRecommendationOption, resultHasPendingProductRecommendations, selectedStackCoverage } from "@/components/formulation-results-helpers";
+import { productRecommendationOptionsForResult, selectProductRecommendationOption, resultHasPendingProductRecommendations } from "@/components/formulation-results-helpers";
 import { visibleFormulaIngredients, localizedSupplementName, localizedIngredientRationale } from "@/components/formulation-support-helpers";
 import { getLocalizedText, revealFinalCopy } from "@/components/formulation-reveal-copy";
 import { WebMatchingAdvice } from "@/components/web-health-advice";
@@ -58,7 +58,6 @@ export function WebCombinedReveal({ locale, planId, result, snapshot, failed, re
   const selected = products.filter(product => selectedIds.includes(productId(product)));
   const removed = products.filter(product => !selectedIds.includes(productId(product)));
   const coverage = reduceSelectionCoverage(matchedOption?.coverageSnapshot, selectedIds);
-  const basketCoverage = removed.length ? coverage.coveragePercent : selectedStackCoverage(summary, products);
   const retailer = [...(option?.retailerOptions ?? [])].filter(item => item.organisationId && item.organisationName).sort((a, b) =>
     (b.supplementProductCoveragePercent ?? 0) - (a.supplementProductCoveragePercent ?? 0) ||
     (b.totalPlanCoveragePercent ?? 0) - (a.totalPlanCoveragePercent ?? 0) ||
@@ -163,12 +162,11 @@ export function WebCombinedReveal({ locale, planId, result, snapshot, failed, re
           </>}
           </SectionCard>
         </div>}
-        {!!products.length && <div className="mn-web-selection-details">
-          <p className="mn-web-coverage">{c.coverage}: {basketCoverage == null ? "—" : `${Math.round(basketCoverage)}%`}</p>
-          {!!removed.length && <div className="mn-web-basket-impact" data-testid="basket-selection-impact" role="status">
+        {!!removed.length && <div className="mn-web-selection-details">
+          <div className="mn-web-basket-impact" data-testid="basket-selection-impact" role="status">
             <p>{coverage.status === "verified" ? c.subset : c.unknownCoverage}</p>
             {!!affected.length && <p>{c.affected}: {affected.join(" · ")}</p>}<p>{c.fullFormula}</p>
-          </div>}
+          </div>
         </div>}
         <PharmacyPlanInvitation locale={locale}>
           <Link className="mn-read-now" href={`/${locale}/nutrition/plan?plan=${encodeURIComponent(planId)}`}>{c.plan}</Link>
