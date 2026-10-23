@@ -20,9 +20,9 @@ import { trackWebProductMilestone } from "@/lib/meta-client";
 import { trackBpmEvent } from "@/lib/bpm-client";
 import { nutritionRevealPath } from "@/lib/nutrition-paths";
 import { webRevealProgress } from "@/lib/web-reveal-progress";
-import type { FormulationResult, RecommendedProduct } from "@/lib/formulation-types";
+import type { FormulationResult, LocalizedText, RecommendedProduct } from "@/lib/formulation-types";
 import type { NutritionJourneySnapshot } from "@/lib/nutrition-journey-read";
-import type { Locale } from "@/lib/i18n";
+import { resolveLocalizedText, type Locale } from "@/lib/i18n";
 import "./web-preparation.css";
 
 const productId = (product: RecommendedProduct) => product.productId ?? product.id;
@@ -34,6 +34,9 @@ export function WebCombinedReveal({ locale, planId, result, snapshot, failed, re
   snapshot: NutritionJourneySnapshot | null; failed: boolean; retry: () => void;
 }) {
   const c = webProductCopy[locale], shared = combinedCopy[locale], detailCopy = revealFinalCopy[locale];
+  // Changing display language must never hide saved explanations or cautions.
+  const generatedText = (value: LocalizedText) => getLocalizedText(value, locale)
+    || resolveLocalizedText(value, snapshot?.locale ?? locale).trim();
   const root = useRef<HTMLDivElement>(null);
   const [copied, setCopied] = useState(false), [copyFailed, setCopyFailed] = useState(false);
   const formula = result?.access === "full" && snapshot && snapshot.revision === result.assessmentRevision
@@ -116,13 +119,13 @@ export function WebCombinedReveal({ locale, planId, result, snapshot, failed, re
         <div data-web-result-stage={ingredients.length ? "formula" : undefined}>
           <PharmacyIngredientCards locale={locale} ingredients={ingredients} name={firstNameFromFormulation(formula) || shared.you}
             details={ingredient => <div className="mn-web-ingredient-detail">
-              <p>{getLocalizedText(ingredient.whyThisIsForYou ?? ingredient.forYou ?? ingredient.rationale, locale)}</p>
+              <p>{generatedText(ingredient.whyThisIsForYou ?? ingredient.forYou ?? ingredient.rationale)}</p>
               <details><summary>{detailCopy.nutrientWhy}</summary>
-                {ingredient.whyThisIsForYou && <p>{getLocalizedText(ingredient.whyThisIsForYou, locale)}</p>}
-                <p>{localizedIngredientRationale(ingredient, locale)}</p>
-                {ingredient.decision && <p>{getLocalizedText(ingredient.decision, locale)}</p>}
-                {ingredient.safety?.message && <p className="mn-web-caution">{getLocalizedText(ingredient.safety.message, locale)}</p>}
-                {ingredient.cautions?.map(caution => <p key={caution.id} className="mn-web-caution">{getLocalizedText(caution.body, locale)}</p>)}
+                {ingredient.whyThisIsForYou && <p>{generatedText(ingredient.whyThisIsForYou)}</p>}
+                <p>{generatedText(ingredient.rationale) || localizedIngredientRationale(ingredient, locale)}</p>
+                {ingredient.decision && <p>{generatedText(ingredient.decision)}</p>}
+                {ingredient.safety?.message && <p className="mn-web-caution">{generatedText(ingredient.safety.message)}</p>}
+                {ingredient.cautions?.map(caution => <p key={caution.id} className="mn-web-caution">{generatedText(caution.body)}</p>)}
               </details>
             </div>} />
         </div>
@@ -144,7 +147,7 @@ export function WebCombinedReveal({ locale, planId, result, snapshot, failed, re
           <SectionCard done={false} title={c.reviewBasket} titleId="mn-web-order-title"
             description={<><strong>{c.selectionHelp}</strong><br />{c.selectionUpdates}</>}
             footer={!!products.length && <div className="space-y-3">
-              <p className="mn-section-card__copy">{selectedPriced ? c.deliveryNext : c.pricingPending}</p>
+              {!selectedPriced && <p className="mn-section-card__copy">{c.pricingPending}</p>}
               {checkoutHref ? <Link className="mn-green-button w-full gap-2" href={checkoutHref} onClick={confirmBasket}>{c.continue}<ArrowRight size={18} aria-hidden="true" /></Link>
                 : <button className="mn-green-button w-full gap-2 disabled:cursor-not-allowed disabled:opacity-50" disabled>{selectedIds.length ? c.continue : c.empty}<ArrowRight size={18} aria-hidden="true" /></button>}
             </div>}>

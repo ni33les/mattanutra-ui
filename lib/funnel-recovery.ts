@@ -20,9 +20,10 @@ export async function recoverFunnelWork(planId: string, locale: unknown, refresh
   const [legacy] = await sql<PaymentRow[]>`select * from public.payments where plan_id = ${planId}::uuid
     and paid_at is not null and status = 'fulfillment_failed' order by created_at desc limit 1`;
   if (legacy?.stripe_checkout_session_id) await fulfillCheckoutSession(legacy.stripe_checkout_session_id, { source: "return_page" });
-  const [assessment] = await sql`select selected_plan, journey_version from public.assessments where plan_id = ${planId}::uuid`;
+  const [assessment] = await sql`select selected_plan, journey_version, locale from public.assessments where plan_id = ${planId}::uuid`;
   if (!assessment) throw new FunnelError("Assessment not found", 404, "assessment_not_found");
-  const generation = await loadGenerationInput(sql, planId, locale);
+  const sourceLocale = isWebProductJourney(assessment.journey_version) && isLocale(assessment.locale) ? assessment.locale : locale;
+  const generation = await loadGenerationInput(sql, planId, sourceLocale);
   if (!generation) throw new FunnelError("Assessment changed; please retry", 409, "assessment_changed");
   await withGenerationInput(planId, generation, async () => {
     const [payment] = await sql<PaymentRow[]>`select * from public.payments where plan_id = ${planId}::uuid
@@ -32,14 +33,14 @@ export async function recoverFunnelWork(planId: string, locale: unknown, refresh
       if (prepared.evidence.status !== "complete") await withDatabaseTransaction(sql, tx => enqueueWebPaymentFulfillment(tx, payment, prepared));
     }
     if (!refreshOnly) {
-      await enqueueHealthScoreAnalysisTask({ planId, locale });
-      if (assessment.selected_plan || isWebProductJourney(assessment.journey_version)) await enqueueNutritionPlanTasks({ planId, plan: assessment.selected_plan ?? "precision", answers: generation.answers, locale, recovery: generation, accessOnly: isWebProductJourney(assessment.journey_version) });
-      else if (payment) await enqueueAssessmentPregenerationTasks({ planId, answers: generation.answers, locale });
+      await enqueueHealthScoreAnalysisTask({ planId, locale: sourceLocale });
+      if (assessment.selected_plan || isWebProductJourney(assessment.journey_version)) await enqueueNutritionPlanTasks({ planId, plan: assessment.selected_plan ?? "precision", answers: generation.answers, locale: sourceLocale, recovery: generation, accessOnly: isWebProductJourney(assessment.journey_version) });
+      else if (payment) await enqueueAssessmentPregenerationTasks({ planId, answers: generation.answers, locale: sourceLocale });
     }
     if (assessment.selected_plan || isWebProductJourney(assessment.journey_version)) await ensureFreshProductRecommendationsForReveal(planId);
   });
-  const readiness = await getFunnelReadiness(planId, locale);
-  if (refreshOnly && readiness) await recoverMissingFunnelGeneration({ planId, locale,
+  const readiness = await getFunnelReadiness(planId, sourceLocale);
+  if (refreshOnly && readiness) await recoverMissingFunnelGeneration({ planId, locale: sourceLocale,
     healthScoreMissing: !readiness.copyReady && !readiness.copyFailed,
     formulationMissing: readiness.hasFullPlanAccess && (isWebProductJourney(readiness.journeyVersion) || readiness.fulfillmentStatus === "complete") && readiness.formulationStatus === "pending" });
   return readiness;

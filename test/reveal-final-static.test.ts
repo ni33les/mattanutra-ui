@@ -153,7 +153,7 @@ describe("final reveal UX", () => {
     assert.match(route, /import \{ notFound, redirect \} from "next\/navigation"/);
     assert.match(route, /nutritionHealthScorePath/);
     assert.match(gate, /if \(!assessment\) \{[\s\S]*notFound\(\);[\s\S]*\}/);
-    assert.match(gate, /isWebProductJourney\(readiness\?\.journeyVersion\)/);
+    assert.match(gate, /isWebProductJourney\(assessment\.journeyVersion\)/);
     assert.match(gate, /webProductJourneyEnabled\(\) && isPublicWebAssessment\(assessment\.answers\)/);
     assert.match(gate, /if \(!commerce && !readiness\?\.readyForReveal\) redirect\(nutritionProgressPath/);
     assert.match(

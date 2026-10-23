@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { FormulationResults } from "@/components/formulation-results";
 import { PublicNutritionShell } from "@/components/nutrition-flow/public-nutrition-shell";
+import { WebRevealPage } from "@/components/nutrition-flow/web-reveal-page";
 import { ServiceIssue } from "@/components/service-issue";
 import { SiteFooter } from "@/components/site-footer";
 import { TitleBar } from "@/components/title-bar";
@@ -108,15 +109,27 @@ export default async function NutritionRevealPage({
     notFound();
   }
 
-  const readiness = await getFunnelReadiness(planId, locale);
-  const commerce = isWebProductJourney(readiness?.journeyVersion) || (webProductJourneyEnabled() && isPublicWebAssessment(assessment.answers));
+  const commerce = isWebProductJourney(assessment.journeyVersion) || (webProductJourneyEnabled() && isPublicWebAssessment(assessment.answers));
+  const sourceLocale = commerce ? assessment.locale : locale;
+  const readiness = await getFunnelReadiness(planId, sourceLocale);
   if (!commerce && !assessment.plan && !readiness?.hasFullPlanAccess) {
     redirect(nutritionHealthScorePath(locale, planId));
   }
 
   if (!commerce && !readiness?.readyForReveal) redirect(nutritionProgressPath(locale, planId));
   const stored = commerce && readiness?.formulationStatus === "ready"
-    ? await getStoredFormulationRead(planId, { locale, includeProducts: readiness.readyForReveal && !readiness.refreshPending }) : null;
+    ? await getStoredFormulationRead(planId, { locale: sourceLocale, includeProducts: readiness.readyForReveal && !readiness.refreshPending }) : null;
+
+  if (commerce) return (
+    <WebRevealPage
+      key={planId}
+      locale={locale}
+      planId={planId}
+      initialResult={stored?.result?.access === "full" ? stored.result : null}
+      commerce={{ sourceLocale, answers: assessment.answers as Record<string, unknown>, initial: readiness,
+        bootstrap: !isWebProductJourney(readiness?.journeyVersion) }}
+    />
+  );
 
   return (
     <main className="mn-customer-shell flex min-h-screen flex-col bg-background text-foreground">
@@ -127,8 +140,6 @@ export default async function NutritionRevealPage({
       />
       <FormulationResults
         initialResult={stored?.result?.access === "full" ? stored.result : null}
-        commerce={commerce ? { answers: assessment.answers as Record<string, unknown>, initial: readiness,
-          bootstrap: !isWebProductJourney(readiness?.journeyVersion) } : undefined}
         initialStackPreference={initialStackPreference}
         locale={locale}
         planId={planId}

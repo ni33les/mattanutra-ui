@@ -51,6 +51,20 @@ async function formula(tx: postgres.Sql | postgres.TransactionSql, id: string, v
 }
 
 for (const includeProducts of [false, true]) {
+  it(`reuses the saved web calculation when only the display language changes (products=${includeProducts})`, async () => {
+    const id = await assessment(); await formula(writer, id, 1, 1, "saved-formula");
+    const original = await getStoredFormulationRead(id, { locale: "en", includeProducts });
+    for (const locale of ["th", "zh-CN"]) {
+      const translated = await getStoredFormulationRead(id, { locale, includeProducts });
+      assert.equal(translated?.readiness?.locale, "en");
+      assert.equal(translated?.readiness?.formulationStatus, "ready");
+      assert.equal(translated?.readiness?.resultVersion, original?.readiness?.resultVersion);
+      assert.equal(translated?.readiness?.formulaVersion, 1);
+      assert.deepEqual(translated?.result.supplementBreakdown, original?.result.supplementBreakdown);
+    }
+    const [tasks] = await writer`select count(*)::int as count from public.tasks where plan_id=${id}::uuid`;
+    assert.equal(tasks.count, 0, "Switching display language must remain read-only");
+  });
   it(`pins pending readiness when a worker completes between reads (products=${includeProducts})`, async () => {
     const id = await assessment();
     betweenReads = () => formula(writer, id, 1, 1, "new-formula");

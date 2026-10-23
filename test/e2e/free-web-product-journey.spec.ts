@@ -21,6 +21,63 @@ function observeWebOnly(page: Page) {
   return { errors, pharmacyRequests };
 }
 
+test("reveal language changes keep the saved calculation and selected basket without reloading", async ({ page }) => {
+  const channel = observeWebOnly(page);
+  const { stdout } = await execute(process.execPath, ["--experimental-strip-types", "--import", "./scripts/register-ts-path-loader.mjs",
+    "scripts/seed-browser-fixtures.ts", `/tmp/web-reveal-locale-${Date.now()}.json`, JSON.stringify({ scenario: "free_products", locale: "en" })],
+  { env: process.env, timeout: 60_000 });
+  const seeded = JSON.parse(stdout.split("\n").find(line => line.startsWith("BROWSER_FIXTURES:"))!.slice(17));
+  const generationRequests: string[] = [];
+  page.on("request", request => {
+    if (request.method() === "POST" && /\/(journey\/retry|formulation\/refresh|product-recommendations)$/.test(new URL(request.url()).pathname)) {
+      generationRequests.push(request.url());
+    }
+  });
+  await page.goto(seeded.REVEAL_VISUAL_SMOKE_URL);
+  const journey = page.getByTestId("web-product-journey");
+  await expect(journey).toHaveAttribute("data-stage", "ready");
+  const checkboxes = page.locator("#products .mn-product-check");
+  await expect(checkboxes).toHaveCount(2);
+  await checkboxes.first().uncheck();
+  const before = new URL(await page.getByRole("link", { name: webProductCopy.en.continue, exact: true }).getAttribute("href") ?? "", page.url()).search;
+  await journey.evaluate(element => {
+    element.setAttribute("data-retained-instance", "yes");
+    const observer = new MutationObserver(() => {
+      if (element.getAttribute("data-stage") !== "ready") element.setAttribute("data-restarted", "yes");
+    });
+    observer.observe(element, { attributes: true, attributeFilter: ["data-stage"] });
+  });
+
+  for (const [locale, label, lang] of [["th", "ไทย", "th-TH"], ["zh-CN", "中文", "zh-CN"]] as const) {
+    await page.locator(".mn-language-switcher").getByRole("link", { name: label, exact: true }).click();
+    await expect(page).toHaveURL(new RegExp(`/${locale}/nutrition/reveal\\?`));
+    await expect(page.locator("html")).toHaveAttribute("lang", lang);
+    await expect(journey).toHaveAttribute("data-retained-instance", "yes");
+    await expect(journey).toHaveAttribute("data-stage", "ready");
+    await expect(journey).not.toHaveAttribute("data-restarted", "yes");
+    await expect(checkboxes.first()).not.toBeChecked();
+    await expect(checkboxes.last()).toBeChecked();
+    const checkout = page.getByRole("link", { name: webProductCopy[locale].continue, exact: true });
+    await expect(checkout).toBeVisible();
+    const target = new URL(await checkout.getAttribute("href") ?? "", page.url());
+    expect(target.pathname).toBe(`/${locale}/basket/checkout`);
+    expect(target.search).toBe(before);
+  }
+  await page.goBack();
+  await expect(page.locator("html")).toHaveAttribute("lang", "th-TH");
+  await expect(journey).toHaveAttribute("data-retained-instance", "yes");
+  await expect(checkboxes.first()).not.toBeChecked();
+  const thaiCheckout = await page.getByRole("link", { name: webProductCopy.th.continue, exact: true }).getAttribute("href");
+  await page.reload();
+  await expect(journey).toHaveAttribute("data-stage", "ready");
+  await expect(page.locator(".mn-status-single")).toBeHidden();
+  expect(generationRequests).toEqual([]);
+  // A translated checkout must accept the original calculation/run and chosen subset.
+  await page.goto(thaiCheckout!);
+  await expect(page.locator("#retail-checkout-form")).toBeVisible();
+  expect(channel.errors).toEqual([]);
+});
+
 for (const locale of ["en", "th", "zh-CN"] as const) {
   test(`${locale}: free reveal stays on one page, exposes formula before matching and survives reload`, async ({ page }, testInfo) => {
     const channel = observeWebOnly(page);

@@ -1,4 +1,4 @@
-/* Keep the shared footer links reachable above the active questionnaire actions. */
+/* Keep the active questions focused; the welcome page retains the site footer. */
 .page:has([data-testid="chat-questionnaire"]) > :global(.mn-site-footer) {
-  padding-bottom: calc(5rem + env(safe-area-inset-bottom));
+  display: none;
 }

@@ -23,8 +23,8 @@ it('V5-CHECKOUT-PG-01: new checkout validates its snapshot without fencing unrel
     const productIds = products.map(row => row.id);
     const [epoch] = await sql<Array<{ revision: string }>>`select revision::text from public.catalogue_runtime_revision where singleton = true`;
     assert.ok(epoch);
-    await sql`insert into public.assessments (plan_id, locale, answers, answer_summary, health_score, input_revision)
-      values (${planId}::uuid, 'en', '{}'::jsonb, '{}'::jsonb, '{}'::jsonb, 1)`;
+    await sql`insert into public.assessments (plan_id, locale, answers, answer_summary, health_score, input_revision, journey_version)
+      values (${planId}::uuid, 'en', '{}'::jsonb, '{}'::jsonb, '{}'::jsonb, 1, 'web-products-v1')`;
     await sql`insert into public.product_recommendation_runs (id, plan_id, assessment_revision, generation_locale, generator_version, selection_revision, catalogue_revision, diagnostics)
       values (${runId}::uuid, ${planId}::uuid, 1, 'en', ${FUNNEL_GENERATOR_VERSION}, 0, ${epoch.revision}::bigint,
         ${sql.json({ algorithmVersion: MATCHER_VERSION, matching: { selectedCandidateKey: 'eight', options: [{ candidateKey: 'eight', productIds, recommendations: [] }] } })}::jsonb)`;
@@ -32,6 +32,14 @@ it('V5-CHECKOUT-PG-01: new checkout validates its snapshot without fencing unrel
       values (${runId}::uuid, ${productId}::uuid, ${rank + 1}, ${`https://fixture.invalid/${productId}`}, ${rank + 10})`;
     const input = { planId, locale: 'en' as const, selectedItemIds: productIds, recommendationRunId: runId, candidateKey: 'eight', assessmentRevision: 1, selectionRevision: 0 };
     const prepared = await currentWebCheckoutSelection(sql, input);
+    for (const locale of ["th", "zh-CN"] as const) {
+      const localizedInput = { ...input, locale };
+      const localized = await currentWebCheckoutSelection(sql, localizedInput);
+      assert.equal(localized.proof.locale, locale, "Payment and presentation retain the selected language");
+      assert.equal(localized.proof.runId, prepared.proof.runId, "A language switch retains the same product run");
+      assert.deepEqual(localized.recommendations, prepared.recommendations);
+      assert.deepEqual(await validateCurrentWebCheckoutRecommendations(sql, localizedInput, localized), prepared.recommendations);
+    }
     let ready!: () => void;
     const checkoutReady = new Promise<void>(resolve => { ready = resolve; });
     const hold = new Promise<void>(resolve => { release = resolve; });

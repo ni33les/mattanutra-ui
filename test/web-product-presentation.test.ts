@@ -72,7 +72,7 @@ describe("free reveal progress follows available work", () => {
   });
 });
 
-it("a completed empty catalogue shows availability without a zero-price basket and preserves the saved formula", async () => {
+it("a completed empty catalogue shows availability without a zero-price basket and preserves the saved formula", async (t) => {
   register("./payment-return/next-loader.mjs", import.meta.url);
   register("./pharmacy-reveal/style-loader.mjs", import.meta.url);
   register("./mcp-tool-card/config-loader.mjs", import.meta.url);
@@ -132,4 +132,29 @@ it("a completed empty catalogue shows availability without a zero-price basket a
   assert.match(render(nonempty, "en"), /\/basket\/checkout\?/);
   assert.doesNotMatch(render(nonempty, "en"), /data-testid="web-product-unavailable"/);
   assert.doesNotMatch(render(result, "en", { ...snapshot, readyForReveal: false }), /data-testid="web-product-unavailable"/);
+  await t.test("language changes preserve saved explanations and cautions when translations are absent", () => {
+    const sourceCopy = {
+      rationale: "Original saved rationale", whyThisIsForYou: "Original personal explanation",
+      decision: "Original recommendation decision", safety: "Original safety message", caution: "Original caution message"
+    };
+    const original: FormulationResult = { ...result, supplementBreakdown: [{ ...result.supplementBreakdown[0],
+      rationale: sourceCopy.rationale, whyThisIsForYou: sourceCopy.whyThisIsForYou, decision: sourceCopy.decision,
+      safety: { action: "advisory", visibility: "visible", message: sourceCopy.safety },
+      cautions: [{ id: "original-caution", severity: "caution", body: sourceCopy.caution }]
+    }] };
+    for (const locale of ["th", "zh-CN"] as const) {
+      const html = render(original, locale, { ...snapshot, locale: "en" });
+      for (const text of Object.values(sourceCopy)) assert.ok(html.includes(text), `${locale}: preserved ${text}`);
+      const translated: FormulationResult = { ...original, supplementBreakdown: [{ ...original.supplementBreakdown[0],
+        rationale, whyThisIsForYou: rationale, decision: rationale,
+        safety: { action: "advisory", visibility: "visible", message: caution },
+        cautions: [{ id: "translated-caution", severity: "caution", body: caution }]
+      }] };
+      const localizedHtml = render(translated, locale, { ...snapshot, locale: "en" });
+      assert.ok(localizedHtml.includes(rationale[locale]));
+      assert.ok(localizedHtml.includes(caution[locale]));
+      assert.ok(!localizedHtml.includes(rationale.en));
+      assert.ok(!localizedHtml.includes(caution.en));
+    }
+  });
 });

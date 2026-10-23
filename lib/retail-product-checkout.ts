@@ -400,7 +400,8 @@ export async function validateCurrentWebCheckoutRecommendations(sql: RetailCheck
     left join public.assessment_product_preferences p on p.plan_id = a.plan_id
     where r.plan_id = ${proof.planId}::uuid and r.assessment_revision = a.input_revision
       and a.input_revision = ${proof.assessmentRevision} and coalesce(p.revision, 0) = ${proof.selectionRevision}
-      and r.selection_revision = coalesce(p.revision, 0) and r.generation_locale = ${proof.locale}
+      and r.selection_revision = coalesce(p.revision, 0)
+      and r.generation_locale = case when a.journey_version = 'web-products-v1' then a.locale else ${proof.locale} end
       and r.generator_version = ${FUNNEL_GENERATOR_VERSION} and r.status in ('completed', 'partial')
       and ${currentWebProductMarketSql(sql, "a", "r")}
       and coalesce(r.diagnostics ->> 'stackPreference', 'balanced') = ${proof.stackPreference}
@@ -411,13 +412,16 @@ export async function validateCurrentWebCheckoutRecommendations(sql: RetailCheck
   return prepared.recommendations;
 }
 async function readCurrentWebCheckoutSelection(sql: RetailCheckoutDb, input: WebCheckoutSelectionInput, catalogueRevision: number | string | undefined) {
+  // UI/payment language does not change the saved web calculation identity.
+  // Resolve that identity from the assessment, never from a client-supplied locale.
   const runs = await sql`select distinct on (coalesce(r.diagnostics ->> 'stackPreference', 'balanced'))
       r.id::text, r.diagnostics, r.selection_revision, r.catalogue_revision, a.input_revision,
       coalesce(p.revision, 0) as current_selection_revision, coalesce(p.excluded_product_ids, '{}'::uuid[]) as excluded_product_ids
     from public.product_recommendation_runs r join public.assessments a on a.plan_id = r.plan_id
     left join public.assessment_product_preferences p on p.plan_id = a.plan_id
     where r.plan_id = ${input.planId}::uuid and r.assessment_revision = a.input_revision
-      and r.generation_locale = ${input.locale} and r.generator_version = ${FUNNEL_GENERATOR_VERSION}
+      and r.generation_locale = case when a.journey_version = 'web-products-v1' then a.locale else ${input.locale} end
+      and r.generator_version = ${FUNNEL_GENERATOR_VERSION}
       and r.selection_revision = coalesce(p.revision, 0) and r.status in ('completed', 'partial')
       and ${currentWebProductMarketSql(sql, "a", "r")}
     order by coalesce(r.diagnostics ->> 'stackPreference', 'balanced'), r.generated_at desc, r.id desc`;

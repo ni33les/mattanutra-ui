@@ -137,7 +137,7 @@ export function PharmacyRevealShell({ locale, ready, failed, formulaReady,
               <div className="mn-analysis-grid">
                 {(inputs ?? c.inputs).map((label, index) => (
                   <div
-                    key={label}
+                    key={index}
                     className={`mn-analysis-tile ${matchingReady ? "is-active" : ""}`}
                     data-analysis-step={index}
                   >

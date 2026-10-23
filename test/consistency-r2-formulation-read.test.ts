@@ -41,7 +41,8 @@ describe("consistency r2 formulation read", () => {
     assert.doesNotMatch(reveal, /detail:\s*"page"/);
     assert.doesNotMatch(reveal, /await ensureFreshProductRecommendationsForReveal/);
     assert.doesNotMatch(reveal, /setTimeout|ensureFreshProductRecommendationsForReveal/);
-    assert.match(reveal, /getFunnelReadiness\(planId, locale\)/);
+    assert.match(reveal, /getFunnelReadiness\(planId, sourceLocale\)/);
+    assert.match(reveal, /const sourceLocale = commerce \? assessment\.locale : locale/);
     assert.match(reveal, /!readiness\?\.readyForReveal.*nutritionProgressPath/);
     assert.doesNotMatch(formulation, /jsonb_to_recordset/);
     assert.doesNotMatch(formulation, /blocked_product_facts/);

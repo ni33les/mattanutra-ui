@@ -39,7 +39,7 @@ type FormulationResultsProps = Readonly<{
   locale: Locale;
   planId: string;
   pharmacy?: { source?: PharmacySource; slug: string; name: string; revision: number; sourceLocale: Locale; receipt: PharmacyOrderReceipt | null };
-  commerce?: { answers: Record<string, unknown>; initial: NutritionJourneySnapshot | null; bootstrap: boolean };
+  commerce?: { answers: Record<string, unknown>; initial: NutritionJourneySnapshot | null; bootstrap: boolean; sourceLocale?: Locale };
 }>;
 
 export function FormulationResults({
@@ -64,7 +64,7 @@ export function FormulationResults({
 
   const pollingComplete = useCallback(() => setProductPollingPreference(null), []);
   const { result, snapshot, loadState, failed, retry, refresh: refreshFormulationResult } = useFormulationPolling(
-    effectivePlanId, pharmacy?.sourceLocale ?? locale, initialResult, productPollingPreference, pollingComplete, !pharmacy?.receipt,
+    effectivePlanId, pharmacy?.sourceLocale ?? commerce?.sourceLocale ?? locale, initialResult, productPollingPreference, pollingComplete, !pharmacy?.receipt,
     commerce?.initial, Boolean(commerce), commerce?.bootstrap);
   const startProductStackPolling = useCallback((preference: ProductStackPreference) => {
     setProductPollingPreference(preference);

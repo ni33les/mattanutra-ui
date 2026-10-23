@@ -167,7 +167,9 @@ describe("free web product journey on PostgreSQL", { concurrency: false }, () =>
       assert.equal(body.supplementBreakdown.length, 2);
       assert.equal(body.recommendations.length, 0);
     }
-    assert.equal((await response(receipt.planId, false, "th")).status, 202);
+    const switched = await response(receipt.planId, false, "th");
+    assert.equal(switched.status, 200, "Display language reuses the captured formula");
+    assert.equal((await switched.json()).formulaVersion, 1);
     const edited = await captureAssessment({ answers: { ...answers, activity: "active" }, locale: "en", expectedRevision: receipt.revision },
       { planId: receipt.planId, idempotencyKey: key() });
     assert.equal(edited.revision, receipt.revision + 1);
@@ -179,11 +181,14 @@ describe("free web product journey on PostgreSQL", { concurrency: false }, () =>
     const sql = getSql()!;
     const [before] = await sql`select answers,input_revision,input_hash from public.assessments where plan_id=${planId}::uuid`;
     assert.equal((await getFunnelReadiness(planId))?.hasFullPlanAccess, false);
-    const recovered = await recoverFunnelWork(planId, "en");
+    const recovered = await recoverFunnelWork(planId, "th");
+    assert.equal(recovered?.locale, "en", "Recovery retains the captured calculation language");
     assert.equal(recovered?.hasFullPlanAccess, true);
     assert.equal(recovered?.hasConfirmedPlanPayment, false);
     assert.equal((await response(planId)).status, 200);
-    await recoverFunnelWork(planId, "en");
+    await recoverFunnelWork(planId, "zh-CN");
+    const generationLocales = await sql`select distinct payload #>> '{generation,locale}' as locale from public.tasks where plan_id=${planId}::uuid and payload ? 'generation'`;
+    assert.deepEqual(generationLocales.map(row => row.locale), ["en"], "Retry must not queue another calculation language");
     assert.deepEqual((await sql`select answers,input_revision,input_hash from public.assessments where plan_id=${planId}::uuid`)[0], before);
     assert.equal((await sql`select selected_plan from public.assessments where plan_id=${planId}::uuid`)[0].selected_plan, null);
     assert.equal((await sql`select count(*)::int as n from public.assessment_versions where plan_id=${planId}::uuid and reason='free_product_journey_adopted'`)[0].n, 1);
