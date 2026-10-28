@@ -441,6 +441,10 @@ export const WORK_TASK_REGISTRY = {
     agentKey: "emailDispatcher",
     requiredCapabilities: [AGENT_CAPABILITIES.emailSend]
   },
+  send_saved_plan_email: {
+    agentKey: "emailDispatcher",
+    requiredCapabilities: [AGENT_CAPABILITIES.emailSend]
+  },
   send_reassessment_email: {
     agentKey: "emailDispatcher",
     requiredCapabilities: [AGENT_CAPABILITIES.reassessmentEmailSend]

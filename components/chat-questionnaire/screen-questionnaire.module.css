@@ -53,6 +53,9 @@
 .primary:disabled { background:#d9e3d5; border-color:#d9e3d5; color:#82927f; cursor:not-allowed; }
 .secondary { background:white; border:1px solid #dbe4d8; color:#45614c; }
 .review { padding:20px; margin-top:16px; }
+.emailCard { padding:23px 20px; margin-top:20px; }
+.emailCard .questionTitle { float:none; margin-bottom:8px; }
+.emailCard .hint { margin:0 0 18px; }
 .review summary { cursor:pointer; font-weight:600; font-size:.9rem; }
 .reviewGroup { margin-top:18px; }
 .reviewRow { display:flex; align-items:center; gap:15px; justify-content:space-between; border-top:1px solid #e9ede6; padding:14px 0; font-size:.8rem; line-height:1.6; }

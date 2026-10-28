@@ -15,6 +15,7 @@ import { buildInitialAnswers } from "@/components/assessment-flow-state";
 import { createAssessmentSnapshot, DEFAULT_ASSESSMENT_PLAN, type AssessmentSnapshot } from "@/lib/assessment-snapshot";
 import { getStoredAssessmentPrefill, isUuid, persistAssessmentSubmission, toJsonValue } from "@/lib/assessment-store";
 import { normalizeAssessmentContactEmail } from "@/lib/assessment-contact";
+import { requestSavedPlanDelivery, type SavedPlanDeliveryReceipt } from "@/lib/saved-plan-delivery";
 import { firstNameFromAssessmentAnswers } from "@/lib/assessment-first-name";
 import { getAssessmentResumeDraft, finalizeAssessmentResumeDraft } from "@/lib/assessment-resume-store";
 import { appendAssessmentVersion } from "@/lib/domain-versions";
@@ -35,6 +36,7 @@ export type CaptureReceipt = AssessmentSnapshot & {
   formulaReady: boolean; productsReady: boolean;
   paymentId: string | null; taskIds: unknown;
   journeyVersion: string | null; hasFullPlanAccess: boolean; hasConfirmedPlanPayment: boolean; skipHealthScore: boolean;
+  savedPlanDelivery?: SavedPlanDeliveryReceipt | null;
 };
 
 function record(value: unknown): Record<string, unknown> {
@@ -172,6 +174,8 @@ async function captureAssessmentInternal(bodyValue: unknown, options: { planId?:
     await bindMetaContext(tx, "plan", planId, options.request, { email: contactEmail });
     if (contactEmail) await recordMetaPlanMilestone(tx, planId, "EmailCapture", locale);
     if (isWebProductJourney(journeyVersion)) await recordMetaPlanMilestone(tx, planId, "Lead", locale);
+    const savedPlanDelivery = contactEmail && isWebProductJourney(journeyVersion)
+      ? await requestSavedPlanDelivery(planId, { email: contactEmail, locale }) : null;
     const taskIds = await enqueueAssessmentPregenerationTasks({ answers, locale, planId });
     if (selectedPlan) await enqueueNutritionPlanTasks({ answers, locale, planId, plan: selectedPlan });
     if (resume) await finalizeAssessmentResumeDraft({ planId, token });
@@ -184,7 +188,7 @@ async function captureAssessmentInternal(bodyValue: unknown, options: { planId?:
     const receipt: CaptureReceipt = { ...snapshot, ...identity, firstName: firstNameFromAssessmentAnswers(answers), generationStatus: readiness?.readyForReveal ? "ready" : readiness?.failed ? "failed" : "pending",
       formulaReady: readiness?.formulationStatus === "ready", productsReady: Boolean(readiness?.readyForReveal), paymentId: paymentId ? String(paymentId) : null, taskIds,
       journeyVersion, hasFullPlanAccess: Boolean(selectedPlan) || isWebProductJourney(journeyVersion),
-      hasConfirmedPlanPayment: Boolean(paymentEvidence?.confirmed), skipHealthScore };
+      hasConfirmedPlanPayment: Boolean(paymentEvidence?.confirmed), skipHealthScore, savedPlanDelivery };
     await completeFunnelRequest(tx, "assessment-capture", options.idempotencyKey, receipt);
     return receipt;
   });
@@ -195,10 +199,11 @@ async function captureAssessmentInternal(bodyValue: unknown, options: { planId?:
   return result;
 }
 
-export async function updateAssessmentContact(planId: string, emailValue: unknown, request?: Request) {
+export async function updateAssessmentContact(planId: string, emailValue: unknown, request?: Request, displayLocale?: unknown) {
   if (!isUuid(planId)) throw new FunnelError("Assessment not found", 404, "assessment_not_found");
   const email = normalizeAssessmentContactEmail(emailValue);
   if (!email) throw new FunnelError("Enter a valid email address", 400, "invalid_email");
+  if (displayLocale !== undefined && !isLocale(displayLocale)) throw new FunnelError("Invalid display locale", 400, "invalid_locale");
   const sql = getSql();
   if (!sql) throw new Error("Database is not configured");
   return withDatabaseTransaction(sql, async tx => {
@@ -209,7 +214,8 @@ export async function updateAssessmentContact(planId: string, emailValue: unknow
       eventType: "assessment_contact_updated", afterPayload: { contactEmail: email }, eventPayload: {} });
     await bindMetaContext(tx, "plan", planId, request, { email });
     await recordMetaPlanMilestone(tx, planId, "EmailCapture", row.locale ?? "en");
-    return { planId, contactEmail: email, revision: Number(row.input_revision) };
+    const savedPlanDelivery = await requestSavedPlanDelivery(planId, { email, locale: displayLocale });
+    return { planId, contactEmail: email, revision: Number(row.input_revision), savedPlanDelivery };
   });
 }
 

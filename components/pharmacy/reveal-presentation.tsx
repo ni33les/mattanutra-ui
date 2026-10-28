@@ -272,13 +272,14 @@ export function PharmacyIngredientCards({ locale, ingredients, name, details }: 
 }
 
 export function PharmacyProductCard({ locale, imageUrl, name, coverage, price, quantity, selected,
-  disabled = false, onChange, children }: {
+  disabled = false, onChange, children, badge }: {
   locale: Locale; imageUrl?: string | null; name: string; coverage?: ReactNode; price: ReactNode;
   quantity?: number; selected: boolean; disabled?: boolean; onChange: (selected: boolean) => void;
-  children?: ReactNode;
+  children?: ReactNode; badge?: ReactNode;
 }) {
   const c = combinedCopy[locale], p = pharmacyCopy[locale];
   return <div className={`mn-product ${selected ? "" : "is-excluded"}`}>
+    {badge !== undefined && <div className="mn-product-badge-slot">{badge}</div>}
     <SafeImage className="mn-packshot-photo" src={imageUrl} alt="" width={156} height={260} />
     <div className="mn-match text-small"><Check size={15} aria-hidden="true" />{c.matched}</div>
     <div className="mn-product-name text-small">{name}</div>

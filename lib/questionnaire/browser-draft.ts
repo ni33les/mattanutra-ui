@@ -3,7 +3,7 @@ import { toAssessmentAnswers } from "@/lib/questionnaire/normalize";
 import type { QuestionnaireState } from "@/lib/questionnaire/types";
 import type { Locale } from "@/lib/i18n";
 
-export type ChatCaptureReceipt = { planId: string; revision: number; inputHash?: string };
+export type ChatCaptureReceipt = { planId: string; revision: number; inputHash?: string; contactEmail?: string | null };
 export type ChatDraft = {
   version: 1;
   state: QuestionnaireState;
@@ -75,6 +75,9 @@ export function resolveChatDraft(input: { locale: Locale; sessionId: string; ser
   }
   if (server?.captured) state = { ...state, phase: "complete", planId: server.planId! };
   return { version: 1, state, revision: server?.revision ?? 0,
+    // A saved server contact does not prove a link was requested (older plans
+    // predate email delivery). Synchronize once; local POST/PATCH receipts retain
+    // their acknowledged contact so subsequent reloads do not repeat the PATCH.
     captured: server?.captured && server.planId ? { planId: server.planId, revision: server.revision } : null,
     contactEmail: server?.contactEmail ?? null, paymentId: server?.paymentId ?? null,
     updatedAt: server?.updatedAt ? Date.parse(server.updatedAt) : Date.now() };

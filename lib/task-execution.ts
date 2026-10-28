@@ -277,6 +277,10 @@ async function executeTaskWorkItemInternal(
     const { deliverHealthScore } = await import("@/lib/healthscore-delivery");
     return deliverHealthScore(workItem.deliveryRequestId);
   }
+  if (workItem.taskType === "send_saved_plan_email") {
+    const { deliverSavedPlan } = await import("@/lib/saved-plan-delivery");
+    return deliverSavedPlan(workItem.deliveryRequestId);
+  }
   if (workItem.taskType === "fulfill_web_payment") {
     const { fulfillWebPayment } = await import("@/lib/web-payment-fulfillment");
     return fulfillWebPayment(workItem.paymentId);

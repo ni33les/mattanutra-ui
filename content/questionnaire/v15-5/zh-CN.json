@@ -1,0 +1,15 @@
+{
+  "x": {
+    "reviewTitle": "您的回答已准备就绪",
+    "reviewHint": "继续前，您可以检查或修改回答。",
+    "reviewExpand": "检查或修改回答",
+    "submit": "查看我的个人计划",
+    "disclosureLabel": "我确认",
+    "unknownNotice": "未知的回答将保持未知，不会被视为“否”。",
+    "emailTitle": "保存并接收您的免费计划",
+    "emailHint": "输入邮箱即可收到链接，随时返回已保存的计划。您也可以不填写邮箱，直接继续。",
+    "emailLabel": "电子邮箱",
+    "emailPlaceholder": "you@example.com",
+    "emailError": "请输入有效的电子邮箱，或留空后继续。"
+  }
+}

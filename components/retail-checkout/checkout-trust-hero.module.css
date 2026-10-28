@@ -26,6 +26,13 @@
 .care p { max-width: 410px; margin: 0 0 0 auto; font-size: 13px; line-height: 1.6; }
 .identity .genericCare { display: flex; align-items: center; gap: 9px; }
 .genericCare svg { width: 22px; height: 22px; flex: none; }
+.compactPackaging figcaption { font-size: .75rem; }
+.compactPackaging img { max-height: 190px; object-fit: contain; }
+.compactCare { flex-wrap: wrap; padding: 16px; border-radius: 12px; }
+.compactCare .identity { flex: 1; max-width: none; }
+.compactCare .identity strong { font-size: 1rem; }
+.compactCare .identity span { font-size: .875rem; line-height: 1.5; }
+.compactCare p { flex-basis: 100%; max-width: none; margin: 0; font-size: .875rem; line-height: 1.5; }
 .hero[lang="th"] .copy h2 { font-family: var(--mn-font-thai-serif), var(--mn-font-thai), serif; line-height: 1.45; font-size: clamp(26px, 2.7vw, 34px); letter-spacing: 0; }
 .hero[lang="th"] .copy h2 em { font-style: normal; }
 .hero[lang="th"] .eyebrow { letter-spacing: .02em; line-height: 1.8; }
@@ -39,4 +46,6 @@
   .care { flex-wrap: wrap; gap: 12px; padding: 18px 22px; }
   .identity { flex: 1; max-width: none; }
   .care p { width: 100%; max-width: none; margin: 0; font-size: 12px; }
+  .compactCare { padding: 16px; }
+  .compactCare p { font-size: .875rem; }
 }

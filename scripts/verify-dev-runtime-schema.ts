@@ -42,7 +42,7 @@ const requiredTables = [
   "organisations", "product_brands", "product_facts", "supplements", "supplement_aliases", "supplement_safety_limits", "retail_sellable_products",
   "catalogue_runtime_revision", "catalogue_correction_audit", "supplement_safety_reference_corrections",
   "assessment_product_preferences", "assessments", "formulations", "food_guidance", "recommendations", "nutrition_reports", "product_recommendation_runs",
-  "assessment_inputs", "assessment_healthscore_results", "assessment_resume_drafts", "funnel_requests", "healthscore_delivery_requests", "tasks",
+  "assessment_inputs", "assessment_healthscore_results", "assessment_resume_drafts", "funnel_requests", "healthscore_delivery_requests", "saved_plan_delivery_requests", "tasks",
   "admin_product_coverage_demand_profile_cache",
   "payment_versions",
   "payments",
@@ -313,6 +313,7 @@ try {
   }
   for (const column of ["revision", "locale", "generator_version", "result"]) requireColumn(columnMap, "assessment_healthscore_results", column, { notNull: true });
   for (const column of ["revision", "locale", "email", "status", "attempts"]) requireColumn(columnMap, "healthscore_delivery_requests", column, { notNull: true });
+  for (const column of ["plan_id", "locale", "email", "status", "attempts"]) requireColumn(columnMap, "saved_plan_delivery_requests", column, { notNull: true });
 
   for (const columnName of [
     "supplement_id",

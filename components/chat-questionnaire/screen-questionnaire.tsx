@@ -14,6 +14,7 @@ import { advanceScreen, createScreenState, fastForwardScreens, firstMissingScree
 import { questionnaireAttemptContext } from "@/lib/questionnaire/telemetry";
 import type { QuestionnaireState, TurnDef } from "@/lib/questionnaire/types";
 import { ASSESSMENT_FIRST_NAME_MAX_LENGTH } from "@/lib/assessment-first-name";
+import { assessmentContactEmailError, normalizeAssessmentContactEmail } from "@/lib/assessment-contact";
 import { getBpmPayload, trackBpmEvent } from "@/lib/bpm-client";
 import { trackMetaEvent } from "@/lib/meta-client";
 import { WEB_PRODUCT_JOURNEY_VERSION } from "@/lib/web-product-journey";
@@ -30,6 +31,9 @@ export function ScreenQuestionnaire({ locale, sessionId, reviewRequested = false
   const [state, setState] = useState<QuestionnaireState | null>(null);
   const [mode, setMode] = useState<"loading" | "welcome" | "resume" | "quiz" | "calculating">("loading");
   const [saveFailed, setSaveFailed] = useState(false);
+  const [contactEmail, setContactEmail] = useState("");
+  const [emailTouched, setEmailTouched] = useState(false);
+  const emailInputRef = useRef<HTMLInputElement>(null);
   const draftRef = useRef<ChatDraft | null>(null);
   const captureInFlight = useRef(false);
   const sessionRef = useRef(sessionId || returningPlanId || paymentId || crypto.randomUUID());
@@ -55,6 +59,8 @@ export function ScreenQuestionnaire({ locale, sessionId, reviewRequested = false
   const inlineCapture = mode === "calculating" && skipHealthScoreStep;
   const inlineBusy = inlineCapture && capture.status !== "error";
   const captureCopy = getWelcomeCopy(locale);
+  const showEmailCapture = skipHealthScore && !pharmacyId;
+  const emailInvalid = Boolean(assessmentContactEmailError(contactEmail));
 
   const commit = useCallback((next: QuestionnaireState) => {
     setState(next);
@@ -67,6 +73,7 @@ export function ScreenQuestionnaire({ locale, sessionId, reviewRequested = false
     let local: ChatDraft | null = null;
     try { local = parseChatDraft(localStorage.getItem(chatDraftStorageKey(base.state.sessionId))); } catch { /* The server draft is still available. */ }
     const draft = resolveChatDraft({ locale, sessionId: sessionRef.current, server: serverDraft, local });
+    setContactEmail(draft.contactEmail ?? ""); setEmailTouched(false);
     // Completed legacy captures keep their original receipt and recovery path.
     if (!reviewRequested && ["complete", "completing", "failed"].includes(draft.state.phase)) {
       save(draft); setState(draft.state); setMode("calculating"); void runCapture(draft.state); return;
@@ -131,6 +138,12 @@ export function ScreenQuestionnaire({ locale, sessionId, reviewRequested = false
   function submit() {
     if (!state || captureInFlight.current || mode === "calculating") return;
     if (!screenQuestionnaireComplete(state)) { const missing = firstMissingScreen(state); if (missing) commit(openScreen(state, missing.id)); return; }
+    if (showEmailCapture && emailInvalid) { setEmailTouched(true); emailInputRef.current?.focus(); return; }
+    if (showEmailCapture && draftRef.current) {
+      const email = normalizeAssessmentContactEmail(contactEmail);
+      save({ ...draftRef.current, contactEmail: email, updatedAt: Date.now() });
+      setContactEmail(email ?? "");
+    }
     const next: QuestionnaireState = { ...state, phase: "complete", completedAt: Date.now() };
     commit(next); telemetry.close(); setMode("calculating");
     trackBpmEvent("chat_complete", { eventType: "funnel", locale, properties: { ...questionnaireAttemptContext(next), completionPct: 100, ...telemetry.stamp() } });
@@ -238,6 +251,19 @@ export function ScreenQuestionnaire({ locale, sessionId, reviewRequested = false
               <button type="button" className={styles.link} data-edit-screen={screen.id} aria-label={`${x.edit}: ${turn.q}`} onClick={() => { telemetry.close(); commit(openScreen(state, screen.id, true)); }}>{x.edit}</button>
             </div>))}</section>)}
         </details><p className={styles.hint}>{x.unknownNotice}</p>
+        {showEmailCapture ? <section className={`${styles.card} ${styles.emailCard}`} aria-labelledby="questionnaire-email-title" data-testid="questionnaire-email-card">
+          <h2 id="questionnaire-email-title" className={styles.questionTitle}>{x.emailTitle}</h2>
+          <p id="questionnaire-email-hint" className={styles.hint}>{x.emailHint}</p>
+          <label className={styles.label} htmlFor="questionnaire-contact-email">{x.emailLabel}</label>
+          <input ref={emailInputRef} id="questionnaire-contact-email" className={styles.input} type="email" inputMode="email" autoComplete="email" autoCapitalize="none" spellCheck={false}
+            maxLength={254} placeholder={x.emailPlaceholder} value={contactEmail} aria-invalid={emailTouched && emailInvalid}
+            aria-describedby={`questionnaire-email-hint${emailTouched && emailInvalid ? " questionnaire-email-error" : ""}`}
+            onBlur={() => setEmailTouched(true)} onChange={event => {
+              const email = event.target.value; setContactEmail(email);
+              if (draftRef.current) save({ ...draftRef.current, contactEmail: email, updatedAt: Date.now() });
+            }} />
+          {emailTouched && emailInvalid ? <p id="questionnaire-email-error" className={styles.error} role="alert">{x.emailError}</p> : null}
+        </section> : null}
       </div> : <><div className={styles.card} data-testid="question-answers">{turns.map(renderQuestion)}</div>
         {current.id === "diet" && state.autoFilled.length ? <div className={`${styles.card} ${styles.review}`}><p className={styles.hint}>{x.inferred}</p>
           {state.autoFilled.map(key => { const turn = definition.turns.find(item => item.k === key)!; return <p key={key} className={styles.hint}>{turn.q} — {answerLabel(turn)}</p>; })}</div> : null}</>}

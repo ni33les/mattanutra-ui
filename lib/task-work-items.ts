@@ -436,6 +436,7 @@ export type TaskWorkItem =
   | Readonly<{ taskId: string; taskType: "send_meta_event"; eventId: string }>
   | Readonly<{ taskId: string; taskType: "match_agentic_plan"; operationId: string }>
   | Readonly<{ taskId: string; taskType: "send_healthscore_email"; deliveryRequestId: string }>
+  | Readonly<{ taskId: string; taskType: "send_saved_plan_email"; deliveryRequestId: string }>
   | Readonly<{ taskId: string; taskType: "fulfill_web_payment"; paymentId: string }>
   | Readonly<{ taskId: string; taskType: "superseded_generation" }>
   | AdminCatalogueOptimizationWorkItem
@@ -2300,6 +2301,7 @@ const taskWorkItemHandlers: Readonly<Record<string, TaskWorkItemBuilder>> = {
   route_admin_communication: buildAdminCommunicationRouteWorkItem,
   send_example_email: buildExampleEmailWorkItem,
   send_healthscore_email: buildHealthScoreEmailWorkItem,
+  send_saved_plan_email: task => ({ taskId: task.id, taskType: "send_saved_plan_email", deliveryRequestId: payloadText(task.payload, "deliveryRequestId") }),
   send_reassessment_email: buildReassessmentEmailWorkItem,
   send_retail_order_workflow_email: buildRetailOrderWorkflowEmailWorkItem,
   source_product_fda_approvals: buildProductFdaApprovalSourcingWorkItem,

@@ -2,6 +2,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { expect, test, type Page } from "../helpers/offline-browser";
 import { webProductCopy } from "../../components/nutrition-flow/web-product-copy";
+import type { FormulationResult, ProductRecommendationOption } from "../../lib/formulation-types";
 const execute = promisify(execFile);
 test.setTimeout(180_000);
 async function fixture(input: Record<string, unknown>) {
@@ -20,6 +21,86 @@ function observeWebOnly(page: Page) {
   });
   return { errors, pharmacyRequests };
 }
+
+test("starter presets keep every card visible and preserve custom and empty baskets", async ({ page }, testInfo) => {
+  const { stdout } = await execute(process.execPath, ["--experimental-strip-types", "--import", "./scripts/register-ts-path-loader.mjs",
+    "scripts/seed-browser-fixtures.ts", `/tmp/web-starter-${Date.now()}.json`, JSON.stringify({ scenario: "free_products", locale: "en" })],
+  { env: process.env, timeout: 60_000 });
+  const seeded = JSON.parse(stdout.split("\n").find(line => line.startsWith("BROWSER_FIXTURES:"))!.slice(17));
+  const channel = observeWebOnly(page);
+  let generationRequests = 0, basketConfirmations = 0;
+  page.on("request", request => {
+    if (request.method() !== "POST") return;
+    if (/\/(journey\/retry|formulation\/refresh|product-recommendations)$/.test(new URL(request.url()).pathname)) generationRequests++;
+    if (new URL(request.url()).pathname === "/api/bpm" && request.postDataJSON()?.eventName === "product_basket_confirmed") basketConfirmations++;
+  });
+  // Add an overlapping C product to the browser read model. The real two-product
+  // fixture below separately exercises server-validated checkout and payment.
+  await page.route(`**/api/assessment/${seeded.planId}/formulation?*`, async route => {
+    const response = await route.fetch();
+    const body = await response.json() as FormulationResult;
+    function withOverlap(option: ProductRecommendationOption): ProductRecommendationOption {
+      if (option.id !== "balanced" || option.recommendations.length !== 2) return option;
+      const [first, second] = option.recommendations;
+      const extraId = "11111111-1111-4111-8111-111111111111";
+      const extra = { ...first, id: extraId, productId: extraId, name: "Overlapping fixture product", price: { amount: 15, currency: "THB" } };
+      const recommendations = [first, extra, second];
+      const matching = option.productRecommendations.matching!;
+      const options = matching.options.map(candidate => {
+        if (candidate.candidateKey !== matching.selectedCandidateKey) return candidate;
+        const snapshot = candidate.coverageSnapshot!;
+        const contribution = snapshot.products.find(product => product.productId === (first.productId ?? first.id))!;
+        return { ...candidate, productIds: recommendations.map(product => product.productId ?? product.id),
+          coverageSnapshot: { ...snapshot, products: [...snapshot.products, { ...contribution, productId: extraId }] } };
+      });
+      return { ...option, recommendations,
+        retailerOptions: option.retailerOptions?.map(retailer => ({ ...retailer, subtotalAmount: Number(retailer.subtotalAmount) + 15, productCount: 3 })),
+        productRecommendations: { ...option.productRecommendations, matchedCount: 3, matching: { ...matching, options } } };
+    }
+    const options = (body.productRecommendationOptions ?? [{ id: "balanced", recommendations: body.recommendations, productRecommendations: body.productRecommendations! }]).map(withOverlap);
+    const selected = options.find(option => option.id === "balanced")!;
+    await route.fulfill({ response, json: { ...body, productRecommendationOptions: options, recommendations: selected.recommendations, productRecommendations: selected.productRecommendations } });
+  });
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto(seeded.REVEAL_VISUAL_SMOKE_URL);
+  const cards = page.locator("#products .mn-product"), checkboxes = cards.locator(".mn-product-check");
+  await expect(cards).toHaveCount(3);
+  await expect(checkboxes.nth(0)).toBeChecked();
+  await expect(checkboxes.nth(1)).not.toBeChecked();
+  await expect(checkboxes.nth(2)).toBeChecked();
+  const starter = page.getByTestId("starter-preset"), all = page.getByTestId("all-products-preset");
+  await expect(starter).toHaveAttribute("aria-pressed", "true");
+  await all.focus(); await page.keyboard.press("Enter");
+  for (const checkbox of await checkboxes.all()) await expect(checkbox).toBeChecked();
+  await expect(cards).toHaveCount(3);
+  await expect(all).toHaveAttribute("aria-pressed", "true");
+  await starter.click();
+  await expect(checkboxes.nth(1)).not.toBeChecked();
+  await checkboxes.nth(0).uncheck();
+  await expect(starter).toHaveAttribute("aria-pressed", "false");
+  await expect(all).toHaveAttribute("aria-pressed", "false");
+  const checkout = page.getByRole("link", { name: webProductCopy.en.continue, exact: true });
+  const selection = new URL(await checkout.getAttribute("href") ?? "", page.url()).search;
+  await page.reload();
+  await expect(checkboxes.nth(0)).not.toBeChecked();
+  await expect(checkboxes.nth(1)).not.toBeChecked();
+  await expect(checkboxes.nth(2)).toBeChecked();
+  expect(new URL(await checkout.getAttribute("href") ?? "", page.url()).search).toBe(selection);
+  await checkboxes.nth(2).uncheck();
+  await page.reload();
+  for (const checkbox of await checkboxes.all()) await expect(checkbox).not.toBeChecked();
+  await expect(checkout).toHaveCount(0);
+  await starter.click();
+  await page.locator("#products").scrollIntoViewIfNeeded();
+  await page.screenshot({ path: testInfo.outputPath("starter-desktop.png"), fullPage: true });
+  await page.setViewportSize({ width: 375, height: 812 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await page.getByTestId("web-basket").scrollIntoViewIfNeeded();
+  await page.screenshot({ path: testInfo.outputPath("starter-mobile.png"), fullPage: true });
+  expect(generationRequests).toBe(0);
+  expect(basketConfirmations).toBe(0);
+  expect(channel.errors).toEqual([]);
+});
 
 test("reveal language changes keep the saved calculation and selected basket without reloading", async ({ page, baseURL }) => {
   const channel = observeWebOnly(page);
@@ -106,6 +187,8 @@ test("reveal language changes keep the saved calculation and selected basket wit
   const thaiCheckout = await page.getByRole("link", { name: webProductCopy.th.continue, exact: true }).getAttribute("href");
   await page.reload();
   await expect(journey).toHaveAttribute("data-stage", "ready");
+  await expect(checkboxes.first()).not.toBeChecked();
+  await expect(checkboxes.last()).toBeChecked();
   await expect(page.locator(".mn-status-single")).toBeHidden();
   expect(generationRequests).toEqual([]);
   // A translated checkout must accept the original calculation/run and chosen subset.
@@ -309,9 +392,13 @@ test("free product basket supports removal and undo, tracks visible cards, and o
   const mobileProducts = await page.locator("#products").boundingBox();
   expect(mobileProducts!.x).toBeGreaterThanOrEqual(24);
   expect(mobileProducts!.x + mobileProducts!.width).toBeLessThanOrEqual(390 - 24);
+  // Returning from the detail pages keeps the explicit one-product basket.
+  await expect(checkboxes.first()).toBeChecked();
+  await expect(checkboxes.last()).not.toBeChecked();
+  await checkboxes.last().check();
   await checkboxes.first().uncheck();
-  await page.locator(".mn-transaction").scrollIntoViewIfNeeded();
-  await expect(page.locator(".mn-transaction")).toHaveCSS("opacity", "1");
+  await page.getByTestId("web-basket").scrollIntoViewIfNeeded();
+  await expect(page.getByTestId("web-basket")).toHaveCSS("opacity", "1");
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   await expect(page.locator(".mn-analysis-tile")).toHaveCount(5);
   await expect(page.locator(".mn-coffee-intro img")).toBeVisible();

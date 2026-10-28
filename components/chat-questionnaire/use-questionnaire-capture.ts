@@ -5,6 +5,8 @@ import { useCallback, useEffect, useRef, useState, type MutableRefObject } from 
 import { finalizeAssessmentCapture } from "@/lib/questionnaire/agents/capture-agent";
 import type { QuestionnaireState } from "@/lib/questionnaire/types";
 import type { ChatDraft } from "@/lib/questionnaire/browser-draft";
+import { syncCapturedQuestionnaireContact } from "@/lib/questionnaire/capture-contact";
+import { normalizeAssessmentContactEmail } from "@/lib/assessment-contact";
 import { fetchWithBodyDeadline } from "@/lib/funnel-polling";
 import { retryHealthScoreCopy, waitForHealthScoreCopy } from "@/lib/healthscore-copy-client";
 import type { Locale } from "@/lib/i18n";
@@ -46,9 +48,14 @@ export function useQuestionnaireCapture(input: {
             properties: { ...questionnaireAttemptContext(state), clientAt: Date.now() } });
           throw new Error(captured.error || "Capture failed");
         }
-        receipt = { planId: captured.planId, revision: captured.revision, inputHash: captured.inputHash };
+        receipt = { planId: captured.planId, revision: captured.revision, inputHash: captured.inputHash, contactEmail: normalizeAssessmentContactEmail(draft.contactEmail) };
         draft = { ...draft, revision: receipt.revision, captured: receipt, state: { ...state, phase: "complete", planId: receipt.planId }, updatedAt: Date.now() };
         options.save(draft);
+      } else if (options.skipHealthScore && !options.pharmacyId && !analysisOnly) {
+        const updated = await syncCapturedQuestionnaireContact(draft, options.locale,
+          (url, init) => fetchWithBodyDeadline(url, { ...init, signal: controller.signal }, 30_000));
+        controller.signal.throwIfAborted();
+        if (updated !== draft) options.save(updated);
       }
       setPlanId(receipt.planId);
       if (!options.skipHealthScore) {

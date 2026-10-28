@@ -9372,6 +9372,42 @@
     "translatable": true,
     "variables": []
   },
+  "outbound.savedPlanEmail.subject": {
+    "audience": "customer",
+    "defaultMessage": "Your saved MattaNutra plan",
+    "description": "Private saved-plan link, sent after the customer supplies their email.",
+    "namespace": "outbound.savedPlanEmail",
+    "surface": "email",
+    "translatable": true,
+    "variables": []
+  },
+  "outbound.savedPlanEmail.body": {
+    "audience": "customer",
+    "defaultMessage": "Your answers are saved. Use this link to return to your personal supplement plan whenever you need it. If your recommendations are still being prepared, the page will show their progress.",
+    "description": "Saved-plan receipt that does not claim recommendations are already ready.",
+    "namespace": "outbound.savedPlanEmail",
+    "surface": "email",
+    "translatable": true,
+    "variables": []
+  },
+  "outbound.savedPlanEmail.cta": {
+    "audience": "customer",
+    "defaultMessage": "Open my saved plan",
+    "description": "Open the existing plan without generating a new assessment.",
+    "namespace": "outbound.savedPlanEmail",
+    "surface": "email",
+    "translatable": true,
+    "variables": []
+  },
+  "outbound.savedPlanEmail.privacy": {
+    "audience": "customer",
+    "defaultMessage": "Keep this link private. Anyone with the link can view your plan.",
+    "description": "Privacy note for the existing private plan link.",
+    "namespace": "outbound.savedPlanEmail",
+    "surface": "email",
+    "translatable": true,
+    "variables": []
+  },
   "outbound.healthscoreReadyEmail.subject": {
     "audience": "customer",
     "defaultMessage": "Your MattaNutra HealthScore is ready",

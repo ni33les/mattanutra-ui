@@ -2,12 +2,14 @@
 
 import Link from "next/link";
 import { useRef, useState } from "react";
-import { ArrowRight, House, LoaderCircle, Store } from "lucide-react";
+import { ArrowRight, LoaderCircle } from "lucide-react";
 import { PharmacyRevealShell, PharmacyIngredientCards, PharmacyProductCard, PharmacyPlanInvitation } from "@/components/pharmacy/reveal-presentation";
 import { combinedCopy } from "@/components/pharmacy/combined-copy";
 import { WebRevealRecovery } from "./web-preparation-panel";
 import { webProductCopy } from "./web-product-copy";
 import { SectionCard } from "./ui";
+import { useWebBasketSelection } from "./use-web-basket-selection";
+import { CheckoutPackaging, CheckoutPharmacyCare } from "@/components/retail-checkout/checkout-trust-hero";
 import { useVisibleWebMilestones } from "./use-visible-web-milestones";
 import { productRecommendationOptionsForResult, selectProductRecommendationOption, resultHasPendingProductRecommendations } from "@/components/formulation-results-helpers";
 import { visibleFormulaIngredients, localizedSupplementName, localizedIngredientRationale } from "@/components/formulation-support-helpers";
@@ -16,6 +18,7 @@ import { WebMatchingAdvice } from "@/components/web-health-advice";
 import { firstNameFromFormulation } from "@/lib/assessment-first-name";
 import { formatCurrencyAmount } from "@/lib/currencies";
 import { reduceSelectionCoverage } from "@/lib/matcher/selection-coverage";
+import { starterProductIds } from "@/lib/web-basket-selection";
 import { trackWebProductMilestone } from "@/lib/meta-client";
 import { trackBpmEvent } from "@/lib/bpm-client";
 import { nutritionRevealPath } from "@/lib/nutrition-paths";
@@ -23,6 +26,7 @@ import { webRevealProgress } from "@/lib/web-reveal-progress";
 import type { FormulationResult, LocalizedText, RecommendedProduct } from "@/lib/formulation-types";
 import type { NutritionJourneySnapshot } from "@/lib/nutrition-journey-read";
 import { resolveLocalizedText, type Locale } from "@/lib/i18n";
+import { t } from "@/lib/i18n-messages";
 import "./web-preparation.css";
 
 const productId = (product: RecommendedProduct) => product.productId ?? product.id;
@@ -54,10 +58,13 @@ export function WebCombinedReveal({ locale, planId, result, snapshot, failed, re
     && matching?.operationalStatus === "no_purchase"
     && matching.matchingDiagnostics?.reasonCode === "catalogue_empty";
   const matchedOption = matching?.options.find(candidate => candidate.candidateKey === matching.selectedCandidateKey);
+  const allIds = products.map(productId);
+  const starterIds = starterProductIds(allIds, matchedOption?.coverageSnapshot);
   // A different run or assessment revision must never inherit an old basket selection.
-  const identity = `${planId}:${formula?.assessmentRevision}:${formula?.selectionRevision}:${runId}:${matching?.selectedCandidateKey}:${products.map(productId).join(",")}`;
-  const [selection, setSelection] = useState<{ identity: string; ids: string[] } | null>(null);
-  const selectedIds = selection?.identity === identity ? selection.ids : products.map(productId);
+  const identity = `${planId}:${formula?.assessmentRevision}:${formula?.selectionRevision}:${runId}:${matching?.selectedCandidateKey}:${allIds.join(",")}`;
+  const [selectedIds, setSelectedIds] = useWebBasketSelection(identity, allIds, starterIds);
+  const isStarter = selectedIds.length === starterIds.length && starterIds.every(id => selectedIds.includes(id));
+  const isAll = selectedIds.length === allIds.length && allIds.every(id => selectedIds.includes(id));
   const selected = products.filter(product => selectedIds.includes(productId(product)));
   const removed = products.filter(product => !selectedIds.includes(productId(product)));
   const coverage = reduceSelectionCoverage(matchedOption?.coverageSnapshot, selectedIds);
@@ -90,9 +97,15 @@ export function WebCombinedReveal({ locale, planId, result, snapshot, failed, re
 
   function toggle(id: string, included: boolean) {
     const ids = included ? [...new Set([...selectedIds, id])] : selectedIds.filter(value => value !== id);
-    setSelection({ identity, ids });
+    setSelectedIds(ids);
     trackBpmEvent("product_basket_edited", { eventType: "funnel", locale, planId,
       properties: { planId, revision: formula?.assessmentRevision, runId, journeyVersion: "web-products-v1", selectedItemIds: ids, productId: id, included } });
+  }
+  function applyPreset(preset: "starter" | "all") {
+    const ids = preset === "starter" ? starterIds : allIds;
+    setSelectedIds(ids);
+    trackBpmEvent("product_basket_edited", { eventType: "funnel", locale, planId,
+      properties: { planId, revision: formula?.assessmentRevision, runId, journeyVersion: "web-products-v1", selectedItemIds: ids, preset } });
   }
   function confirmBasket() {
     if (!checkoutHref) return;
@@ -129,11 +142,21 @@ export function WebCombinedReveal({ locale, planId, result, snapshot, failed, re
               </details>
             </div>} />
         </div>
-        {!catalogueUnavailable && <div className="mn-group-flow"><h3 className="mn-flow-copy">{c.availableProducts}</h3><div className="mn-flow-mark" aria-hidden="true" /></div>}
+        {!catalogueUnavailable && <div className="mn-group-flow"><h3 className="mn-flow-copy">{ready && products.length ? c.starterTitle : c.availableProducts}</h3><div className="mn-flow-mark" aria-hidden="true" /></div>}
+        {ready && products.length > 0 && <div className="mn-web-product-presets">
+          <p>{products.length >= 2 ? c.starterHelp : c.selectionHelp}</p>
+          <div className="mn-pill-group" role="group" aria-label={c.selectionPresets}>
+            <button type="button" data-testid="starter-preset" aria-pressed={isStarter}
+              className={`mn-pill ${isStarter ? "mn-pill--selected" : "mn-pill--idle"}`} onClick={() => applyPreset("starter")}>{c.startHere}</button>
+            <button type="button" data-testid="all-products-preset" aria-pressed={isAll && !isStarter}
+              className={`mn-pill ${isAll && !isStarter ? "mn-pill--selected" : "mn-pill--idle"}`} onClick={() => applyPreset("all")}>{c.allProducts}</button>
+          </div>
+        </div>}
         {ready && !catalogueUnavailable && <div id="products" className="mn-products" data-web-result-stage={products.length && priced ? "products" : undefined}>
           {products.map(product => <PharmacyProductCard key={productId(product)} locale={locale} imageUrl={product.imageUrl} name={product.name}
             coverage={product.covers.map(id => localizedSupplementName(ingredients.find(item => item.id === id)?.supplement ?? id, id, locale)).join(" · ")}
             price={Number.isFinite(productAmount(product)) ? formatCurrencyAmount(locale, Number(productAmount(product)), product.price?.currency ?? currency) : "—"}
+            badge={starterIds.includes(productId(product)) && selectedIds.includes(productId(product)) ? <span className="mn-web-starter-badge text-small" data-testid="starter-product-badge">{c.starterBadge}</span> : null}
             quantity={1} selected={selectedIds.includes(productId(product))} onChange={included => toggle(productId(product), included)} />)}
         </div>}
       </> : undefined}>
@@ -145,11 +168,14 @@ export function WebCombinedReveal({ locale, planId, result, snapshot, failed, re
           <p>{c.planSavedWithoutProducts}</p>
         </section> : <div className="mn-web-basket" data-testid="web-basket">
           <SectionCard done={false} title={c.reviewBasket} titleId="mn-web-order-title"
-            description={<><strong>{c.selectionHelp}</strong><br />{c.selectionUpdates}</>}
+            description={<><strong>{t(locale, "customer.titleBar.logoTagline")}</strong><br />
+              <span>{c.rightAmountBody}</span><br /><br />
+              <strong>{c.selectionHelp}</strong><br />{c.selectionUpdates}</>}
             footer={!!products.length && <div className="space-y-3">
               {!selectedPriced && <p className="mn-section-card__copy">{c.pricingPending}</p>}
               {checkoutHref ? <Link className="mn-green-button w-full gap-2" href={checkoutHref} onClick={confirmBasket}>{c.continue}<ArrowRight size={18} aria-hidden="true" /></Link>
                 : <button className="mn-green-button w-full gap-2 disabled:cursor-not-allowed disabled:opacity-50" disabled>{selectedIds.length ? c.continue : c.empty}<ArrowRight size={18} aria-hidden="true" /></button>}
+              <p className="mn-section-card__copy mn-web-checkout-note">{c.reviewBeforePayment}</p>
             </div>}>
           <div className="mn-order-summary" aria-live="polite" aria-atomic="true"><span className="mn-order-count">{selected.length} {shared.items}</span>
             <strong className="mn-order-total">{selectedPriced ? new Intl.NumberFormat(locale, {
@@ -158,9 +184,14 @@ export function WebCombinedReveal({ locale, planId, result, snapshot, failed, re
           {!products.length ? <p>{c.noProducts}</p> : <>
             <p className="mn-web-payment-note">{c.selectionPayment}</p>
             <section className="mn-web-pharmacy-delivery" aria-labelledby="mn-web-pharmacy-title">
-              <div className="mn-web-delivery-icons" aria-hidden="true"><Store /><ArrowRight /><House /></div>
-              <h3 id="mn-web-pharmacy-title">{c.pharmacyDelivery}</h3>
-              <p>{pharmacyLabel ? <>{c.pharmacyLead}<strong>{pharmacyLabel}</strong>{c.pharmacyTail}</> : c.pharmacyFallback}</p>
+              <div className="mn-web-delivery-layout">
+                <CheckoutPackaging locale={locale} compact />
+                <div className="space-y-4">
+                  <h3 id="mn-web-pharmacy-title">{pharmacyName ? c.pharmacyDeliveryFrom.replace("{pharmacy}", pharmacyName) : c.pharmacyDelivery}</h3>
+                  <p>{pharmacyLabel ? <>{c.pharmacyLead}<strong>{pharmacyLabel}</strong>{c.pharmacyTail}</> : c.pharmacyFallback}</p>
+                  <CheckoutPharmacyCare locale={locale} retailerName={pharmacyName ?? null} compact />
+                </div>
+              </div>
             </section>
           </>}
           </SectionCard>

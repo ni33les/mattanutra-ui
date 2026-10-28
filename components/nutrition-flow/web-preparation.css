@@ -7,6 +7,14 @@
 @media(prefers-reduced-motion:reduce){#mn-pharmacy-combined[data-channel=web] .mn-web-progress-spinner{animation:none}}
 #mn-pharmacy-combined[data-channel=web] .mn-products{width:min(960px,100% - 32px);margin:12px auto 24px;gap:20px}
 #mn-pharmacy-combined[data-channel=web] .mn-product{padding:18px 14px 14px}
+#mn-pharmacy-combined[data-channel=web] .mn-product:not(.is-excluded){border-color:var(--mn-green)}
+#mn-pharmacy-combined[data-channel=web] .mn-product.is-excluded{opacity:1}
+#mn-pharmacy-combined[data-channel=web] .mn-product.is-excluded .mn-product-order{background:color-mix(in srgb,var(--mn-soft-green) 72%,transparent);color:var(--mn-green)}
+#mn-pharmacy-combined[data-channel=web] .mn-web-product-presets{width:min(960px,100% - 32px);margin:16px auto 20px;text-align:center}
+#mn-pharmacy-combined[data-channel=web] .mn-web-product-presets>p{margin-bottom:16px;font-size:1rem;line-height:1.5}
+#mn-pharmacy-combined[data-channel=web] .mn-web-product-presets .mn-pill-group{justify-content:center}
+#mn-pharmacy-combined[data-channel=web] .mn-product-badge-slot{min-height:28px;margin-bottom:6px}
+#mn-pharmacy-combined[data-channel=web] .mn-web-starter-badge{display:inline-block;padding:3px 8px;border-radius:999px;background:var(--mn-green);color:#fff;font-weight:600}
 @media(max-width:520px){
   #mn-pharmacy-combined[data-channel=web] .mn-products{width:calc(100% - 20px);gap:12px;margin-top:8px;margin-bottom:20px}
   #mn-pharmacy-combined[data-channel=web] .mn-product{padding:14px 10px 10px}
@@ -29,7 +37,9 @@
 #mn-pharmacy-combined[data-channel=web] .mn-web-basket .mn-section-card__copy{margin-top:8px}
 #mn-pharmacy-combined[data-channel=web] .mn-web-payment-note{margin:16px 0}
 #mn-pharmacy-combined[data-channel=web] .mn-web-pharmacy-delivery{border-top:1px solid var(--mn-line);padding-top:16px}
-#mn-pharmacy-combined[data-channel=web] .mn-web-delivery-icons{display:flex;align-items:center;gap:12px;color:var(--mn-green);margin-bottom:12px}
-#mn-pharmacy-combined[data-channel=web] .mn-web-delivery-icons svg{width:24px;height:24px}
-#mn-pharmacy-combined[data-channel=web] .mn-web-pharmacy-delivery h3{margin-bottom:8px;color:var(--mn-green)}
+#mn-pharmacy-combined[data-channel=web] .mn-web-delivery-layout{display:grid;grid-template-columns:minmax(0,.8fr) minmax(0,1fr);align-items:center;gap:20px}
+#mn-pharmacy-combined[data-channel=web] .mn-web-delivery-layout p{font-size:.875rem;line-height:1.5}
+#mn-pharmacy-combined[data-channel=web] .mn-web-pharmacy-delivery h3{color:var(--mn-green);font-size:1rem;font-weight:600}
+#mn-pharmacy-combined[data-channel=web] .mn-web-checkout-note{text-align:center}
 #mn-pharmacy-combined[data-channel=web] .mn-web-selection-details{width:min(100%,760px);margin:18px auto 0}
+@media(max-width:600px){#mn-pharmacy-combined[data-channel=web] .mn-web-delivery-layout{grid-template-columns:1fr}}

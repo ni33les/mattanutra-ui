@@ -18,6 +18,7 @@ import {
 describe("system agents", () => {
   for (const [taskType, field] of [
     ["send_healthscore_email", "deliveryRequestId"],
+    ["send_saved_plan_email", "deliveryRequestId"],
     ["fulfill_web_payment", "paymentId"]
   ] as const) {
     it(`builds ${taskType} through the registry without changing payload semantics`, async () => {

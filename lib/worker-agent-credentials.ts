@@ -65,6 +65,7 @@ export const RUNTIME_WORKER_PROFILES: readonly RuntimeWorkerCredentialProfile[] 
     "send_example_email",
     "send_reassessment_email",
     "send_healthscore_email",
+    "send_saved_plan_email",
     "send_retail_order_workflow_email"
   ]),
   profile("food", "foodGuidanceWorker", "WORKER_FOOD_AGENT_API_KEY", "platform_agent", [

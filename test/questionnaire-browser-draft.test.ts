@@ -26,6 +26,18 @@ describe("questionnaire browser draft recovery", () => {
     const switched = resolveChatDraft({ locale: "zh-CN", sessionId: "same", local: draft });
     assert.equal(switched.captured?.planId, "plan"); assert.equal(switched.state.locale, "zh-CN");
   });
+  it("prefills saved contact and keeps contact-only drafts and receipts across locale changes", () => {
+    const draft = resolveChatDraft({ locale: "en", sessionId: "same", server: {
+      answers: { firstName: "Saved" }, planId: "plan", revision: 2, captured: true, contactEmail: "saved@fixture.test"
+    } });
+    assert.equal(draft.contactEmail, "saved@fixture.test");
+    assert.equal(draft.captured?.contactEmail, undefined, "Server contact alone does not acknowledge saved-link delivery");
+    const edited = { ...draft, contactEmail: "edited@fixture.test", updatedAt: Date.now() + 100 };
+    const switched = resolveChatDraft({ locale: "th", sessionId: "same", local: parseChatDraft(JSON.stringify(edited)) });
+    assert.equal(switched.contactEmail, "edited@fixture.test");
+    assert.deepEqual(updateChatDraft(switched, switched.state).captured, draft.captured);
+    assert.equal(switched.state.answers.contactEmail, undefined);
+  });
   it("maps saved body, food, lab and safety inputs without losing their values", () => {
     const answers = { heightCm: "173", weightKg: "69", foodFrequency: { fish: "often" }, skin: "IV", labs: { vitd: "30" }, labUnits: { vitd: "ng/mL" }, disclosure: true };
     const result = toAssessmentAnswers(chatAnswersFromAssessment(answers));

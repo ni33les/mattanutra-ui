@@ -80,6 +80,9 @@ it("a completed empty catalogue shows availability without a zero-price basket a
   mock.module(require.resolve("next/link.js"), {
     defaultExport: (props: AnchorHTMLAttributes<HTMLAnchorElement>) => createElement("a", props)
   });
+  mock.module(require.resolve("next/image.js"), {
+    defaultExport: (props: ImgHTMLAttributes<HTMLImageElement>) => createElement("img", { ...props, priority: undefined })
+  });
   mock.module("../components/safe-image.tsx", {
     namedExports: { SafeImage: (props: ImgHTMLAttributes<HTMLImageElement>) => createElement("img", props) }
   });
@@ -132,6 +135,37 @@ it("a completed empty catalogue shows availability without a zero-price basket a
   assert.match(render(nonempty, "en"), /\/basket\/checkout\?/);
   assert.doesNotMatch(render(nonempty, "en"), /data-testid="web-product-unavailable"/);
   assert.doesNotMatch(render(result, "en", { ...snapshot, readyForReveal: false }), /data-testid="web-product-unavailable"/);
+  await t.test("starter preset keeps every matched product visible and reuses supplier-specific delivery imagery", () => {
+    const products = ["first", "second", "third"].map((id, index) => ({ ...nonempty.recommendations[0], id,
+      name: `Product ${index + 1}`, price: { amount: (index + 1) * 100, currency: "THB" } }));
+    const populated = { ...nonempty, recommendations: products };
+    for (const locale of ["en", "th", "zh-CN"] as const) {
+      const html = render(populated, locale);
+      assert.equal((html.match(/type="checkbox"/g) ?? []).length, 3);
+      assert.equal((html.match(/checked=""/g) ?? []).length, 2);
+      assert.equal((html.match(/data-testid="starter-product-badge"/g) ?? []).length, 2);
+      assert.ok(html.includes(webProductCopy[locale].startHere));
+      assert.ok(html.includes(webProductCopy[locale].allProducts));
+      assert.ok(html.includes(webProductCopy[locale].starterHelp));
+      assert.ok(html.includes(webProductCopy[locale].reviewBeforePayment));
+      assert.ok(html.includes("/healthscore/v8-4/box.webp"));
+      assert.ok(!html.includes("khun_dream.webp"), "unknown suppliers must not inherit Delight's pharmacist");
+      assert.doesNotMatch(html, /Selected basket coverage/);
+      const checkout = html.match(/href="([^\"]*\/basket\/checkout\?[^\"]*)"/)?.[1]?.replaceAll("&amp;", "&");
+      assert.ok(checkout);
+      const query = new URL(checkout, "https://example.test").searchParams;
+      assert.equal(query.get("selected"), "first,second");
+      assert.equal(query.get("removed"), "third");
+    }
+    const delight = { ...populated, productRecommendationOptions: [{ id: "balanced" as const,
+      recommendations: products, productRecommendations: populated.productRecommendations!,
+      retailerOptions: [{ organisationId: "delight", organisationName: "Delight Pharmacy", dispatchCity: "Chiang Mai", currency: "THB" }]
+    }] } as FormulationResult;
+    assert.ok(render(delight, "en").includes("khun_dream.webp"));
+    assert.ok(render(delight, "en").includes("Khun Dream"));
+    assert.ok(render(delight, "en").includes("Knowing the right amount"));
+    assert.ok(render(delight, "en").includes("exactly enough."));
+  });
   await t.test("language changes preserve saved explanations and cautions when translations are absent", () => {
     const sourceCopy = {
       rationale: "Original saved rationale", whyThisIsForYou: "Original personal explanation",

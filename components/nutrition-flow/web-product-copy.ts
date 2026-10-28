@@ -3,10 +3,16 @@ import type { Locale } from "@/lib/i18n";
 
 export const webProductCopy = {
   en: {
-    selectionHelp: "Untick any product you do not want or already have.",
+    starterTitle: "Start with these", startHere: "Start here", allProducts: "All matched products",
+    starterHelp: "A smaller first order, selected for you. Add or remove products to suit your needs.",
+    starterBadge: "Selected to start", selectionPresets: "Choose a starting selection",
+    reviewBeforePayment: "Review your order and delivery details before payment.",
+    rightAmountBody: "MattaNutra is inspired by the Pāli wisdom of knowing the right amount—wellbeing comes not from more, but from exactly enough.",
+    selectionHelp: "Tick products to add them, or untick any you do not want or already have.",
     selectionUpdates: "Your item count and total update immediately.",
     selectionPayment: "You only pay for the products you select.",
     pharmacyDelivery: "From a local pharmacy to your doorstep",
+    pharmacyDeliveryFrom: "From {pharmacy} to your doorstep",
     pharmacyLead: "Your selected supplements are supplied by ",
     pharmacyTail: ", your MattaNutra partner pharmacy, and delivered directly to your home.",
     pharmacyLocation: "{pharmacy} in {city}",
@@ -30,10 +36,16 @@ export const webProductCopy = {
     back: "Back to my products", health: "View my free HealthScore", plan: "Read my full plan", edit: "Review my answers", continue: "Continue to checkout", noProducts: "Your formula is ready. There are no products to purchase for this result."
   },
   th: {
-    selectionHelp: "นำเครื่องหมายออกจากผลิตภัณฑ์ที่ไม่ต้องการหรือมีอยู่แล้ว",
+    starterTitle: "เริ่มต้นด้วยผลิตภัณฑ์เหล่านี้", startHere: "เริ่มต้นที่นี่", allProducts: "ผลิตภัณฑ์ที่จับคู่ทั้งหมด",
+    starterHelp: "คัดสรรให้คุณเริ่มต้นด้วยรายการที่น้อยลง เพิ่มหรือนำผลิตภัณฑ์ออกได้ตามความต้องการ",
+    starterBadge: "เลือกไว้ให้เริ่มต้น", selectionPresets: "เลือกชุดผลิตภัณฑ์เริ่มต้น",
+    reviewBeforePayment: "ตรวจสอบรายการสั่งซื้อและข้อมูลจัดส่งก่อนชำระเงิน",
+    rightAmountBody: "MattaNutra ได้แรงบันดาลใจจากปัญญาในภาษาบาลีเรื่องการรู้ปริมาณที่พอดี สุขภาวะที่ดีไม่ได้มาจากการมีมากขึ้น แต่มาจากการมีอย่างพอดี",
+    selectionHelp: "ทำเครื่องหมายเพื่อเพิ่มผลิตภัณฑ์ หรือนำเครื่องหมายออกจากรายการที่ไม่ต้องการหรือมีอยู่แล้ว",
     selectionUpdates: "จำนวนรายการและยอดรวมจะปรับทันที",
     selectionPayment: "ชำระเฉพาะผลิตภัณฑ์ที่คุณเลือกเท่านั้น",
     pharmacyDelivery: "จากร้านยาใกล้คุณ ส่งตรงถึงบ้าน",
+    pharmacyDeliveryFrom: "จาก{pharmacy} ส่งตรงถึงบ้านคุณ",
     pharmacyLead: "อาหารเสริมที่คุณเลือกจัดจำหน่ายโดย ",
     pharmacyTail: " ร้านยาพันธมิตรของ MattaNutra และจัดส่งตรงถึงบ้านคุณ",
     pharmacyLocation: "{pharmacy} ใน{city}",
@@ -57,10 +69,16 @@ export const webProductCopy = {
     back: "กลับไปที่ผลิตภัณฑ์", health: "ดู HealthScore ฟรี", plan: "อ่านแผนฉบับเต็ม", edit: "ทบทวนคำตอบ", continue: "ดำเนินการชำระเงิน", noProducts: "สูตรของคุณพร้อมแล้ว ผลลัพธ์นี้ไม่มีผลิตภัณฑ์ที่ต้องซื้อ"
   },
   "zh-CN": {
-    selectionHelp: "取消勾选您不需要或已经拥有的产品。",
+    starterTitle: "从这些产品开始", startHere: "从这里开始", allProducts: "所有匹配产品",
+    starterHelp: "为您精选精简的首次订单。您可以按需添加或移除产品。",
+    starterBadge: "已为您选好", selectionPresets: "选择起始产品组合",
+    reviewBeforePayment: "付款前，请核对订单和配送信息。",
+    rightAmountBody: "MattaNutra 的灵感源自巴利语中知量的智慧——健康并非来自更多，而是恰到好处。",
+    selectionHelp: "勾选以添加产品，或取消勾选您不需要或已经拥有的产品。",
     selectionUpdates: "产品数量和总价会立即更新。",
     selectionPayment: "您只需支付所选产品的费用。",
     pharmacyDelivery: "从本地药房，直送您家",
+    pharmacyDeliveryFrom: "从{pharmacy}，直送您家",
     pharmacyLead: "您选择的营养补充剂由 MattaNutra 合作药房 ",
     pharmacyTail: " 提供，并直接配送到您家。",
     pharmacyLocation: "{city}的 {pharmacy}",

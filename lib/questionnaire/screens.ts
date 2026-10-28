@@ -1,5 +1,6 @@
 import en from "@/content/questionnaire/v15-5/en.json" with { type: "json" };
 import th from "@/content/questionnaire/v15-5/th.json" with { type: "json" };
+import zh from "@/content/questionnaire/v15-5/zh-CN.json" with { type: "json" };
 import { getQuestionnaireDefinition } from "@/lib/questionnaire/definition";
 import { isTurnVisible } from "@/lib/questionnaire/reactions";
 import type { QuestionnaireAnswers, QuestionnaireLocale, QuestionnaireState, TurnDef } from "@/lib/questionnaire/types";
@@ -8,7 +9,8 @@ export const SCREEN_QUESTIONNAIRE_VERSION = "v15.5-screens";
 export type QuestionnaireScreen = Readonly<{ id: string; sec: number; nong?: string; blocks: readonly string[] }>;
 const removedKeys = ["budget", "maxPills", "form", "tracker", "otherTracker", "fitness", "vo2", "hrv", "protein", "precisionGate"];
 export const questionnaireScreens: readonly QuestionnaireScreen[] = en.screens;
-export function screenCopy(locale: string) { return locale === "th" ? th : en; }
+const zhScreenCopy = { ...en, x: { ...en.x, ...zh.x } };
+export function screenCopy(locale: string) { return locale === "th" ? th : locale === "zh-CN" ? zhScreenCopy : en; }
 export function screenDefinition(state: QuestionnaireState) { return getQuestionnaireDefinition(state.locale, SCREEN_QUESTIONNAIRE_VERSION); }
 export function screenTurns(state: QuestionnaireState, screen: QuestionnaireScreen, includeInferred = false): TurnDef[] {
   const definition = screenDefinition(state);

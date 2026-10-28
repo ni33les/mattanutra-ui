@@ -144,6 +144,7 @@
     "worker:stock": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs workers/runner.ts stock",
     "worker:supplement": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs workers/runner.ts supplement",
     "web-products:schema:apply": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/apply-web-product-journey-schema.ts",
+    "saved-plan-delivery:schema:apply": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/apply-saved-plan-delivery-schema.ts",
     "web-funnel:schema:apply": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/apply-web-funnel-schema.ts",
     "web-funnel:audit": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/audit-web-funnel.ts",
     "test:full": "node scripts/run-full-test-suite.mjs",
