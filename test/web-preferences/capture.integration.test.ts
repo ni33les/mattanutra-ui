@@ -15,7 +15,7 @@ test('WEB-PREF-PG-01 capture, replay, legacy regeneration and agent generation p
     for (const channel of ['web', 'agent'] as const) {
       const completed = fastForwardQuestionnaire(createInitialState({ locale, channel })); assert.equal(completed.ok, true);
       const state = { ...completed.state, answers: { ...completed.state.answers, budget: 'u1000', maxPills: '1-3', form: 'capsules' } };
-      const body = { answers: buildCapturePayload(state).answers, questionnaireState: state, locale, sessionId: state.sessionId };
+      const body = { contactEmail: channel === 'web' ? 'web-preferences@example.test' : undefined, answers: buildCapturePayload(state).answers, questionnaireState: state, locale, sessionId: state.sessionId };
       const options = { idempotencyKey: randomUUID() };
       const receipt = await captureAssessment(body, options);
       assert.deepEqual(await captureAssessment(body, options), receipt);
@@ -45,7 +45,7 @@ test('WEB-PREF-PG-01 capture, replay, legacy regeneration and agent generation p
 
 test('WEB-PREF-PG-02 classic capture without chat state ignores saved preferences and keeps replay stable', async t => {
   fixtureDatabaseUrl(); const sql = getSql(); assert.ok(sql); t.after(closeSqlPool);
-  const body = { locale: 'en', answers: { firstName: 'Classic', age: '36-45', sex: 'male', goals: ['energy'],
+  const body = { contactEmail: 'classic@fixture.test', locale: 'en', answers: { firstName: 'Classic', age: '36-45', sex: 'male', goals: ['energy'],
     meds: 'yes', medTypes: ['statin'], budget: 'u1000', maxPills: '1-3', form: 'capsules' } };
   const options = { idempotencyKey: randomUUID() };
   const receipt = await captureAssessment(body, options);

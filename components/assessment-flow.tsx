@@ -21,6 +21,7 @@ import {
   QuestionnairePrecisionMeter
 } from "@/components/assessment-flow-panels";
 import {
+  assessmentRequiredEmailCopy,
   assessmentUiCopy,
   copies,
   gaugeLabelsByLocale
@@ -112,6 +113,7 @@ type AssessmentSection = Readonly<{
 type ProcessingStepState = "active" | "complete" | "failed" | "pending";
 
 type ProcessingStatus = Readonly<{
+  contactEmail?: string | null;
   healthScore?: HealthScoreResult;
   planId: string;
   queuePosition: number;
@@ -136,6 +138,17 @@ function buildReturningScoreGateStatus(planId: string, healthScore: HealthScoreR
       { id: "assessment", state: "complete" },
       { id: "score", state: "complete" },
       { id: "results", state: "complete" }
+    ]
+  };
+}
+
+export function buildClassicServerReceipt(planId: string | undefined, revision: number, healthScore?: HealthScoreResult | null): ProcessingStatus | null {
+  if (!planId || !(revision > 0 || healthScore)) return null;
+  // Captured pharmacy plans may not have HealthScore copy. A resume-only draft has no revision.
+  // Contact acknowledgement stays unknown until /contact confirms this browser's email.
+  return healthScore ? buildReturningScoreGateStatus(planId, healthScore) : {
+    planId, queuePosition: 0, status: "queued", steps: [
+      { id: "assessment", state: "complete" }, { id: "score", state: "pending" }, { id: "results", state: "pending" }
     ]
   };
 }
@@ -176,11 +189,11 @@ export function AssessmentFlow({
   const skipHealthScoreStep = skipHealthScore || Boolean(pharmacyId);
   const copy = copies[locale];
   const router = useRouter();
-  const returningScoreStatus = returningPlanId && returningHealthScore
-    ? buildReturningScoreGateStatus(returningPlanId, returningHealthScore)
-    : null;
+  const returningCaptureStatus = buildClassicServerReceipt(returningPlanId, assessmentRevision, returningHealthScore);
   const [answers, setAnswers] = useState<Answers>(() => buildInitialAnswers(effectiveQuestionnaireAnswers(prefillAnswers)));
   const [contactEmail, setContactEmail] = useState(prefillContactEmail ?? "");
+  const [contactEmailTouched, setContactEmailTouched] = useState(false);
+  const finalEmailInput = useRef<HTMLInputElement>(null);
   const [resumePlanId, setResumePlanId] = useState(returningPlanId ?? "");
   const [resumeStatus, setResumeStatus] = useState<"idle" | "sending" | "sent" | "failed">("idle");
   const [resumeError, setResumeError] = useState("");
@@ -188,7 +201,7 @@ export function AssessmentFlow({
   const [sectionIndex, setSectionIndex] = useState(initialSectionIndex ?? 0);
   const [processingStatus, setProcessingStatus] = useState<ProcessingStatus | null>(null);
   const [processingError, setProcessingError] = useState("");
-  const [capturedStatus, setCapturedStatus] = useState<ProcessingStatus | null>(returningScoreStatus);
+  const [capturedStatus, setCapturedStatus] = useState<ProcessingStatus | null>(returningCaptureStatus);
   const [showHealthScore, setShowHealthScore] = useState(Boolean(initialStage === "healthscore"));
   const [healthScore, setHealthScore] = useState<HealthScoreResult | null>(returningHealthScore ?? null);
   const captureInFlight = useRef<Promise<ProcessingStatus | null> | null>(null);
@@ -201,6 +214,8 @@ export function AssessmentFlow({
   const gaugeLabels = gaugeLabelsByLocale[locale];
   const normalizedContactEmail = normalizeAssessmentContactEmail(contactEmail);
   const contactEmailInvalid = assessmentContactEmailError(contactEmail) !== null;
+  const requiredEmailError = assessmentContactEmailError(contactEmail, { required: true });
+  const emailCopy = assessmentRequiredEmailCopy[locale];
   const effectiveReturningPlanId = resumePlanId || returningPlanId;
   const capturedAnswers = useRef(JSON.stringify(buildInitialAnswers(effectiveQuestionnaireAnswers(prefillAnswers))));
   const flowController = useRef<AbortController | null>(null);
@@ -218,12 +233,21 @@ export function AssessmentFlow({
         setAnswers(buildInitialAnswers(effectiveQuestionnaireAnswers(saved.answers))); setContactEmail(saved.contactEmail || "");
         setSectionIndex(saved.sectionIndex || 0); setResumePlanId(saved.planId || returningPlanId || "");
         if (saved.receipt) { capturedAnswers.current = JSON.stringify(buildInitialAnswers(effectiveQuestionnaireAnswers(saved.answers))); setCapturedStatus(saved.receipt); }
-        if (saved.processing && saved.receipt?.planId) router.replace(pharmacyId ? pharmacyPath(locale, pharmacyId, "reveal", { plan: saved.receipt.planId }) : skipHealthScoreStep ? nutritionRevealPath(locale, saved.receipt.planId) : nutritionHealthScorePath(locale, saved.receipt.planId));
+        if (saved.processing && saved.receipt?.planId) {
+          const email = normalizeAssessmentContactEmail(saved.contactEmail);
+          if (email && email === normalizeAssessmentContactEmail(saved.receipt.contactEmail)) {
+            router.replace(pharmacyId ? pharmacyPath(locale, pharmacyId, "reveal", { plan: saved.receipt.planId }) : skipHealthScoreStep ? nutritionRevealPath(locale, saved.receipt.planId) : nutritionHealthScorePath(locale, saved.receipt.planId));
+          } else {
+            // Old captures and unsaved contact edits return to a visible field without recapturing answers.
+            setSectionIndex(copy.stages.length - 1);
+            setShowHealthScore(false);
+          }
+        }
       }
     } catch { /* Ignore drafts from another format. */ }
     setDraftReady(true);
     return () => flowController.current?.abort();
-  }, [assessmentRevision, classicDraftKey, locale, pharmacyId, returningPlanId, router, serverUpdatedAt, skipHealthScoreStep]);
+  }, [assessmentRevision, classicDraftKey, copy.stages.length, locale, pharmacyId, returningPlanId, router, serverUpdatedAt, skipHealthScoreStep]);
   useEffect(() => {
     if (!draftReady) return;
     const matchingReceipt = capturedAnswers.current === JSON.stringify(answers) ? capturedStatus : null;
@@ -307,6 +331,7 @@ export function AssessmentFlow({
     setContactEmail(value);
     setResumeStatus("idle");
     setResumeError("");
+    setProcessingError("");
   }
 
   async function sendResumeLink() {
@@ -1112,7 +1137,7 @@ export function AssessmentFlow({
   const renderedQuestions = currentSection.questions;
   const isFinalStep = sectionIndex === sections.length - 1;
   const inlineSaving = Boolean(skipHealthScoreStep && processingStatus && !processingError);
-  const primaryActionDisabled = !answers.disclosure || inlineSaving;
+  const primaryActionDisabled = !answers.disclosure || inlineSaving || (isFinalStep && Boolean(requiredEmailError));
 
   function goBack() {
     setProcessingError("");
@@ -1157,8 +1182,10 @@ export function AssessmentFlow({
 
   async function prepareHealthScoreGate(answerPayload = answers) {
     if (captureInFlight.current || (processingStatus && !processingError)) return;
-    if (contactEmailInvalid) {
-      setProcessingError(ui.resume.invalid);
+    if (requiredEmailError) {
+      setContactEmailTouched(true);
+      setProcessingError(requiredEmailError === "required" ? emailCopy.required : ui.resume.invalid);
+      requestAnimationFrame(() => finalEmailInput.current?.focus());
       return;
     }
 
@@ -1207,6 +1234,7 @@ export function AssessmentFlow({
       if (readyStatus.healthScore) {
         setHealthScore(readyStatus.healthScore);
       }
+      readyStatus = { ...readyStatus, contactEmail: normalizedContactEmail };
       setCapturedStatus(readyStatus);
       setProcessingStatus(skipHealthScoreStep ? readyStatus : null);
       setShowHealthScore(!skipHealthScoreStep);
@@ -1232,16 +1260,27 @@ export function AssessmentFlow({
 
   async function captureAssessment(force = false, answerPayload = answers) {
     answerPayload = buildInitialAnswers(effectiveQuestionnaireAnswers(answerPayload));
-    if (!force && capturedStatus?.planId && capturedAnswers.current === JSON.stringify(answerPayload)) {
-      return capturedStatus;
-    }
-
+    if (!normalizedContactEmail) throw new Error("A valid email is required");
     if (captureInFlight.current) {
       return captureInFlight.current;
     }
 
-    captureInFlight.current = (async () => {
+    const pendingCapture = (async () => {
       try {
+        if (!force && capturedStatus?.planId && capturedAnswers.current === JSON.stringify(answerPayload)) {
+          if (normalizeAssessmentContactEmail(capturedStatus.contactEmail) === normalizedContactEmail) return capturedStatus;
+          const response = await fetchWithTimeout(`/api/assessment/${encodeURIComponent(capturedStatus.planId)}/contact`, {
+            method: "PATCH", headers: { "content-type": "application/json" }, cache: "no-store",
+            signal: flowController.current?.signal, body: JSON.stringify({ contactEmail: normalizedContactEmail, locale })
+          });
+          const saved = await response.json();
+          if (!response.ok || saved.planId !== capturedStatus.planId || normalizeAssessmentContactEmail(saved.contactEmail) !== normalizedContactEmail) {
+            throw new Error("Unable to save assessment contact");
+          }
+          const updated = { ...capturedStatus, contactEmail: normalizedContactEmail };
+          setCapturedStatus(updated);
+          return updated;
+        }
         const urlSession = new URL(window.location.href).searchParams.get("session");
         const sessionStorageKey = `mn-classic-capture-session:${urlSession || resumeToken || effectiveReturningPlanId || paymentId || "new"}`;
         const sessionId = window.sessionStorage.getItem(sessionStorageKey) || browserSession;
@@ -1296,19 +1335,18 @@ export function AssessmentFlow({
           throw new Error("Unable to capture assessment plan");
         }
 
-        const status = (await response.json()) as ProcessingStatus;
+        const status: ProcessingStatus = { ...await response.json(), contactEmail: normalizedContactEmail };
         capturedAnswers.current = JSON.stringify(answerPayload);
         setCapturedStatus(status);
         setResumePlanId(status.planId);
         return status;
       } catch {
         return null;
-      } finally {
-        captureInFlight.current = null;
       }
     })();
-
-    return captureInFlight.current;
+    captureInFlight.current = pendingCapture;
+    try { return await pendingCapture; }
+    finally { if (captureInFlight.current === pendingCapture) captureInFlight.current = null; }
   }
 
   return (
@@ -1418,6 +1456,21 @@ export function AssessmentFlow({
                     {question.content}
                   </Question>
                 ))}
+                {isFinalStep ? <div className="mn-email-card" data-testid="classic-required-email">
+                  <div className="mn-email-card__header"><h3>{emailCopy.title}</h3></div>
+                  <p id="classic-email-hint" className="mn-email-card__body">{emailCopy.body}</p>
+                  <label className="mt-4 block" htmlFor="classic-contact-email">
+                    <span className="mn-question__label">{ui.resume.inputLabel}</span>
+                    <input ref={finalEmailInput} id="classic-contact-email" className="mn-text-input" type="email" inputMode="email"
+                      autoComplete="email" autoCapitalize="none" spellCheck={false} maxLength={254} required
+                      placeholder={ui.resume.placeholder} value={contactEmail} aria-invalid={contactEmailTouched && Boolean(requiredEmailError)}
+                      aria-describedby={`classic-email-hint${contactEmailTouched && requiredEmailError ? " classic-email-error" : ""}`}
+                      onBlur={() => setContactEmailTouched(true)} onChange={event => updateContactEmail(event.target.value)} />
+                  </label>
+                  {contactEmailTouched && requiredEmailError ? <p id="classic-email-error" role="alert" className="mt-2 text-sm font-semibold text-red-600">
+                    {requiredEmailError === "required" ? emailCopy.required : ui.resume.invalid}
+                  </p> : null}
+                </div> : null}
                 {sectionIndex === 0 ? (
                   <AssessmentTrustStrip items={copy.about.trustItems} />
                 ) : null}

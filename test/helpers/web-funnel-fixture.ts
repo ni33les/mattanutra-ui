@@ -29,7 +29,7 @@ const answers = { firstName: "Funnel Fixture", sex: "male", age: "36-45", goals:
 let output: unknown;
 try {
   if (input.action === "capture") {
-    output = await captureAssessment({ answers, locale, sessionId: randomUUID(), paymentId: input.paymentId }, { idempotencyKey: randomUUID() });
+    output = await captureAssessment({ contactEmail: "capture@fixture.test", answers, locale, sessionId: randomUUID(), paymentId: input.paymentId }, { idempotencyKey: randomUUID() });
   } else if (input.action === "resume") {
     let state = startQuestionnaire(createInitialState({ locale, sessionId: randomUUID() })).state;
     const named = applyAnswer(state, "firstName", "Resume Fixture");

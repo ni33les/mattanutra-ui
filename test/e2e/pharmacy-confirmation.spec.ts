@@ -32,7 +32,7 @@ async function expectSharedConfirmation(page: Page, locale: Locale) {
   await expect(page.getByText(copy.emailOptionalNote, { exact: true })).toHaveCount(0);
   await expect(page.getByTestId("questionnaire-back")).toHaveCount(0);
   await expect(root.getByRole("button", { name: /LINE/i })).toHaveCount(0);
-  await expect(page.locator("#questionnaire-contact-email")).toHaveJSProperty("required", false);
+  await expect(page.locator("#questionnaire-contact-email")).toHaveJSProperty("required", true);
   expect(await page.evaluate(() => {
     const email = document.querySelector('[data-testid="questionnaire-email-card"]')!.getBoundingClientRect();
     const submit = document.querySelector('[data-testid="questionnaire-submit"]')!.getBoundingClientRect();
@@ -54,11 +54,19 @@ for (const source of ["in_store", "business_card"] as const) {
     await expect(page.getByTestId("questionnaire-submit")).toBeDisabled();
     await page.getByTestId("questionnaire-disclosure").check();
     const email = page.locator("#questionnaire-contact-email");
-    await email.fill("not an email");
-    await page.getByTestId("questionnaire-submit").click();
-    await expect(email).toHaveAttribute("aria-invalid", "true");
-    await expect(page.locator("#questionnaire-email-error")).toBeVisible();
-    expect(captures).toHaveLength(0);
+    for (const invalid of ["", "   ", "not an email"]) {
+      await email.fill(invalid);
+      await expect(page.getByTestId("questionnaire-submit")).toBeEnabled();
+      await page.getByTestId("questionnaire-submit").click();
+      await expect(email).toHaveAttribute("aria-invalid", "true");
+      await expect(email).toBeFocused();
+      await expect(page.locator("#questionnaire-email-error")).toBeVisible();
+      await expect(page.locator("#questionnaire-email-error")).toHaveText(invalid.trim()
+        ? screenCopy("en").x.emailError : screenCopy("en").x.emailRequired);
+      await expect(page.getByTestId("questionnaire-review")).toBeVisible();
+      expect(captures).toHaveLength(0);
+      expect(new URL(page.url()).pathname).toBe(`/en/retail/${slug}/quiz`);
+    }
     await email.fill("Pharmacy@fixture.test");
     await page.reload();
     await page.getByTestId("questionnaire-resume").click();
@@ -80,25 +88,27 @@ for (const source of ["in_store", "business_card"] as const) {
     expect(captures[0].questionnaireState).not.toHaveProperty("answers.contactEmail");
   });
 
-  test(`PHARM-CONFIRMATION ${source} accepts blank email and hands the captured assessment to pharmacy reveal`, async ({ page }) => {
+  test(`PHARM-CONFIRMATION ${source} captures normalized email and hands the assessment to pharmacy reveal`, async ({ page }) => {
     const captures: Array<Record<string, unknown>> = [];
+    const contactEmail = `Pharmacy.${randomUUID()}@fixture.test`;
     await page.route("**/api/assessment", async route => {
       captures.push(route.request().postDataJSON());
-      // Native capture against isolated PostgreSQL proves the optional field
-      // keeps the pharmacy journey and acquisition binding. Blank contact
-      // cannot queue an email; no external worker runs in this fixture.
+      // Native capture against isolated PostgreSQL proves contact capture
+      // keeps the pharmacy journey and acquisition binding. SMTP is blocked,
+      // and no email worker runs against this fixture.
       await route.fulfill({ response: await route.fetch() });
     });
     const { sessionId } = await openPharmacyReview(page, source, "th");
     await expectSharedConfirmation(page, "th");
     await expect(page.locator("#questionnaire-contact-email")).toBeEmpty();
     await page.getByTestId("questionnaire-disclosure").check();
+    await page.locator("#questionnaire-contact-email").fill(contactEmail);
     await page.getByTestId("questionnaire-submit").click();
     await expect(page).toHaveURL(new RegExp(`/th/retail/${slug}/reveal\\?plan=`));
     await expect(page.getByTestId("pharmacy-combined")).toBeVisible();
     await expect(page.locator("[data-pharmacy-source]")).toHaveAttribute("data-pharmacy-source", source);
     expect(captures).toHaveLength(1);
-    expect(captures[0]).not.toHaveProperty("contactEmail");
+    expect(captures[0].contactEmail).toBe(contactEmail.toLowerCase());
     expect(captures[0]).toMatchObject({ sessionId, pharmacyId: slug,
       bpm: { ray: sessionId, attribution: { sourceDetail: source } } });
     await expect(page.getByTestId("questionnaire-calculating")).toHaveCount(0);
@@ -145,4 +155,59 @@ for (const source of ["in_store", "business_card"] as const) {
       return saved ? JSON.parse(saved.value).captured : null;
     }).toEqual({ planId, revision: 2, contactEmail: "corrected@fixture.test" });
   });
+
+  for (const recovery of [{ phase: "complete", captured: true }, { phase: "completing", captured: false }] as const) {
+    test(`PHARM-CONFIRMATION ${source} ${recovery.phase} draft without email returns to confirmation before resuming`, async ({ page }) => {
+      const captures: Array<Record<string, unknown>> = [], contacts: Array<Record<string, unknown>> = [];
+      const planId = recovery.captured ? randomUUID() : null;
+      await page.route("**/api/assessment", route => {
+        captures.push(route.request().postDataJSON());
+        return route.fulfill({ status: 503, json: { message: "Capture inspection barrier" } });
+      });
+      await page.route("**/api/assessment/*/contact", route => {
+        const body = route.request().postDataJSON(); contacts.push(body);
+        return route.fulfill({ json: { planId, revision: 2, contactEmail: body.contactEmail } });
+      });
+      await page.route(`**/retail/${slug}/reveal?**`, route => route.abort());
+      const { sessionId } = await openPharmacyReview(page, source, "th");
+      await page.getByTestId("questionnaire-disclosure").check();
+      await page.evaluate(({ sessionId, planId, phase }) => {
+        const key = `mn-questionnaire:v1:${sessionId}`;
+        const draft = JSON.parse(localStorage.getItem(key)!);
+        draft.state.planId = planId;
+        draft.state.phase = phase;
+        draft.revision = planId ? 2 : 0;
+        draft.captured = planId ? { planId, revision: 2, contactEmail: null } : null;
+        draft.contactEmail = null;
+        draft.updatedAt = Date.now();
+        localStorage.setItem(key, JSON.stringify(draft));
+      }, { sessionId, planId, phase: recovery.phase });
+      await page.reload();
+      await expect(page.getByTestId("questionnaire-review")).toBeVisible();
+      await expectSharedConfirmation(page, "th");
+      const email = page.locator("#questionnaire-contact-email");
+      await expect(email).toBeEmpty();
+      await expect(page.getByTestId("questionnaire-disclosure")).toBeChecked();
+      await expect(page.getByTestId("questionnaire-calculating")).toHaveCount(0);
+      expect(captures).toHaveLength(0);
+      expect(contacts).toHaveLength(0);
+      await page.getByTestId("questionnaire-submit").click();
+      await expect(email).toBeFocused();
+      await expect(page.locator("#questionnaire-email-error")).toBeVisible();
+      expect(captures).toHaveLength(0);
+      expect(contacts).toHaveLength(0);
+      await email.fill("Recovered@fixture.test");
+      await page.getByTestId("questionnaire-submit").click();
+      if (recovery.captured) {
+        await expect.poll(() => contacts.length).toBe(1);
+        expect(contacts[0]).toEqual({ contactEmail: "recovered@fixture.test", locale: "th" });
+        expect(captures).toHaveLength(0);
+      } else {
+        await expect.poll(() => captures.length).toBe(1);
+        expect(captures[0]).toMatchObject({ contactEmail: "recovered@fixture.test", pharmacyId: slug,
+          bpm: { attribution: { sourceDetail: source } } });
+        expect(contacts).toHaveLength(0);
+      }
+    });
+  }
 }

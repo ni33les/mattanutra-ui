@@ -11,6 +11,7 @@
     "emailOptionalNote": "邮箱为选填项。您可以留空后继续。",
     "emailLabel": "电子邮箱",
     "emailPlaceholder": "you@example.com",
-    "emailError": "请输入有效的电子邮箱，或留空后继续。"
+    "emailRequired": "请输入您的电子邮箱地址以继续。",
+    "emailError": "请输入有效的电子邮箱地址。"
   }
 }

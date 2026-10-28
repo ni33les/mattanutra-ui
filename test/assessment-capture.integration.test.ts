@@ -2,7 +2,10 @@ import { cleanupFixtureRelationships } from "./helpers/fixture-teardown.ts";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { before, after, describe, it } from "node:test";
-import { captureAssessment, updateAssessmentContact, retryAssessmentHealthScore } from "../lib/assessment-capture.ts";
+import { captureAssessment, updateAssessmentContact, retryAssessmentHealthScore, validateCaptureAnswers } from "../lib/assessment-capture.ts";
+import { getStoredAssessmentPrefill } from "../lib/assessment-store.ts";
+import { assessmentInputHash } from "../lib/assessment-revisions.ts";
+import { completedFunnelRequest } from "../lib/funnel-idempotency.ts";
 import { createAssessmentResumeDraft, getAssessmentResumeDraft } from "../lib/assessment-resume-store.ts";
 import { closeSqlPool, getSql, withDatabaseTransaction } from "../lib/db.ts";
 import { createServerQuestionnaireCoordinator } from "../lib/questionnaire/server.ts";
@@ -15,15 +18,71 @@ const databaseUrl = process.env.TEST_DB_URL;
 assert.ok(databaseUrl, "Assessment capture tests require isolated PostgreSQL");
 describe("shared assessment capture on PostgreSQL", () => {
   const plans: string[] = [], payments: string[] = [], keys: string[] = [], drafts: string[] = [];
-  const body = { answers: { firstName: "Fixture", age: "36-45", sex: "male", goals: ["energy"] }, locale: "en", intent: "capture" };
+  const body = { answers: { firstName: "Fixture", age: "36-45", sex: "male", goals: ["energy"] }, locale: "en", intent: "capture", contactEmail: "visitor@funnel-fixture.test" };
   const request = (planId?: string) => { const idempotencyKey = randomUUID(); keys.push(idempotencyKey); return { idempotencyKey, planId }; };
   before(async () => {
     const url = new URL(databaseUrl!);
     assert.equal(url.hostname, "127.0.0.1"); assert.match(url.pathname, /^\/mattanutra_lock_review/);
     process.env.DB_URL = databaseUrl;
+    // This suite also covers the classic HealthScore flow; modern delivery has its own suite.
+    process.env.WEB_PRODUCT_JOURNEY_ENABLED = "0";
     for (const locale of ["en", "th", "zh-CN"]) await getSql()!`insert into public.site_locales (code, label, native_label, html_lang)
       values (${locale}, ${locale}, ${locale}, ${locale}) on conflict (code) do nothing`;
     await getSql()!`insert into public.organisations (slug, name, organisation_type) values ('mattanutra', 'MattaNutra', 'platform') on conflict do nothing`;
+  });
+  it("requires email for classic and grouped browser capture before creating any receipt, plan or work", async () => {
+    const sql = getSql()!;
+    const [pharmacy] = await sql`select slug from public.organisations where slug='matcher-v5-isolated-fixture-retailer' and status='active'`;
+    assert.ok(pharmacy, "Controlled pharmacy fixture is required");
+    const counts = () => sql`select
+      (select count(*)::int from assessments) as assessments,
+      (select count(*)::int from assessment_inputs) as inputs,
+      (select count(*)::int from tasks) as tasks,
+      (select count(*)::int from funnel_requests) as requests,
+      (select count(*)::int from saved_plan_delivery_requests) as deliveries,
+      (select count(*)::int from communication_channels) as channels`;
+    const before = await counts();
+    let state = fastForwardScreens(createScreenState("en", randomUUID()));
+    state = { ...state, answers: { ...state.answers, disclosure: true }, phase: "complete", completedAt: Date.now() };
+    for (const grouped of [false, true]) for (const source of ["website", "in_store", "business_card"]) {
+      const input = { ...body, ...(grouped ? { answers: buildCapturePayload(state).answers, questionnaireState: state } : {}),
+        ...(source === "website" ? {} : { pharmacyId: pharmacy.slug,
+          bpm: { ray: randomUUID(), attribution: { sourceDetail: source, trafficSource: "pharmacy" } } }) };
+      for (const email of [undefined, null, "", "   ", "broken", 0, false]) {
+        await assert.rejects(captureAssessment({ ...input, contactEmail: email }, request()), { code: "invalid_email" }, `${source}/${grouped}/${String(email)}`);
+      }
+    }
+    assert.deepEqual(await counts(), before);
+  });
+  it("preserves saved contact on browser edits and blocks historical email-less receipt replay without blocking reads", async () => {
+    const sql = getSql()!, options = request();
+    const first = await captureAssessment(body, options); plans.push(first.planId);
+    const omitted = { ...body, contactEmail: undefined };
+    const editing = request(first.planId);
+    assert.equal((await captureAssessment(omitted, editing)).revision, first.revision);
+    await updateAssessmentContact(first.planId, "corrected@fixture.test");
+    assert.equal((await captureAssessment(omitted, editing)).planId, first.planId, "An omitted-field replay remains stable after a contact correction");
+    assert.equal((await captureAssessment({ ...body, contactEmail: "   " }, request(first.planId))).revision, first.revision);
+    assert.equal((await getStoredAssessmentPrefill(first.planId))?.contactEmail, "corrected@fixture.test");
+    await assert.rejects(captureAssessment({ ...body, contactEmail: "invalid" }, request(first.planId)), { code: "invalid_email" });
+    const oldInput = { planId: null, sessionId: null, answers: validateCaptureAnswers(body.answers), locale: "en",
+      contactEmail: null, paymentId: null, expectedRevision: null };
+    await sql`update funnel_requests set input_hash=${assessmentInputHash(oldInput)} where scope='assessment-capture' and request_key=${options.idempotencyKey}`;
+    await sql`update assessments set contact_email=null where plan_id=${first.planId}::uuid`;
+    assert.ok(await completedFunnelRequest(sql, "assessment-capture", options.idempotencyKey, oldInput), "Fixture models a matching pre-requirement receipt");
+    const before = await sql`select id,task_type from tasks where plan_id=${first.planId}::uuid order by id`;
+    await assert.rejects(captureAssessment(omitted, options), { code: "invalid_email" });
+    await assert.rejects(captureAssessment(omitted, request(first.planId)), { code: "invalid_email" });
+    assert.equal((await getStoredAssessmentPrefill(first.planId))?.contactEmail, null, "Historical saved plans remain readable");
+    assert.deepEqual(await sql`select id,task_type from tasks where plan_id=${first.planId}::uuid order by id`, before);
+  });
+  it("continues to accept completed LINE, agent and API questionnaires without email", async () => {
+    for (const channel of ["line", "agent", "api"] as const) {
+      const state = fastForwardQuestionnaire(createInitialState({ locale: "en", channel })).state;
+      const receipt = await captureAssessment({ locale: "en", answers: buildCapturePayload(state).answers,
+        questionnaireState: state }, request()); plans.push(receipt.planId);
+      assert.equal((await getStoredAssessmentPrefill(receipt.planId))?.contactEmail, null);
+    }
   });
   after(async () => {
     await withDatabaseTransaction(getSql()!, async sql => {
@@ -71,7 +130,7 @@ describe("shared assessment capture on PostgreSQL", () => {
     state = updateScreenAnswer(state, "avoid", "kimchi");
     state = { ...state, answers: { ...state.answers, disclosure: true }, phase: "complete", completedAt: Date.now() };
     const input = { answers: buildCapturePayload(state).answers, questionnaireState: state,
-      sessionId: state.sessionId, locale: "th", intent: "capture" };
+      sessionId: state.sessionId, locale: "th", intent: "capture", contactEmail: "screens@fixture.test" };
     const unconfirmed = { ...state, answers: { ...state.answers, disclosure: false } };
     await assert.rejects(captureAssessment({ ...input, answers: buildCapturePayload(unconfirmed).answers,
       questionnaireState: unconfirmed }, request()), { code: "invalid_questionnaire_state" });
@@ -166,8 +225,9 @@ describe("shared assessment capture on PostgreSQL", () => {
     const draft = await createAssessmentResumeDraft({ answers: body.answers, contactEmail: "resume@funnel-fixture.test", paymentId, locale: "en" });
     drafts.push(draft.draftId); plans.push(draft.planId);
     assert.equal((await getAssessmentResumeDraft(draft.token))?.paymentId, paymentId);
-    const first = await captureAssessment({ ...body, resumeToken: draft.token }, request(draft.planId));
+    const first = await captureAssessment({ ...body, contactEmail: undefined, resumeToken: draft.token }, request(draft.planId));
     assert.equal(first.planId, draft.planId);
+    assert.equal((await getStoredAssessmentPrefill(first.planId))?.contactEmail, "resume@funnel-fixture.test");
     assert.equal(first.paymentId, paymentId);
     assert.equal((await getAssessmentResumeDraft(draft.token))?.planId, first.planId, "finalized URLs remain usable");
     const [count] = await getSql()!`select count(*)::int as n from public.assessments`;

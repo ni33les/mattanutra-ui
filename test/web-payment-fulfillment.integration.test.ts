@@ -171,7 +171,7 @@ describe("durable web payment fulfillment on PostgreSQL", () => {
 
   it("accepts purchase from early HealthScore, reuses the running formula and preserves reveal gates", async () => {
     const sql = getSql()!;
-    const { planId } = await captureAssessment({ answers: { firstName: "Early Purchase Fixture", sex: "male", age: "36-45", goals: ["energy"] },
+    const { planId } = await captureAssessment({ contactEmail: "capture@fixture.test", answers: { firstName: "Early Purchase Fixture", sex: "male", age: "36-45", goals: ["energy"] },
       locale: "en" }, { idempotencyKey: newKey() });
     plans.push(planId);
     await sql`insert into public.assessment_healthscore_results(plan_id,revision,locale,generator_version,result)

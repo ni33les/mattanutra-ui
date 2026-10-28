@@ -118,6 +118,7 @@ for (const [locale, pharmacy] of [["en", false], ["th", true]] as const) {
     await expect(page.getByTestId("questionnaire-disclosure")).not.toBeChecked();
     await expect(page.getByTestId("questionnaire-submit")).toBeDisabled();
     await page.getByTestId("questionnaire-disclosure").check();
+    await page.locator("#questionnaire-contact-email").fill(`capture.${session}@fixture.test`);
     await page.getByTestId("questionnaire-submit").click();
     try {
       await expect.poll(() => requests.length).toBe(1);

@@ -61,8 +61,8 @@ export function ScreenQuestionnaire({ locale, sessionId, reviewRequested = false
   const inlineCapture = mode === "calculating" && skipHealthScoreStep;
   const inlineBusy = inlineCapture && capture.status !== "error";
   const captureCopy = getWelcomeCopy(locale);
-  const showEmailCapture = skipHealthScoreStep;
-  const emailInvalid = Boolean(assessmentContactEmailError(contactEmail));
+  const emailError = assessmentContactEmailError(contactEmail, { required: true });
+  const emailInvalid = Boolean(emailError);
 
   const commit = useCallback((next: QuestionnaireState) => {
     setState(next);
@@ -76,8 +76,10 @@ export function ScreenQuestionnaire({ locale, sessionId, reviewRequested = false
     try { local = parseChatDraft(localStorage.getItem(chatDraftStorageKey(base.state.sessionId))); } catch { /* The server draft is still available. */ }
     const draft = resolveChatDraft({ locale, sessionId: sessionRef.current, server: serverDraft, local });
     setContactEmail(draft.contactEmail ?? ""); setEmailTouched(false);
-    // Completed legacy captures keep their original receipt and recovery path.
-    if (!reviewRequested && ["complete", "completing", "failed"].includes(draft.state.phase)) {
+    const recovering = ["complete", "completing", "failed"].includes(draft.state.phase);
+    const needsRecoveryEmail = recovering && Boolean(assessmentContactEmailError(draft.contactEmail, { required: true }));
+    // Keep saved receipts, but collect missing contact before capture or result recovery.
+    if (!reviewRequested && recovering && !needsRecoveryEmail) {
       save(draft); setState(draft.state); setMode("calculating"); void runCapture(draft.state); return;
     }
     let next = migrateScreenState(draft.state);
@@ -88,10 +90,10 @@ export function ScreenQuestionnaire({ locale, sessionId, reviewRequested = false
       return Array.isArray(value) ? value.length > 0 : value !== undefined && value !== null && value !== "" && value !== false;
     });
     const hasStarted = hasAnswers || Boolean(draft.state.completedScreens?.length) || Boolean(draft.state.startedAt && !pharmacyId);
-    if (reviewRequested) next = { ...next, phase: "active", screenReview: true };
+    if (reviewRequested || needsRecoveryEmail) next = { ...next, phase: "active", screenReview: true };
     else if (!hasStarted && pharmacyId) next = { ...openScreen(next, "name"), startedAt: draft.state.startedAt ?? Date.now() };
     save(updateChatDraft(draft, next)); setState(next);
-    setMode(reviewRequested || !hasStarted && pharmacyId ? "quiz" : hasStarted ? "resume" : "welcome");
+    setMode(reviewRequested || needsRecoveryEmail || !hasStarted && pharmacyId ? "quiz" : hasStarted ? "resume" : "welcome");
     trackBpmEvent("chat_view", { eventType: "funnel", locale, properties: { channel: "web", questionnaireVersion: SCREEN_QUESTIONNAIRE_VERSION, uxVersion: "v15.5-screens", pharmacyId } });
     if (!hasStarted && pharmacyId) trackBpmEvent("chat_start", { eventType: "funnel", locale, properties: questionnaireAttemptContext(next) });
   }, [locale, pharmacyId, reviewRequested, serverDraft, save, runCapture]);
@@ -140,8 +142,8 @@ export function ScreenQuestionnaire({ locale, sessionId, reviewRequested = false
   function submit() {
     if (!state || captureInFlight.current || mode === "calculating") return;
     if (!screenQuestionnaireComplete(state)) { const missing = firstMissingScreen(state); if (missing) commit(openScreen(state, missing.id)); return; }
-    if (showEmailCapture && emailInvalid) { setEmailTouched(true); emailInputRef.current?.focus(); return; }
-    if (showEmailCapture && draftRef.current) {
+    if (emailInvalid) { setEmailTouched(true); emailInputRef.current?.focus(); return; }
+    if (draftRef.current) {
       const email = normalizeAssessmentContactEmail(contactEmail);
       save({ ...draftRef.current, contactEmail: email, updatedAt: Date.now() });
       setContactEmail(email ?? "");
@@ -231,7 +233,7 @@ export function ScreenQuestionnaire({ locale, sessionId, reviewRequested = false
     if (Array.isArray(value)) return value.map(answer => turn.opts?.find(option => option.v === answer)?.l ?? answer).join(", ");
     return turn.opts?.find(option => option.v === value)?.l ?? (value ? String(value) : x.notAnswered);
   }
-  const confirmationLayout = state.screenReview && showEmailCapture;
+  const confirmationLayout = Boolean(state.screenReview);
   const editableAnswers = state.screenReview ? <details className={confirmationLayout ? styles.confirmationAnswers : `${styles.card} ${styles.review}`} open={reviewRequested}>
     <summary>{x.reviewExpand}</summary>
     {definition.sections.map((group, index) => <section key={index} className={styles.reviewGroup}><h2 className={styles.label}>{group.title}</h2>
@@ -258,23 +260,18 @@ export function ScreenQuestionnaire({ locale, sessionId, reviewRequested = false
       </>}
       <fieldset disabled={inlineCapture} style={{ display: "contents" }}>
       {state.screenReview ? <div data-testid="questionnaire-review">
-        {confirmationLayout ? <div className={styles.confirmationCard}>
+        <div className={styles.confirmationCard}>
           <SectionCard title={definition.turns.find(turn => turn.k === "disclosure")!.q} titleId="questionnaire-confirmation-title" done={state.answers.disclosure === true}>
             {disclosure}{editableAnswers}
           </SectionCard>
-        </div> : <>
-          <section className={`${styles.card} ${styles.question}`}><h2 className={styles.questionTitle}>{definition.turns.find(turn => turn.k === "disclosure")!.q}</h2>
-            {disclosure}<p className={styles.hint}>{x.reviewHint}</p></section>
-          {editableAnswers}
-        </>}
-        {!confirmationLayout ? <p className={styles.hint}>{x.unknownNotice}</p> : null}
-        {showEmailCapture ? <div className={styles.emailCard} data-testid="questionnaire-email-card">
+        </div>
+        <div className={styles.emailCard} data-testid="questionnaire-email-card">
           <SectionCard title={x.emailTitle} titleId="questionnaire-email-title" description={<span id="questionnaire-email-hint">{x.emailHint}</span>} done={false}>
             <div>
               <label className={styles.label} htmlFor="questionnaire-contact-email">{x.emailLabel}</label>
               <div className={styles.emailInput}>
                 <Mail aria-hidden="true" />
-                <input ref={emailInputRef} id="questionnaire-contact-email" className={styles.input} type="email" inputMode="email" autoComplete="email" autoCapitalize="none" spellCheck={false}
+                <input ref={emailInputRef} id="questionnaire-contact-email" className={styles.input} type="email" required inputMode="email" autoComplete="email" autoCapitalize="none" spellCheck={false}
                   maxLength={254} placeholder={x.emailPlaceholder} value={contactEmail} aria-invalid={emailTouched && emailInvalid}
                   aria-describedby={`questionnaire-email-hint${emailTouched && emailInvalid ? " questionnaire-email-error" : ""}`}
                   onBlur={() => setEmailTouched(true)} onChange={event => {
@@ -282,10 +279,10 @@ export function ScreenQuestionnaire({ locale, sessionId, reviewRequested = false
                     if (draftRef.current) save({ ...draftRef.current, contactEmail: email, updatedAt: Date.now() });
                   }} />
               </div>
-              {emailTouched && emailInvalid ? <p id="questionnaire-email-error" className={styles.error} role="alert">{x.emailError}</p> : null}
+              {emailTouched && emailInvalid ? <p id="questionnaire-email-error" className={styles.error} role="alert">{emailError === "required" ? x.emailRequired : x.emailError}</p> : null}
             </div>
           </SectionCard>
-        </div> : null}
+        </div>
       </div> : <><div className={styles.card} data-testid="question-answers">{turns.map(renderQuestion)}</div>
         {current.id === "diet" && state.autoFilled.length ? <div className={`${styles.card} ${styles.review}`}><p className={styles.hint}>{x.inferred}</p>
           {state.autoFilled.map(key => { const turn = definition.turns.find(item => item.k === key)!; return <p key={key} className={styles.hint}>{turn.q} — {answerLabel(turn)}</p>; })}</div> : null}</>}

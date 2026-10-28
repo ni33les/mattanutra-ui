@@ -81,7 +81,7 @@ describe("saved web and pharmacy plan email delivery", () => {
     const href = html.match(/href="([^"]+)"/)?.[1]; assert.ok(href);
     return new URL(href.replaceAll("&amp;", "&"));
   };
-  it("captures an optional email, plan contact and consented Meta identity atomically without duplicate sends", async () => {
+  it("captures the required email, plan contact and consented Meta identity atomically without duplicate sends", async () => {
     const context = await setMetaConsent(request(), true, "/en"); contexts.push(context);
     const p = await capture(" OWNER@fixture.test ", "th", request(context)), sql = getSql()!;
     assert.equal(p.savedPlanDelivery?.status, "queued");
@@ -97,9 +97,7 @@ describe("saved web and pharmacy plan email delivery", () => {
     assert.doesNotMatch(JSON.stringify(events), /owner@fixture|Private fixture|36-45/);
     assert.equal((await sql`select count(*)::int as n from public.saved_plan_delivery_requests where plan_id=${p.planId}::uuid`)[0].n, 1);
     assert.equal((await sql`select count(*)::int as n from public.tasks where plan_id=${p.planId}::uuid and task_type='send_saved_plan_email'`)[0].n, 1);
-    const noEmail = await capture();
-    assert.equal(noEmail.savedPlanDelivery, null);
-    assert.equal((await sql`select count(*)::int as n from public.plan_communication_identities where plan_id=${noEmail.planId}::uuid`)[0].n, 0);
+    await assert.rejects(capture(), { code: "invalid_email" });
   });
   it("keeps email delivery independent of advertising refusal", async () => {
     const context = await setMetaConsent(request(), false, "/en"); contexts.push(context);
@@ -138,12 +136,11 @@ describe("saved web and pharmacy plan email delivery", () => {
       assert.deepEqual((await sql`select answers,locale,input_revision,input_hash,contact_email from public.assessments where plan_id=${p.planId}::uuid`)[0], saved);
     });
   }
-  it("adds pharmacy contact through PATCH without changing calculation locale, answers, source or generation", async () => {
-    const p = await capturePharmacy("business_card"), sql = getSql()!;
-    assert.equal(p.savedPlanDelivery, null);
-    assert.equal((await sql`select count(*)::int n from public.saved_plan_delivery_requests where plan_id=${p.planId}::uuid`)[0].n, 0);
+  it("corrects pharmacy contact through PATCH without changing calculation locale, answers, source or generation", async () => {
+    const p = await capturePharmacy("business_card", "original@fixture.test"), sql = getSql()!;
+    assert.equal(p.savedPlanDelivery?.status, "queued");
     const [saved] = await sql`select answers,locale,input_revision,input_hash,health_score from public.assessments where plan_id=${p.planId}::uuid`;
-    const beforeTasks = await sql`select id,task_type from public.tasks where plan_id=${p.planId}::uuid order by id`;
+    const beforeTasks = await sql`select id,task_type from public.tasks where plan_id=${p.planId}::uuid and task_type<>'send_saved_plan_email' order by id`;
     const response = await updateContactRoute(new Request(`https://dev.mattanutra.com/api/assessment/${p.planId}/contact`, {
       method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ contactEmail: "returning@fixture.test", locale: "zh-CN",
         pharmacyId: "another-pharmacy", source: "in_store" })
@@ -161,7 +158,7 @@ describe("saved web and pharmacy plan email delivery", () => {
     assert.deepEqual(await sql`select id,task_type from public.tasks where plan_id=${p.planId}::uuid and task_type<>'send_saved_plan_email' order by id`, beforeTasks);
   });
   it("contact PATCH uses display locale without changing calculation inputs, locale or generation tasks", async () => {
-    const p = await capture(), sql = getSql()!;
+    const p = { planId: await seed("") }, sql = getSql()!;
     const [before] = await sql`select answers,input_revision,input_hash,locale,health_score from public.assessments where plan_id=${p.planId}::uuid`;
     const beforeTasks = await sql`select id,task_type from public.tasks where plan_id=${p.planId}::uuid order by id`;
     const response = await updateContactRoute(new Request(`https://dev.mattanutra.com/api/assessment/${p.planId}/contact`, {

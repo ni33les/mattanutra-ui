@@ -7,6 +7,12 @@ import { getNamespace, t } from "@/lib/i18n-messages";
 
 export const copies: Record<Locale, Copy> = { en, th, "zh-CN": zhCn };
 
+export const assessmentRequiredEmailCopy = {
+  en: { title: "Save and receive your free plan", body: "Enter your email to receive your plan and return to it later.", required: "Enter your email to continue." },
+  th: { title: "บันทึกและรับแผนฟรีของคุณ", body: "กรอกอีเมลเพื่อรับแผนและกลับมาเปิดดูภายหลัง", required: "กรอกอีเมลเพื่อดำเนินการต่อ" },
+  "zh-CN": { title: "保存并接收您的免费计划", body: "输入您的邮箱，以接收计划并随时返回查看。", required: "请输入邮箱以继续。" }
+} satisfies Record<Locale, { title: string; body: string; required: string }>;
+
 export const gaugeLabelsByLocale = {
   en: ["Basic", "Essentials", "Precision"],
   th: ["พื้นฐาน", "ข้อมูลหลัก", "ความแม่นยำ"],

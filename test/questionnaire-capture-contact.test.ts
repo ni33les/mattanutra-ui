@@ -31,9 +31,9 @@ describe("saved questionnaire contact synchronization", () => {
     assert.equal(calls, 1);
   });
 
-  it("does not send blank, unchanged, or uncaptured contact requests", async () => {
+  it("does not send unchanged or uncaptured contact requests", async () => {
     const fetchImpl: typeof fetch = async () => { assert.fail("No contact request expected"); };
-    for (const draft of [savedDraft(), { ...savedDraft(), contactEmail: " " }, { ...savedDraft(), captured: null }]) {
+    for (const draft of [savedDraft(), { ...savedDraft(), captured: null }]) {
       assert.equal(await syncCapturedQuestionnaireContact(draft, "en", fetchImpl), draft);
     }
   });
@@ -54,9 +54,11 @@ describe("saved questionnaire contact synchronization", () => {
     assert.equal(calls, 2);
   });
 
-  it("rejects invalid nonempty contact before sending a request", async () => {
-    const draft = { ...savedDraft(), contactEmail: "not an email" };
-    await assert.rejects(syncCapturedQuestionnaireContact(draft, "en", async () => { assert.fail("Invalid contact must stay local"); }), /valid email/);
+  it("rejects missing and invalid contact before reusing a saved receipt", async () => {
+    for (const contactEmail of [null, "", " ", "not an email"]) {
+      const draft = { ...savedDraft(), contactEmail };
+      await assert.rejects(syncCapturedQuestionnaireContact(draft, "en", async () => { assert.fail("Invalid contact must stay local"); }), /valid email/);
+    }
   });
 
   it("migrates a legacy receipt by synchronizing contact once", async () => {

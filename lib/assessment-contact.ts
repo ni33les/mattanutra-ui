@@ -6,9 +6,9 @@ export function normalizeAssessmentContactEmail(value: unknown) {
   return validation.ok ? validation.email : null;
 }
 
-export function assessmentContactEmailError(value: unknown) {
+export function assessmentContactEmailError(value: unknown, { required = false }: { required?: boolean } = {}) {
   if (typeof value !== "string" || value.trim().length === 0) {
-    return null;
+    return required ? "required" : null;
   }
 
   return normalizeAssessmentContactEmail(value) ? null : "invalid";

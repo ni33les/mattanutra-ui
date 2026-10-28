@@ -96,8 +96,9 @@ async function captureAssessmentInternal(bodyValue: unknown, options: { planId?:
   if (body.intent === "process") throw new FunnelError("Payment is required before plan processing", 402, "payment_required");
   if (!isLocale(body.locale)) throw new FunnelError("Invalid assessment locale", 400, "invalid_locale");
   const locale = body.locale;
-  const contactEmail = body.contactEmail == null || body.contactEmail === "" ? null : normalizeAssessmentContactEmail(body.contactEmail);
-  if (body.contactEmail && !contactEmail) throw new FunnelError("Enter a valid email address", 400, "invalid_email");
+  const submittedContactEmail = normalizeAssessmentContactEmail(body.contactEmail);
+  const contactOmitted = body.contactEmail == null || typeof body.contactEmail === "string" && !body.contactEmail.trim();
+  if (!contactOmitted && !submittedContactEmail) throw new FunnelError("Enter a valid email address", 400, "invalid_email");
   const token = typeof body.resumeToken === "string" ? body.resumeToken : "";
   const resume = token ? await getAssessmentResumeDraft(token) : null;
   if (token && !resume) throw new FunnelError("This resume link is invalid or expired", 400, "invalid_resume");
@@ -111,6 +112,12 @@ async function captureAssessmentInternal(bodyValue: unknown, options: { planId?:
   const channel = questionnaireChannel(body.questionnaireState === undefined ? undefined : record(body.questionnaireState).channel);
   const rawAnswers = validateCaptureAnswers(answerInput, channel);
   const existing = requestedPlanId ? await getStoredAssessmentPrefill(requestedPlanId) : null;
+  const captureContact = (savedEmail: unknown) => submittedContactEmail ?? (channel === "web"
+    ? normalizeAssessmentContactEmail(savedEmail) ?? normalizeAssessmentContactEmail(resume?.contactEmail) : null);
+  let contactEmail = captureContact(existing?.contactEmail);
+  // Gate browser submissions before an old completed receipt can bypass admission.
+  // Saved plans remain readable; edits can reuse their existing valid contact.
+  if (channel === "web" && !contactEmail) throw new FunnelError("Enter a valid email address", 400, "invalid_email");
   const { invalidRequested, pharmacy } = await resolveCapturePharmacy(body.pharmacyId, existing?.answers ?? resume?.answers);
   if (invalidRequested) throw new FunnelError("Pharmacy not found", 404, "pharmacy_not_found");
   const rayHash = createHash("sha256").update(`pharmacy-acquisition:${options.idempotencyKey}`).digest("hex");
@@ -124,7 +131,7 @@ async function captureAssessmentInternal(bodyValue: unknown, options: { planId?:
   if (!sql) throw new Error("Database is not configured");
   const sessionId = typeof body.sessionId === "string" ? body.sessionId : null;
   if (sessionId && !isUuid(sessionId)) throw new FunnelError("Invalid questionnaire session", 400, "invalid_session");
-  const requestInput = { planId: requestedPlanId, sessionId, answers, locale, contactEmail, paymentId, expectedRevision: body.expectedRevision ?? null };
+  const requestInput = { planId: requestedPlanId, sessionId, answers, locale, contactEmail: submittedContactEmail, paymentId, expectedRevision: body.expectedRevision ?? null };
   const previous = await completedFunnelRequest(sql, "assessment-capture", options.idempotencyKey, requestInput);
   if (previous) { timing.resultReused = true; return previous as CaptureReceipt; }
   let replayed = false;
@@ -135,7 +142,7 @@ async function captureAssessmentInternal(bodyValue: unknown, options: { planId?:
     const planId = requestedPlanId ?? session?.resourceId ?? claimed.resourceId;
     timing.planId = planId;
     await tx`update public.funnel_requests set resource_id = ${planId}::uuid where scope = 'assessment-capture' and request_key = ${options.idempotencyKey}`;
-    const [current] = await tx`select selected_plan, journey_version, input_revision, answers from public.assessments where plan_id = ${planId}::uuid for no key update`;
+    const [current] = await tx`select selected_plan, journey_version, input_revision, answers, contact_email from public.assessments where plan_id = ${planId}::uuid for no key update`;
     if (requestedPlanId && !current && resume?.planId !== planId) throw new FunnelError("Assessment not found", 404, "assessment_not_found");
     if (current && body.expectedRevision !== undefined && Number(body.expectedRevision) !== Number(current.input_revision)) {
       throw new FunnelError("Assessment answers changed. Reload the saved assessment before editing.", 409, "assessment_changed");
@@ -148,6 +155,8 @@ async function captureAssessmentInternal(bodyValue: unknown, options: { planId?:
     if (current && (currentPharmacy?.id ?? null) !== (pharmacy?.id ?? null)) {
       throw new FunnelError("Assessment pharmacy cannot be changed", 409, "pharmacy_conflict");
     }
+    contactEmail = captureContact(current?.contact_email);
+    if (channel === "web" && !contactEmail) throw new FunnelError("Enter a valid email address", 400, "invalid_email");
     // Session idempotency may resolve an existing assessment after admission.
     // Reuse its attribution inside the already-owned capture transaction.
     if (pharmacy && current) {

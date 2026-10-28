@@ -22,7 +22,7 @@ after(()=>{
 const answers={firstName:'Count fixture',age:'36-45',sex:'male',goals:['energy']};
 const ids=['vitamin-d3','omega-3','magnesium','vitamin-b12','coq10','creatine','vitamin-c','zinc','l-carnitine','selenium'];
 async function prepared(locale:'en'|'th'|'zh-CN'='en') {
-  const receipt=await captureAssessment({answers,locale},{idempotencyKey:randomUUID()});const id=receipt.planId;
+  const receipt=await captureAssessment({ contactEmail: "capture@fixture.test",answers,locale},{idempotencyKey:randomUUID()});const id=receipt.planId;
   await sql`insert into assessment_healthscore_results(plan_id,revision,locale,generator_version,result) values(${id}::uuid,1,${locale},${FUNNEL_GENERATOR_VERSION},${sql.json(completeHealthScoreFixture(locale))})`;
   const tasks=await formulaTasks(id);assert.equal(tasks.length,1,'Capture must create one real formulation task');
   const generation=await loadGenerationInput(sql,id,locale);assert.ok(generation);
@@ -58,7 +58,7 @@ test('HS-COUNT-02 completed task with missing output remains recoverable',async(
 for(const locale of ['en','th','zh-CN'] as const)test(`HS-COUNT-03 ${locale} reuses its formula but changed answers require a new revision`,async()=>{
   const receipt=await prepared(locale),before=await formulaTasks(receipt.planId);
   await retryAssessmentHealthScore(receipt.planId,locale);assert.deepEqual(await formulaTasks(receipt.planId),before);
-  const changed=await captureAssessment({answers:{...answers,goals:['sleep']},locale,expectedRevision:1},{planId:receipt.planId,idempotencyKey:randomUUID()});
+  const changed=await captureAssessment({ contactEmail: "capture@fixture.test",answers:{...answers,goals:['sleep']},locale,expectedRevision:1},{planId:receipt.planId,idempotencyKey:randomUUID()});
   assert.equal(changed.revision,2);assert.equal(await getRevisionFormulationNutrientCount(receipt.planId,locale,2),null);
   assert.equal((await formulaTasks(receipt.planId)).filter(t=>t.payload.generation.revision===2&&t.status==='queued').length,1);
 });
@@ -102,7 +102,7 @@ test('HS-COUNT-06 legacy completed task without a generation envelope retains ex
 
 
 test('HS-COUNT-07 concurrent pending retries reuse the admitted current formula task',async()=>{
-  const receipt=await captureAssessment({answers,locale:'en'},{idempotencyKey:randomUUID()}),id=receipt.planId;
+  const receipt=await captureAssessment({ contactEmail: "capture@fixture.test",answers,locale:'en'},{idempotencyKey:randomUUID()}),id=receipt.planId;
   const before=await formulaTasks(id);assert.equal(before.length,1);assert.equal(before[0].status,'queued');
   assert.equal(await getRevisionFormulationNutrientCount(id,'en',1),null,'There is no completed output to mask active-task reuse');
   const generation=await loadGenerationInput(sql,id,'en');assert.ok(generation);
@@ -113,7 +113,7 @@ test('HS-COUNT-07 concurrent pending retries reuse the admitted current formula 
 });
 
 test('HS-COUNT-08 an active task with conflicting health input cannot satisfy a retry by body hash alone',async()=>{
-  const receipt=await captureAssessment({answers,locale:'en'},{idempotencyKey:randomUUID()}),id=receipt.planId;
+  const receipt=await captureAssessment({ contactEmail: "capture@fixture.test",answers,locale:'en'},{idempotencyKey:randomUUID()}),id=receipt.planId;
   const before=await formulaTasks(id);assert.equal(before.length,1);assert.equal(before[0].status,'queued');
   const generation=await loadGenerationInput(sql,id,'en');assert.ok(generation);
   const payload={...before[0].payload,inputHash:stableHash({answers:generation.answers,locale:'en'}),generation:{...before[0].payload.generation,inputHash:'different-health-input'}};
@@ -125,7 +125,7 @@ test('HS-COUNT-08 an active task with conflicting health input cannot satisfy a 
 
 
 for(const completed of [true,false])test(`HS-COUNT-09 ${completed?'completed':'pending'} current work on a legacy assessment resolves its nullable stored hash`,async()=>{
-  const receipt=completed?await prepared():await captureAssessment({answers,locale:'en'},{idempotencyKey:randomUUID()}),id=receipt.planId;
+  const receipt=completed?await prepared():await captureAssessment({ contactEmail: "capture@fixture.test",answers,locale:'en'},{idempotencyKey:randomUUID()}),id=receipt.planId;
   await sql`update assessments set input_hash=null where plan_id=${id}::uuid`;
   const generation=await loadGenerationInput(sql,id,'en');assert.ok(generation);
   const original=(await formulaTasks(id))[0];assert.equal(original.status,completed?'completed':'queued');

@@ -81,7 +81,7 @@ describe("free web product journey on PostgreSQL", { concurrency: false }, () =>
   });
   async function capture(answerOverrides: Record<string, unknown> = {}) {
     const options = { idempotencyKey: key() };
-    const body = { answers: { ...answers, ...answerOverrides }, locale: "en", intent: "capture", sessionId: randomUUID() };
+    const body = { contactEmail: "capture@fixture.test", answers: { ...answers, ...answerOverrides }, locale: "en", intent: "capture", sessionId: randomUUID() };
     const receipt = await captureAssessment(body, options); plans.push(receipt.planId);
     return { receipt, body, options };
   }
@@ -170,7 +170,7 @@ describe("free web product journey on PostgreSQL", { concurrency: false }, () =>
     const switched = await response(receipt.planId, false, "th");
     assert.equal(switched.status, 200, "Display language reuses the captured formula");
     assert.equal((await switched.json()).formulaVersion, 1);
-    const edited = await captureAssessment({ answers: { ...answers, activity: "active" }, locale: "en", expectedRevision: receipt.revision },
+    const edited = await captureAssessment({ contactEmail: "capture@fixture.test", answers: { ...answers, activity: "active" }, locale: "en", expectedRevision: receipt.revision },
       { planId: receipt.planId, idempotencyKey: key() });
     assert.equal(edited.revision, receipt.revision + 1);
     assert.equal((await response(receipt.planId)).status, 202, "old formula must not leak across an edited assessment");
@@ -333,21 +333,21 @@ describe("free web product journey on PostgreSQL", { concurrency: false }, () =>
     const planId = await legacyPlan();
     const sql = getSql()!;
     await sql`update public.assessments set selected_plan='precision' where plan_id=${planId}::uuid`;
-    const noPayment = await captureAssessment({ answers, locale: "en" }, { planId, idempotencyKey: key() });
+    const noPayment = await captureAssessment({ contactEmail: "capture@fixture.test", answers, locale: "en" }, { planId, idempotencyKey: key() });
     assert.equal(noPayment.hasFullPlanAccess, true);
     assert.equal(noPayment.hasConfirmedPlanPayment, false);
     const paymentId = randomUUID(); payments.push(paymentId);
     await sql`insert into public.payments (id,plan_id,selected_plan,status,amount,paid_at,stripe_mode,fulfillment_status)
       values (${paymentId}::uuid,${planId}::uuid,'precision','paid',690000000,now(),'test','complete')`;
-    const paid = await captureAssessment({ answers, locale: "en" }, { planId, idempotencyKey: key() });
+    const paid = await captureAssessment({ contactEmail: "capture@fixture.test", answers, locale: "en" }, { planId, idempotencyKey: key() });
     assert.equal(paid.hasConfirmedPlanPayment, true, "persisted paid evidence survives a recapture with no browser payment ID");
   });
 
   it("freezes original acquisition into a real subset checkout and its BPM events", async () => {
     const sql = getSql()!;
     const acquisition = { ray: randomUUID(), attribution: { utmSource: "meta", utmMedium: "paid_social", utmCampaign: "fixture_products", campaignId: "123456", adId: "234567", trafficSource: "meta" } };
-    const captured = await captureAssessment({ answers, locale: "en", bpm: acquisition }, { idempotencyKey: key() }); plans.push(captured.planId);
-    await captureAssessment({ answers, locale: "en", bpm: { ray: randomUUID(), attribution: { utmSource: "direct", utmCampaign: "later_visit" } } }, { planId: captured.planId, idempotencyKey: key() });
+    const captured = await captureAssessment({ contactEmail: "capture@fixture.test", answers, locale: "en", bpm: acquisition }, { idempotencyKey: key() }); plans.push(captured.planId);
+    await captureAssessment({ contactEmail: "capture@fixture.test", answers, locale: "en", bpm: { ray: randomUUID(), attribution: { utmSource: "direct", utmCampaign: "later_visit" } } }, { planId: captured.planId, idempotencyKey: key() });
     const [stored] = await sql`select acquisition_attribution from public.assessments where plan_id=${captured.planId}::uuid`;
     assert.deepEqual(stored.acquisition_attribution, acquisition);
     const items = await sql`select s.product_id::text,s.rrp_price_amount from public.retail_sellable_products s

@@ -32,6 +32,7 @@ export function useQuestionnaireCapture(input: {
     try {
       let draft = options.draft.current;
       if (!draft) throw new Error("Saved questionnaire is missing");
+      if (!normalizeAssessmentContactEmail(draft.contactEmail)) throw new Error("Enter a valid email address");
       let receipt = draft.captured;
       if (!receipt && analysisOnly) throw new Error("Capture must complete before analysis can retry");
       if (!receipt) {
@@ -51,7 +52,7 @@ export function useQuestionnaireCapture(input: {
         receipt = { planId: captured.planId, revision: captured.revision, inputHash: captured.inputHash, contactEmail: normalizeAssessmentContactEmail(draft.contactEmail) };
         draft = { ...draft, revision: receipt.revision, captured: receipt, state: { ...state, phase: "complete", planId: receipt.planId }, updatedAt: Date.now() };
         options.save(draft);
-      } else if (options.skipHealthScore && !analysisOnly) {
+      } else if (!analysisOnly) {
         const updated = await syncCapturedQuestionnaireContact(draft, options.locale,
           (url, init) => fetchWithBodyDeadline(url, { ...init, signal: controller.signal }, 30_000));
         controller.signal.throwIfAborted();

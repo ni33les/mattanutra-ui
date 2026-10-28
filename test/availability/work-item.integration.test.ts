@@ -12,7 +12,7 @@ assert.ok(process.env.TEST_DB_URL,'Isolated PostgreSQL required');
 const url=new URL(process.env.TEST_DB_URL);assert.equal(url.hostname,'127.0.0.1');assert.match(url.pathname,/^\/mattanutra_lock_review_ax_/);
 const sql=getSql()!;after(closeSqlPool);
 async function reserved(country = 'Vietnam'){
- const assessment=await captureAssessment({answers:{age:'36-45',sex:'male',goals:['energy'],country},locale:'en'},{idempotencyKey:randomUUID()});
+ const assessment=await captureAssessment({ contactEmail: "capture@fixture.test",answers:{age:'36-45',sex:'male',goals:['energy'],country},locale:'en'},{idempotencyKey:randomUUID()});
  const {agent}=await registerWorkerSession({agent:{name:`availability-${randomUUID()}`,capabilities:['generate_supplement_guidance']},instanceId:randomUUID(),taskTypes:['generate_supplement_guidance'],workerVersion:process.env.AGENTIC_BUILD_ID});
  const rows=await sql`update tasks set status='reserved',reserved_by_agent_id=${agent.id}::uuid,lease_until=now()+interval '180 seconds' where plan_id=${assessment.planId}::uuid and task_type='generate_supplement_guidance' returning id`;
  assert.equal(rows.length,1);return (await getTaskBundle({taskId:rows[0].id})).task;

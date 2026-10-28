@@ -45,6 +45,7 @@ test("PHARM-SOURCE chat capture sends the entry attribution without adding it to
   const ray=new URL(page.url()).searchParams.get("session");
   await page.getByTestId("dev-fill-questionnaire").click();
   await page.getByTestId("questionnaire-disclosure").check();
+  await page.locator("#questionnaire-contact-email").fill("source@fixture.test");
   await page.getByTestId("questionnaire-submit").click();
   await expect.poll(()=>captured?.bpm?.attribution?.sourceDetail).toBe("business_card");
   expect(captured!.bpm.ray).toBe(ray);

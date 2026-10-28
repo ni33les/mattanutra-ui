@@ -50,7 +50,7 @@ it("PHARM-SRC-PG-02 unpaid order retains source and funnel deduplicates retries 
 });
 it("PHARM-SRC-PG-03 same-key capture without browser metadata stays idempotent and historical source stays unknown", async () => {
   const fixture=await seedPharmacyFixture("en",false), key=randomUUID();
-  const body={answers,locale:"en",pharmacyId:fixture.slug};
+  const body={contactEmail:"capture@fixture.test",answers,locale:"en",pharmacyId:fixture.slug};
   const first=await captureAssessment(body,{idempotencyKey:key});
   assert.deepEqual(await captureAssessment(body,{idempotencyKey:key}),first);
   const [before]=await sql`select input_hash, input_revision, answers from public.assessments where plan_id=${first.planId}::uuid`;

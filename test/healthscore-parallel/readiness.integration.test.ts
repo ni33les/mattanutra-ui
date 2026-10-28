@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import test, { after } from 'node:test';
+import test, { after, before } from 'node:test';
 import { randomUUID } from 'node:crypto';
 import { getSql, closeSqlPool } from '../../lib/db.ts';
 import { captureAssessment, retryAssessmentHealthScore } from '../../lib/assessment-capture.ts';
@@ -10,11 +10,18 @@ import { completeHealthScoreFixture } from '../fixtures/healthscore.ts';
 assert.ok(process.env.TEST_DB_URL, 'Isolated PostgreSQL is required');
 const url = new URL(process.env.TEST_DB_URL); assert.equal(url.hostname, '127.0.0.1'); assert.match(url.pathname, /^\/mattanutra_lock_review_/);
 after(closeSqlPool);
+const previousJourneyFlag = process.env.WEB_PRODUCT_JOURNEY_ENABLED;
+// These readiness regressions exercise the historical HealthScore-first journey.
+before(() => { process.env.WEB_PRODUCT_JOURNEY_ENABLED = '0'; });
+after(() => {
+  if (previousJourneyFlag === undefined) delete process.env.WEB_PRODUCT_JOURNEY_ENABLED;
+  else process.env.WEB_PRODUCT_JOURNEY_ENABLED = previousJourneyFlag;
+});
 const sql = getSql()!;
 const answers = { firstName: 'Parallel Fixture', age: '36-45', sex: 'male', goals: ['energy'] };
 
 test('HS-PAR-PG-01 advice opens HealthScore before formula; paid reveal still waits for formula and products', async () => {
-  const receipt = await captureAssessment({ answers, locale: 'en', intent: 'capture' }, { idempotencyKey: randomUUID() });
+  const receipt = await captureAssessment({ contactEmail: "capture@fixture.test", answers, locale: 'en', intent: 'capture' }, { idempotencyKey: randomUUID() });
   const id = receipt.planId;
   const tasks = await sql`select id,task_type,payload->>'dependsOnTaskId' as depends_on_task_id,status from tasks where plan_id=${id}::uuid`;
   const copy = tasks.find(t => t.task_type === 'analyze_healthscore'), formula = tasks.find(t => t.task_type === 'generate_supplement_guidance'), product = tasks.find(t => t.task_type === 'generate_product_recommendations');
@@ -55,7 +62,7 @@ test('HS-PAR-PG-01 advice opens HealthScore before formula; paid reveal still wa
 });
 
 test('HS-PAR-PG-04 product and terminal formula failures cannot fail valid HealthScore advice', async () => {
-  const { planId } = await captureAssessment({ answers, locale: 'en' }, { idempotencyKey: randomUUID() });
+  const { planId } = await captureAssessment({ contactEmail: "capture@fixture.test", answers, locale: 'en' }, { idempotencyKey: randomUUID() });
   await sql`insert into assessment_healthscore_results(plan_id,revision,locale,generator_version,result) values(${planId}::uuid,1,'en',${FUNNEL_GENERATOR_VERSION},${sql.json(completeHealthScoreFixture('en'))})`;
   await sql`update tasks set status='failed' where plan_id=${planId}::uuid and task_type='generate_product_recommendations'`;
   const waiting = await getFunnelReadiness(planId, 'en');
@@ -74,7 +81,7 @@ test('HS-PAR-PG-04 product and terminal formula failures cannot fail valid Healt
 });
 
 test('HS-PAR-PG-02 analysis retry also repairs failed formulation for the saved assessment without recapture', async () => {
-  const receipt = await captureAssessment({ answers, locale: 'en', intent: 'capture' }, { idempotencyKey: randomUUID() });
+  const receipt = await captureAssessment({ contactEmail: "capture@fixture.test", answers, locale: 'en', intent: 'capture' }, { idempotencyKey: randomUUID() });
   const id = receipt.planId;
   await sql`insert into assessment_healthscore_results(plan_id,revision,locale,generator_version,result) values(${id}::uuid,1,'en',${FUNNEL_GENERATOR_VERSION},${sql.json(completeHealthScoreFixture('en'))})`;
   await sql`update tasks set status='failed' where plan_id=${id}::uuid and task_type='generate_supplement_guidance'`;
@@ -88,7 +95,7 @@ test('HS-PAR-PG-02 analysis retry also repairs failed formulation for the saved 
 });
 
 test('HS-PAR-PG-05 formula alone cannot release missing or failed advice; copy readiness is locale-specific', async () => {
-  const { planId } = await captureAssessment({ answers, locale: 'en' }, { idempotencyKey: randomUUID() });
+  const { planId } = await captureAssessment({ contactEmail: "capture@fixture.test", answers, locale: 'en' }, { idempotencyKey: randomUUID() });
   await sql`insert into formulations(plan_id,version,assessment_revision,generation_locale,generator_version,formulation)
     values(${planId}::uuid,1,1,'en',${FUNNEL_GENERATOR_VERSION},'{"supplementBreakdown":[{"id":"target"}]}')`;
   const pending = await getFunnelReadiness(planId, 'en');
@@ -108,7 +115,7 @@ test('HS-PAR-PG-05 formula alone cannot release missing or failed advice; copy r
 });
 
 test('HS-PAR-PG-06 shortlist excludes examples and hidden nutrients, and accepts a real zero-count result', async () => {
-  const { planId } = await captureAssessment({ answers, locale: 'en' }, { idempotencyKey: randomUUID() });
+  const { planId } = await captureAssessment({ contactEmail: "capture@fixture.test", answers, locale: 'en' }, { idempotencyKey: randomUUID() });
   await sql`insert into assessment_healthscore_results(plan_id,revision,locale,generator_version,result)
     values(${planId}::uuid,1,'en',${FUNNEL_GENERATOR_VERSION},${sql.json(completeHealthScoreFixture('en'))})`;
   await sql`insert into formulations(plan_id,version,assessment_revision,generation_locale,generator_version,model_version,formulation)
@@ -127,7 +134,7 @@ test('HS-PAR-PG-06 shortlist excludes examples and hidden nutrients, and accepts
 });
 
 test('HS-PAR-PG-07 stale revisions and generator versions cannot supply copy, counts or failures', async () => {
-  const { planId } = await captureAssessment({ answers, locale: 'en' }, { idempotencyKey: randomUUID() });
+  const { planId } = await captureAssessment({ contactEmail: "capture@fixture.test", answers, locale: 'en' }, { idempotencyKey: randomUUID() });
   await sql`insert into assessment_healthscore_results(plan_id,revision,locale,generator_version,result)
     values(${planId}::uuid,1,'en',${FUNNEL_GENERATOR_VERSION},${sql.json(completeHealthScoreFixture('en'))})`;
   await sql`insert into formulations(plan_id,version,assessment_revision,generation_locale,generator_version,formulation)
@@ -148,10 +155,11 @@ test('HS-PAR-PG-07 stale revisions and generator versions cannot supply copy, co
 });
 
 test('HS-PAR-PG-08 pharmacy skips advice but still waits for its current formula and product match', async () => {
-  const { planId } = await captureAssessment({ answers, locale: 'en' }, { idempotencyKey: randomUUID() });
+  const { planId } = await captureAssessment({ contactEmail: "capture@fixture.test", answers, locale: 'en' }, { idempotencyKey: randomUUID() });
   await sql`update assessments set funnel_skip_healthscore=true,selected_plan='precision' where plan_id=${planId}::uuid`;
   const pharmacy = await getFunnelReadiness(planId, 'en');
-  assert.equal(pharmacy?.copyReady, true);
+  assert.equal(pharmacy?.skipHealthScore, true);
+  assert.equal(pharmacy?.copyReady, false, 'Skipping HealthScore does not fabricate a completed copy result');
   assert.equal(pharmacy?.readyForReveal, false);
   await sql`insert into formulations(plan_id,version,assessment_revision,generation_locale,generator_version,formulation)
     values(${planId}::uuid,1,1,'en',${FUNNEL_GENERATOR_VERSION},'{"supplementBreakdown":[{"id":"target"}]}')`;
@@ -163,14 +171,14 @@ test('HS-PAR-PG-08 pharmacy skips advice but still waits for its current formula
 });
 
 test('HS-PAR-PG-09 an earlier page snapshot cannot combine its answers with newer revision advice', async () => {
-  const first = await captureAssessment({ answers, locale: 'en' }, { idempotencyKey: randomUUID() });
+  const first = await captureAssessment({ contactEmail: "capture@fixture.test", answers, locale: 'en' }, { idempotencyKey: randomUUID() });
   const original = completeHealthScoreFixture('en');
   await sql`insert into assessment_healthscore_results(plan_id,revision,locale,generator_version,result)
     values(${first.planId}::uuid,${first.revision},'en',${FUNNEL_GENERATOR_VERSION},${sql.json(original)})`;
   assert.deepEqual(await getRevisionHealthScore(first.planId, 'en', first.revision), original);
 
   // A recapture commits after the page read its answers but before its advice query.
-  const second = await captureAssessment({ answers: { ...answers, activity: 'active' }, locale: 'en', expectedRevision: first.revision },
+  const second = await captureAssessment({ contactEmail: "capture@fixture.test", answers: { ...answers, activity: 'active' }, locale: 'en', expectedRevision: first.revision },
     { planId: first.planId, idempotencyKey: randomUUID() });
   assert.equal(second.revision, first.revision + 1);
   const revised = { ...original, pageContent: { ...original.pageContent,
@@ -189,8 +197,8 @@ test('HS-PAR-PG-03 different submitted lifestyle answers produce distinct stored
   const filled = fastForwardQuestionnaire(createInitialState({ locale: 'en', channel: 'web' })); assert.ok(filled.ok);
   const original = toAssessmentAnswers(filled.state.answers);
   const changed = { ...original, sleepHrs: '7-8', energy: 'good', activity: 'active' };
-  const first = await captureAssessment({ answers: original, locale: 'en' }, { idempotencyKey: randomUUID() });
-  const second = await captureAssessment({ answers: changed, locale: 'en' }, { idempotencyKey: randomUUID() });
+  const first = await captureAssessment({ contactEmail: "capture@fixture.test", answers: original, locale: 'en' }, { idempotencyKey: randomUUID() });
+  const second = await captureAssessment({ contactEmail: "capture@fixture.test", answers: changed, locale: 'en' }, { idempotencyKey: randomUUID() });
   const rows = await sql`select plan_id,(health_score->>'score')::int as score from assessments where plan_id=any(${[first.planId, second.planId]}::uuid[])`;
   assert.equal(rows.find(r => r.plan_id === first.planId)?.score, 38);
   assert.equal(rows.find(r => r.plan_id === second.planId)?.score, 66);

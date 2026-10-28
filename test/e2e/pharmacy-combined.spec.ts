@@ -314,6 +314,7 @@ for (const source of ["in_store", "business_card"])
         },
         locale: "en",
         sessionId: session,
+        contactEmail: `source.${session}@fixture.test`,
         pharmacyId: slug,
         bpm: {
           ray: session,

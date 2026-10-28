@@ -20,7 +20,7 @@ after(closeSqlPool);
 test("PHARM-FOLLOWUP-MARKET visiting customer uses pharmacy catalogue through preparation, publication and checkout", async () => {
   const [pharmacy] = await sql`select id::text,slug from organisations where slug='matcher-v5-isolated-fixture-retailer'`;
   assert.ok(pharmacy, "A real controlled retailer is required");
-  const captured = await captureAssessment({ pharmacyId: pharmacy.slug, locale: "en", answers: { country: "Philippines", age: "36-45", sex: "male", goals: ["energy"] } }, {idempotencyKey: randomUUID()});
+  const captured = await captureAssessment({ contactEmail: "capture@fixture.test", pharmacyId: pharmacy.slug, locale: "en", answers: { country: "Philippines", age: "36-45", sex: "male", goals: ["energy"] } }, {idempotencyKey: randomUUID()});
   const saved = await seedPharmacyFixture("en", true, captured);
   const [row] = await sql`select id::text from tasks where plan_id=${saved.planId}::uuid and task_type='generate_product_recommendations'`;
   const original = (await getTaskBundle({taskId: row.id})).task;
