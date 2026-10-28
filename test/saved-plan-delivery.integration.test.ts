@@ -15,7 +15,7 @@ register("../scripts/matcher-http-loader.mjs", import.meta.url);
 const { PATCH: updateContactRoute } = await import("../app/api/assessment/[planId]/contact/route.ts");
 
 fixtureDatabaseUrl();
-describe("saved web plan email delivery", () => {
+describe("saved web and pharmacy plan email delivery", () => {
   const plans: string[] = [], contexts: string[] = [];
   before(async () => {
     Object.assign(process.env, { DB_URL: process.env.TEST_DB_URL, WEB_PRODUCT_JOURNEY_ENABLED: "1", MATTANUTRA_ENV: "dev",
@@ -67,6 +67,20 @@ describe("saved web plan email delivery", () => {
     const planId = await seed(email);
     return { planId, receipt: (await requestSavedPlanDelivery(planId, { email, locale: "en" }))! };
   }
+  async function capturePharmacy(source: "in_store" | "business_card", email?: string, locale = "en") {
+    const [pharmacy] = await getSql()!`select id::text,slug from public.organisations
+      where slug='matcher-v5-isolated-fixture-retailer' and status='active' and organisation_type='tenant'`;
+    assert.ok(pharmacy, "Controlled pharmacy fixture is required");
+    const input = { ...body(email, locale), pharmacyId: pharmacy.slug,
+      bpm: { ray: randomUUID(), attribution: { trafficSource: "pharmacy", sourceChannel: pharmacy.slug, sourceDetail: source } } };
+    const options = { idempotencyKey: randomUUID() };
+    const result = await captureAssessment(input, options); plans.push(result.planId);
+    return { ...result, input, options, pharmacy };
+  }
+  const messageLink = (html: string) => {
+    const href = html.match(/href="([^"]+)"/)?.[1]; assert.ok(href);
+    return new URL(href.replaceAll("&amp;", "&"));
+  };
   it("captures an optional email, plan contact and consented Meta identity atomically without duplicate sends", async () => {
     const context = await setMetaConsent(request(), true, "/en"); contexts.push(context);
     const p = await capture(" OWNER@fixture.test ", "th", request(context)), sql = getSql()!;
@@ -94,6 +108,57 @@ describe("saved web plan email delivery", () => {
     assert.equal((await getSql()!`select consent_granted from public.meta_tracking_contexts where id=${context}::uuid`)[0].consent_granted, false);
     assert.equal((await getSql()!`select count(*)::int as n from public.meta_conversion_events where context_id=${context}::uuid`)[0].n, 0);
     assert.equal((await getSql()!`select count(*)::int as n from public.meta_tracking_bindings where resource_type='plan' and resource_id=${p.planId}`)[0].n, 0);
+  });
+  for (const source of ["in_store", "business_card"] as const) {
+    it(`captures and emails the saved ${source} pharmacy plan without changing its generation or source`, async () => {
+      const p = await capturePharmacy(source, " PHARMACY@fixture.test ", "th"), sql = getSql()!;
+      assert.equal(p.journeyVersion, null); assert.equal(p.skipHealthScore, true);
+      assert.equal(p.savedPlanDelivery?.status, "queued");
+      const [saved] = await sql`select answers,locale,input_revision,input_hash,contact_email from public.assessments where plan_id=${p.planId}::uuid`;
+      assert.equal(saved.contact_email, "pharmacy@fixture.test");
+      assert.equal(saved.answers.inStorePharmacy.organisationId, p.pharmacy.id);
+      assert.deepEqual(saved.answers.inStorePharmacy.acquisition, { source, ray: p.input.bpm.ray });
+      const channels = await listCommunicationChannels({ planId: p.planId });
+      assert.equal(selectBestCommunicationChannel(channels, "email")?.address, "pharmacy@fixture.test");
+      assert.equal(channels.filter(channel => channel.channelType === "line").length, 0);
+      const beforeTasks = await sql`select id,task_type from public.tasks where plan_id=${p.planId}::uuid order by id`;
+      assert.equal((await captureAssessment(p.input, p.options)).savedPlanDelivery?.id, p.savedPlanDelivery!.id);
+      assert.equal((await requestSavedPlanDelivery(p.planId, { email: "pharmacy@fixture.test", locale: "en" }))?.locale, "th");
+      let sends = 0;
+      assert.equal((await deliverSavedPlan(p.savedPlanDelivery!.id, async input => {
+        sends++; assert.equal(input.to, "pharmacy@fixture.test");
+        const link = messageLink(input.html);
+        assert.equal(link.pathname, `/th/retail/${p.pharmacy.slug}/reveal`);
+        assert.equal(link.searchParams.get("plan"), p.planId); assert.equal(link.searchParams.get("source"), source);
+        return { sent: true, outcome: "accepted", messageId: `${source}-fixture` };
+      })).status, "sent");
+      await deliverSavedPlan(p.savedPlanDelivery!.id, async () => { assert.fail("Already delivered"); });
+      assert.equal(sends, 1);
+      assert.deepEqual(await sql`select id,task_type from public.tasks where plan_id=${p.planId}::uuid order by id`, beforeTasks);
+      assert.deepEqual((await sql`select answers,locale,input_revision,input_hash,contact_email from public.assessments where plan_id=${p.planId}::uuid`)[0], saved);
+    });
+  }
+  it("adds pharmacy contact through PATCH without changing calculation locale, answers, source or generation", async () => {
+    const p = await capturePharmacy("business_card"), sql = getSql()!;
+    assert.equal(p.savedPlanDelivery, null);
+    assert.equal((await sql`select count(*)::int n from public.saved_plan_delivery_requests where plan_id=${p.planId}::uuid`)[0].n, 0);
+    const [saved] = await sql`select answers,locale,input_revision,input_hash,health_score from public.assessments where plan_id=${p.planId}::uuid`;
+    const beforeTasks = await sql`select id,task_type from public.tasks where plan_id=${p.planId}::uuid order by id`;
+    const response = await updateContactRoute(new Request(`https://dev.mattanutra.com/api/assessment/${p.planId}/contact`, {
+      method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ contactEmail: "returning@fixture.test", locale: "zh-CN",
+        pharmacyId: "another-pharmacy", source: "in_store" })
+    }), { params: Promise.resolve({ planId: p.planId }) });
+    assert.equal(response.status, 200);
+    const updated = await response.json(); assert.equal(updated.savedPlanDelivery.locale, "zh-CN");
+    assert.equal((await updateAssessmentContact(p.planId, "returning@fixture.test", undefined, "th")).savedPlanDelivery?.id, updated.savedPlanDelivery.id);
+    await deliverSavedPlan(updated.savedPlanDelivery.id, async input => {
+      const link = messageLink(input.html);
+      assert.equal(link.pathname, `/zh-CN/retail/${p.pharmacy.slug}/reveal`);
+      assert.equal(link.searchParams.get("plan"), p.planId); assert.equal(link.searchParams.get("source"), "business_card");
+      return { sent: true, outcome: "accepted", messageId: "corrected-pharmacy-fixture" };
+    });
+    assert.deepEqual((await sql`select answers,locale,input_revision,input_hash,health_score from public.assessments where plan_id=${p.planId}::uuid`)[0], saved);
+    assert.deepEqual(await sql`select id,task_type from public.tasks where plan_id=${p.planId}::uuid and task_type<>'send_saved_plan_email' order by id`, beforeTasks);
   });
   it("contact PATCH uses display locale without changing calculation inputs, locale or generation tasks", async () => {
     const p = await capture(), sql = getSql()!;
@@ -197,8 +262,9 @@ describe("saved web plan email delivery", () => {
     assert.equal(channels.find(channel => channel.address === "earlier@fixture.test")?.status, "disabled");
     assert.equal(selectBestCommunicationChannel(channels, "email")?.address, "corrected@fixture.test");
   });
-  it("does not admit pharmacy, legacy or agentic plans and does not send an outdated recipient", async () => {
-    for (const [journey, answers] of [[null, {}], ["web-products-v1", { inStorePharmacy: { id: randomUUID() } }], ["web-products-v1", { channel: "mcp" }]] as const) {
+  it("does not admit invalid pharmacy bindings, legacy web or agentic plans and does not send an outdated recipient", async () => {
+    for (const [journey, answers] of [[null, {}], ["web-products-v1", { inStorePharmacy: { id: randomUUID() } }], ["web-products-v1", { channel: "mcp" }],
+      [null, { inStorePharmacy: { organisationId: randomUUID(), slug: "fixture-pharmacy" }, source: "mcp" }]] as const) {
       const planId = await seed("excluded@fixture.test", journey, answers);
       assert.equal(await requestSavedPlanDelivery(planId, { email: "excluded@fixture.test" }), null);
       assert.equal((await getSql()!`select count(*)::int as n from public.tasks where plan_id=${planId}::uuid`)[0].n, 0);
@@ -207,6 +273,18 @@ describe("saved web plan email delivery", () => {
     await assert.rejects(requestSavedPlanDelivery(p.planId, { email: "outsider@fixture.test" }), { code: "contact_changed" });
     await getSql()!`update public.assessments set contact_email='corrected@fixture.test' where plan_id=${p.planId}::uuid`;
     assert.equal((await deliverSavedPlan(p.receipt.id, async () => { throw new Error("Old recipient must not send"); })).status, "superseded");
+  });
+  it("does not admit non-browser pharmacy channels or send them after a queued plan changes channel", async () => {
+    const answers = { inStorePharmacy: { organisationId: randomUUID(), slug: "fixture-pharmacy" } };
+    for (const channel of ["line", "agent", "api"]) {
+      const planId = await seed("excluded@fixture.test", null, answers);
+      await getSql()!`update public.assessments set questionnaire_state=${getSql()!.json({ channel })} where plan_id=${planId}::uuid`;
+      assert.equal(await requestSavedPlanDelivery(planId, { email: "excluded@fixture.test" }), null);
+    }
+    const planId = await seed("queued@fixture.test", null, answers);
+    const queued = await requestSavedPlanDelivery(planId, { email: "queued@fixture.test" }); assert.ok(queued);
+    await getSql()!`update public.assessments set questionnaire_state='{"channel":"agent"}' where plan_id=${planId}::uuid`;
+    assert.equal((await deliverSavedPlan(queued.id, async () => { assert.fail("Agentic plan must not send"); })).status, "superseded");
   });
   it("rolls back contact, communications identity, receipt and task together", async () => {
     const planId = await seed("before@fixture.test"), sql = getSql()!;
@@ -228,5 +306,11 @@ describe("saved web plan email delivery", () => {
     assert.match(savedPlanDeliveryEmail("en", "fixture-plan").body, /still being prepared/);
     assert.match(savedPlanDeliveryEmail("th", "fixture-plan").subject, /ของคุณ/);
     assert.match(savedPlanDeliveryEmail("zh-CN", "fixture-plan").subject, /\p{Script=Han}/u);
+    for (const locale of ["en", "th", "zh-CN"] as const) {
+      const message = savedPlanDeliveryEmail(locale, "fixture-plan", { inStorePharmacy: { organisationId: randomUUID(), slug: "delight-pharmacy" } });
+      const link = messageLink(message.html);
+      assert.equal(link.pathname, `/${locale}/retail/delight/reveal`);
+      assert.equal(link.searchParams.get("source"), "unknown", "Historical pharmacy links must not invent an in-store source");
+    }
   });
 });

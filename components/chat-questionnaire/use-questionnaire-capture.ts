@@ -51,7 +51,7 @@ export function useQuestionnaireCapture(input: {
         receipt = { planId: captured.planId, revision: captured.revision, inputHash: captured.inputHash, contactEmail: normalizeAssessmentContactEmail(draft.contactEmail) };
         draft = { ...draft, revision: receipt.revision, captured: receipt, state: { ...state, phase: "complete", planId: receipt.planId }, updatedAt: Date.now() };
         options.save(draft);
-      } else if (options.skipHealthScore && !options.pharmacyId && !analysisOnly) {
+      } else if (options.skipHealthScore && !analysisOnly) {
         const updated = await syncCapturedQuestionnaireContact(draft, options.locale,
           (url, init) => fetchWithBodyDeadline(url, { ...init, signal: controller.signal }, 30_000));
         controller.signal.throwIfAborted();

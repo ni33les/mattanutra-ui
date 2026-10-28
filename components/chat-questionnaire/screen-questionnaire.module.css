@@ -66,7 +66,7 @@
 @media(max-width:380px) { .main{padding:18px 10px;} .question{padding:20px 14px;} .option{padding:12px 9px;gap:7px;font-size:.8rem;} .measurements{gap:10px;} }
 @media(prefers-reduced-motion:reduce) { .fill,.option{transition:none;} }
 
-/* The final web confirmation uses the shared cards and an in-flow action. */
+/* Final confirmation uses the shared cards and an in-flow action in every plan flow. */
 .confirmation { --ink:color-mix(in srgb,var(--mn-ink) 75%,var(--mn-teal)); background:var(--mn-paper); padding-bottom:0; }
 .confirmation .progress { padding:16px; background:rgba(255,255,255,.7); border-color:var(--mn-line); }
 .confirmation .progressText { font-size:.875rem; }

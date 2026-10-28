@@ -2,17 +2,3 @@
 .page:has([data-testid="chat-questionnaire"]) > :global(.mn-site-footer) {
   display: none;
 }
-
-/* Keep the shared brand/language header focused on the final confirmation. */
-.page:has([data-confirmation-layout="true"]) > :global(.mn-titlebar) {
-  background:var(--mn-paper);
-}
-.page:has([data-confirmation-layout="true"]) :global(.mn-titlebar-main) {
-  max-width:620px;
-  min-height:64px;
-  padding:12px 16px;
-}
-.page:has([data-confirmation-layout="true"]) :global(.mn-titlebar-nav),
-.page:has([data-confirmation-layout="true"]) :global(.mn-titlebar-mobile-menu) {
-  display:none;
-}

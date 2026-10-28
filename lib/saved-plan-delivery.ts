@@ -6,7 +6,10 @@ import { getSql, withDatabaseTransaction } from "@/lib/db";
 import { FunnelError } from "@/lib/funnel-errors";
 import { isLocale, type Locale } from "@/lib/i18n";
 import { getNamespace } from "@/lib/i18n-messages";
-import { buildAssessmentResultsUrl } from "@/lib/site-url";
+import { buildAssessmentResultsUrl, siteBaseUrl } from "@/lib/site-url";
+import { inStorePharmacyFromAnswers } from "@/lib/pharmacy-in-store";
+import { pharmacyAcquisitionFromAnswers } from "@/lib/pharmacy-acquisition";
+import { pharmacyPath } from "@/lib/pharmacy-journey";
 import { sendTransactionalEmail, type SendTransactionalEmailResult } from "@/lib/smtp-email";
 import { requiredCapabilitiesForWorkTaskType } from "@/lib/system-agents";
 import { createTask } from "@/lib/task-service";
@@ -18,9 +21,20 @@ type DeliveryRow = {
   id: string; plan_id: string; locale: Locale; email: string; status: DeliveryStatus;
   task_id: string | null; attempts: number; error_message: string | null;
 };
+type DeliveryAssessment = { answers: unknown; journey_version: unknown; questionnaire_state: unknown; contact_email: unknown; locale?: unknown };
 export type SavedPlanDeliveryReceipt = { id: string; planId: string; locale: Locale; status: DeliveryStatus };
 const receipt = (row: DeliveryRow): SavedPlanDeliveryReceipt => ({ id: row.id, planId: row.plan_id, locale: row.locale, status: row.status });
 const terminal = (status: DeliveryStatus) => ["sent", "unknown", "superseded"].includes(status);
+
+function deliveryEligible(assessment: DeliveryAssessment) {
+  const answers = assessment.answers && typeof assessment.answers === "object" ? assessment.answers as Record<string, unknown> : {};
+  if (answers.channel === "mcp" || answers.source === "mcp") return false;
+  if (inStorePharmacyFromAnswers(answers)) {
+    const state = assessment.questionnaire_state as { channel?: unknown } | null;
+    return !state?.channel || state.channel === "web";
+  }
+  return isWebProductJourney(assessment.journey_version) && isPublicWebAssessment(answers);
+}
 
 async function disableSupersededContactChannels(sql: NonNullable<ReturnType<typeof getSql>>, planId: string, email: string | null) {
   // Only manage addresses captured by this flow; unrelated channels keep their preferences.
@@ -40,10 +54,10 @@ export async function requestSavedPlanDelivery(planId: string, input: { email: u
   const sql = getSql();
   if (!sql) throw new Error("Database is not configured");
   return withDatabaseTransaction(sql, async tx => {
-    const [assessment] = await tx`select contact_email, locale, journey_version, answers from public.assessments
+    const [assessment] = await tx<DeliveryAssessment[]>`select contact_email, locale, journey_version, answers, questionnaire_state from public.assessments
       where plan_id=${planId}::uuid for no key update`;
     if (!assessment) throw new FunnelError("Assessment not found", 404, "assessment_not_found");
-    if (!isWebProductJourney(assessment.journey_version) || !isPublicWebAssessment(assessment.answers)) return null;
+    if (!deliveryEligible(assessment)) return null;
     if (normalizeAssessmentContactEmail(assessment.contact_email) !== email) {
       throw new FunnelError("Save the current email address before requesting delivery", 409, "contact_changed");
     }
@@ -77,9 +91,12 @@ export async function requestSavedPlanDelivery(planId: string, input: { email: u
 }
 
 const escape = (value: string) => value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
-export function savedPlanDeliveryEmail(locale: Locale, planId: string) {
+export function savedPlanDeliveryEmail(locale: Locale, planId: string, answers?: unknown) {
   const copy = getNamespace<{ subject: string; body: string; cta: string; privacy: string }>(locale, "outbound.savedPlanEmail");
-  const url = buildAssessmentResultsUrl(locale, planId);
+  const pharmacy = inStorePharmacyFromAnswers(answers);
+  const url = pharmacy ? siteBaseUrl() + pharmacyPath(locale, pharmacy.slug, "reveal", {
+    plan: planId, source: pharmacyAcquisitionFromAnswers(answers)?.source ?? "unknown"
+  }) : buildAssessmentResultsUrl(locale, planId);
   return {
     subject: copy.subject,
     body: `${copy.body}\n\n${copy.cta}: ${url}\n\n${copy.privacy}`,
@@ -95,32 +112,33 @@ export async function deliverSavedPlan(requestId: string, send: typeof sendTrans
   const [initial] = await sql<DeliveryRow[]>`select * from public.saved_plan_delivery_requests where id=${requestId}::uuid`;
   if (!initial) throw new Error("Saved plan delivery request was not found");
   if (terminal(initial.status)) return receipt(initial);
-  // A rendering/configuration failure is safely retryable: no SMTP attempt has begun.
-  const message = savedPlanDeliveryEmail(initial.locale, initial.plan_id);
   const prepared = await withDatabaseTransaction(sql, async tx => {
     // Keep the same assessment -> receipt lock order as contact correction.
-    const [assessment] = await tx`select contact_email,journey_version,answers from public.assessments
+    const [assessment] = await tx<DeliveryAssessment[]>`select contact_email,journey_version,answers,questionnaire_state from public.assessments
       where plan_id=${initial.plan_id}::uuid for no key update`;
     const [row] = await tx<DeliveryRow[]>`select * from public.saved_plan_delivery_requests where id=${requestId}::uuid for update`;
     if (!row) throw new Error("Saved plan delivery request was not found");
-    if (terminal(row.status)) return { row, send: false };
+    if (terminal(row.status)) return { row, message: null };
     if (row.status === "sending") {
       await tx`update public.saved_plan_delivery_requests set status='unknown',
         error_message='Previous SMTP acceptance could not be confirmed; manual reconciliation required',updated_at=now() where id=${row.id}::uuid`;
-      return { row: { ...row, status: "unknown" as const }, send: false };
+      return { row: { ...row, status: "unknown" as const }, message: null };
     }
-    if (!assessment || !isWebProductJourney(assessment.journey_version) || !isPublicWebAssessment(assessment.answers)
+    if (!assessment || !deliveryEligible(assessment)
       || normalizeAssessmentContactEmail(assessment.contact_email) !== row.email) {
       await tx`update public.saved_plan_delivery_requests set status='superseded',updated_at=now() where id=${row.id}::uuid`;
-      return { row: { ...row, status: "superseded" as const }, send: false };
+      return { row: { ...row, status: "superseded" as const }, message: null };
     }
-    if (row.attempts >= 3) return { row, send: false };
+    if (row.attempts >= 3) return { row, message: null };
+    // Resolve the destination from the saved binding, before SMTP admission; rendering failures remain retryable.
+    const message = savedPlanDeliveryEmail(row.locale, row.plan_id, assessment.answers);
     await tx`update public.saved_plan_delivery_requests set status='sending',attempts=attempts+1,error_message=null,updated_at=now()
       where id=${row.id}::uuid`;
-    return { row, send: true };
+    return { row, message };
   });
-  if (!prepared.send) return receipt(prepared.row);
+  if (!prepared.message) return receipt(prepared.row);
   const row = prepared.row;
+  const message = prepared.message;
   let result: SendTransactionalEmailResult;
   try { result = await send({ ...message, to: row.email, messageId: `<saved-plan-${row.id}@mattanutra.com>` }); }
   catch (error) { result = { sent: false, outcome: "unknown", reason: error instanceof Error ? error.message : "SMTP acceptance is unknown" }; }

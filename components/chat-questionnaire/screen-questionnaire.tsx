@@ -61,7 +61,7 @@ export function ScreenQuestionnaire({ locale, sessionId, reviewRequested = false
   const inlineCapture = mode === "calculating" && skipHealthScoreStep;
   const inlineBusy = inlineCapture && capture.status !== "error";
   const captureCopy = getWelcomeCopy(locale);
-  const showEmailCapture = skipHealthScore && !pharmacyId;
+  const showEmailCapture = skipHealthScoreStep;
   const emailInvalid = Boolean(assessmentContactEmailError(contactEmail));
 
   const commit = useCallback((next: QuestionnaireState) => {

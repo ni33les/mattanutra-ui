@@ -174,7 +174,7 @@ async function captureAssessmentInternal(bodyValue: unknown, options: { planId?:
     await bindMetaContext(tx, "plan", planId, options.request, { email: contactEmail });
     if (contactEmail) await recordMetaPlanMilestone(tx, planId, "EmailCapture", locale);
     if (isWebProductJourney(journeyVersion)) await recordMetaPlanMilestone(tx, planId, "Lead", locale);
-    const savedPlanDelivery = contactEmail && isWebProductJourney(journeyVersion)
+    const savedPlanDelivery = contactEmail && (isWebProductJourney(journeyVersion) || pharmacy)
       ? await requestSavedPlanDelivery(planId, { email: contactEmail, locale }) : null;
     const taskIds = await enqueueAssessmentPregenerationTasks({ answers, locale, planId });
     if (selectedPlan) await enqueueNutritionPlanTasks({ answers, locale, planId, plan: selectedPlan });
