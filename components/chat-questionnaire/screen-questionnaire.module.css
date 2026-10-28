@@ -103,6 +103,7 @@
 .confirmationSubmit svg { flex-shrink:0; width:24px; height:24px; }
 .confirmationSubmit:focus-visible,.confirmationAnswers summary:focus-visible { outline:2px solid var(--mn-teal-deep); outline-offset:4px; }
 :global(html:lang(th)) .confirmationHeading .title { font-family:var(--mn-font-thai-serif),var(--mn-font-thai),serif; font-size:clamp(1.75rem,7.5vw,2.25rem); line-height:1.35; }
+:global(html:lang(zh-CN)) .confirmationHeading .title { max-width:none; text-wrap:balance; }
 @media(min-width:640px) {
   .confirmationHeading img { width:104px; height:136px; }
   .confirmationCard :global(.mn-section-card__header),.emailCard :global(.mn-section-card__header) { padding:24px 24px 0; }
