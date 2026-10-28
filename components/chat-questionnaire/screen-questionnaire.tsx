@@ -267,7 +267,7 @@ export function ScreenQuestionnaire({ locale, sessionId, reviewRequested = false
             {disclosure}<p className={styles.hint}>{x.reviewHint}</p></section>
           {editableAnswers}
         </>}
-        <p className={confirmationLayout ? styles.confirmationNotice : styles.hint}>{x.unknownNotice}</p>
+        {!confirmationLayout ? <p className={styles.hint}>{x.unknownNotice}</p> : null}
         {showEmailCapture ? <div className={styles.emailCard} data-testid="questionnaire-email-card">
           <SectionCard title={x.emailTitle} titleId="questionnaire-email-title" description={<span id="questionnaire-email-hint">{x.emailHint}</span>} done={false}>
             <div>
@@ -276,7 +276,7 @@ export function ScreenQuestionnaire({ locale, sessionId, reviewRequested = false
                 <Mail aria-hidden="true" />
                 <input ref={emailInputRef} id="questionnaire-contact-email" className={styles.input} type="email" inputMode="email" autoComplete="email" autoCapitalize="none" spellCheck={false}
                   maxLength={254} placeholder={x.emailPlaceholder} value={contactEmail} aria-invalid={emailTouched && emailInvalid}
-                  aria-describedby={`questionnaire-email-hint questionnaire-email-optional${emailTouched && emailInvalid ? " questionnaire-email-error" : ""}`}
+                  aria-describedby={`questionnaire-email-hint${emailTouched && emailInvalid ? " questionnaire-email-error" : ""}`}
                   onBlur={() => setEmailTouched(true)} onChange={event => {
                     const email = event.target.value; setContactEmail(email);
                     if (draftRef.current) save({ ...draftRef.current, contactEmail: email, updatedAt: Date.now() });
@@ -294,7 +294,6 @@ export function ScreenQuestionnaire({ locale, sessionId, reviewRequested = false
       {inlineCapture && capture.status === "error" ? <p className={styles.error} role="alert" data-testid="questionnaire-capture-error">{captureCopy.calcCaptureFailed}</p> : null}
     </div>
     <div className={`${styles.footer} ${confirmationLayout ? styles.confirmationActions : ""}`}>
-      {confirmationLayout ? <p id="questionnaire-email-optional" className={styles.confirmationNotice}>{x.emailOptionalNote}</p> : null}
       <div className={styles.footerInner}>
       {!confirmationLayout && (currentIndex > 0 || state.screenReview || state.screenEdit) ? <button type="button" data-testid="questionnaire-back" className={styles.secondary} disabled={inlineCapture} onClick={() => { telemetry.close(); commit(previousScreen(state)); }}>{x.back}</button> : null}
       {inlineCapture ? <button type="button" data-testid="questionnaire-submit" className={confirmationLayout ? `mn-primary-button ${styles.confirmationSubmit}` : styles.primary} disabled={inlineBusy} aria-busy={inlineBusy} onClick={retryInlineCapture}>{inlineBusy ? combinedCopy[locale].saving : captureCopy.calcRetryCapture}</button>

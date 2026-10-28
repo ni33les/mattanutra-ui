@@ -87,7 +87,6 @@
 .confirmationCheck input { width:22px; height:22px; margin:0; accent-color:var(--mn-teal-deep); }
 .confirmationAnswers { border-top:1px solid var(--mn-line); margin-top:16px; padding-top:14px; }
 .confirmationAnswers summary { cursor:pointer; font-size:1rem; font-weight:600; line-height:1.5; }
-.confirmationNotice { margin:12px 8px 0; color:var(--mn-ash); font-size:.8125rem; line-height:1.5; text-align:center; }
 .emailCard .label { font-size:.9375rem; margin-bottom:8px; }
 .emailInput { position:relative; }
 .emailInput svg { position:absolute; left:13px; top:50%; transform:translateY(-50%); width:24px; height:24px; color:var(--mn-ink); pointer-events:none; }
@@ -95,8 +94,7 @@
 .emailInput .input::placeholder { color:var(--mn-ash); opacity:.8; }
 .emailInput .input:focus-visible { outline:2px solid var(--mn-teal-deep); outline-offset:2px; }
 .emailInput .input[aria-invalid=true] { border-color:var(--mn-error); }
-.confirmationActions { position:static; max-width:620px; margin:auto; padding:0 16px calc(28px + env(safe-area-inset-bottom)); background:none; border:0; backdrop-filter:none; }
-.confirmationActions .confirmationNotice { margin:14px 0 12px; }
+.confirmationActions { position:static; max-width:620px; margin:auto; padding:20px 16px calc(28px + env(safe-area-inset-bottom)); background:none; border:0; backdrop-filter:none; }
 .confirmationSubmit { width:100%; min-height:58px; gap:12px; border:1px solid var(--mn-ink); border-radius:var(--mn-radius-md); background:linear-gradient(180deg,var(--mn-ink-soft),var(--mn-ink)); box-shadow:inset 0 1px 0 rgb(255 255 255 / .2),0 4px 12px rgb(10 37 64 / .12); color:white; padding:15px 18px; font-size:1.125rem; font-weight:600; line-height:1.4; text-transform:none; letter-spacing:0; }
 .confirmationSubmit:hover { background:var(--mn-ink); }
 .confirmationSubmit:disabled { opacity:.75; }
