@@ -53,9 +53,7 @@
 .primary:disabled { background:#d9e3d5; border-color:#d9e3d5; color:#82927f; cursor:not-allowed; }
 .secondary { background:white; border:1px solid #dbe4d8; color:#45614c; }
 .review { padding:20px; margin-top:16px; }
-.emailCard { padding:23px 20px; margin-top:20px; }
-.emailCard .questionTitle { float:none; margin-bottom:8px; }
-.emailCard .hint { margin:0 0 18px; }
+.emailCard { margin-top:16px; }
 .review summary { cursor:pointer; font-weight:600; font-size:.9rem; }
 .reviewGroup { margin-top:18px; }
 .reviewRow { display:flex; align-items:center; gap:15px; justify-content:space-between; border-top:1px solid #e9ede6; padding:14px 0; font-size:.8rem; line-height:1.6; }
@@ -67,3 +65,47 @@
 :global(html:lang(th)) .title,:global(html:lang(th)) .name .questionTitle { font-family:var(--mn-font-thai),sans-serif; font-size:1.4rem; line-height:1.6; }
 @media(max-width:380px) { .main{padding:18px 10px;} .question{padding:20px 14px;} .option{padding:12px 9px;gap:7px;font-size:.8rem;} .measurements{gap:10px;} }
 @media(prefers-reduced-motion:reduce) { .fill,.option{transition:none;} }
+
+/* The final web confirmation uses the shared cards and an in-flow action. */
+.confirmation { --ink:color-mix(in srgb,var(--mn-ink) 75%,var(--mn-teal)); background:var(--mn-paper); padding-bottom:0; }
+.confirmation .progress { padding:16px; background:rgba(255,255,255,.7); border-color:var(--mn-line); }
+.confirmation .progressText { font-size:.875rem; }
+.confirmation .bar { height:6px; margin-top:12px; }
+.confirmation .fill { background:var(--mn-teal-deep); }
+.confirmation .main { padding:22px 16px 0; }
+.confirmationHeading { display:flex; align-items:center; justify-content:space-between; gap:12px; margin:0 0 22px; }
+.confirmationHeading .title { max-width:12ch; margin:0; font-size:clamp(1.875rem,8.8vw,2.5rem); font-weight:600; line-height:1.1; letter-spacing:-.025em; }
+.confirmationHeading img { flex:0 0 auto; width:88px; height:112px; object-fit:contain; }
+.confirmationCard :global(.mn-section-card),.emailCard :global(.mn-section-card) { border-radius:var(--mn-radius-lg); background:white; box-shadow:0 4px 24px rgb(10 37 64 / .05),0 0 0 1px rgb(10 37 64 / .035); }
+.confirmationCard :global(.mn-section-card__header),.emailCard :global(.mn-section-card__header) { padding:18px 16px 0; background:none; }
+.confirmationCard :global(.mn-section-card__body),.emailCard :global(.mn-section-card__body) { padding:14px 16px 18px; border:0; }
+.confirmationCard :global(.mn-section-card__title),.emailCard :global(.mn-section-card__title) { margin:0; color:var(--ink); }
+.confirmationCard :global(.mn-section-card__title) { font-size:1.125rem; line-height:1.45; }
+.emailCard :global(.mn-section-card__title) { font-size:1.5rem; line-height:1.2; }
+.emailCard :global(.mn-section-card__copy) { margin-top:8px; color:var(--ink); font-size:1rem; line-height:1.5; }
+.confirmationCheck { margin:0; align-items:center; gap:12px; font-size:1rem; line-height:1.5; min-height:32px; }
+.confirmationCheck input { width:22px; height:22px; margin:0; accent-color:var(--mn-teal-deep); }
+.confirmationAnswers { border-top:1px solid var(--mn-line); margin-top:16px; padding-top:14px; }
+.confirmationAnswers summary { cursor:pointer; font-size:1rem; font-weight:600; line-height:1.5; }
+.confirmationNotice { margin:12px 8px 0; color:var(--mn-ash); font-size:.8125rem; line-height:1.5; text-align:center; }
+.emailCard .label { font-size:.9375rem; margin-bottom:8px; }
+.emailInput { position:relative; }
+.emailInput svg { position:absolute; left:13px; top:50%; transform:translateY(-50%); width:24px; height:24px; color:var(--mn-ink); pointer-events:none; }
+.emailInput .input { min-height:48px; padding-left:48px; border-color:color-mix(in srgb,var(--mn-ash) 45%,white); color:var(--ink); }
+.emailInput .input::placeholder { color:var(--mn-ash); opacity:.8; }
+.emailInput .input:focus-visible { outline:2px solid var(--mn-teal-deep); outline-offset:2px; }
+.emailInput .input[aria-invalid=true] { border-color:var(--mn-error); }
+.confirmationActions { position:static; max-width:620px; margin:auto; padding:0 16px calc(28px + env(safe-area-inset-bottom)); background:none; border:0; backdrop-filter:none; }
+.confirmationActions .confirmationNotice { margin:14px 0 12px; }
+.confirmationSubmit { width:100%; min-height:58px; gap:12px; border:1px solid var(--mn-ink); border-radius:var(--mn-radius-md); background:linear-gradient(180deg,var(--mn-ink-soft),var(--mn-ink)); box-shadow:inset 0 1px 0 rgb(255 255 255 / .2),0 4px 12px rgb(10 37 64 / .12); color:white; padding:15px 18px; font-size:1.125rem; font-weight:600; line-height:1.4; text-transform:none; letter-spacing:0; }
+.confirmationSubmit:hover { background:var(--mn-ink); }
+.confirmationSubmit:disabled { opacity:.75; }
+.confirmationSubmit svg { flex-shrink:0; width:24px; height:24px; }
+.confirmationSubmit:focus-visible,.confirmationAnswers summary:focus-visible { outline:2px solid var(--mn-teal-deep); outline-offset:4px; }
+:global(html:lang(th)) .confirmationHeading .title { font-family:var(--mn-font-thai-serif),var(--mn-font-thai),serif; font-size:clamp(1.75rem,7.5vw,2.25rem); line-height:1.35; }
+@media(min-width:640px) {
+  .confirmationHeading img { width:104px; height:136px; }
+  .confirmationCard :global(.mn-section-card__header),.emailCard :global(.mn-section-card__header) { padding:24px 24px 0; }
+  .confirmationCard :global(.mn-section-card__body),.emailCard :global(.mn-section-card__body) { padding:16px 24px 24px; }
+  .confirmationCard :global(.mn-section-card__title) { font-size:1.25rem; }
+}

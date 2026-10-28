@@ -7,7 +7,8 @@
     "disclosureLabel": "我确认",
     "unknownNotice": "未知的回答将保持未知，不会被视为“否”。",
     "emailTitle": "保存并接收您的免费计划",
-    "emailHint": "输入邮箱即可收到链接，随时返回已保存的计划。您也可以不填写邮箱，直接继续。",
+    "emailHint": "输入您的邮箱，以便随时返回查看计划。",
+    "emailOptionalNote": "邮箱为选填项。您可以留空后继续。",
     "emailLabel": "电子邮箱",
     "emailPlaceholder": "you@example.com",
     "emailError": "请输入有效的电子邮箱，或留空后继续。"

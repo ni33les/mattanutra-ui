@@ -1,6 +1,8 @@
 "use client";
 
 import Image from "next/image";
+import { ArrowRight, Mail } from "lucide-react";
+import { SectionCard } from "@/components/nutrition-flow/ui";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getWelcomeCopy, QuestionnaireWelcome } from "./questionnaire-welcome";
@@ -229,41 +231,61 @@ export function ScreenQuestionnaire({ locale, sessionId, reviewRequested = false
     if (Array.isArray(value)) return value.map(answer => turn.opts?.find(option => option.v === answer)?.l ?? answer).join(", ");
     return turn.opts?.find(option => option.v === value)?.l ?? (value ? String(value) : x.notAnswered);
   }
-  return <div className={styles.shell} data-testid="chat-questionnaire" data-screen={state.screenReview ? "review" : current.id} onPointerDown={telemetry.activity} onKeyDown={telemetry.activity}>
+  const confirmationLayout = state.screenReview && showEmailCapture;
+  const editableAnswers = state.screenReview ? <details className={confirmationLayout ? styles.confirmationAnswers : `${styles.card} ${styles.review}`} open={reviewRequested}>
+    <summary>{x.reviewExpand}</summary>
+    {definition.sections.map((group, index) => <section key={index} className={styles.reviewGroup}><h2 className={styles.label}>{group.title}</h2>
+      {questionnaireScreens.filter(screen => screen.sec === index).flatMap(screen => screenTurns(state, screen, true).map(turn => <div className={styles.reviewRow} key={turn.k}>
+        <div><strong>{turn.q}</strong><p>{answerLabel(turn)}</p>{state.autoFilled.includes(turn.k) ? <p>{x.inferred}</p> : null}</div>
+        <button type="button" className={styles.link} data-edit-screen={screen.id} aria-label={`${x.edit}: ${turn.q}`} onClick={() => { telemetry.close(); commit(openScreen(state, screen.id, true)); }}>{x.edit}</button>
+      </div>))}</section>)}
+  </details> : null;
+  const disclosure = <label className={`${styles.check} ${confirmationLayout ? styles.confirmationCheck : ""}`}><input type="checkbox" data-testid="questionnaire-disclosure" checked={state.answers.disclosure === true} onChange={event => change("disclosure", event.target.checked)} /><span>{x.disclosureLabel}</span></label>;
+  return <div className={`${styles.shell} ${confirmationLayout ? styles.confirmation : ""}`} data-confirmation-layout={confirmationLayout || undefined} data-testid="chat-questionnaire" data-screen={state.screenReview ? "review" : current.id} onPointerDown={telemetry.activity} onKeyDown={telemetry.activity}>
     <div className={styles.progress} data-testid="quiz-progress-header"><div className={styles.progressInner}>
       <div className={styles.progressText}><span>{section.eyebrow} · {progress}%</span><span aria-live="polite">{saveFailed ? x.saveUnavailable : x.savedTag}</span></div>
       <div className={styles.bar} role="progressbar" aria-label={x.progressLabel} aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress}><div className={styles.fill} style={{ width: `${progress}%` }} /></div>
     </div></div>
     <div className={`${styles.main} ${current.id === "name" && !state.screenReview ? styles.name : ""}`}>
-      <header className={styles.heading}><p className={styles.eyebrow}>{section.eyebrow}</p><h1 ref={headingRef} tabIndex={-1} className={styles.title}>{state.screenReview ? x.reviewTitle : current.id === "name" ? x.introTitle : section.title}</h1>
-        {current.id !== "name" && !state.screenReview ? <p className={styles.description}>{section.desc}</p> : null}</header>
-      {state.screenReview || current.nong ? <div className={styles.nong}><Image width={84} height={120} alt="" src={`/assets/questionnaire/v15-5/nong-${state.screenReview ? "wai" : current.nong === "safety" ? "reassuring" : current.nong === "final" ? "sincere" : "open"}.webp`} />
-        <p>{state.screenReview ? x.summaryText : current.id === "name" ? copy.ui.introHi : current.nong === "final" ? x.finalDetails.replace("{n}", "") : section.desc}</p></div> : null}
+      {confirmationLayout ? <header className={styles.confirmationHeading}>
+        <h1 ref={headingRef} tabIndex={-1} className={styles.title}>{x.reviewTitle}</h1>
+        <Image width={104} height={136} alt="" priority src="/assets/questionnaire/v15-5/nong-wai.webp" />
+      </header> : <>
+        <header className={styles.heading}><p className={styles.eyebrow}>{section.eyebrow}</p><h1 ref={headingRef} tabIndex={-1} className={styles.title}>{state.screenReview ? x.reviewTitle : current.id === "name" ? x.introTitle : section.title}</h1>
+          {current.id !== "name" && !state.screenReview ? <p className={styles.description}>{section.desc}</p> : null}</header>
+        {state.screenReview || current.nong ? <div className={styles.nong}><Image width={84} height={120} alt="" src={`/assets/questionnaire/v15-5/nong-${state.screenReview ? "wai" : current.nong === "safety" ? "reassuring" : current.nong === "final" ? "sincere" : "open"}.webp`} />
+          <p>{state.screenReview ? x.summaryText : current.id === "name" ? copy.ui.introHi : current.nong === "final" ? x.finalDetails.replace("{n}", "") : section.desc}</p></div> : null}
+      </>}
       <fieldset disabled={inlineCapture} style={{ display: "contents" }}>
       {state.screenReview ? <div data-testid="questionnaire-review">
-        <section className={`${styles.card} ${styles.question}`}><h2 className={styles.questionTitle}>{definition.turns.find(turn => turn.k === "disclosure")!.q}</h2>
-          <label className={styles.check}><input type="checkbox" data-testid="questionnaire-disclosure" checked={state.answers.disclosure === true} onChange={event => change("disclosure", event.target.checked)} /><span>{x.disclosureLabel}</span></label>
-          <p className={styles.hint}>{x.reviewHint}</p></section>
-        <details className={`${styles.card} ${styles.review}`} open={reviewRequested}><summary>{x.reviewExpand}</summary>
-          {definition.sections.map((group, index) => <section key={index} className={styles.reviewGroup}><h2 className={styles.label}>{group.title}</h2>
-            {questionnaireScreens.filter(screen => screen.sec === index).flatMap(screen => screenTurns(state, screen, true).map(turn => <div className={styles.reviewRow} key={turn.k}>
-              <div><strong>{turn.q}</strong><p>{answerLabel(turn)}</p>{state.autoFilled.includes(turn.k) ? <p>{x.inferred}</p> : null}</div>
-              <button type="button" className={styles.link} data-edit-screen={screen.id} aria-label={`${x.edit}: ${turn.q}`} onClick={() => { telemetry.close(); commit(openScreen(state, screen.id, true)); }}>{x.edit}</button>
-            </div>))}</section>)}
-        </details><p className={styles.hint}>{x.unknownNotice}</p>
-        {showEmailCapture ? <section className={`${styles.card} ${styles.emailCard}`} aria-labelledby="questionnaire-email-title" data-testid="questionnaire-email-card">
-          <h2 id="questionnaire-email-title" className={styles.questionTitle}>{x.emailTitle}</h2>
-          <p id="questionnaire-email-hint" className={styles.hint}>{x.emailHint}</p>
-          <label className={styles.label} htmlFor="questionnaire-contact-email">{x.emailLabel}</label>
-          <input ref={emailInputRef} id="questionnaire-contact-email" className={styles.input} type="email" inputMode="email" autoComplete="email" autoCapitalize="none" spellCheck={false}
-            maxLength={254} placeholder={x.emailPlaceholder} value={contactEmail} aria-invalid={emailTouched && emailInvalid}
-            aria-describedby={`questionnaire-email-hint${emailTouched && emailInvalid ? " questionnaire-email-error" : ""}`}
-            onBlur={() => setEmailTouched(true)} onChange={event => {
-              const email = event.target.value; setContactEmail(email);
-              if (draftRef.current) save({ ...draftRef.current, contactEmail: email, updatedAt: Date.now() });
-            }} />
-          {emailTouched && emailInvalid ? <p id="questionnaire-email-error" className={styles.error} role="alert">{x.emailError}</p> : null}
-        </section> : null}
+        {confirmationLayout ? <div className={styles.confirmationCard}>
+          <SectionCard title={definition.turns.find(turn => turn.k === "disclosure")!.q} titleId="questionnaire-confirmation-title" done={state.answers.disclosure === true}>
+            {disclosure}{editableAnswers}
+          </SectionCard>
+        </div> : <>
+          <section className={`${styles.card} ${styles.question}`}><h2 className={styles.questionTitle}>{definition.turns.find(turn => turn.k === "disclosure")!.q}</h2>
+            {disclosure}<p className={styles.hint}>{x.reviewHint}</p></section>
+          {editableAnswers}
+        </>}
+        <p className={confirmationLayout ? styles.confirmationNotice : styles.hint}>{x.unknownNotice}</p>
+        {showEmailCapture ? <div className={styles.emailCard} data-testid="questionnaire-email-card">
+          <SectionCard title={x.emailTitle} titleId="questionnaire-email-title" description={<span id="questionnaire-email-hint">{x.emailHint}</span>} done={false}>
+            <div>
+              <label className={styles.label} htmlFor="questionnaire-contact-email">{x.emailLabel}</label>
+              <div className={styles.emailInput}>
+                <Mail aria-hidden="true" />
+                <input ref={emailInputRef} id="questionnaire-contact-email" className={styles.input} type="email" inputMode="email" autoComplete="email" autoCapitalize="none" spellCheck={false}
+                  maxLength={254} placeholder={x.emailPlaceholder} value={contactEmail} aria-invalid={emailTouched && emailInvalid}
+                  aria-describedby={`questionnaire-email-hint questionnaire-email-optional${emailTouched && emailInvalid ? " questionnaire-email-error" : ""}`}
+                  onBlur={() => setEmailTouched(true)} onChange={event => {
+                    const email = event.target.value; setContactEmail(email);
+                    if (draftRef.current) save({ ...draftRef.current, contactEmail: email, updatedAt: Date.now() });
+                  }} />
+              </div>
+              {emailTouched && emailInvalid ? <p id="questionnaire-email-error" className={styles.error} role="alert">{x.emailError}</p> : null}
+            </div>
+          </SectionCard>
+        </div> : null}
       </div> : <><div className={styles.card} data-testid="question-answers">{turns.map(renderQuestion)}</div>
         {current.id === "diet" && state.autoFilled.length ? <div className={`${styles.card} ${styles.review}`}><p className={styles.hint}>{x.inferred}</p>
           {state.autoFilled.map(key => { const turn = definition.turns.find(item => item.k === key)!; return <p key={key} className={styles.hint}>{turn.q} — {answerLabel(turn)}</p>; })}</div> : null}</>}
@@ -271,10 +293,12 @@ export function ScreenQuestionnaire({ locale, sessionId, reviewRequested = false
       </fieldset>
       {inlineCapture && capture.status === "error" ? <p className={styles.error} role="alert" data-testid="questionnaire-capture-error">{captureCopy.calcCaptureFailed}</p> : null}
     </div>
-    <div className={styles.footer}><div className={styles.footerInner}>
-      {currentIndex > 0 || state.screenReview || state.screenEdit ? <button type="button" data-testid="questionnaire-back" className={styles.secondary} disabled={inlineCapture} onClick={() => { telemetry.close(); commit(previousScreen(state)); }}>{x.back}</button> : null}
-      {inlineCapture ? <button type="button" data-testid="questionnaire-submit" className={styles.primary} disabled={inlineBusy} aria-busy={inlineBusy} onClick={retryInlineCapture}>{inlineBusy ? combinedCopy[locale].saving : captureCopy.calcRetryCapture}</button>
-        : state.screenReview ? <button type="button" data-testid="questionnaire-submit" className={styles.primary} disabled={!screenQuestionnaireComplete(state)} onClick={submit}>{x.submit}</button>
+    <div className={`${styles.footer} ${confirmationLayout ? styles.confirmationActions : ""}`}>
+      {confirmationLayout ? <p id="questionnaire-email-optional" className={styles.confirmationNotice}>{x.emailOptionalNote}</p> : null}
+      <div className={styles.footerInner}>
+      {!confirmationLayout && (currentIndex > 0 || state.screenReview || state.screenEdit) ? <button type="button" data-testid="questionnaire-back" className={styles.secondary} disabled={inlineCapture} onClick={() => { telemetry.close(); commit(previousScreen(state)); }}>{x.back}</button> : null}
+      {inlineCapture ? <button type="button" data-testid="questionnaire-submit" className={confirmationLayout ? `mn-primary-button ${styles.confirmationSubmit}` : styles.primary} disabled={inlineBusy} aria-busy={inlineBusy} onClick={retryInlineCapture}>{inlineBusy ? combinedCopy[locale].saving : captureCopy.calcRetryCapture}</button>
+        : state.screenReview ? <button type="button" data-testid="questionnaire-submit" className={confirmationLayout ? `mn-primary-button ${styles.confirmationSubmit}` : styles.primary} disabled={!screenQuestionnaireComplete(state)} onClick={submit}>{x.submit}{confirmationLayout ? <ArrowRight aria-hidden="true" /> : null}</button>
         : <button type="button" data-testid="questionnaire-next" className={styles.primary} disabled={!screenComplete(state, current)} onClick={nextScreen}>{currentIndex === visibleScreens(state).length - 1 ? x.reviewBtn : x.next}</button>}
     </div></div>
   </div>;
